@@ -30,6 +30,20 @@ from ezzy_api import serializers as ezzy_api_serializers
 from core.context_processors import get_cached_business
 
 
+def _fit(model, field_name, value):
+    """Truncate ``value`` to the model field's max_length.
+
+    Inbound webhook payloads are untrusted-width: a verbose line-item list or a
+    long address overflows the column and Postgres raises
+    StringDataRightTruncation, which surfaces as a 500 and silently drops the
+    order. Every CharField written from a payload goes through this. The width
+    is read from the model so it cannot drift out of sync with a migration.
+    """
+    s = '' if value is None else str(value)
+    max_len = model._meta.get_field(field_name).max_length
+    return s[:max_len] if max_len else s
+
+
 def get_api_user_business(request):
     """
     Helper to get business for API request user.
@@ -82,15 +96,23 @@ class OrderList(generics.ListCreateAPIView):
             return orders_models.Order.objects.filter(business=business)
         return orders_models.Order.objects.none()
 
+    def get_serializer_context(self):
+        """Hand the caller's business to the serializer so its FK validators can
+        reject another tenant's pickup location / warehouse."""
+        context = super().get_serializer_context()
+        context['business'] = get_api_user_business(self.request)
+        return context
+
     def perform_create(self, serializer):
         """Force the order onto the caller's own business — never trust a
         `business` value from the request body (prevents creating orders under
-        another tenant)."""
+        another tenant). Incoming orders always start in review; a client cannot
+        create one that is already published or delivered."""
         from rest_framework.exceptions import PermissionDenied
         business = get_api_user_business(self.request)
         if not business:
             raise PermissionDenied('No business is associated with this account')
-        serializer.save(business=business)
+        serializer.save(business=business, order_status='to_review')
 
 
 
@@ -504,45 +526,138 @@ def driver_update_task_status(request, task_id):
         )
 
 
+#: Most pings accepted in one flush of the driver's offline queue.
+_MAX_LOCATION_BATCH = 100
+#: A replayed fix older than this is dropped — the driver has long since moved.
+_MAX_FIX_AGE_HOURS = 24
+#: Tolerance for a device clock running ahead of the server.
+_MAX_FIX_SKEW_MINUTES = 5
+
+
+def _as_float(value):
+    """Coerce an optional numeric ping field, discarding junk instead of 500ing."""
+    if value is None or value == '':
+        return None
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if (f != f or f in (float('inf'), float('-inf'))) else f
+
+
+def _parse_fix_time(value):
+    """
+    Read the device's fix timestamp, or None if it can't be trusted.
+
+    A wrong device clock is common enough that an unbounded value would poison
+    the tracking trail — anything from the future or older than a day is
+    discarded, and the row then falls back to the server receipt time.
+    """
+    if not value:
+        return None
+    from django.utils.dateparse import parse_datetime
+    try:
+        parsed = parse_datetime(value) if isinstance(value, str) else None
+    except (ValueError, TypeError):
+        return None
+    if not parsed:
+        return None
+    if timezone.is_naive(parsed):
+        from datetime import timezone as dt_timezone
+        parsed = timezone.make_aware(parsed, dt_timezone.utc)
+    now = timezone.now()
+    if parsed > now + timedelta(minutes=_MAX_FIX_SKEW_MINUTES):
+        return None
+    if parsed < now - timedelta(hours=_MAX_FIX_AGE_HOURS):
+        return None
+    return parsed
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_update_location(request):
-    """Save a GPS ping from the driver PWA."""
+    """
+    Save GPS ping(s) from the driver PWA.
+
+    Accepts either a single ping in the body, or ``{"pings": [...]}`` when the
+    PWA flushes its offline queue. Each ping may carry ``fixed_at`` — the moment
+    the device took the fix — which is what tracking reads instead of the server
+    receipt time.
+    """
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-
-        latitude = request.data.get('latitude')
-        longitude = request.data.get('longitude')
-
-        if latitude is None or longitude is None:
-            return Response(
-                {'error': 'Latitude and longitude are required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        loc = fleet_models.DriverLocation.objects.create(
-            driver=driver,
-            latitude=latitude,
-            longitude=longitude,
-            accuracy=request.data.get('accuracy'),
-            speed=request.data.get('speed'),
-            heading=request.data.get('heading'),
-            task_id=request.data.get('task_id'),
-        )
-
-        return Response({
-            'message': 'Location updated successfully',
-            'id': loc.pk,
-            'latitude': str(loc.latitude),
-            'longitude': str(loc.longitude),
-            'timestamp': loc.created_at.isoformat(),
-        }, status=status.HTTP_200_OK)
-
     except fleet_models.Driver.DoesNotExist:
         return Response(
             {'error': 'Driver profile not found'},
             status=status.HTTP_404_NOT_FOUND
         )
+
+    batch = request.data.get('pings')
+    is_batch = isinstance(batch, list)
+    pings = batch if is_batch else [request.data]
+
+    if not pings:
+        return Response({'error': 'No pings supplied'}, status=status.HTTP_400_BAD_REQUEST)
+    if len(pings) > _MAX_LOCATION_BATCH:
+        return Response(
+            {'error': f'At most {_MAX_LOCATION_BATCH} pings per request'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    rows, rejected = [], 0
+    for ping in pings:
+        if not isinstance(ping, dict):
+            rejected += 1
+            continue
+        latitude = ping.get('latitude')
+        longitude = ping.get('longitude')
+        if latitude is None or longitude is None:
+            rejected += 1
+            continue
+        try:
+            lat_f, lng_f = float(latitude), float(longitude)
+        except (TypeError, ValueError):
+            rejected += 1
+            continue
+        if not (-90 <= lat_f <= 90) or not (-180 <= lng_f <= 180):
+            rejected += 1
+            continue
+
+        rows.append(fleet_models.DriverLocation(
+            driver=driver,
+            latitude=lat_f,
+            longitude=lng_f,
+            accuracy=_as_float(ping.get('accuracy')),
+            speed=_as_float(ping.get('speed')),
+            heading=_as_float(ping.get('heading')),
+            task_id=ping.get('task_id') or None,
+            fixed_at=_parse_fix_time(ping.get('fixed_at')),
+            queued=bool(ping.get('queued')),
+        ))
+
+    if not rows:
+        return Response(
+            {'error': 'Latitude and longitude are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    created = fleet_models.DriverLocation.objects.bulk_create(rows)
+
+    if is_batch:
+        return Response({
+            'message': 'Locations updated successfully',
+            'saved': len(created),
+            'rejected': rejected,
+        }, status=status.HTTP_200_OK)
+
+    loc = created[0]
+    return Response({
+        'message': 'Location updated successfully',
+        'id': loc.pk,
+        'latitude': str(loc.latitude),
+        'longitude': str(loc.longitude),
+        'timestamp': (loc.fixed_at or loc.created_at).isoformat() if (loc.fixed_at or loc.created_at) else None,
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -1092,7 +1207,18 @@ def driver_complete_task(request, task_id):
                 except Exception:
                     pass
 
-        # Upload documents
+        # Upload documents. objects.create() skips full_clean(), so the model's
+        # own validators never fire here — check each file explicitly first.
+        from core.validators import DOCUMENT_EXTENSIONS, validate_upload_file
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            for _key in ('delivery_proof', 'signature', 'photo'):
+                if _key in request.FILES:
+                    validate_upload_file(request.FILES[_key], DOCUMENT_EXTENSIONS,
+                                         max_mb=10, field_label=_key.replace('_', ' ').title())
+        except DjangoValidationError as exc:
+            return Response({'error': exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+
         documents_created = []
         if 'delivery_proof' in request.FILES:
             doc = ezzy_api_models.TaskDocument.objects.create(
@@ -1204,7 +1330,15 @@ def driver_upload_task_document(request, task_id):
                 {'error': 'Document file is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        from core.validators import DOCUMENT_EXTENSIONS, validate_upload_file
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            validate_upload_file(document_file, DOCUMENT_EXTENSIONS, max_mb=10,
+                                 field_label='Document')
+        except DjangoValidationError as exc:
+            return Response({'error': exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+
         document = ezzy_api_models.TaskDocument.objects.create(
             task=task,
             document_type=document_type,
@@ -2481,39 +2615,20 @@ def _validate_webhook_url(url):
     Rejects loopback, private, link-local, reserved and multicast targets.
     Returns (ok: bool, reason: str).
     """
-    import ipaddress
-    import socket
-    from urllib.parse import urlparse
+    from core.net_guard import validate_public_url
 
-    try:
-        parsed = urlparse(url)
-    except Exception:
-        return False, 'Invalid URL'
-
-    if parsed.scheme not in ('http', 'https'):
-        return False, 'Only http/https webhook URLs are allowed'
-
-    host = parsed.hostname
-    if not host:
-        return False, 'Webhook URL must include a host'
-
-    try:
-        # Resolve every address the host maps to and reject internal ranges.
-        infos = socket.getaddrinfo(host, None)
-    except Exception:
-        return False, 'Webhook host could not be resolved'
-
-    for info in infos:
-        ip_str = info[4][0]
-        try:
-            ip = ipaddress.ip_address(ip_str)
-        except ValueError:
-            return False, 'Webhook host resolved to an invalid address'
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
-            return False, 'Webhook URL resolves to a non-public address'
-
-    return True, ''
+    ok, reason = validate_public_url(url)
+    if ok:
+        return True, ''
+    # Keep the webhook-specific wording the API has always returned.
+    webhook_wording = {
+        'Only http/https URLs are allowed': 'Only http/https webhook URLs are allowed',
+        'URL must include a host': 'Webhook URL must include a host',
+        'Host could not be resolved': 'Webhook host could not be resolved',
+        'Host resolved to an invalid address': 'Webhook host resolved to an invalid address',
+        'URL resolves to a non-public address': 'Webhook URL resolves to a non-public address',
+    }
+    return False, webhook_wording.get(reason, reason)
 
 
 @api_view(['POST'])
@@ -4044,15 +4159,17 @@ def webhook_inbound_order(request, webhook_key):
         if wc_id:
             billing = payload.get('billing', {})
             shipping = payload.get('shipping', {})
+            # Same untrusted-width problem as the create path below.
+            _O = orders_models.Order
             updates = {}
             name = f"{billing.get('first_name', '')} {billing.get('last_name', '')}".strip()
             if name:
-                updates['customer_name'] = name
+                updates['customer_name'] = _fit(_O, 'customer_name', name)
             if billing.get('phone'):
-                updates['customer_phone'] = billing['phone']
+                updates['customer_phone'] = _fit(_O, 'customer_phone', billing['phone'])
             addr = f"{shipping.get('address_1', '')} {shipping.get('city', '')}".strip()
             if addr:
-                updates['customer_address'] = addr
+                updates['customer_address'] = _fit(_O, 'customer_address', addr)
             if updates:
                 orders_models.Order.objects.filter(
                     business=business,
@@ -4122,6 +4239,7 @@ def webhook_inbound_order(request, webhook_key):
     }
 
     created_count = 0
+    failed = []
     for order_data in orders_list:
         if not isinstance(order_data, dict):
             continue
@@ -4186,33 +4304,54 @@ def webhook_inbound_order(request, webhook_key):
                     mapped[f'product_{idx}'] = str(li_name)
                     mapped[f'count_{idx}'] = str(li_qty)
             if not mapped.get('package_desc'):
+                # Same [:10] cap as the product_N loop above — an unbounded join
+                # over every line item is what overflowed package_desc and 500'd.
                 desc = ', '.join(
                     f"{li.get('name') or li.get('title', '')} x{li.get('quantity') or li.get('qty', 1)}"
-                    for li in line_items if isinstance(li, dict)
+                    for li in line_items[:10] if isinstance(li, dict)
                 )
                 mapped['package_desc'] = desc
 
         # Create TempOrder — coerce to '' since these columns are NOT NULL and
-        # a mapped value may be an explicit None that .get(key, '') won't catch.
-        orders_models.TempOrder.objects.create(
-            business=business,
-            source_type='webhook',
-            platform_id=mapped.get('client_order_code') or '',
-            client_order_code=mapped.get('client_order_code') or '',
-            customer_name=mapped.get('customer_name') or '',
-            customer_phone=mapped.get('customer_phone') or '',
-            customer_address=mapped.get('customer_address') or '',
-            cod_amount=mapped.get('cod_amount') or '',
-            package_desc=mapped.get('package_desc') or '',
-            raw_row=order_data,
-            status='new',
-        )
-        created_count += 1
+        # a mapped value may be an explicit None that .get(key, '') won't catch,
+        # then clamp to each column's width (see _fit).
+        # One malformed order must not abort the batch: the orders already
+        # created would not be logged, and the sender would re-POST the whole
+        # payload, duplicating them on every retry.
+        _TO = orders_models.TempOrder
+        try:
+            _TO.objects.create(
+                business=business,
+                source_type='webhook',
+                platform_id=_fit(_TO, 'platform_id', mapped.get('client_order_code') or ''),
+                client_order_code=_fit(_TO, 'client_order_code', mapped.get('client_order_code') or ''),
+                customer_name=_fit(_TO, 'customer_name', mapped.get('customer_name') or ''),
+                customer_phone=_fit(_TO, 'customer_phone', mapped.get('customer_phone') or ''),
+                customer_address=_fit(_TO, 'customer_address', mapped.get('customer_address') or ''),
+                cod_amount=_fit(_TO, 'cod_amount', mapped.get('cod_amount') or ''),
+                package_desc=_fit(_TO, 'package_desc', mapped.get('package_desc') or ''),
+                raw_row=order_data,
+                status='new',
+            )
+            created_count += 1
+        except Exception as exc:
+            failed.append(f"{mapped.get('client_order_code') or '(no code)'}: {exc}")
+            logger.exception(
+                'Webhook order failed for business %s (key %s): %s',
+                business.business_id, wk.key[:12], exc,
+            )
 
-    # Update log and key stats
+    # Update log and key stats. Partial failures are recorded rather than
+    # raised — a 5xx makes the sender retry the whole batch and duplicate the
+    # orders that did land, so the failures go in the log for ops instead.
     log.orders_created = created_count
-    log.status = 'processed'
-    log.save(update_fields=['orders_created', 'status'])
+    if failed:
+        log.status = 'error'
+        log.error_message = '\n'.join(failed)
+        log.save(update_fields=['orders_created', 'status', 'error_message'])
+    else:
+        log.status = 'processed'
+        log.save(update_fields=['orders_created', 'status'])
 
     wk.last_used = timezone.now()
     wk.total_received = (wk.total_received or 0) + created_count
@@ -4222,6 +4361,7 @@ def webhook_inbound_order(request, webhook_key):
         'success': True,
         'message': f'{created_count} order(s) received',
         'orders_created': created_count,
+        'failed': len(failed),
     }, status=201)
 
 
@@ -5124,6 +5264,16 @@ def driver_document_upload(request):
         return Response({'error': f'document_type must be one of {VALID_DOC_TYPES}'}, status=status.HTTP_400_BAD_REQUEST)
     if not document_no:
         return Response({'error': 'document_no is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from core.validators import DOCUMENT_EXTENSIONS, validate_upload_file
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    try:
+        for _f, _label in ((document_file, 'Document scan'),
+                           (document_file_back, 'Document back scan')):
+            if _f:
+                validate_upload_file(_f, DOCUMENT_EXTENSIONS, max_mb=8, field_label=_label)
+    except DjangoValidationError as exc:
+        return Response({'error': exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
 
     doc, created = fleet_models.DriverDocument.objects.update_or_create(
         driver=driver,

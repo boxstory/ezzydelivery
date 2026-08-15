@@ -4,9 +4,10 @@
 {# Purpose: Manual CRM lead creation form for staff. #}
 {# Used by: workforce.crm_views.crm_lead_create #}
 {# Notes: crmf__ namespace; plain form POST, redirects to the new lead's detail page. #}
+{#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718e" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -25,8 +26,17 @@
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-arrow-left"></i> Back to Board
         </a>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_crm_lead_form_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
       </div>
     </div>
+
+    <div class="wfnote" id="workforce_crm_lead_form_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_lead_form_card_notes' %}" hidden></div>
 
     <div class="crmf__body">
       {% if error %}

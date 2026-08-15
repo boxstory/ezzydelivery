@@ -57,7 +57,7 @@ from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
-from django.db.models import Q
+from django.db.models import Q, Count, Sum
 from django.db import IntegrityError, transaction
 from datetime import datetime, timedelta, timezone
 from django.utils import timezone as dj_timezone
@@ -105,6 +105,18 @@ from core.utils import (
     convert_arabic_numerals,
     format_whatsapp_number,
 )
+from core.json_utils import safe_json
+from core.validators import safe_int
+
+
+# Grouped delivery-task statuses. The orders manifest renders these as a single
+# "In transit" / "Failed" state, so the tally rail and the dlStatus filter group
+# them the same way.
+DL_STATUS_ACTIVE = [
+    'assigned', 'accepted', 'picked_up',
+    'out_for_delivery', 'in_transit', 'start_ride',
+]
+DL_STATUS_FAILED = ['failed', 'non_reachable']
 
 
 # =============================================================================
@@ -192,7 +204,7 @@ def orders_all_list(request):
         'delivery_task__business',
     )
 
-    # Apply filters
+    # --- Scope filters: these define the manifest window (search + dates) ---
     if order_number:
         items = items.filter(order_number__icontains=order_number)
     if mobile:
@@ -201,30 +213,42 @@ def orders_all_list(request):
         items = items.filter(customer_name__icontains=customer_name)
     if zone:
         items = items.filter(dl_zone=zone)
-    if c_status == 'pending':
-        items = items.exclude(order_status__in=['delivered', 'cancelled'])
-    elif c_status:
-        items = items.filter(order_status=c_status)
     if date_from:
         items = items.filter(order_date__gte=date_from)
     if date_to:
         items = items.filter(order_date__lte=date_to)
-    if cod_status == 'with_cod':
-        items = items.filter(cod_amount__gt=0)
-    elif cod_status == 'no_cod':
-        items = items.filter(cod_amount=0)
-
-    # Delivery status filter (uses dl_task_status text field, not dms numeric codes)
-    if dl_status == 'no_task':
-        items = items.filter(delivery_task__isnull=True)
-    elif dl_status:
-        items = items.filter(delivery_task__dl_task_status=dl_status)
 
     # Delivered date filter
     if delivered_from:
         items = items.filter(delivery_task__completed_at__date__gte=delivered_from)
     if delivered_to:
         items = items.filter(delivery_task__completed_at__date__lte=delivered_to)
+
+    # Snapshot the window before the status/COD segment filters are applied, so the
+    # tally rail always shows the full breakdown of the current window regardless of
+    # which segment is selected.
+    scoped_items = items
+
+    # --- Segment filters: which slice of the window is on screen ---
+    if c_status == 'pending':
+        items = items.exclude(order_status__in=['delivered', 'cancelled'])
+    elif c_status:
+        items = items.filter(order_status=c_status)
+    if cod_status == 'with_cod':
+        items = items.filter(cod_amount__gt=0)
+    elif cod_status == 'no_cod':
+        items = items.filter(cod_amount=0)
+
+    # Delivery status filter (uses dl_task_status text field, not dms numeric codes).
+    # 'active' and 'failed' are grouped values matching how the table renders status.
+    if dl_status == 'no_task':
+        items = items.filter(delivery_task__isnull=True)
+    elif dl_status == 'active':
+        items = items.filter(delivery_task__dl_task_status__in=DL_STATUS_ACTIVE).distinct()
+    elif dl_status == 'failed':
+        items = items.filter(delivery_task__dl_task_status__in=DL_STATUS_FAILED).distinct()
+    elif dl_status:
+        items = items.filter(delivery_task__dl_task_status=dl_status)
 
     # Sort handling
     VALID_SORT_FIELDS = {
@@ -303,10 +327,52 @@ def orders_all_list(request):
     filter_qs.pop('page', None)
     filter_qs.pop('per_page', None)
 
+    # Tally rail — one aggregate over the scoped window. Joined counts use
+    # distinct=True because an order can carry more than one delivery task (retries).
+    tally = scoped_items.aggregate(
+        total=Count('id', distinct=True),
+        review=Count('id', distinct=True, filter=Q(order_status='to_review')),
+        ready=Count('id', distinct=True, filter=Q(order_status='ready_to_pickup')),
+        published=Count('id', distinct=True, filter=Q(order_status='publish')),
+        transit=Count('id', distinct=True,
+                      filter=Q(delivery_task__dl_task_status__in=DL_STATUS_ACTIVE)),
+        delivered=Count('id', distinct=True,
+                        filter=Q(delivery_task__dl_task_status='delivered')),
+        failed=Count('id', distinct=True,
+                     filter=Q(delivery_task__dl_task_status__in=DL_STATUS_FAILED)),
+    )
+    # COD still owed to the business. Summed off a plain id subquery so the delivered
+    # date join can't double-count an amount.
+    tally['cod_due'] = orders_models.Order.objects.filter(
+        id__in=scoped_items.values('id'), cod_amount__gt=0,
+    ).exclude(
+        cod_status_by_staff='cod_settled_with_business',
+    ).exclude(
+        order_status='cancelled',
+    ).aggregate(total=Sum('cod_amount'))['total'] or 0
+
+    # Querystring the tally links carry: the window (search + dates + sort) minus the
+    # segment keys they each set themselves.
+    scope_qs = filter_qs.copy()
+    for key in ('cStatus', 'dlStatus', 'codStatus'):
+        scope_qs.pop(key, None)
+    scope_params = scope_qs.urlencode()
+
+    # Which tally segment is currently selected (drives the active marker)
+    if dl_status in ('active', 'delivered', 'failed'):
+        active_segment = dl_status
+    elif c_status in ('to_review', 'ready_to_pickup', 'publish'):
+        active_segment = c_status
+    else:
+        active_segment = 'all'
+
     context = {
         'orders': orders,
         'business': business,
         'fallback_failure_notes': fallback_failure_notes,
+        'tally': tally,
+        'active_segment': active_segment,
+        'scope_params': scope_params,
         'len': paginator.count,  # Use paginator.count (cached) instead of items.count()
         'per_page': str(per_page),  # String for template comparison
         'filter_params': filter_qs.urlencode(),
@@ -780,7 +846,7 @@ def bulk_order_entry(request):
 def mobile_product_row_partial(request):
     """HTMX endpoint: returns a single mobile product row with the next index."""
     try:
-        row_index = int(request.GET.get('index', 0))
+        row_index = safe_int(request.GET.get('index'), default=0, minimum=0, maximum=100000)
     except (TypeError, ValueError):
         row_index = 0
     if row_index < 0:
@@ -799,10 +865,10 @@ def add_order(request):
     business = request.current_business
     logger.debug(f"User {request.user.id} adding order for business {business.business_id}")
 
-    # Show fulfillment stores first when fulfillment service is enabled
+    # The seller's own default comes first, then fulfilment stores
     pickup_locations = business_models.PickupLocation.objects.filter(
         business_id=business.business_id
-    ).order_by('-is_fulfilment_center', 'pickup_location_title')
+    ).order_by('-is_default', '-is_fulfilment_center', 'pickup_location_title')
 
     if not pickup_locations:
         # If fulfillment is active, try to auto-create the missing pickup location from the warehouse link
@@ -829,7 +895,7 @@ def add_order(request):
                 logger.info(f"Auto-created missing fulfillment pickup location for business {business.business_id}")
                 pickup_locations = business_models.PickupLocation.objects.filter(
                     business_id=business.business_id
-                ).order_by('-is_fulfilment_center', 'pickup_location_title')
+                ).order_by('-is_default', '-is_fulfilment_center', 'pickup_location_title')
             else:
                 messages.warning(request, "Please add a pickup location or link a fulfillment center first.")
                 return redirect('business:pickup_location_list')
@@ -837,7 +903,11 @@ def add_order(request):
             logger.debug("No pickup locations, redirecting to stores setup")
             messages.warning(request, "Please add a pickup location or link a fulfillment center first.")
             return redirect('business:pickup_location_list')
-    else:
+
+    # Was an `else:` of the block above, which skipped the whole form setup when
+    # the fulfilment pickup location had just been auto-created — the render then
+    # blew up on the unbound `form`. Any path that reaches here now has locations.
+    if pickup_locations:
         if request.method == 'POST':
             logger.debug("Processing POST form for add_order")
             form = orders_forms.AddOrderForm(
@@ -931,21 +1001,29 @@ def add_order(request):
                 'lat': float(location.pickup_lat) if location.pickup_lat else None,
                 'lon': float(location.pickup_lon) if location.pickup_lon else None,
             }
-        pickup_locations_json = json.dumps(pickup_locations_dict)
+        pickup_locations_json = safe_json(pickup_locations_dict)
 
-        # Determine default pickup ID for mobile pre-selection
-        # Priority: active fulfillment center > is_default flag > first
+        # Determine default pickup ID for the pre-selected card / mobile option.
+        # Priority: active fulfillment center > is_default flag > first active.
+        # A non-active location is still listed, but never pre-selected.
+        active_locations = [loc for loc in pickup_locations if loc.pickup_status == 'active']
         default_pickup_id = None
         if business.fulfillment_service_status == 'active':
-            fc = next((loc for loc in pickup_locations if loc.is_fulfilment_center), None)
+            fc = next((loc for loc in active_locations if loc.is_fulfilment_center), None)
             if fc:
                 default_pickup_id = fc.id
         if not default_pickup_id:
             df = next((loc for loc in pickup_locations if loc.is_default), None)
             if df:
                 default_pickup_id = df.id
+        if not default_pickup_id and active_locations:
+            default_pickup_id = active_locations[0].id
         if not default_pickup_id and pickup_locations:
             default_pickup_id = pickup_locations[0].id
+
+    # Which card is checked on render: what was posted (so a failed submit keeps
+    # the choice), otherwise the default worked out above.
+    selected_pickup_id = str(request.POST.get('pickup_location') or default_pickup_id or '')
 
     return render(request, 'orders/order_add.html', {
         'form': form,
@@ -953,6 +1031,11 @@ def add_order(request):
         'pickup_locations': pickup_locations,
         'pickup_locations_json': pickup_locations_json,
         'default_pickup_id': default_pickup_id,
+        'selected_pickup_id': selected_pickup_id,
+        # Gates the "Import from Store" panel — same check as orders_all_list.
+        'has_ecom_api': business_models.BusinessApiSettings.objects.filter(
+            business=business, api_type__in=['shopify', 'woocommerce']
+        ).exists(),
     })
 
 
@@ -1362,7 +1445,7 @@ def pick_from_here(request, pickup_id):
             'lat': float(location.pickup_lat) if location.pickup_lat else None,
             'lon': float(location.pickup_lon) if location.pickup_lon else None,
         }
-    pickup_locations_json = json.dumps(pickup_locations_dict)
+    pickup_locations_json = safe_json(pickup_locations_dict)
 
     return render(request, 'orders/order_add.html', {
         'form': form,
@@ -1731,6 +1814,130 @@ def order_product_list(request, order_id):
 
 @require_POST
 @login_required(login_url='/accounts/login/')
+def set_order_scheduled_delivery(request, order_id):
+    """
+    AJAX: set / change / clear the scheduled delivery date on an order.
+
+    Called from the client's order list (calendar action) so a seller can put a
+    birthday or event order on a future day without re-editing the whole order.
+    POST: scheduled_date (YYYY-MM-DD, blank clears), scheduled_time, occasion, note.
+
+    The date is mirrored onto the live DeliveryTask so dispatch and the staff
+    Upcoming list read the same day.
+    """
+    import datetime as _dt
+
+    order = orders_models.Order.objects.filter(pk=order_id).first()
+    if not order:
+        return JsonResponse({'success': False, 'error': 'Order not found'}, status=404)
+
+    # Owner-or-staff, same rule as update_order_status
+    if not request.user.is_staff:
+        user_business = get_cached_business(request)
+        if not user_business or user_business.business_id != order.business_id:
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    if order.order_status in ('delivered', 'cancelled'):
+        return JsonResponse({
+            'success': False,
+            'error': f'Cannot schedule a {order.get_order_status_display().lower()} order',
+        }, status=400)
+
+    task = order.delivery_task.exclude(
+        dl_task_status__in=['delivered', 'cancelled']
+    ).order_by('-id').first()
+    if task and task.dl_task_status in ('delivered', 'partial_delivery'):
+        return JsonResponse({'success': False, 'error': 'This order is already delivered'}, status=400)
+
+    raw_date = (request.POST.get('scheduled_date') or '').strip()
+    raw_time = (request.POST.get('scheduled_time') or '').strip()
+    occasion = (request.POST.get('scheduled_occasion') or '').strip()
+    note = (request.POST.get('scheduled_note') or '').strip()[:160]
+
+    valid_occasions = {c for c, _ in orders_models.Order.SCHEDULED_OCCASION_CHOICES}
+    if occasion not in valid_occasions:
+        occasion = ''
+
+    if not raw_date:
+        # Clearing the schedule — the order goes back to the normal daily flow.
+        order.scheduled_delivery = False
+        order.scheduled_date = None
+        order.scheduled_time = None
+        order.scheduled_occasion = ''
+        order.scheduled_note = ''
+        order.save(update_fields=['scheduled_delivery', 'scheduled_date', 'scheduled_time',
+                                  'scheduled_occasion', 'scheduled_note'])
+        history_note = 'Scheduled delivery cleared'
+        new_date = None
+    else:
+        try:
+            sched_date = _dt.date.fromisoformat(raw_date)
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'Invalid date. Use YYYY-MM-DD'}, status=400)
+        if sched_date < dj_timezone.localdate():
+            return JsonResponse({'success': False, 'error': 'The delivery date cannot be in the past'}, status=400)
+
+        sched_time = None
+        if raw_time:
+            try:
+                sched_time = _dt.time.fromisoformat(raw_time)
+            except ValueError:
+                return JsonResponse({'success': False, 'error': 'Invalid time. Use HH:MM'}, status=400)
+
+        order.scheduled_delivery = True
+        order.scheduled_date = sched_date
+        order.scheduled_time = sched_time
+        order.scheduled_occasion = occasion
+        order.scheduled_note = note
+        order.save(update_fields=['scheduled_delivery', 'scheduled_date', 'scheduled_time',
+                                  'scheduled_occasion', 'scheduled_note'])
+
+        # Keep the task in step — this is the date dispatch actually works from.
+        if task:
+            task_fields = ['dl_task_date']
+            task.dl_task_date = sched_date
+            if sched_time:
+                hour = sched_time.hour
+                task.preferred_time = ('9am-1pm' if hour < 13
+                                       else '2pm-6pm' if hour < 18
+                                       else '6pm-10pm')
+                task_fields.append('preferred_time')
+            task.save(update_fields=task_fields)
+
+        bits = [f'Delivery date: {sched_date}']
+        if sched_time:
+            bits.append(sched_time.strftime('%H:%M'))
+        if occasion:
+            bits.append(dict(orders_models.Order.SCHEDULED_OCCASION_CHOICES).get(occasion, occasion))
+        if note:
+            bits.append(note)
+        history_note = ' · '.join(bits)
+        new_date = str(sched_date)
+
+    try:
+        orders_models.OrderStatusHistory.objects.create(
+            order=order,
+            field_name='order_edited',
+            old_value='scheduled_delivery',
+            new_value='scheduled_delivery',
+            old_display='',
+            new_display='Scheduled Delivery',
+            changed_by=request.user,
+            notes=history_note[:255],
+        )
+    except Exception:
+        logger.warning('Could not log scheduled-delivery history for order %s', order.id)
+
+    return JsonResponse({
+        'success': True,
+        'scheduled': bool(new_date),
+        'scheduled_date': new_date,
+        'message': history_note,
+    })
+
+
+@require_POST
+@login_required(login_url='/accounts/login/')
 def update_order_status(request, order_id=None):
     """Update order status - supports both form POST and JSON body"""
     try:
@@ -1835,6 +2042,10 @@ def update_order_status(request, order_id=None):
                 ).update(
                     dl_task_status='cancelled'
                 )
+                # The task update above is a queryset write — no signals fire, so the
+                # first-mile pickup is pulled explicitly (idempotent if already cancelled)
+                from delivery.services.pickup import cancel_pickup_for_order
+                cancel_pickup_for_order(order)
                 # Free up the client_order_code so the same order can be re-imported
                 if order.client_order_code and '_DEL' not in order.client_order_code:
                     orders_models.Order.objects.filter(pk=order.pk).update(
@@ -1884,14 +2095,24 @@ def bulk_update_order_status(request):
             orders_qs = orders_qs.exclude(order_status__in=['publish', 'delivered', 'cancelled'])
 
         with transaction.atomic():
-            updated = orders_qs.update(order_status=status)
+            # Saved row by row, not via queryset.update(): the per-order signals are what
+            # write the status history, notify the customer and cancel the first-mile
+            # pickup. A bulk update fires none of them and leaves the order silently split
+            # from its delivery task. Bulk selections are checkbox-sized, so this is cheap.
+            targets = list(orders_qs)
+            for order in targets:
+                order.order_status = status
+                order._status_changed_by = request.user
+                order.save()
+            updated = len(targets)
 
-            # Cancel active delivery tasks when bulk-cancelling
-            if status == 'cancelled':
+            # Cancel active delivery tasks when bulk-cancelling. Scoped to the orders that
+            # were actually cancelled above — filtering on the raw order_ids would cancel
+            # the task of an order the ownership/status filters had already dropped.
+            if status == 'cancelled' and targets:
                 from delivery import models as delivery_models
                 delivery_models.DeliveryTask.objects.filter(
-                    order__in=order_ids,
-                    order__business=user_business
+                    order__in=targets,
                 ).exclude(
                     dl_task_status__in=['delivered', 'cancelled', 'failed']
                 ).update(
@@ -2425,6 +2646,17 @@ def orders_api_pending_import(request):
     business = get_cached_business(request)
     if not business:
         return HttpResponse('', status=403)
+
+    # This endpoint creates real Orders, so it needs the same permission as
+    # add_order. Checked inline rather than via @business_permission_required
+    # because that decorator redirects, which HTMX would swap into the panel.
+    # Returned as 200 on purpose: the base template's htmx:responseError handler
+    # navigates the browser to the failing path, and this one is POST-only.
+    if not user_has_business_permission(request.user, BusinessPermissions.ORDER_CREATE):
+        return HttpResponse(
+            '<div class="alert alert-danger py-2 small mb-0">'
+            'You do not have permission to create orders.</div>'
+        )
 
     indices = request.POST.getlist('selected')
     saved = 0
@@ -4024,9 +4256,7 @@ def customer_tracking(request, token):
     # Get driver location if active
     driver_lat = driver_lng = None
     if show_map and task.driver_id:
-        latest_loc = fleet_models.DriverLocation.objects.filter(
-            driver_id=task.driver_id
-        ).order_by('-created_at').first()
+        latest_loc = fleet_models.DriverLocation.latest_for_driver(task.driver_id)
         if latest_loc:
             driver_lat = float(latest_loc.latitude)
             driver_lng = float(latest_loc.longitude)
@@ -4095,9 +4325,7 @@ def customer_tracking_data(request, token):
     }
 
     if task.driver_id:
-        latest_loc = fleet_models.DriverLocation.objects.filter(
-            driver_id=task.driver_id
-        ).order_by('-created_at').first()
+        latest_loc = fleet_models.DriverLocation.latest_for_driver(task.driver_id)
         if latest_loc:
             data['driver_lat'] = float(latest_loc.latitude)
             data['driver_lng'] = float(latest_loc.longitude)

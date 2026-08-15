@@ -8,9 +8,10 @@ Forms for delivery address updates and driver assignments.
 from django import forms
 from crispy_forms.helper import FormHelper
 from delivery import models as delivery_models
+from core.forms_base import SanitizedForm, SanitizedFormMixin, SanitizedModelForm
 
 
-class DlAddressUpdateForm(forms.ModelForm):
+class DlAddressUpdateForm(SanitizedModelForm):
     """
     Form for updating delivery address information.
 
@@ -73,7 +74,7 @@ class DlAddressUpdateForm(forms.ModelForm):
         return mobile
 
 
-class DriverAssignForm(forms.ModelForm):
+class DriverAssignForm(SanitizedModelForm):
     """
     Form for assigning a driver to a delivery task.
 

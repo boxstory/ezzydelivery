@@ -4,11 +4,44 @@ Provides sidebar badge counts for the workforce dashboard.
 """
 
 
+def workforce_departments(request):
+    """
+    Expose the signed-in staff member's departments to the sidebar templates.
+
+    Cheap: reads three booleans off the already-cached profile, no queries of
+    its own. Kept out of workforce_sidebar_counts because that result is cached
+    for 60s — a department change must take effect on the next page load, not a
+    minute later.
+
+    Provides:
+        wf_dept_ops / wf_dept_fin / wf_dept_mkt / wf_dept_admin (bool)
+        wf_departments (set of codes)
+    """
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
+        return {}
+
+    from core.departments import ADMIN, FIN, MKT, OPS, user_departments
+
+    held = user_departments(request.user)
+    if not held:
+        return {}
+
+    return {
+        'wf_departments': held,
+        'wf_dept_ops': OPS in held,
+        'wf_dept_fin': FIN in held,
+        'wf_dept_mkt': MKT in held,
+        'wf_dept_admin': ADMIN in held,
+    }
+
+
 def _safe_count_pickup_pending():
     """Count unclaimed first-mile pickup tasks. Returns 0 defensively."""
     try:
-        from delivery.models import PickupTask
-        return PickupTask.objects.filter(status='pending', driver__isnull=True).count()
+        # Same definition the drivers' pool uses, so staff and drivers can't see
+        # different numbers (cancelled/delivered legs are excluded from both).
+        from delivery.selectors import pending_pickup_pool
+        return pending_pickup_pool().count()
     except Exception:
         return 0
 
@@ -19,9 +52,10 @@ def _safe_count_crm_overdue():
     try:
         from django.utils import timezone
         from crm.models import Lead
+        from crm.services import closed_stage_keys
         return (
             Lead.objects.filter(next_followup_at__lt=timezone.localdate())
-            .exclude(stage__in=Lead.CLOSED_STAGES).count()
+            .exclude(stage__in=closed_stage_keys()).count()
         )
     except Exception:
         return 0
@@ -35,6 +69,34 @@ def _safe_count_avj():
         return AddressVerificationJob.objects.filter(
             status__in=('queued', 'sent', 'manual_review', 'failed')
         ).count()
+    except Exception:
+        return 0
+
+
+def _safe_count_upcoming_tasks():
+    """Count open delivery tasks dated past today (postponed / future-dated).
+    Mirrors workforce.views.tasks_upcoming_list. Returns 0 defensively."""
+    try:
+        from django.db.models import Case, DateField, F, Value, When
+        from django.db.models.functions import Greatest
+        from django.utils import timezone
+        from delivery.models import DeliveryTask
+
+        today = timezone.localdate()
+        scheduled_expr = Case(
+            When(order__scheduled_delivery=True, order__scheduled_date__isnull=False,
+                 then=F('order__scheduled_date')),
+            default=Value(None, output_field=DateField()),
+            output_field=DateField(),
+        )
+        return DeliveryTask.objects.filter(
+            order__business__business_status='active',
+        ).exclude(
+            dl_task_status__in=['delivered', 'partial_delivery', 'cancelled',
+                                'rejected', 'dropsownlost'],
+        ).annotate(
+            due_date=Greatest('dl_task_date', 'reschedule_date', scheduled_expr),
+        ).filter(due_date__gt=today).count()
     except Exception:
         return 0
 
@@ -122,6 +184,9 @@ def workforce_sidebar_counts(request):
 
         # Unclaimed first-mile pickups (Pickup sidebar badge)
         'pickup_pending_count': _safe_count_pickup_pending(),
+
+        # Open tasks dated after today — postponed or future-dated deliveries
+        'upcoming_tasks_count': _safe_count_upcoming_tasks(),
     }
 
     cache.set(cache_key, counts, 60)  # 60 second TTL

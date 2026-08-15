@@ -176,6 +176,7 @@
             </div>
             {% endfor %}
         </div>
+        {% include "includes/components/_pagination.html" with page_obj=cod_in_hand_page filter_params=cod_in_hand_params per_page=per_page pagination_id="cod_in_hand" variant="compact" show_goto="false" %}
     </div>
 
     {% else %}
@@ -198,7 +199,7 @@
 {% if cod_transactions %}
 <div class="fleet-card fleet-slide-up" style="animation-delay: 0.3s;">
     <div class="fleet-card__header">
-        <h3 class="fleet-card__title">COD Submissions ({{ cod_transactions|length }})</h3>
+        <h3 class="fleet-card__title">COD Submissions ({{ cod_transactions_total }})</h3>
     </div>
     <div class="fleet-card__body" style="padding: 0;">
         {% for txn in cod_transactions %}
@@ -218,6 +219,7 @@
         </a>
         {% endwith %}
         {% endfor %}
+        {% include "includes/components/_pagination.html" with page_obj=cod_transactions_page filter_params=cod_transactions_params page_param="txn_page" per_page=per_page pagination_id="cod_submissions" variant="compact" show_goto="false" %}
     </div>
 </div>
 {% endif %}

@@ -1,0 +1,112 @@
+{% comment %}
+Purpose: "About this page" notes panel for product_requests_list.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_product_requests_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      The staff queue for stock moving in and out of our fulfilment warehouses. Each row is a request
+      raised by a client (or by us on their behalf) to either send goods into a warehouse or pull
+      goods back out of it, with a list of products and quantities attached. Your job here is to work
+      the queue: check a request, approve it so the warehouse can act, then mark it completed once the
+      stock has physically moved. Clicking any row opens the full request detail with its item lines.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Approve</dt>
+            <dd class="wfnote__def">The tick button. Moves a request from Pending to Approved and
+              stamps your name and the time on it. Only shown while the request is pending.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Complete</dt>
+            <dd class="wfnote__def">The double-tick. Closes an approved request as done and records
+              who closed it. Only shown once the request is approved — you cannot skip approval.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">New inbound</dt>
+            <dd class="wfnote__def">Opens the create form to raise an inbound request yourself, for a
+              client who has sent goods without logging them.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Type filter</dt>
+            <dd class="wfnote__def">All, inbound only or outbound only.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Status filter</dt>
+            <dd class="wfnote__def">Multi-select — tick any combination of pending, approved,
+              completed and cancelled. Leaving it empty shows every status.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Business</dt>
+            <dd class="wfnote__def">Narrows to one client. The list only offers clients who have
+              fulfilment service switched on.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Open a request</dt>
+            <dd class="wfnote__def">Click the row to see the item lines, warehouse, and who raised,
+              approved or completed it.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">Type</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Inbound</dt>
+            <dd class="wfnote__def">Client goods arriving at one of our warehouses to be stored and
+              picked from later.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Outbound</dt>
+            <dd class="wfnote__def">Client goods leaving a warehouse back to the client or elsewhere —
+              not a customer delivery.</dd>
+          </div>
+        </dl>
+
+        <h2 class="wfnote__h">Status</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Pending</dt>
+            <dd class="wfnote__def">Raised and waiting on a staff decision. This is the only state
+              that can be approved.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Approved</dt>
+            <dd class="wfnote__def">Cleared for the warehouse to handle. The goods have not
+              necessarily moved yet.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Completed</dt>
+            <dd class="wfnote__def">The movement is finished and the request is closed. No further
+              action buttons appear.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Cancelled</dt>
+            <dd class="wfnote__def">Dropped without being actioned. It stays in the list for history
+              but offers no buttons.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>There is <strong>no undo</strong> on this page. Approve and Complete only move forwards,
+          and neither button reappears once used — a mistake has to be corrected on the request
+          itself.</li>
+        <li>Approving and completing record status and audit stamps. Treat <em>Completed</em> as your
+          confirmation that stock physically moved, and reconcile quantities in the warehouse
+          screens.</li>
+        <li>The stat tiles read differently on purpose: <em>Pending Inbound</em> and
+          <em>Pending Outbound</em> count every such request in the system, while
+          <em>Approved</em> and <em>Completed</em> count only what your current filters returned.</li>
+        <li>With type set to All, inbound and outbound come from two separate record sets merged by
+          date, so request numbers will not run in one continuous sequence.</li>
+      </ul>
+    </section>
+  

@@ -22,6 +22,7 @@
         <p class="wh__subtitle">{{ batch.warehouse.name }}{% if batch.driver %} &middot; Driver: {{ batch.driver.user.get_full_name|default:batch.driver.driver_code }}{% endif %}</p>
       </div>
     </div>
+    <div class="d-flex align-items-center gap-2">
     <span class="wh__badge pkl__badge--lg
       {% if batch.status == 'dispatched' or batch.status == 'completed' %}wh__badge--success
       {% elif batch.status == 'handed_over' %}wh__badge--primary
@@ -29,7 +30,17 @@
       {% else %}wh__badge--warning{% endif %}" id="dsp_status_badge">
       {{ batch.get_status_display }}
     </span>
+      <button type="button" class="wfnote__btn" data-wfnote-toggle
+              aria-expanded="false" aria-controls="warehouse_dispatch_detail_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
+    </div>
   </div>
+
+  <div class="wfnote wfnote--inset" id="warehouse_dispatch_detail_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_dispatch_detail_card_notes' %}" hidden></div>
 
   <!-- Summary Row -->
   <div class="row g-3 mb-3">

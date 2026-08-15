@@ -1,9 +1,18 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 {% comment %}
-Purpose: Staff pickup pool — every first-mile pickup task, filters, and assign/reassign to driver
+Purpose: Staff pickup pool — every first-mile pickup task, filters, assign/reassign, return-to-pool, cancel, delete, bulk actions
 Used by: workforce_views.pickup_pool_status at /workforce/pickups/
-Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reuses fleet search
+Notes: Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (accepted→pending) only before
+       collection. Cancel closes the first-mile leg only (order + delivery task untouched) and is refused on
+       already-closed legs. Delete removes the row and is superadmin-only (can_delete_pickups) and refused
+       once collected. Row checkboxes (shift-click ranges) drive the bulk bar, which posts pickup_ids[] to the
+       same assign/unassign/cancel/delete endpoints. Driver picker reuses fleet search.
+       Hero filters carry data-no-select2 and are enhanced locally instead: the global
+       staff-dashboard enhancer forces width:100% + light chrome, which stacked the fields and
+       collapsed the navy hero. The local init uses width:'auto' and the ppl__pick skin.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
 {% endcomment %}
 
 {% block title %}Pickup Pool - Staff Dashboard{% endblock title %}
@@ -29,14 +38,16 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reu
                 </div>
             </div>
             <form method="GET" class="d-flex flex-wrap gap-2">
-                <select name="status" class="form-select form-select-sm w-auto ppl__ffield" onchange="this.form.submit()">
+                <select name="status" class="form-select form-select-sm w-auto ppl__ffield" data-no-select2
+                        onchange="this.form.submit()">
                     <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All statuses</option>
                     <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active only</option>
                     {% for value, label in status_choices %}
                     <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
-                <select name="mode" class="form-select form-select-sm w-auto ppl__ffield" onchange="this.form.submit()">
+                <select name="mode" class="form-select form-select-sm w-auto ppl__ffield" data-no-select2
+                        onchange="this.form.submit()">
                     <option value="all" {% if mode_filter == 'all' %}selected{% endif %}>All modes</option>
                     <option value="assigned" {% if mode_filter == 'assigned' %}selected{% endif %}>Assigned fleet</option>
                     <option value="public_pool" {% if mode_filter == 'public_pool' %}selected{% endif %}>Public pool</option>
@@ -45,6 +56,30 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reu
                        placeholder="Order / business / driver…">
                 <button class="btn btn-sm ppl__fbtn" type="submit">Filter</button>
             </form>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_pickup_pool_status_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="wfnote" id="workforce_pickup_pool_status_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_pickup_pool_status_card_notes' %}" hidden></div>
+
+    <div class="ppl__bulk" id="workforce_pickup_pool_bar_bulk" hidden>
+        <span class="ppl__bulk-count"><strong class="pp-bulk-n">0</strong> selected</span>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <input type="search" class="form-control form-control-sm w-auto ppl__bulk-search" id="pp_bulk_search"
+                   placeholder="Assign all to driver…" autocomplete="off">
+            <div class="pp-bulk-results d-flex flex-wrap gap-1" id="pp_bulk_results"></div>
+            <button type="button" class="btn btn-sm ppl__btn ppl__btn--quiet" id="pp_bulk_unassign">Back to pool</button>
+            <button type="button" class="btn btn-sm ppl__btn ppl__btn--warn" id="pp_bulk_cancel">Cancel</button>
+            {% if can_delete_pickups %}
+            <button type="button" class="btn btn-sm ppl__btn ppl__btn--danger" id="pp_bulk_delete">Delete</button>
+            {% endif %}
+            <button type="button" class="btn btn-sm ppl__btn ppl__btn--quiet" id="pp_bulk_clear">Clear</button>
         </div>
     </div>
 
@@ -52,6 +87,10 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reu
         <table class="ppl__table" id="workforce_pickup_pool_table_view">
             <thead>
                 <tr>
+                    <th class="ppl__th ppl__th--check">
+                        <input type="checkbox" class="form-check-input ppl__check" id="pp_check_all"
+                               title="Select all actionable rows on this page">
+                    </th>
                     <th class="ppl__th">Order</th>
                     <th class="ppl__th">Client / collect from</th>
                     <th class="ppl__th">Mode</th>
@@ -59,13 +98,32 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reu
                     <th class="ppl__th">Status</th>
                     <th class="ppl__th">Driver</th>
                     <th class="ppl__th">Age</th>
-                    <th class="ppl__th text-end">Assign</th>
+                    <th class="ppl__th text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in pickups %}
-                <tr class="ppl__row{% if p.status == 'pending' %} ppl__row--pending{% endif %}" data-pickup-id="{{ p.id }}">
-                    <td class="ppl__td"><span class="ppl__order">{{ p.order.order_number }}</span></td>
+                <tr class="ppl__row{% if p.status == 'pending' %} ppl__row--pending{% endif %}"
+                    data-pickup-id="{{ p.id }}" data-status="{{ p.status }}">
+                    <td class="ppl__td ppl__td--check">
+                        {% if p.status != 'dropped' and p.status != 'handed_off' %}
+                        <input type="checkbox" class="form-check-input ppl__check pp-check"
+                               value="{{ p.id }}" data-status="{{ p.status }}"
+                               data-order="{{ p.order.order_number }}">
+                        {% endif %}
+                    </td>
+                    <td class="ppl__td">
+                        {# Opens in a new tab so the pool keeps its filters and selection. #}
+                        {% if p.task_id %}
+                        <a class="ppl__order ppl__order--link" target="_blank" rel="noopener"
+                           href="{% url 'workforce:delivery_task_detail' p.task_id %}"
+                           title="Open the delivery task for {{ p.order.order_number }}">{{ p.order.order_number }}</a>
+                        {% else %}
+                        <a class="ppl__order ppl__order--link" target="_blank" rel="noopener"
+                           href="{% url 'workforce:order_detail' p.order_id %}"
+                           title="No delivery task yet — opens the order">{{ p.order.order_number }}</a>
+                        {% endif %}
+                    </td>
                     <td class="ppl__td">
                         <span class="ppl__biz">{{ p.business.business_name|default:p.business.business_code }}</span>
                         {% if p.pickup_location %}
@@ -99,11 +157,23 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reu
                         <button type="button" class="btn btn-sm ppl__btn ppl__btn--primary pp-assign-open">Assign</button>
                         {% elif p.status == 'accepted' or p.status == 'in_progress' or p.status == 'arrived' %}
                         <button type="button" class="btn btn-sm ppl__btn pp-assign-open">Reassign</button>
+                        <button type="button" class="btn btn-sm ppl__btn ppl__btn--quiet pp-unassign"
+                                data-order="{{ p.order.order_number }}">Back to pool</button>
+                        {% endif %}
+                        {% if p.status != 'cancelled' and p.status != 'dropped' and p.status != 'handed_off' %}
+                        <button type="button" class="btn btn-sm ppl__btn ppl__btn--warn pp-cancel"
+                                data-order="{{ p.order.order_number }}"
+                                data-collected="{% if p.status == 'collected' %}1{% endif %}">Cancel</button>
+                        {% endif %}
+                        {% if can_delete_pickups and p.status != 'collected' and p.status != 'dropped' and p.status != 'handed_off' %}
+                        <button type="button" class="btn btn-sm ppl__btn ppl__btn--danger pp-delete"
+                                data-order="{{ p.order.order_number }}"
+                                title="Remove this pickup task permanently">Delete</button>
                         {% endif %}
                     </td>
                 </tr>
                 <tr class="pp-assign-row" hidden>
-                    <td colspan="8" class="ppl__td p-0">
+                    <td colspan="9" class="ppl__td p-0">
                         <div class="ppl__panel">
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <span class="ppl__panel-title me-1">Assign {{ p.order.order_number }} to</span>
@@ -115,7 +185,7 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reu
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8" class="ppl__td text-center text-muted py-4">No pickup tasks match this filter.</td></tr>
+                <tr><td colspan="9" class="ppl__td text-center text-muted py-4">No pickup tasks match this filter.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -129,6 +199,33 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reu
     'use strict';
     const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
+    // The hero filters opt out of the global enhancer (data-no-select2) because it
+    // forces width:100%. They are enhanced here instead so the menu is a real brand
+    // panel rather than the OS list, while the closed control keeps the navy skin.
+    // Select2 is deferred, so it is ready by DOMContentLoaded.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof jQuery === 'undefined' || !jQuery.fn || !jQuery.fn.select2) return;
+        jQuery('.ppl__hero select.ppl__ffield').each(function () {
+            const el = this;
+            const $el = jQuery(el);
+            if ($el.data('select2')) return;
+            $el.select2({
+                width: 'auto',
+                // Ten statuses and three modes both scan in one glance — a search
+                // box on top of them is chrome for its own sake.
+                minimumResultsForSearch: Infinity
+            });
+            const inst = $el.data('select2');
+            if (inst && inst.$container) inst.$container.addClass('ppl__pick');
+            if (inst && inst.$dropdown) inst.$dropdown.addClass('ppl__pick-menu');
+            // Select2 announces a pick with jQuery's .trigger('change'), which never
+            // reaches the native onchange="this.form.submit()" — bridge it.
+            $el.on('select2:select', function () {
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        });
+    });
+
     document.querySelectorAll('#workforce_pickup_pool_table_view .pp-assign-open').forEach(btn => {
         btn.addEventListener('click', () => {
             const panel = btn.closest('tr').nextElementSibling;
@@ -136,6 +233,221 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; driver picker reu
             if (!panel.hidden) panel.querySelector('.pp-assign-search').focus();
         });
     });
+
+    // Send a claimed leg back to Pending — driver cleared, task re-enters the pool.
+    document.querySelectorAll('#workforce_pickup_pool_table_view .pp-unassign').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const order = btn.dataset.order || 'this pickup';
+            if (!confirm(`Return ${order} to the pool? The current driver will be unassigned.`)) return;
+            const form = new FormData();
+            form.append('csrfmiddlewaretoken', csrf);
+            form.append('pickup_id', btn.closest('tr').dataset.pickupId);
+            btn.disabled = true;
+            fetch("{% url 'workforce:pickup_staff_unassign' %}", { method: 'POST', body: form })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) location.reload();
+                    else { alert(res.error || 'Failed'); btn.disabled = false; }
+                })
+                .catch(() => { alert('Network error'); btn.disabled = false; });
+        });
+    });
+
+    // One row, one action — used by cancel and delete, which both just need a
+    // confirmed POST of a single id. `extra` carries the cancel reason.
+    function rowPost(url, btn, extra) {
+        const form = new FormData();
+        form.append('csrfmiddlewaretoken', csrf);
+        form.append('pickup_id', btn.closest('tr').dataset.pickupId);
+        Object.entries(extra || {}).forEach(([k, v]) => form.append(k, v));
+        btn.disabled = true;
+        fetch(url, { method: 'POST', body: form })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) location.reload();
+                else { alert(res.error || 'Failed'); btn.disabled = false; }
+            })
+            .catch(() => { alert('Network error'); btn.disabled = false; });
+    }
+
+    // Cancel closes the first-mile leg only — the order and its delivery task
+    // stay live, so the wording must not promise the order is off.
+    document.querySelectorAll('#workforce_pickup_pool_table_view .pp-cancel').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const order = btn.dataset.order || 'this pickup';
+            const warn = btn.dataset.collected
+                ? '\n\nThis pickup is already COLLECTED — the goods are with the driver.'
+                : '';
+            const reason = prompt(
+                `Cancel the pickup for ${order}?${warn}\n\n`
+                + 'The order and delivery task are not touched. Reason (optional):', '');
+            if (reason === null) return;
+            rowPost("{% url 'workforce:pickup_staff_cancel' %}", btn, { reason: reason });
+        });
+    });
+
+    // Delete removes the row for good — superadmin only, refused after collection.
+    document.querySelectorAll('#workforce_pickup_pool_table_view .pp-delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const order = btn.dataset.order || 'this pickup';
+            if (!confirm(
+                `Delete the pickup task for ${order}?\n\n`
+                + 'This removes the first-mile task permanently and cannot be undone. '
+                + 'The order itself is not deleted. Cancel it instead if you only want to stop the collection.')) return;
+            rowPost("{% url 'workforce:pickup_staff_delete' %}", btn, null);
+        });
+    });
+
+    // ---- Multi-select: tick rows, act on the whole selection in one call -------
+    const checks = Array.from(document.querySelectorAll('.pp-check'));
+    const checkAll = document.getElementById('pp_check_all');
+    const bulkBar = document.getElementById('workforce_pickup_pool_bar_bulk');
+    const bulkCount = bulkBar ? bulkBar.querySelector('.pp-bulk-n') : null;
+    const bulkSearch = document.getElementById('pp_bulk_search');
+    const bulkResults = document.getElementById('pp_bulk_results');
+    const bulkUnassign = document.getElementById('pp_bulk_unassign');
+    const bulkCancel = document.getElementById('pp_bulk_cancel');
+    const bulkDelete = document.getElementById('pp_bulk_delete');
+    let lastChecked = null;
+
+    const selected = () => checks.filter(c => c.checked);
+
+    function syncBulkBar() {
+        const picked = selected();
+        checks.forEach(c => c.closest('tr').classList.toggle('ppl__row--picked', c.checked));
+        if (bulkCount) bulkCount.textContent = picked.length;
+        if (bulkBar) bulkBar.hidden = picked.length === 0;
+        if (checkAll) {
+            checkAll.checked = picked.length > 0 && picked.length === checks.length;
+            checkAll.indeterminate = picked.length > 0 && picked.length < checks.length;
+        }
+        // Only claimed legs can go back to the pool; a selection of pending-only
+        // rows has nothing to return.
+        if (bulkUnassign) {
+            bulkUnassign.disabled = !picked.some(
+                c => ['accepted', 'in_progress', 'arrived'].includes(c.dataset.status));
+        }
+        // Cancel needs a live leg; delete additionally refuses collected ones.
+        if (bulkCancel) {
+            bulkCancel.disabled = !picked.some(c => c.dataset.status !== 'cancelled');
+        }
+        if (bulkDelete) {
+            bulkDelete.disabled = !picked.some(c => c.dataset.status !== 'collected');
+        }
+    }
+
+    checks.forEach(cb => {
+        cb.addEventListener('click', ev => {
+            // Shift-click fills the range, the way every list console behaves.
+            if (ev.shiftKey && lastChecked && lastChecked !== cb) {
+                const a = checks.indexOf(lastChecked), b = checks.indexOf(cb);
+                checks.slice(Math.min(a, b), Math.max(a, b) + 1)
+                      .forEach(c => { c.checked = cb.checked; });
+            }
+            lastChecked = cb;
+            syncBulkBar();
+        });
+    });
+
+    if (checkAll) {
+        checkAll.addEventListener('change', () => {
+            checks.forEach(c => { c.checked = checkAll.checked; });
+            syncBulkBar();
+        });
+    }
+
+    const bulkClear = document.getElementById('pp_bulk_clear');
+    if (bulkClear) {
+        bulkClear.addEventListener('click', () => {
+            checks.forEach(c => { c.checked = false; });
+            if (bulkSearch) bulkSearch.value = '';
+            if (bulkResults) bulkResults.innerHTML = '';
+            syncBulkBar();
+        });
+    }
+
+    // One request per action carrying every selected id — the view reports how
+    // many moved and names the ones it refused.
+    function bulkPost(url, extra, confirmText, trigger) {
+        const ids = selected().map(c => c.value);
+        if (!ids.length) return;
+        if (confirmText && !confirm(confirmText.replace('{n}', ids.length))) return;
+        const form = new FormData();
+        form.append('csrfmiddlewaretoken', csrf);
+        ids.forEach(id => form.append('pickup_ids', id));
+        Object.entries(extra || {}).forEach(([k, v]) => form.append(k, v));
+        if (trigger) trigger.disabled = true;
+        fetch(url, { method: 'POST', body: form })
+            .then(r => r.json())
+            .then(res => {
+                const failed = res.failed || [];
+                if (failed.length) {
+                    alert(`${res.updated || 0} updated, ${failed.length} skipped:\n`
+                        + failed.map(f => `• ${f.order || f.id}: ${f.error}`).join('\n'));
+                }
+                if (res.success) location.reload();
+                else {
+                    if (!failed.length) alert(res.error || 'Failed');
+                    if (trigger) trigger.disabled = false;
+                }
+            })
+            .catch(() => { alert('Network error'); if (trigger) trigger.disabled = false; });
+    }
+
+    if (bulkUnassign) {
+        bulkUnassign.addEventListener('click', () => bulkPost(
+            "{% url 'workforce:pickup_staff_unassign' %}", null,
+            'Return {n} pickup(s) to the pool? Their drivers will be unassigned.',
+            bulkUnassign));
+    }
+
+    if (bulkCancel) {
+        bulkCancel.addEventListener('click', () => {
+            const n = selected().length;
+            if (!n) return;
+            // The prompt doubles as the confirm step — Escape aborts.
+            const reason = prompt(
+                `Cancel ${n} pickup(s)? Their orders and delivery tasks are not touched.\n\n`
+                + 'Reason (optional):', '');
+            if (reason === null) return;
+            bulkPost("{% url 'workforce:pickup_staff_cancel' %}",
+                     { reason: reason }, null, bulkCancel);
+        });
+    }
+
+    if (bulkDelete) {
+        bulkDelete.addEventListener('click', () => bulkPost(
+            "{% url 'workforce:pickup_staff_delete' %}", null,
+            'Delete {n} pickup task(s) permanently? This cannot be undone. '
+            + 'The orders themselves are not deleted.',
+            bulkDelete));
+    }
+
+    if (bulkSearch) {
+        let bulkTimer = null;
+        bulkSearch.addEventListener('input', () => {
+            clearTimeout(bulkTimer);
+            bulkTimer = setTimeout(() => {
+                const q = bulkSearch.value.trim();
+                if (!q) { bulkResults.innerHTML = ''; return; }
+                fetch("{% url 'workforce:pickup_fleet_driver_search' %}?q=" + encodeURIComponent(q))
+                    .then(r => r.json())
+                    .then(res => {
+                        bulkResults.innerHTML = (res.drivers || []).map(d =>
+                            `<button type="button" class="btn btn-sm ppl__btn" data-driver-id="${d.id}">
+                                + ${d.name} <small class="ppl__code">${d.code}</small>
+                            </button>`).join('') || '<small class="text-muted">No matches</small>';
+                        bulkResults.querySelectorAll('[data-driver-id]').forEach(b =>
+                            b.addEventListener('click', () => bulkPost(
+                                "{% url 'workforce:pickup_staff_assign' %}",
+                                { driver_id: b.dataset.driverId },
+                                'Assign {n} pickup(s) to this driver?', b)));
+                    });
+            }, 300);
+        });
+    }
+
+    syncBulkBar();
 
     document.querySelectorAll('.pp-assign-search').forEach(input => {
         let timer = null;

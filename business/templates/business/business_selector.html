@@ -1,23 +1,15 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block title %}Select Business{% endblock title %}
 
 {% block content %}
-<div class="col-12 bsl" id="client_business_selector_container_main">
+<div class="col-12 bcon__page bsl" id="client_business_selector_container_main">
 
-<!-- Hero Header -->
-<div class="bsl__hero">
-    <div class="d-flex align-items-center gap-3">
-        <div class="bsl__hero-icon">
-            <i class="fa-solid fa-building"></i>
-        </div>
-        <div>
-            <h1 class="bsl__hero-title">Select Your Business</h1>
-            <p class="bsl__hero-sub">You have access to {{ total_count }} business{{ total_count|pluralize:"es" }}</p>
-        </div>
-    </div>
-</div>
+{% with n=total_count|stringformat:"s" %}
+{% bconheader eyebrow="Account" live="Businesses" icon="fa-solid fa-building" title="Select Your Business" subtitle="You have access to "|add:n|add:" business account(s)." %}{% endbconheader %}
+{% endwith %}
 
 <!-- Business Cards Grid -->
 <div class="bsl__grid" id="client_business_selector_grid">

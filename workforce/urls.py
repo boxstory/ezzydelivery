@@ -11,6 +11,18 @@ app_name = 'workforce'
 urlpatterns = [
     path('dashboard/', workforce_views.wf_dashboard, name='wf_dashboard'),
 
+    # Lazy "about this page" notes panel, fetched on first help-button click
+    path('page-notes/<str:key>/', workforce_views.page_notes, name='page_notes'),
+
+    # Staff role management (super admin) — department sub-roles per staff user
+    path('staff-roles/', workforce_views.staff_roles_list, name='staff_roles_list'),
+    path('staff-roles/<int:profile_id>/update/', workforce_views.staff_role_update, name='staff_role_update'),
+
+    # Page → department map editor (super admin) — move pages between desks,
+    # switch them off, classify routes that have none
+    path('staff-pages/', workforce_views.staff_pages_list, name='staff_pages_list'),
+    path('staff-pages/update/', workforce_views.staff_page_update, name='staff_page_update'),
+
     # Sellers section urls -------------------------------------------------------------------
     path('sellers/', workforce_views.sellers_list, name='sellers_list'),
     path('sellers/pending/', workforce_views.sellers_pending, name='sellers_pending'),
@@ -31,6 +43,8 @@ urlpatterns = [
     path('sellers/<int:business_id>/api-products/import/', workforce_views.seller_api_products_import, name='seller_api_products_import'),
     path('sellers/<int:business_id>/api-orders/', workforce_views.seller_api_orders, name='seller_api_orders'),
     path('sellers/<int:business_id>/doc-field/', workforce_views.seller_doc_field_update, name='seller_doc_field_update'),
+    path('sellers/<int:business_id>/team/<int:member_id>/', workforce_views.seller_team_member_detail, name='seller_team_member_detail'),
+    path('sellers/<int:business_id>/team/<int:member_id>/update/', workforce_views.seller_team_member_update, name='seller_team_member_update'),
     path('sellers/<int:business_id>/pickup-location/add/', workforce_views.wf_pickup_location_add, name='wf_pickup_location_add'),
     path('sellers/<int:business_id>/pickup-location/<int:location_id>/update/', workforce_views.wf_pickup_location_update, name='wf_pickup_location_update'),
     path('sellers/<int:business_id>/pickup-location/<int:location_id>/delete/', workforce_views.wf_pickup_location_delete, name='wf_pickup_location_delete'),
@@ -126,6 +140,8 @@ urlpatterns = [
 
     #Deliveries sections urls ----------------------------------------------------------------
     path('tasks/dl_list_all/', workforce_views.dl_list_all, name='dl_list_all'),
+    path('tasks/sheet/export/', workforce_views.export_dl_tasks_sheet_csv, name='export_dl_tasks_sheet_csv'),
+    path('tasks/sheet/print/', workforce_views.dl_tasks_print_sheet, name='dl_tasks_print_sheet'),
     path('tasks/fulfilled-clients/', workforce_views.fulfilled_clients_tasks, name='dl_list_fulfilled_clients'),
     path('tasks/non-fulfilled-clients/', workforce_views.non_fulfilled_clients_tasks, name='dl_list_non_fulfilled_clients'),
     path('tasks/unpublished/', workforce_views.dl_list_ready_to_published_to_dms, name='dl_list_ready_to_published_to_dms'),
@@ -156,6 +172,9 @@ urlpatterns = [
     # First-Mile Pickup Automation
     path('pickups/', workforce_views.pickup_pool_status, name='pickup_pool_status'),
     path('pickups/assign/', workforce_views.pickup_staff_assign, name='pickup_staff_assign'),
+    path('pickups/unassign/', workforce_views.pickup_staff_unassign, name='pickup_staff_unassign'),
+    path('pickups/cancel/', workforce_views.pickup_staff_cancel, name='pickup_staff_cancel'),
+    path('pickups/delete/', workforce_views.pickup_staff_delete, name='pickup_staff_delete'),
     path('pickup-automation/', workforce_views.pickup_automation_list, name='pickup_automation_list'),
     path('pickup-automation/save/', workforce_views.pickup_automation_save, name='pickup_automation_save'),
     path('pickup-automation/fleet/<int:business_id>/', workforce_views.pickup_fleet_list, name='pickup_fleet_list'),
@@ -165,6 +184,7 @@ urlpatterns = [
     # User Verification URLs
     path('verification/business/', workforce_views.business_verification_list, name='business_verification_list'),
     path('verification/drivers/', workforce_views.driver_verification_list, name='driver_verification_list'),
+    path('verification/drivers/export/', workforce_views.export_driver_verification_csv, name='export_driver_verification_csv'),
     path('drivers/<int:driver_id>/remind-completion/', workforce_views.driver_remind_completion, name='driver_remind_completion'),
     path('verification/users/', workforce_views.user_verification_list, name='user_verification_list'),
     path('verification/teams/', workforce_views.team_verification_list, name='team_verification_list'),
@@ -179,6 +199,7 @@ urlpatterns = [
 
     # Additional Tasks URLs
     path('tasks/followup-list/', workforce_views.tasks_followup_list, name='tasks_followup_list'),
+    path('tasks/upcoming/', workforce_views.tasks_upcoming_list, name='tasks_upcoming_list'),
     path('tasks/reported/', workforce_views.tasks_reported, name='tasks_reported'),
     path('tasks/live-map/', workforce_views.tasks_live_map, name='tasks_live_map'),
 
@@ -188,6 +209,8 @@ urlpatterns = [
     # Fleet Accounts URLs
     path('fleet/driver-tasks/', workforce_views.wf_driver_tasks, name='wf_driver_tasks'),
     path('fleet/cod-in-hand/', workforce_views.fleet_cod_in_hand, name='fleet_cod_in_hand'),
+    path('fleet/location-reviews/', workforce_views.delivery_location_reviews, name='delivery_location_reviews'),
+    path('fleet/location-reviews/action/', workforce_views.delivery_location_review_action, name='delivery_location_review_action'),
     path('fleet/drivers-earnings/', workforce_views.fleet_drivers_earnings, name='fleet_drivers_earnings'),
     path('fleet/driver-payout/<int:driver_id>/', workforce_views.driver_payout_worksheet, name='driver_payout_worksheet'),
     path('fleet/driver-payout/<int:driver_id>/create/', workforce_views.driver_payout_create, name='driver_payout_create'),
@@ -204,7 +227,9 @@ urlpatterns = [
     path('fleet/recalculate-cod-balances/', workforce_views.recalculate_cod_balances, name='recalculate_cod_balances'),
     path('fleet/transactions/<int:txn_id>/cod-details/', workforce_views.fleet_transaction_cod_details, name='fleet_transaction_cod_details'),
     path('fleet/transactions/<int:txn_id>/update-status/', workforce_views.fleet_transaction_update_status, name='fleet_transaction_update_status'),
+    path('fleet/transactions/mark-prepaid-settled/', workforce_views.mark_prepaid_settled, name='mark_prepaid_settled'),
     path('fleet/tasks/<int:task_id>/cod-correct/', workforce_views.fleet_task_cod_correct, name='fleet_task_cod_correct'),
+    path('fleet/tasks/<int:task_id>/cod-reconcile/', workforce_views.fleet_task_cod_reconcile, name='fleet_task_cod_reconcile'),
 
     # COD bookkeeping ledger (all COD transactions, filterable)
     path('fleet/cod-ledger/', workforce_views.cod_ledger, name='cod_ledger'),
@@ -220,7 +245,17 @@ urlpatterns = [
     path('fleet/cod-business-settlement/action/', workforce_views.cod_business_settlement_action, name='cod_business_settlement_action'),
     path('fleet/cod-business-settlement/reverse/', workforce_views.cod_business_settlement_reverse, name='cod_business_settlement_reverse'),
     path('fleet/cod-business-settlement/pdf/', workforce_views.cod_business_settlement_pdf, name='cod_business_settlement_pdf'),
+    path('fleet/cod-business-settlement/history/', workforce_views.cod_business_payout_history, name='cod_business_payout_history'),
     path('fleet/cod-business-settlement/invoice/<str:txn_code>/', workforce_views.cod_business_payout_invoice, name='cod_business_payout_invoice'),
+
+    # Charges to Collect (receivable leg — Business → EzzyDelivery)
+    path('client-charges/collect/', workforce_views.client_charges_collect, name='client_charges_collect'),
+    path('client-charges/collect/issue/', workforce_views.client_charge_invoice_create, name='client_charge_invoice_create'),
+    path('client-charges/invoices/', workforce_views.client_charge_invoices, name='client_charge_invoices'),
+    path('client-charges/invoices/payment/', workforce_views.client_charge_invoice_payment, name='client_charge_invoice_payment'),
+    path('client-charges/invoices/void/', workforce_views.client_charge_invoice_void, name='client_charge_invoice_void'),
+    path('client-charges/invoices/whatsapp/', workforce_views.client_charge_invoice_whatsapp, name='client_charge_invoice_whatsapp'),
+    path('client-charges/invoices/<str:invoice_code>/', workforce_views.client_charge_invoice_detail, name='client_charge_invoice_detail'),
 
     # COD Submissions Management (Staff)
     path('fleet/cod-submissions/', workforce_views.staff_cod_submissions_redirect, name='staff_cod_submissions'),
@@ -328,6 +363,9 @@ urlpatterns = [
     path('crm/leads/new/', crm_views.crm_lead_create, name='crm_lead_create'),
     path('crm/leads/<int:lead_id>/', crm_views.crm_lead_detail, name='crm_lead_detail'),
     path('crm/leads/<int:lead_id>/update-stage/', crm_views.crm_lead_update_stage, name='crm_lead_update_stage'),
+    path('crm/leads/<int:lead_id>/unpin-stage/', crm_views.crm_lead_unpin_stage, name='crm_lead_unpin_stage'),
+    path('crm/leads/<int:lead_id>/merge/', crm_views.crm_lead_merge, name='crm_lead_merge'),
+    path('crm/leads/<int:lead_id>/unmerge/', crm_views.crm_lead_unmerge, name='crm_lead_unmerge'),
     path('crm/leads/<int:lead_id>/update/', crm_views.crm_lead_update, name='crm_lead_update'),
     path('crm/leads/<int:lead_id>/add-activity/', crm_views.crm_lead_add_activity, name='crm_lead_add_activity'),
     path('crm/leads/<int:lead_id>/delete-activity/<int:activity_id>/', crm_views.crm_lead_delete_activity, name='crm_lead_delete_activity'),
@@ -344,6 +382,10 @@ urlpatterns = [
     path('crm/whatsapp-inbox/resync/', crm_views.crm_wa_resync, name='crm_wa_resync'),
     path('crm/contacts/', crm_views.crm_contacts, name='crm_contacts'),
     path('crm/reports/', crm_views.crm_reports, name='crm_reports'),
+    path('crm/stages/', crm_views.crm_stages_manage, name='crm_stages_manage'),
+    path('crm/stages/save/', crm_views.crm_stage_save, name='crm_stage_save'),
+    path('crm/stages/delete/', crm_views.crm_stage_delete, name='crm_stage_delete'),
+    path('crm/stages/reorder/', crm_views.crm_stage_reorder, name='crm_stage_reorder'),
 
     # Import History & Temp Orders
     path('import-history/', workforce_views.import_history, name='import_history'),
@@ -417,5 +459,6 @@ urlpatterns = [
     path('whatsapp/get-instances/', workforce_views.whatsapp_get_instances, name='whatsapp_get_instances'),
     path('whatsapp/last-message/', workforce_views.whatsapp_last_message, name='whatsapp_last_message'),
     path('whatsapp/send-message/', workforce_views.whatsapp_send_message, name='whatsapp_send_message'),
+    path('whatsapp/send-routed/', workforce_views.whatsapp_send_routed, name='whatsapp_send_routed'),
 
 ]

@@ -1,0 +1,129 @@
+{% comment %}
+Purpose: "About this page" notes panel for fleet_cod_in_hand.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_fleet_cod_in_hand_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            How much of our cash is sitting in drivers' pockets right now. One row is one approved driver, and
+            the amount is the COD they have <strong>collected from customers but not yet handed in</strong>. It
+            is the page to open before a cash handover, and to keep an eye on when a balance climbs. Nothing is
+            settled here — opening a driver takes you to their transactions, and the settlement itself is done
+            on the COD settlement pages.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Period</dt>
+                        <dd class="wfnote__def">Preset windows or a custom from/to. This does more than filter —
+                            see the note below, it changes what the amount means.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Balance</dt>
+                        <dd class="wfnote__def">Show only drivers holding cash, only drivers holding none, or a
+                            custom minimum and maximum amount.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Order</dt>
+                        <dd class="wfnote__def">Opens on the largest balance first. You can also order by name or
+                            by when the driver last handed cash in. The Driver, In hand and Last hand-in headings
+                            sort too, and flip direction on each click.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Print</dt>
+                        <dd class="wfnote__def">Prints the ledger without the controls — a handover sheet for a
+                            cash collection round.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Export CSV</dt>
+                        <dd class="wfnote__def">Downloads a CSV built from what is on screen. Ctrl or Cmd + E does
+                            the same thing.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Open a driver</dt>
+                        <dd class="wfnote__def"><em>Open</em> at the end of a row goes to fleet transactions filtered
+                            to that driver — every collection, settlement and adjustment behind the number.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Settlement report</dt>
+                        <dd class="wfnote__def">The button in the header goes to the COD settlement report, where
+                            money actually gets reconciled.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What the numbers mean</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">QAR outstanding</dt>
+                        <dd class="wfnote__def">In the header: everything the filtered drivers are holding, added
+                            up — our exposure at this moment.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Holding cash</dt>
+                        <dd class="wfnote__def">How many of the approved fleet are holding anything at all. Drivers
+                            on zero are still listed, greyed, and do not count here.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Longest held</dt>
+                        <dd class="wfnote__def">Days since the oldest uncollected hand-in anywhere on the page, and
+                            who is holding it. Age is the risk, not size — old money is the money to chase.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Last hand-in</dt>
+                        <dd class="wfnote__def">The most recent settlement across the whole fleet. If this is months
+                            old, hand-ins have stopped happening, not just this driver's.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">The bar under a name</dt>
+                        <dd class="wfnote__def">That driver's balance against the largest on the page, so you can
+                            see whether the exposure sits with one person or is spread. The yellow one is the
+                            largest holder.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Days held</dt>
+                        <dd class="wfnote__def">Age of the oldest collection that driver has not handed in. Amber
+                            past 7 days, red past 14. Hover it for the date.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Deliveries</dt>
+                        <dd class="wfnote__def">How many unsettled drops sit behind the amount, prepaid ones
+                            included — so a driver can show deliveries with zero cash.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Wallet</dt>
+                        <dd class="wfnote__def">The driver's earnings wallet, as it stands now. A separate pot from
+                            COD — do not net one against the other.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Last hand-in (row)</dt>
+                        <dd class="wfnote__def">When that driver last handed cash in. <em>never</em> on a driver
+                            holding money is worth chasing.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>With no dates set, the amount is <strong>cash still owed to us</strong>. The moment you set a
+                    date range it becomes <strong>COD collected in that window</strong> whether or not it has since
+                    been settled — the column heading changes from "In hand" to "Collected", the Days held column
+                    disappears, and the header line above says which reading you are on. Do not use a date-filtered
+                    figure to decide what a driver owes.</li>
+                <li>Only <strong>approved</strong> drivers appear in the ledger. Cash held by a driver who was
+                    blocked or suspended after collecting it is called out in the red band above the table, with a
+                    link to those drivers — it is deliberately not added into the totals, which keep meaning
+                    "the approved fleet".</li>
+                <li>Nothing on this page settles anything. Marking cash as received happens on the settlement
+                    pages; this is a read-only picture.</li>
+                <li>Export writes out <strong>only the rows on the current page</strong>, not the whole filtered
+                    set. Fifty drivers per page.</li>
+                <li>The summary cards follow your filters, so they are not fleet-wide totals unless the filters are
+                    clear. The one exception is Last hand-in, which is always fleet-wide.</li>
+            </ul>
+        </section>

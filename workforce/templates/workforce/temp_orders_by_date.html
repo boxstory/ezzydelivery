@@ -1,6 +1,14 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
+{% load custom_filters %}
 {% load static %}
+{% comment %}
+Purpose: Sync every import source, then browse temp-order rows across all businesses by date
+Used by: workforce_views.temp_orders_by_date at /workforce/temp-orders/by-date/
+Notes: Sync runs synchronously (up to ~2 min); the two-step preview modal transfers rows into real orders.
+       Carries the shared page-notes card (wfnote__) under the hero, hidden on load; the hero help
+       button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
@@ -31,8 +39,17 @@
                 <span class="oli__hero__count-value">{{ total_count|default:"0" }}</span>
                 <span class="oli__hero__count-label">rows</span>
             </div>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_temp_orders_by_date_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </header>
+
+    <div class="wfnote" id="workforce_temp_orders_by_date_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_temp_orders_by_date_card_notes' %}" hidden></div>
 
     {% csrf_token %}
 
@@ -233,7 +250,7 @@
                             data-status="{{ row.status }}"
                             data-synced-at="{{ row.synced_at|date:'Y-m-d H:i' }}"
                             data-created-at="{{ row.created_at|date:'Y-m-d H:i' }}"
-                            data-raw-row="{{ row.raw_row|safe }}">
+                            data-raw-row="{{ row.raw_row|to_json }}">
                             <i class="fa-solid fa-eye"></i>
                         </button>
                     </td>
@@ -386,12 +403,20 @@ function showDetail(btn) {
         shopify:'<i class="fa-brands fa-shopify me-1"></i>Shopify', woocommerce:'<i class="fa-brands fa-wordpress me-1"></i>WooCommerce',
         public_link:'<i class="fa-solid fa-link me-1"></i>Public Link' }[d.sourceType] || d.sourceType;
 
+    // Imported sheet cells are merchant-supplied and land in innerHTML below —
+    // escape every interpolated value so a cell containing markup stays text.
+    const esc = (v) => String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+
     let rawHtml = '';
     try {
-        const raw = JSON.parse(d.rawRow.replace(/'/g, '"'));
+        // data-raw-row now carries real JSON; the browser has already decoded the
+        // HTML entities Django escaped it with, so it parses as-is.
+        const raw = JSON.parse(d.rawRow || '[]');
         if (Array.isArray(raw) && raw.length) {
             rawHtml = '<hr><h6 class="fw-semibold small">Raw Row Data</h6><div class="table-responsive"><table class="table table-sm table-bordered small"><tbody>';
-            raw.forEach((v, i) => { if(v) rawHtml += '<tr><td class="fw-bold text-muted" style="width:40px">'+i+'</td><td>'+v+'</td></tr>'; });
+            raw.forEach((v, i) => { if(v) rawHtml += '<tr><td class="fw-bold text-muted" style="width:40px">'+i+'</td><td>'+esc(v)+'</td></tr>'; });
             rawHtml += '</tbody></table></div>';
         }
     } catch(e) {}
@@ -400,19 +425,19 @@ function showDetail(btn) {
         <div class="row g-3">
             <div class="col-6"><small class="text-muted d-block">Status</small>${statusBadge}</div>
             <div class="col-6"><small class="text-muted d-block">Source</small>${srcIcon}</div>
-            <div class="col-6"><small class="text-muted d-block">Business</small><strong>${d.business||'—'}</strong></div>
-            <div class="col-3"><small class="text-muted d-block">Sheet</small>${d.sheet||'—'}</div>
-            <div class="col-3"><small class="text-muted d-block">Row #</small>${d.rowNum||'—'}</div>
-            <div class="col-6"><small class="text-muted d-block">Order Code</small><strong>${d.clientOrderCode||'—'}</strong></div>
-            <div class="col-6"><small class="text-muted d-block">Order Date</small>${d.orderDate||'—'}</div>
-            <div class="col-6"><small class="text-muted d-block">Customer</small>${d.customerName||'—'}</div>
-            <div class="col-6"><small class="text-muted d-block">Phone</small>${d.customerPhone||'—'}</div>
-            <div class="col-12"><small class="text-muted d-block">Address</small>${d.customerAddress||'—'}</div>
-            <div class="col-4"><small class="text-muted d-block">Zone</small>${d.dlZone||'—'}</div>
-            <div class="col-4"><small class="text-muted d-block">Street</small>${d.dlStreet||'—'}</div>
-            <div class="col-4"><small class="text-muted d-block">Building</small>${d.dlBuilding||'—'}</div>
-            <div class="col-6"><small class="text-muted d-block">COD Amount</small>${d.codAmount||'—'}</div>
-            <div class="col-6"><small class="text-muted d-block">Package</small>${d.packageDesc||'—'}</div>
+            <div class="col-6"><small class="text-muted d-block">Business</small><strong>${esc(d.business)||'—'}</strong></div>
+            <div class="col-3"><small class="text-muted d-block">Sheet</small>${esc(d.sheet)||'—'}</div>
+            <div class="col-3"><small class="text-muted d-block">Row #</small>${esc(d.rowNum)||'—'}</div>
+            <div class="col-6"><small class="text-muted d-block">Order Code</small><strong>${esc(d.clientOrderCode)||'—'}</strong></div>
+            <div class="col-6"><small class="text-muted d-block">Order Date</small>${esc(d.orderDate)||'—'}</div>
+            <div class="col-6"><small class="text-muted d-block">Customer</small>${esc(d.customerName)||'—'}</div>
+            <div class="col-6"><small class="text-muted d-block">Phone</small>${esc(d.customerPhone)||'—'}</div>
+            <div class="col-12"><small class="text-muted d-block">Address</small>${esc(d.customerAddress)||'—'}</div>
+            <div class="col-4"><small class="text-muted d-block">Zone</small>${esc(d.dlZone)||'—'}</div>
+            <div class="col-4"><small class="text-muted d-block">Street</small>${esc(d.dlStreet)||'—'}</div>
+            <div class="col-4"><small class="text-muted d-block">Building</small>${esc(d.dlBuilding)||'—'}</div>
+            <div class="col-6"><small class="text-muted d-block">COD Amount</small>${esc(d.codAmount)||'—'}</div>
+            <div class="col-6"><small class="text-muted d-block">Package</small>${esc(d.packageDesc)||'—'}</div>
         </div>
         ${rawHtml}`;
     new bootstrap.Modal(document.getElementById('tempOrderModal')).show();

@@ -1,26 +1,23 @@
 {% extends 'business_dashboard_base.html' %}
 {% load static %}
 {% load custom_filters %}
+{% load business_console %}
 
 {% block title %}Stock Card - {{ product.item_name }}{% endblock %}
 
 {% block content %}
 <div class="skc" id="main-content">
-  <!-- Breadcrumb -->
-  <nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item">
-        <a href="{% url 'product:inventory_list' %}"
-           hx-get="{% url 'product:inventory_list' %}"
-           hx-target="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true">
-          Inventory
-        </a>
-      </li>
-      <li class="breadcrumb-item active">{{ product.item_name }}</li>
-    </ol>
-  </nav>
+  {# The hero's eyebrow + back button replace the old breadcrumb. #}
+  {% bconheader eyebrow="Inventory" live="Stock card" icon="fa-solid fa-layer-group" title=product.item_name subtitle="Every movement in and out of stock for this item." %}
+    <a href="{% url 'product:inventory_list' %}"
+       class="bcon__btn bcon__btn--ghost"
+       hx-get="{% url 'product:inventory_list' %}"
+       hx-target="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      <i class="fa-solid fa-arrow-left"></i> Inventory
+    </a>
+  {% endbconheader %}
 
   <!-- Product Hero Header -->
   <div class="skc__hero">

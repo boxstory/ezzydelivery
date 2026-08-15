@@ -1,6 +1,9 @@
 /* Purpose: Auto Triggers ledger design layer — restrained console styling for /workforce/auto-triggers/
    Used by: workforce/templates/workforce/auto_triggers_list.html (page wrapper class .atl)
-   Notes: Visual overrides only (colors, chrome); layout stays Bootstrap utilities. Status pills become swatch+text. */
+   Notes: Visual overrides only (colors, chrome); layout stays Bootstrap utilities. Status pills become swatch+text.
+          The three tables share ONE column grid (percentages below, table-layout:fixed) so the
+          Status/Enabled/Edit control rail lands on the same x in all of them — the page reads as
+          one ledger, not three. Change a rail width and you must change it in every ..--rail* rule. */
 
 .atl {
   --atl-ink: #16233a;
@@ -11,6 +14,66 @@
   --atl-ok: #2fae5f;
   --atl-off: #9aa3af;
   --atl-warn: #d97706;
+}
+
+/* ---- Department split: tab rail, desk caption, row tag ---- */
+.atl .atl__tabs-label {
+  color: var(--atl-muted);
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-right: 0.35rem;
+}
+.atl .atl__tab {
+  background: transparent;
+  border: 1px solid var(--atl-hair);
+  border-radius: 4px;
+  color: #4a5262;
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 0.3rem 0.7rem;
+  min-height: 2rem;
+}
+.atl .atl__tab:hover { border-color: #c3cad4; color: var(--atl-ink); }
+.atl .atl__tab--active {
+  background: var(--atl-navy);
+  border-color: var(--atl-navy);
+  color: #fff;
+}
+.atl .atl__tab-count {
+  color: var(--atl-muted);
+  font-family: var(--bs-font-monospace);
+  font-size: 0.68rem;
+  margin-left: 0.4rem;
+}
+/* Gold on this page belongs to the live "n on" reading only — the active tab
+   count is chrome, so it stays white and the accent keeps one meaning. */
+.atl .atl__tab--active .atl__tab-count { color: rgba(255, 255, 255, 0.75); }
+.atl .atl__deskline {
+  color: var(--atl-muted);
+  font-size: 0.78rem;
+}
+.atl .atl__deskline i { color: var(--atl-off); }
+.atl .atl__dept {
+  color: var(--atl-muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-top: 0.15rem;
+}
+/* warehouse.css ships `#main-content .card { display: flex !important }`, which
+   reaches every page in this shell and outguns Bootstrap's .d-none. Re-assert the
+   hide here (ID + classes) so a department tab can drop an empty category card. */
+#main-content .atl .card.d-none { display: none !important; }
+.atl .atl__empty {
+  border: 1px dashed var(--atl-hair);
+  border-radius: 6px;
+  color: var(--atl-muted);
+  font-size: 0.82rem;
+  padding: 1.75rem 1rem;
+  text-align: center;
 }
 
 /* ---- Cards as ledger panels ---- */
@@ -136,6 +199,9 @@
   font-weight: 400;
 }
 .atl tbody .wa-notif__via-badge i { color: var(--atl-off); }
+/* Channel picked, but that stack isn't configured on this server — the row would
+   not actually deliver, so it reads struck-through rather than merely quiet. */
+.atl tbody .wa-notif__via-badge--off { text-decoration: line-through; opacity: 0.7; }
 
 /* ---- Pages column links: quiet ink references (hardened against themed link defaults) ---- */
 .atl .wa-notif__page-link {
@@ -144,13 +210,32 @@
   font-size: 0.78rem;
   font-weight: 500;
   border-bottom: 1px dotted #b8bec9;
-  white-space: nowrap;
+  /* Was nowrap — under the fixed column grid a long link ("Verification
+     Trigger") overflowed into the next column instead of wrapping. */
+  white-space: normal;
 }
 .atl .wa-notif__page-link:hover {
   color: #111826 !important;
   border-bottom-color: currentColor;
   border-bottom-style: solid;
 }
+
+/* ---- Manual-composer rows: "this rides that route above" pointer ---- */
+/* Reads as a cross-reference, not a page link — it jumps within this table. */
+.atl .atl__uses-route {
+  color: var(--atl-muted) !important;
+  text-decoration: none !important;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-bottom: 1px dotted #c3cad4;
+  white-space: normal;
+}
+.atl .atl__uses-route:hover {
+  color: var(--atl-ink) !important;
+  border-bottom-color: currentColor;
+}
+.atl .atl__uses-route i { color: var(--atl-off); }
 
 /* ---- Controls: navy switch, ghost edit button ---- */
 /* brandkit-overrides.css squares all [type=checkbox] with !important — restore the switch shape here */
@@ -177,4 +262,102 @@
   --bs-btn-hover-border-color: var(--atl-navy);
   --bs-btn-hover-color: #fff;
   border-radius: 4px;
+}
+
+/* ================================================================
+   ONE LEDGER — shared column grid
+   The three tables carried different auto-widths, so Status/Enabled/Edit
+   zig-zagged by up to 62px down the page. Fixed layout + one rail spec
+   pins the control columns to the same x in every table.
+   ================================================================ */
+.atl table { table-layout: fixed; width: 100%; }
+
+/* Shared in all three tables */
+.atl .atl__col--num    { width: 3.5%; }
+.atl .atl__col--status { width: 8%; }
+.atl .atl__col--switch { width: 7%; }
+.atl .atl__col--edit   { width: 5.5%; }
+
+/* WhatsApp table (5 content columns). Action carries the longest strings
+   ("sendText — Delivery confirmation to customer") so it outweighs Pages and
+   From, which hold a short link stack and one phone number. */
+   Trigger is sized off the longest trigger_key (wa_location_verification, 24
+   mono chars) so keys never break mid-word. */
+.atl .atl__col--trigger { width: 17%; }
+.atl .atl__col--desc    { width: 18%; }
+.atl .atl__col--action  { width: 16%; }
+.atl .atl__col--pages   { width: 11%; }
+.atl .atl__col--from    { width: 14%; }
+
+/* Webhook + system tables (3 content columns, same 76% of content space) */
+.atl .atl__col--trigger-wide { width: 20%; }
+.atl .atl__col--desc-wide    { width: 29%; }
+.atl .atl__col--action-wide  { width: 27%; }
+
+/* Fixed layout means a long trigger_key can no longer stretch its column */
+.atl code,
+.atl tbody td { overflow-wrap: anywhere; }
+
+/* The rail: one hairline separating what a trigger IS from what you can DO to it */
+.atl .atl__col--status,
+.atl .atl__cell--rail { border-left: 1px solid var(--atl-hair); }
+
+/* ---- Density: rows carry 2 lines, not 3 — take back the padding ---- */
+.atl tbody td { padding: 0.375rem 0.75rem; line-height: 1.45; }
+.atl thead th { padding: 0.375rem 0.75rem; }
+.atl tbody tr.table-light td { padding: 0.375rem 0.75rem; }
+.atl .atl__rownum { color: var(--atl-off); font-family: var(--bs-font-monospace); font-size: 0.72rem; }
+.atl .atl__copy { cursor: pointer; }
+
+/* ---- Section headers: one badge treatment, and a live state reading ----
+   Bootstrap's .bg-* utilities and brandkit-overrides both use !important, which
+   is why "API Webhooks" rendered solid yellow while "via Evolution API" rendered
+   as a gold outline. Same role, three looks. One quiet chip instead. */
+.atl .card-header .badge,
+.atl .card-header .badge.bg-primary,
+.atl .card-header .badge.bg-warning {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.72) !important;
+  font-family: var(--bs-font-monospace);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  border-radius: 3px;
+  padding: 0.2rem 0.45rem;
+}
+
+/* "5 / 7 on" — the reading this page was missing: what is actually firing */
+.atl .atl__live {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.atl .atl__live-on {
+  color: var(--atl-gold);
+  font-family: var(--bs-font-monospace);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.atl .atl__live-total {
+  font-family: var(--bs-font-monospace);
+  font-size: 0.74rem;
+  letter-spacing: 0;
+}
+.atl .atl__live--none .atl__live-on { color: rgba(255, 255, 255, 0.45); }
+
+/* ---- Narrow screens: below ~992px the fixed grid crushes the content
+   columns, so hand the widths back to the browser and let the table scroll.
+   The rail stops aligning there — measured at 1100px it still holds, which
+   covers the laptops staff actually use. ---- */
+@media (max-width: 991.98px) {
+  .atl table { table-layout: auto; }
+  .atl .table-responsive { overflow-x: auto; }
+  .atl thead th { white-space: nowrap; }
 }

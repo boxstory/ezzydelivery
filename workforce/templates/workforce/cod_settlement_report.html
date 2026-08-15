@@ -1,348 +1,431 @@
 {% extends "wf_dashboard_base.html" %}
-{% load static %}
+{% load static humanize %}
+{% comment %}
+Purpose: Cash collection sheet — tick the drivers handing COD in now, record how it came in, close it out
+Used by: workforce.views.cod_settlement_report at /workforce/fleet/cod-settlement/
+Notes: Every amount here is WalletService.live_cod_in_hand(), the same figure the settle action posts —
+       the sheet must never offer a number the ledger will not book. Settling always takes a driver's
+       FULL balance; there is no partial hand-in on this page, so nothing is editable per row.
+       The count rail is the sticky bottom band: it holds the running total, the method, and the one
+       yellow action. It mirrors the hero's yellow rule, so the ledger sits between two bands.
+       The page-notes card (wfnote__, shared) sits under the hero; the hero help button toggles it
+       via the delegated handler in workforce.js.
+{% endcomment %}
 
-{% block title %}COD Settlement Report{% endblock %}
+{% block title %}Collect COD - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_settlement_report.css' %}?v=20260514a" type="text/css" />
-{% endblock %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/cod_settlement_report.css' %}?v=20260803e" type="text/css" />
+{% endblock extra_css %}
 
 {% block content %}
-<div class="container-fluid py-3">
-  <!-- Hero Header -->
-  <div class="wfd__hero">
-    <div class="wfd__hero-content">
-      <h1 class="wfd__hero-title"><i class="fa-solid fa-file-invoice-dollar"></i>COD Settlement Report</h1>
-      <p class="wfd__hero-subtitle">Collect COD from drivers and generate settlement reports</p>
-    </div>
-    <div class="wfd__hero-actions">
-      <a href="{% url 'workforce:cod_ledger' %}" class="btn btn-sm btn-outline-light">
-        <i class="fa-solid fa-book me-1"></i> COD Ledger
-      </a>
-      <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="btn btn-sm btn-outline-light">
-        <i class="fa-solid fa-arrow-left me-1"></i> Back to COD List
-      </a>
-    </div>
-  </div>
+<div class="csr">
 
-  <!-- Date Filter -->
-  <div class="csr__filter-card">
-    <form method="GET" class="row g-3 align-items-end">
-      <div class="col-md-3">
-        <label class="csr__filter-label">From Date</label>
-        <input type="date" name="date_from" class="form-control csr__filter-input" value="{{ date_from }}">
-      </div>
-      <div class="col-md-3">
-        <label class="csr__filter-label">To Date</label>
-        <input type="date" name="date_to" class="form-control csr__filter-input" value="{{ date_to }}">
-      </div>
-      <div class="col-md-3">
-        <button type="submit" class="csr__filter-btn">
-          <i class="fa-solid fa-filter"></i> Filter
-        </button>
-      </div>
-    </form>
-  </div>
-
-  <!-- Summary Cards -->
-  <div class="row mb-4 g-3">
-    <div class="col-md-3">
-      <div class="csr__stat-card">
-        <div class="csr__stat-icon csr__stat-icon--danger">
-          <i class="fa-solid fa-exclamation-circle"></i>
-        </div>
-        <div class="csr__stat-value csr__stat-value--danger">{{ total_unsettled|floatformat:2 }} QR</div>
-        <div class="csr__stat-label">Total Unsettled COD</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="csr__stat-card">
-        <div class="csr__stat-icon csr__stat-icon--primary">
-          <i class="fa-solid fa-users"></i>
-        </div>
-        <div class="csr__stat-value">{{ drivers_with_cod }}</div>
-        <div class="csr__stat-label">Drivers with COD</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="csr__stat-card">
-        <div class="csr__stat-icon csr__stat-icon--success">
-          <i class="fa-solid fa-check-circle"></i>
-        </div>
-        <div class="csr__stat-value csr__stat-value--success" id="selected-total">0.00 QR</div>
-        <div class="csr__stat-label">Selected Amount</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="csr__stat-card">
-        <div class="csr__stat-icon" style="background: #fef3c7; color: #92400e;">
-          <i class="fa-solid fa-hourglass-half"></i>
-        </div>
-        <div class="csr__stat-value" style="color: #92400e;">{{ pending_count }}</div>
-        <div class="csr__stat-label">Pending Requests</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Drivers List -->
-  <div class="csr__card">
-    <div class="csr__card-header">
-      <h5 class="csr__card-title">
-        <i class="fa-solid fa-users csr__section-icon"></i>DRIVERS WITH UNSETTLED COD
-      </h5>
-      <div class="form-check">
-        <input class="form-check-input csr__select-all" type="checkbox" id="selectAll">
-        <label class="form-check-label" for="selectAll">Select All</label>
-      </div>
-    </div>
-
-    <div id="drivers-list" class="csr__drivers-grid">
-      {% for driver in drivers %}
-      <div class="csr__driver-card">
-        <div class="csr__driver-card-checkbox">
-          <input class="form-check-input driver-checkbox" type="checkbox"
-                 value="{{ driver.driver_id }}"
-                 data-amount="{{ driver.cod_in_hand }}"
-                 data-name="{{ driver.user.first_name }} {{ driver.user.last_name }}"
-                 id="driver{{ driver.driver_id }}">
-        </div>
-        <div class="csr__driver-card-content">
-          <div class="csr__driver-card-name">{{ driver.user.first_name }} {{ driver.user.last_name }}</div>
-          <div class="csr__driver-card-id">ID: {{ driver.driver_id }}</div>
-          <div class="csr__driver-card-phone">{{ driver.user.profile.phone|default:"-" }}</div>
-        </div>
-        <div class="csr__driver-card-amount">
-          {{ driver.cod_in_hand|floatformat:2 }}
-          <span>QR</span>
-        </div>
-      </div>
-      {% empty %}
-      <div class="csr__empty" style="grid-column: 1 / -1;">
-        <i class="fa-solid fa-check-circle"></i>
-        <p>No unsettled COD found</p>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- Pending Driver Requests -->
-  <div class="csr__card" style="margin-bottom: 1.5rem;">
-    <div class="csr__card-header">
-      <h5 class="csr__card-title">
-        <i class="fa-solid fa-hourglass-half csr__section-icon"></i>PENDING DRIVER REQUESTS
-      </h5>
-      {% if pending_count > 0 %}
-      <span style="font-size: 0.75rem; background: #fef3c7; color: #92400e; padding: 0.25rem 0.75rem; border-radius: 999px; font-weight: 600;">
-        {{ pending_count }} pending
+  <header class="wfhero">
+    <div class="wfhero__ident">
+      <span class="wfhero__eyebrow">Fleet cash</span>
+      <h1 class="wfhero__title">Collect COD</h1>
+      <span class="wfhero__sub">
+        Tick the drivers handing cash in, record how it arrived, and close it out.
+        Each one settles in full — there is no part hand-in here.
       </span>
-      {% else %}
-      <span style="font-size: 0.75rem; color: var(--brand-grey-500);">No pending requests</span>
-      {% endif %}
     </div>
+    <div class="wfhero__side">
+      <div class="wfhero__tallies">
+        <div class="wfhero__tally">
+          <span class="wfhero__tally-num">{{ total_in_hand|floatformat:2|intcomma }}</span>
+          <span class="wfhero__tally-lbl">QAR to collect</span>
+        </div>
+        <div class="wfhero__tally">
+          <span class="wfhero__tally-num">{{ drivers_with_cod }}</span>
+          <span class="wfhero__tally-lbl">Drivers holding</span>
+        </div>
+      </div>
+      <nav class="wfhero__actions">
+        <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="wfhero__ghost">COD in hand</a>
+        <a href="{% url 'workforce:cod_ledger' %}" class="wfhero__ghost">COD ledger</a>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_cod_settlement_report_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
+      </nav>
+    </div>
+  </header>
 
-    <div id="pending-requests-list" style="max-height: 500px; overflow-y: auto;">
-      {% for txn in pending_requests %}
-      <div class="csr__request-row">
-        <div class="csr__request-icon" style="background: {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}#dcfce7{% elif txn.transaction_type == 'settlement' %}#eff6ff{% else %}#fef3c7{% endif %}; color: {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}#15803d{% elif txn.transaction_type == 'settlement' %}#2563eb{% else %}#92400e{% endif %};">
-          <i class="fa-solid {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}fa-money-bill-wave{% elif txn.transaction_type == 'settlement' %}fa-briefcase{% else %}fa-hand-holding-dollar{% endif %}"></i>
-        </div>
-        <div class="csr__request-info" style="flex: 1;">
-          <div class="csr__request-type">
-            {{ txn.get_transaction_type_display }}
-          </div>
-          <div class="csr__request-meta">
-            Driver: <strong>{{ txn.driver.user.first_name }} {{ txn.driver.user.last_name }}</strong> (ID: {{ txn.driver.driver_id }}) • {{ txn.created_at|date:"d M Y, h:i A" }}
-          </div>
-        </div>
-        <div class="csr__request-amount">
-          {{ txn.amount|floatformat:2 }} QR
-        </div>
-        <div class="csr__request-status">
-          {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}
-            {% if txn.is_received %}
-              <span style="font-size: 0.7rem; background: #dcfce7; color: #15803d; padding: 0.25rem 0.5rem; border-radius: var(--brand-radius-sm); display: inline-flex; align-items: center; gap: 0.25rem;">
-                <i class="fa-solid fa-check-circle"></i> Received
-              </span>
-            {% else %}
-              <span style="font-size: 0.7rem; background: #fee2e2; color: #991b1b; padding: 0.25rem 0.5rem; border-radius: var(--brand-radius-sm); display: inline-flex; align-items: center; gap: 0.25rem;">
-                <i class="fa-solid fa-circle-xmark"></i> Pending
-              </span>
-            {% endif %}
-          {% else %}
-            <span style="font-size: 0.7rem; background: #fef3c7; color: #92400e; padding: 0.25rem 0.5rem; border-radius: var(--brand-radius-sm); display: inline-flex; align-items: center; gap: 0.25rem;">
-              <i class="fa-solid fa-hourglass-end"></i> Pending
-            </span>
-          {% endif %}
-        </div>
-      </div>
-      {% empty %}
-      <div class="csr__empty" style="padding: 2rem 1.5rem;">
-        <i class="fa-solid fa-check-double" style="font-size: 2.5rem; color: #15803d; display: block; margin-bottom: 0.75rem;"></i>
-        <p style="margin: 0; color: #15803d; font-weight: 600;">All caught up!</p>
-        <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--brand-grey-500);">No pending driver requests</p>
-      </div>
-      {% endfor %}
+  <div class="wfnote" id="workforce_cod_settlement_report_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'workforce_cod_settlement_report_card_notes' %}" hidden></div>
+
+  {% comment %}
+  Three facts the total alone does not carry: whether the exposure sits with one
+  driver, how old the oldest cash is, and how much is already claimed as handed
+  in but still unverified — money that would be collected twice if ticked here.
+  {% endcomment %}
+  <div class="wfstat" role="group" aria-label="Collection summary">
+    <div class="wfstat__card {% if not largest_amount %}wfstat__card--null{% endif %}">
+      <span class="wfstat__label">Largest balance</span>
+      <span class="wfstat__value">{{ largest_amount|floatformat:2|intcomma|default:"—" }}<span class="wfstat__unit">QAR</span></span>
+      <span class="wfstat__sub">
+        {% if drivers %}{{ drivers.0.user.first_name }} {{ drivers.0.user.last_name }}{% else %}nothing outstanding{% endif %}
+      </span>
     </div>
+    <div class="wfstat__card {% if oldest_driver.days_held >= overdue_days %}wfstat__card--late{% endif %} {% if not oldest_driver %}wfstat__card--null{% endif %}">
+      <span class="wfstat__label">Oldest cash</span>
+      <span class="wfstat__value">{% if oldest_driver %}{{ oldest_driver.days_held }}<span class="wfstat__unit">days</span>{% else %}—{% endif %}</span>
+      <span class="wfstat__sub">
+        {% if oldest_driver %}held by {{ oldest_driver.user.first_name }} {{ oldest_driver.user.last_name }}{% else %}no cash outstanding{% endif %}
+      </span>
+    </div>
+    <a class="wfstat__card {% if not pending_count %}wfstat__card--done wfstat__card--null{% endif %}" href="#csr_claimed">
+      <span class="wfstat__label">Claimed, unverified</span>
+      <span class="wfstat__value">{{ pending_total|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+      <span class="wfstat__sub">
+        {% if pending_count %}{{ pending_count }} hand-in{{ pending_count|pluralize }} awaiting a check{% else %}nothing awaiting a check{% endif %}
+      </span>
+    </a>
   </div>
 
-  <!-- Action Buttons -->
-  <div class="csr__action-bar">
-    <div class="row align-items-end g-3">
-      <div class="col-md-3">
-        <label class="csr__filter-label"><i class="fa-solid fa-money-bill me-1"></i>Payment Method</label>
-        <select class="form-select" id="payment-method">
+  {% if drivers %}
+  <div class="csr__ledger">
+    <div class="csr__ledger-head">
+      <label class="csr__pickall">
+        <input type="checkbox" class="csr__tick" id="csr_select_all" aria-describedby="csr_pickall_hint">
+        <span class="csr__pickall-text" id="csr_pickall_hint">Tick all {{ drivers_with_cod }}</span>
+      </label>
+      <span class="csr__ledger-note">Ticking a driver takes the whole balance shown.</span>
+    </div>
+    <div class="csr__scroll">
+      <table class="csr__table" id="workforce_cod_settlement_table_sheet">
+        <thead>
+          <tr>
+            <th class="csr__col-tick"><span class="visually-hidden">Select</span></th>
+            <th class="csr__col-who">Driver</th>
+            <th class="csr__num">Held</th>
+            <th class="csr__num">Last hand-in</th>
+            <th class="csr__num csr__col-money">In hand</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for driver in drivers %}
+          <tr class="csr__row" data-driver="{{ driver.driver_id }}">
+            <td class="csr__col-tick">
+              <input type="checkbox" class="csr__tick csr__pick"
+                     id="csr_driver_{{ driver.driver_id }}"
+                     value="{{ driver.driver_id }}"
+                     data-amount="{{ driver.in_hand }}"
+                     data-name="{{ driver.user.first_name }} {{ driver.user.last_name }}"
+                     aria-label="Collect {{ driver.in_hand|floatformat:2 }} QAR from {{ driver.user.first_name }} {{ driver.user.last_name }}">
+            </td>
+            <td class="csr__col-who">
+              <div class="csr__who">
+                <span class="csr__initials" aria-hidden="true">{{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}</span>
+                <span class="csr__who-text">
+                  <span class="csr__name">
+                    {{ driver.user.first_name }} {{ driver.user.last_name }}
+                    {% if driver.off_roster %}<span class="csr__flag">{{ driver.get_driver_status_display|lower }}</span>{% endif %}
+                  </span>
+                  <span class="csr__meta">{{ driver.driver_id }}<span class="csr__meta-sep">·</span>{{ driver.driver_phone|default:"no phone" }}</span>
+                </span>
+              </div>
+              {# This balance against the largest on the sheet. Width comes from data-share via JS. #}
+              <span class="csr__share" aria-hidden="true"><span class="csr__share-fill" data-share="{{ driver.share_pct }}"></span></span>
+            </td>
+            <td class="csr__num">
+              {% if driver.days_held is None %}
+                <span class="csr__quiet">—</span>
+              {% else %}
+                <span class="csr__age {% if driver.days_held >= overdue_days %}csr__age--overdue{% elif driver.days_held >= stale_days %}csr__age--stale{% endif %}"
+                      title="Oldest uncollected cash from {{ driver.held_since|date:'d M Y' }}">{{ driver.days_held }}d</span>
+              {% endif %}
+            </td>
+            <td class="csr__num csr__quiet">{{ driver.last_settlement_date|date:"d M Y"|default:"never" }}</td>
+            <td class="csr__num csr__col-money">
+              <span class="csr__amount">{{ driver.in_hand|floatformat:2|intcomma }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="csr__empty">
+    <p class="csr__empty-line">No driver is holding cash. Nothing to collect.</p>
+    <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="csr__btn">Open COD in hand</a>
+  </div>
+  {% endif %}
+
+  {% comment %}
+  Hand-ins the drivers say they have already made. They are not collectible here
+  — they are waiting for someone to confirm the money arrived — so they sit
+  below the sheet rather than in it.
+  {% endcomment %}
+  <section class="csr__claimed" id="csr_claimed">
+    <h2 class="csr__claimed-title">
+      Claimed hand-ins
+      <span class="csr__claimed-count">{% if pending_count %}{{ pending_count }} awaiting verification{% else %}all verified{% endif %}</span>
+    </h2>
+
+    {% if pending_requests %}
+    <div class="csr__ledger">
+      <div class="csr__scroll">
+        <table class="csr__table csr__table--claimed">
+          <thead>
+            <tr>
+              <th>Driver</th>
+              <th class="csr__col-fill">Type</th>
+              <th>Received</th>
+              <th class="csr__num">Submitted</th>
+              <th class="csr__num csr__col-money">Amount</th>
+              <th><span class="visually-hidden">Open</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for txn in pending_requests %}
+            <tr class="csr__row">
+              <td>
+                <span class="csr__name">{{ txn.driver.user.first_name }} {{ txn.driver.user.last_name }}</span>
+                <span class="csr__meta">{{ txn.driver.driver_id }}</span>
+              </td>
+              <td class="csr__quiet csr__col-fill">{{ txn.get_transaction_type_display }}</td>
+              <td>
+                {% if txn.transaction_type == 'settlement' %}
+                  <span class="csr__state csr__state--wait">Not applicable</span>
+                {% elif txn.is_received %}
+                  <span class="csr__state csr__state--in">Money in</span>
+                {% else %}
+                  <span class="csr__state csr__state--wait">Not yet</span>
+                {% endif %}
+              </td>
+              <td class="csr__num csr__quiet">{{ txn.created_at|date:"d M Y, H:i" }}</td>
+              <td class="csr__num csr__col-money"><span class="csr__amount">{{ txn.amount|floatformat:2|intcomma }}</span></td>
+              <td class="csr__col-go">
+                <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ txn.driver.driver_id }}"
+                   class="csr__go" aria-label="Open transactions for {{ txn.driver.user.first_name }} {{ txn.driver.user.last_name }}">Verify</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="csr__empty csr__empty--tight">
+      <p class="csr__empty-line">Every claimed hand-in has been checked.</p>
+    </div>
+    {% endif %}
+  </section>
+</div>
+
+{% comment %}
+The count rail. The page is a cash count, so its running total lives at the
+bottom edge and stays there — tick a driver forty rows down and the figure you
+are about to take custody of is still under your thumb. Idle until something is
+ticked, which is also why the method fields only matter once it is live.
+{% endcomment %}
+<div class="csr__rail" id="csr_rail" role="region" aria-label="Hand-in being recorded">
+  <div class="csr__rail-inner">
+    <div class="csr__rail-count">
+      <span class="csr__rail-total" id="csr_rail_total" aria-live="polite">0.00</span>
+      <span class="csr__rail-lbl">QAR from <span id="csr_rail_count">0</span> of {{ drivers_with_cod }} drivers</span>
+    </div>
+
+    <div class="csr__rail-fields">
+      <div class="csr__rail-field">
+        <label class="csr__rail-flbl" for="csr_method">Arrived as</label>
+        <select class="csr__rail-select" id="csr_method" data-no-select2>
           <option value="cash" selected>Cash</option>
-          <option value="bank">Bank Transfer</option>
-          <option value="atm">ATM Deposit</option>
+          <option value="bank">Bank transfer</option>
+          <option value="atm">ATM deposit</option>
           <option value="fawran">Fawran</option>
         </select>
       </div>
-      <div class="col-md-3">
-        <label class="csr__filter-label"><i class="fa-solid fa-receipt me-1"></i>Reference (Optional)</label>
-        <input type="text" class="form-control" id="payment-reference" placeholder="Transaction ID / Receipt No.">
+      <div class="csr__rail-field">
+        <label class="csr__rail-flbl" for="csr_reference">Reference</label>
+        <input type="text" class="csr__rail-input" id="csr_reference"
+               placeholder="Receipt or transaction no." autocomplete="off">
       </div>
-      <div class="col-md-3">
-        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
-          <button type="button" class="csr__btn csr__btn--outline" id="btn-export-pdf" disabled title="Export selected drivers to PDF">
-            <i class="fa-solid fa-file-pdf"></i> <span class="d-none d-sm-inline">Export PDF</span>
-          </button>
-          <button type="button" class="csr__btn csr__btn--success" id="btn-settle" disabled title="Settle COD for selected drivers">
-            <i class="fa-solid fa-check-circle"></i> <span class="d-none d-sm-inline">Settle</span> (<span id="settle-count">0</span>)
-          </button>
-        </div>
-      </div>
+    </div>
+
+    <div class="csr__rail-acts">
+      <button type="button" class="csr__btn csr__btn--ghost" id="csr_export" disabled>Print sheet</button>
+      <button type="button" class="csr__btn csr__btn--go" id="csr_record" disabled>Record hand-in</button>
     </div>
   </div>
 </div>
 
-<!-- Settlement Confirmation Modal -->
-<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+<div class="modal fade csr__modal" id="csr_confirm" tabindex="-1" aria-labelledby="csr_confirm_title" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="confirmModalLabel">
-          <i class="fa-solid fa-check-circle me-2" style="color: #15803d;"></i>Confirm COD Settlement
-        </h5>
+        <h5 class="modal-title" id="csr_confirm_title">Record this hand-in</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p>You are about to settle COD for <strong id="confirm-count">0</strong> driver(s).</p>
-        <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border: 1px solid #a7f3d0; border-radius: var(--brand-radius-sm); padding: 1rem; text-align: center; margin: 1rem 0;">
-          <div style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #15803d; margin-bottom: 0.25rem;">Total Amount</div>
-          <div style="font-size: 1.375rem; font-weight: 700; color: #15803d;"><span id="confirm-amount">0.00</span> QR</div>
+        <div class="csr__confirm-sum">
+          <span class="csr__confirm-amount" id="csr_confirm_amount">0.00</span>
+          <span class="csr__confirm-lbl">QAR from <span id="csr_confirm_count">0 drivers</span>, arriving as <span id="csr_confirm_method">cash</span></span>
         </div>
-        <p style="margin-bottom: 0.75rem;"><strong style="color: var(--brand-grey-800);">Payment Method:</strong><br><span id="confirm-method" style="color: var(--brand-grey-600); font-size: 0.875rem;">Cash</span></p>
-        <details style="margin-top: 1rem;">
-          <summary style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--brand-grey-500); cursor: pointer; user-select: none;">View drivers (<span id="confirm-count-detail">0</span>)</summary>
-          <div id="confirm-drivers-list" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--brand-grey-200); font-size: 0.75rem; color: var(--brand-grey-600); max-height: 200px; overflow-y: auto;"></div>
-        </details>
+        <ul class="csr__confirm-list" id="csr_confirm_list"></ul>
+        <p class="csr__confirm-note">Each driver's balance is settled in full. This cannot be undone from here.</p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-          <i class="fa-solid fa-times me-1"></i>Cancel
-        </button>
-        <button type="button" class="btn btn-success" id="btn-confirm-settle">
-          <i class="fa-solid fa-check-circle me-1"></i>Confirm Settlement
-        </button>
+        <button type="button" class="csr__btn csr__btn--ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="csr__btn csr__btn--go" id="csr_confirm_go">Record hand-in</button>
       </div>
     </div>
   </div>
 </div>
-{% endblock %}
+{% endblock content %}
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
-  var selectedDrivers = [];
-  var selectedTotal = 0;
+(function () {
+  var picks = Array.prototype.slice.call(document.querySelectorAll('.csr__pick'));
+  var selectAll = document.getElementById('csr_select_all');
+  var rail = document.getElementById('csr_rail');
+  var railTotal = document.getElementById('csr_rail_total');
+  var railCount = document.getElementById('csr_rail_count');
+  var btnRecord = document.getElementById('csr_record');
+  var btnExport = document.getElementById('csr_export');
+  var selected = [];
 
-  // Update selection summary
-  function updateSummary() {
-    selectedDrivers = [];
-    selectedTotal = 0;
+  // Share-bar widths are data, not styling, so they arrive on the element as
+  // data-share and are applied here rather than as inline style attributes.
+  document.querySelectorAll('.csr__share-fill').forEach(function (el) {
+    el.style.width = Math.max(2, Math.min(100, parseInt(el.dataset.share, 10) || 0)) + '%';
+  });
 
-    $('.driver-checkbox:checked').each(function() {
-      selectedDrivers.push({
-        id: $(this).val(),
-        name: $(this).data('name'),
-        amount: parseFloat($(this).data('amount'))
-      });
-      selectedTotal += parseFloat($(this).data('amount'));
-    });
+  // The rail is fixed to the viewport, so its left edge is measured from the
+  // content column rather than guessed at a breakpoint — the sidebar is a
+  // Bootstrap grid fraction and its pixel width changes with the window.
+  var column = document.getElementById('main-content');
+  function placeRail() {
+    rail.style.left = column ? Math.round(column.getBoundingClientRect().left) + 'px' : '0px';
+  }
+  placeRail();
+  window.addEventListener('resize', placeRail);
 
-    $('#selected-total').text(selectedTotal.toFixed(2) + ' QR');
-    $('#settle-count').text(selectedDrivers.length);
-
-    var hasSelection = selectedDrivers.length > 0;
-    $('#btn-settle').prop('disabled', !hasSelection);
-    $('#btn-export-pdf').prop('disabled', !hasSelection);
+  function money(n) {
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  // Checkbox change
-  $('.driver-checkbox').on('change', updateSummary);
+  function refresh() {
+    selected = picks.filter(function (el) { return el.checked; }).map(function (el) {
+      return { id: el.value, name: el.dataset.name, amount: parseFloat(el.dataset.amount) || 0 };
+    });
+    var total = selected.reduce(function (sum, d) { return sum + d.amount; }, 0);
 
-  // Select all
-  $('#selectAll').on('change', function() {
-    $('.driver-checkbox').prop('checked', $(this).is(':checked'));
-    updateSummary();
+    railTotal.textContent = money(total);
+    railCount.textContent = selected.length;
+    rail.classList.toggle('csr__rail--live', selected.length > 0);
+    btnRecord.disabled = selected.length === 0;
+    btnExport.disabled = selected.length === 0;
+
+    picks.forEach(function (el) {
+      el.closest('.csr__row').classList.toggle('csr__row--picked', el.checked);
+    });
+    if (selectAll) {
+      selectAll.checked = selected.length === picks.length && picks.length > 0;
+      selectAll.indeterminate = selected.length > 0 && selected.length < picks.length;
+    }
+  }
+
+  picks.forEach(function (el) { el.addEventListener('change', refresh); });
+
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      picks.forEach(function (el) { el.checked = selectAll.checked; });
+      refresh();
+    });
+  }
+
+  // The whole row ticks the driver — a 16px box is a poor target on a sheet you
+  // work down at speed. Clicks that already landed on the box, a link or a
+  // button are left alone, and selecting text must not tick anything.
+  var sheet = document.getElementById('workforce_cod_settlement_table_sheet');
+  if (sheet) {
+    sheet.addEventListener('click', function (e) {
+      if (e.target.closest('a, button, input, label')) return;
+      var row = e.target.closest('.csr__row[data-driver]');
+      if (!row) return;
+      if (window.getSelection && String(window.getSelection())) return;
+      var box = row.querySelector('.csr__pick');
+      box.checked = !box.checked;
+      refresh();
+    });
+  }
+
+  btnExport.addEventListener('click', function () {
+    var q = selected.map(function (d) { return 'driver_ids=' + encodeURIComponent(d.id); }).join('&');
+    window.open('{% url "workforce:cod_settlement_pdf" %}?' + q, '_blank');
   });
 
-  // Export PDF
-  $('#btn-export-pdf').on('click', function() {
-    var driverIds = selectedDrivers.map(d => d.id);
-    var url = '{% url "workforce:cod_settlement_pdf" %}?driver_ids=' + driverIds.join('&driver_ids=');
-    window.open(url, '_blank');
+  btnRecord.addEventListener('click', function () {
+    var total = selected.reduce(function (sum, d) { return sum + d.amount; }, 0);
+    document.getElementById('csr_confirm_amount').textContent = money(total);
+    document.getElementById('csr_confirm_count').textContent =
+      selected.length + (selected.length === 1 ? ' driver' : ' drivers');
+    document.getElementById('csr_confirm_method').textContent =
+      document.getElementById('csr_method').selectedOptions[0].text.toLowerCase();
+
+    var list = document.getElementById('csr_confirm_list');
+    list.innerHTML = '';
+    selected.forEach(function (d) {
+      var li = document.createElement('li');
+      li.className = 'csr__confirm-item';
+      var who = document.createElement('span');
+      who.textContent = d.name;
+      var amt = document.createElement('span');
+      amt.className = 'csr__confirm-item-amt';
+      amt.textContent = money(d.amount);
+      li.appendChild(who);
+      li.appendChild(amt);
+      list.appendChild(li);
+    });
+
+    new bootstrap.Modal(document.getElementById('csr_confirm')).show();
   });
 
-  // Show settlement confirmation
-  $('#btn-settle').on('click', function() {
-    $('#confirm-count').text(selectedDrivers.length);
-    $('#confirm-count-detail').text(selectedDrivers.length);
-    $('#confirm-amount').text(selectedTotal.toFixed(2));
-    $('#confirm-method').text($('#payment-method option:selected').text());
+  document.getElementById('csr_confirm_go').addEventListener('click', function () {
+    var btn = this;
+    var body = new URLSearchParams();
+    selected.forEach(function (d) { body.append('driver_ids[]', d.id); });
+    body.append('payment_method', document.getElementById('csr_method').value);
+    body.append('reference', document.getElementById('csr_reference').value);
+    body.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
-    var driversList = selectedDrivers.map(d => '<div style="padding: 0.25rem 0;">' + d.name + ' — <strong>' + d.amount.toFixed(2) + ' QR</strong></div>').join('');
-    $('#confirm-drivers-list').html(driversList);
+    btn.disabled = true;
+    btn.textContent = 'Recording…';
 
-    var modal = new bootstrap.Modal(document.getElementById('confirmModal'));
-    modal.show();
-  });
-
-  // Confirm settlement
-  $('#btn-confirm-settle').on('click', function() {
-    var btn = $(this);
-    var driverIds = selectedDrivers.map(d => d.id);
-    var paymentMethod = $('#payment-method').val();
-    var reference = $('#payment-reference').val();
-
-    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Processing...');
-
-    $.ajax({
-      url: '{% url "workforce:cod_settlement_action" %}',
+    fetch('{% url "workforce:cod_settlement_action" %}', {
       method: 'POST',
-      data: {
-        'driver_ids[]': driverIds,
-        'payment_method': paymentMethod,
-        'reference': reference,
-        'csrfmiddlewaretoken': '{{ csrf_token }}'
-      },
-      success: function(response) {
-        bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide();
-
-        if (response.success) {
-          alert('Settlement completed!\n\nSettled: ' + response.settled_count + ' drivers\nTotal: ' + response.total_settled.toFixed(2) + ' QR');
-          location.reload();
-        } else {
-          alert('Error: ' + (response.error || 'Unknown error'));
-          btn.prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i>Confirm Settlement');
-        }
-      },
-      error: function(xhr) {
-        alert('Error: ' + (xhr.responseJSON?.error || 'Server error'));
-        btn.prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i>Confirm Settlement');
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: body
+    }).then(function (r) {
+      return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+    }).then(function (res) {
+      if (res.ok && res.data.success) {
+        // The page is rebuilt from the ledger rather than patched, so what is on
+        // screen after a hand-in is what was actually booked.
+        window.location.reload();
+        return;
       }
+      throw new Error((res.data && res.data.error) || 'The hand-in was not recorded.');
+    }).catch(function (err) {
+      var note = document.querySelector('.csr__confirm-note');
+      note.textContent = err.message + ' Nothing was settled — check the ledger before retrying.';
+      note.classList.add('csr__confirm-note--bad');
+      btn.disabled = false;
+      btn.textContent = 'Record hand-in';
     });
   });
-});
+
+  refresh();
+})();
 </script>
-{% endblock %}
+{% endblock extra_js %}

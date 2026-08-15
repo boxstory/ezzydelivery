@@ -1,0 +1,72 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/create_pick_list.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_create_pick_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Turns <strong>orders into one picking job</strong>. Tick the orders you want collected
+            together and the system builds a pick list grouped by product, so a picker walks the shelves
+            once instead of once per order. Only orders that are ready for pickup and do not already
+            belong to a pick list appear here — the fifty most recent.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">How it works</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pick the orders</dt>
+                        <dd class="wfnote__def">Any mix you like. Orders going to the same warehouse
+                            end up on the same list.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Grouped by product</dt>
+                        <dd class="wfnote__def">Ten orders needing the same item become one line for
+                            ten units. They are split back out per order at the pack station.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Items count</dt>
+                        <dd class="wfnote__def">The number beside an order is how many of its products
+                            can actually be picked — order lines with no product record are skipped.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">After creating</dt>
+                        <dd class="wfnote__def">You land on the new list, ready to start picking.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Why an order is missing</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Not ready yet</dt>
+                        <dd class="wfnote__def">Only orders at <em>ready to pickup</em> qualify.
+                            Anything earlier in the pipeline is not offered.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Already on a list</dt>
+                        <dd class="wfnote__def">An order can only belong to one pick list. Find it from
+                            the Pick Lists page instead.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">No products</dt>
+                        <dd class="wfnote__def">Orders whose lines are not linked to product records
+                            have nothing to pick, so they produce no items.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Another business</dt>
+                        <dd class="wfnote__def">A seller account sees only its own orders; staff see
+                            everyone's.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Batch by shape of work</strong> — orders drawing from the same area
+                        make a shorter walk than a random selection.</li>
+                    <li><strong>Nothing moves yet.</strong> Creating a list only plans the work; stock
+                        is untouched until the orders are fulfilled.</li>
+                </ul>
+            </section>
+        </div>

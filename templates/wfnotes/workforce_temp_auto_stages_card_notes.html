@@ -1,0 +1,97 @@
+{% comment %}
+Purpose: "About this page" notes panel for temp_auto_stages.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_temp_auto_stages_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            When a raw imported row is <strong>auto-imported</strong> from Temp Orders, it runs through a fixed
+            pipeline of steps: read the address, match products, arrange the pickup, place the pin, set the
+            status, message the customer, hand it to the fleet. This grid decides, <strong>per client</strong>,
+            which of those steps are allowed to run. A ticked box means the step runs for that client's rows; an
+            unticked box means it is skipped and, where it matters, left for a human. Only clients with temp-order
+            sync switched on appear here.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Tick a box</dt>
+                        <dd class="wfnote__def">Turns that one stage on or off for that one client and saves at once —
+                            there is no Save button. A toast confirms it; if the save fails the tick springs back.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">All on / All off</dt>
+                        <dd class="wfnote__def">In a column header — applies that stage to <strong>every</strong> client
+                            with temp-order sync on, after a confirmation. The reply tells you how many changed.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">All / None</dt>
+                        <dd class="wfnote__def">In the Row Actions column — turns every stage on or off for that one
+                            client in a single save.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Back to Temp Orders</dt>
+                        <dd class="wfnote__def">Returns to the temp order queue, where auto-import is actually run.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The stages</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">AI parse</dt>
+                        <dd class="wfnote__def">Reads the free-text address and pulls out zone, street and building.
+                            Off means whatever the source supplied is used as-is.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Match products</dt>
+                        <dd class="wfnote__def">Tries to line the imported item text up against the client's product
+                            catalogue.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Auto pickup</dt>
+                        <dd class="wfnote__def">Raises the first-mile collection job for the order, following that
+                            client's rule on <strong>Pickup Automation</strong>.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Geocode</dt>
+                        <dd class="wfnote__def">Turns the parsed address into a map pin via QNAS so the driver has
+                            somewhere to navigate to.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Set publish</dt>
+                        <dd class="wfnote__def">Moves the new order's status to publish instead of leaving it for review.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Send WhatsApp</dt>
+                        <dd class="wfnote__def">Messages the customer a link to confirm their own address. Leave it off
+                            for clients who do not want us contacting their customers.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Publish to fleet</dt>
+                        <dd class="wfnote__def">The last step — makes the delivery job visible to drivers. Off means the
+                            order is created but nobody is offered it until staff publish it.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Stages default to <strong>on</strong>. A client who has never been configured here behaves as if
+                    every box were ticked.</li>
+                <li>The column bulk buttons hit <strong>every listed client at once</strong>, including rows you have
+                    scrolled past. There is no undo — you would have to set them back one by one.</li>
+                <li>Changes apply to <strong>future auto-imports only</strong>. Rows already imported keep whatever
+                    happened at the time.</li>
+                <li>An empty table means no client has temp-order sync switched on yet — turn it on from
+                    <strong>Temp Order Config</strong> and they will appear here.</li>
+                <li>Turning a stage off does not block the import; it just leaves that piece of work undone, so expect
+                    those orders to land in the review queue instead of going straight out.</li>
+            </ul>
+        </section>
+    

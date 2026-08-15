@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff read-only stock report — seller cards, then a per-seller product stock table
+Used by: workforce_views.inventory_reports at /workforce/inventory-reports/
+Notes: Stock is summed from all inventory rows per product; the reorder level is a fixed threshold.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Inventory Reports - Ezzy Delivery{% endblock title %}
 
@@ -13,7 +20,16 @@
       </h1>
       <p class="ivr__hero-subtitle">Track stock levels and inventory status across sellers</p>
     </div>
+    <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_inventory_reports_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
   </div>
+
+  <div class="wfnote" id="workforce_inventory_reports_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_inventory_reports_card_notes' %}" hidden></div>
 
   <!-- Filter Section -->
   <div class="ivr__filter-bar">
@@ -66,6 +82,7 @@
       </tbody>
     </table>
   </div>
+  {% include "includes/components/_pagination.html" with page_obj=products_page per_page=per_page pagination_id="inventory_report_products" %}
 
   {% else %}
   <!-- Compact View - Seller/Store Cards -->
@@ -95,6 +112,7 @@
     </div>
     {% endfor %}
   </div>
+  {% include "includes/components/_pagination.html" with page_obj=sellers_page per_page=per_page pagination_id="inventory_report_sellers" %}
   {% else %}
   <div class="ivr__empty">
     <i class="fa-solid fa-store"></i>

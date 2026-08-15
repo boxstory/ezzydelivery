@@ -1,0 +1,66 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/rma_list.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_rma_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            <strong>Goods coming back from customers</strong> after a delivery — the RMA queue. Each row
+            is one return request against one order: what the customer is sending back, why, and how far
+            through receiving and inspection it has got. Newest first.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Status, in order</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Requested</dt>
+                        <dd class="wfnote__def">Raised, nothing physically back yet. The warehouse is
+                            expecting it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Received</dt>
+                        <dd class="wfnote__def">The parcel has arrived and every line is marked
+                            received. Inspection is the next step.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Resolved</dt>
+                        <dd class="wfnote__def">Every line has been inspected and given a disposition —
+                            restocked, held or written off. Nothing further is owed.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Rejected</dt>
+                        <dd class="wfnote__def">The return was refused. Nothing goes back on the shelf.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the list</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">RMA number</dt>
+                        <dd class="wfnote__def">The reference for the whole return. It is stamped on
+                            every stock movement the return creates.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Order</dt>
+                        <dd class="wfnote__def">The delivery the goods came from — a return always
+                            belongs to an order, never floats on its own.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Status filter</dt>
+                        <dd class="wfnote__def">The quickest way to see what is waiting to be received
+                            versus waiting to be inspected.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Not to be confused with</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Return tasks</strong> — those are items coming back off a cancelled
+                        order that was already picked. They never left the building.</li>
+                    <li><strong>Failed deliveries</strong> — stock the driver could not deliver goes
+                        back through the order pipeline, not through an RMA.</li>
+                </ul>
+            </section>
+        </div>

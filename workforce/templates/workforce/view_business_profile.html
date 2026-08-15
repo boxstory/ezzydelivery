@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff read-only dossier of a client applicant's user + business profile, for verification review
+Used by: workforce.views.view_user_business_profile at /workforce/verification/<profile_id>/business-profile/
+Notes: Nothing here is editable — approve/reject happens back on the verification list.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}View Business Profile - Staff Dashboard{% endblock title %}
 
@@ -47,7 +54,16 @@
             </small>
         </div>
     </div>
+    <button type="button" class="wfnote__btn" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_view_business_profile_card_notes"
+            title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+    </button>
 </div>
+
+<div class="wfnote" id="workforce_view_business_profile_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_view_business_profile_card_notes' %}" hidden></div>
 
 <!-- Back Link -->
 <a href="javascript:history.back()" class="btn btn-outline-secondary mb-3">

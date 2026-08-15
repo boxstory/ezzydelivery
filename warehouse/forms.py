@@ -25,6 +25,8 @@ Related:
 
 from django import forms
 from warehouse import models as warehouse_models
+from product import forms as product_forms
+from core.forms_base import SanitizedForm, SanitizedFormMixin, SanitizedModelForm
 
 # Local aliases for commonly used models
 Warehouse = warehouse_models.Warehouse
@@ -42,7 +44,7 @@ CycleCountItem = warehouse_models.CycleCountItem
 # =============================================================================
 
 
-class WarehouseForm(forms.ModelForm):
+class WarehouseForm(SanitizedModelForm):
     """
     Form for creating/editing fulfillment centers.
     Staff-only form - warehouses are NOT owned by sellers.
@@ -101,7 +103,7 @@ class WarehouseForm(forms.ModelForm):
         }
 
 
-class WarehouseLocationForm(forms.ModelForm):
+class WarehouseLocationForm(SanitizedModelForm):
     """
     Form for creating/editing warehouse pickup/dispatch locations.
     Each warehouse can have multiple physical locations.
@@ -161,7 +163,7 @@ class WarehouseLocationForm(forms.ModelForm):
         }
 
 
-class SellerWarehouseLinkForm(forms.ModelForm):
+class SellerWarehouseLinkForm(SanitizedModelForm):
     """
     Form for linking sellers to fulfillment centers.
     Staff-only form - controls which warehouses serve which sellers.
@@ -214,7 +216,7 @@ class SellerWarehouseLinkForm(forms.ModelForm):
 # =============================================================================
 
 
-class StorageLocationForm(forms.ModelForm):
+class StorageLocationForm(SanitizedModelForm):
     class Meta:
         model = warehouse_models.StorageLocation
         fields = ['warehouse', 'parent', 'name', 'code', 'location_type', 'is_pickable', 'is_active']
@@ -236,7 +238,7 @@ class StorageLocationForm(forms.ModelForm):
 # =============================================================================
 
 
-class StockLevelForm(forms.ModelForm):
+class StockLevelForm(SanitizedModelForm):
     class Meta:
         model = warehouse_models.StockLevel
         fields = ['product', 'warehouse', 'location', 'quantity_on_hand',
@@ -260,7 +262,7 @@ class StockLevelForm(forms.ModelForm):
 # =============================================================================
 
 
-class ReceiveStockForm(forms.Form):
+class ReceiveStockForm(SanitizedForm):
     warehouse = forms.ModelChoiceField(
         queryset=warehouse_models.Warehouse.objects.none(),
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -320,7 +322,7 @@ class ReceiveStockForm(forms.Form):
 # =============================================================================
 
 
-class CycleCountForm(forms.ModelForm):
+class CycleCountForm(SanitizedModelForm):
     class Meta:
         model = warehouse_models.CycleCount
         fields = ['warehouse', 'location', 'scheduled_date', 'assigned_to', 'notes']
@@ -340,7 +342,7 @@ class CycleCountForm(forms.ModelForm):
 # =============================================================================
 
 
-class CycleCountItemForm(forms.ModelForm):
+class CycleCountItemForm(SanitizedModelForm):
     class Meta:
         model = warehouse_models.CycleCountItem
         fields = ['counted_quantity', 'variance_reason']
@@ -358,7 +360,7 @@ class CycleCountItemForm(forms.ModelForm):
 # =============================================================================
 
 
-class AdjustmentForm(forms.Form):
+class AdjustmentForm(SanitizedForm):
     ADJUSTMENT_TYPE_CHOICES = [
         ('adjust_in', 'Adjustment In (Add)'),
         ('adjust_out', 'Adjustment Out (Remove)'),
@@ -375,3 +377,57 @@ class AdjustmentForm(forms.Form):
     reason = forms.CharField(
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2})
     )
+
+
+# =============================================================================
+# STAFF PRODUCT ADD FORM
+# Warehouse-side quick add for a seller's catalogue.
+# =============================================================================
+
+
+class StaffProductAddForm(product_forms.AddItemsForm):
+    """
+    The seller's product form, relaxed for the receiving desk.
+
+    The seller-facing form demands a brand, a SKU, a price and a category
+    because a seller is describing a product they are about to sell. Warehouse
+    staff are usually adding an item that just turned up in a box, and holding
+    the record hostage to a category they have no opinion about means the
+    product never gets created at all. Only the name is required here; the
+    seller fills the rest in later on their own screen.
+    """
+
+    OPTIONAL_FOR_STAFF = ('brand_name', 'item_sku', 'item_price', 'product_category')
+
+    def __init__(self, *args, business=None, **kwargs):
+        # The chosen seller, needed for the SKU rule below. Not a form field:
+        # the view owns it, the same way it owns which business is saved.
+        self.business = business
+        super().__init__(*args, **kwargs)
+        for name in self.OPTIONAL_FOR_STAFF:
+            if name in self.fields:
+                self.fields[name].required = False
+        # Deliberately left not-required even for a fulfilment seller: the
+        # standard "This field is required." says nothing about why, so the
+        # check lives in clean_item_sku where it can explain itself.
+
+    def _business_needs_sku(self):
+        return bool(self.business and getattr(self.business, 'fulfillment_service_enabled', False))
+
+    def clean_item_price(self):
+        # PositiveIntegerField is NOT NULL with a default of 0 — a blank box
+        # means "not priced yet", not "no value allowed".
+        return self.cleaned_data.get('item_price') or 0
+
+    def clean_brand_name(self):
+        return (self.cleaned_data.get('brand_name') or '').strip()
+
+    def clean_item_sku(self):
+        sku = (self.cleaned_data.get('item_sku') or '').strip()
+        # Product.save() refuses a blank SKU for a fulfilment-enabled seller.
+        # Catch it here so it reads as a field error instead of a 500.
+        if not sku and self._business_needs_sku():
+            raise forms.ValidationError(
+                "This seller is fulfilment-enabled, so every product needs a SKU."
+            )
+        return sku

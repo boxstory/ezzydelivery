@@ -3,6 +3,7 @@
 {% load static %}
 {% load custom_filters %}
 {% load business_pwa_tags %}
+{% load business_console %}
 <!-- extra css -->
 {% block extra_css %}
   <link href="{% static 'orders/css/orders.css' %}?v=20260215e"
@@ -107,32 +108,27 @@
     <section class="d-block" id="orders_pending_list_section_main">
       <div class="col-12 pb-2">
         <div class="px-2 px-md-3">
-          <div class="col-12 pt-3 pt-md-4 d-flex flex-wrap justify-content-between pb-3 pb-md-4 gap-2" id="orders_pending_list_header">
-            <div class="d-flex align-items-center gap-3">
-              <div class="m-0 fs-5 fw-bolder" id="orders_pending_list_title">Pending Orders ({{ len }})</div>
+          {% bconheader header_id="orders_pending_list_header" eyebrow="Orders" live="Pending" icon="fa-solid fa-clock" title="Pending Orders" subtitle="Orders waiting to be confirmed and dispatched." readout_label="Pending" readout_value=len %}
+            <a class="bcon__btn bcon__btn--secondary"
+               href="{% url 'delivery:all_delivery_tasks' %}"
+               id="orders_pending_list_btn_go_tasks">
+              <i class="fa-solid fa-truck"></i> Go to Tasks
+            </a>
+            <!-- View Toggle -->
+            <div class="btn-group" role="group" aria-label="View toggle">
+              <button type="button" class="bcon__btn bcon__btn--ghost active" id="view-toggle-table">
+                <i class="fas fa-table"></i> Table
+              </button>
+              <button type="button" class="bcon__btn bcon__btn--ghost" id="view-toggle-kanban">
+                <i class="fas fa-columns"></i> Kanban
+              </button>
             </div>
-            <div class="d-flex flex-wrap gap-2 align-items-center" id="orders_pending_list_nav_actions">
-              <a class="btn btn-outline-secondary btn-sm"
-                 href="{% url 'delivery:all_delivery_tasks' %}"
-                 id="orders_pending_list_btn_go_tasks">
-                <i class="fa-solid fa-truck me-1"></i> Go to Tasks
-              </a>
-              <!-- View Toggle -->
-              <div class="btn-group" role="group" aria-label="View toggle">
-                <button type="button" class="btn btn-outline-secondary btn-sm active" id="view-toggle-table">
-                  <i class="fas fa-table me-1"></i> Table
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="view-toggle-kanban">
-                  <i class="fas fa-columns me-1"></i> Kanban
-                </button>
-              </div>
-              <a class="btn btn-dark btn-sm text-white"
-                 href="{% url 'orders:add_order' %}"
-                 id="orders_pending_list_btn_add_orders">
-                <i class="fa fa-add me-1"></i> Add
-              </a>
-            </div>
-          </div>
+            <a class="bcon__btn bcon__btn--primary"
+               href="{% url 'orders:add_order' %}"
+               id="orders_pending_list_btn_add_orders">
+              <i class="fa fa-add"></i> Add
+            </a>
+          {% endbconheader %}
 
           <div id="orders-table-view">
             {% include "orders/parts/order_list_table_view.html" %}

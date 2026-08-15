@@ -18,7 +18,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260728g">
+<link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260729a">
 {% endblock %}
 
 {% block content %}
@@ -226,10 +226,15 @@
         }
     }
 
-    if ('geolocation' in navigator) {
-        navigator.geolocation.watchPosition(updateDriverPosition, function() {}, {
-            enableHighAccuracy: true, timeout: 10000, maximumAge: 5000
-        });
+    // Ride on the fixes EzzyGPS is already taking. A second watchPosition here
+    // would run the GPS radio twice over for the same blue dot.
+    document.addEventListener('ezzy:gps', function(e) {
+        var d = e.detail;
+        if (d) updateDriverPosition({ coords: { latitude: d.lat, longitude: d.lng, accuracy: d.accuracy } });
+    });
+    if (typeof EzzyGPS !== 'undefined') {
+        var known = EzzyGPS.getPosition();
+        if (known) updateDriverPosition({ coords: { latitude: known.lat, longitude: known.lng, accuracy: known.accuracy } });
     }
 })();
 </script>

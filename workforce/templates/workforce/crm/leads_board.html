@@ -3,10 +3,11 @@
 
 {# Purpose: CRM kanban board — drag leads between pipeline stage columns. #}
 {# Used by: workforce.crm_views.crm_leads_board #}
-{# Notes: crmb__ namespace; HTML5 drag-and-drop posts to crm_lead_update_stage; Won/Lost show last {{ closed_window_days }} days only. #}
+{# Notes: crmb__ namespace; HTML5 drag-and-drop posts to crm_lead_update_stage; columns come from LeadStage rows managed at crm_stages_manage, and each terminal column hides its closed cards after its own hide_after_days. #}
+{#        Serves both the business and the driver board; carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260724b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -19,7 +20,7 @@
       <div class="crm__head-title">
         <div class="crm__eyebrow">{% if is_driver_board %}Recruitment Pipeline{% else %}Sales Pipeline{% endif %}</div>
         <h1 class="crm__title">{% if is_driver_board %}Driver Leads Board{% else %}Leads Board{% endif %}</h1>
-        <p class="crm__subtitle">Drag a card to change its stage · Won/Lost show last {{ closed_window_days }} days</p>
+        <p class="crm__subtitle">Drag a card to change its stage{% if closed_window_days %} · closed cards show for {{ closed_window_days }} days{% endif %}</p>
         <div class="crm__board-tabs" role="tablist" aria-label="Lead boards">
           <a href="{% url 'workforce:crm_leads_board' %}"
              class="crm__board-tab {% if not is_driver_board %}crm__board-tab--active{% endif %}"
@@ -45,8 +46,8 @@
           <span class="crm__metric-value {% if overdue_total %}crm__metric-value--alert{% endif %}">{{ overdue_total }}</span>
         </div>
         <div class="crm__metric">
-          <span class="crm__metric-label">Won · {{ closed_window_days }}d</span>
-          <span class="crm__metric-value">{{ won_window }}</span>
+          <span class="crm__metric-label">{{ outcome_label }}{% if closed_window_days %} · {{ closed_window_days }}d{% endif %}</span>
+          <span class="crm__metric-value">{{ outcome_total }}</span>
         </div>
       </div>
       <div class="crm__head-actions">
@@ -55,10 +56,163 @@
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-table-list"></i> List
         </a>
+        <a href="{% url 'workforce:crm_stages_manage' %}?board={{ board_category }}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_stages_manage' %}?board={{ board_category }}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-table-columns"></i> Columns
+        </a>
         <a href="{% url 'workforce:crm_lead_create' %}{% if is_driver_board %}?category=driver{% endif %}" class="crm__btn crm__btn--primary">
           <i class="fa-solid fa-plus"></i> New Lead
         </a>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_crm_leads_board_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
       </div>
+    </div>
+
+    <div class="wfnote" id="workforce_crm_leads_board_card_notes" hidden>
+      <p class="wfnote__lede">
+        The kanban view of the lead pipeline — one column per stage, one card per prospect. There are
+        two boards behind this page: <strong>Business</strong> is the sales pipeline for prospective
+        clients, and <strong>Drivers</strong> is the recruitment funnel for people applying to drive
+        for us. Both hold the same kind of record as the <strong>Leads</strong> table; the board is
+        where you move work along, the table is where you filter and count. Dragging a card between
+        columns saves the new stage straight away.
+      </p>
+
+      <div class="wfnote__cols">
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">What you can do here</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Board tabs</dt>
+              <dd class="wfnote__def">Switch between the business sales pipeline and the driver
+                recruitment pipeline. Each has its own columns and its own totals.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Drag a card</dt>
+              <dd class="wfnote__def">Drops it into the new stage and saves immediately. If the save
+                fails the card slides back to where it came from and you get an error.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Open a card</dt>
+              <dd class="wfnote__def">Click it (or press Enter on it) to open the lead detail page
+                with the timeline, notes and WhatsApp conversation.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Chat chip</dt>
+              <dd class="wfnote__def">Shown only on cards whose number has WhatsApp history on
+                record; it jumps straight to that conversation on the detail page.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Search</dt>
+              <dd class="wfnote__def">Filters the cards by company, contact person, phone or product
+                category as you type.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Filters</dt>
+              <dd class="wfnote__def">Narrow by source and by assignee, including <em>Assigned to
+                me</em> and <em>Unassigned</em>. <em>Reset</em> clears them.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">List / New Lead</dt>
+              <dd class="wfnote__def">Switch to the filterable table of the same leads, or register a
+                lead that arrived by phone, referral or walk-in.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Counters</dt>
+              <dd class="wfnote__def">Each column header shows how many cards it holds and how many
+                of them are late on their follow-up.</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">Business columns</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">New → Quoted</dt>
+              <dd class="wfnote__def">New, Contacted and Quoted track how far the sales conversation
+                has got.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Negotiating</dt>
+              <dd class="wfnote__def">Price or terms under discussion.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">On Hold</dt>
+              <dd class="wfnote__def">Still open, but parked — it keeps counting towards Open.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Won / Lost</dt>
+              <dd class="wfnote__def">Closed. A close date is stamped and the card stops counting as
+                open or overdue.</dd>
+            </div>
+          </dl>
+
+          <h2 class="wfnote__h">Driver columns</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">New / Applied</dt>
+              <dd class="wfnote__def"><em>New Application</em> is a driver we know of but who has not
+                submitted; <em>Applied</em> means the form is in.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Incomplete</dt>
+              <dd class="wfnote__def">Registered but the application was never submitted.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Uploads done</dt>
+              <dd class="wfnote__def">Every section and document is in — ready for a staff decision.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Under Review</dt>
+              <dd class="wfnote__def">A staff member has picked it up and is checking the documents.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Approved / Rejected</dt>
+              <dd class="wfnote__def">The decision columns. They write back to the driver's real
+                verification status.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">More columns</dt>
+              <dd class="wfnote__def">These seven are just the starting set — <strong>Columns</strong>
+                in the header lets you add your own, name it, colour it, place it anywhere in the row
+                and choose which applicants it collects.</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+
+      <section class="wfnote__sec wfnote__sec--note">
+        <h2 class="wfnote__h">Worth knowing</h2>
+        <ul class="wfnote__notes">
+          <li>Each outcome column decides how long a closed card lingers — the built-in ones show
+            {{ closed_window_days|default:"30" }} days' worth. Older closed leads are still on the
+            Leads table; they have simply aged out of the board. You can change or remove that limit
+            per column under <strong>Columns</strong>.</li>
+          <li>The driver board rebuilds itself every time it loads: a card is created for every driver
+            application and each card is snapped to the column whose conditions that applicant matches.
+            <strong>Your moves always stick.</strong> If you move a driver card somewhere its application
+            status does not justify, the card is <em>pinned</em> (thumbtack icon) and auto-filing stops
+            for that card until you press <em>Resume auto-filing</em> on the lead page. If the column you
+            drop it in sets the driver's real status, no pin is needed — reality now agrees, so the card
+            keeps tracking the application. A column with <em>no</em> conditions is never auto-filed at all.</li>
+          <li>Dragging a driver card into a column that sets the driver's real status — the built-in
+            <strong>Approved</strong>, <strong>Rejected</strong> and <strong>Under Review</strong>, plus
+            any you configure that way — changes the applicant's verification status and sends them a
+            WhatsApp message. You are asked to confirm first, and a rejection can carry a reason — but
+            once sent, the message cannot be taken back.</li>
+          <li>Moving a lead that came from a pricing inquiry also updates that inquiry's CRM status on
+            the pricing inquiries page.</li>
+          <li>Dropping a business lead in <strong>Won</strong> does not create an account. Accounts are
+            attached by linking the lead to a real business on the Business Verification page, which
+            marks it Won for you.</li>
+        </ul>
+      </section>
     </div>
 
     <!-- TOOLBAR -->
@@ -80,7 +234,7 @@
         </div>
 
         <div class="crm__facets">
-          <select name="source" class="crm__facet-select" aria-label="Filter by source"
+          <select name="source" class="crm__facet-select {% if source_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by source"
                   hx-get="" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                   hx-include="#workforce_crm_board_form_filter">
@@ -90,7 +244,7 @@
             {% endfor %}
           </select>
 
-          <select name="assigned" class="crm__facet-select" aria-label="Filter by assignee"
+          <select name="assigned" class="crm__facet-select {% if assigned_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by assignee"
                   hx-get="" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                   hx-include="#workforce_crm_board_form_filter">
@@ -109,22 +263,44 @@
         <a href="{{ board_url }}" class="crm__clear-all"
            hx-get="{{ board_url }}"
            hx-target="#main-content" hx-select="#main-content"
-           hx-swap="outerHTML" hx-push-url="true">Reset</a>
+           hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i> Reset
+        </a>
         {% endif %}
       </form>
     </div>
 
     <!-- BOARD -->
-    <div class="crmb__lanes" id="workforce_crm_board_div_lanes">
+    {# The lane strip is wider than the console, and the browser's own horizontal #}
+    {# scrollbar sits at the very bottom of a viewport-tall box — effectively out of #}
+    {# reach. The rail adds pan buttons, wheel panning and drag auto-pan (crm_leads_board.js). #}
+    <div class="crmb__rail">
+      <button type="button" class="crmb__pan crmb__pan--prev" data-crmb-pan="-1"
+              aria-label="Scroll columns left" title="Scroll columns left" hidden>
+        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="crmb__pan crmb__pan--next" data-crmb-pan="1"
+              aria-label="Scroll columns right" title="Scroll columns right" hidden>
+        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+      </button>
+    <div class="crmb__lanes" id="workforce_crm_board_div_lanes" tabindex="0"
+         role="group" aria-label="Pipeline columns — scrollable">
       {% for column in columns %}
-      <div class="crmb__column crmb__column--{{ column.key }}" data-stage="{{ column.key }}">
-        <div class="crmb__col-head crmb__col-head--{{ column.key }}">
-          <span class="crmb__col-dot"></span>
+      <div class="crmb__column{% if column.is_first %} crmb__column--first{% endif %}{% if column.in_bays %} crmb__column--bay{% endif %}{% if column.bay_start %} crmb__column--bay-start{% endif %}"
+           data-stage="{{ column.key }}">
+        <div class="crmb__col-head">
+          <span class="crmb__col-dot crmb__col-dot--{{ column.swatch }}"></span>
           <span class="crmb__col-title">{{ column.label }}</span>
+          {# Only meaningful on the driver board — every business column is manual, so #}
+          {# the marker there was noise on all seven headers. #}
+          {% if column.is_manual and is_driver_board %}<span class="crmb__col-manual" title="Manual column — cards stay where staff put them"><i class="fa-solid fa-hand"></i></span>{% endif %}
           {% if column.overdue %}<span class="crmb__col-late">{{ column.overdue }} late</span>{% endif %}
           <span class="crmb__col-count">{{ column.count }}</span>
         </div>
-        <div class="crmb__col-body" data-stage-body="{{ column.key }}">
+        <div class="crmb__col-body"
+             {% if column.droppable %}data-stage-body="{{ column.key }}"{% endif %}
+             {% if column.confirm_text %}data-confirm="{{ column.confirm_text }}"{% endif %}
+             {% if column.needs_reason %}data-needs-reason="1"{% endif %}>
           {% for lead in column.leads %}
           <div class="crmb__card {% if lead.is_overdue %}crmb__card--overdue{% endif %}"
                role="button" tabindex="0"
@@ -133,6 +309,11 @@
                data-stage-url="{% url 'workforce:crm_lead_update_stage' lead.pk %}">
             <div class="crmb__card-top">
               <span class="crmb__card-name">{{ lead.company_name|default:lead.contact_name|default:lead.phone|default:"Lead" }}</span>
+              {% if lead.stage_pinned %}
+              <span class="crmb__card-pin" title="Pinned here by staff — this card does not follow the driver's application status">
+                <i class="fa-solid fa-thumbtack"></i>
+              </span>
+              {% endif %}
               <span class="crmb__card-id">#{{ lead.pk }}</span>
             </div>
             {% if lead.contact_name and lead.company_name %}
@@ -146,7 +327,9 @@
                 <i class="fa-brands fa-whatsapp"></i> Chat
               </a>
               {% endif %}
-              <span class="crm__source crm__source--{{ lead.source }}">{{ lead.get_source_display }}</span>
+              {% for badge in lead.source_badges %}
+              <span class="crm__source crm__source--{{ badge.key }}">{{ badge.label }}</span>
+              {% endfor %}
               {% if lead.category == 'driver' %}
               <span class="crm__cat crm__cat--driver"><i class="fa-solid fa-motorcycle"></i> Driver</span>
               {% endif %}
@@ -161,14 +344,26 @@
               </span>
               {% endif %}
             </div>
+            {# Merged duplicates ride inside the card they were absorbed into, so one #}
+            {# prospect is one card without losing which doors they came through. #}
+            {% for child in lead.merged_children.all %}
+            {# The parent's badge row already names both origins, so the sub-card #}
+            {# carries the absorbed card's own identity instead of repeating it. #}
+            <div class="crmb__submerge">
+              <span class="crmb__submerge-mark"><i class="fa-solid fa-layer-group"></i></span>
+              <span class="crmb__submerge-name">{{ child.company_name|default:child.contact_name|default:child.phone|default:"Lead" }}</span>
+              <span class="crmb__submerge-id">#{{ child.pk }}</span>
+            </div>
+            {% endfor %}
           </div>
           {% empty %}
-          <div class="crmb__col-empty">Drop leads here</div>
+          <div class="crmb__col-empty">{% if column.droppable %}Drop leads here{% else %}Empty{% endif %}</div>
           {% endfor %}
         </div>
       </div>
       {% endfor %}
     </div>
+    </div><!-- /.crmb__rail -->
 
   </div>
 </div>
@@ -177,5 +372,5 @@
 <script>
   window.CRMB_CONFIG = { csrfToken: "{{ csrf_token }}", driverBoard: {{ is_driver_board|yesno:"true,false" }} };
 </script>
-<script src="{% static 'workforce/js/crm_leads_board.js' %}?v=20260724a"></script>
+<script src="{% static 'workforce/js/crm_leads_board.js' %}?v=20260807f"></script>
 {% endblock %}

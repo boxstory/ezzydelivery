@@ -66,6 +66,20 @@ from business import models as business_models
 from fleet import models as fleet_models
 from core.seo import SEOMetadata, InternalLinkingMap
 from django.urls import reverse
+from core.json_utils import safe_json
+from core.validators import safe_int, sanitize_text
+from core.decorators import staff_required
+from django_ratelimit.decorators import ratelimit
+from django_ratelimit.core import is_ratelimited
+
+# Public, unauthenticated form endpoints. block=False so the view still renders
+# and can show a field error instead of a bare 403; CloudflareIPMiddleware has
+# already set REMOTE_ADDR to the real client IP by the time this keys on 'ip'.
+PUBLIC_FORM_RATE = '5/h'
+RATE_LIMIT_MESSAGE = (
+    'Too many submissions from this connection. Please wait an hour and try '
+    'again, or reach us on WhatsApp if this is urgent.'
+)
 
 # Local aliases for commonly used models/forms
 WhatsAppInquiry = webpages_models.WhatsAppInquiry
@@ -148,8 +162,8 @@ def p2p_pricing(request):
     popular = [loc_index[n] for n in _popular_names if n in loc_index]
 
     return render(request, 'webpages/p2p_pricing.html', {
-        'localities_json': _json.dumps(localities),
-        'popular_json': _json.dumps(popular),
+        'localities_json': safe_json(localities),
+        'popular_json': safe_json(popular),
     })
 
 @require_http_methods(["POST"])
@@ -252,17 +266,37 @@ def delivery_inquiry(request):
         request.session['inquiry_data'] = {}
 
     # Get current step (default to 1)
-    current_step = int(request.GET.get('step', request.session.get('inquiry_step', 1)))
+    current_step = safe_int(
+        request.GET.get('step', request.session.get('inquiry_step', 1)),
+        default=1, minimum=1, maximum=20,
+    )
 
     if request.method == 'POST':
         # Handle WhatsApp quick inquiry
         if 'whatsapp_submit' in request.POST:
-            company_name = request.POST.get('wa_company_name')
-            contact_person = request.POST.get('wa_contact_person')
-            contact_number = request.POST.get('wa_contact_number')
-            product_category = request.POST.get('wa_product_category')
-            product_name = request.POST.get('wa_product_name', '')
-            additional_info = request.POST.get('wa_additional_info', '')
+            # Rate-limited on its own group, not the decorator: the multi-step
+            # form legitimately POSTs once per step, so a view-wide limit would
+            # cut off genuine users part-way through.
+            if is_ratelimited(request, group='wa_quick_inquiry', key='ip',
+                              rate=PUBLIC_FORM_RATE, method='POST', increment=True):
+                messages.error(request, RATE_LIMIT_MESSAGE)
+                return redirect('webpages:delivery_inquiry')
+
+            # .objects.create() skips model validation, so an over-long POST
+            # used to reach the DB and 500 on a DataError. Clamp to the column
+            # widths and strip control characters here instead.
+            def _field(name, limit, required=False):
+                value = sanitize_text(request.POST.get(name) or '', collapse_whitespace=True)
+                if required and not value:
+                    value = '—'
+                return value[:limit]
+
+            company_name = _field('wa_company_name', 200, required=True)
+            contact_person = _field('wa_contact_person', 100, required=True)
+            contact_number = _field('wa_contact_number', 50, required=True)
+            product_category = _field('wa_product_category', 200, required=True)
+            product_name = _field('wa_product_name', 200)
+            additional_info = sanitize_text(request.POST.get('wa_additional_info') or '')[:2000]
 
             # Save to database
             wa_inquiry = WhatsAppInquiry.objects.create(
@@ -376,6 +410,10 @@ def delivery_inquiry(request):
             inquiry.is_complete = True
             inquiry.save()
 
+            # A submitted quote request is proof of intent — attribute any later signup to it
+            from core import signup_origin
+            signup_origin.mark_intent(request, signup_origin.SOURCE_PRICING)
+
             # Register as a CRM lead — never let CRM failures break the public form
             try:
                 from crm.services import create_lead_from_pricing_inquiry
@@ -432,8 +470,15 @@ def inquiry_success(request):
 
 
 @login_required
+@staff_required
 def inquiry_preview(request, inquiry_id):
-    """Read-only plain-page preview of a PricingEnquiry — linked from WhatsApp admin notifications."""
+    """Read-only plain-page preview of a PricingEnquiry — linked from WhatsApp admin notifications.
+
+    Staff-gated: this renders a sales lead's name, phone, email, current courier
+    and delivery costs. `webpages` is not in GATED_NAMESPACES, so the department
+    middleware never fires here — without this decorator every driver and seller
+    account could walk the whole PricingEnquiry table by id.
+    """
     from django.shortcuts import get_object_or_404
     inquiry = get_object_or_404(PricingEnquiry, pk=inquiry_id)
     return render(request, 'webpages/inquiry_preview.html', {'inquiry': inquiry})
@@ -539,11 +584,14 @@ def fleets(request):
     return render(request, 'webpages/fleets.html', data)
 
 
+@ratelimit(key='ip', rate=PUBLIC_FORM_RATE, method='POST', block=False)
 def contactus(request):
     meta = SEOMetadata.get_contact_meta()
     if request.method == 'POST':
         f = ContactForm(request.POST)
-        if f.is_valid():
+        if getattr(request, 'limited', False):
+            messages.error(request, RATE_LIMIT_MESSAGE)
+        elif f.is_valid():
             full_name = f.cleaned_data['full_name']
             email = f.cleaned_data['email']
             mobile = f.cleaned_data['mobile']
@@ -557,12 +605,15 @@ def contactus(request):
 
     return render(request, 'webpages/contactus.html', {'seo': meta, 'form': f})
 
+@ratelimit(key='ip', rate=PUBLIC_FORM_RATE, method='POST', block=False)
 def careers(request):
     meta = SEOMetadata.get_careers_meta()
     f = CareersForm(request.POST or None)
     if request.method == 'POST':
         f = CareersForm(request.POST)
-        if f.is_valid():
+        if getattr(request, 'limited', False):
+            messages.error(request, RATE_LIMIT_MESSAGE)
+        elif f.is_valid():
             f.save()
             messages.success(request, "Successful Submission")
             return redirect('/')
@@ -657,6 +708,7 @@ def testimonials(request):
     return render(request, 'webpages/testimonials.html', data)
 
 
+@ratelimit(key='ip', rate=PUBLIC_FORM_RATE, method='POST', block=False)
 def delivery_request(request):
     """
     Delivery request page for users/non-sellers
@@ -671,7 +723,9 @@ def delivery_request(request):
 
     form = DeliveryRequestForm(request.POST or None)
     if request.method == 'POST':
-        if form.is_valid():
+        if getattr(request, 'limited', False):
+            messages.error(request, RATE_LIMIT_MESSAGE)
+        elif form.is_valid():
             form.save()
             messages.success(request, "Your delivery request has been submitted successfully. We will contact you soon!")
             return redirect('webpages:index')

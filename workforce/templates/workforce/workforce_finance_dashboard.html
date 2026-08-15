@@ -1,5 +1,11 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff finance overview — COD pipeline, driver holdings, earnings and delivery performance
+Used by: workforce.views.workforce_finance_dashboard at /workforce/finance/
+Notes: Read-only roll-up; every figure links out to the page that can act on it. Carries the shared
+       wfnote__ page-notes card under the hero, hidden on load; the hero help button toggles it.
+{% endcomment %}
 
 {% block title %}Finance Dashboard{% endblock %}
 
@@ -45,8 +51,17 @@
           <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
         </select>
       </form>
+      <button type="button" class="wfnote__btn" data-wfnote-toggle
+              aria-expanded="false" aria-controls="workforce_finance_dashboard_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
     </div>
   </div>
+
+  <div class="wfnote" id="workforce_finance_dashboard_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_finance_dashboard_card_notes' %}" hidden></div>
 
   <!-- ── COD with Fleet ────────────────────────────────── -->
   <div class="wfd__section-header">

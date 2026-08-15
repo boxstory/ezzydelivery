@@ -1,5 +1,11 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Read-only log of every order-import run, newest first, with the raw source rows kept
+Used by: workforce.views.import_history at /workforce/import-history/
+Notes: Shows the latest 100 runs only. Carries the shared wfnote__ page-notes card under the title
+       row, hidden on load; the help button in the row toggles it via workforce.js.
+{% endcomment %}
 
 {% block title %}Import History{% endblock title %}
 
@@ -17,8 +23,17 @@
                 <option value="{{ val }}" {% if source_filter == val %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
+            <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_import_history_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_import_history_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_import_history_card_notes' %}" hidden></div>
 
     {% if logs %}
     <div class="d-flex flex-column gap-2">
@@ -198,6 +213,7 @@
         </div>
         {% endfor %}
     </div>
+    {% include "includes/components/_pagination.html" with page_obj=logs_page per_page=per_page pagination_id="import_history" %}
     {% else %}
     <div class="text-center text-muted py-5">
         <i class="fa-solid fa-inbox fa-3x mb-3 d-block"></i>

@@ -1,51 +1,39 @@
 {% extends 'business_dashboard_base.html' %}
 {% load static %}
+{% load business_console %}
 {% load custom_filters %}
 
 {% block title %}Inventory Dashboard{% endblock %}
 
 {% block content %}
 <div class="ivl" id="main-content">
-  <!-- Hero Header -->
-  <div class="ivl__hero">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-      <div class="d-flex align-items-center gap-3">
-        <div class="ivl__hero-icon">
-          <i class="fas fa-warehouse"></i>
-        </div>
-        <div>
-          <h1 class="ivl__hero-title">All Inventory Items</h1>
-          <p class="ivl__hero-sub">Manage your product inventory across all warehouses</p>
-        </div>
-      </div>
-      <a href="{% url 'warehouse:receive_stock' %}"
-         class="ivl__action-btn"
-         hx-get="{% url 'warehouse:receive_stock' %}"
-         hx-target="#main-content"
-         hx-swap="outerHTML"
-         hx-push-url="true">
-        <i class="fas fa-plus me-2"></i>Receive Stock
-      </a>
-    </div>
+  {% bconheader eyebrow="Inventory" live="All Items" icon="fa-solid fa-warehouse" title="All Inventory Items" subtitle="Manage your product inventory across all warehouses." %}
+    <a href="{% url 'warehouse:receive_stock' %}"
+       class="bcon__btn bcon__btn--primary"
+       hx-get="{% url 'warehouse:receive_stock' %}"
+       hx-target="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      <i class="fa-solid fa-plus"></i> Receive Stock
+    </a>
+  {% endbconheader %}
 
-    <!-- Stats Row -->
-    <div class="ivl__stats">
-      <div class="ivl__stat">
-        <div class="ivl__stat-label">Total Items</div>
-        <div class="ivl__stat-value">{{ stock_levels.paginator.count }}</div>
-      </div>
-      <div class="ivl__stat">
-        <div class="ivl__stat-label">Total Quantity</div>
-        <div class="ivl__stat-value">{{ stock_levels.object_list|length }}</div>
-      </div>
-      <div class="ivl__stat">
-        <div class="ivl__stat-label">Warehouses</div>
-        <div class="ivl__stat-value">{{ warehouses.count }}</div>
-      </div>
-      <div class="ivl__stat">
-        <div class="ivl__stat-label">Total Value</div>
-        <div class="ivl__stat-value">QAR {{ total_value|floatformat:2 }}</div>
-      </div>
+  <div class="bcon__plates">
+    <div class="bcon__plate bcon__plate--primary">
+      <div class="bcon__plate-top"><p class="bcon__plate-label">Total Items</p></div>
+      <p class="bcon__plate-value">{{ stock_levels.paginator.count }}</p>
+    </div>
+    <div class="bcon__plate bcon__plate--info">
+      <div class="bcon__plate-top"><p class="bcon__plate-label">Total Quantity</p></div>
+      <p class="bcon__plate-value">{{ stock_levels.object_list|length }}</p>
+    </div>
+    <div class="bcon__plate bcon__plate--navy">
+      <div class="bcon__plate-top"><p class="bcon__plate-label">Warehouses</p></div>
+      <p class="bcon__plate-value">{{ warehouses.count }}</p>
+    </div>
+    <div class="bcon__plate bcon__plate--success">
+      <div class="bcon__plate-top"><p class="bcon__plate-label">Total Value</p></div>
+      <p class="bcon__plate-value">QAR {{ total_value|floatformat:2 }}</p>
     </div>
   </div>
 

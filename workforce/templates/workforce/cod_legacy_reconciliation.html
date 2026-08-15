@@ -3,6 +3,7 @@
 Purpose: Read-only reconciliation of electronic COD (Fawran/POS) that was swept into cash hand-ins before the electronic-methods exclusion existed.
 Used by: workforce.views.cod_legacy_reconciliation at /workforce/fleet/cod-legacy-reconciliation/
 Notes: Deliberately has no write action — the deposits are historical and correcting them would restate settled figures.
+       Carries the shared wfnote__ page-notes card under the hero, hidden on load; the hero help button toggles it via workforce.js.
 {% endcomment %}
 {% load static %}
 
@@ -33,8 +34,17 @@ Notes: Deliberately has no write action — the deposits are historical and corr
       <a href="{% url 'workforce:cod_ledger' %}" class="btn btn-sm btn-outline-light">
         <i class="fa-solid fa-book me-1"></i> COD Ledger
       </a>
+      <button type="button" class="wfnote__btn" data-wfnote-toggle
+              aria-expanded="false" aria-controls="workforce_cod_legacy_reconciliation_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
     </div>
   </div>
+
+  <div class="wfnote mt-2" id="workforce_cod_legacy_reconciliation_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_cod_legacy_reconciliation_card_notes' %}" hidden></div>
 
   <!-- Filter card — narrows the deposits listed and the legs printed under each -->
   <div class="clr__filters mt-2">
@@ -267,6 +277,7 @@ Notes: Deliberately has no write action — the deposits are historical and corr
     {% endif %}
   </div>
   {% endfor %}
+  {% include "includes/components/_pagination.html" with page_obj=deposits_page per_page=per_page pagination_id="legacy_deposits" %}
 
 </div>
 

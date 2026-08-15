@@ -43,6 +43,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
+from django.urls import reverse
 
 
 from product import models as product_models
@@ -50,8 +51,12 @@ from business import models as business_models
 from warehouse import models as warehouse_models
 from product import forms as product_forms
 from core.context_processors import get_cached_business
+from product.image_import import attach_product_image
+from product.catalog_import import find_existing_product, update_product_fields
+from core.pagination import paginate
 from django.core.paginator import Paginator
 from django.db.models import Sum, F, Q
+from core.exports import safe_csv_writer
 
 # Local aliases for commonly used models
 Product = product_models.Product
@@ -120,17 +125,32 @@ def product_all_list_card(request):
 
 # -----------------------------------------------------------------------------
 # product_single_add: Add new product to business catalog.
-# Sets business FK automatically from logged-in user.
+# Sets business FK automatically from logged-in user, or from ?business_id=
+# when staff add on a seller's behalf from the seller detail page.
 # Template: product/product_single_add.html
 # Form: AddItemsForm
 # -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_single_add(request):
-    business = get_cached_business(request)
-    if not business:
-        logger.warning(f"User {request.user.id} has no associated business")
-        messages.error(request, "No business associated with your account")
-        return redirect('business:business_dashboard')
+    """Add one product manually.
+
+    Two contexts (mirrors product_csv_import):
+      - Client dashboard: adds into the logged-in user's own business.
+      - Staff dashboard (seller section): staff pass ?business_id=<pk> to add
+        into that seller's catalog, and land back on the seller detail page.
+    """
+    biz_id = request.POST.get('business_id') or request.GET.get('business_id')
+    staff_mode = bool(biz_id) and is_staff_user(request)
+
+    if staff_mode:
+        business = get_object_or_404(Business, pk=biz_id)
+    else:
+        business = get_cached_business(request)
+        if not business:
+            logger.warning(f"User {request.user.id} has no associated business")
+            messages.error(request, "No business associated with your account")
+            return redirect('business:business_dashboard')
+
     logger.info(f"User {request.user.id} accessing product add page for business {business.business_id}")
 
     if request.method == 'POST':
@@ -142,6 +162,10 @@ def product_single_add(request):
             product.save()
             logger.info(f"Product {product.id} created for business {business.business_id}")
             messages.success(request, 'Product added successfully!')
+            if staff_mode:
+                return redirect(
+                    reverse('workforce:seller_detail', args=[business.business_id]) + '#products'
+                )
             return redirect('product:product_all_list_table')
         else:
             logger.warning(f"Invalid product form submitted by user {request.user.id}: {form.errors}")
@@ -151,7 +175,9 @@ def product_single_add(request):
 
     data = {
         'form': form,
-        'business': business
+        'business': business,
+        'staff_mode': staff_mode,
+        'base_template': 'wf_dashboard_base.html' if staff_mode else 'business_dashboard_base.html',
     }
     return render(request, 'product/product_single_add.html', data)
 
@@ -388,8 +414,14 @@ def product_all_list_table(request):
     colors = product_models.ColorVariant.objects.all()
     units = product_models.UnitVariant.objects.all()
 
+    # Paginate — this table renders an editable row per product with four
+    # dropdowns each, so a full catalogue was the heaviest page in the app.
+    products_page, products_total = paginate(request, products)
+
     data = {
-        'products': products,
+        'products': products_page,
+        'products_page': products_page,
+        'products_total': products_total,
         'business': business,
         'categories': categories,
         'colors': colors,
@@ -741,6 +773,8 @@ def product_api_import(request):
     try:
         data = json.loads(request.body)
         products_to_import = data.get('products', [])
+        # Update mode: refresh products that already exist instead of skipping them.
+        update_existing = bool(data.get('update_existing'))
     except (json.JSONDecodeError, KeyError):
         return JsonResponse({'success': False, 'message': 'Invalid request data'}, status=400)
 
@@ -748,7 +782,24 @@ def product_api_import(request):
         return JsonResponse({'success': False, 'message': 'No products selected'}, status=400)
 
     imported_count = 0
+    updated_count = 0
     skipped_count = 0
+    skipped_no_sku = 0
+    skipped_duplicate = 0
+    skipped_unchanged = 0
+    skipped_failed = 0
+    generated_sku_count = 0
+    image_count = 0
+
+    # SKUs already in the catalogue — checked in memory so a batch can't create
+    # duplicates within itself (the per-row DB query could not see them).
+    existing_skus = set(
+        s for s in Product.objects
+        .filter(business=business)
+        .exclude(item_sku='')
+        .values_list('item_sku', flat=True)
+        if s
+    )
 
     for p in products_to_import:
         item_name = (p.get('item_name') or '').strip()[:100]
@@ -758,9 +809,57 @@ def product_api_import(request):
             skipped_count += 1
             continue
 
+        variant_id = (p.get('variant_id') or '').strip()
+        platform_id = (p.get('platform_id') or '').strip()
+
+        # Update mode: refresh the row this product already maps to. Matching also
+        # covers the EZ-{platform id} form, so a SKU added in the store later lands
+        # on the existing product instead of creating a second copy.
+        if update_existing:
+            existing = find_existing_product(Product, business, sku, variant_id, platform_id)
+            if existing:
+                try:
+                    if update_product_fields(existing, p, new_sku=sku):
+                        updated_count += 1
+                    else:
+                        skipped_count += 1
+                        skipped_unchanged += 1
+                except Exception:
+                    logger.exception(
+                        "Product API update failed for business %s (sku=%r)",
+                        business.pk, sku,
+                    )
+                    skipped_count += 1
+                    skipped_failed += 1
+                    continue
+                # Fill in a photo the product never had; existing photos are kept.
+                if not existing.product_image:
+                    try:
+                        if attach_product_image(existing, p.get('image_url')):
+                            image_count += 1
+                    except Exception:
+                        logger.exception("Product image update failed for %s", existing.pk)
+                continue
+
+        # Auto-generate a SKU when the merchant didn't set one — same rule as the
+        # staff-side importer (workforce.seller_api_products_import). Prefer the
+        # platform's variant id (stable across re-imports), then the product id,
+        # then a per-business counter. Products with no SKU cannot be saved at all
+        # for fulfillment-enabled businesses (Product.save raises ValueError).
+        if not sku:
+            ext_id = variant_id or platform_id
+            if ext_id:
+                sku = f'EZ-{ext_id}'[:100]
+            else:
+                n = len([s for s in existing_skus
+                         if s.startswith(f'EZ-{business.business_id}-')]) + 1
+                sku = f'EZ-{business.business_id}-{n:05d}'[:100]
+            generated_sku_count += 1
+
         # Skip if a product with the same SKU already exists for this business
-        if sku and Product.objects.filter(business=business, item_sku=sku).exists():
+        if sku in existing_skus:
             skipped_count += 1
+            skipped_duplicate += 1
             continue
 
         # Parse price - item_price is PositiveIntegerField
@@ -769,24 +868,81 @@ def product_api_import(request):
         except (ValueError, TypeError):
             price_val = 0
 
-        Product.objects.create(
-            business=business,
-            item_name=item_name,
-            brand_name=(p.get('brand_name') or '')[:100],
-            item_sku=sku,
-            barcode=(p.get('barcode') or '')[:100],
-            item_price=price_val,
-            size=(p.get('size') or '')[:100],
-            item_discription=(p.get('item_discription') or '')[:100],
-        )
+        try:
+            new_product = Product.objects.create(
+                business=business,
+                item_name=item_name,
+                brand_name=(p.get('brand_name') or '')[:100],
+                item_sku=sku,
+                barcode=(p.get('barcode') or '')[:100],
+                item_price=price_val,
+                size=(p.get('size') or '')[:100],
+                item_discription=(p.get('item_discription') or '')[:100],
+            )
+        except Exception:
+            logger.exception(
+                "Product API import failed for business %s (sku=%r, name=%r)",
+                business.pk, sku, item_name,
+            )
+            skipped_count += 1
+            skipped_failed += 1
+            continue
+
+        existing_skus.add(sku)
         imported_count += 1
+
+        # Pull the store's photo into local storage. Kept outside the create
+        # block on purpose: the product is already saved, so a dead CDN must
+        # never turn a successful import into a "failed" row.
+        try:
+            if attach_product_image(new_product, p.get('image_url')):
+                image_count += 1
+        except Exception:
+            logger.exception("Product image import failed for product %s", new_product.pk)
+
+    reasons = []
+    if skipped_duplicate:
+        reasons.append(f'{skipped_duplicate} already imported (same SKU)')
+    if skipped_unchanged:
+        reasons.append(f'{skipped_unchanged} already up to date')
+    if skipped_failed:
+        reasons.append(f'{skipped_failed} failed to save')
+    other = skipped_count - skipped_duplicate - skipped_unchanged - skipped_failed
+    if other > 0:
+        reasons.append(f'{other} missing name')
+
+    message = f'Imported {imported_count} product{"s" if imported_count != 1 else ""}.'
+    if updated_count:
+        message += f' Updated {updated_count} existing product{"s" if updated_count != 1 else ""}.'
+    if skipped_count:
+        message += f' Skipped {skipped_count} ({", ".join(reasons)}).'
+    if image_count:
+        message += f' {image_count} photo{"s" if image_count != 1 else ""} saved.'
+    if generated_sku_count:
+        message += (f' {generated_sku_count} product'
+                    f'{"s" if generated_sku_count != 1 else ""} had no SKU in your store — '
+                    f'an EZ- SKU was generated automatically.')
+
+    logger.info(
+        "API product import for business %s: imported=%s updated=%s skipped=%s "
+        "(dup=%s unchanged=%s failed=%s) generated_sku=%s images=%s update_mode=%s",
+        business.business_id, imported_count, updated_count, skipped_count,
+        skipped_duplicate, skipped_unchanged, skipped_failed,
+        generated_sku_count, image_count, update_existing,
+    )
 
     return JsonResponse({
         'success': True,
-        'message': f'Imported {imported_count} product{"s" if imported_count != 1 else ""}.'
-                   + (f' Skipped {skipped_count} (duplicate SKU or empty).' if skipped_count else ''),
+        'message': message,
         'imported': imported_count,
+        'updated': updated_count,
         'skipped': skipped_count,
+        'skipped_unchanged': skipped_unchanged,
+        'skipped_no_sku': skipped_no_sku,
+        'skipped_duplicate': skipped_duplicate,
+        'skipped_failed': skipped_failed,
+        'generated_sku': generated_sku_count,
+        'images_saved': image_count,
     })
 
 
@@ -1194,6 +1350,138 @@ def combo_delete(request, combo_id):
 
 
 # =============================================================================
+# STAFF BULK TABLE EDIT (seller detail → Products tab)
+# =============================================================================
+
+# Fields a staff member may edit straight in the seller's products table.
+# Scalars carry their model max_length; the three FKs are resolved by pk.
+BULK_EDIT_TEXT_FIELDS = {
+    'item_name': 100,
+    'brand_name': 100,
+    'item_sku': 100,
+    'barcode': 100,
+    'size': 100,
+    'item_discription': 100,
+}
+BULK_EDIT_FK_FIELDS = {
+    'color': (ColorVariant, 'color_variant'),
+    'unit': (UnitVariant, 'unit_variant'),
+    'product_category': (ProductCategory, 'category_name'),
+}
+# Fields that must not be blanked out.
+BULK_EDIT_REQUIRED = {'item_name'}
+# Columns Product allows to be empty string vs NULL.
+BULK_EDIT_NULLABLE = {'barcode', 'size', 'item_discription'}
+
+
+# -----------------------------------------------------------------------------
+# product_staff_bulk_update: Save many inline cell edits for one seller at once.
+# POST JSON {business_id, changes: [{id, field, value}, ...]} -> per-row results.
+# SECURITY: staff-only, and every product is re-checked against business_id so a
+# crafted payload cannot touch another seller's catalog.
+# -----------------------------------------------------------------------------
+@login_required(login_url='account_login')
+@require_http_methods(["POST"])
+def product_staff_bulk_update(request):
+    """Apply a batch of inline edits to one seller's products."""
+    if not is_staff_user(request):
+        return JsonResponse({'success': False, 'message': 'Staff access required.'}, status=403)
+
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'Invalid JSON.'}, status=400)
+
+    business_id = payload.get('business_id')
+    changes = payload.get('changes') or []
+    if not business_id:
+        return JsonResponse({'success': False, 'message': 'Missing business_id.'}, status=400)
+    if not isinstance(changes, list) or not changes:
+        return JsonResponse({'success': False, 'message': 'No changes to save.'}, status=400)
+
+    business = get_object_or_404(Business, pk=business_id)
+
+    # Group the flat change list by product so each row saves once.
+    by_product = {}
+    for change in changes:
+        try:
+            pid = int(change.get('id'))
+        except (TypeError, ValueError):
+            continue
+        field = change.get('field')
+        if field not in BULK_EDIT_TEXT_FIELDS and field not in BULK_EDIT_FK_FIELDS and field != 'item_price':
+            return JsonResponse(
+                {'success': False, 'message': f'Field "{field}" is not editable.'}, status=400
+            )
+        by_product.setdefault(pid, {})[field] = change.get('value')
+
+    products = {
+        p.id: p for p in Product.objects.filter(id__in=by_product.keys(), business=business)
+    }
+
+    updated = 0
+    errors = []
+
+    for pid, fields in by_product.items():
+        product = products.get(pid)
+        if not product:
+            errors.append(f'Product #{pid} does not belong to this seller — skipped.')
+            continue
+
+        label = product.item_name or f'#{pid}'
+        try:
+            for field, raw in fields.items():
+                value = (raw or '').strip() if isinstance(raw, str) else raw
+
+                if field == 'item_price':
+                    try:
+                        price = int(float(value)) if value not in (None, '') else 0
+                    except (TypeError, ValueError):
+                        raise ValueError(f"'{value}' is not a valid price")
+                    product.item_price = max(price, 0)
+
+                elif field in BULK_EDIT_FK_FIELDS:
+                    model, _label_field = BULK_EDIT_FK_FIELDS[field]
+                    if value in (None, '', '0'):
+                        setattr(product, field, None)
+                    else:
+                        try:
+                            setattr(product, field, model.objects.get(pk=value))
+                        except (model.DoesNotExist, ValueError, TypeError):
+                            raise ValueError(f'invalid {field} selection')
+
+                else:
+                    if field in BULK_EDIT_REQUIRED and not value:
+                        raise ValueError(f'{field} cannot be empty')
+                    trimmed = (value or '')[:BULK_EDIT_TEXT_FIELDS[field]]
+                    setattr(product, field, trimmed or (None if field in BULK_EDIT_NULLABLE else ''))
+
+            product.save()
+            updated += 1
+        except ValueError as exc:
+            # Product.save() raises ValueError for the fulfillment SKU rule too.
+            errors.append(f'{label}: {exc}')
+        except Exception as exc:
+            logger.exception(f'Bulk edit failed for product {pid}: {exc}')
+            errors.append(f'{label}: could not be saved.')
+
+    logger.info(
+        f'Staff {request.user.id} bulk-edited {updated} product(s) '
+        f'for business {business.business_id} ({len(errors)} failed)'
+    )
+
+    return JsonResponse({
+        'success': not errors,
+        'updated': updated,
+        'errors': errors,
+        'message': (
+            f"Saved {updated} product{'s' if updated != 1 else ''}."
+            if updated else 'Nothing was saved.'
+        ),
+    })
+
+
+# =============================================================================
 # CSV PRODUCT IMPORT
 # =============================================================================
 
@@ -1228,28 +1516,144 @@ def product_staff_delete(request, product_id):
     messages.success(request, f'Deleted "{name}".')
 
     if biz:
-        return redirect('workforce:seller_detail', business_id=biz.business_id)
+        return redirect(reverse('workforce:seller_detail', args=[biz.business_id]) + '#products')
     return redirect('product:product_all_list_table')
 
 
 # -----------------------------------------------------------------------------
-# product_csv_sample: Download a ready-to-fill sample CSV with the correct
-# headers and one example row. Served inline so users see the exact format.
+# _read_import_rows: Turn an uploaded catalog file into (headers, row dicts).
+# Handles .xlsx/.xlsm via openpyxl and .csv/.txt with any of the four common
+# separators — Excel writes ';' instead of ',' on Arabic / Gulf locales, and
+# such a file used to import as one squashed column.
+# Raises ValueError with a user-facing message when the file can't be read.
+# -----------------------------------------------------------------------------
+def _read_import_rows(upload, filename):
+    """Return (fieldnames, [row dicts]) from an uploaded CSV or Excel file."""
+    if filename.endswith(('.xlsx', '.xlsm')):
+        from openpyxl import load_workbook
+        try:
+            wb = load_workbook(io.BytesIO(upload.read()), read_only=True, data_only=True)
+        except Exception:
+            raise ValueError("Could not read that Excel file. Please re-save it as .xlsx or .csv and retry.")
+
+        ws = wb.active
+        rows = ws.iter_rows(values_only=True)
+        header_row = next(rows, None)
+        if not header_row:
+            return [], []
+
+        def as_text(value):
+            if value is None:
+                return ''
+            if isinstance(value, float) and value.is_integer():
+                return str(int(value))
+            return str(value).strip()
+
+        fieldnames = [as_text(h) for h in header_row]
+        data_rows = []
+        for raw_row in rows:
+            values = [as_text(v) for v in raw_row]
+            if not any(values):
+                continue
+            data_rows.append({
+                fieldnames[i]: (values[i] if i < len(values) else '')
+                for i in range(len(fieldnames))
+            })
+        wb.close()
+        return fieldnames, data_rows
+
+    # Decode with utf-8-sig to transparently strip Excel's BOM.
+    payload = upload.read()
+    try:
+        raw = payload.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        try:
+            raw = payload.decode('latin-1')
+        except Exception:
+            raise ValueError("Could not read the file. Please save it as UTF-8 CSV and retry.")
+
+    # Normalise line endings first. "Save as CSV (Macintosh)" writes bare \r,
+    # which io.StringIO does not treat as a line break — the csv module then
+    # sees the \r inside a field and raises _csv.Error instead of parsing.
+    raw = raw.replace('\r\n', '\n').replace('\r', '\n')
+
+    # Excel writes a "sep=;" hint line above the header — drop it and honour it.
+    delimiter = None
+    lines = raw.split('\n')
+    if lines and lines[0].lower().startswith('sep=') and len(lines[0]) >= 5:
+        delimiter = lines[0][4]
+        raw = '\n'.join(lines[1:])
+
+    if delimiter is None:
+        header_line = next((ln for ln in raw.split('\n') if ln.strip()), '')
+        # Pick whichever separator actually splits the header row.
+        delimiter = max([',', ';', '\t', '|'], key=header_line.count)
+        if header_line.count(delimiter) == 0:
+            delimiter = ','
+
+    try:
+        reader = csv.DictReader(io.StringIO(raw, newline=''), delimiter=delimiter)
+        return (reader.fieldnames or []), list(reader)
+    except csv.Error as exc:
+        logger.warning(f"CSV parse failed for '{filename}': {exc}")
+        raise ValueError(
+            "Could not parse that CSV — the rows or quotes look malformed. "
+            "Open it in Excel and save it as .xlsx (or as normal CSV UTF-8), then retry."
+        )
+
+
+CSV_SAMPLE_ROW = [
+    'Oud Royal 50ml', 'Ezzy Perfumes', 'OUD-50-001', '6291000000017',
+    '120', '50ml', 'Perfumes', 'Gold', 'piece',
+    'Premium oud fragrance', 'royal oud, special oud',
+]
+
+
+# -----------------------------------------------------------------------------
+# product_csv_sample: Download a ready-to-fill import template with the correct
+# headers and one example row.
+# Default is .xlsx — a plain CSV opens as a single squashed column in Excel
+# whenever the machine's list separator is not a comma (common on Arabic /
+# Gulf locales, where it is ';'). ?format=csv still serves the raw CSV.
 # -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_csv_sample(request):
-    """Return a sample product-import CSV (headers + one example row)."""
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="product_import_sample.csv"'
-    # utf-8-sig BOM so Excel opens Arabic / special characters correctly
-    response.write('﻿')
-    writer = csv.writer(response)
-    writer.writerow(CSV_IMPORT_COLUMNS)
-    writer.writerow([
-        'Oud Royal 50ml', 'Ezzy Perfumes', 'OUD-50-001', '6291000000017',
-        '120', '50ml', 'Perfumes', 'Gold', 'piece',
-        'Premium oud fragrance', 'royal oud, special oud',
-    ])
+    """Return a sample product-import file (headers + one example row)."""
+    fmt = (request.GET.get('format') or 'xlsx').lower()
+
+    if fmt == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="product_import_sample.csv"'
+        # utf-8-sig BOM so Excel opens Arabic / special characters correctly
+        response.write('﻿')
+        writer = safe_csv_writer(response)
+        writer.writerow(CSV_IMPORT_COLUMNS)
+        writer.writerow(CSV_SAMPLE_ROW)
+        return response
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Products'
+    ws.append(CSV_IMPORT_COLUMNS)
+    ws.append(CSV_SAMPLE_ROW)
+
+    head_fill = PatternFill('solid', fgColor='1B2A4A')
+    for idx, column in enumerate(CSV_IMPORT_COLUMNS, start=1):
+        cell = ws.cell(row=1, column=idx)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = head_fill
+        ws.column_dimensions[get_column_letter(idx)].width = max(14, len(column) + 4)
+    ws.freeze_panes = 'A2'
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="product_import_sample.xlsx"'
+    wb.save(response)
     return response
 
 
@@ -1293,32 +1697,48 @@ def product_csv_import(request):
 
     upload = request.FILES.get('csv_file')
     if not upload:
-        messages.error(request, "Please choose a CSV file to upload.")
+        messages.error(request, "Please choose a file to upload.")
         return render(request, 'product/product_csv_import.html', context)
 
-    if not upload.name.lower().endswith('.csv'):
-        messages.error(request, "Unsupported file type. Please upload a .csv file.")
+    name = upload.name.lower()
+    if name.endswith('.xls'):
+        messages.error(
+            request,
+            "Old .xls files are not supported. Open it in Excel and re-save as .xlsx or .csv."
+        )
         return render(request, 'product/product_csv_import.html', context)
 
-    # Decode with utf-8-sig to transparently strip Excel's BOM.
+    if not name.endswith(('.csv', '.txt', '.xlsx', '.xlsm')):
+        messages.error(request, "Unsupported file type. Please upload a .csv or .xlsx file.")
+        return render(request, 'product/product_csv_import.html', context)
+
     try:
-        raw = upload.read().decode('utf-8-sig')
-    except UnicodeDecodeError:
-        try:
-            raw = upload.read().decode('latin-1')
-        except Exception:
-            messages.error(request, "Could not read the file. Please save it as UTF-8 CSV and retry.")
-            return render(request, 'product/product_csv_import.html', context)
+        fieldnames, data_rows = _read_import_rows(upload, name)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return render(request, 'product/product_csv_import.html', context)
+    except Exception as exc:
+        # A malformed upload must never take the page down with a 500.
+        logger.exception(f"Product import failed to read '{upload.name}': {exc}")
+        messages.error(
+            request,
+            "Could not read that file. Please re-save it as .xlsx or CSV UTF-8 and try again."
+        )
+        return render(request, 'product/product_csv_import.html', context)
 
-    reader = csv.DictReader(io.StringIO(raw))
-    if not reader.fieldnames:
-        messages.error(request, "The CSV appears to be empty.")
+    if not fieldnames:
+        messages.error(request, "The file appears to be empty.")
         return render(request, 'product/product_csv_import.html', context)
 
     # Normalise headers -> lowercase/stripped so mapping is forgiving.
-    header_map = {(h or '').strip().lower(): h for h in reader.fieldnames}
+    header_map = {(h or '').strip().lower(): h for h in fieldnames}
     if 'item_name' not in header_map:
-        messages.error(request, "CSV must include an 'item_name' column. Download the sample file for the correct format.")
+        messages.error(
+            request,
+            "The file must include an 'item_name' column — found: "
+            f"{', '.join(h for h in fieldnames if h) or '(no headers)'}. "
+            "Download the template for the correct format."
+        )
         return render(request, 'product/product_csv_import.html', context)
 
     def cell(row, key):
@@ -1332,13 +1752,17 @@ def product_csv_import(request):
         .values_list('item_sku', flat=True)
     )
 
+    # Fulfillment sellers reject SKU-less products at Product.save() — catch it
+    # per row so the page names the offending rows instead of a raw ValueError.
+    requires_sku = bool(getattr(business, 'fulfillment_service_enabled', False))
+
     imported = 0
     skipped = 0
     errors = []
     seen_skus = set()
 
-    # DictReader row numbering: row 1 is the header, data starts at 2.
-    for idx, row in enumerate(reader, start=2):
+    # Row 1 is the header, so data rows are numbered from 2 (matches Excel).
+    for idx, row in enumerate(data_rows, start=2):
         item_name = cell(row, 'item_name')[:100]
         if not item_name:
             skipped += 1
@@ -1348,6 +1772,14 @@ def product_csv_import(request):
         if sku and (sku in existing_skus or sku in seen_skus):
             skipped += 1
             errors.append(f"Row {idx}: skipped — SKU '{sku}' already exists.")
+            continue
+
+        if requires_sku and not sku:
+            skipped += 1
+            errors.append(
+                f"Row {idx}: skipped — '{item_name}' has no item_sku, "
+                "and this seller has fulfillment enabled (SKU is mandatory)."
+            )
             continue
 
         price_raw = cell(row, 'item_price')
@@ -1412,7 +1844,8 @@ def product_csv_import(request):
     if imported:
         messages.success(request, f"Imported {imported} product{'s' if imported != 1 else ''}.")
     if skipped:
-        messages.warning(request, f"Skipped {skipped} row{'s' if skipped != 1 else ''} (duplicates or empty name).")
+        reason = "see the details below" if errors else "no item_name"
+        messages.warning(request, f"Skipped {skipped} row{'s' if skipped != 1 else ''} — {reason}.")
     if not imported and not skipped:
         messages.info(request, "No data rows found in the file.")
 
@@ -1422,6 +1855,8 @@ def product_csv_import(request):
     context['skipped'] = skipped
     if imported and not errors:
         if staff_mode:
-            return redirect('workforce:seller_detail', business_id=business.business_id)
+            return redirect(
+                reverse('workforce:seller_detail', args=[business.business_id]) + '#products'
+            )
         return redirect('product:product_all_list_table')
     return render(request, 'product/product_csv_import.html', context)

@@ -1,0 +1,103 @@
+{% comment %}
+Purpose: "About this page" notes panel for seller_transactions.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_seller_transactions_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The client side of COD — money we collected from customers on a seller's behalf and now owe back to
+            them. The page opens on a card per active seller, ordered so whoever is owed the most leads.
+            Picking a seller swaps to their order ledger, where each order shows how much cash it carried and
+            where that cash currently sits. Paying a client is done from the
+            <strong>Settle COD to Business</strong> link on their profile, not from this ledger.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filter sellers</dt>
+                        <dd class="wfnote__def">On the landing roster, narrows the cards by business name or
+                            account code as you type.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Open a seller</dt>
+                        <dd class="wfnote__def">Click a card to load that account's orders. Once inside, the
+                            pencil beside the name switches to another seller.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Date range or preset, settled versus pending, delivery status
+                            (pick several at once), and a minimum/maximum COD amount.
+                            <em>Clear</em> resets them but stays on the seller.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sort</dt>
+                        <dd class="wfnote__def">Click the Order Date or COD Amount headers to sort, and again to
+                            reverse.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Settle COD</dt>
+                        <dd class="wfnote__def">Takes you to the settlement report for this client, already
+                            scoped to them — that is where a payout to the seller is actually raised.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Export</dt>
+                        <dd class="wfnote__def">CSV lets you choose columns; Excel gives a fixed sheet. Both
+                            cover every filtered order, not just the page you are looking at.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Where the cash sits</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">With driver</dt>
+                        <dd class="wfnote__def">Collected from the customer but not yet handed in to Ezzy. Chase
+                            it on <strong>Fleet Transactions</strong>.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">With Ezzy</dt>
+                        <dd class="wfnote__def">Handed in and verified, but not yet paid across to the client.
+                            This is the money the client is waiting for.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Settled</dt>
+                        <dd class="wfnote__def">Paid out to the client. Closed on both sides.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Collected</dt>
+                        <dd class="wfnote__def">The customer has paid in full, before the hand-in chain has been
+                            worked through.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pending</dt>
+                        <dd class="wfnote__def">No cash movement recorded yet — usually an order still out for
+                            delivery.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Card rail</dt>
+                        <dd class="wfnote__def">The bar on each roster card is the same three legs — with
+                            driver, held by Ezzy, paid out — shown in proportion, so a long unpaid middle
+                            section is a client to deal with today.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>The table lists <strong>all</strong> of the seller's orders, including prepaid and
+                    undelivered ones. The totals above it are stricter: only delivered or partly delivered
+                    orders count, so an undelivered order can never inflate what we appear to owe.</li>
+                <li>Only <strong>active</strong> sellers get a roster card. A deactivated client we still owe
+                    money to has to be reached through the settlement report.</li>
+                <li>A card showing zero held does not mean no activity — the client may simply be fully paid up.
+                    Read the rail and the order count together.</li>
+                <li>Nothing on this page moves money. Marking an order settled happens through the COD business
+                    settlement flow, and the figures here follow it.</li>
+            </ul>
+        </section>
+    

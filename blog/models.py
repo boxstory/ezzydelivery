@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils.text import slugify
+from core.validators import image_validators
 
 
 class BlogCategory(models.Model):
@@ -49,7 +50,8 @@ class BlogPost(models.Model):
     content = models.TextField(help_text="Main blog content (Markdown supported)")
 
     # Featured image
-    featured_image = models.ImageField(upload_to='blog/', null=True, blank=True)
+    featured_image = models.ImageField(
+        upload_to='blog/', null=True, blank=True, validators=image_validators(max_mb=8))
     featured_image_alt = models.CharField(max_length=255, blank=True, help_text="Alt text for SEO")
 
     # Taxonomy

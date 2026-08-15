@@ -7,8 +7,9 @@
 {% block head_title %}{% trans "Sign Up" %}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'account/css/auth-common.css' %}?v=20260422003">
-<link rel="stylesheet" href="{% static 'account/css/signup.css' %}?v=20260422003">
+<link rel="stylesheet" href="{% static 'account/css/auth-common.css' %}?v=20260801006">
+<link rel="stylesheet" href="{% static 'account/css/signup.css' %}?v=20260801006">
+<link rel="stylesheet" href="{% static 'account/css/password-strength.css' %}?v=20260801013">
 {% endblock %}
 
 {% block content %}
@@ -123,29 +124,10 @@
                         <span class="auth__helptext">{{ form.password1.help_text }}</span>
                     {% endif %}
 
-                    <!-- Password Requirements (Custom Validation) -->
-                    <div class="auth__pwd-requirements" id="account_signup_password_requirements_container">
-                        <div class="auth__pwd-requirements-title" id="account_signup_password_requirements_title">
-                            <i class="fa-solid fa-shield-halved" id="account_signup_password_requirements_icon"></i>
-                            Password Requirements
-                        </div>
-                        <div class="auth__pwd-requirement" id="account_signup_password_requirement_length" data-requirement="length">
-                            <i class="fa-solid fa-circle" id="account_signup_password_requirement_length_icon"></i>
-                            <span id="account_signup_password_requirement_length_text">At least 8 characters long</span>
-                        </div>
-                        <div class="auth__pwd-requirement" id="account_signup_password_requirement_similarity" data-requirement="similarity">
-                            <i class="fa-solid fa-circle" id="account_signup_password_requirement_similarity_icon"></i>
-                            <span id="account_signup_password_requirement_similarity_text">Not too similar to your other personal information</span>
-                        </div>
-                        <div class="auth__pwd-requirement" id="account_signup_password_requirement_common" data-requirement="common">
-                            <i class="fa-solid fa-circle" id="account_signup_password_requirement_common_icon"></i>
-                            <span id="account_signup_password_requirement_common_text">Not a commonly used password</span>
-                        </div>
-                        <div class="auth__pwd-requirement" id="account_signup_password_requirement_numeric" data-requirement="numeric">
-                            <i class="fa-solid fa-circle" id="account_signup_password_requirement_numeric_icon"></i>
-                            <span id="account_signup_password_requirement_numeric_text">Can't be entirely numeric</span>
-                        </div>
-                    </div>
+                    {% comment %}Similarity is checked against what the user is typing right now, so watch the fields instead of baking values in.{% endcomment %}
+                    {% with pwd_signup_watch=form.first_name.id_for_label|add:","|add:form.last_name.id_for_label|add:","|add:form.email.id_for_label|add:","|add:form.username.id_for_label %}
+                        {% include "account/parts/_password_strength.html" with pwd_prefix="account_signup_password1" pwd_input=form.password1.id_for_label pwd_gate="account_signup_btn_submit" pwd_match=form.password2.id_for_label pwd_watch=pwd_signup_watch %}
+                    {% endwith %}
 
                     {% if form.password1.errors %}
                         <ul class="auth__errorlist">
@@ -244,196 +226,8 @@
     </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const password1Input = document.querySelector('[name="password1"]');
-    const password2Input = document.querySelector('[name="password2"]');
-    const emailInput = document.querySelector('[name="email"]');
-    const usernameInput = document.querySelector('[name="username"]');
-    const requirementsDiv = document.getElementById('account_signup_password_requirements_container');
-
-    if (!password1Input || !requirementsDiv) return;
-
-    // Password visibility toggle
-    document.querySelectorAll('.auth__password-toggle').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const targetId = this.dataset.target;
-            const input = document.getElementById(targetId);
-            const icon = this.querySelector('i');
-
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
-            } else {
-                input.type = 'password';
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye');
-            }
-        });
-    });
-
-    // Common passwords list (simplified)
-    const commonPasswords = [
-        'password', '123456', '12345678', 'qwerty', 'abc123', 'monkey',
-        '1234567', 'letmein', 'trustno1', 'dragon', 'baseball', 'iloveyou',
-        'master', 'sunshine', 'ashley', 'bailey', 'passw0rd', 'shadow',
-        'superman', 'qazwsx', 'michael', 'football', 'welcome', 'jesus'
-    ];
-
-    // Show requirements on focus
-    password1Input.addEventListener('focus', function() {
-        requirementsDiv.classList.add('show');
-    });
-
-    // Hide requirements on blur if empty
-    password1Input.addEventListener('blur', function() {
-        if (!this.value) {
-            requirementsDiv.classList.remove('show');
-        }
-    });
-
-    // Validate password in real-time
-    password1Input.addEventListener('input', function() {
-        const password = this.value;
-        const email = emailInput ? emailInput.value : '';
-        const username = usernameInput ? usernameInput.value : '';
-
-        validatePassword(password, email, username);
-    });
-
-    // Also validate when email/username changes
-    if (emailInput) {
-        emailInput.addEventListener('input', function() {
-            if (password1Input.value) {
-                validatePassword(password1Input.value, this.value, usernameInput ? usernameInput.value : '');
-            }
-        });
-    }
-
-    if (usernameInput) {
-        usernameInput.addEventListener('input', function() {
-            if (password1Input.value) {
-                validatePassword(password1Input.value, emailInput ? emailInput.value : '', this.value);
-            }
-        });
-    }
-
-    function validatePassword(password, email, username) {
-        // Requirement 1: Length (at least 8 characters)
-        const lengthReq = document.querySelector('[data-requirement="length"]');
-        const hasLength = password.length >= 8;
-        updateRequirement(lengthReq, hasLength);
-
-        // Requirement 2: Not too similar to personal information
-        const similarityReq = document.querySelector('[data-requirement="similarity"]');
-        const notSimilar = checkSimilarity(password, email, username);
-        updateRequirement(similarityReq, notSimilar);
-
-        // Requirement 3: Not a commonly used password
-        const commonReq = document.querySelector('[data-requirement="common"]');
-        const notCommon = !isCommonPassword(password);
-        updateRequirement(commonReq, notCommon);
-
-        // Requirement 4: Not entirely numeric
-        const numericReq = document.querySelector('[data-requirement="numeric"]');
-        const notNumeric = !/^\d+$/.test(password);
-        updateRequirement(numericReq, notNumeric);
-    }
-
-    function updateRequirement(element, isMet) {
-        if (!element) return;
-
-        element.classList.remove('met', 'failed');
-
-        if (isMet) {
-            element.classList.add('met');
-            const icon = element.querySelector('i');
-            if (icon) {
-                icon.className = 'fa-solid fa-check';
-            }
-        } else if (password1Input.value.length > 0) {
-            element.classList.add('failed');
-            const icon = element.querySelector('i');
-            if (icon) {
-                icon.className = 'fa-solid fa-times';
-            }
-        } else {
-            // Reset to default state
-            const icon = element.querySelector('i');
-            if (icon) {
-                icon.className = 'fa-solid fa-circle';
-            }
-        }
-    }
-
-    function checkSimilarity(password, email, username) {
-        if (!password) return true; // Empty password is "valid" for this check
-
-        const passwordLower = password.toLowerCase();
-
-        // Check email similarity
-        if (email) {
-            const emailParts = email.toLowerCase().split('@');
-            const emailUser = emailParts[0];
-
-            // If password is substantially the same as email username
-            if (emailUser.length >= 3 && passwordLower.includes(emailUser)) {
-                return false;
-            }
-            // If password is very similar (Levenshtein-like)
-            if (emailUser.length >= 3 && isTooSimilar(passwordLower, emailUser)) {
-                return false;
-            }
-        }
-
-        // Check username similarity
-        if (username && username.length >= 3) {
-            const usernameLower = username.toLowerCase();
-            if (passwordLower.includes(usernameLower) || isTooSimilar(passwordLower, usernameLower)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    function isTooSimilar(str1, str2) {
-        // Simple similarity check: if strings share more than 70% of characters
-        const minLength = Math.min(str1.length, str2.length);
-        if (minLength < 3) return false;
-
-        let matches = 0;
-        for (let i = 0; i < str1.length; i++) {
-            if (str2.includes(str1[i])) {
-                matches++;
-            }
-        }
-
-        const similarity = matches / str1.length;
-        return similarity > 0.7;
-    }
-
-    function isCommonPassword(password) {
-        if (!password) return false;
-
-        const passwordLower = password.toLowerCase();
-
-        // Check if it's in common passwords list
-        if (commonPasswords.includes(passwordLower)) {
-            return true;
-        }
-
-        // Check for sequential numbers (12345, 123456, etc.)
-        if (/^(0123456789|123456789|12345678|1234567|123456|12345)$/.test(password)) {
-            return true;
-        }
-
-        // Check for keyboard patterns (qwerty, asdfgh, etc.)
-        const keyboardPatterns = ['qwerty', 'asdfgh', 'zxcvbn', 'qwertyuiop', 'asdfghjkl'];
-        return keyboardPatterns.some(pattern => passwordLower.includes(pattern));
-    }
-});
-</script>
 {% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'account/js/password-strength.js' %}?v=20260801013"></script>
+{% endblock extra_js %}

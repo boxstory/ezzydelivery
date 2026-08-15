@@ -1,29 +1,30 @@
-{% extends "business_dashboard_base.html" %}
+{% extends base_template|default:"business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% load crispy_forms_tags %}
 
-{% block extra_head %}
-<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260728g">
-Products - Add
-{% endblock extra_head %}
+{% block title %}Add Product{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260801b">
+{% endblock extra_css %}
 
 {% block content %}
+{% if staff_mode %}
+  {% url 'workforce:seller_detail' business_id=business.business_id as psa_back_url %}
+{% else %}
+  {% url 'product:product_all_list_table' as psa_back_url %}
+{% endif %}
 <div class="psa" id="product_add_section">
-  <!-- Page Header -->
-  <div class="psa__header">
-    <div class="psa__header-left">
-      <a href="{% url 'product:product_all_list_table' %}" class="psa__back" title="Back to Products">
-        <i class="fa-solid fa-arrow-left"></i>
-      </a>
-      <div class="psa__header-icon">
-        <i class="fa-solid fa-box-open"></i>
-      </div>
-      <div>
-        <h1 class="psa__title">Add Product</h1>
-        <p class="psa__subtitle">Add a new product to your inventory</p>
-      </div>
-    </div>
-  </div>
+  {% if staff_mode %}
+  {% bconheader eyebrow="Catalogue" live="New Product" icon="fa-solid fa-box-open" title="Add Product" subtitle=business.business_name|default:"Seller" %}
+    <a href="{{ psa_back_url }}" class="bcon__btn bcon__btn--ghost"><i class="fa-solid fa-arrow-left"></i> Back</a>
+  {% endbconheader %}
+  {% else %}
+  {% bconheader eyebrow="Catalogue" live="New Product" icon="fa-solid fa-box-open" title="Add Product" subtitle="Add a new product to your inventory." %}
+    <a href="{{ psa_back_url }}" class="bcon__btn bcon__btn--ghost"><i class="fa-solid fa-arrow-left"></i> Back</a>
+  {% endbconheader %}
+  {% endif %}
 
   <!-- Form Card -->
   <div class="psa__card" id="product_add_form_container">
@@ -34,6 +35,7 @@ Products - Add
     <div class="psa__card-body">
       <form method="POST" enctype="multipart/form-data" id="product_add_form_main" novalidate>
         {% csrf_token %}
+        {% if staff_mode %}<input type="hidden" name="business_id" value="{{ business.business_id }}">{% endif %}
         {% if form.non_field_errors %}
         <div class="psa__alert psa__alert--error">
           {% for error in form.non_field_errors %}
@@ -43,7 +45,7 @@ Products - Add
         {% endif %}
         {{ form | crispy }}
         <div class="psa__submit-wrap" id="product_add_submit_wrapper">
-          <a href="{% url 'product:product_all_list_table' %}" class="psa__back-btn">
+          <a href="{{ psa_back_url }}" class="psa__back-btn">
             <i class="fa-solid fa-times"></i> Cancel
           </a>
           <button type="submit" class="psa__submit-btn" id="product_add_btn_submit">
@@ -58,16 +60,29 @@ Products - Add
 
 {% block extra_js %}
 <script>
-  $(document).ready(function() {
-    // Initialize Select2
-    $("#id_color").select2({ placeholder: "Select a color", allowClear: true });
-    $("#id_unit").select2({ placeholder: "Select a unit", allowClear: true });
-    $("#id_product_category").select2({
-      placeholder: "Select a category",
-      allowClear: true,
-      width: '100%',
-      dropdownAutoWidth: true
-    });
-  });
+  // The staff base renders {% templatetag openblock %} extra_js {% templatetag closeblock %}
+  // above its jQuery/Select2 bundle, so wait for window load instead of
+  // calling $() straight away.
+  (function initProductAddSelects() {
+    if (typeof window.jQuery === 'undefined' || !window.jQuery.fn.select2) {
+      window.addEventListener('load', function () {
+        if (typeof window.jQuery === 'undefined' || !window.jQuery.fn.select2) return;
+        applySelect2(window.jQuery);
+      });
+      return;
+    }
+    window.jQuery(function () { applySelect2(window.jQuery); });
+
+    function applySelect2($) {
+      $("#id_color").select2({ placeholder: "Select a color", allowClear: true, width: '100%' });
+      $("#id_unit").select2({ placeholder: "Select a unit", allowClear: true, width: '100%' });
+      $("#id_product_category").select2({
+        placeholder: "Select a category",
+        allowClear: true,
+        width: '100%',
+        dropdownAutoWidth: true
+      });
+    }
+  })();
 </script>
 {% endblock extra_js %}

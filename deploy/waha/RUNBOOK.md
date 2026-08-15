@@ -72,6 +72,48 @@ sudo nginx -t && sudo systemctl reload nginx
 2. Click "Show QR to connect" → scan with the dedicated business WhatsApp.
 3. State should flip to **WORKING** within ~10s.
 
+## 5b. Add a second number (extra WAHA session)
+
+WAHA Core has been multi-session since `2026.6.1` — the old "Core = one
+session" limit is gone, so both numbers run in this one container. Django is
+session-aware throughout (`whatsapp/sessions.py` is the single resolver), and
+`WhatsAppMessage`/`WhatsAppContact` are uniquely keyed per session.
+
+**Apply migrations first.** `whatsapp/migrations/0009_*` swaps the global
+unique on `waha_message_id` for `(session, waha_message_id)`. WAHA message ids
+are unique per chat, not per session, so if inbound traffic from a second
+number arrives before that migration lands, the webhook's `update_or_create`
+silently overwrites the first number's rows instead of failing.
+
+```bash
+cd /home/ezzyadmin/ezdlproject/ezzydelivery
+source ../venvezzy/bin/activate && python manage.py migrate whatsapp
+
+# Then create + start the session (name: a-z A-Z 0-9 - _ only)
+K=$(grep -m1 '^WAHA_API_KEY=' .env | cut -d= -f2-)
+curl -s -X POST http://127.0.0.1:3000/api/sessions \
+  -H "X-Api-Key: $K" -H 'Content-Type: application/json' \
+  -d '{"name":"fleet","start":true}'
+```
+
+Then browse to `https://ezzydelivery.qa/waha/wa-dashboard/?session=fleet` and
+scan the QR with that number. A tab strip appears on wa-dashboard, wa-chats and
+the CRM inbox as soon as a second session exists.
+
+Finally, point the routing at it — set **WAHA session** to `fleet` on the
+matching row at `/workforce/auto-triggers/whatsapp-instances/`. Sends resolve
+section → `WhatsAppSenderRoute` → `WhatsAppInstance.waha_session`, so nothing
+changes hands until that field is filled in.
+
+Notes:
+- Pairing a number that is already on Evolution does **not** disturb Evolution;
+  it links as an additional WhatsApp Web device. Evolution stays as a fallback.
+- The engine is container-wide (`WHATSAPP_DEFAULT_ENGINE`) — WAHA has no
+  per-session engine option. Every session here runs WEBJS, one Chromium each.
+  A number needing a browserless engine would need its own container.
+- After **any** container restart every session comes back STOPPED and needs an
+  explicit `POST /api/sessions/start` per session.
+
 ## 6. Cutover
 
 Only after the dashboard shows WORKING and a manual test send succeeds via

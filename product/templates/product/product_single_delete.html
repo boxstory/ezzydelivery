@@ -1,22 +1,16 @@
 {% extends "business_dashboard_base.html" %}
-{% load static %}
+{% load static business_console %}
 
 {% block title %}Delete Product{% endblock %}
 
 {% block content %}
 <div class="col-12 pdl" id="product_delete_container">
     <!-- Page Header -->
-    <div class="pdl__header">
-        <div class="pdl__header__left">
-            <a href="{% url 'product:product_all_list_table' %}" class="pdl__back-btn">
-                <i class="fa-solid fa-arrow-left"></i>
-            </a>
-            <div>
-                <h1 class="pdl__title">Delete Product</h1>
-                <p class="pdl__subtitle">This action cannot be undone</p>
-            </div>
-        </div>
-    </div>
+    {% bconheader eyebrow="Products" live="Delete" icon="fa-solid fa-trash" title="Delete Product" subtitle="This action cannot be undone." %}
+      <a href="{% url 'product:product_all_list_table' %}" class="bcon__btn bcon__btn--ghost">
+        <i class="fa-solid fa-arrow-left"></i> Back to Products
+      </a>
+    {% endbconheader %}
 
     <!-- Confirmation Card -->
     <div class="pdl__card">

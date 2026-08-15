@@ -1,12 +1,22 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Driver payout landing — one card per approved driver showing what Ezzy owes them
+Used by: workforce_views.fleet_drivers_earnings at /workforce/fleet/drivers-earnings/
+Notes: COD is deliberately absent — it is the driver's hand-in leg, not money owed to them.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Driver Payouts - Ezzy Delivery{% endblock title %}
 
 {% block content %}
 <div class="fde">
     <!-- Hero Header -->
-    {% include "workforce/parts/components/_page_header.html" with title="Driver Payouts" icon="fa-money-bill-wave" subtitle="What each driver is owed — COD hand-ins are tracked separately" %}
+    {% include "workforce/parts/components/_page_header.html" with title="Driver Payouts" icon="fa-money-bill-wave" subtitle="What each driver is owed — COD hand-ins are tracked separately" notes_id="workforce_fleet_drivers_earnings_card_notes" %}
+
+    <div class="wfnote wfnote--inset" id="workforce_fleet_drivers_earnings_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_fleet_drivers_earnings_card_notes' %}" hidden></div>
 
     <!-- Summary Stats -->
     <div class="fde__stats">

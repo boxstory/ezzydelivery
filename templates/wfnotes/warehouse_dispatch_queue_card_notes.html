@@ -1,0 +1,72 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/dispatch_queue.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_dispatch_queue_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The <strong>handover point between warehouse and road</strong>. Orders that have been packed
+            and are not yet in a batch wait at the top; you tick the ones a driver is taking, pick the
+            driver, and the system creates a dispatch batch to sign the goods over with. Recent batches
+            are listed underneath.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Creating a batch</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">What qualifies</dt>
+                        <dd class="wfnote__def">An order appears once its pick list is fully packed and
+                            it is not already in another batch. Anything still being picked or packed
+                            will not show.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Driver</dt>
+                        <dd class="wfnote__def">The list offers approved drivers currently marked
+                            available. Leaving it blank creates the batch as <em>ready</em> so a driver
+                            can be attached later.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">COD total</dt>
+                        <dd class="wfnote__def">Summed from the orders as the batch is created — the
+                            cash that driver is expected to come back with.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Warehouse</dt>
+                        <dd class="wfnote__def">Taken from the orders' own pick list, not chosen by
+                            you. Batch orders that were picked in the same building.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Batch status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Ready</dt>
+                        <dd class="wfnote__def">Created with no driver yet.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assigned</dt>
+                        <dd class="wfnote__def">A driver is named but the goods have not changed hands.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Handed over</dt>
+                        <dd class="wfnote__def">Every order in the batch has been signed across to the
+                            driver, order by order, on the batch page.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Dispatched</dt>
+                        <dd class="wfnote__def">Confirmed as gone — the driver has left the warehouse.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Only the twenty most recent batches</strong> are listed; older ones are
+                        still reachable by their batch number.</li>
+                    <li><strong>Creating a batch does not hand anything over.</strong> That happens
+                        item by item on the batch page.</li>
+                </ul>
+            </section>
+        </div>

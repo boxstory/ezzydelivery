@@ -115,6 +115,12 @@ def drain_verification_queue():
     failed = 0
     biz_hour_counts = {}  # business_id -> sends in last hour
 
+    # Address verification is order traffic, so it must leave from whichever
+    # number the Orders & Delivery Tasks route points at — not whatever session
+    # happens to be the global default. Resolved once, outside the loop.
+    from . import sessions as wa_sessions
+    order_session = wa_sessions.for_section('orders_tasks')
+
     for job in candidate_qs:
         if sent_count >= rate:
             break
@@ -139,7 +145,7 @@ def drain_verification_queue():
         sent_msg = None
 
         if use_waha:
-            ok, info = send_waha_text(job.phone, text)
+            ok, info = send_waha_text(job.phone, text, session=order_session)
             sent_msg = info.get('message_obj') if ok else None
 
         if not ok:

@@ -9,6 +9,7 @@ Also provides utility functions for views to get cached user data:
 import datetime
 from core.seo import SEOMetadata
 import json
+from core.json_utils import safe_json
 
 
 # =============================================================================
@@ -237,40 +238,56 @@ def dl_task_status_choices(request):
     from delivery.models import DeliveryTask
     choices = [{'value': v, 'label': l} for v, l in DeliveryTask._meta.get_field('dl_task_status').choices]
     return {
-        'dl_task_status_choices_json': json.dumps(choices),
+        'dl_task_status_choices_json': safe_json(choices),
         'dl_task_status_choices': choices,
     }
 
 
+#: Statuses that mean the driver is out on the road right now, as opposed to
+#: merely holding a task. GPS tracking spends its high-accuracy battery budget
+#: on exactly this set, and delivery.tasks raises its "GPS lost" alert on the
+#: same one — the two must not drift apart.
+DRIVER_ON_DUTY_STATUSES = ['picked_up', 'start_ride', 'out_for_delivery', 'in_transit']
+DRIVER_PENDING_STATUSES = ['assigned', 'accepted', 'contacted', 'non_reachable'] + DRIVER_ON_DUTY_STATUSES
+
+
 def driver_pending_tasks(request):
     """
-    Inject pending_tasks_count for fleet PWA bottom nav badge.
+    Inject pending_tasks_count for the fleet PWA bottom nav badge, and
+    driver_on_duty for the GPS module's power profile.
     Only queries for authenticated users on /fleet/ paths.
     """
+    empty = {'pending_tasks_count': 0, 'driver_on_duty': False}
     if not hasattr(request, 'user') or not request.user.is_authenticated:
-        return {'pending_tasks_count': 0}
+        return empty
 
     # Only run on fleet URLs to avoid overhead on every page
     path = request.path
     if not path.startswith('/fleet/'):
-        return {'pending_tasks_count': 0}
+        return empty
 
     # Check request cache to avoid duplicate queries per request
-    if hasattr(request, '_driver_pending_tasks_count'):
-        return {'pending_tasks_count': request._driver_pending_tasks_count}
+    if hasattr(request, '_driver_pending_tasks'):
+        return request._driver_pending_tasks
 
     try:
         from fleet.models import Driver
         from delivery.models import DeliveryTask
         driver = Driver.objects.only('driver_id').get(user_id=request.user.id)
-        count = DeliveryTask.objects.filter(
+        # One query answers both questions — the badge count and whether any of
+        # those tasks is actually in flight.
+        statuses = list(DeliveryTask.objects.filter(
             driver=driver,
-            dl_task_status__in=['assigned', 'accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable']
-        ).count()
-        request._driver_pending_tasks_count = count
-        return {'pending_tasks_count': count}
+            dl_task_status__in=DRIVER_PENDING_STATUSES,
+        ).values_list('dl_task_status', flat=True))
+        ctx = {
+            'pending_tasks_count': len(statuses),
+            'driver_on_duty': any(s in DRIVER_ON_DUTY_STATUSES for s in statuses),
+        }
+        request._driver_pending_tasks = ctx
+        return ctx
     except Exception:
-        return {'pending_tasks_count': 0}
+        return empty
 
 
 def google_one_tap(request):

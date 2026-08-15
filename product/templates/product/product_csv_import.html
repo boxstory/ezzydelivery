@@ -1,10 +1,10 @@
 {% extends base_template|default:"business_dashboard_base.html" %}
 {% load static %}
 
-{% block title %}CSV Import{% endblock title %}
+{% block title %}Product Import{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260728g">
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260801a">
 {% endblock extra_css %}
 
 {% block content %}
@@ -25,7 +25,7 @@
       <div class="pci__eyebrow">Catalog · Bulk intake</div>
       <h1 class="pci__title">Product Import</h1>
       <div class="pci__meta">
-        <span class="pci__meta-key">source</span> CSV
+        <span class="pci__meta-key">source</span> CSV / Excel
         <span class="pci__meta-sep">/</span>
         <span class="pci__meta-key">loading into</span>
         <span class="pci__meta-arrow">→</span>
@@ -69,11 +69,11 @@
     {% if staff_mode %}<input type="hidden" name="business_id" value="{{ business.business_id }}">{% endif %}
 
     <label class="pci__dock" id="product_csv_import_dropzone" for="product_csv_import_file">
-      <span class="pci__dock-tab">.csv</span>
+      <span class="pci__dock-tab">.xlsx / .csv</span>
       <span class="pci__dock-icon"><i class="fa-solid fa-inbox"></i></span>
-      <span class="pci__dock-title" id="product_csv_import_filename">Drop your CSV onto the dock</span>
+      <span class="pci__dock-title" id="product_csv_import_filename">Drop your Excel or CSV file onto the dock</span>
       <span class="pci__dock-hint">or click to choose a file · one product per row</span>
-      <input type="file" name="csv_file" id="product_csv_import_file" accept=".csv" class="pci__file-input" required>
+      <input type="file" name="csv_file" id="product_csv_import_file" accept=".csv,.txt,.xlsx,.xlsm" class="pci__file-input" required>
     </label>
 
     <div class="pci__actions">
@@ -81,7 +81,10 @@
         <i class="fa-solid fa-arrow-right-to-bracket"></i> Import products
       </button>
       <a href="{% url 'product:product_csv_sample' %}" class="pci__btn pci__btn--ghost" id="product_csv_import_sample_btn">
-        <i class="fa-solid fa-download"></i> Blank template
+        <i class="fa-solid fa-file-excel"></i> Excel template
+      </a>
+      <a href="{% url 'product:product_csv_sample' %}?format=csv" class="pci__btn pci__btn--ghost" id="product_csv_import_sample_csv_btn">
+        <i class="fa-solid fa-file-csv"></i> CSV template
       </a>
     </div>
   </form>
@@ -90,7 +93,10 @@
   <section class="pci__schema" id="product_csv_import_schema">
     <div class="pci__schema-head">
       <h2 class="pci__schema-title">Column schema</h2>
-      <span class="pci__schema-sub">11 columns · only <code>item_name</code> is required</span>
+      <span class="pci__schema-sub">
+        11 columns · only <code>item_name</code> is required{% if business.fulfillment_service_enabled %},
+        plus <code>item_sku</code> for this seller{% endif %}
+      </span>
     </div>
     <div class="pci__ledger-scroll">
       <table class="pci__ledger">
@@ -106,7 +112,13 @@
             <td>item_name</td><td><span class="pci__stamp">required</span></td><td>Oud Royal 50ml</td>
           </tr>
           <tr><td>brand_name</td><td>optional</td><td>Ezzy Perfumes</td></tr>
+          {% if business.fulfillment_service_enabled %}
+          <tr class="pci__ledger-row--req">
+            <td>item_sku</td><td><span class="pci__stamp">required</span> · unique · fulfillment seller</td><td>OUD-50-001</td>
+          </tr>
+          {% else %}
           <tr><td>item_sku</td><td>optional · unique</td><td>OUD-50-001</td></tr>
+          {% endif %}
           <tr><td>barcode</td><td>optional</td><td>6291000000017</td></tr>
           <tr><td>item_price</td><td>optional · whole QAR</td><td>120</td></tr>
           <tr><td>size</td><td>optional</td><td>50ml</td></tr>
@@ -121,6 +133,8 @@
     <p class="pci__footnote">
       <i class="fa-solid fa-circle-info"></i>
       Rows whose SKU already exists in this catalog are held back, not overwritten. Rows without an <code>item_name</code> are skipped.
+      Excel (<code>.xlsx</code>) and CSV are both accepted — CSVs separated by <code>,</code> <code>;</code> or tab all work.
+      If a CSV opens as one squashed column in Excel, use the Excel template instead.
     </p>
   </section>
 
@@ -138,7 +152,7 @@
       label.textContent = input.files[0].name;
       zone.classList.add('pci__dock--loaded');
     } else {
-      label.textContent = 'Drop your CSV onto the dock';
+      label.textContent = 'Drop your Excel or CSV file onto the dock';
       zone.classList.remove('pci__dock--loaded');
     }
   }

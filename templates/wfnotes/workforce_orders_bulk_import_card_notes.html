@@ -1,0 +1,121 @@
+{% comment %}
+Purpose: "About this page" notes panel for orders_bulk_import.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_orders_bulk_import_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            For the client who sends a spreadsheet. Upload their CSV or Excel file, tell us which of their
+            columns is which, check the rows, and the page creates the orders one at a time while you
+            watch. The whole run is attached to the seller you pick at the start, and what happened is
+            kept on <strong>Import&nbsp;History</strong>. Orders that come in through a shop or a sheet
+            connection go through the <strong>Import&nbsp;Wizard</strong> instead.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Select seller</dt>
+                        <dd class="wfnote__def">Required. Every order in the file is created under this
+                            client, so a wrong pick means a whole batch under the wrong name.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Upload</dt>
+                        <dd class="wfnote__def">Drop a file on the box or click to browse. CSV, XLSX and
+                            XLS are accepted. The cross clears it if you grabbed the wrong one.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sample files</dt>
+                        <dd class="wfnote__def">Download a ready-made CSV or Excel with the right headings
+                            to send to a client who does not know what to give us.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Map columns</dt>
+                        <dd class="wfnote__def">Match each column in their file to one of our order fields.
+                            Common headings are detected for you; the counters at the top show how many
+                            columns were found and how many you have wired.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Save mapping</dt>
+                        <dd class="wfnote__def">Keeps the wiring for this client so the next file from them
+                            comes in pre-mapped. <em>Reset to Auto-detect</em> throws it away.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Preview &amp; edit</dt>
+                        <dd class="wfnote__def">The rows as they will be saved. Click any cell to correct it
+                            before importing — a missing zone, a phone with a stray space.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Start import</dt>
+                        <dd class="wfnote__def">Runs the batch with a live progress bar and a running log of
+                            every row as it succeeds or fails.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Retry failed</dt>
+                        <dd class="wfnote__def">Rows that failed come back in an editable table with the
+                            reason attached. Fix them and retry just those — the successful ones are not
+                            touched again.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Import more</dt>
+                        <dd class="wfnote__def">Clears the wizard back to step one for the next file.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The columns</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Required</dt>
+                        <dd class="wfnote__def">Customer name, phone and address. Everything else is
+                            optional and can be filled in later.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Order ID</dt>
+                        <dd class="wfnote__def">The client's own reference for the order. Map it whenever
+                            they have one — it is how they will ask you about it later.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Zone / street / building</dt>
+                        <dd class="wfnote__def">The Qatar national address numbers. Mapping them saves
+                            someone parsing the address by hand afterwards.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">COD amount</dt>
+                        <dd class="wfnote__def">Cash the driver must collect at the door.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Delivery fee</dt>
+                        <dd class="wfnote__def">What we bill the client for the job. Not collected from the
+                            customer — do not map a total into this.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Product columns</dt>
+                        <dd class="wfnote__def">Repeating product-and-count pairs, for files that list
+                            several items across one row.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Orders are created <strong>one row at a time</strong>. If you close the tab halfway,
+                    everything up to that point is already in the system — go and check before re-running
+                    the file.</li>
+                <li>A failed row does not stop the batch. The rest keeps going and the failures are handed
+                    back for you to fix, so read the log rather than assuming the run was clean.</li>
+                <li>The file is read in your browser. A very large spreadsheet will be slow on a weak
+                    machine, and nothing is uploaded to us until you press start.</li>
+                <li>Edits in the preview change what we save, not the client's file. Their copy still holds
+                    the bad value.</li>
+                <li>Duplicates are caught by the client's order code, and a row whose code we already hold
+                    is rejected. Rows with <strong>no order code get one generated</strong>, so re-running
+                    a file without codes will happily create the same orders again.</li>
+                <li>Imported orders arrive needing review and address verification like any other.</li>
+            </ul>
+        </section>
+    

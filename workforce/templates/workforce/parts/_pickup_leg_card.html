@@ -8,7 +8,11 @@ Notes: Renders nothing when pickup is empty; cancelled shows a flat row instead 
 {% if pickup %}
 <div class="pkl">
     <div class="pkl__head">
-        <span class="pkl__title"><i class="fa-solid fa-box-open"></i> First-Mile Pickup</span>
+        <span class="pkl__title">
+            <i class="fa-solid fa-box-open"></i> First-Mile Pickup
+            {# The rail shades stages but never says where the leg actually stands. #}
+            <span class="pkl__state pkl__state--{{ pickup.status }}">{{ pickup.get_status_display }}</span>
+        </span>
         <span class="pkl__meta">
             {{ pickup.get_pickup_mode_display }} · plan: {{ pickup.get_disposition_display }}
             {% if pickup.disposition == 'drop' and pickup.drop_warehouse %}
@@ -19,7 +23,22 @@ Notes: Renders nothing when pickup is empty; cancelled shows a flat row instead 
     </div>
 
     {% if pickup.status == 'cancelled' %}
-    <div class="pkl__cancelled"><i class="fa-solid fa-circle-xmark"></i> Pickup cancelled</div>
+    {% comment %}The status badge already says Cancelled, so this row carries what the
+    badge cannot: how far the leg got, when it was closed, who closed it and why.{% endcomment %}
+    {% with cancel=pickup|pickup_cancel_info %}
+    <div class="pkl__cancelled">
+        <i class="fa-solid fa-circle-xmark"></i>
+        {% if cancel.when %}
+        Cancelled while {{ cancel.from_label|default:"in progress" }}
+        &middot; {{ cancel.when|date:"d M, H:i" }} &middot; {{ cancel.by }}
+        {% else %}
+        Pickup cancelled &mdash; no record of when or why
+        {% endif %}
+    </div>
+    {% if cancel.reason %}
+    <div class="pkl__note"><i class="fa-regular fa-message"></i> {{ cancel.reason }}</div>
+    {% endif %}
+    {% endwith %}
     {% else %}
     {% comment %}Only a hub drop stamps dropped_at; a hand-off has no dedicated field,
     so the last step falls back to updated_at and is marked approximate.{% endcomment %}

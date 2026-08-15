@@ -1,0 +1,71 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/location_list.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_location_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The <strong>inside of each warehouse as a tree</strong>: zones hold racks, racks hold
+            shelves, shelves hold bins. A bin is the only level stock actually sits in — everything
+            above it exists to give that bin an address. Most of this structure is created in one go by
+            the warehouse capacity setup; this page is where you inspect and adjust it.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The four levels</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Zone</dt>
+                        <dd class="wfnote__def">A section of the floor. Counting a zone in a cycle count
+                            pulls in everything beneath it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Rack</dt>
+                        <dd class="wfnote__def">A run of shelving inside a zone.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Shelf</dt>
+                        <dd class="wfnote__def">A level on that rack.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Bin</dt>
+                        <dd class="wfnote__def">The slot itself. Stock rows, put-away destinations and
+                            pick routes all point at bins.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Working with the tree</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Warehouse filter</dt>
+                        <dd class="wfnote__def">Narrows to one building. The counts by type at the head
+                            of each tree are that warehouse's totals.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Codes</dt>
+                        <dd class="wfnote__def">Built by joining the levels, so a bin carries its whole
+                            address — that is what a picker reads on the shelf.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Add / edit</dt>
+                        <dd class="wfnote__def">For one-off changes — a new bay, a renamed rack. Bulk
+                            structure comes from the capacity generator instead.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Delete</dt>
+                        <dd class="wfnote__def">Removes the location and everything under it. Check
+                            nothing is stored there first.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>An empty tree means capacity was never generated</strong> for that
+                        warehouse — stock can only sit in the building generally.</li>
+                    <li><strong>These are not pickup points.</strong> Driver-facing addresses live on
+                        the Pickup/Dispatch Locations page.</li>
+                </ul>
+            </section>
+        </div>

@@ -1,0 +1,84 @@
+{% comment %}
+Purpose: "About this page" notes panel for team_verification_list.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_team_verification_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+        Clients can invite their own staff into their dashboard. Each card here is one such
+        <strong>team membership</strong> — a person, the business they were added to, and the role they were
+        given. New memberships land as <em>Pending</em> and the person cannot use the client's dashboard until
+        a staff member activates them. This page is where that decision is made, and where access is taken away
+        again if it needs to be.
+    </p>
+
+    <div class="wfnote__cols">
+        <section class="wfnote__sec">
+            <h2 class="wfnote__h">What you can do here</h2>
+            <dl class="wfnote__list">
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Filter pills</dt>
+                    <dd class="wfnote__def">Switch between Pending, Active, Rejected, Suspended and All. The page opens
+                        on <em>Pending</em>, so what you see first is the queue waiting on you.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Activate</dt>
+                    <dd class="wfnote__def">Grants the person access to that client's dashboard and marks the membership
+                        verified. Shown on any card that is not already active.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Suspend</dt>
+                    <dd class="wfnote__def">Pulls access back from someone who currently has it. Only offered on active
+                        cards. The membership stays on file and can be activated again later.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Reject</dt>
+                    <dd class="wfnote__def">Turns down the membership. Only offered while it is pending or suspended —
+                        an active membership must be suspended first.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Card details</dt>
+                    <dd class="wfnote__def">Name, role, email and phone, the business and its code, when the membership
+                        was added, who added it, and how complete that person's own profile is.</dd>
+                </div>
+            </dl>
+        </section>
+
+        <section class="wfnote__sec">
+            <h2 class="wfnote__h">Membership status</h2>
+            <dl class="wfnote__list">
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Pending</dt>
+                    <dd class="wfnote__def">Added by the client, waiting on us. No access yet.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Active</dt>
+                    <dd class="wfnote__def">Approved and verified — the person can sign in and work in that client's
+                        dashboard.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Suspended</dt>
+                    <dd class="wfnote__def">Access withdrawn for now, membership kept.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Rejected</dt>
+                    <dd class="wfnote__def">Turned down. The record stays visible under the Rejected filter.</dd>
+                </div>
+            </dl>
+        </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+        <h2 class="wfnote__h">Worth knowing</h2>
+        <ul class="wfnote__notes">
+            <li>Every button asks for confirmation, then <strong>applies immediately and reloads the page</strong>.
+                There is no undo — reversing a decision means pressing the opposite button afterwards.</li>
+            <li>Activating also sets the membership as verified. Suspending or rejecting later does not clear that flag,
+                so read the status badge rather than assuming.</li>
+            <li>A membership is scoped to <strong>one business</strong>. The same person invited by two clients has two
+                separate cards and needs approving separately for each.</li>
+            <li>The Pending and Active counters in the hero are totals across every business and ignore the filter you
+                are currently looking at.</li>
+            <li>The profile-completion percentage is that person's own profile, not the client's registration — a low
+                number is not a reason on its own to reject.</li>
+        </ul>
+    </section>

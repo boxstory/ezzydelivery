@@ -50,6 +50,8 @@ urlpatterns = [
          orders_views.bulk_update_order_status, name='bulk_update_order_status'),
     path('<int:order_id>/update-status/',
          orders_views.update_order_status, name='update_order_status_by_id'),
+    path('<int:order_id>/scheduled-delivery/',
+         orders_views.set_order_scheduled_delivery, name='set_order_scheduled_delivery'),
 
     # Order comments
     path('order/<int:order_id>/comments/',

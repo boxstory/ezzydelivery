@@ -39,14 +39,27 @@ class WorkforceTestMixin:
     """Reusable helpers for workforce/staff tests."""
 
     def create_staff_user(self, username='staffuser', password='Staff@123',
-                          via_user=True, via_profile=True):
-        """Create a staff user. Set via_user=False to test Profile.is_staff only."""
+                          via_user=True, via_profile=True, departments=None):
+        """
+        Create a staff user. Set via_user=False to test Profile.is_staff only.
+
+        Departments default to all three, which is what core migration 0017 gave
+        every existing staff member. Without them StaffDepartmentMiddleware would
+        302 this user away from every page, since it fails closed.
+        Pass departments=[] to build a staff user with no desk.
+        """
+        from core.departments import ASSIGNABLE_DEPARTMENTS, DEPARTMENT_FIELDS
+
+        if departments is None:
+            departments = ASSIGNABLE_DEPARTMENTS
+        dept_fields = {DEPARTMENT_FIELDS[code]: True for code in departments}
+
         user = User.objects.create_user(
             username=username, password=password,
             email=f'{username}@test.com', is_staff=via_user)
         profile = core_models.Profile.objects.create(
             user=user, first_name='Staff', last_name='User',
-            phone=11111111, is_staff=via_profile)
+            phone=11111111, is_staff=via_profile, **dept_fields)
         return user, profile
 
     def create_non_staff_user(self, username='regularuser'):
@@ -1274,6 +1287,63 @@ class WfFinanceFleetTest(WorkforceTestMixin, TestCase):
         resp = self.client.post(
             reverse('workforce:cod_settlement_action'), {})
         self.assertEqual(resp.status_code, 400)
+
+    def _driver_holding_cod(self, amount, did=None):
+        """A driver with one delivered, cash-collected, unsettled task."""
+        business = self.create_business(bid=9100 + (did or 0) % 100,
+                                        code=f'CB{did}')
+        loc = self.create_pickup_location(business)
+        order = self.create_order(business, loc, status='delivered',
+                                  cod=amount)
+        driver = self.create_driver(did=did)
+        task = self.create_delivery_task(order, driver, status='delivered')
+        delivery_models.DeliveryTask.objects.filter(pk=task.pk).update(
+            cod_collected=True,
+            cod_collected_amount=Decimal(amount),
+            cod_collected_at=timezone.now(),
+            cod_settled=False,
+            payment_method='cash',
+        )
+        return driver
+
+    def test_cod_settlement_lists_live_balance_not_cached_column(self):
+        """#118: The sheet is built from the tasks, so a stale cached
+        Driver.cod_in_hand neither hides a driver nor changes the figure."""
+        driver = self._driver_holding_cod(250, did=7801)
+        # Cached column drifted to zero — the old page filtered on it and would
+        # have dropped this driver off the sheet entirely.
+        fleet_models.Driver.objects.filter(pk=driver.pk).update(
+            cod_in_hand=Decimal('0.00'))
+
+        resp = self.client.get(reverse('workforce:cod_settlement_report'))
+        self.assertEqual(resp.status_code, 200)
+        listed = {d.driver_id: d.in_hand for d in resp.context['drivers']}
+        self.assertIn(driver.driver_id, listed)
+        self.assertEqual(listed[driver.driver_id], Decimal('250.00'))
+        self.assertEqual(resp.context['total_in_hand'], Decimal('250.00'))
+
+    def test_cod_settlement_action_settles_and_clears(self):
+        """#119: Recording a hand-in settles the tasks and empties the sheet."""
+        driver = self._driver_holding_cod(300, did=7802)
+
+        resp = self.client.post(
+            reverse('workforce:cod_settlement_action'),
+            {'driver_ids[]': [str(driver.driver_id)],
+             'payment_method': 'cash',
+             'reference': 'RCPT-1'})
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.json()
+        self.assertTrue(payload['success'])
+        self.assertEqual(payload['settled_count'], 1)
+        self.assertEqual(payload['total_settled'], 300.0)
+
+        self.assertFalse(
+            delivery_models.DeliveryTask.objects.filter(
+                driver=driver, cod_collected=True, cod_settled=False).exists())
+        after = self.client.get(reverse('workforce:cod_settlement_report'))
+        self.assertNotIn(
+            driver.driver_id,
+            [d.driver_id for d in after.context['drivers']])
 
 
 # =============================================================================

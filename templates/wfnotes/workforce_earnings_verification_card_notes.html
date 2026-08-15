@@ -1,0 +1,110 @@
+{% comment %}
+Purpose: "About this page" notes panel for earnings_verification.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_earnings_verification_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      Where a driver's pay for a job is agreed. Every completed delivery — delivered or partially delivered,
+      COD or prepaid — arrives here with a calculated figure. You check the job, adjust the figure if it does
+      not fit, and publish it, which is the moment the money is credited to the driver's wallet. What happens
+      after that is a payout, handled on <strong>Driver Earnings</strong>. The mirror of this page for what the
+      client is charged is Client Charge Verification.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Filters</dt>
+            <dd class="wfnote__def">Narrow to one driver, one verification status, and a period of today, 7, 30
+              or 90 days. It opens on pending work.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Verified box</dt>
+            <dd class="wfnote__def">The editable figure — what the driver will actually be paid. It starts at
+              the calculated amount; type over it when the job was not standard.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Set all selected</dt>
+            <dd class="wfnote__def">Writes one amount across every ticked row at once, for a batch that should
+              all pay the same.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Verify</dt>
+            <dd class="wfnote__def">Marks the ticked rows as checked and saves your figures, stamping your name
+              against them. No money moves yet.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Publish</dt>
+            <dd class="wfnote__def">Commits the figure and credits the driver's wallet. This is the one that
+              actually pays.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Reject</dt>
+            <dd class="wfnote__def">Parks a row as not payable — a job that should not earn. It stays visible
+              under the rejected filter.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Log</dt>
+            <dd class="wfnote__def">Opens the driver's activity trail for that task, so you can see what
+              actually happened before agreeing a fee.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Row detail</dt>
+            <dd class="wfnote__def">Task number and date, driver, client, pickup and drop with their zones, job
+              type, and the COD collected or <em>Prepaid</em>.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">The four states</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Pending</dt>
+            <dd class="wfnote__def">Delivered but nobody has agreed the fee. This is the queue to work through.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Verified</dt>
+            <dd class="wfnote__def">A figure has been checked and saved, but nothing has been credited. Still
+              editable.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Published</dt>
+            <dd class="wfnote__def">Credited to the driver's wallet. The amount box locks.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Rejected</dt>
+            <dd class="wfnote__def">Ruled not payable.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Calculated</dt>
+            <dd class="wfnote__def">The system's own figure, read-only: pick &amp; drop pays 80% of the delivery
+              price, an ordinary delivery pays the flat rate shown in the header.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Pending earnings</dt>
+            <dd class="wfnote__def">The tile at the top — what the unagreed rows in your current filter would
+              cost if you published them as they stand.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li><strong>Publishing moves money.</strong> It writes a wallet transaction against the driver, so fix
+          the amount before you publish, not after — a published row cannot be edited here.</li>
+        <li>Re-publishing a row already published will not credit it twice; it is skipped and reported back as
+          an error line. Treat that as a safety net, not a workflow.</li>
+        <li>Earnings do not depend on cash. A prepaid delivery earns exactly like a COD one, and COD collected
+          is shown only as context for judging the job.</li>
+        <li>Anything typed in an amount box is saved as part of Verify or Publish — pressing neither leaves the
+          change on screen only.</li>
+        <li>Maximum 500 rows per action, and a single amount above 10,000 QAR is refused as a typo. Fifty rows
+          per page, and ticks do not survive turning the page.</li>
+      </ul>
+    </section>
+  

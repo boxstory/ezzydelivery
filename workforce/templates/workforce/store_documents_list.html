@@ -1,5 +1,11 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff directory of every store's registration record, card/table toggle + search
+Used by: workforce_views.store_documents_list at /workforce/documents/stores/
+Notes: Carries the shared page-notes card (wfnote__) under the hero, hidden on load; the hero help
+       button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Store Documents - Ezzy Delivery{% endblock title %}
 
@@ -13,7 +19,16 @@
       </h1>
       <p class="sdl__hero-subtitle">Manage store registration and business documents</p>
     </div>
+    <button type="button" class="wfnote__btn" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_store_documents_list_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
   </div>
+
+  <div class="wfnote" id="workforce_store_documents_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_store_documents_list_card_notes' %}" hidden></div>
 
   <!-- Filter Bar -->
   <div class="sdl__filter-bar">

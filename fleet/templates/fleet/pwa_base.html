@@ -19,7 +19,7 @@
 
     <!-- PWA Modern CSS -->
     {% load static %}
-    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260728g">
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260802a">
     <!-- Fleet Component CSS - fth__ ffs__ fpm__ BEM blocks -->
     <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260630a">
 
@@ -248,18 +248,57 @@
     </script>
 
     <!-- EzzyGPS — global driver location tracking module -->
+    <script src="{% static 'fleet/js/ezzy-gps-queue.js' %}?v=20260802a"></script>
     <script>
     (function() {
+        /* Power profiles.
+         *
+         * The GPS radio, not the network, is what empties a driver's battery, so
+         * high accuracy is spent only where it buys something: while a task is
+         * actually in hand. Idle drivers are located from cell and wifi, which
+         * costs almost nothing, and a driver who has stopped moving is polled
+         * even less often. Fixes are taken on a duty cycle rather than through a
+         * permanent watch, so the radio sleeps between them. */
+        var PROFILES = {
+            idle:   { high: false, sendMs: 180000, maxAge: 120000, timeout: 20000, label: 'Idle' },
+            active: { high: true,  sendMs: 30000,  maxAge: 10000,  timeout: 15000, label: 'On task' },
+            parked: { high: false, sendMs: 150000, maxAge: 120000, timeout: 20000, label: 'Parked' }
+        };
+        var STATIONARY_METRES = 40;      // movement below this doesn't count as travel
+        var STATIONARY_AFTER_MS = 300000; // 5 min still on an active task → parked profile
+        var MAX_ACCURACY = 100;          // above this a fix is flagged, never discarded
+
+        // Whether the driver has a task in flight, decided server-side. This is
+        // what keeps tracking sharp across the whole PWA rather than only on
+        // the navigation screen, without the client having to guess.
+        var onDuty = {{ driver_on_duty|yesno:"true,false" }};
+        var mode = 'poll';        // poll = duty-cycled fixes; live = continuous watch (nav page)
+        var profileName = 'idle';
         var watchId = null;
-        var sendTimer = null;
+        var pollTimer = null;
+        var running = false;
         var currentPos = null;
+        var lastMovedAt = 0;
+        var anchorPos = null;     // position the stationary test measures against
         var activeTaskId = null;
-        var SEND_INTERVAL = 30000; // 30 seconds
-        var MAX_ACCURACY = 100;    // ignore readings worse than 100m
-        var gpsState = 'grey';     // grey|green|red|yellow
+        var gpsState = 'grey';    // grey|green|red|yellow
+        var wakeLock = null;
+        var wakeLockWanted = false;
+
+        function profile() { return PROFILES[profileName]; }
 
         function getCsrf() {
             return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        }
+
+        function metresBetween(a, b) {
+            var R = 6371000, toRad = Math.PI / 180;
+            var dLat = (b.lat - a.lat) * toRad;
+            var dLng = (b.lng - a.lng) * toRad;
+            var h = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                  + Math.cos(a.lat * toRad) * Math.cos(b.lat * toRad)
+                  * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            return 2 * R * Math.asin(Math.sqrt(h));
         }
 
         function setGpsState(state, title) {
@@ -274,53 +313,129 @@
             console.log('[EzzyGPS] Status:', state, '-', title);
         }
 
-        function sendLocation() {
-            if (!currentPos) return;
-            var body = {
+        function buildPing() {
+            if (!currentPos) return null;
+            return {
                 latitude: currentPos.lat,
                 longitude: currentPos.lng,
                 accuracy: currentPos.accuracy,
                 speed: currentPos.speed,
-                heading: currentPos.heading
+                heading: currentPos.heading,
+                fixed_at: new Date(currentPos.fixedAt).toISOString(),
+                task_id: activeTaskId || null
             };
-            if (activeTaskId) body.task_id = activeTaskId;
+        }
 
-            fetch('/api/driver/location/', {
+        /* Deliver a ping, or park it in the offline queue.
+         *
+         * Anything that doesn't reach the server is kept rather than lost, and a
+         * Background Sync is requested so the browser can replay it even after
+         * the driver has closed the app. */
+        function sendLocation(useKeepalive) {
+            var ping = buildPing();
+            if (!ping) return Promise.resolve(false);
+
+            return fetch('/api/driver/location/', {
                 method: 'POST',
                 credentials: 'same-origin',
+                keepalive: !!useKeepalive,
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCsrf()
                 },
-                body: JSON.stringify(body)
+                body: JSON.stringify(ping)
             }).then(function(r) {
-                if (!r.ok) console.warn('[EzzyGPS] Ping failed:', r.status);
-                else console.log('[EzzyGPS] Ping sent OK — lat:', currentPos.lat.toFixed(5), 'lng:', currentPos.lng.toFixed(5), 'acc:', Math.round(currentPos.accuracy) + 'm');
-            }).catch(function(err) { console.warn('[EzzyGPS] Ping error:', err); });
+                if (r.ok) {
+                    console.log('[EzzyGPS] Ping OK —', ping.latitude.toFixed(5), ping.longitude.toFixed(5),
+                                Math.round(ping.accuracy || 0) + 'm', '[' + profileName + ']');
+                    return true;
+                }
+                console.warn('[EzzyGPS] Ping rejected:', r.status);
+                if (r.status >= 500) queuePing(ping);
+                return false;
+            }).catch(function(err) {
+                console.warn('[EzzyGPS] Ping failed, queued:', err && err.message);
+                queuePing(ping);
+                return false;
+            });
+        }
+
+        function queuePing(ping) {
+            if (!self.EzzyGPSQueue) return;
+            EzzyGPSQueue.enqueue(Object.assign({}, ping, { csrf: getCsrf() })).then(requestSync).catch(function() {});
+        }
+
+        function requestSync() {
+            if (!('serviceWorker' in navigator) || !self.EzzyGPSQueue) return;
+            navigator.serviceWorker.ready.then(function(reg) {
+                if (reg.sync) return reg.sync.register(EzzyGPSQueue.SYNC_TAG);
+            }).catch(function() { /* Background Sync unsupported — flush on next foreground */ });
+        }
+
+        function flushQueue() {
+            if (!self.EzzyGPSQueue || !navigator.onLine) return;
+            EzzyGPSQueue.flush(getCsrf()).then(function(sent) {
+                if (sent) console.log('[EzzyGPS] Replayed', sent, 'queued ping(s)');
+            });
+        }
+
+        /* Drop to the parked profile once the driver has genuinely stopped, and
+         * come straight back out on the first real movement.
+         *
+         * onDuty is what carries the active profile across the rest of the PWA:
+         * a driver checking their COD screen mid-delivery is still mid-delivery,
+         * and dropping them to the idle profile there is exactly how the trail
+         * used to go coarse between task pages. */
+        function reprofile() {
+            if (!activeTaskId && !onDuty) {
+                applyProfile('idle');
+                return;
+            }
+            var stillFor = Date.now() - lastMovedAt;
+            applyProfile(stillFor > STATIONARY_AFTER_MS ? 'parked' : 'active');
+        }
+
+        function applyProfile(name) {
+            if (name === profileName) return;
+            profileName = name;
+            console.log('[EzzyGPS] Profile →', name);
+            if (running) { stopSensors(); startSensors(); }
         }
 
         function onPosition(pos) {
             var c = pos.coords;
-            if (c.accuracy > MAX_ACCURACY) {
-                console.warn('[EzzyGPS] Skipped: accuracy', Math.round(c.accuracy) + 'm >', MAX_ACCURACY + 'm');
-                setGpsState('yellow', 'Poor accuracy (' + Math.round(c.accuracy) + 'm)');
-                return;
-            }
-            currentPos = {
+            var fix = {
                 lat: c.latitude,
                 lng: c.longitude,
                 accuracy: c.accuracy,
                 speed: c.speed,
-                heading: c.heading
+                heading: c.heading,
+                fixedAt: pos.timestamp || Date.now()
             };
-            setGpsState('green', 'Active (' + Math.round(c.accuracy) + 'm)');
-            document.dispatchEvent(new CustomEvent('ezzy:gps', { detail: currentPos }));
+
+            // A coarse fix is still worth reporting — a rough position beats a
+            // hole in the trail — it is only marked as such.
+            if (c.accuracy > MAX_ACCURACY) {
+                setGpsState('yellow', 'Approximate (' + Math.round(c.accuracy) + 'm)');
+            } else {
+                setGpsState('green', 'Active (' + Math.round(c.accuracy) + 'm)');
+            }
+
+            var moved = !anchorPos || metresBetween(anchorPos, fix) > STATIONARY_METRES;
+            if (moved) {
+                anchorPos = fix;
+                lastMovedAt = Date.now();
+            }
+            currentPos = fix;
+            document.dispatchEvent(new CustomEvent('ezzy:gps', { detail: fix }));
+            reprofile();
         }
 
         function onError(err) {
             console.warn('[EzzyGPS] Error:', err.code, err.message);
             if (err.code === 1) { // PERMISSION_DENIED
                 setGpsState('red', 'Permission denied');
+                stop();
                 if (typeof showToast === 'function') {
                     showToast('Location permission denied. GPS tracking disabled.', 'warning', 5000);
                 }
@@ -331,10 +446,72 @@
             }
         }
 
+        function geoOptions() {
+            var p = profile();
+            return { enableHighAccuracy: p.high, maximumAge: p.maxAge, timeout: p.timeout };
+        }
+
+        /* One duty cycle: wake the radio, take a fix, report it, sleep again. */
+        function tick() {
+            navigator.geolocation.getCurrentPosition(function(pos) {
+                onPosition(pos);
+                sendLocation();
+            }, function(err) {
+                onError(err);
+                if (currentPos) sendLocation();  // report the last known rather than nothing
+            }, geoOptions());
+            pollTimer = setTimeout(tick, profile().sendMs);
+        }
+
+        function startSensors() {
+            if (mode === 'live') {
+                watchId = navigator.geolocation.watchPosition(onPosition, onError, geoOptions());
+                pollTimer = setInterval(function() { sendLocation(); }, profile().sendMs);
+            } else {
+                tick();
+            }
+        }
+
+        function stopSensors() {
+            if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+            if (pollTimer) { clearTimeout(pollTimer); clearInterval(pollTimer); pollTimer = null; }
+        }
+
+        function stop() {
+            if (!running) return;
+            running = false;
+            stopSensors();
+            releaseWakeLock();
+            setGpsState('grey', 'Stopped');
+        }
+
+        // ---- Screen wake lock (opt-in, off by default) ----
+        // Keeping the screen alive is the single biggest battery cost on the
+        // device, so it is never taken automatically — only when a driver has
+        // asked for it on the navigation screen.
+        function acquireWakeLock() {
+            if (!wakeLockWanted || wakeLock || !('wakeLock' in navigator)) return;
+            if (document.visibilityState !== 'visible') return;
+            navigator.wakeLock.request('screen').then(function(lock) {
+                wakeLock = lock;
+                lock.addEventListener('release', function() { wakeLock = null; });
+            }).catch(function(err) { console.warn('[EzzyGPS] Wake lock refused:', err && err.message); });
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock) { wakeLock.release().catch(function() {}); wakeLock = null; }
+        }
+
         window.EzzyGPS = {
+            /* taskId names the specific job to stamp on each ping. Being on a
+             * job at all — which is what unlocks the high-accuracy profile —
+             * comes from the server via onDuty, so it holds on every page. */
             start: function(taskId) {
-                if (watchId !== null) return; // already running
-                activeTaskId = taskId || null;
+                if (taskId) {
+                    activeTaskId = taskId;
+                    lastMovedAt = Date.now();
+                }
+                if (running) { reprofile(); return; }
                 if (!('geolocation' in navigator)) {
                     setGpsState('grey', 'Not supported');
                     if (typeof showToast === 'function') {
@@ -342,39 +519,62 @@
                     }
                     return;
                 }
-                watchId = navigator.geolocation.watchPosition(onPosition, onError, {
-                    enableHighAccuracy: true,
-                    maximumAge: 10000,
-                    timeout: 15000
-                });
-                // Send first ping after 5s, then every 30s
-                sendTimer = setInterval(sendLocation, SEND_INTERVAL);
-                setTimeout(sendLocation, 5000);
-                console.log('[EzzyGPS] Started tracking' + (taskId ? ' for task ' + taskId : ''));
+                running = true;
+                profileName = (activeTaskId || onDuty) ? 'active' : 'idle';
+                if (profileName === 'active') lastMovedAt = Date.now();
+                startSensors();
+                flushQueue();
+                console.log('[EzzyGPS] Started —', mode, 'mode,', profileName, 'profile');
             },
             stop: function() {
-                if (watchId !== null) {
-                    navigator.geolocation.clearWatch(watchId);
-                    watchId = null;
-                }
-                if (sendTimer) {
-                    clearInterval(sendTimer);
-                    sendTimer = null;
-                }
                 activeTaskId = null;
-                setGpsState('grey', 'Stopped');
-                console.log('[EzzyGPS] Stopped tracking');
+                stop();
+            },
+            /* Continuous fixes for the turn-by-turn map. Costs more battery, so
+             * only the navigation screen asks for it. */
+            setLiveMode: function(on) {
+                var next = on ? 'live' : 'poll';
+                if (next === mode) return;
+                mode = next;
+                if (running) { stopSensors(); startSensors(); }
+            },
+            wakeLock: {
+                enable: function() { wakeLockWanted = true; acquireWakeLock(); },
+                disable: function() { wakeLockWanted = false; releaseWakeLock(); },
+                isEnabled: function() { return wakeLockWanted; },
+                isSupported: function() { return 'wakeLock' in navigator; }
             },
             getPosition: function() {
                 return currentPos ? Object.assign({}, currentPos) : null;
             },
-            getState: function() {
-                return gpsState;
-            }
+            getState: function() { return gpsState; },
+            getProfile: function() { return profileName; },
+            flushQueue: flushQueue
         };
 
-        // Auto-start GPS tracking for all driver pages
-        // Sends location pings every 30s so staff can see driver on live map
+        /* Backgrounded pages get their timers throttled and their GPS starved,
+         * so tracking is torn down deliberately instead of being left to decay.
+         * A final ping goes out first — that is what tells staff the difference
+         * between "app closed here" and a dead marker with no explanation. */
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden') {
+                if (running) { sendLocation(true); stopSensors(); }
+                releaseWakeLock();
+            } else if (running) {
+                startSensors();
+                flushQueue();
+                acquireWakeLock();
+            }
+        });
+
+        window.addEventListener('pagehide', function() {
+            if (running) sendLocation(true);
+        });
+
+        window.addEventListener('online', flushQueue);
+
+        // Auto-start for every driver page. No task in hand means the cheap
+        // idle profile — a fix roughly every 3 minutes, no GPS radio.
         EzzyGPS.start();
     })();
     </script>

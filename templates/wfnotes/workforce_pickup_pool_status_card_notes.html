@@ -1,0 +1,143 @@
+{% comment %}
+Purpose: "About this page" notes panel for pickup_pool_status.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_pickup_pool_status_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Every <strong>first-mile pickup</strong> in the system, live. A pickup is the leg where a
+            driver collects goods from the client's own shop and brings them into our network; one is
+            raised automatically when an order is created, following the rule set for that client on
+            <strong>Pickup&nbsp;&rsaquo;&nbsp;Automation</strong>. This page is where staff step in when
+            the automation is not enough — nobody has claimed a job, the wrong driver has it, or a
+            driver has gone quiet. You can work one row at a time or tick several and act on them
+            together.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assign</dt>
+                        <dd class="wfnote__def">On an unclaimed row. Opens a driver search under the row —
+                            type a name or code, click the driver, and the job becomes theirs.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Reassign</dt>
+                        <dd class="wfnote__def">The same picker on a job that already has a driver. The new
+                            driver is told it is theirs and the old one is told it was taken away.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Back to pool</dt>
+                        <dd class="wfnote__def">Strips the driver off and puts the job back to Pending so
+                            someone else can take it. Only offered before the goods are collected.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Cancel</dt>
+                        <dd class="wfnote__def">Closes the pickup leg and tells the driver not to collect. The
+                            order and its delivery task are <strong>not</strong> touched — use it when the goods
+                            are coming to us another way, not when the order is off. You can add a reason; it is
+                            written to the order's timeline.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Delete</dt>
+                        <dd class="wfnote__def">Removes the pickup row for good — for jobs that should never
+                            have been raised (duplicate, wrong client, test). Superadmins only, refused once the
+                            goods are collected, and nothing re-creates it. The order itself stays. If in doubt,
+                            cancel instead.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Tick rows</dt>
+                        <dd class="wfnote__def">The checkbox column selects a row for a bulk action. Only
+                            rows that can still be acted on have one. Shift-click a second box to take
+                            everything in between, and the header box takes the whole page.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Bulk bar</dt>
+                        <dd class="wfnote__def">Appears once anything is ticked. Search a driver to hand the
+                            entire selection to them in one go, send the selection back to the pool, cancel or
+                            delete the selection, or clear it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Status (or <em>Active only</em>, everything still in play)
+                            and mode. Both apply as soon as you change them.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Search</dt>
+                        <dd class="wfnote__def">Matches order number, client name, or the driver's code —
+                            the code, not the driver's name.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Age</dt>
+                        <dd class="wfnote__def">How long since the job was raised. A pending row with a big
+                            age is one nobody has picked up.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pending</dt>
+                        <dd class="wfnote__def">Nobody has it. Offered to the client's own fleet or to every
+                            approved driver, depending on the mode.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Accepted</dt>
+                        <dd class="wfnote__def">A driver owns it but has not set off yet.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">In Progress</dt>
+                        <dd class="wfnote__def">The driver is on the way to the client.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Arrived</dt>
+                        <dd class="wfnote__def">At the client's counter, goods not yet in hand.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Collected</dt>
+                        <dd class="wfnote__def">Goods are with the driver. From here the after-collection
+                            rule takes over and staff can no longer reassign or recall it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Dropped</dt>
+                        <dd class="wfnote__def">Delivered into the hub. The pickup leg is finished.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Handed Off</dt>
+                        <dd class="wfnote__def">Passed to another driver who has confirmed. While the
+                            confirmation is outstanding the row still reads Collected and names the
+                            driver it is waiting on.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Cancelled</dt>
+                        <dd class="wfnote__def">Dropped — either the order itself was cancelled, or staff
+                            cancelled the pickup leg from this page.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Assigning does not ask the driver — it puts the job <strong>straight into Accepted</strong>
+                    under their name and notifies them. If they are unreachable, nothing gets collected, so
+                    reassign rather than assume.</li>
+                <li>Only <strong>approved</strong> drivers appear in the pickers, and a driver already on the
+                    job is refused rather than reassigned to themselves.</li>
+                <li><em>Back to pool</em> stops working once the goods are collected. At that point the
+                    driver is holding the client's stock and the after-collection flow has to finish it.</li>
+                <li>Returning an assigned-fleet job to the pool re-notifies that client's drivers. If the
+                    client has no active pickup drivers, it will sit unclaimed until staff assign it.</li>
+                <li>Bulk actions are best-effort: rows in a state that cannot move are skipped and listed
+                    back to you, and the page reloads if anything did move. Read the skipped list.</li>
+                <li>Cancelling a pickup does <strong>not</strong> cancel the order. If the order is off, cancel
+                    the order itself — that closes the pickup automatically.</li>
+                <li>The tallies count the <strong>whole system</strong>, not the filtered page.</li>
+                <li>The pickup leg carries no COD and no driver earnings — both belong to the delivery leg.</li>
+            </ul>
+        </section>
+    

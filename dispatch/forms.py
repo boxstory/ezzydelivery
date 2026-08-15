@@ -5,9 +5,10 @@ from django.utils import timezone
 from .models import RiderShift, DispatchConfig
 from fleet.models import Driver
 from business.models import PickupLocation
+from core.forms_base import SanitizedForm, SanitizedFormMixin, SanitizedModelForm
 
 
-class RiderShiftForm(forms.ModelForm):
+class RiderShiftForm(SanitizedModelForm):
     """Form for creating and editing rider shifts"""
 
     rider = forms.ModelChoiceField(
@@ -120,7 +121,7 @@ class RiderShiftEditForm(RiderShiftForm):
         return status
 
 
-class DispatchConfigForm(forms.ModelForm):
+class DispatchConfigForm(SanitizedModelForm):
     """Form for editing dispatch configuration per location"""
 
     class Meta:
@@ -174,7 +175,7 @@ class DispatchConfigForm(forms.ModelForm):
         return cleaned_data
 
 
-class BatchFilterForm(forms.Form):
+class BatchFilterForm(SanitizedForm):
     """Form for filtering batches in the list view"""
 
     STATUS_CHOICES = [('', 'All Statuses')] + list([
@@ -211,7 +212,7 @@ class BatchFilterForm(forms.Form):
     )
 
 
-class ShiftFilterForm(forms.Form):
+class ShiftFilterForm(SanitizedForm):
     """Form for filtering shifts in the list view"""
 
     STATUS_CHOICES = [('', 'All Statuses')] + list(RiderShift.SHIFT_STATUS)

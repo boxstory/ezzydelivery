@@ -64,8 +64,10 @@ from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 from core.decorators import business_required
+from core.pagination import paginate, other_params
 from decouple import config
 from django.core.files.storage import default_storage
 from PIL import Image
@@ -87,6 +89,7 @@ from business import forms as business_forms
 from datetime import datetime
 from core.seo import SEOMetadata
 from core.context_processors import get_cached_profile, get_cached_business
+from core.exports import set_export_filename, safe_csv_writer
 from warehouse import models as warehouse_models
 
 # Local aliases for commonly used models
@@ -302,13 +305,19 @@ def driver_directory(request):
         messages.error(request, "Business not found")
         return redirect('business:business_dashboard')
 
+    # Ordered explicitly: an unordered queryset gives the paginator no stable
+    # sort, so a row can repeat on page 2 or never appear at all.
     driver_directory = business_models.DriverDirectory.objects.filter(
-        business_id=business.business_id).all()
+        business_id=business.business_id).order_by('-id')
 
     logger.info(f"User {request.user.id} accessed driver directory for business {business.business_id}")
 
+    contacts_page, contacts_total = paginate(request, driver_directory)
+
     context = {
-        'contacts': driver_directory,
+        'contacts': contacts_page,
+        'contacts_page': contacts_page,
+        'contacts_total': contacts_total,
         'business': business,
     }
     return render(request, 'business/parts/driver_directory.html', context)
@@ -410,15 +419,17 @@ def pickup_location_list(request):
             business_id=business.business_id
         ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
-        all_locations = list(pickup_locations)
+        stores_page, stores_total = paginate(request, pickup_locations)
 
-        if not all_locations:
+        if not stores_total:
             return redirect('business:pickup_location_choose')
 
-        logger.info(f"User {request.user.id} viewing {len(all_locations)} pickup locations for business {business.business_id}")
+        logger.info(f"User {request.user.id} viewing {stores_total} pickup locations for business {business.business_id}")
 
         context = {
-            'stores': all_locations,
+            'stores': stores_page,
+            'stores_page': stores_page,
+            'stores_total': stores_total,
             'business': business,
             'fulfillment_enabled': business.fulfillment_service_enabled,
         }
@@ -485,6 +496,76 @@ def pickup_location_add(request):
         logger.error(f"Business not found for user {request.user.id}")
         messages.error(request, "Business not found")
         return redirect('core:main_dashboard')
+
+
+@login_required(login_url='account_login')
+@business_required
+@require_POST
+def pickup_location_add_ajax(request):
+    """
+    Create a pickup location for the signed-in business and return it as JSON.
+
+    Used by the "Add pickup location" card on the order-add page so a client
+    can add a store without leaving the form. Always scoped to the caller's
+    own business — the request carries no business id.
+    """
+    business = get_cached_business(request)
+    if not business:
+        return JsonResponse({'success': False, 'error': 'No business associated with your account'}, status=403)
+
+    title = request.POST.get('pickup_location_title', '').strip()
+    if not title:
+        return JsonResponse({'success': False, 'error': 'Location title is required'}, status=400)
+
+    def _int_or_none(val):
+        try:
+            return int(val) if val and val.strip() else None
+        except (ValueError, TypeError):
+            return None
+
+    def _dec_or_none(val):
+        try:
+            from decimal import Decimal
+            return Decimal(val) if val and val.strip() else None
+        except Exception:
+            return None
+
+    is_default = request.POST.get('is_default') in ('on', 'true', '1')
+    if is_default:
+        business_models.PickupLocation.objects.filter(
+            business=business, is_default=True
+        ).update(is_default=False)
+
+    loc = business_models.PickupLocation.objects.create(
+        business=business,
+        pickup_location_title=title,
+        locality=request.POST.get('locality', '').strip(),
+        pickup_zone_no=_int_or_none(request.POST.get('pickup_zone_no')),
+        pickup_street_no=_int_or_none(request.POST.get('pickup_street_no')),
+        pickup_building_no=_int_or_none(request.POST.get('pickup_building_no')),
+        pickup_lat=_dec_or_none(request.POST.get('pickup_lat')),
+        pickup_lon=_dec_or_none(request.POST.get('pickup_lon')),
+        pickup_status='active',
+        is_default=is_default,
+    )
+    logger.info("User %s added pickup location %s for business %s via order form",
+                request.user.id, loc.id, business.business_id)
+    return JsonResponse({
+        'success': True,
+        'message': 'Pickup location added successfully',
+        'location': {
+            'id': loc.id,
+            'title': loc.pickup_location_title,
+            'locality': loc.locality,
+            'zone': loc.pickup_zone_no,
+            'street': loc.pickup_street_no,
+            'building': loc.pickup_building_no,
+            'status': loc.pickup_status,
+            'is_default': loc.is_default,
+            'lat': str(loc.pickup_lat) if loc.pickup_lat is not None else '',
+            'lon': str(loc.pickup_lon) if loc.pickup_lon is not None else '',
+        }
+    })
 
 
 @login_required(login_url='account_login')
@@ -808,19 +889,30 @@ def business_settings(request, business_id):
 
     # N+1 FIX: Use select_related for FK relationships
     business = business_models.Business.objects.select_related('user', 'profile').filter(business_id=business_id).first()
-    business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
+    business_apis = business_models.BusinessApiSettings.objects.filter(
+        business_id=business_id).order_by('-id')
 
-    teams = business_models.BusinessTeamProfile.objects.select_related('user').filter(business_id=business_id)
-    stores = business_models.PickupLocation.objects.filter(business_id=business_id)
+    teams = business_models.BusinessTeamProfile.objects.select_related('user').filter(
+        business_id=business_id).order_by('-created_at')
+    stores = business_models.PickupLocation.objects.filter(
+        business_id=business_id).order_by('pickup_location_title')
     logger.debug(f'Loading business settings for business_id={business_id}: apis={business_apis.count()}, teams={teams.count()}, stores={stores.count()}')
 
     is_business_owner = business.user_id == request.user.id if business and business.user_id else False
 
+    # This page is a settings hub, not a list page — three lists share one URL,
+    # so they cannot each carry a ?page=. Each section shows a preview and links
+    # to its own paginated page (stores, teams, APIs) for the full set.
+    preview = 6
     context = {
         'business': business,
-        'business_apis': business_apis,
-        'teams': teams,
-        'stores': stores,
+        'business_apis': business_apis[:preview],
+        'business_apis_total': business_apis.count(),
+        'teams': teams[:preview],
+        'teams_total': teams.count(),
+        'stores': stores[:preview],
+        'stores_total': stores.count(),
+        'preview_size': preview,
         'is_business_owner': is_business_owner,
     }
     return render(request, 'business/parts/business_settings.html', context)
@@ -864,8 +956,11 @@ def business_settings_api_update(request, business_id, api_id):
         context = {
             'business': business,
             'form': form,
+            'api': business_apis,
             'api_id': api_id,
-            'form_title': 'Business API Settings Add'
+            'form_title': 'Business API Settings Add',
+            'shopify_oauth_redirect_uri': shopify_oauth_redirect_uri(),
+            'shopify_oauth_app_url': shopify_oauth_app_url(),
         }
 
         return render(request, 'business/parts/business_settings_api_update.html', context)
@@ -894,6 +989,18 @@ def business_settings_api_add(request, business_id):
                 api_settings.business = business
                 api_settings.save()
                 logger.info(f'API settings added successfully for business_id={business_id}')
+
+                # Shopify OAuth needs a second step, and saving credentials on
+                # its own connects nothing. Hand straight off to authorization
+                # instead of dropping the merchant back on the settings list
+                # with a config that will 401 on every call.
+                if (api_settings.api_type == 'shopify'
+                        and form.cleaned_data.get('shopify_setup_mode', 'oauth') != 'custom_app'):
+                    return redirect(
+                        'business:shopify_oauth_start',
+                        business_id=business_id, api_id=api_settings.id,
+                    )
+
                 messages.success(request, "Successful Submission")
                 return redirect("business:business_settings", business_id)
             else:
@@ -902,7 +1009,9 @@ def business_settings_api_add(request, business_id):
         context = {
             'business': business,
             'form': form,
-            'form_title': 'Business API Settings Adding Form'
+            'form_title': 'Business API Settings Adding Form',
+            'shopify_oauth_redirect_uri': shopify_oauth_redirect_uri(),
+            'shopify_oauth_app_url': shopify_oauth_app_url(),
         }
 
         return render(request, 'business/parts/business_settings_api_add.html', context)
@@ -920,15 +1029,63 @@ def business_settings_api_list(request, business_id):
         return redirect('business:business_dashboard')
 
     business = user_business
-    business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
+    # Ordered explicitly — the paginator needs a stable sort or rows shuffle
+    # between pages.
+    business_apis = business_models.BusinessApiSettings.objects.filter(
+        business_id=business_id).order_by('-id')
     api_keys = ezzy_api_models.ClientApiKey.objects.filter(business=business).order_by('-created_at')
     has_shopify_integration = business_apis.filter(api_type__icontains='shopify').exists()
 
+    # Two independent lists on one URL, so the API keys table gets its own page
+    # parameter and each pager keeps the other list where it was.
+    apis_page, apis_total = paginate(request, business_apis, default=25)
+    keys_page, keys_total = paginate(request, api_keys, default=25, page_param='keys_page')
+
+    # The header readout says "n of m live", so the live figure has to be the
+    # real verified count — it used to reuse the total and always read 100%.
+    verified_apis_total = business_apis.filter(is_verify_api=True).count()
+    active_keys_total = api_keys.filter(is_active=True).count()
+
+    # Resolve each row's platform + connection state here so the card template
+    # stays declarative. "broken" is narrower than "pending": credentials were
+    # saved but there is no access token, so every call 401s.
+    platform_codes = {'shopify': 'SHP', 'woocommerce': 'WOO', 'magento': 'MAG', 'custom': 'API'}
+    for api in apis_page:
+        api_type = (api.api_type or '').lower()
+        if 'shopify' in api_type:
+            api.platform_slug = 'shopify'
+        elif 'woo' in api_type:
+            api.platform_slug = 'woocommerce'
+        elif 'magento' in api_type:
+            api.platform_slug = 'magento'
+        elif 'custom' in api_type:
+            api.platform_slug = 'custom'
+        else:
+            api.platform_slug = 'default'
+        api.platform_code = platform_codes.get(api.platform_slug, 'API')
+
+        if api.is_verify_api:
+            api.link_state = 'live'
+        elif api.platform_slug == 'shopify' and not api.api_access_token:
+            api.link_state = 'broken'
+        else:
+            api.link_state = 'pending'
+
     context = {
         'business': business,
-        'business_apis': business_apis,
-        'api_keys': api_keys,
+        'business_apis': apis_page,
+        'business_apis_page': apis_page,
+        'business_apis_total': apis_total,
+        'business_apis_params': other_params(request, 'page'),
+        'verified_apis_total': verified_apis_total,
+        'api_keys': keys_page,
+        'api_keys_page': keys_page,
+        'api_keys_total': keys_total,
+        'active_keys_total': active_keys_total,
+        'api_keys_params': other_params(request, 'keys_page'),
         'has_shopify_integration': has_shopify_integration,
+        'shopify_oauth_redirect_uri': shopify_oauth_redirect_uri(),
+        'shopify_oauth_app_url': shopify_oauth_app_url(),
     }
     return render(request, 'business/parts/business_settings_api_list.html', context)
 
@@ -986,14 +1143,25 @@ def business_settings_api_test_result(request, business_id, api_id):
     business = user_business
     business_api = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
     from django.utils import timezone as dj_timezone
-    update_time = dj_timezone.localtime().strftime('%Y-%m-%d  Time : %H:%M:%S')
+    update_time = dj_timezone.localtime().strftime('%Y-%m-%d %H:%M:%S')
 
     def _htmx_error(msg):
+        """Config problems that stop the test before any call goes out.
+
+        Rendered in the same status-line shape as a real result so the console
+        reads consistently, with the data div the run-state badge looks for.
+        """
         return HttpResponse(
-            f'<div class="bapi__status-section bapi__status-section--error">'
-            f'<div class="bapi__status-icon"><i class="fa-solid fa-circle-exclamation"></i></div>'
-            f'<div class="bapi__status-content"><h4>Configuration Error</h4><p>{msg}</p></div>'
-            f'</div>'
+            f'<div id="api-test-status-data" class="d-none" data-status="0" data-succeeded="false"></div>'
+            f'<div class="bapi__statusline bapi__statusline--none">'
+            f'<span class="bapi__statusline-code">n/a</span>'
+            f'<div class="bapi__statusline-main">'
+            f'<p class="bapi__statusline-text">Not configured</p>'
+            f'<p class="bapi__statusline-meta">No request was sent.</p>'
+            f'</div></div>'
+            f'<div class="bapi__fix"><div class="bapi__fix-head">'
+            f'<i class="fa-solid fa-screwdriver-wrench"></i>How to fix</div>'
+            f'<ol class="bapi__fix-list"><li>{msg}</li></ol></div>'
         )
 
     if not business_api:
@@ -1019,9 +1187,33 @@ def business_settings_api_test_result(request, business_id, api_id):
     result = {}
     status = 0
     error_message = None
+    # The console reports each call the test actually makes, so a partial
+    # failure says which leg broke instead of collapsing into one verdict.
+    probes = []
+    # raise_for_status() used to lose the real code — the response block forced
+    # status to 0, so the 401/403/404/5xx guidance below could never render.
+    http_status = None
+
+    def _probe(label, response, path):
+        """Record one call, then hand the response back for the caller to use."""
+        probes.append({
+            'label': label,
+            'path': path,
+            'status': response.status_code,
+            'ms': int(response.elapsed.total_seconds() * 1000) if response.elapsed else None,
+            'detail': None,
+        })
+        return response
 
     try:
         if business_api.api_type == 'shopify':
+            if not BASE_API_ACCESS_KEY:
+                return _htmx_error(
+                    "No Shopify access token saved. The Client ID and Secret alone cannot call the "
+                    "Admin API — click <strong>Connect with Shopify</strong> to complete the OAuth "
+                    "authorization, or paste an Admin API access token (starts with "
+                    "<code>shpat_</code>) from your Shopify custom app."
+                )
             shop_url = BASE_API_STORE_NAME
             logger.debug(f'Testing Shopify API for shop_url={shop_url}')
 
@@ -1029,14 +1221,19 @@ def business_settings_api_test_result(request, business_id, api_id):
             product_base_url = 'https://' + shop_url + BASE_API_PRODUCT_ENDPINT
             header_value = {'X-Shopify-Access-Token': BASE_API_ACCESS_KEY, 'Content-Type': 'application/json'}
 
-            order_response = requests.get(order_base_url, headers=header_value, params={'status': 'any', 'limit': 10}, timeout=30)
+            order_response = _probe('Orders', requests.get(
+                order_base_url, headers=header_value,
+                params={'status': 'any', 'limit': 10}, timeout=30), BASE_API_ORDER_ENDPINT)
             order_response.raise_for_status()
             order_count = len(order_response.json().get('orders', []))
+            probes[-1]['detail'] = f'{order_count} returned'
             logger.debug(f'Shopify order_count={order_count}')
 
-            product_response = requests.get(product_base_url, headers=header_value, timeout=30)
+            product_response = _probe('Products', requests.get(
+                product_base_url, headers=header_value, timeout=30), BASE_API_PRODUCT_ENDPINT)
             product_response.raise_for_status()
             product_count = len(product_response.json().get('products', []))
+            probes[-1]['detail'] = f'{product_count} returned'
             logger.debug(f'Shopify product_count={product_count}')
 
         elif business_api.api_type == 'woocommerce':
@@ -1051,14 +1248,16 @@ def business_settings_api_test_result(request, business_id, api_id):
                 timeout=30,
             )
 
-            order_response = wcapi.get("orders")
+            order_response = _probe('Orders', wcapi.get("orders"), '/wp-json/wc/v3/orders')
             order_count_str = order_response.headers.get('X-WP-Total', '0')
             order_count = int(order_count_str) if order_count_str else 0
+            probes[-1]['detail'] = f'{order_count} returned'
             logger.debug(f'WooCommerce order_count={order_count}')
 
-            product_response = wcapi.get("products", params={"per_page": 20})
+            product_response = _probe('Products', wcapi.get("products", params={"per_page": 20}), '/wp-json/wc/v3/products')
             product_count_str = product_response.headers.get('X-WP-Total', '0')
             product_count = int(product_count_str) if product_count_str else 0
+            probes[-1]['detail'] = f'{product_count} returned'
             logger.debug(f'WooCommerce product_count={product_count}')
 
         elif business_api.api_type == 'google_sheet':
@@ -1093,6 +1292,13 @@ def business_settings_api_test_result(request, business_id, api_id):
                     order_count = sum(s['rows'] for s in sheets_info)
                     product_count = len(worksheets)
                     status = 200
+                    probes.append({
+                        'label': 'Spreadsheet',
+                        'path': sheet_url,
+                        'status': 200,
+                        'ms': None,
+                        'detail': f'{product_count} sheets, {order_count} rows',
+                    })
 
         else:
             error_message = f'API type "{business_api.api_type}" is not yet supported for testing.'
@@ -1104,7 +1310,8 @@ def business_settings_api_test_result(request, business_id, api_id):
         error_message = 'Could not connect to the API. Please check your store URL.'
         logger.error(f'API connection error for business {business_id}, api {api_id}')
     except requests.exceptions.HTTPError as e:
-        error_message = f'API returned error: {e.response.status_code} - {e.response.reason}'
+        http_status = e.response.status_code
+        error_message = f'{e.response.status_code} {e.response.reason}'
         logger.error(f'API HTTP error for business {business_id}, api {api_id}: {e}')
     except ValueError as e:
         error_message = f'Invalid response from API: {str(e)}'
@@ -1116,7 +1323,9 @@ def business_settings_api_test_result(request, business_id, api_id):
     # Handle response data
     if error_message:
         result = {'error': error_message}
-        status = 0
+        # Keep the code the server actually returned. Zeroing it here is what
+        # made the 401/403/404/5xx "How to fix" branches unreachable.
+        status = http_status or 0
     elif order_response is not None:
         try:
             result = order_response.json()
@@ -1130,6 +1339,23 @@ def business_settings_api_test_result(request, business_id, api_id):
         result = {'error': f'API type "{business_api.api_type}" is not yet supported for testing.'}
         status = 0
 
+    # Counts are only meaningful when the call actually came back 2xx —
+    # showing "0 orders" next to a 401 reads as data when it is just absence.
+    succeeded = 200 <= status < 300 and not error_message
+
+    # Orders is tried first, so a failure there means Products never ran. Say
+    # so explicitly rather than leaving the second call unaccounted for.
+    if business_api.api_type in ('shopify', 'woocommerce'):
+        ran = {p['label'] for p in probes}
+        expected = [
+            ('Orders', BASE_API_ORDER_ENDPINT or '—'),
+            ('Products', BASE_API_PRODUCT_ENDPINT or '—'),
+        ]
+        for label, path in expected:
+            if label not in ran:
+                probes.append({'label': label, 'path': path, 'status': None,
+                               'ms': None, 'detail': 'Not attempted'})
+
     context = {
         'business': business,
         'api': business_api,
@@ -1139,6 +1365,10 @@ def business_settings_api_test_result(request, business_id, api_id):
         'status': status,
         'result': result,
         'error_message': error_message,
+        'probes': probes,
+        'succeeded': succeeded,
+        'total_ms': sum(p['ms'] or 0 for p in probes) or None,
+        'target_host': BASE_API_STORE_NAME,
         'sheets_info': sheets_info if 'sheets_info' in locals() else None,
     }
     return render(request, 'business/parts/business_settings_api_test_result.html', context)
@@ -1148,6 +1378,32 @@ def business_settings_api_test_result(request, business_id, api_id):
 import hashlib
 import hmac
 import secrets
+
+
+def shopify_oauth_redirect_uri():
+    """The single redirect URI sent to Shopify and shown in the setup guide.
+
+    Merchants must whitelist this exact string in their Shopify app's "Allowed
+    redirection URL(s)". Falls back to the canonical public callback when the
+    setting is absent so the value is never empty.
+    """
+    from django.conf import settings as django_settings
+    return getattr(
+        django_settings, 'SHOPIFY_OAUTH_REDIRECT_URI',
+        'https://ezzydelivery.qa/business/shopify/oauth/callback/',
+    )
+
+
+def shopify_oauth_app_url():
+    """The App URL merchants must set in their Shopify app.
+
+    Derived from the redirect URI so the two can never be documented on
+    different hosts — Shopify rejects the install with "the redirect_uri and
+    application url must have matching hosts" when they disagree.
+    """
+    from urllib.parse import urlsplit
+    parts = urlsplit(shopify_oauth_redirect_uri())
+    return f'{parts.scheme}://{parts.netloc}/'
 
 @login_required(login_url='/accounts/login/')
 @business_required
@@ -1179,7 +1435,10 @@ def shopify_oauth_start(request, business_id, api_id):
     shop_domain = api_settings.site_api_url.replace('https://', '').replace('http://', '').rstrip('/')
     client_id = api_settings.api_key
     scopes = 'read_orders,read_products,read_fulfillments,read_shipping'
-    redirect_uri = request.build_absolute_uri(reverse('business:shopify_oauth_callback'))
+    # Pinned, not derived from the request: Shopify matches redirect_uri against
+    # the app whitelist exactly, so it must not shift with the browsing host
+    # (apex vs www) or the merchant gets "redirect_uri is not whitelisted".
+    redirect_uri = shopify_oauth_redirect_uri()
 
     auth_url = (
         f"https://{shop_domain}/admin/oauth/authorize"
@@ -1342,6 +1601,7 @@ from business.decorators import (
     user_has_business_permission,
 )
 from business.permissions import BusinessPermissions, TeamRoles, get_role_permissions
+from core.validators import safe_int
 
 
 @login_required(login_url='/accounts/login/')
@@ -1368,9 +1628,13 @@ def business_teams(request, business_id):
         'custom_permissions'
     ).filter(business_id=business_id).order_by('-created_at')
 
+    # Paginate before annotating: permission_count is set on the model instances,
+    # and paginating afterwards would re-run the query and throw those away.
+    teams_page, teams_total = paginate(request, teams, default=25)
+
     # Add permission count to each team member (uses prefetched custom_permissions)
     from business.permissions import get_role_permissions
-    for team in teams:
+    for team in teams_page:
         role_perms = set(get_role_permissions(team.team_role))
         for custom_perm in team.custom_permissions.all():  # Uses prefetch cache
             if custom_perm.is_granted:
@@ -1385,11 +1649,13 @@ def business_teams(request, business_id):
 
     join_request_count = join_requests.count()
 
-    logger.debug(f'Loading teams for business_id={business_id}, count={teams.count()}')
+    logger.debug(f'Loading teams for business_id={business_id}, count={teams_total}')
 
     context = {
         'business': business,
-        'teams': teams,
+        'teams': teams_page,
+        'teams_page': teams_page,
+        'teams_total': teams_total,
         'join_requests': join_requests,
         'join_request_count': join_request_count,
         'can_manage_team': user_has_business_permission(
@@ -2030,7 +2296,7 @@ def business_finance_dashboard(request):
         return redirect('core:main_dashboard')
 
     try:
-        days = int(request.GET.get('days', 30))
+        days = safe_int(request.GET.get('days'), default=30, minimum=1, maximum=730)
         if days <= 0 or days > 365:
             days = 30
     except (ValueError, TypeError):
@@ -2063,25 +2329,47 @@ def business_finance_dashboard(request):
         total_count=Count('id'),
     )
 
-    # COD client settlements for this business — net of any payout reversals
-    # (a reversal claws a payout back when a settled order is later returned).
-    cod_client_settled = abs(txns.filter(
-        transaction_type='cod_client_settle'
-    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+    # COD payouts to this business. The transaction holds the NET that reached the
+    # bank; the gross COD released and the charges withheld come from the invoice
+    # lines. All three are stated so the seller can reconcile the transfer against
+    # the COD their orders collected instead of being shown one unexplained figure.
+    from fleet.wallet_service import WalletService
+
+    settle_txns = txns.filter(transaction_type='cod_client_settle')
+    cod_client_gross, cod_client_deductions, cod_client_net = (
+        WalletService.payout_totals(settle_txns)
+    )
     cod_client_reversed = abs(txns.filter(
         transaction_type='cod_client_settle_reversal'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
-    cod_client_settled = cod_client_settled - cod_client_reversed
+    # Net of any payout reversals (a reversal claws a payout back when a settled
+    # order is later returned).
+    cod_client_settled = cod_client_net - cod_client_reversed
 
-    # Charges billed to this business
+    # Charges billed to this business. Charges recovered at payout are EXCLUDED:
+    # they were already withheld from the COD above, so counting them here as
+    # well showed the seller the same money owed twice.
     charges = txns.filter(
         transaction_type__in=['delivery_charge', 'fulfillment_charge', 'inventory_handling', 'other_charge']
-    ).values('transaction_type').annotate(
+    ).filter(deduction_line__isnull=True).values('transaction_type').annotate(
         total=Sum('amount'),
         count=Count('id')
     )
 
     total_charges = sum(abs(c['total'] or Decimal('0')) for c in charges) if charges else Decimal('0')
+
+    # What the seller actually owes right now. Deliberately NOT date-windowed and
+    # NOT taken from the charge transactions above: those never come down when a
+    # payment arrives, so a paid invoice would keep reading as money owed.
+    from fleet.models import BusinessChargeInvoice
+
+    live_invoices = list(BusinessChargeInvoice.objects.filter(
+        business=business
+    ).exclude(status=BusinessChargeInvoice.STATUS_VOID))
+    invoice_billed = sum((i.total_amount or Decimal('0') for i in live_invoices), Decimal('0'))
+    invoice_paid = sum((i.amount_paid or Decimal('0') for i in live_invoices), Decimal('0'))
+    invoice_outstanding = invoice_billed - invoice_paid
+    invoice_unpaid_count = sum(1 for i in live_invoices if i.amount_due > 0)
 
     # Bills for this business
     bills_payable = abs(txns.filter(
@@ -2110,8 +2398,15 @@ def business_finance_dashboard(request):
         'selected_days': days,
         'cod_stats': cod_stats,
         'cod_client_settled': cod_client_settled,
+        'cod_client_gross': cod_client_gross,
+        'cod_client_deductions': cod_client_deductions,
+        'cod_client_reversed': cod_client_reversed,
         'charges': charges,
         'total_charges': total_charges,
+        'invoice_billed': invoice_billed,
+        'invoice_paid': invoice_paid,
+        'invoice_outstanding': invoice_outstanding,
+        'invoice_unpaid_count': invoice_unpaid_count,
         'bills_payable': bills_payable,
         'bills_receivable': bills_receivable,
         'delivery_stats': delivery_stats,
@@ -2136,7 +2431,7 @@ def business_transactions(request):
         return redirect('core:main_dashboard')
 
     try:
-        days = int(request.GET.get('days', 30))
+        days = safe_int(request.GET.get('days'), default=30, minimum=1, maximum=730)
         if days <= 0 or days > 365:
             days = 30
     except (ValueError, TypeError):
@@ -2163,9 +2458,15 @@ def business_transactions(request):
         ('bills_receivable', 'Bills Receivable'),
     ]
 
+    # Paginate — at ?days=365 an active seller's ledger is thousands of rows,
+    # all of which were being rendered on one page. The badge keeps the total.
+    transactions_page, transactions_total = paginate(request, transactions)
+
     context = {
         'business': business,
-        'transactions': transactions,
+        'transactions': transactions_page,
+        'transactions_page': transactions_page,
+        'transactions_total': transactions_total,
         'selected_days': days,
         'selected_type': txn_type,
         'transaction_types': business_types,
@@ -2190,7 +2491,7 @@ def business_cod_statement(request):
         return redirect('core:main_dashboard')
 
     try:
-        days = int(request.GET.get('days', 30))
+        days = safe_int(request.GET.get('days'), default=30, minimum=1, maximum=730)
         if days <= 0 or days > 365:
             days = 30
     except (ValueError, TypeError):
@@ -2212,32 +2513,222 @@ def business_cod_statement(request):
         total=Count('id'),
     )
 
+    # Outstanding COD — deliberately NOT date-windowed. Money collected 90 days ago
+    # and still unpaid is owed today, so scoping it to the selected period hides it.
+    # Split by leg because the two are owed differently: cash still in a driver's
+    # pocket cannot be paid out yet, cash already handed to EzzyDelivery can.
+    # Filters mirror the staff payout console (workforce.views.cod_business_settlement_report)
+    # so both screens quote the same figure.
+    outstanding = delivery_models.DeliveryTask.objects.filter(
+        business=business.business_id,
+        cod_collected=True,
+        cod_client_settled=False,
+        dl_task_status__in=['delivered', 'partial_delivery'],
+    ).aggregate(
+        with_driver=Sum('cod_collected_amount', filter=Q(cod_settled=False)),
+        with_driver_count=Count('id', filter=Q(cod_settled=False)),
+        ready=Sum('cod_collected_amount', filter=Q(cod_settled=True)),
+        ready_count=Count('id', filter=Q(cod_settled=True)),
+    )
+    cod_with_driver = outstanding['with_driver'] or Decimal('0')
+    cod_ready = outstanding['ready'] or Decimal('0')
+
     # COD settlements to this business (includes payout reversals in the list)
     settlements = fleet_models.DriverTransaction.objects.filter(
         business=business,
         transaction_type__in=['cod_client_settle', 'cod_client_settle_reversal'],
         created_at__gte=start_date.date()
-    ).select_related('created_by').order_by('-created_at')
+    ).select_related('created_by').prefetch_related(
+        'payout_deductions'
+    ).order_by('-created_at')
+
+    # A payout row holds the NET transferred. Stamp the gross COD released and the
+    # charges withheld on each one, so the seller can reconcile a transfer against
+    # the COD their deliveries collected rather than seeing an unexplained gap.
+    from fleet.wallet_service import WalletService
+
+    payout_rows = [s for s in settlements if s.transaction_type == 'cod_client_settle']
+    for s in payout_rows:
+        s.gross_cod, s.deductions_total, s.net_paid = WalletService.payout_figures(s)
+
+    total_gross = sum((s.gross_cod for s in payout_rows), Decimal('0'))
+    total_deductions = sum((s.deductions_total for s in payout_rows), Decimal('0'))
+    settled_net = sum((s.net_paid for s in payout_rows), Decimal('0'))
 
     # Net total = payouts minus reversals
-    settled_gross = abs(settlements.filter(
-        transaction_type='cod_client_settle').aggregate(
-        total=Sum('amount'))['total'] or Decimal('0'))
     settled_reversed = abs(settlements.filter(
         transaction_type='cod_client_settle_reversal').aggregate(
         total=Sum('amount'))['total'] or Decimal('0'))
-    total_settled = settled_gross - settled_reversed
+    total_settled = settled_net - settled_reversed
+
+    # Paginate the delivery list — at ?days=365 a high-volume seller would otherwise
+    # render every task on one page. The badge keeps showing the full count.
+    from django.core.paginator import Paginator
+
+    try:
+        per_page = safe_int(request.GET.get('per_page'), default=50, minimum=1, maximum=200)
+        if per_page not in (10, 25, 50, 100):
+            per_page = 50
+    except (ValueError, TypeError):
+        per_page = 50
+
+    cod_deliveries_total = cod_deliveries.count()
+    paginator = Paginator(cod_deliveries, per_page)
+    deliveries_page = paginator.get_page(request.GET.get('page'))
 
     context = {
         'business': business,
         'selected_days': days,
-        'cod_deliveries': cod_deliveries,
+        'cod_deliveries': deliveries_page,
+        'cod_deliveries_page': deliveries_page,
+        'cod_deliveries_total': cod_deliveries_total,
+        'per_page': str(per_page),
+        'pagination_filter_params': f'days={days}',
         'stats': stats,
         'settlements': settlements,
         'total_settled': total_settled,
+        'total_gross': total_gross,
+        'total_deductions': total_deductions,
+        'settled_reversed': settled_reversed,
+        'cod_with_driver': cod_with_driver,
+        'cod_with_driver_count': outstanding['with_driver_count'] or 0,
+        'cod_ready': cod_ready,
+        'cod_ready_count': outstanding['ready_count'] or 0,
     }
 
     return render(request, 'business/parts/business_cod_statement.html', context)
+
+
+@login_required(login_url='account_login')
+@business_required
+@business_permission_required(BusinessPermissions.REPORTS_VIEW)
+def business_cod_payout_invoice(request, txn_code):
+    """The seller's own copy of a COD payout invoice.
+
+    Same document staff issue, read-only and scoped to the logged-in business —
+    a payout belonging to any other account 404s rather than being readable by
+    guessing a CODCS code. Sellers previously received money with no document
+    at all, which made the gross-versus-net gap impossible to reconcile.
+    """
+    from decimal import Decimal
+    from delivery.charges import charge_paid
+
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    settle_txn = get_object_or_404(
+        fleet_models.DriverTransaction.objects.select_related('business', 'created_by'),
+        transaction_code=txn_code,
+        transaction_type='cod_client_settle',
+        business=business,
+    )
+
+    tasks = list(delivery_models.DeliveryTask.objects.filter(
+        cod_client_settle_txn=settle_txn
+    ).select_related('order', 'order__business').order_by('completed_at', 'id'))
+
+    lines = []
+    total_cod = Decimal('0')
+    total_fee = Decimal('0')
+    for t in tasks:
+        cod = t.cod_collected_amount or Decimal('0')
+        fee = charge_paid(t)
+        total_cod += cod
+        total_fee += fee
+        lines.append({'task': t, 'order': t.order, 'cod': cod, 'fee': fee})
+
+    deductions = list(settle_txn.payout_deductions.all())
+    total_deductions = sum((d.amount or Decimal('0') for d in deductions), Decimal('0'))
+
+    reversal = fleet_models.DriverTransaction.objects.filter(
+        transaction_type='cod_client_settle_reversal',
+        reference_number=settle_txn.transaction_code,
+    ).order_by('-created_at').first()
+
+    context = {
+        'page_title': f'Payout Invoice {settle_txn.transaction_code}',
+        'settle_txn': settle_txn,
+        'business': settle_txn.business,
+        'lines': lines,
+        'total_cod': total_cod,
+        'total_fee': total_fee,
+        'deductions': deductions,
+        'total_deductions': total_deductions,
+        'net_paid': settle_txn.amount,
+        'reversal': reversal,
+        # Hides the staff-only controls on the shared invoice template.
+        'seller_view': True,
+    }
+    return render(request, 'workforce/cod_business_payout_invoice.html', context)
+
+
+@login_required(login_url='account_login')
+@business_required
+@business_permission_required(BusinessPermissions.REPORTS_VIEW)
+def business_charge_invoices(request):
+    """The seller's own charge invoices — what they owe EzzyDelivery.
+
+    The COD statement answers "what is Ezzy holding for me". A prepaid seller
+    has no COD, so nothing on their finance pages ever said what the deliveries
+    cost them. This is that ledger.
+    """
+    from decimal import Decimal
+    from fleet.models import BusinessChargeInvoice
+
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    invoices = list(BusinessChargeInvoice.objects.filter(
+        business=business
+    ).select_related('business').order_by('-issued_at'))
+
+    live = [i for i in invoices if not i.is_void]
+    total_billed = sum((i.total_amount or Decimal('0') for i in live), Decimal('0'))
+    total_paid = sum((i.amount_paid or Decimal('0') for i in live), Decimal('0'))
+
+    context = {
+        'business': business,
+        'invoices': invoices,
+        'total_billed': total_billed,
+        'total_paid': total_paid,
+        'total_outstanding': total_billed - total_paid,
+        'unpaid_count': sum(1 for i in live if i.amount_due > 0),
+    }
+    return render(request, 'business/parts/business_charge_invoices.html', context)
+
+
+@login_required(login_url='account_login')
+@business_required
+@business_permission_required(BusinessPermissions.REPORTS_VIEW)
+def business_charge_invoice(request, invoice_code):
+    """The seller's copy of one charge invoice.
+
+    Same document staff issue, read-only and scoped to the logged-in business —
+    an invoice belonging to any other account 404s rather than being readable by
+    guessing a code.
+    """
+    from fleet.models import BusinessChargeInvoice
+    from workforce.views import _charge_invoice_context
+
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    invoice = get_object_or_404(
+        BusinessChargeInvoice.objects.select_related('business', 'issued_by'),
+        invoice_code=invoice_code, business=business,
+    )
+
+    context = _charge_invoice_context(invoice)
+    context['page_title'] = f'Invoice {invoice.invoice_code}'
+    # Hides the staff-only controls on the shared invoice template.
+    context['seller_view'] = True
+    return render(request, 'workforce/client_charge_invoice.html', context)
 
 
 # =============================================================================
@@ -2751,9 +3242,13 @@ def business_join_requests_list(request, business_id):
         business=business, status='pending'
     ).count()
 
+    join_reqs_page, join_reqs_total = paginate(request, join_reqs, default=25)
+
     context = {
         'business': business,
-        'join_requests': join_reqs,
+        'join_requests': join_reqs_page,
+        'join_requests_page': join_reqs_page,
+        'join_requests_total': join_reqs_total,
         'pending_count': pending_count,
         'current_filter': status_filter,
     }
@@ -2837,9 +3332,7 @@ def live_tracking_data(request):
         # Get latest driver location
         driver_loc = None
         if task.driver_id:
-            driver_loc = DriverLocation.objects.filter(
-                driver_id=task.driver_id
-            ).order_by('-created_at').first()
+            driver_loc = DriverLocation.latest_for_driver(task.driver_id)
 
         order = task.order
         pin = {
@@ -2948,9 +3441,9 @@ def export_orders_csv(request):
     orders = orders.order_by('-created_at')
 
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="orders_{request.current_business.business_code}_{date_from or "all"}_{date_to or "all"}.csv"'
+    set_export_filename(response, 'orders', code=request.current_business, ext='csv')
 
-    writer = csv.writer(response)
+    writer = safe_csv_writer(response)
     writer.writerow(['Order #', 'Client Code', 'Customer', 'Phone', 'Address', 'Zone', 'Street', 'Building', 'Status', 'COD Amount', 'COD Status', 'Time Slot', 'Created', 'Delivered At'])
 
     for o in orders:
@@ -2987,9 +3480,9 @@ def export_cod_csv(request):
     orders = orders.order_by('-created_at')
 
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="cod_report_{request.current_business.business_code}_{date_from or "all"}.csv"'
+    set_export_filename(response, 'cod_report', code=request.current_business, ext='csv')
 
-    writer = csv.writer(response)
+    writer = safe_csv_writer(response)
     writer.writerow(['Order #', 'Customer', 'COD Amount', 'Client COD Status', 'Staff COD Status', 'Order Status', 'Created', 'Delivered At'])
 
     for o in orders:
@@ -3031,9 +3524,9 @@ def export_performance_csv(request):
     ).order_by('-date')
 
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="performance_{request.current_business.business_code}.csv"'
+    set_export_filename(response, 'performance', code=request.current_business, ext='csv')
 
-    writer = csv.writer(response)
+    writer = safe_csv_writer(response)
     writer.writerow(['Date', 'Total Tasks', 'Delivered', 'Failed', 'Cancelled', 'Success Rate %'])
 
     for d in daily:
@@ -3282,8 +3775,14 @@ def returns_list(request):
     if status_filter:
         returns_qs = returns_qs.filter(status=status_filter)
 
+    # Paginate — a long-running seller accumulates returns indefinitely and the
+    # whole history was rendering on one page. The badge keeps the full count.
+    returns_page, returns_total = paginate(request, returns_qs)
+
     return render(request, 'business/returns_list.html', {
-        'returns': returns_qs,
+        'returns': returns_page,
+        'returns_page': returns_page,
+        'returns_total': returns_total,
         'status_filter': status_filter,
         'status_choices': ReturnRequest.RETURN_STATUS_CHOICES,
         'user_business': business,
@@ -3374,7 +3873,7 @@ def return_create(request, order_id):
             qty_key = f'qty_{item.id}'
             chk_key = f'item_{item.id}'
             if request.POST.get(chk_key):
-                qty = int(request.POST.get(qty_key, 1))
+                qty = safe_int(request.POST.get(qty_key), default=1, minimum=0, maximum=100000)
                 if qty > 0:
                     selected_items.append((item, min(qty, item.quantity)))
 

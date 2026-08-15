@@ -294,6 +294,9 @@ main .col-12.d-flex {
 }
 .wh__filter-group--sm { min-width: auto; }
 .wh__filter-group--lg { flex: 1; min-width: 180px; }
+/* Business filter: options read "CODE - Business Name" and need room */
+.wh__filter-group--wide { min-width: 260px; }
+.wh__filter-group--wide select.wh__filter-select { width: 100%; max-width: 320px; }
 
 .wh__filter-label {
     font-size: 0.65rem;
@@ -1450,8 +1453,20 @@ textarea.wha__textarea {
     gap: 1rem;
     align-items: start;
 }
+/* The walk-through that used to sit in the right rail now lives in the hero's
+   help panel, so the sheet takes the full width. */
+.wrs__layout--full { grid-template-columns: 1fr; }
 .wrs__main { min-width: 0; }
 .wrs__aside { min-width: 0; }
+/* On-hand at the destination warehouse, shown beside each row being received. */
+.wrs__stock {
+    font-family: var(--wh-mono);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--wh-navy);
+}
+.wrs__stock--zero { color: var(--wh-red); }
+.wrs__stock--unknown { color: var(--wh-dim); font-weight: 400; }
 .wrs__tips-header {
     background: var(--wh-blue-bg) !important;
 }
@@ -1512,6 +1527,121 @@ textarea.wha__textarea {
     color: var(--wh-muted);
     margin: 0;
     line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STOCK ADJUSTMENT (wsa__)
+   Shares the receive-stock furniture (wrs__ hero, wha__ fields);
+   only the count sheet's own parts live here.
+   ═══════════════════════════════════════════════════════════ */
+.wsa__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.wsa__search {
+    height: 28px;
+    width: 180px;
+    padding: 0 0.5rem;
+    font-size: 0.75rem;
+    color: var(--wh-navy);
+    background-color: var(--wh-surface);
+    border: 1px solid var(--wh-border);
+    border-radius: var(--wh-radius);
+}
+.wsa__search:focus {
+    outline: none;
+    border-color: var(--wh-accent);
+    box-shadow: 0 0 0 3px var(--wh-accent-glow);
+}
+.wsa__search:disabled {
+    background-color: var(--wh-surface-alt);
+    cursor: not-allowed;
+}
+.wsa__count,
+.wsa__header-hint {
+    font-size: 0.72rem;
+    color: var(--wh-muted);
+}
+.wsa__placeholder {
+    text-align: center;
+    padding: 2rem;
+    color: var(--wh-muted);
+    font-size: 0.8125rem;
+}
+.wsa__placeholder-icon {
+    display: block;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--wh-dim);
+}
+.wsa__onhand {
+    font-family: var(--wh-mono);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--wh-navy);
+}
+input.wsa__input {
+    width: 84px;
+    margin: 0 auto;
+    text-align: center;
+    font-family: var(--wh-mono);
+}
+.wsa__delta {
+    font-family: var(--wh-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--wh-dim);
+}
+.wsa__delta--flat {
+    font-weight: 400;
+    color: var(--wh-muted);
+}
+.wsa__delta--up { color: var(--wh-green); }
+.wsa__delta--down { color: var(--wh-red); }
+/* A touched row is marked on its left edge — the sheet can run to hundreds of
+   rows, so the changed ones have to be findable without reading every delta. */
+.wsa__row--up td:first-child { box-shadow: inset 3px 0 0 var(--wh-green); }
+.wsa__row--down td:first-child { box-shadow: inset 3px 0 0 var(--wh-red); }
+.wsa__row--hidden { display: none; }
+
+/* Variant columns (colour / size / unit) — secondary to the product name, so
+   they read as attributes of the row rather than competing with it. */
+.wsa__variant {
+    font-size: 0.75rem;
+    color: var(--wh-muted);
+    white-space: nowrap;
+}
+.wsa__barcode {
+    font-family: var(--wh-mono);
+    font-size: 0.6875rem;
+    color: var(--wh-dim);
+}
+/* On-hand held in OTHER locations of the same warehouse. Read-only context:
+   the sheet only ever writes the selected location. */
+.wsa__other,
+.wsa__reserved {
+    font-family: var(--wh-mono);
+    font-size: 0.75rem;
+    color: var(--wh-dim);
+}
+.wsa__other--has {
+    font-weight: 700;
+    color: var(--wh-amber);
+}
+.wsa__stray-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 0.6rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--wh-border);
+    border-left: 3px solid var(--wh-amber);
+    border-radius: var(--wh-radius);
+    background: var(--wh-amber-bg);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--wh-slate);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2691,18 +2821,9 @@ textarea.wha__textarea {
     .wha__row { grid-template-columns: 1fr; }
     .wh__breadcrumb { font-size: 0.6875rem; margin-bottom: 0.75rem; }
     .wh__help-card { font-size: 0.75rem; }
-    /* Hero headers — full bleed on mobile */
-    .whdt__hero,
-    .wha__hero,
-    .wrs__hero,
-    .wcp__hero,
-    .wcpv__hero,
-    .wcc__hero {
-        border-radius: 0;
-        margin: 0 -0.75rem 1rem;
-        width: calc(100% + 1.5rem);
-        padding: 1rem 0.75rem;
-    }
+    /* Hero headers are already flush and compact via staff-hero.css. The old
+       negative-margin full-bleed rule lived here; its calc() width outlived the
+       margin override and pushed the notes button off the right edge. */
     /* Simplify cards for touch */
     .wh__action-btn { width: 36px; height: 36px; font-size: 0.8125rem; }
     .wh__action-btn--pill { padding: 0.35rem 0.875rem; }
@@ -3787,10 +3908,96 @@ textarea.wha__textarea {
     .pak__product-icon { width: 24px; height: 24px; font-size: 0.5625rem; }
 }
 
-/* ── Breadcrumb sits BELOW the hero (hero pulled up via flex order) ── */
+/* ── Breadcrumb sits BELOW the hero (hero pulled up via flex order) ──
+   Every warehouse page uses the shared staff masthead band (staff-hero.css),
+   so the order/spacing rule has to name each page's hero block by hand — the
+   band selector lives in another file and BEM prefixes differ per page. */
 .wh { display: flex; flex-direction: column; }
-.wh__header { order: -1; }
-.wh .wh__breadcrumb { order: 0; margin: 0 0.375rem 0.6rem; }
+.wh__header,
+.wh > :is(
+    .wcc__hero, .wcp__hero, .wcpv__hero, .wha__hero, .whdt__hero,
+    .wla__hero, .wla2__hero, .wld__hero, .wle__hero,
+    .wrs__hero, .swld__hero, .swlf__hero
+) { order: -1; }
+.wh .wh__breadcrumb { order: 0; margin: 0 0 0.6rem; }
+
+/* ── One masthead across every warehouse page ──
+   staff-hero.css already flattens the band (navy, 3px yellow rule, compact
+   padding). These rules finish the job inside the band: one icon chip, one
+   subtitle scale, and no leftover decoration from the old tall gradient heroes
+   (the inset ::after bar doubled up with the band's own yellow rule). */
+/* The seller-link detail hero was built as a pale card: its title is navy, which
+   disappears once the block becomes the navy band, and its stacked layout drops
+   the notes button onto a second row. */
+.swld__hero {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+}
+.swld__hero-top { flex: 1 1 auto; margin-bottom: 0; }
+.swld__link-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    color: #fff;
+}
+
+/* wle/wld/wla2 never had layout rules of their own — without these the icon,
+   the title block and the notes button stack vertically inside the band. */
+.wle__hero, .wld__hero, .wla2__hero {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    position: relative;
+}
+
+/* One band height everywhere, including the pages whose hero carries no
+   subtitle line (seller-link detail) or an extra one (warehouse detail). */
+.wh__header,
+.wh > :is(
+    .wcc__hero, .wcp__hero, .wcpv__hero, .wha__hero, .whdt__hero,
+    .wla__hero, .wla2__hero, .wld__hero, .wle__hero,
+    .wrs__hero, .swld__hero, .swlf__hero
+) { min-height: 3.75rem; }
+
+.wh__header-icon,
+.wcc__hero-icon, .wcp__hero-icon, .wcpv__hero-icon, .wha__hero-icon,
+.whdt__hero-icon, .wla__hero-icon, .wla2__hero-icon, .wld__hero-icon,
+.wle__hero-icon, .wrs__hero-icon, .swlf__hero-icon {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(247, 192, 0, 0.18);
+    color: var(--wh-accent);
+    border-radius: 9px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    box-shadow: none;
+}
+
+.wh__subtitle,
+.wcc__hero-subtitle, .wcp__hero-subtitle, .wcpv__hero-subtitle,
+.wha__hero-subtitle, .wla__hero-subtitle, .wla2__hero-subtitle,
+.wld__hero-subtitle, .wle__hero-subtitle, .wrs__hero-subtitle,
+.swlf__hero-subtitle {
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0.1rem 0 0;
+    font-weight: 400;
+}
+
+[data-dashboard="staff"] :is(
+    .wcp__hero, .wcpv__hero, .wha__hero, .whdt__hero,
+    .wla__hero, .wrs__hero, .swlf__hero
+)::before,
+[data-dashboard="staff"] :is(
+    .wcp__hero, .wcpv__hero, .wha__hero, .whdt__hero,
+    .wla__hero, .wrs__hero, .swlf__hero
+)::after { display: none; }
 
 /* Dashboard summary: 8 tiles as 2 rows of 4 (2 cols on phones, never 1) */
 .wh__stats--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -3821,4 +4028,59 @@ textarea.wha__textarea {
     /* Warehouse rows / list rows stack cleanly */
     .wh__list-row { flex-wrap: wrap; }
     .wh__list-row-right { width: 100%; margin-top: 0.4rem; justify-content: flex-start; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HTMX LOADING INDICATOR
+   #htmx-loading-indicator lives in wh_dashboard_base.html, which loads
+   warehouse.css but NOT workforce.css — without these rules the loader
+   rendered inline at the top of <body> and pushed the page down.
+   ═══════════════════════════════════════════════════════════ */
+body[data-shell="warehouse"] .htmx-indicator {
+    display: none;
+}
+
+body[data-shell="warehouse"] .htmx-indicator.htmx-request,
+body[data-shell="warehouse"] .htmx-request .htmx-indicator {
+    display: block;
+}
+
+body[data-shell="warehouse"] .htmx-loader__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1050; /* above content, below Bootstrap modals (1055) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(241, 243, 247, 0.82);
+    backdrop-filter: blur(2px);
+}
+
+body[data-shell="warehouse"] .htmx-loader__spinner {
+    text-align: center;
+    padding: 1.25rem 1.75rem;
+    background: var(--wh-surface);
+    border: 1px solid var(--wh-border);
+    border-radius: var(--wh-radius-lg);
+    box-shadow: var(--wh-shadow-lg);
+}
+
+body[data-shell="warehouse"] .htmx-loader__spinner .spinner-border {
+    width: 2rem;
+    height: 2rem;
+    border-width: 0.2em;
+    color: var(--wh-navy) !important;
+}
+
+body[data-shell="warehouse"] .htmx-loader__text {
+    font-family: var(--wh-font);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--wh-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body[data-shell="warehouse"] .htmx-loader__spinner .spinner-border { animation-duration: 1.6s; }
 }

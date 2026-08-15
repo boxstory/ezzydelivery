@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff list of rider shifts — who is locked to which store and when, with status/location/date filters
+Used by: workforce.dispatch_views.shift_list at /workforce/dispatch/shifts/
+Notes: With no date filter the list defaults to today and later. The page-notes card (wfnote__, shared)
+       sits under the hero, hidden on load; the hero help button toggles it via the delegated handler in
+       workforce.js.
+{% endcomment %}
 
 {% block title %}Rider Shifts{% endblock %}
 
@@ -22,9 +29,18 @@
                 <a href="{% url 'workforce:dispatch_dashboard' %}" class="dps__back-btn">
                     <i class="fa-solid fa-arrow-left me-1"></i>Dashboard
                 </a>
+                <button type="button" class="wfnote__btn" data-wfnote-toggle
+                        aria-expanded="false" aria-controls="workforce_dispatch_shift_list_card_notes"
+                        title="About this page">
+                    <i class="fa-solid fa-question" aria-hidden="true"></i>
+                    <span class="visually-hidden">Show notes</span>
+                </button>
             </div>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_dispatch_shift_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_dispatch_shift_list_card_notes' %}" hidden></div>
 
     <!-- Filters -->
     <div class="dps__filter-bar">

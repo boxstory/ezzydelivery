@@ -8,6 +8,10 @@
 <a href="{% url 'fleet:driver_tasks' %}?tab=accepted" class="fleet-btn-icon" title="Back to Tasks">
     <i class="fa-solid fa-arrow-left"></i>
 </a>
+<button type="button" id="fleet_nav_btn_wakelock" class="fleet-btn-icon fnav__wake-btn"
+        title="Keep screen on while driving">
+    <i class="fa-solid fa-mobile-screen"></i>
+</button>
 <a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
     <i class="fa-solid fa-bell"></i>
     {% if unread_notifications > 0 %}
@@ -246,7 +250,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260728g">
+<link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260729a">
 {% endblock %}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -326,9 +330,34 @@
         }
     });
 
-    // Start GPS tracking for this task
+    // Continuous fixes for this task — the only screen that asks for them, and
+    // the only one where the extra battery buys a live blue dot.
     if (typeof EzzyGPS !== 'undefined') {
+        EzzyGPS.setLiveMode(true);
         EzzyGPS.start({{ task.id }});
+
+        // Keep-screen-on is opt-in and remembered per device. Off by default:
+        // a screen that never sleeps costs far more battery than the GPS does.
+        var wakeBtn = document.getElementById('fleet_nav_btn_wakelock');
+        if (wakeBtn && EzzyGPS.wakeLock.isSupported()) {
+            wakeBtn.classList.add('fnav__wake-btn--ready');
+            var paintWake = function() {
+                var on = localStorage.getItem('ezzy_wake_lock') === '1';
+                wakeBtn.classList.toggle('fnav__wake-btn--on', on);
+                wakeBtn.title = on ? 'Screen stays on — tap to allow sleep' : 'Keep screen on while driving';
+                if (on) { EzzyGPS.wakeLock.enable(); } else { EzzyGPS.wakeLock.disable(); }
+            };
+            wakeBtn.addEventListener('click', function() {
+                haptic([5]);
+                var next = localStorage.getItem('ezzy_wake_lock') === '1' ? '0' : '1';
+                localStorage.setItem('ezzy_wake_lock', next);
+                paintWake();
+                if (typeof showToast === 'function') {
+                    showToast(next === '1' ? 'Screen will stay on (uses more battery)' : 'Screen can sleep normally', 'info');
+                }
+            });
+            paintWake();
+        }
     }
 
     // Google Maps navigate

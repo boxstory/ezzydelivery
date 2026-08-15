@@ -10,10 +10,14 @@ Parameters:
 - show_goto: Show go-to-page input (default: true)
 - per_page: Current items per page (optional, defaults to 50)
 - variant: 'default', 'compact', or 'minimal' (optional)
+- page_param: query parameter this pager drives (optional, defaults to 'page').
+  Only for pages showing two independent lists — give the second one its own
+  parameter and pass a filter_params built with core.pagination.other_params,
+  so each pager drops its own page number but keeps the other one's.
 {% endcomment %}
 
 {% load static %}
-<link href="{% static 'webpages/css/pagination.css' %}?v=20260728h" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/pagination.css' %}?v=20260801a" rel="stylesheet" type="text/css" />
 
 {% comment %}Current per_page: explicit context var (views should pass it), else 50{% endcomment %}
 {% with current_per_page=per_page|default:"50" %}
@@ -26,7 +30,7 @@ Parameters:
         <li class="page-item prev {% if not page_obj.has_previous %}disabled{% endif %}">
             {% if page_obj.has_previous %}
             <a class="page-link"
-               href="?page={{ page_obj.previous_page_number }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
+               href="?{{ page_param|default:'page' }}={{ page_obj.previous_page_number }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
                aria-label="Previous page">
                 <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
             </a>
@@ -46,7 +50,7 @@ Parameters:
             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
             <li class="page-item {% if num < page_obj.number|add:'-1' or num > page_obj.number|add:'1' %}hide-mobile{% endif %}">
                 <a class="page-link"
-                   href="?page={{ num }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
+                   href="?{{ page_param|default:'page' }}={{ num }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
                    aria-label="Page {{ num }}">
                     {{ num }}
                 </a>
@@ -62,7 +66,7 @@ Parameters:
         <li class="page-item next {% if not page_obj.has_next %}disabled{% endif %}">
             {% if page_obj.has_next %}
             <a class="page-link"
-               href="?page={{ page_obj.next_page_number }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
+               href="?{{ page_param|default:'page' }}={{ page_obj.next_page_number }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
                aria-label="Next page">
                 <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
             </a>
@@ -78,7 +82,7 @@ Parameters:
     <!-- Per Page Selector -->
     <div class="pgn__per-page">
         <select id="pagination-per-page-select-{{ pagination_id|default:'default' }}"
-                onchange="window.location.href='?page=1&per_page=' + this.value + '{% if filter_params %}&{{ filter_params }}{% endif %}';">
+                onchange="window.location.href='?{{ page_param|default:'page' }}=1&per_page=' + this.value + '{% if filter_params %}&{{ filter_params }}{% endif %}';">
             <option value="10" {% if current_per_page == "10" %}selected{% endif %}>10 / page</option>
             <option value="25" {% if current_per_page == "25" %}selected{% endif %}>25 / page</option>
             <option value="50" {% if current_per_page == "50" %}selected{% endif %}>50 / page</option>
@@ -96,7 +100,7 @@ Parameters:
                min="1"
                max="{{ page_obj.paginator.num_pages }}"
                value="{{ page_obj.number }}"
-               onkeypress="if(event.key==='Enter'){var p=Math.min(Math.max(1,this.value),{{ page_obj.paginator.num_pages }});window.location.href='?page='+p+'&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}';}"
+               onkeypress="if(event.key==='Enter'){var p=Math.min(Math.max(1,this.value),{{ page_obj.paginator.num_pages }});window.location.href='?{{ page_param|default:'page' }}='+p+'&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}';}"
                aria-label="Go to page number">
         <span class="pgn__goto-suffix">Page</span>
     </div>

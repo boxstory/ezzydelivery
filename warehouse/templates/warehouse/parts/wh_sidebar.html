@@ -28,7 +28,7 @@
           <span>Inventory</span>
           <i class="fa-solid fa-chevron-down ms-auto"></i>
         </div>
-        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'inventory_list,stock_card,transaction_list,low_stock_alerts,receive_stock,confirm_receive' %}show{% endif %}" id="wh-sub-inventory">
+        <div class="multi-level collapse submenu {% if request.resolver_match.url_name in 'inventory_list,stock_card,transaction_list,low_stock_alerts,receive_stock,confirm_receive,stock_adjust' %}show{% endif %}" id="wh-sub-inventory">
           <ul class="nav flex-column">
             <li class="nav-item {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}active{% endif %}">
               <a class="nav-link btn {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}active{% endif %}"
@@ -42,6 +42,13 @@
                  href="{% url 'warehouse:receive_stock' %}"
                  hx-get="{% url 'warehouse:receive_stock' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fa-solid fa-truck-loading me-2"></i> Receive Stock
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'stock_adjust' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'stock_adjust' %}active{% endif %}"
+                 href="{% url 'warehouse:stock_adjust' %}"
+                 hx-get="{% url 'warehouse:stock_adjust' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-scale-balanced me-2"></i> Stock Adjustment
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'transaction_list' %}active{% endif %}">

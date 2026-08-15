@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block content %}
 <div class="col-12 bpl-list" id="client_location_list_container_main">
@@ -15,30 +16,19 @@
   </a>
 </div>
 
-<!-- Hero Header (desktop only) -->
-<div class="bpl-list__hero d-none d-md-block">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <div class="bpl-list__hero-icon">
-                <i class="fa-solid fa-location-dot"></i>
-            </div>
-            <div>
-                <h1 class="bpl-list__hero-title">Store Locations</h1>
-                <p class="bpl-list__hero-sub">Manage pickup and delivery points</p>
-            </div>
-        </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            {% if fulfillment_enabled %}
-            <a href="{% url 'business:warehouse_request' %}" class="bpl-list__btn bpl-list__btn--fulfillment"
-                id="client_location_list_btn_fulfillment">
-                <i class="fa-solid fa-warehouse"></i> Link Fulfillment Store
-            </a>
-            {% endif %}
-            <a href="{% url 'business:pickup_location_add' %}" class="bpl-list__btn bpl-list__btn--add" id="client_location_list_btn_new">
-                <i class="fa-solid fa-plus"></i> Add Location
-            </a>
-        </div>
-    </div>
+<!-- Page header (desktop only) -->
+<div class="d-none d-md-block">
+    {% bconheader eyebrow="Network" live="Stores" icon="fa-solid fa-location-dot" title="Store Locations" subtitle="Manage pickup and delivery points." %}
+        {% if fulfillment_enabled %}
+        <a href="{% url 'business:warehouse_request' %}" class="bcon__btn bcon__btn--secondary"
+            id="client_location_list_btn_fulfillment">
+            <i class="fa-solid fa-warehouse"></i> Link Fulfillment Store
+        </a>
+        {% endif %}
+        <a href="{% url 'business:pickup_location_add' %}" class="bcon__btn bcon__btn--primary" id="client_location_list_btn_new">
+            <i class="fa-solid fa-plus"></i> Add Location
+        </a>
+    {% endbconheader %}
 </div>
 
 <!-- Info Callout -->
@@ -53,7 +43,7 @@
         <div class="bpl-list__section-head">
             <i class="fa-solid fa-store"></i>
             <span>Your Store Locations</span>
-            <span class="bpl-list__section-count">{{ stores|length }}</span>
+            <span class="bpl-list__section-count">{{ stores_total }}</span>
         </div>
         <div class="bpl-list__grid" id="client_location_list_grid">
             {% for store in stores %}
@@ -128,6 +118,7 @@
             </div>
             {% endfor %}
         </div>
+        {% include "includes/components/_pagination.html" with page_obj=stores_page per_page=per_page pagination_id="pickup_locations" variant="compact" show_goto="false" %}
     </div>
 
 {% else %}

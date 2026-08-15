@@ -1,0 +1,158 @@
+{# Purpose: Add a product to a seller's catalogue from inside the warehouse (staff only). #}
+{# Used by: warehouse.views.staff_product_add (URL warehouse:staff_product_add) #}
+{# Notes: Mirrors staff_product_edit.html; the business picker is the only extra field and is set on the instance in the view. #}
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+{% load business_dropdown %}
+{% load crispy_forms_tags %}
+
+{% block title %}Add Product{% endblock %}
+
+{% block content %}
+<div class="wh">
+  <!-- Breadcrumb -->
+  <div class="wh__breadcrumb">
+    <a href="{% url 'workforce:wf_dashboard' %}">Workforce</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <a href="{% url 'warehouse:dashboard' %}">Warehouse</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <a href="{% url 'warehouse:inventory_list' %}">Inventory</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">Add Product</span>
+  </div>
+
+  <!-- Header -->
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon"><i class="fas fa-box-open"></i></div>
+      <div>
+        <h1 class="wh__title">Add Product</h1>
+        <p class="wh__subtitle">Create a product in a seller's catalogue — stock arrives later through receiving</p>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'warehouse:inventory_list' %}{% endif %}"
+         class="wh__btn wh__btn--secondary">
+        <i class="fas fa-arrow-left"></i> Back
+      </a>
+      <button type="button" class="wfnote__btn" data-wfnote-toggle
+              aria-expanded="false" aria-controls="warehouse_staff_product_add_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="wfnote wfnote--inset" id="warehouse_staff_product_add_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_staff_product_add_card_notes' %}" hidden></div>
+
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left">
+        <i class="fas fa-box-open"></i>
+        <span>Product Details</span>
+      </div>
+    </div>
+    <div class="p-3 p-md-4">
+      <form method="POST" enctype="multipart/form-data" id="staff_product_add_form" novalidate>
+        {% csrf_token %}
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+
+        {% comment %}
+        One summary at the top: the fields run past the fold, so an error on a
+        field near the bottom is invisible after the page reloads.
+        {% endcomment %}
+        {% if form.errors %}
+        <div class="alert alert-danger py-2 mb-3" id="staff_product_add_errors">
+          {% for error in form.non_field_errors %}
+          <div class="small">{{ error }}</div>
+          {% endfor %}
+          {% for field in form %}
+            {% for error in field.errors %}
+            <div class="small"><strong>{{ field.label }}:</strong> {{ error }}</div>
+            {% endfor %}
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="wha__row">
+          <div class="wha__field">
+            <label for="business" class="wha__label"><i class="fas fa-store"></i> Business <span class="wha__required">*</span></label>
+            <select name="business" id="business" class="wha__select" required>
+              <option value="">Select Business</option>
+              {% for b in businesses|code_last %}
+              <option value="{{ b.pk }}" {% if selected_business_id == b.pk|stringformat:"d" %}selected{% endif %}>{% if b.business_code %}{{ b.business_code }}{% else %}*{{ b.business_id }}{% endif %} - {{ b.business_name }}</option>
+              {% endfor %}
+            </select>
+            <span class="wha__hint"><i class="fas fa-info-circle"></i> The product belongs to this seller and cannot be moved later. Only the business and item name are required — the seller can fill in the rest.</span>
+          </div>
+        </div>
+
+        <div class="wha__divider"></div>
+
+        {{ form | crispy }}
+
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="wh__btn wh__btn--primary" id="staff_product_add_submit">
+            <i class="fas fa-save"></i>
+            <span class="btn-text">Create Product</span>
+          </button>
+          <button type="submit" name="save_and_add_another" value="1" class="wh__btn wh__btn--secondary">
+            <i class="fas fa-plus"></i> Save &amp; Add Another
+          </button>
+          <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'warehouse:inventory_list' %}{% endif %}"
+             class="wh__btn wh__btn--secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Bound on arrival either way: the warehouse sidebar navigates by HTMX swap of
+// #main-content, so DOMContentLoaded has long since fired when this re-runs.
+(function () {
+function initProductAdd() {
+  var form = document.getElementById('staff_product_add_form');
+  if (!form || form.dataset.wpaInit) return;
+  form.dataset.wpaInit = '1';
+
+  if (window.jQuery) {
+    jQuery("#id_color, #id_unit, #id_product_category").select2({ width: '100%' });
+  }
+
+  // A rejected save re-renders at the top of the page; without this the field
+  // that actually failed can sit several screens down, unseen.
+  var errorBox = document.getElementById('staff_product_add_errors');
+  if (errorBox) {
+    errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  var btn = document.getElementById('staff_product_add_submit');
+  form.addEventListener('submit', function (e) {
+    var business = document.getElementById('business');
+    if (business && !business.value) {
+      e.preventDefault();
+      business.focus();
+      alert('Choose the business this product belongs to.');
+      return;
+    }
+    if (!btn) return;
+    btn.style.opacity = '0.7';
+    btn.style.pointerEvents = 'none';
+    var t = btn.querySelector('.btn-text');
+    if (t) t.textContent = 'Saving...';
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initProductAdd);
+} else {
+  initProductAdd();
+}
+})();
+</script>
+{% endblock extra_js %}

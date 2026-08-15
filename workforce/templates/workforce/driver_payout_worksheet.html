@@ -1,6 +1,7 @@
 {# Purpose: One driver's payout desk — money ready to pay, plus the deliveries still awaiting verification. #}
 {# Used by: workforce.views.driver_payout_worksheet (URL workforce:driver_payout_worksheet) #}
 {# Notes: Flush layout, no page padding. COD is read-only context and is never part of a payout total. #}
+{#        Carries the shared page-notes card (wfnote__) under the masthead, hidden on load and toggled by the masthead help button. #}
 {% extends "wf_dashboard_base.html" %}
 {% load static humanize %}
 
@@ -10,74 +11,90 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/driver_payout_worksheet.css' %}?v=20260728i" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/driver_payout_worksheet.css' %}?v=20260729a" type="text/css" />
 {% endblock %}
 
 {% block content %}
 <div class="dpw" id="workforce_payout_root">
 
   <!-- Masthead — one line: who, and what the desk knows about them -->
-  <header class="dpw__masthead">
-    <div class="dpw__ident">
-      <span class="dpw__eyebrow">Driver payout</span>
-      <h1 class="dpw__title">{{ driver_display_name }}</h1>
-      <span class="dpw__ident-meta">
-        {# Last-paid lives on the ladder's fourth gate; repeating it here was the one duplicated fact on the page. #}
-        {{ driver.driver_code|default:"—" }}<span class="dpw__sep">/</span>ID {{ driver.driver_id }}
+  <header class="wfhero">
+    <div class="wfhero__ident">
+      <span class="wfhero__eyebrow">Driver payout</span>
+      <h1 class="wfhero__title">{{ driver_display_name }}</h1>
+      <span class="wfhero__sub">
+        {# Last-paid lives on the stat row's fourth card; repeating it here was the one duplicated fact on the page. #}
+        <span class="wfhero__code">{{ driver.driver_code|default:"—" }}</span><span class="wfhero__sep">/</span>ID {{ driver.driver_id }}
       </span>
     </div>
-    <nav class="dpw__masthead-actions">
-      <a href="{% url 'workforce:fleet_drivers_earnings' %}" class="dpw__ghost">All drivers</a>
-      <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}" class="dpw__ghost">Transactions</a>
-    </nav>
+    <div class="wfhero__side">
+      <div class="wfhero__tallies">
+        <div class="wfhero__tally">
+          <span class="wfhero__tally-num">{{ queue_total|intcomma }}</span>
+          <span class="wfhero__tally-lbl">In queue</span>
+        </div>
+      </div>
+      <nav class="wfhero__actions">
+        <a href="{% url 'workforce:fleet_drivers_earnings' %}" class="wfhero__ghost">All drivers</a>
+        <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}" class="wfhero__ghost">Transactions</a>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_driver_payout_worksheet_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
+      </nav>
+    </div>
   </header>
 
+  <div class="wfnote" id="workforce_driver_payout_worksheet_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_driver_payout_worksheet_card_notes' %}" hidden></div>
+
   {% comment %}
-  The ladder. A driver's money only ever moves through these four gates, in this
-  order, so the page states the whole pipeline instead of five loose figures —
-  and marks the gate holding money right now. Each gate is also the way into the
-  work it describes.
+  A driver's money only ever moves through these four stages, in this order, so
+  the page states the whole pipeline instead of five loose figures — and marks the
+  card holding money right now. Each card is also the way into the work it names.
   {% endcomment %}
-  <nav class="dpw__ladder" aria-label="Where this driver's money is">
+  <nav class="wfstat" aria-label="Where this driver's money is">
     <a href="?days={{ selected_days }}&amp;only=pending"
-       class="dpw__gate {% if money_at == 'pending' %}dpw__gate--here{% endif %} {% if only == 'pending' %}dpw__gate--on{% endif %}">
-      <span class="dpw__gate-label">Awaiting verification</span>
-      <span class="dpw__gate-value">{{ pending_value|floatformat:2|intcomma }}<span class="dpw__fig-unit">QAR</span></span>
-      <span class="dpw__gate-sub">{{ pending_count|intcomma }} deliver{{ pending_count|pluralize:"y,ies" }}</span>
+       class="wfstat__card {% if money_at == 'pending' %}wfstat__card--here{% endif %} {% if only == 'pending' %}wfstat__card--on{% endif %}">
+      <span class="wfstat__label">Awaiting verification</span>
+      <span class="wfstat__value">{{ pending_value|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+      <span class="wfstat__sub">{{ pending_count|intcomma }} deliver{{ pending_count|pluralize:"y,ies" }}</span>
     </a>
     <a href="?days={{ selected_days }}&amp;only=verified"
-       class="dpw__gate {% if money_at == 'verified' %}dpw__gate--here{% endif %} {% if only == 'verified' %}dpw__gate--on{% endif %}">
-      <span class="dpw__gate-label">Verified, not published</span>
-      <span class="dpw__gate-value">{{ verified_value|floatformat:2|intcomma }}<span class="dpw__fig-unit">QAR</span></span>
-      <span class="dpw__gate-sub">{{ verified_count|intcomma }} deliver{{ verified_count|pluralize:"y,ies" }}</span>
+       class="wfstat__card {% if money_at == 'verified' %}wfstat__card--here{% endif %} {% if only == 'verified' %}wfstat__card--on{% endif %}">
+      <span class="wfstat__label">Verified, not published</span>
+      <span class="wfstat__value">{{ verified_value|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+      <span class="wfstat__sub">{{ verified_count|intcomma }} deliver{{ verified_count|pluralize:"y,ies" }}</span>
     </a>
     <a href="#workforce_payout_panel"
-       class="dpw__gate {% if money_at == 'payable' %}dpw__gate--here{% endif %}">
-      <span class="dpw__gate-label">Ready to pay</span>
-      <span class="dpw__gate-value">{{ net_payable|floatformat:2|intcomma }}<span class="dpw__fig-unit">QAR</span></span>
-      <span class="dpw__gate-sub">
+       class="wfstat__card {% if money_at == 'payable' %}wfstat__card--here{% endif %}">
+      <span class="wfstat__label">Ready to pay</span>
+      <span class="wfstat__value">{{ net_payable|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+      <span class="wfstat__sub">
         {% if payable_lines %}{{ payable_lines|length }} line{{ payable_lines|length|pluralize }}{% else %}nothing published yet{% endif %}
       </span>
     </a>
     {% if last_payout %}
-    <a href="{% url 'workforce:driver_payout_invoice' last_payout.settlement_id %}" class="dpw__gate dpw__gate--done">
-      <span class="dpw__gate-label">Last paid</span>
-      <span class="dpw__gate-value">{{ last_payout.net_amount|floatformat:2|intcomma }}<span class="dpw__fig-unit">QAR</span></span>
-      <span class="dpw__gate-sub">{{ last_payout.paid_at|date:"d M Y"|default:last_payout.created_at|date:"d M Y" }}</span>
+    <a href="{% url 'workforce:driver_payout_invoice' last_payout.settlement_id %}" class="wfstat__card wfstat__card--done">
+      <span class="wfstat__label">Last paid</span>
+      <span class="wfstat__value">{{ last_payout.net_amount|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+      <span class="wfstat__sub">{{ last_payout.paid_at|date:"d M Y"|default:last_payout.created_at|date:"d M Y" }}</span>
     </a>
     {% else %}
-    <span class="dpw__gate dpw__gate--done dpw__gate--null">
-      <span class="dpw__gate-label">Last paid</span>
-      <span class="dpw__gate-value">—</span>
-      <span class="dpw__gate-sub">never paid out</span>
+    <span class="wfstat__card wfstat__card--done wfstat__card--null">
+      <span class="wfstat__label">Last paid</span>
+      <span class="wfstat__value">—</span>
+      <span class="wfstat__sub">never paid out</span>
     </span>
     {% endif %}
   </nav>
 
   <!-- ── Ready to pay ─────────────────────────────────────────── -->
   {% comment %}
-  Only rendered when there is money to pay. When there isn't, the ladder's third
-  gate already says so — an empty panel would just repeat it.
+  Only rendered when there is money to pay. When there isn't, the third stat card
+  already says so — an empty panel would just repeat it.
   {% endcomment %}
   {% if payable_lines %}
   <form method="post" action="{% url 'workforce:driver_payout_create' driver.driver_id %}" id="workforce_payout_form">

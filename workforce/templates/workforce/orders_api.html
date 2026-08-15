@@ -1,10 +1,17 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static workforce_tags %}
+{% comment %}
+Purpose: Staff console for live platform orders (Shopify / WooCommerce / Google Sheet) + import wizard
+Used by: workforce_views.wf_api_orders at /workforce/orders/api/
+Notes: Rows are fetched live from the platform on every load, then annotated with our import status.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Order Auto/API — Staff Dashboard{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'orders/css/order_api_get.css' %}?v=20260322c">
+<link rel="stylesheet" href="{% static 'workforce/css/orders-api-sync.css' %}?v=20260802e">
 {% endblock extra_css %}
 
 {% block content %}
@@ -15,7 +22,7 @@
             <h1 class="woa__hero-title">
                 <i class="fa-solid fa-plug me-2"></i>Order Auto/API
             </h1>
-            <p class="woa__hero-sub">Orders imported via Shopify, WooCommerce, TikTok Shop &amp; other integrations</p>
+            <p class="woa__hero-sub">Live orders on connected stores, checked against what EzzyDelivery already holds</p>
         </div>
         <div class="p-3 d-flex gap-2">
             <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-light btn-sm">
@@ -24,303 +31,283 @@
             <a href="{% url 'workforce:import_history' %}" class="btn btn-outline-light btn-sm">
                 <i class="fa-solid fa-clock-rotate-left me-1"></i>Import History
             </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_orders_api_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
 
-    <div class="p-3">
-        <!-- Filters -->
-        <div class="woa__card woa__card--select mb-3">
-            <div class="woa__card-body">
-                <!-- Business filter row -->
-                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-                    <span class="woa__form-label mb-0 me-1 text-nowrap"><i class="fa-solid fa-store me-1"></i>Business:</span>
-                    <a href="{% url 'workforce:wf_api_orders' %}{% if status_filter %}?status={{ status_filter }}{% endif %}"
-                       class="btn btn-sm {% if not selected_business_id %}btn-primary{% else %}btn-outline-secondary{% endif %}">
-                        All
-                    </a>
-                    {% for biz in api_businesses %}
-                    <a href="?business={{ biz.business_id }}{% if status_filter %}&status={{ status_filter }}{% endif %}"
-                       class="btn btn-sm {% if selected_business_id == biz.business_id|stringformat:'s' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
-                        {{ biz.business_name }}
-                        {% for cfg in biz.business_settings_api.all %}{% if cfg.is_verify_api %}
-                        <span class="badge bg-success ms-1" style="font-size:0.6rem;">{{ cfg.api_type|upper }}</span>
-                        {% endif %}{% endfor %}
-                    </a>
-                    {% empty %}
-                    <span class="text-muted small">No approved API integrations yet.</span>
-                    {% endfor %}
-                </div>
-                <!-- Status filter row -->
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <span class="woa__form-label mb-0 me-1 text-nowrap"><i class="fa-solid fa-filter me-1"></i>Show:</span>
-                    <a href="?{% if selected_business_id %}business={{ selected_business_id }}&{% endif %}"
-                       class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
-                        All
-                    </a>
+    <div class="wfnote" id="workforce_orders_api_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_orders_api_card_notes' %}" hidden></div>
+
+    <div class="oasl">
+        <!-- Toolbar: which store, and which side of the sync to look at -->
+        <div class="oasl__toolbar">
+            <div class="oasl__toolbar-row d-flex flex-wrap gap-2 align-items-center">
+                <span class="oasl__label">Store</span>
+                <a href="{% url 'workforce:wf_api_orders' %}{% if status_filter %}?status={{ status_filter }}{% endif %}"
+                   class="oasl__chip {% if not selected_business_id %}oasl__chip--active{% endif %}">All</a>
+                {% for biz in api_businesses %}
+                <a href="?business={{ biz.business_id }}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+                   class="oasl__chip {% if selected_business_id == biz.business_id|stringformat:'s' %}oasl__chip--active{% endif %}">
+                    {{ biz.business_name }}
+                    {% for cfg in biz.business_settings_api.all %}{% if cfg.is_verify_api %}<span class="oasl__chip-plat">{{ cfg.api_type }}</span>{% endif %}{% endfor %}
+                </a>
+                {% empty %}
+                <span class="oasl__meta">No approved API integrations yet.</span>
+                {% endfor %}
+            </div>
+
+            <div class="oasl__toolbar-row d-flex flex-wrap gap-2 align-items-center">
+                <span class="oasl__label">Show</span>
+                <div class="oasl__seg">
+                    <a href="?{% if selected_business_id %}business={{ selected_business_id }}{% endif %}"
+                       class="oasl__seg-item {% if not status_filter %}oasl__seg-item--active{% endif %}">Everything</a>
                     <a href="?{% if selected_business_id %}business={{ selected_business_id }}&{% endif %}status=not_imported"
-                       class="btn btn-sm {% if status_filter == 'not_imported' %}btn-warning{% else %}btn-outline-secondary{% endif %}">
-                        <i class="fa-solid fa-clock me-1"></i>Not Imported
-                    </a>
+                       class="oasl__seg-item oasl__seg-item--pending {% if status_filter == 'not_imported' %}oasl__seg-item--active{% endif %}">Not imported</a>
                     <a href="?{% if selected_business_id %}business={{ selected_business_id }}&{% endif %}status=imported"
-                       class="btn btn-sm {% if status_filter == 'imported' %}btn-success{% else %}btn-outline-secondary{% endif %}">
-                        <i class="fa-solid fa-circle-check me-1"></i>Imported
-                    </a>
+                       class="oasl__seg-item {% if status_filter == 'imported' %}oasl__seg-item--active{% endif %}">Imported</a>
                 </div>
+
+                {% if selected_api.api_type == 'google_sheet' %}
+                <span class="oasl__note {% if not selected_api.column_mapping %}oasl__note--unset{% endif %} ms-auto">
+                    <span class="oasl__note-flag"></span>
+                    {% if selected_api.column_mapping %}
+                    Columns mapped ({{ selected_api.column_mapping|length }} fields)
+                    {% else %}
+                    No column mapping — import will auto-detect
+                    {% endif %}
+                </span>
+                <button type="button" class="oasl__btn oasl__btn--go border" id="wfapi_mapping_btn" onclick="openMappingModal()">
+                    <i class="fa-solid fa-table-columns"></i>Map columns
+                </button>
+                {% endif %}
             </div>
         </div>
 
         {% if selected_business and selected_api %}
 
-        {% if selected_api.api_type == 'google_sheet' %}
-        <!-- Column Mapping Setup -->
-        <div class="d-flex align-items-center gap-2 mb-3">
-            <button type="button" class="btn btn-sm btn-outline-primary" id="wfapi_mapping_btn" onclick="openMappingModal()">
-                <i class="fa-solid fa-columns me-1"></i>Setup Column Mapping
-            </button>
-            {% if selected_api.column_mapping %}
-            <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Mapping saved ({{ selected_api.column_mapping|length }} fields)</span>
-            {% else %}
-            <span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No mapping configured — using auto-detect</span>
-            {% endif %}
-        </div>
-        {% endif %}
-
-        <!-- Live API Orders (fetched directly from platform) -->
-
         {% if live_error %}
         <div class="alert alert-danger">
             <i class="fa-solid fa-triangle-exclamation me-1"></i>
-            <strong>API Error:</strong> {{ live_error }}
+            <strong>{{ selected_api.api_type|title }} did not answer:</strong> {{ live_error }}
         </div>
         {% endif %}
 
-        <!-- Bulk Action Bar -->
-        <div id="wfapi_bulk_bar" class="d-none mb-3 p-2 rounded d-flex align-items-center gap-3" style="background:#fef9c3; border:1px solid #fde047;">
-            <span class="fw-semibold small"><span id="wfapi_selected_count">0</span> order(s) selected</span>
-            <button type="button" class="btn btn-success btn-sm" id="wfapi_transfer_btn">
-                <i class="fa-solid fa-file-import me-1"></i> Import (Mapping)
+        <!-- Bulk action bar — appears only with a selection -->
+        <div id="wfapi_bulk_bar" class="oasl__bulk d-none">
+            <span class="oasl__bulk-count" id="wfapi_selected_count">0</span>
+            <span class="oasl__bulk-word">selected</span>
+            <button type="button" class="oasl__btn oasl__btn--go" id="wfapi_transfer_btn">
+                <i class="fa-solid fa-file-import"></i>Import into EzzyDelivery
             </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" id="wfapi_deselect_btn">
-                <i class="fa-solid fa-xmark me-1"></i> Deselect All
-            </button>
-            <div id="wfapi_transfer_status" class="small ms-2"></div>
+            <button type="button" class="oasl__btn oasl__btn--ghost" id="wfapi_deselect_btn">Clear</button>
+            <div id="wfapi_transfer_status" class="oasl__bulk-status"></div>
         </div>
 
-        <div class="woa__card">
-            <div class="woa__card-header d-flex justify-content-between align-items-center">
-                <div>
-                    <i class="fa-solid fa-plug me-2 woa__icon-accent"></i>
-                    <span class="woa__section-label">
-                        {{ selected_business.business_name }} — Live {{ selected_api.api_type|title }} Orders
-                    </span>
-                    {% if live_total %}
-                    <span class="badge bg-secondary ms-2">{{ live_total }} total</span>
-                    {% endif %}
-                    {% if live_orders %}
-                    <span class="badge bg-info text-dark ms-1">showing {{ live_orders|length }}</span>
-                    {% endif %}
+        <div class="oasl__sheet">
+            {# Sync ribbon: track = everything on the store, fill = what we already hold. #}
+            <progress class="oasl__meter" value="{{ imported_count }}" max="{{ live_count|default:1 }}"
+                      aria-label="{{ imported_count }} of {{ live_count }} live orders imported">{{ imported_count }}/{{ live_count }}</progress>
+
+            <div class="oasl__sheet-head">
+                <span class="oasl__sheet-title">{{ selected_business.business_name }}</span>
+                <span class="oasl__sheet-plat">{{ selected_api.api_type }}{% if live_total %} · {{ live_total }} on store{% endif %}</span>
+                <div class="oasl__tally">
+                    <span class="oasl__tally-item"><span class="oasl__tally-num">{{ live_count }}</span><span class="oasl__tally-word">live</span></span>
+                    <span class="oasl__tally-item"><span class="oasl__tally-num">{{ imported_count }}</span><span class="oasl__tally-word">imported</span></span>
+                    <span class="oasl__tally-item oasl__tally-item--pending"><span class="oasl__tally-num">{{ pending_count }}</span><span class="oasl__tally-word">pending</span></span>
                 </div>
                 {% if live_orders %}
-                <label class="d-flex align-items-center gap-1 small text-muted mb-0" style="cursor:pointer;">
-                    <input type="checkbox" id="wfapi_select_all"> Select all
+                <label class="oasl__selectall" for="wfapi_select_all">
+                    <input type="checkbox" id="wfapi_select_all" class="oasl__check">Select all
                 </label>
                 {% endif %}
             </div>
-            <div class="woa__card-body p-0">
-                {% if live_orders %}
 
-                {% if selected_api.api_type == 'google_sheet' and gs_headers %}
-                <!-- Google Sheet: keep dynamic table layout -->
-                <div class="table-responsive">
-                    <table class="table table-hover table-sm mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width:36px;"></th>
-                                <th class="text-muted">Row</th>
-                                {% for h in gs_headers %}
-                                <th class="small">{{ h }}</th>
-                                {% endfor %}
-                                <th>Imported</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for o in live_orders %}
-                            <tr id="row-{{ o.row_number }}" class="{% if o.imported %}table-success{% endif %}">
-                                <td>
-                                    {% if not o.imported %}
-                                    <input type="checkbox" class="wfapi-check form-check-input" value="{{ o.platform_id }}" data-source="{{ o.source }}">
-                                    {% else %}
-                                    <i class="fa-solid fa-circle-check text-success"></i>
-                                    {% endif %}
-                                </td>
-                                <td class="text-muted small">{{ o.row_number }}</td>
-                                {% for h in gs_headers %}
-                                <td class="small text-truncate" style="max-width:160px;" title="{{ o.cells|get_item:h }}">{{ o.cells|get_item:h }}</td>
-                                {% endfor %}
-                                <td>
-                                    {% if o.imported %}
-                                    <a href="{% url 'workforce:order_detail' o.imported_order_id %}" class="badge bg-success text-decoration-none">
-                                        <i class="fa-solid fa-circle-check me-1"></i>{{ o.imported_order_number }}
-                                    </a>
-                                    {% else %}
-                                    <span class="text-muted small">—</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+            {% if live_orders %}
 
-                {% else %}
-                <!-- Shopify / WooCommerce: Receipt card layout -->
-                <div class="oag__list p-3">
-                    {% for o in live_orders %}
-                    <div class="oag__receipt {% if o.imported %}oag__receipt--imported{% endif %}" id="row-{{ o.row_number }}" style="animation-delay: {{ forloop.counter0 }}0ms">
-
-                        <!-- Receipt Header -->
-                        <div class="oag__receipt-header">
-                            <div class="oag__receipt-header-left">
+            {% if selected_api.api_type == 'google_sheet' and gs_headers %}
+            <!-- Google Sheet: the merchant's own columns, kept verbatim -->
+            <div class="oasl__gs">
+                <table>
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Row</th>
+                            {% for h in gs_headers %}<th>{{ h }}</th>{% endfor %}
+                            <th>In EzzyDelivery</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for o in live_orders %}
+                        <tr {% if o.row_number %}id="row-{{ o.row_number }}"{% endif %} class="{% if o.imported %}oasl__gs-row--done{% endif %}">
+                            <td class="oasl__pick">
                                 {% if not o.imported %}
-                                <input type="checkbox" class="wfapi-check woa__check" value="{{ o.platform_id }}" data-source="{{ o.source }}">
+                                <input type="checkbox" class="wfapi-check oasl__check" value="{{ o.platform_id }}" data-source="{{ o.source }}"
+                                       aria-label="Select row {{ o.row_number }}">
                                 {% else %}
-                                <i class="fa-solid fa-circle-check" style="color:#4ade80;"></i>
+                                <i class="fa-solid fa-circle-check oasl__done-mark" aria-hidden="true"></i>
                                 {% endif %}
-                                <span class="oag__order-num">{{ o.name }}</span>
-                                <span class="oag__fin-badge oag__fin-badge--{{ o.status }}">{{ o.status|default:'—' }}</span>
-                                {% if o.fulfillment %}
-                                <span class="oag__fin-badge" style="background:#1e3a5f;color:#93c5fd;">{{ o.fulfillment }}</span>
-                                {% endif %}
-                                <span class="oag__source-tag">{{ o.source|upper }}</span>
-                            </div>
-                            <div class="oag__receipt-header-right">
+                            </td>
+                            <td class="oasl__gs-rownum">{{ o.row_number }}</td>
+                            {% for h in gs_headers %}
+                            <td title="{{ o.cells|get_item:h }}">{{ o.cells|get_item:h }}</td>
+                            {% endfor %}
+                            <td class="oasl__gs-sync">
                                 {% if o.imported %}
-                                <a href="{% url 'workforce:order_detail' o.imported_order_id %}" class="oag__imported-link">
-                                    <i class="fa-solid fa-circle-check me-1"></i>{{ o.imported_order_number }}
-                                </a>
+                                <a href="{% url 'workforce:order_detail' o.imported_order_id %}" class="oasl__mirror">{{ o.imported_order_number }}</a>
+                                {% else %}
+                                <span class="oasl__await">Not imported</span>
                                 {% endif %}
-                                <span class="oag__receipt-date">
-                                    <i class="far fa-calendar-alt"></i>
-                                    {{ o.date|default:'—'|slice:":10" }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- Receipt Body -->
-                        <div class="oag__receipt-body">
-
-                            <!-- Left: Customer & Address -->
-                            <div class="oag__receipt-left">
-                                <div class="oag__info-block">
-                                    <div class="oag__info-eyebrow">Customer</div>
-                                    <div class="oag__info-primary">{{ o.customer|default:'Unknown' }}</div>
-                                    {% if o.phone %}
-                                    <div class="oag__info-secondary"><i class="fas fa-phone fa-xs me-1"></i>{{ o.phone }}</div>
-                                    {% endif %}
-                                </div>
-                                {% if o.address %}
-                                <div class="oag__info-block">
-                                    <div class="oag__info-eyebrow"><i class="fas fa-map-marker-alt"></i> Address</div>
-                                    <div class="oag__info-secondary">{{ o.address }}</div>
-                                    {% if o.country %}
-                                    <div class="oag__info-secondary">{{ o.country }}</div>
-                                    {% endif %}
-                                    {% for sl in o.shipping_lines %}{% if sl.title %}
-                                    <div class="oag__shipping-type-badge" data-type="{{ sl.title|lower }}"><i class="fas fa-shipping-fast"></i> {{ sl.title }}</div>
-                                    {% endif %}{% endfor %}
-                                </div>
-                                {% endif %}
-                            </div>
-
-                            <!-- Right: COD Ledger -->
-                            <div class="oag__receipt-right">
-                                <div class="oag__ledger">
-                                    {% if o.subtotal %}
-                                    <div class="oag__ledger-row">
-                                        <span class="oag__ledger-label">Subtotal</span>
-                                        <span class="oag__ledger-value">{% if o.currency %}{{ o.currency }} {% endif %}{{ o.subtotal }}</span>
-                                    </div>
-                                    {% endif %}
-                                    {% for sl in o.shipping_lines %}
-                                    <div class="oag__ledger-row">
-                                        <span class="oag__ledger-label">Shipping{% if sl.title %}<span class="oag__shipping-type-badge" data-type="{{ sl.title|lower }}"><i class="fas fa-shipping-fast"></i> {{ sl.title }}</span>{% endif %}</span>
-                                        <span class="oag__ledger-value">{% if o.currency %}{{ o.currency }} {% endif %}{{ sl.price }}</span>
-                                    </div>
-                                    {% endfor %}
-                                    <div class="oag__ledger-divider"></div>
-                                    <div class="oag__ledger-row oag__ledger-row--total">
-                                        <span class="oag__ledger-label">Total</span>
-                                        <span class="oag__ledger-value">{% if o.currency %}{{ o.currency }} {% endif %}{{ o.cod|default:'0.00' }}</span>
-                                    </div>
-                                    <div class="oag__ledger-divider oag__ledger-divider--light"></div>
-                                    {% if o.status == 'paid' %}
-                                    <div class="oag__ledger-row oag__ledger-row--paid">
-                                        <span class="oag__ledger-label"><i class="fas fa-check-circle"></i> Paid</span>
-                                        <span class="oag__ledger-value">{% if o.currency %}{{ o.currency }} {% endif %}{{ o.cod|default:'0.00' }}</span>
-                                    </div>
-                                    <div class="oag__ledger-row oag__ledger-row--cod">
-                                        <span class="oag__ledger-label"><i class="fas fa-money-bill-wave"></i> COD</span>
-                                        <span class="oag__ledger-value">{{ o.currency|default:'' }} 0.00</span>
-                                    </div>
-                                    {% else %}
-                                    <div class="oag__ledger-row oag__ledger-row--paid">
-                                        <span class="oag__ledger-label"><i class="fas fa-check-circle"></i> Paid</span>
-                                        <span class="oag__ledger-value">{{ o.currency|default:'' }} 0.00</span>
-                                    </div>
-                                    <div class="oag__ledger-row oag__ledger-row--cod oag__ledger-row--cod-due">
-                                        <span class="oag__ledger-label"><i class="fas fa-money-bill-wave"></i> COD Due</span>
-                                        <span class="oag__ledger-value">{% if o.currency %}{{ o.currency }} {% endif %}{{ o.cod|default:'0.00' }}</span>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <!-- Line Items -->
-                        {% if o.items %}
-                        <div class="oag__items">
-                            <div class="oag__items-header">
-                                <i class="fas fa-cubes"></i> Items ({{ o.items|length }})
-                            </div>
-                            <div class="oag__items-grid">
-                                {% for item in o.items %}
-                                <div class="oag__item">
-                                    <span class="oag__item-qty">{{ item.qty }}×</span>
-                                    <span class="oag__item-name">{{ item.name }}</span>
-                                    <span class="oag__item-price">{% if o.currency %}{{ o.currency }} {% endif %}{{ item.price }}</span>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endif %}
-
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                {% elif not live_error %}
-                <div class="woa__empty">
-                    <i class="fa-solid fa-inbox"></i>
-                    <h3>No Orders Found</h3>
-                    <p>No orders returned from {{ selected_api.api_type|title }} API.</p>
-                </div>
-                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
+
+            {% else %}
+            <!-- Shopify / WooCommerce: one row per order, details on demand -->
+            <div class="oasl__head" aria-hidden="true">
+                <span></span>
+                <span>Order</span>
+                <span>Customer</span>
+                <span>Fulfilment</span>
+                <span class="oasl__h--money">Value</span>
+                <span class="oasl__h--sync">In EzzyDelivery</span>
+                <span></span>
+            </div>
+
+            {% for o in live_orders %}
+            <div class="oasl__row {% if o.imported %}oasl__row--done{% endif %}" {% if o.row_number %}id="row-{{ o.row_number }}"{% endif %}>
+                <div class="oasl__pick">
+                    {% if not o.imported %}
+                    <input type="checkbox" class="wfapi-check oasl__check" value="{{ o.platform_id }}" data-source="{{ o.source }}"
+                           aria-label="Select order {{ o.name }}">
+                    {% else %}
+                    <i class="fa-solid fa-circle-check oasl__done-mark" title="Already in EzzyDelivery"></i>
+                    {% endif %}
+                </div>
+
+                <div class="oasl__cell oasl__ref">
+                    <span class="oasl__code">{{ o.name }}</span>
+                    <span class="oasl__meta oasl__meta--mono">{{ o.date|default:'—'|slice:":10" }}</span>
+                </div>
+
+                <div class="oasl__cell oasl__who">
+                    <span class="oasl__name">{{ o.customer|default:'Unnamed customer' }}</span>
+                    <span class="oasl__meta">
+                        {% if o.phone %}<span class="oasl__meta--mono">{{ o.phone }}</span>{% endif %}
+                        {% if o.phone and o.address %}<span class="oasl__meta-sep">·</span>{% endif %}
+                        {% if o.address %}<bdi>{{ o.address }}</bdi>{% endif %}
+                        {% if not o.phone and not o.address %}No phone or address{% endif %}
+                    </span>
+                    {% if o.imported %}
+                    <a href="{% url 'workforce:order_detail' o.imported_order_id %}" class="oasl__mirror oasl__mirror--inline">{{ o.imported_order_number }}</a>
+                    {% endif %}
+                </div>
+
+                <div class="oasl__cell oasl__flow">
+                    <span class="oasl__tag {% if o.fulfillment == 'fulfilled' %}oasl__tag--fulfilled{% endif %}">{{ o.fulfillment|default:o.status|default:'unknown' }}</span>
+                    <span class="oasl__ship">
+                        {% for sl in o.shipping_lines %}{% if sl.title %}<bdi>{{ sl.title }}</bdi>{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}
+                        {% if o.items %}{% if o.shipping_lines %} · {% endif %}{{ o.items|length }} item{{ o.items|length|pluralize }}{% endif %}
+                    </span>
+                </div>
+
+                <div class="oasl__cell oasl__money">
+                    <span class="oasl__amount"><span class="oasl__cur">{{ o.currency|default:'QAR' }}</span>{{ o.cod|default:'0.00' }}</span>
+                    {% if o.status == 'paid' %}
+                    <span class="oasl__pay oasl__pay--prepaid">Prepaid</span>
+                    {% else %}
+                    <span class="oasl__pay oasl__pay--cod">COD due</span>
+                    {% endif %}
+                </div>
+
+                <div class="oasl__cell oasl__sync">
+                    {% if o.imported %}
+                    <a href="{% url 'workforce:order_detail' o.imported_order_id %}" class="oasl__mirror">{{ o.imported_order_number }}</a>
+                    {% else %}
+                    <span class="oasl__await">Not imported</span>
+                    {% endif %}
+                </div>
+
+                <div class="oasl__exp">
+                    {% if o.items or o.address or o.shipping_lines %}
+                    <button type="button" class="oasl__expand" data-oasl-expand="oasl_drawer_{{ forloop.counter }}"
+                            aria-expanded="false" aria-controls="oasl_drawer_{{ forloop.counter }}">
+                        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                        <span class="visually-hidden">Show order detail</span>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if o.items or o.address or o.shipping_lines %}
+            <div class="oasl__drawer {% if o.imported %}oasl__drawer--done{% endif %}" id="oasl_drawer_{{ forloop.counter }}" hidden>
+                <div>
+                    <div class="oasl__drawer-label">Items</div>
+                    {% for item in o.items %}
+                    <div class="oasl__item">
+                        <span class="oasl__item-qty">{{ item.qty }}×</span>
+                        <span class="oasl__item-name">{{ item.name }}</span>
+                        <span class="oasl__item-price">{{ o.currency|default:'QAR' }} {{ item.price }}</span>
+                    </div>
+                    {% empty %}
+                    <div class="oasl__meta">The platform returned no line items.</div>
+                    {% endfor %}
+                    {% if o.address %}
+                    <div class="oasl__drawer-label mt-3">Ship to</div>
+                    <div class="oasl__addr">{{ o.address }}{% if o.country %}, {{ o.country }}{% endif %}</div>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="oasl__drawer-label">Breakdown</div>
+                    {% if o.subtotal %}
+                    <div class="oasl__break-row"><span>Subtotal</span><span class="oasl__break-val">{{ o.currency|default:'QAR' }} {{ o.subtotal }}</span></div>
+                    {% endif %}
+                    {% for sl in o.shipping_lines %}
+                    <div class="oasl__break-row"><span>Shipping{% if sl.title %} — {{ sl.title }}{% endif %}</span><span class="oasl__break-val">{{ o.currency|default:'QAR' }} {{ sl.price }}</span></div>
+                    {% endfor %}
+                    <div class="oasl__break-row oasl__break-row--total"><span>Total</span><span class="oasl__break-val">{{ o.currency|default:'QAR' }} {{ o.cod|default:'0.00' }}</span></div>
+                    <div class="oasl__break-row">
+                        <span>{% if o.status == 'paid' %}Paid on the store{% else %}Collect on delivery{% endif %}</span>
+                        <span class="oasl__break-val">{{ o.currency|default:'QAR' }} {{ o.cod|default:'0.00' }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% endif %}
+
+            {% elif not live_error %}
+            <div class="oasl__empty">
+                <i class="fa-solid fa-inbox"></i>
+                <p class="oasl__empty-title">Nothing to show</p>
+                <p class="oasl__empty-text">
+                    {% if status_filter == 'imported' %}No live order on this store has been imported yet.
+                    {% elif status_filter == 'not_imported' %}Every live order on this store is already in EzzyDelivery.
+                    {% else %}{{ selected_api.api_type|title }} returned no orders for this store.{% endif %}
+                </p>
+            </div>
+            {% endif %}
         </div>
 
-        <!-- Sheet row jump + PAGER (shared brand component) -->
-        {% if page_obj and page_obj.paginator.count > 0 %}
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+        <!-- Row jump — only sheets have row numbers to jump to -->
+        {% if selected_api.api_type == 'google_sheet' and page_obj and page_obj.paginator.count > 0 %}
+        <div class="oasl__foot">
             {% if live_total and live_total != total_filtered %}
-            <div class="small text-muted">{{ live_total }} total rows in sheet</div>
+            <span class="oasl__meta">{{ live_total }} rows in the source sheet</span>
             {% endif %}
             <div class="d-flex align-items-center gap-1 ms-auto">
-                <label class="small text-muted text-nowrap mb-0" for="wfapi_goto_row">Go to row:</label>
-                <input type="number" id="wfapi_goto_row" class="form-control form-control-sm woa__goto-row" min="2" max="{{ total_filtered|add:1 }}" placeholder="Row" {% if default_goto_row %}value="{{ default_goto_row }}"{% endif %}>
-                <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" onclick="goToRow()">
-                    <i class="fa-solid fa-arrow-right"></i>
+                <label class="oasl__label mb-0" for="wfapi_goto_row">Jump to row</label>
+                <input type="number" id="wfapi_goto_row" class="form-control form-control-sm oasl__goto" min="2" max="{{ total_filtered|add:1 }}" placeholder="—" {% if default_goto_row %}value="{{ default_goto_row }}"{% endif %}>
+                <button type="button" class="oasl__btn oasl__btn--go border" onclick="goToRow()">
+                    <i class="fa-solid fa-arrow-right"></i><span class="visually-hidden">Go</span>
                 </button>
             </div>
         </div>
@@ -329,14 +316,11 @@
         {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="wf_orders_api" %}
 
         {% else %}
-        <!-- No business selected: prompt to pick one -->
-        <div class="woa__card">
-            <div class="woa__card-body">
-                <div class="woa__empty">
-                    <i class="fa-solid fa-arrow-pointer"></i>
-                    <h3>Select a Business</h3>
-                    <p>Choose an approved API business above to load their live orders.</p>
-                </div>
+        <div class="oasl__sheet">
+            <div class="oasl__empty">
+                <i class="fa-solid fa-store"></i>
+                <p class="oasl__empty-title">Pick a store to compare</p>
+                <p class="oasl__empty-text">Choose one of the connected stores above. Its live orders load straight from the platform, side by side with what EzzyDelivery already holds.</p>
             </div>
         </div>
         {% endif %}
@@ -573,6 +557,19 @@
 
 {% block extra_js %}
 <script>
+function wfEscHtml(s){ if(s===null||s===undefined) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;'); }
+
+// Row detail drawer — items + price breakdown stay out of the way until asked for.
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-oasl-expand]');
+    if (!btn) return;
+    const drawer = document.getElementById(btn.dataset.oaslExpand);
+    if (!drawer) return;
+    const open = drawer.hasAttribute('hidden');
+    drawer.toggleAttribute('hidden', !open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+});
+
 // Go to Row — calculates which page contains the given sheet row number
 function goToRow() {
     const inp = document.getElementById('wfapi_goto_row');
@@ -649,7 +646,7 @@ document.addEventListener('DOMContentLoaded', function() {
             checked.forEach(cb => body.append('platform_ids[]', cb.value));
 
             transferBtn.disabled = true;
-            transferBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Preparing...';
+            transferBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>Preparing…';
 
             fetch('{% url "workforce:import_wizard_prepare" %}', {
                 method: 'POST',
@@ -662,13 +659,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.location.href = data.redirect;
                 } else {
                     transferBtn.disabled = false;
-                    transferBtn.innerHTML = '<i class="fa-solid fa-file-import me-1"></i>Import Selected';
+                    transferBtn.innerHTML = '<i class="fa-solid fa-file-import"></i>Import into EzzyDelivery';
                     alert(data.error || 'Failed to prepare import');
                 }
             })
             .catch(err => {
                 transferBtn.disabled = false;
-                transferBtn.innerHTML = '<i class="fa-solid fa-file-import me-1"></i>Import Selected';
+                transferBtn.innerHTML = '<i class="fa-solid fa-file-import"></i>Import into EzzyDelivery';
                 alert('Network error: ' + err.message);
             });
         });
@@ -840,7 +837,7 @@ function loadPreview() {
                     th2.style.fontSize = '0.65rem';
                     th2.textContent = 'Row';
                 } else {
-                    th1.innerHTML = `<span class="text-warning fw-bold">${f.label}</span>`;
+                    th1.innerHTML = `<span class="text-warning fw-bold">${wfEscHtml(f.label)}</span>`;
                     th2.className = 'fw-normal';
                     th2.style.fontSize = '0.65rem';
                     th2.innerHTML = f.sheet_col
@@ -934,9 +931,9 @@ function loadPreview() {
                 }
                 tr.innerHTML = `
                     <td class="text-muted">${idx + 1}</td>
-                    <td>${pm.raw}</td>
-                    <td>${pm.qty}</td>
-                    <td>${pm.matched_name ? `<span class="text-success">${pm.matched_name}</span>` : '<span class="text-muted fst-italic">raw name saved in notes</span>'}</td>
+                    <td>${wfEscHtml(pm.raw)}</td>
+                    <td>${wfEscHtml(pm.qty)}</td>
+                    <td>${pm.matched_name ? `<span class="text-success">${wfEscHtml(pm.matched_name)}</span>` : '<span class="text-muted fst-italic">raw name saved in notes</span>'}</td>
                     <td>${badgeHtml}</td>
                 `;
                 matchTbody.appendChild(tr);
@@ -970,7 +967,7 @@ function toggleApiVerifyEdit(platformId, btn) {
             const td = tr.querySelector(`td[data-field="${f.name}"]`);
             if (!td) return;
             const curVal = td.textContent === '—' ? '' : td.textContent;
-            td.innerHTML = `<input type="text" class="form-control form-control-sm" style="min-width:80px;font-size:0.78rem;" value="${curVal.replace(/"/g, '&quot;')}" data-orig="${curVal.replace(/"/g, '&quot;')}">`;
+            td.innerHTML = `<input type="text" class="form-control form-control-sm" style="min-width:80px;font-size:0.78rem;" value="${wfEscHtml(curVal)}" data-orig="${wfEscHtml(curVal)}">`;
         });
     } else {
         // Save mode: read inputs, store overrides, restore to view
@@ -1228,11 +1225,11 @@ function buildMappingRows() {
 
         row.innerHTML = `
             <div style="flex:1;" class="small">
-                <span class="fw-semibold">${f.label}</span>${req}
+                <span class="fw-semibold">${wfEscHtml(f.label)}</span>${req}
             </div>
             <div style="width:30px;text-align:center;"><i class="fa-solid fa-arrow-left text-muted"></i></div>
             <div style="flex:1;">
-                <select class="form-select form-select-sm wfapi-map-field" data-field="${f.name}">
+                <select class="form-select form-select-sm wfapi-map-field" data-field="${wfEscHtml(f.name)}">
                     ${selectHtml}
                 </select>
             </div>

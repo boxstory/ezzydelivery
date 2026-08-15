@@ -643,6 +643,8 @@
 
 {% block extra_js %}
 <script>
+function wfEscHtml(s){ if(s===null||s===undefined) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;'); }
+
 document.addEventListener('DOMContentLoaded', function() {
   // ===================== COD SELECTION (Desktop) =====================
   const selectAllCheckbox = document.getElementById('cod-select-all');
@@ -736,10 +738,10 @@ document.addEventListener('DOMContentLoaded', function() {
       tr.style.borderBottom = '1px solid #f3f4f6';
       tr.innerHTML = `
         <td class="py-2 ps-3 text-muted">${idx}</td>
-        <td class="py-2"><span style="font-family: monospace; font-size: 0.8rem;">${taskNum}</span></td>
+        <td class="py-2"><span style="font-family: monospace; font-size: 0.8rem;">${wfEscHtml(taskNum)}</span></td>
         <td class="py-2">
-          <div class="fw-medium">${customer}</div>
-          <div class="text-muted" style="font-size: 0.75rem;"><i class="fa-solid fa-phone me-1"></i>${mobile}</div>
+          <div class="fw-medium">${wfEscHtml(customer)}</div>
+          <div class="text-muted" style="font-size: 0.75rem;"><i class="fa-solid fa-phone me-1"></i>${wfEscHtml(mobile)}</div>
         </td>
         <td class="py-2 pe-3 text-end fw-semibold" style="color: #d97706;">${amount.toFixed(0)} QR</td>
       `;

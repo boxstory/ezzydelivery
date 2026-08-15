@@ -1,0 +1,112 @@
+{% comment %}
+Purpose: "About this page" notes panel for dashboard.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_dispatch_dashboard_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The live control room for <strong>order batching</strong>. When an order is verified, the engine
+            looks for another order leaving the <strong>same pickup location for the same zone</strong>, holds
+            the pair for a few minutes in case a second one turns up, releases it, then hands it to a rider who
+            is clocked in at that location. This page shows that machinery as it runs right now — today's batch
+            counts, every batch still in play, who is on shift, and what the engine did last. Nothing is edited
+            here; the batch, shift and config pages do the editing.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">New shift</dt>
+                        <dd class="wfnote__def">Schedules a rider at one pickup location for a block of time.
+                            A rider with no shift can never be given a batch, so this is the first thing to fix
+                            when batches pile up in <em>Ready</em>.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Quick links</dt>
+                        <dd class="wfnote__def">All Batches (full history and filters), Manage Shifts, KPI
+                            Dashboard, and Config — the per-location batching rules.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Tiles</dt>
+                        <dd class="wfnote__def">Counts of batches <strong>created since midnight</strong> broken
+                            down by status, plus the number of shifts currently sitting in Active.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Active batches</dt>
+                        <dd class="wfnote__def">The 30 newest batches that are still holding, ready, assigned or
+                            in progress. It reloads itself every 10 seconds; the refresh button forces it now.
+                            The eye icon opens the batch.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Countdown</dt>
+                        <dd class="wfnote__def">On a holding batch, the time left before it is released
+                            automatically. At zero it reads "Releasing…" until the background worker picks it up.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Active riders</dt>
+                        <dd class="wfnote__def">Everyone on an Active shift, their store and batches done so far.
+                            Reloads every 30 seconds.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Activity</dt>
+                        <dd class="wfnote__def">The last 20 dispatch log entries across the whole system —
+                            batches created, released, assigned, cancelled, shifts started and ended.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Batch statuses</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Holding</dt>
+                        <dd class="wfnote__def">The hold timer is running and the batch still has room for
+                            another order going to the same zone.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Ready</dt>
+                        <dd class="wfnote__def">Released — the batch is closed and waiting for a rider. Nobody
+                            has it yet.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assigned</dt>
+                        <dd class="wfnote__def">A rider has been given the batch and the delivery tasks for its
+                            orders have moved to in-transit under that rider.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">In progress</dt>
+                        <dd class="wfnote__def">The rider pressed start in the app and is out with the orders.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Completed</dt>
+                        <dd class="wfnote__def">The rider closed the batch. This is the point where the shift's
+                            batch and order counters go up.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pending</dt>
+                        <dd class="wfnote__def">A batch that exists but has not started its timer yet — normally
+                            visible for a fraction of a second.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>The tiles count <strong>today only</strong>, but the active batch list ignores dates — a batch
+                    left open from yesterday shows in the list and not in the tiles.</li>
+                <li><strong>Released is not assigned.</strong> Releasing only closes the batch to new orders; a
+                    separate background pass hands it to a rider a few seconds later.</li>
+                <li>Assignment only ever considers riders with a shift in <em>Active</em> status at that batch's
+                    own pickup location, who are approved, under their order and batch limits, and who have
+                    enough COD headroom for the cash on the batch.</li>
+                <li>All the timing — releasing expired holds, SLA rescues, auto-assignment, ending shifts — runs
+                    on background workers. If those are stopped, batches sit where they are and only a manual
+                    release on the batch page will move them.</li>
+                <li>Cancelled batches disappear from this monitor. Use <strong>All Batches</strong> with the
+                    status filter to find them again.</li>
+            </ul>
+        </section>
+    

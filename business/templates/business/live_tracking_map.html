@@ -1,26 +1,17 @@
 {% extends "business_dashboard_base.html" %}
-{% load static %}
+{% load static business_console %}
 
 {% block title %}Live Tracking - {% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="{% static 'business/css/business-live-tracking.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-live-tracking.css' %}?v=20260729a">
 {% endblock %}
 
 
 {% block content %}
-<div class="bcon__page pt-3">
-  <div class="bcon__header">
-    <div class="bcon__header-main">
-      <div class="bcon__eyebrow">
-        <span>Operations</span>
-        <span class="bcon__eyebrow-sep"></span>
-        <span class="bcon__eyebrow-live"><i class="fa-solid fa-circle bcon__i-success bcon__dot"></i> Live · auto-refresh 30s</span>
-      </div>
-      <h1 class="bcon__title"><i class="fa-solid fa-map-location-dot"></i> Live Tracking</h1>
-    </div>
-  </div>
+<div class="bcon__page">
+  {% bconheader eyebrow="Operations" live="Live · auto-refresh 30s" icon="fa-solid fa-map-location-dot" title="Live Tracking" subtitle="Follow every delivery in progress on the map, refreshed automatically." %}{% endbconheader %}
 </div>
 
 <div id="blt-container">

@@ -16,6 +16,7 @@ from django.db.models import Q, Count, Prefetch
 
 from warehouse import models as warehouse_models
 from business import models as business_models
+from core.validators import safe_int
 
 logger = logging.getLogger('warehouse')
 
@@ -86,7 +87,7 @@ def seller_warehouse_links(request):
 
     # Pagination — ?per_page= validated against the shared pager options
     try:
-        per_page = int(request.GET.get('per_page', 25))
+        per_page = safe_int(request.GET.get('per_page'), default=25, minimum=1, maximum=200)
     except (ValueError, TypeError):
         per_page = 25
     if per_page not in (10, 25, 50, 100):
@@ -192,7 +193,7 @@ def seller_warehouse_link_add(request):
             business_id = request.POST.get('business')
             warehouse_id = request.POST.get('warehouse')
             default_location_id = request.POST.get('default_location')
-            priority = int(request.POST.get('priority', 0))
+            priority = safe_int(request.POST.get('priority'), default=0, minimum=0, maximum=9999)
             is_default = request.POST.get('is_default') == 'on'
             is_active = request.POST.get('is_active', 'on') == 'on'
             notes = request.POST.get('notes', '').strip()
@@ -299,7 +300,7 @@ def seller_warehouse_link_edit(request, pk):
     if request.method == 'POST':
         try:
             default_location_id = request.POST.get('default_location')
-            priority = int(request.POST.get('priority', 0))
+            priority = safe_int(request.POST.get('priority'), default=0, minimum=0, maximum=9999)
             is_default = request.POST.get('is_default') == 'on'
             is_active = request.POST.get('is_active', 'on') == 'on'
             notes = request.POST.get('notes', '').strip()

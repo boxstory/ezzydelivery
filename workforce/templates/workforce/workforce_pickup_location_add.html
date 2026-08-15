@@ -1,5 +1,11 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff products console for one business — add a product and browse that business's catalogue.
+Used by: workforce_views.workforce_pickup_location_add at /workforce/documents/business-licenses/<id>/add-pickup-location/
+Notes: The view name and URL are historical — the page manages products, not pickup locations. The page-notes
+       card (wfnote__, shared) sits under the header, hidden on load, toggled by the header help button.
+{% endcomment %}
 
 {% block title %}Products - {{ business.business_name }}{% endblock title %}
 
@@ -27,7 +33,16 @@
                 Business: <strong>{{ business.business_name }}</strong> ({{ business.business_code }})
             </p>
         </div>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_pickup_location_add_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
+
+    <div class="wfnote" id="workforce_pickup_location_add_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_pickup_location_add_card_notes' %}" hidden></div>
 
     <div class="wfp__layout">
         <!-- Left Column: Add Product Form -->

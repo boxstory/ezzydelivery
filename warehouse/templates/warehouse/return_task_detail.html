@@ -24,13 +24,24 @@
         <p class="wh__subtitle">{{ return_task.return_number }} &mdash; {{ return_task.warehouse.name }}</p>
       </div>
     </div>
+    <div class="d-flex align-items-center gap-2">
     <span class="wh__badge pkl__badge--lg
       {% if return_task.status == 'completed' %}wh__badge--success
       {% elif return_task.status == 'in_progress' %}wh__badge--primary
       {% else %}wh__badge--warning{% endif %}" id="rtn_status_badge">
       {{ return_task.get_status_display }}
     </span>
+      <button type="button" class="wfnote__btn" data-wfnote-toggle
+              aria-expanded="false" aria-controls="warehouse_return_task_detail_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
+    </div>
   </div>
+
+  <div class="wfnote wfnote--inset" id="warehouse_return_task_detail_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_return_task_detail_card_notes' %}" hidden></div>
 
   <!-- Info Card -->
   <div class="wh__card mb-3">

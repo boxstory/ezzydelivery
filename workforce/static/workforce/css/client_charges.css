@@ -1,0 +1,174 @@
+/* Purpose: The few things the receivable leg needs that the teller layer does not already carry. */
+/* Used by: client_charges_collect.html, client_charge_invoices.html, client_charge_invoice.html */
+/* Notes: Loaded AFTER cod_business_settlement.css / cod_payout_invoice.css and borrows their --tlr-* tokens.
+   Status reads as swatch + word, never colour alone; the payment desk is screen-only and never prints. */
+
+/* ── Payment mode: swatch + word, so the column is readable without colour ── */
+.ccc__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+}
+.ccc__swatch {
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--tlr-rule-strong);
+  background: transparent;
+}
+.ccc__mode--cod .ccc__swatch { background: var(--tlr-rule-strong); }
+.ccc__mode--prepaid .ccc__swatch { background: var(--tlr-brass); border-color: var(--tlr-brass); }
+
+/* COD on this desk is context, not money being billed — it reads back a step. */
+.ccc__num--context { color: var(--tlr-muted); }
+
+/* ── "Verified only" toggle in the filter window ────────────────────────── */
+.ccc__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  margin: 0 0.5rem 0 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ── Invoice status: one hairline pill, no candy ────────────────────────── */
+.ccc__pill {
+  display: inline-block;
+  font-family: var(--tlr-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--tlr-rule-strong);
+  color: var(--tlr-muted);
+}
+.ccc__pill--issued { color: var(--tlr-ink); border-color: var(--tlr-ink); }
+.ccc__pill--part_paid { color: var(--tlr-brass-deep); border-color: var(--tlr-brass); }
+.ccc__pill--paid { color: var(--tlr-brass-deep); border-color: var(--tlr-brass); background: var(--tlr-brass-soft); }
+.ccc__pill--void { color: var(--tlr-void); border-color: rgba(158, 59, 43, 0.4); }
+
+.ccc__age {
+  font-family: var(--tlr-mono);
+  font-size: 0.64rem;
+  color: var(--tlr-muted);
+  margin-left: 0.35rem;
+}
+
+/* ── Invoice document extras ─────────────────────────────────────────────── */
+.ccc__inv-note {
+  font-size: 0.82rem;
+  color: #5c6560;
+  border-left: 2px solid #d7dbd2;
+  padding-left: 0.7rem;
+  margin: 1rem 0 0;
+}
+
+.ccc__btn-void { color: #9E3B2B; border-color: rgba(158, 59, 43, 0.4); }
+.ccc__btn-void:hover { color: #9E3B2B; border-color: #9E3B2B; }
+
+/* Payment log sits below the sheet: a working record, not part of the document. */
+.ccc__paylog {
+  max-width: 900px;
+  margin: 1.25rem auto 3rem;
+  background: #FBFCF9;
+  border: 1px solid #B9C0B1;
+  padding: 1rem 1.15rem;
+}
+.ccc__paylog-title {
+  font-family: 'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 0.6rem;
+  color: #16221D;
+}
+.ccc__paylog-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.ccc__paylog-table th {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6B7468;
+  font-weight: 400;
+  text-align: left;
+  border-bottom: 1px solid #D5DACE;
+  padding: 0.3rem 0.5rem;
+}
+.ccc__paylog-table td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid #E6E9E1;
+  color: #16221D;
+}
+
+/* ── Record-payment dialog ───────────────────────────────────────────────── */
+.ccc__paybox {
+  background: #FBFCF9;
+  border: 1px solid #B9C0B1;
+  border-radius: 0;
+  color: #16221D;
+}
+.ccc__paybox-title {
+  font-family: 'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.ccc__paybox-due {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6B7468;
+  margin: 0 0 0.85rem;
+}
+.ccc__paybox-due strong { color: #8A6526; }
+
+.ccc__label {
+  display: block;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6B7468;
+  margin: 0 0 0.3rem;
+}
+.ccc__input {
+  width: 100%;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 0.9rem;
+  color: #16221D;
+  background-color: #FFFFFF;
+  border: 1px solid #B9C0B1;
+  border-radius: 0;
+  padding: 0.45rem 0.6rem;
+}
+.ccc__input:focus { outline: none; border-color: #16221D; }
+
+.ccc__primary {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #EEF1EA;
+  background: #16221D;
+  border: none;
+  padding: 0.6rem 1.1rem;
+  cursor: pointer;
+}
+.ccc__primary:hover:not(:disabled) { background: #0c1813; }
+.ccc__primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+@media print {
+  .ccc__paylog { display: none; }
+}

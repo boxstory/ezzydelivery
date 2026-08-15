@@ -146,11 +146,17 @@ class DriverSettlementAdmin(admin.ModelAdmin):
 
 @admin.register(fleet_models.DriverLocation)
 class DriverLocationAdmin(admin.ModelAdmin):
-    list_display = ('driver', 'latitude', 'longitude', 'accuracy', 'speed', 'task', 'created_at')
-    list_filter = ('created_at',)
+    list_display = ('driver', 'latitude', 'longitude', 'accuracy', 'speed', 'task',
+                    'fixed_at', 'created_at', 'queued', 'lag_seconds')
+    list_filter = ('queued', 'created_at')
     raw_id_fields = ('driver', 'task')
-    readonly_fields = ('created_at',)
+    readonly_fields = ('created_at', 'lag_seconds')
     list_per_page = 50
+
+    @admin.display(description='Lag (s)')
+    def lag_seconds(self, obj):
+        """Seconds the fix spent on the device — large values mean a replayed ping."""
+        return obj.lag_seconds
 
 
 @admin.register(fleet_models.ZoneEarningsRate)

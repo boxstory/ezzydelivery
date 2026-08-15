@@ -1,0 +1,74 @@
+{% comment %}
+Purpose: "About this page" notes panel for zone_groups.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "delivery_zone_groups_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      A <strong>zone group</strong> is a bundle of zone numbers given a name people actually use — West Bay,
+      Industrial Area, Lusail and so on. Groups exist because nobody thinks in zone numbers: drivers pick the
+      groups they are willing to work in, and the zone filters elsewhere in the dashboard are built from
+      them. Each card here is one group, with its zones listed inside it. This page is for looking things up,
+      not editing — the groups themselves are maintained in the admin.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Search</dt>
+            <dd class="wfnote__def">Matches a group's name or its description. <em>Clear</em> puts every
+              group back.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Read a card</dt>
+            <dd class="wfnote__def">Each card shows the group's description, how many zones it holds, its
+              display order, and chips for the zones themselves — the first ten by name and number, then a
+              <em>+n more</em> chip if there are others.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Counters</dt>
+            <dd class="wfnote__def">Total and active groups across the whole system, regardless of what the
+              search is showing.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What the labels mean</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Active</dt>
+            <dd class="wfnote__def">The group is in play — it appears in driver preferences and in the group
+              filters on the zone list and zone map.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Inactive</dt>
+            <dd class="wfnote__def">Kept for the record but hidden from those pickers. It still shows here.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Zones</dt>
+            <dd class="wfnote__def">How many zone numbers the group covers.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Display order</dt>
+            <dd class="wfnote__def">Where the group sits in every list that shows groups — lower numbers come
+              first, and that is the order these cards are in.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>Groups do not affect how an address is resolved to a zone. That is done from zone
+          <strong>boundaries</strong>, on the zone list and polygon editor. Groups only describe coverage.</li>
+        <li>A zone can belong to several groups, and plenty belong to none — a zone missing from every card
+          is not an error.</li>
+        <li>Making a group inactive quietly removes it from driver-preference and filter dropdowns, which
+          changes who sees what. Nothing on this page warns you about that.</li>
+        <li>The chips only show the first ten zones. Use the zone list, filtered by group, to see them all.</li>
+      </ul>
+    </section>
+  

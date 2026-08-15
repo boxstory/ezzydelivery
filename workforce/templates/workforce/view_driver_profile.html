@@ -1,5 +1,6 @@
 {# Purpose: Staff read-only dossier for vetting a driver applicant (verification review) #}
 {# Used by: workforce.views.view_user_driver_profile — /workforce/verification/<id>/driver-profile/ #}
+{# Notes: Carries the shared wfnote__ page-notes card under the hero, toggled by the hero help button #}
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
@@ -25,8 +26,17 @@
             <span class="dvp__hero-applied">
                 {% if profile.verification_applied_at %}Applied {{ profile.verification_applied_at|date:"d M Y, g:i A" }}{% else %}Not yet applied{% endif %}
             </span>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_view_driver_profile_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </header>
+
+    <div class="wfnote" id="workforce_view_driver_profile_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_view_driver_profile_card_notes' %}" hidden></div>
 
     <div class="dvp__layout">
 
@@ -173,10 +183,7 @@
                     <div class="d-flex flex-wrap align-items-center gap-3">
                         <span class="dvp__coords">{{ registration_location.lat }}, {{ registration_location.lng }}</span>
                         {% if registration_location.accuracy_m %}<span class="dvp__coords-acc">&plusmn;{{ registration_location.accuracy_m }} m</span>{% endif %}
-                        <a class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener"
-                           href="https://www.google.com/maps?q={{ registration_location.lat }},{{ registration_location.lng }}">
-                            <i class="fa-solid fa-map me-1"></i>Open in Google Maps
-                        </a>
+                        {% include "includes/components/_map_point.html" with uid=driver.driver_id|stringformat:"s"|add:"-reg" lat=registration_location.lat lon=registration_location.lng label="Registration location" btn_label="Show on map" %}
                     </div>
                     <p class="dvp__note">Self-reported by the applicant's browser at submission — indicative only, not proof of location.</p>
                     {% else %}

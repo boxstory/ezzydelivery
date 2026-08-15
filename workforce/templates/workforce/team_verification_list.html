@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff review of business team memberships — activate, suspend or reject a member's access
+Used by: workforce_views.team_verification_list at /workforce/verification/team/
+Notes: Status changes POST to workforce:update_team_status and reload the page.
+       Carries the shared page-notes card (wfnote__) under the hero, hidden on load; the hero help
+       button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Team Verification - Staff Dashboard{% endblock title %}
 
@@ -25,7 +32,16 @@
             </div>
         </div>
     </div>
+    <button type="button" class="wfnote__btn" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_team_verification_list_card_notes"
+            title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+    </button>
 </div>
+
+<div class="wfnote" id="workforce_team_verification_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_team_verification_list_card_notes' %}" hidden></div>
 
 <!-- Filter Pills -->
 <div class="uvl__filters">

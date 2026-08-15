@@ -302,6 +302,7 @@ Format: `{type}: {description}` where type is feat/fix/refactor/docs/style/perf/
 | `apple-design/` | Apple-style fluid motion for web — springs, gestures, sheets, reduced-motion |
 | `review-animations/` | High-bar review of animation/motion code |
 | `animation-vocabulary/` | Motion-effect glossary — vague description → exact term |
+| `llm-council.md` | Convene N adversarial reviewers (default REFUTED) + synthesis — validate claims, audit a module, stress-test a plan |
 
 ### Available Commands (`.claude/commands/`)
 | Command | Description |
@@ -315,6 +316,7 @@ Format: `{type}: {description}` where type is feat/fix/refactor/docs/style/perf/
 | `/component` | Create UI components |
 | `/page` | Create new pages |
 | `/css-fix` | Fix CSS styling issues |
+| `/llm-council` | Adversarial multi-agent review council |
 
 ## SEO & AI Search
 

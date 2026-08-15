@@ -947,33 +947,12 @@
 .uvl__pill__count { background: rgba(0,0,0,0.06); border-radius: 1rem; padding: 0.05rem 0.4rem; font-size: 0.65rem; font-weight: 700; min-width: 1.25rem; text-align: center; }
 .uvl__pill--active .uvl__pill__count { background: rgba(255,255,255,0.2); }
 
-/* Secondary filter bar (search + vehicle / job / zone / account) */
-.uvl__filterbar {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-    background: #fff; border: 1px solid var(--brand-grey-200, #f0f0f0);
-    border-radius: var(--brand-radius-md, 0.75rem);
-    padding: 0.6rem 0.75rem; margin-bottom: 0.85rem;
-}
-.uvl__filterbar-search { position: relative; flex: 1 1 220px; min-width: 180px; }
-.uvl__filterbar-search-icon {
-    position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
-    font-size: 0.75rem; color: var(--brand-grey-450, #9ca3af); pointer-events: none;
-}
-.uvl__filterbar-search .form-control { padding-left: 1.9rem; font-size: 0.8rem; }
-.uvl__filterbar-select { flex: 0 1 auto; width: auto; min-width: 130px; font-size: 0.8rem; }
-.uvl__filterbar .form-control:focus,
-.uvl__filterbar .form-select:focus { border-color: var(--brand-primary, #f7c000); box-shadow: none; }
-.uvl__filterbar-apply {
-    font-size: 0.8rem; font-weight: 600; white-space: nowrap;
-    background: var(--brand-navy, #001f3f); border: 1px solid var(--brand-navy, #001f3f); color: #fff;
-}
-.uvl__filterbar-apply:hover { background: var(--brand-navy-light, #003366); border-color: var(--brand-navy-light, #003366); color: #fff; }
-.uvl__filterbar-clear {
-    font-size: 0.8rem; font-weight: 600; white-space: nowrap;
-    background: var(--brand-grey-100, #fafafa); border: 1px solid var(--brand-grey-300, #dcdcdc);
-    color: var(--brand-grey-700, #333);
-}
-.uvl__filterbar-clear:hover { background: var(--brand-secondary, #fff7d6); color: var(--brand-grey-800, #1f1f1f); }
+/* The old .uvl__filterbar block was removed 2026-08-01. Its selects are enhanced
+   by the global Select2 initialiser, which hides the native control and inserts
+   a `width: 100% !important` container — so every picker claimed a whole flex
+   line and the bar rendered 285px tall on desktop. The pg-filter system below
+   already solves exactly that (see its Select2 section); the driver verification
+   bar now uses it, and these rules had no other caller. */
 
 /* Search / Filter Toolbar — view width split proportionally across elements */
 .uvl__toolbar {
@@ -1120,6 +1099,20 @@ input.uvl__date:focus {
 .uvl__scope--ok      { background: #dcfce7; color: #166534; }
 .uvl__scope--warn    { background: #fef3c7; color: #92400e; }
 .uvl__scope--neutral { background: var(--brand-grey-100, #fafafa); color: var(--brand-grey-600, #555); }
+/* Signup origin — a quiet aside on the role-profile heading, never a badge.
+   The heading is uppercase flex, so the note opts out and truncates instead
+   of pushing the completion percentage off the row. */
+.uvl__origin-note {
+    font-size: 0.65rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--brand-grey-400, #b0b0b0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.uvl__progress-wrap .uvl__section-head { min-width: 0; }
 
 /* Team Actions */
 .uvl__team-actions { padding: 0.25rem 0.5rem 0.125rem; border-top: 1px dashed var(--brand-grey-200, #e5e5e5); }
@@ -1896,118 +1889,474 @@ textarea.uvl__modal__textarea:focus {
     }
 }
 
-/* ---------- FILTER SECTION (ops-console redesign) ---------- */
+/* ---------- FILTER SECTION (ops-console) ----------
+   Shared by the six staff order lists. The field IDs and .pg-filter__date-btn
+   are a contract with the pg-filter block in workforce.js — do not rename.
+   Yellow appears in exactly one place here: the rule on the applied strip, so
+   the accent carries the meaning "this list is filtered". */
 .pg-filter {
     background: #fff;
     border: 1px solid var(--brand-grey-250, #dee2e6);
-    border-left: 3px solid var(--brand-primary);
-    border-radius: var(--brand-radius-md, 0.75rem);
-    padding: 0.6rem 0.75rem;
-    margin-bottom: 0.6rem;
-    box-shadow: 0 1px 3px rgba(0, 31, 63, 0.05);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    margin-bottom: 0.375rem;
+    box-shadow: 0 1px 2px rgba(0, 31, 63, 0.04);
+}
+.pg-filter__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
 }
 
-/* Filter rows — fill full width, no scroll */
+/* Rows wrap rather than crush — the business select alone wants ~17rem, and
+   nowrap used to squeeze the two text inputs to unusable slivers. */
 .pg-filter__row {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.375rem;
     width: 100%;
     min-width: 0;
 }
+/* Fields are capped, not greedy — a free-text box stretched across half the
+   viewport reads as a mistake, and the row loses its grouping.
+
+   Each field is a small basis plus a max-width cap rather than one fixed width.
+   The cap is the desktop size, so a wide screen looks exactly as before; the
+   small basis is what a laptop needs. This matters because `flex-wrap: wrap`
+   breaks a line as soon as the bases overflow — it does not shrink first — so
+   sizing every field at its desktop width made the whole bar drop to two and
+   three rows below ~1200px instead of tightening up. */
 .pg-filter__row > * { min-width: 0; }
-/* Text inputs grow to fill remaining space */
-.pg-filter__row input[type="text"] { flex: 1 1 80px; }
-/* Status selects share space equally */
-.pg-filter__row select:not(.pg-filter__select-biz) { flex: 1 1 90px; }
+.pg-filter__row input[type="text"] { flex: 1 1 9rem; max-width: 13rem; }
+.pg-filter__row select:not(.pg-filter__select-biz) { flex: 1 1 8rem; max-width: 11rem; }
+.pg-filter__select-biz { flex: 1 1 12rem; max-width: 22rem; }
+.pg-filter__input-sm   { flex: 0 1 7.5rem; }
+#pgf_dlCode            { flex: 0 1 8rem; max-width: 9rem; }
+
+/* Select2 sizing lives further down, with the rest of the picker overrides. */
+
+/* Pushes the status pair to the right, so it lines up under the row-1 actions */
 .pg-filter__sep {
     width: 1px;
-    height: 1.4rem;
-    background: var(--brand-grey-300);
+    align-self: stretch;
+    min-height: 1.5rem;
+    margin-left: auto;
+    background: var(--brand-grey-250, #dee2e6);
+    flex-shrink: 0;
+}
+.pg-filter__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-left: auto;
+}
+/* Cluster label — names a group of controls rather than each field, so the bar
+   is scannable without growing a second line of chrome per input. Same
+   treatment as the applied-strip label, which is the bar's existing label
+   vocabulary. */
+.pg-filter__label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--brand-grey-500);
+    white-space: nowrap;
     flex-shrink: 0;
 }
 
-/* Filter row field sizing */
-.pg-filter__select-biz { flex: 0 0 280px; }
-.pg-filter__input-sm   { flex: 1 1 60px; }
-#pgf_dlCode            { flex: 0 0 150px; }
-
-/* Date preset buttons — segmented control */
+/* Date presets — one segmented control rather than six loose buttons.
+   Height is pinned to the bar's 1.75rem field so every control in the two rows
+   sits on one baseline; left to its own padding it rendered 4px short. */
+.pg-filter__seg {
+    display: inline-flex;
+    align-items: stretch;
+    height: 1.75rem;
+    flex-shrink: 0;
+    background: #fff;
+    border: 1px solid var(--brand-grey-250, #dee2e6);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    overflow: hidden;
+}
 .pg-filter__date-btn {
+    display: inline-flex;
+    align-items: center;
     font-size: 0.68rem;
     font-weight: 600;
-    padding: 0.15rem 0.5rem;
-    border: 1px solid var(--brand-grey-250, #dee2e6);
-    border-radius: 0.4rem;
+    padding: 0 0.5rem;
+    border: 0;
+    border-left: 1px solid var(--brand-grey-250, #dee2e6);
     background: #fff;
     color: var(--brand-grey-600);
     cursor: pointer;
     white-space: nowrap;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-    line-height: 1.5;
+    line-height: 1;
+    transition: background 0.15s ease, color 0.15s ease;
 }
+.pg-filter__date-btn:first-child { border-left: 0; }
 .pg-filter__date-btn:hover {
     background: var(--brand-grey-100);
-    border-color: var(--brand-grey-400);
     color: var(--brand-navy);
 }
 .pg-filter__date-btn.active {
     background: var(--brand-navy);
     color: #fff;
-    border-color: var(--brand-navy);
-    box-shadow: inset 0 -2px 0 var(--brand-primary);
+}
+.pg-filter__date-btn:focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: -2px;
 }
 
 /* Compact inputs & selects inside filter */
 .pg-filter .form-control,
 .pg-filter .form-select {
-    height: 1.75rem !important;
-    padding: 0.1rem 0.45rem !important;
+    height: 1.75rem;
+    padding: 0.1875rem 0.5rem;
     font-size: 0.78rem;
-    min-height: unset !important;
+    min-height: 0;
     border: 1px solid var(--brand-grey-300);
-    border-radius: 0.4rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
     color: var(--brand-grey-800);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+/* Longhand only — a background shorthand would wipe the select arrow tile. */
+.pg-filter .form-select { padding-right: 1.5rem; }
 .pg-filter .form-control:focus,
 .pg-filter .form-select:focus {
     border-color: var(--brand-primary);
-    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.2);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.18);
 }
+.pg-filter .form-control::placeholder { color: var(--brand-grey-450, #9ca3af); }
+
+/* ── Select2 pickers ──────────────────────────────────────────
+   The searchable filters are enhanced by the global Select2 initialiser, which
+   hides the native <select> and inserts a sibling container. Two consequences,
+   both fixed here rather than in select2-filters.css, whose defaults are right
+   for the stacked filter forms elsewhere:
+
+   1. Sizing rules written for the native control land on a display:none
+      element, and the container keeps `width: 100%` — inside this flex row that
+      made every picker eat a whole line, so the two-row bar rendered as five.
+   2. select2-filters.css sets a 34px control to match the taller filter bars.
+      This bar runs 1.75rem (28px) fields, so the pickers stood proud of the
+      text inputs beside them and the row never sat on one baseline.
+
+   So: flex widths mirroring the native rules above, and the bar's own control
+   metrics. Select2 writes width inline, hence the !important. */
+.pg-filter__row > .select2-container.ez-filter-select {
+    width: auto !important;
+    flex: 1 1 8rem;
+    max-width: 11rem;
+}
+/* Keyed off the class, not the id — the print-labels bar uses this same block
+   with plf_business rather than pgf_business. */
+.pg-filter__row > .pg-filter__select-biz + .select2-container.ez-filter-select {
+    flex: 1 1 12rem;
+    max-width: 22rem;
+}
+
+.pg-filter__row .select2-container.ez-filter-select .select2-selection--single {
+    height: 1.75rem;
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.pg-filter__row .select2-container.ez-filter-select .select2-selection--single .select2-selection__rendered {
+    height: 1.625rem;
+    line-height: 1.625rem;
+    padding-left: 0.5rem;
+    padding-right: 1.5rem;
+    font-size: 0.78rem;
+    color: var(--brand-grey-800);
+}
+.pg-filter__row .select2-container.ez-filter-select .select2-selection--single .select2-selection__arrow {
+    height: 1.625rem;
+    right: 0.25rem;
+}
+/* Same yellow ring the inputs beside it use, so focus reads as one system. */
+.pg-filter__row .select2-container.ez-filter-select.select2-container--focus .select2-selection--single,
+.pg-filter__row .select2-container.ez-filter-select.select2-container--open .select2-selection--single {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.18);
+}
+/* Multi-select client. Select2 renders picked values as tags, which grows the
+   control; capped to the bar's height with the overflow scrolling inside so one
+   busy filter cannot push the whole row out of line. */
+.pg-filter__row .select2-container.ez-filter-select .select2-selection--multiple {
+    min-height: 1.75rem;
+    max-height: 1.75rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 0 0.25rem;
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    flex-wrap: nowrap;
+}
+/* A picked client is a tag. Select2 absolutely positions the remove button and
+   reserves no room for it, so the × sat on top of the first characters; and the
+   rendered list defaults to overflow:visible, so two tags spilled straight out
+   past the border of the control. Both fixed here, and a long trading name is
+   truncated rather than allowed to push the row around. */
+.pg-filter__row .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice {
+    position: relative;
+    margin: 0;
+    padding: 0 0.3rem 0 1.05rem;
+    max-width: 8.5rem;
+    font-size: 0.68rem;
+    line-height: 1.25rem;
+    background: var(--brand-grey-100);
+    border: 1px solid var(--brand-grey-300);
+    border-radius: 0.25rem;
+    color: var(--brand-grey-800);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 1 auto;
+}
+.pg-filter__row .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice__remove {
+    position: absolute;
+    left: 0.15rem;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 0.8rem;
+    line-height: 1;
+    color: var(--brand-grey-500);
+}
+.pg-filter__row .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice__remove:hover {
+    color: var(--brand-danger);
+    background: none;
+}
+/* Select2 4.1 builds the inline search as an auto-sizing <textarea>, which
+   computes ~88px tall. Inside a 28px control that pushed the placeholder below
+   the visible strip, so the client picker rendered as a blank box with no hint
+   of what it was. Pinned to one line, and the placeholder given the same grey
+   as the text inputs beside it. */
+.pg-filter__row .select2-container.ez-filter-select .select2-search--inline {
+    display: flex;
+    align-items: center;
+    flex: 1 1 4rem;
+    min-width: 2rem;
+}
+.pg-filter__row .select2-container.ez-filter-select .select2-search--inline .select2-search__field {
+    margin: 0;
+    padding: 0;
+    height: 1.5rem !important;
+    min-height: 0;
+    line-height: 1.5rem;
+    font-size: 0.78rem;
+    resize: none;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.pg-filter__row .select2-container.ez-filter-select .select2-search--inline .select2-search__field::placeholder {
+    color: var(--brand-grey-450, #9ca3af);
+}
+/* Select2 builds a multi-select's search as a full-width textarea inside the
+   control, so clicking the client picker parked a blinking cursor in a field
+   that still read "All Businesses" — every other picker on this bar keeps its
+   search inside the dropdown and shows no caret. Hidden while the placeholder
+   is showing; the moment anything is typed the placeholder goes and the caret
+   comes back, so typing never feels dead. */
+.pg-filter__row .select2-container.ez-filter-select .select2-search__field:placeholder-shown {
+    caret-color: transparent;
+}
+/* Without an arrow the multi picker reads as a text box, not something you open
+   — the single-value pickers next to it all carry one. */
+.pg-filter__row .select2-container.ez-filter-select .select2-selection--multiple::after {
+    content: "";
+    flex: 0 0 auto;
+    width: 0;
+    height: 0;
+    margin-left: auto;
+    margin-right: 0.15rem;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--brand-grey-450, #9ca3af);
+}
+.pg-filter__row .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__rendered {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0;
+    margin: 0;
+    flex-wrap: nowrap;
+    /* Select2 leaves this visible, which let the tags escape the control. */
+    overflow: hidden;
+    min-width: 0;
+}
+
+/* Checkbox-dropdown filters (msf) sitting in a filter row take the bar's
+   metrics too — left to their own stylesheet they rendered full-width and each
+   one claimed a line. */
+.pg-filter__row .msf { flex: 0 1 9rem; min-width: 0; }
+.pg-filter__row .msf__toggle {
+    width: 100%;
+    height: 1.75rem;
+    padding: 0 0.5rem;
+    font-size: 0.78rem;
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    background: #fff;
+    color: var(--brand-grey-800);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.pg-filter__row .msf__toggle-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pg-filter__row .msf__caret { margin-left: auto; font-size: 0.6rem; color: var(--brand-grey-450, #9ca3af); }
+
+/* An unset picker is a placeholder, not a value — it should read as quietly as
+   the "DL Code…" and "Name / Mobile…" placeholders it sits between. */
+.pg-filter__row .select2-container.ez-filter-select .select2-selection__placeholder,
+.pg-filter__row .select2-container.ez-filter-select .select2-selection__rendered[title="All Businesses"],
+.pg-filter__row .select2-container.ez-filter-select .select2-selection__rendered[title="Order Status"],
+.pg-filter__row .select2-container.ez-filter-select .select2-selection__rendered[title="DL Status"] {
+    color: var(--brand-grey-450, #9ca3af);
+    font-size: 0.78rem;
+}
+
 /* Codes & dates read as logistics data → monospace */
 .pg-filter #pgf_dlCode,
 .pg-filter input[type="date"] {
     font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
     letter-spacing: -0.01em;
 }
-.pg-filter .btn-sm {
-    padding: 0.2rem 0.5rem !important;
-    font-size: 0.78rem;
-    transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
-}
-/* Primary search: navy plate with a yellow base rule */
-.pg-filter .btn-dark {
-    background: var(--brand-navy);
-    border: none;
-    border-bottom: 2px solid var(--brand-primary);
-    color: #fff;
-}
-.pg-filter .btn-dark:hover {
-    background: #002a54;
-    transform: translateY(-1px);
-    box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
-}
-/* Clear: quiet outline → navy on hover */
-.pg-filter .btn-outline-secondary {
-    border-color: var(--brand-grey-300);
-    color: var(--brand-grey-600);
-}
-.pg-filter .btn-outline-secondary:hover {
+
+/* Icon actions — quiet by default; the submit is the one filled plate */
+.pg-filter__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    font-size: 0.75rem;
     background: var(--brand-grey-100);
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    color: var(--brand-grey-600);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.pg-filter__btn:hover {
+    background: #fff;
     border-color: var(--brand-navy);
     color: var(--brand-navy);
+}
+.pg-filter__btn--go {
+    background: var(--brand-navy);
+    border-color: var(--brand-navy);
+    color: #fff;
+}
+.pg-filter__btn--go:hover {
+    background: var(--brand-navy-light, #003366);
+    border-color: var(--brand-navy-light, #003366);
+    color: #fff;
+}
+
+/* Applied strip — folded into the same card so the bar reads as one object */
+.pg-filter__applied {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    background: var(--brand-grey-50, #f8f9fa);
+    border-top: 1px solid var(--brand-grey-200);
+    border-left: 3px solid var(--brand-primary);
+    border-radius: 0 0 var(--brand-radius-sm, 0.5rem) var(--brand-radius-sm, 0.5rem);
+}
+.pg-filter__applied-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--brand-grey-500);
+    white-space: nowrap;
+}
+/* Plain sentence inside the applied strip — used where the strip explains a
+   default range rather than listing removable filter tags. */
+.pg-filter__hint {
+    font-size: 0.7rem;
+    color: var(--brand-grey-600);
+}
+/* Page size. Sits in the applied strip rather than the filter rows — it changes
+   how much of the result you see, not what the result is. */
+.pg-filter__perpage {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+.pg-filter__perpage .form-select {
+    width: auto;
+    height: 1.5rem;
+    padding: 0 1.25rem 0 0.375rem;
+    font-size: 0.7rem;
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+}
+/* With a page-size control present the clear-all no longer needs the push. */
+.pg-filter__perpage + .pg-filter__clear-all { margin-left: 0.75rem; }
+.pg-filter__clear-all {
+    margin-left: auto;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--brand-grey-600);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+}
+.pg-filter__clear-all:hover { color: var(--brand-danger); }
+
+@media (max-width: 767.98px) {
+    .pg-filter__form { padding: 0.375rem; }
+    /* Everything goes full width; capped desktop widths would strand controls
+       mid-row and the right-alignment stops meaning anything once stacked. */
+    .pg-filter__select-biz,
+    .pg-filter__row input[type="text"],
+    .pg-filter__row select:not(.pg-filter__select-biz),
+    .pg-filter__row > .select2-container.ez-filter-select { flex: 1 1 100%; max-width: none; }
+    .pg-filter__actions { margin-left: 0; }
+    .pg-filter__sep { display: none; }
+
+    /* The segmented control unjoins and wraps — six segments cannot fit one
+       phone row, and joined-with-overflow clipped "Custom" off the end. */
+    .pg-filter__seg {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        overflow: visible;
+    }
+    .pg-filter__date-btn {
+        flex: 1 1 4.5rem;
+        min-height: 2.25rem;
+        border: 1px solid var(--brand-grey-250, #dee2e6);
+        border-radius: var(--brand-radius-sm, 0.5rem);
+    }
+    .pg-filter__date-btn:first-child { border-left: 1px solid var(--brand-grey-250, #dee2e6); }
+
+    /* 16px keeps iOS from zooming the viewport on focus */
+    .pg-filter .form-control,
+    .pg-filter .form-select {
+        height: 2.25rem;
+        font-size: 16px;
+    }
+    /* Two per row, but wide enough that 16px digits keep their picker icon */
+    .pg-filter input[type="date"] { flex: 1 1 45%; }
+    .pg-filter__btn { width: 2.75rem; height: 2.75rem; }
 }
 
 /* Filter Form Inputs */
@@ -2051,16 +2400,18 @@ textarea.uvl__modal__textarea:focus {
     background-size: 0.75rem;
 }
 
+/* Chip: muted label, dark value — the value is the part being read */
 .pg-filter__tag {
-    padding: 0.2rem 0.5rem;
+    padding: 0.125rem 0.375rem;
     background-color: #fff;
     border: 1px solid var(--brand-grey-250, #dee2e6);
-    border-radius: 0.4rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.375rem;
     font-size: 0.72rem;
-    color: var(--brand-grey-700);
+    font-weight: 600;
+    color: var(--brand-grey-800);
 }
 
 .pg-filter__tag strong {
@@ -2068,21 +2419,21 @@ textarea.uvl__modal__textarea:focus {
     font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--brand-navy);
+    color: var(--brand-grey-500);
 }
 
 .pg-filter__tag-close {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1rem;
-    height: 1rem;
+    width: 0.875rem;
+    height: 0.875rem;
     border-radius: 50%;
-    background: var(--brand-grey-300);
-    color: var(--brand-grey-700);
+    background: transparent;
+    color: var(--brand-grey-450, #9ca3af);
+    font-size: 0.6rem;
     text-decoration: none;
-    transition: var(--brand-transition);
-    margin-left: 0.25rem;
+    transition: background 0.15s ease, color 0.15s ease;
 }
 
 .pg-filter__tag-close:hover {
@@ -2662,35 +3013,8 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     .pgf__btn { min-height: 40px; }
 }
 
-/* Active Filters Bar */
-.active-filters-bar {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.4rem 0.7rem;
-    background: #fafbfc;
-    border: 1px solid var(--brand-grey-250, #dee2e6);
-    border-radius: var(--brand-radius-md, 0.75rem);
-    margin-bottom: 0.6rem;
-}
-
-.active-filters-label {
-    font-size: 0.62rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--brand-grey-500);
-    white-space: nowrap;
-}
-.active-filters-label i { color: var(--brand-primary); }
-
-.active-filters-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    flex: 1;
-}
+/* The old free-standing "Active filters" bar was folded into .pg-filter as
+   .pg-filter__applied — see the filter section above. */
 
 /* Quick Filter Buttons */
 .btn-outline-info {
@@ -7828,12 +8152,18 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     margin-bottom: 2px;
     flex-wrap: nowrap;
 }
+/* Now a button that opens the row's inline map, not a link out — reset the
+   button chrome so it still reads as a bare pin. */
 .orc__map-pin {
     color: var(--brand-danger);
     font-size: 0.875rem;
     line-height: 1;
     text-decoration: none;
     transition: color 0.2s ease, transform 0.2s ease;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
 }
 .orc__map-pin:hover {
     color: var(--brand-danger-dark);
@@ -7856,6 +8186,18 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     border-radius: 3px;
     letter-spacing: 0.02em;
     margin-bottom: 0;
+    white-space: nowrap;
+}
+/* Area name leading the zone line. The line is a nowrap flex row, so the name
+   is the only part allowed to shrink — the Z/S/B chip and the distance keep
+   their width instead of being pushed out by a long area name. */
+.orc__zone-name {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--brand-navy, #001f3f);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 .orc__loc-acc {
@@ -8394,9 +8736,9 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 
 /* Sort links in table headers */
 .dl-table__sort{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:0.125rem;white-space:nowrap;cursor:pointer}
-.dl-table__sort:hover{color:var(--brand-primary,#001f3f)}
+.dl-table__sort:hover{color:var(--brand-navy,#001f3f)}
 .dl-table__sort i{font-size:0.625rem;opacity:0.35;flex-shrink:0}
-.dl-table__sort--active{color:var(--brand-primary,#001f3f);font-weight:700}
+.dl-table__sort--active{color:var(--brand-navy,#001f3f);font-weight:700}
 .dl-table__sort--active i{opacity:1}
 .dl-table__sort--stack{display:inline-flex;flex-direction:column;align-items:flex-start;gap:0;position:relative;padding-right:1rem}
 .dl-table__sort--stack i{position:absolute;right:0;top:50%;transform:translateY(-50%)}
@@ -8568,6 +8910,8 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 /* Location accuracy line in the Zone / Address column */
 /* Accuracy chip now reuses .orc__loc-acc inside .dl-table__coords (same format as orders list) */
 
+/* Now a button that opens the row's inline map, not a link out — reset the
+   button chrome so it still reads as a bare pin. */
 .dl-table__location-pin {
     color: var(--brand-danger);
     font-size: 0.875rem;
@@ -8575,6 +8919,10 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     display: inline-block;
     text-decoration: none;
     transition: color 0.2s ease, transform 0.2s ease;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
 }
 
 .dl-table__location-pin:hover {
@@ -9673,8 +10021,10 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 /* ------------------------------------------------------------------
    WFD: Workforce Dashboard wrapper
    ------------------------------------------------------------------ */
+/* No padding here — the gutter lives on .wf-dashboard (dashboard-modern.css)
+   so the .wfhero band above it can run full-bleed. */
 .wfd {
-    padding: 0.5rem 1rem 1rem;
+    padding: 0;
 }
 @media (max-width: 767px) {
     .wfd {
@@ -10296,22 +10646,6 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     padding: 1rem 1.25rem;
 }
 
-/* Back link */
-.sld__back {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: #6b7280;
-    text-decoration: none;
-    margin-bottom: 1rem;
-    transition: color 0.2s;
-}
-.sld__back:hover {
-    color: #001f3f;
-}
-
 /* SLD Pills (status badges in hero) */
 .sld__pill {
     display: inline-flex;
@@ -10385,6 +10719,9 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 .sld__tab {
     display: inline-flex;
     align-items: center;
+    /* Hold full width and let the rail scroll — flex-shrink squeezed the labels
+       into each other on narrow screens. */
+    flex: 0 0 auto;
     padding: 0.5rem 0.85rem;
     background: none;
     border: none;
@@ -10970,7 +11307,7 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 .sld__modal--api-edit .form-select-sm { font-size: 0.8125rem; }
 .sld__form-note {
     background: #f9fafb;
-    border-left: 3px solid var(--brand-primary, #001f3f);
+    border-left: 3px solid var(--brand-navy, #001f3f);
     padding: 0.5rem 0.75rem;
     border-radius: 0.25rem;
 }
@@ -10982,6 +11319,112 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 /* SLD Team extras */
 .sld__team-name { font-weight: 600; color: #1a1a2e; font-size: 0.8125rem; }
 .sld__team-code { font-size: 0.7rem; color: #9ca3af; }
+
+/* SLD Team member — info / edit modals.
+   Read-only detail is a grid of white cards on the grey modal body; the edit
+   form reuses Bootstrap controls, so only the frame is styled here. */
+.sld__modal--team {
+    width: 820px;
+    max-width: 95vw;
+    display: flex;
+    flex-direction: column;
+}
+.sld__modal--team .sld__modal-body { max-height: calc(90vh - 130px); }
+.sld__tm-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.sld__tm-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 0.5rem;
+    object-fit: cover;
+    border: 1px solid #e5e7eb;
+    flex: 0 0 auto;
+}
+.sld__tm-head-name { font-size: 0.9375rem; font-weight: 700; color: #1a1a2e; }
+.sld__tm-head-sub { font-size: 0.75rem; color: #6b7280; }
+.sld__tm-head-sub i { color: #15803d; }
+.sld__tm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0.75rem;
+}
+.sld__tm-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+}
+.sld__tm-card--wide { margin-top: 0.75rem; }
+.sld__tm-card-title {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+    padding-bottom: 0.375rem;
+    margin-bottom: 0.375rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+.sld__tm-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.25rem 0;
+    font-size: 0.8125rem;
+}
+.sld__tm-row + .sld__tm-row { border-top: 1px solid #f8f9fa; }
+.sld__tm-lbl { color: #6b7280; flex: 0 0 auto; }
+.sld__tm-val {
+    color: #1a1a2e;
+    font-weight: 600;
+    text-align: right;
+    word-break: break-word;
+}
+.sld__tm-perms { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.sld__tm-perm {
+    font-family: var(--brand-font-mono, ui-monospace, monospace);
+    font-size: 0.6875rem;
+    color: #374151;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+}
+.sld__tm-account {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.sld__tm-account-lbl {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+}
+.sld__tm-account-val { font-size: 0.8125rem; font-weight: 600; color: #1a1a2e; }
+.sld__tm-form {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin: 0;
+}
+.sld__modal--team .form-label { color: #374151; margin-bottom: 0.25rem; }
+.sld__modal--team .form-control-sm,
+.sld__modal--team .form-select-sm { font-size: 0.8125rem; }
 
 /* SLD Empty message */
 .sld__empty-msg {
@@ -10996,105 +11439,168 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     display: block;
 }
 
-/* SLD Form Styles */
+/* ------------------------------------------------------------------
+   SLD Amend-record form — the dossier's own field voice.
+   Labels are mono captions, values are Inter; each section is a sheet of
+   paper and only the identity sheet carries the gold record keyline.
+   ------------------------------------------------------------------ */
+.sld__fieldset {
+    position: relative;
+    background: #fff;
+    border: 1px solid var(--sld-hair, #dee2e6);
+    border-radius: var(--brand-radius-md, 0.75rem);
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+/* One keyline for the whole form, on the sheet that holds the legal record. */
+.sld__fieldset--keyed::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.75rem;
+    bottom: 0.75rem;
+    width: 3px;
+    border-radius: 3px;
+    background: var(--sld-gold, #f7c000);
+}
 .sld__form-heading {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: #374151;
-    margin: 1.5rem 0 0.875rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #f5f5f5;
+    font-family: var(--sld-mono);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--sld-navy, #001f3f);
+    margin: 0 0 0.75rem;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid var(--sld-hair, #dee2e6);
     display: flex;
     align-items: center;
     gap: 0.4rem;
 }
-.sld__form-heading:first-child { margin-top: 0; }
-.sld__form-heading-icon { color: #f7c000; }
+/* Quiet — the gold in this panel belongs to the record keyline, the amendment
+   marks and the commit button, and nowhere else. */
+.sld__form-heading-icon { color: var(--brand-grey-450, #9ca3af); }
+.sld__form-heading-note {
+    margin-left: auto;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    color: var(--sld-mute, #6b7280);
+}
 .sld__form-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.875rem;
+    grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+    gap: 0.75rem;
 }
-.sld__form-group--full { grid-column: span 2; }
+.sld__form-group--full { grid-column: 1 / -1; }
 .sld__form-label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: var(--sld-mono);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--sld-mute, #6b7280);
     margin-bottom: 0.25rem;
 }
-.sld__form-label-icon { margin-right: 0.25rem; }
+.sld__form-label-icon { color: var(--sld-mute, #6b7280); }
+.sld__form-req {
+    font-size: 0.55rem;
+    letter-spacing: 0.06em;
+    padding: 0.05rem 0.25rem;
+    border: 1px solid var(--sld-hair, #dee2e6);
+    border-radius: 0.15rem;
+    color: var(--brand-grey-450, #9ca3af);
+}
 .sld__form-input {
     width: 100%;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--sld-hair, #dee2e6);
+    border-left: 2px solid var(--sld-hair, #dee2e6);
+    border-radius: var(--brand-radius-sm, 0.5rem);
     font-size: 0.8125rem;
-    color: #1a1a2e;
+    color: var(--brand-grey-800, #1f1f1f);
     background: #fff;
-    transition: border-color 0.2s;
+    transition: border-color 0.15s ease;
 }
+.sld__form-input::placeholder { color: var(--brand-grey-450, #9ca3af); }
 .sld__form-input:focus {
     outline: none;
-    border-color: #f7c000;
-    box-shadow: 0 0 0 2px rgba(247, 192, 0, 0.15);
+    border-color: var(--sld-gold, #f7c000);
+    box-shadow: none;
 }
-.sld__form-checkbox {
+.sld__form-input--code {
+    font-family: var(--sld-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+}
+/* Custom arrow: longhands only, never the background shorthand. */
+.sld__form-select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 1.6rem;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 0.7rem 0.7rem;
+}
+/* Amended field — the gold mark that the commit bar is counting. */
+.sld__form-group--dirty .sld__form-input { border-left-color: var(--sld-gold, #f7c000); }
+.sld__form-group--dirty .sld__form-label { color: var(--sld-navy, #001f3f); }
+
+/* Service toggle — a described switch, not a naked checkbox in a grid cell. */
+.sld__switch {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
-    color: #374151;
+    align-items: flex-start;
+    gap: 0.625rem;
     cursor: pointer;
 }
-.sld__form-actions {
-    display: flex;
-    gap: 0.625rem;
-    margin-top: 1.5rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid #f5f5f5;
+.sld__switch-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
 }
-.sld__btn-submit {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 1.25rem;
-    background: #001f3f;
-    color: #fff;
-    border: none;
-    border-radius: 0.5rem;
+.sld__switch-track {
+    flex: none;
+    position: relative;
+    width: 2.15rem;
+    height: 1.2rem;
+    margin-top: 0.1rem;
+    border-radius: 1rem;
+    background: var(--brand-grey-300, #dcdcdc);
+    transition: background-color 0.2s ease;
+}
+.sld__switch-knob {
+    position: absolute;
+    top: 0.175rem;
+    left: 0.175rem;
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s ease;
+}
+.sld__switch-input:checked + .sld__switch-track { background: var(--sld-navy, #001f3f); }
+.sld__switch-input:checked + .sld__switch-track .sld__switch-knob { transform: translateX(0.95rem); }
+.sld__switch-input:focus-visible + .sld__switch-track {
+    outline: 2px solid var(--sld-gold, #f7c000);
+    outline-offset: 2px;
+}
+.sld__switch-title {
+    display: block;
     font-size: 0.8125rem;
     font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
+    color: var(--brand-grey-800, #1f1f1f);
 }
-.sld__btn-submit:hover {
-    background: #003366;
-    transform: translateY(-1px);
+.sld__switch-sub {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--sld-mute, #6b7280);
 }
-.sld__btn-cancel {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 1.25rem;
-    background: none;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: #6b7280;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.sld__btn-cancel:hover {
-    border-color: #d1d5db;
-    color: #374151;
-}
-@media (max-width: 640px) {
-    .sld__form-grid { grid-template-columns: 1fr; }
-    .sld__form-group--full { grid-column: span 1; }
-}
+.sld__switch.sld__form-group--dirty .sld__switch-title { color: var(--sld-navy, #001f3f); }
 
 /* SLD Toast */
 .sld__toast {
@@ -11126,6 +11632,19 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     border-radius: 3px;
     object-fit: cover;
     cursor: pointer;
+}
+
+/* Local Products photo column — placeholder for rows with no image yet */
+.sld__product-photo--empty {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px dashed rgba(0, 31, 63, 0.18);
+    border-radius: 0.1875rem;
+    color: rgba(0, 31, 63, 0.28);
+    font-size: 0.75rem;
 }
 
 /* ------------------------------------------------------------------
@@ -11178,6 +11697,8 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     flex-wrap: wrap;
     gap: 1rem;
 }
+/* The navy band geometry for oli (and every other staff hero) is unified in
+   webpages/css/staff-hero.css. */
 .oli__hero-title, .fol__hero-title, .wod__hero-title, .woe__hero-title,
 .woa__hero-title, .obi__hero-title, .dli__hero-title, .obs__hero-title,
 .odm__hero-title, .orp__hero-title {
@@ -11339,6 +11860,25 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     border-left: 4px solid #0d6efd;
     border-radius: 0.5rem;
     padding: 0.5rem 0.75rem;
+}
+
+/* Pickup→drop distance chip, alongside the pickup location. Same stored figure
+   the seller ledger shows, so the two screens can never quote different numbers. */
+.wod__route-km {
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #0d6efd;
+    background: #fff;
+    border: 1px solid #cfe2ff;
+    border-radius: 999px;
+    padding: 0.2rem 0.6rem;
+    white-space: nowrap;
+}
+.wod__route-km--approx {
+    font-weight: 500;
+    color: var(--brand-grey-600, #555);
+    border-color: var(--brand-grey-300, #d5d5d5);
 }
 
 /* Delivery address highlight — distinct from pickup location */
@@ -17977,9 +18517,15 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    min-width: 0;
+    /* Fields size to their content here: the global `#filterForm` rule in
+       fleet_transactions.css forces this form to flex, so the grid fractions
+       above never take effect. min-width is what actually sets their width. */
+    min-width: 118px;
 }
-.wf-temp-orders__filter-field--wide { grid-column: span 1; }
+.wf-temp-orders__filter-field--wide {
+    grid-column: span 1;
+    min-width: 141px;
+}
 .wf-temp-orders__filter-label {
     display: inline-flex;
     align-items: center;
@@ -19536,7 +20082,13 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 .drl__date-line + .drl__date-line { margin-top: 0.25rem; }
 .drl__date-line i { font-size: 0.625rem; color: var(--brand-grey-400); }
 .drl__date-line--muted { color: var(--brand-grey-500); font-weight: 400; }
-.drl .drl__plate {
+/* Vehicle number plate — a shared mark, not a drivers-list detail. Any staff
+   list that shows a vehicle registration draws this same Qatar plate so one
+   driver reads identically wherever they appear (roster, verification queue).
+   Unscoped from `.drl` on 2026-08-01 for that reason; the classes exist nowhere
+   else, so nothing can match them by accident. Sibling of the .qnas-plate
+   address mark — same idea, different document. */
+.drl__plate {
     display: inline-flex;
     align-items: stretch;
     border: 1.5px solid #001f3f;
@@ -19545,10 +20097,10 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     background: #fff;
     line-height: 1;
 }
-.drl .drl__plate-band {
+.drl__plate-band {
     display: flex;
     align-items: center;
-    padding: 0.18rem 0.24rem;
+    padding: 0.24rem 0.34rem;
     background: #001f3f;
     color: #f7c000;
     font-size: 0.42rem;
@@ -19556,12 +20108,17 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     letter-spacing: 0.1em;
     writing-mode: initial;
 }
-.drl .drl__plate-no {
+/* The band carries a vehicle glyph, not the old 0.42rem "QAT" lettering */
+.drl__plate-band i {
+    font-size: 0.86rem;
+    letter-spacing: normal;
+}
+.drl__plate-no {
     display: flex;
     align-items: center;
-    padding: 0.18rem 0.4rem;
+    padding: 0.24rem 0.5rem;
     font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
-    font-size: 0.74rem;
+    font-size: 0.92rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     color: #001f3f;
@@ -20040,9 +20597,117 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     margin-bottom: 1rem;
 }
 
+/* ---------- APPLICANT MAP (dvmap) ---------- */
+.dvmap {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+.dvmap__summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.9rem;
+    cursor: pointer;
+    list-style: none;
+}
+.dvmap__summary::-webkit-details-marker { display: none; }
+.dvmap__summary::marker { content: ""; }
+.dvmap__summary:hover { background: #f8f9fb; }
+.dvmap__summary:focus-visible { outline: 2px solid #f7c000; outline-offset: -2px; }
+.dvmap__summary-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #001f3f;
+}
+.dvmap__summary-title i { color: #f7c000; margin-right: 0.35rem; }
+.dvmap__summary-meta {
+    font-size: 0.68rem;
+    color: #6b7280;
+    margin-right: auto;
+}
+.dvmap__chev { color: #9aa3af; font-size: 0.7rem; transition: transform 0.15s ease; }
+.dvmap[open] .dvmap__chev { transform: rotate(180deg); }
+.dvmap[open] .dvmap__summary { border-bottom: 1px solid #eef1f5; background: #f8f9fb; }
+
+.dvmap__body { padding: 0.75rem 0.9rem 0.9rem; }
+.dvmap__canvas {
+    height: 26rem;
+    border-radius: 0.375rem;
+    border: 1px solid #e5e7eb;
+    z-index: 0;
+}
+.dvmap__legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.9rem;
+    font-size: 0.68rem;
+    color: #4b5563;
+    margin-top: 0.6rem;
+}
+.dvmap__key {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 0.15rem;
+}
+.dvmap__key--pending      { background: #b45309; }
+.dvmap__key--under_review { background: #1d4ed8; }
+.dvmap__key--verified     { background: #15803d; }
+.dvmap__key--rejected     { background: #b91c1c; }
+.dvmap__key--incomplete   { background: #6b7280; }
+.dvmap__fitall {
+    margin-left: auto;
+    border: 1px solid #dee2e6;
+    background: #fff;
+    border-radius: 0.25rem;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #4b5563;
+    cursor: pointer;
+}
+.dvmap__fitall:hover { border-color: #001f3f; color: #001f3f; }
+.dvmap__fitall i { font-size: 0.6rem; margin-right: 0.2rem; }
+
+.dvmap__note, .dvmap__empty {
+    font-size: 0.68rem;
+    color: #6b7280;
+    margin: 0.5rem 0 0;
+}
+.dvmap__note i { color: #9aa3af; margin-right: 0.2rem; }
+.dvmap__empty { margin: 0; }
+
+/* Popup contents — Leaflet owns the bubble, these style the inside */
+.dvmap__pop { font-size: 0.72rem; min-width: 11rem; }
+.dvmap__pop-name { font-weight: 700; color: #001f3f; margin-bottom: 0.3rem; }
+.dvmap__pop-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.1rem 0;
+}
+.dvmap__pop-row span { color: #6b7280; }
+.dvmap__pop-row strong { color: #1f2937; font-weight: 600; text-align: right; }
+.dvmap__pop-link {
+    display: inline-block;
+    margin-top: 0.4rem;
+    font-weight: 600;
+    color: #1d4ed8;
+}
+
+@media (max-width: 575px) {
+    .dvmap__canvas { height: 18rem; }
+}
+
 .dvm__header {
     display: grid;
-    grid-template-columns: 108px minmax(170px, 1.4fr) 92px 110px 56px 104px 130px 104px 20px;
+    grid-template-columns: 24px 108px minmax(170px, 1.4fr) 92px 110px 56px 104px 130px 104px 20px;
     gap: 0.75rem;
     align-items: center;
     padding: 0.5rem 0.9rem;
@@ -20062,7 +20727,7 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 
 .dvm__summary {
     display: grid;
-    grid-template-columns: 108px minmax(170px, 1.4fr) 92px 110px 56px 104px 130px 104px 20px;
+    grid-template-columns: 24px 108px minmax(170px, 1.4fr) 92px 110px 56px 104px 130px 104px 20px;
     gap: 0.75rem;
     align-items: center;
     padding: 0.65rem 0.9rem;
@@ -20074,6 +20739,9 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 .dvm__summary:hover { background: #f8f9fb; }
 .dvm__summary:focus-visible { outline: 2px solid #f7c000; outline-offset: -2px; }
 
+/* Row-selection cell in the review manifest — the box sits on the summary, so it
+   is centred in its own grid track rather than stretching the row. */
+.dvm__pick { display: flex; align-items: center; justify-content: center; }
 .dvm__chev { color: #9ca3af; font-size: 0.72rem; justify-self: end; transition: transform 0.15s ease; }
 .dvm__row[open] .dvm__chev { transform: rotate(180deg); }
 
@@ -20126,6 +20794,8 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     white-space: nowrap;
 }
 .dvm__dot { margin: 0 0.3rem; }
+/* Third line of the applicant cell: arrival source + account creation date */
+.dvm__origin { margin-top: 0.1rem; }
 
 .dvm__code {
     font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
@@ -20135,12 +20805,17 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 }
 .dvm__lang { font-size: 0.72rem; color: #6b7280; }
 
-.dvm__vehicle { font-size: 0.72rem; color: #374151; }
-.dvm__vehicle-no {
-    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
-    font-weight: 700;
-    color: #001f3f;
+/* Type over plate, the fleet roster's reading. The plate itself is the shared
+   .drl__plate mark — see it defined further up, not redrawn here. */
+.dvm__vehicle {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    font-size: 0.72rem;
+    color: #374151;
 }
+.dvm__vehicle-type { font-size: 0.7rem; color: #6b7280; }
 .dvm__docs {
     display: inline-flex; align-items: center; gap: 0.3rem;
     font-size: 0.72rem; font-weight: 600;
@@ -20359,9 +21034,13 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
         padding: 0.7rem 0.85rem;
     }
     .dvm__who { flex: 1 1 100%; order: 1; }
+    .dvm__pick { order: -1; }
     .dvm__stamp { order: 0; }
     .dvm__chev { order: 2; margin-left: auto; }
     .dvm__code, .dvm__lang, .dvm__applied, .dvm__vehicle, .dvm__docs { order: 3; font-size: 0.68rem; }
+    /* Stacked rows are already one item per line — the vehicle cell keeps its
+       label, type and plate together on that line instead of stacking again. */
+    .dvm__vehicle { flex-direction: row; align-items: center; gap: 0.3rem; }
     .dvm__meter { order: 3; flex: 1 1 110px; }
     .dvm__code::before, .dvm__lang::before, .dvm__applied::before, .dvm__meter::before,
     .dvm__vehicle::before, .dvm__docs::before {
@@ -20415,13 +21094,6 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     color: #fff;
     margin: 0;
     line-height: 1.15;
-}
-.pau__hero-sub {
-    display: block;
-    font-size: 0.74rem;
-    color: rgba(255, 255, 255, 0.6);
-    margin-top: 0.25rem;
-    max-width: 34rem;
 }
 .pau__tally {
     display: flex;
@@ -20693,8 +21365,23 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     border-radius: 0.3rem;
 }
 .pau__hero input.pau__search {
+    /* base-forms.css paints .form-control white at this weight, and with the
+       explainer moved out of the hero the field would otherwise stretch. */
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-size: 0.78rem;
     padding: 0.24rem 0.6rem;
     border-radius: 0.3rem;
+    width: 14rem;
+    min-width: 0;
+    flex: 0 0 auto;
+}
+.pau__hero input.pau__search:focus {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: #f7c000;
+    color: #fff;
+    box-shadow: none;
 }
 
 /* Fleet names — second line under the count, plain muted text */
@@ -20766,16 +21453,30 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     margin-top: 0.2rem;
 }
 
-/* In-band filters — dark fields on navy */
+/* In-band filters — dark fields on navy.
+   Never use the `background` shorthand here: the select carries an arrow tile
+   as background-image and the shorthand wipes it.
+   The !important on border/radius/min-height is deliberate: the global form
+   layer (`.form-select`, the 2.75rem touch-target rule) declares those with
+   !important, and without matching it the fields render as 44px light-grey
+   pills that break the navy band. The selects also carry data-no-select2 —
+   the staff-dashboard Select2 enhancer would force them to width:100%. */
 .ppl__hero .ppl__ffield {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
     color: #fff;
     font-size: 0.78rem;
     padding: 0.24rem 0.6rem;
-    border-radius: 0.3rem;
+    border-radius: 0.3rem !important;
+    width: auto;
+    flex: 0 0 auto;
+    line-height: 1.4;
+    min-height: 1.9rem !important;
+    height: 1.9rem;
 }
+.ppl__hero input.ppl__ffield { min-width: 13rem; }
 .ppl__hero select.ppl__ffield {
+    min-width: 8.5rem;
     padding-right: 1.6rem;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f7c000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
     background-repeat: no-repeat;
@@ -20786,12 +21487,132 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 .ppl__hero .ppl__ffield::placeholder { color: rgba(255, 255, 255, 0.45); }
 .ppl__hero .ppl__ffield:focus {
     background-color: rgba(255, 255, 255, 0.12);
-    border-color: #f7c000;
+    border-color: #f7c000 !important;
     color: #fff;
     box-shadow: none;
 }
-.ppl__fbtn { color: #fff; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 0.3rem; font-size: 0.78rem; padding: 0.24rem 0.7rem; }
+.ppl__fbtn {
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 0.3rem;
+    font-size: 0.78rem;
+    padding: 0.24rem 0.7rem;
+    min-height: 1.9rem;
+    height: 1.9rem;
+    line-height: 1.2;
+}
 .ppl__fbtn:hover { color: #001f3f; background: #f7c000; border-color: #f7c000; }
+
+/* --- Hero pickers (Select2, enhanced locally by the page script) -------------
+   A native <select> hands its option list to the OS, so it cannot carry the
+   brand at all. These two are enhanced on the page — `data-no-select2` keeps
+   the global staff enhancer off them because it forces width:100%.
+   `.ppl__pick` is the closed control: it must read exactly like the sibling
+   search input on navy. `.ppl__pick-menu` is the open panel, and per Brand Kit
+   form rule 6 the list stays a light ink panel even over a navy surface.
+   Every selector carries `body .select2-container--default` because
+   base-forms.css paints all Select2 controls white at that same weight
+   (`body .select2-container--default.select2-container .select2-selection--single`);
+   anything lighter loses and the closed picker renders white-on-white. */
+body .select2-container--default.ppl__pick { width: auto !important; }
+body .select2-container--default.ppl__pick .select2-selection--single {
+    height: 1.9rem;
+    min-width: 8.5rem;
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 0.3rem;
+    outline: none;
+}
+body .select2-container--default.ppl__pick .select2-selection--single .select2-selection__rendered {
+    height: calc(1.9rem - 2px);
+    line-height: calc(1.9rem - 2px);
+    padding-left: 0.6rem;
+    padding-right: 1.7rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #fff;
+}
+/* Select2 draws its caret as a CSS triangle — swap it for the same yellow
+   chevron the other hero fields use so the row reads as one control set. */
+body .select2-container--default.ppl__pick .select2-selection--single .select2-selection__arrow {
+    height: calc(1.9rem - 2px);
+    width: 1.5rem;
+    right: 0;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f7c000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-size: 12px 9px;
+    background-position: center;
+    transition: transform 0.2s ease;
+}
+body .select2-container--default.ppl__pick .select2-selection--single .select2-selection__arrow b { display: none; }
+body .select2-container--default.ppl__pick.select2-container--open .select2-selection--single .select2-selection__arrow {
+    transform: rotate(180deg);
+}
+/* Hover lifts the fill only — the border stays put. */
+body .select2-container--default.ppl__pick:hover .select2-selection--single {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+/* Yellow only while the menu is actually open. Select2 leaves
+   `select2-container--focus` on the control after the menu closes, so keying
+   the accent off focus left a stale yellow border sitting on the field long
+   after the interaction ended — the hover lift already reads as "live". */
+body .select2-container--default.ppl__pick.select2-container--focus .select2-selection--single {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    box-shadow: none;
+}
+body .select2-container--default.ppl__pick.select2-container--open .select2-selection--single {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: #f7c000;
+    box-shadow: none;
+}
+/* Keyboard arrivals still need a ring. :focus-visible skips the mouse path, so
+   this fires on Tab and not on click. */
+body .select2-container--default.ppl__pick .select2-selection--single:focus-visible {
+    border-color: #f7c000;
+    outline: none;
+}
+
+/* Open panel — white card, hairline, ink type. Yellow appears once, as the
+   rule on the current selection. */
+body .select2-container--default.ppl__pick-menu .select2-dropdown {
+    min-width: 9rem;
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 24px rgba(0, 31, 63, 0.16);
+    overflow: hidden;
+}
+body .select2-container--default.ppl__pick-menu .select2-results__options {
+    max-height: 17rem;
+    padding: 0.375rem 0;
+}
+body .select2-container--default.ppl__pick-menu .select2-results__option {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #333;
+    padding: 0.375rem 0.75rem;
+    border-left: 2px solid transparent;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+body .select2-container--default.ppl__pick-menu .select2-results__option--highlighted[aria-selected] {
+    background-color: #001f3f;
+    color: #fff;
+}
+body .select2-container--default.ppl__pick-menu .select2-results__option[aria-selected="true"] {
+    background-color: #fafafa;
+    border-left-color: #f7c000;
+    color: #001f3f;
+    font-weight: 600;
+}
+body .select2-container--default.ppl__pick-menu .select2-results__option[aria-selected="true"].select2-results__option--highlighted {
+    background-color: #001f3f;
+    color: #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+    body .select2-container--default.ppl__pick .select2-selection__arrow,
+    body .select2-container--default.ppl__pick-menu .select2-results__option { transition: none; }
+}
 
 /* --- Ledger card + table --- */
 .ppl__card {
@@ -20824,6 +21645,11 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     color: #001f3f;
     letter-spacing: 0.02em;
 }
+/* The number is the row's handle into the job — underline on hover only, so a
+   column of codes still scans as data rather than a wall of links. */
+.ppl__order--link { text-decoration: none; border-bottom: 1px solid transparent; }
+.ppl__order--link:hover,
+.ppl__order--link:focus-visible { color: #003366; border-bottom-color: #b58900; }
 .ppl__biz { display: block; font-weight: 600; color: #1a1a2e; line-height: 1.25; }
 .ppl__sub { display: block; font-size: 0.7rem; color: #6c757d; line-height: 1.35; }
 
@@ -20890,8 +21716,9 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     white-space: nowrap;
 }
 
-/* Actions: ink buttons, sharp corners */
-.ppl__card .btn.ppl__btn {
+/* Actions: ink buttons, sharp corners (shared by row actions and the bulk bar) */
+.ppl__card .btn.ppl__btn,
+.ppl__bulk .btn.ppl__btn {
     border: 1px solid #001f3f;
     color: #001f3f;
     background-color: #fff;
@@ -20902,10 +21729,99 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     border-radius: 0.3rem;
     box-shadow: none;
 }
-.ppl__card .btn.ppl__btn:hover { background-color: #001f3f; color: #fff; }
+.ppl__card .btn.ppl__btn:hover,
+.ppl__bulk .btn.ppl__btn:hover { background-color: #001f3f; color: #fff; }
 .ppl__card .btn.ppl__btn--primary { background-color: #001f3f; color: #fff; }
 .ppl__card .btn.ppl__btn--primary:hover { background-color: #003366; border-color: #003366; }
-.ppl__card .btn.ppl__btn .ppl__code { color: inherit; opacity: 0.65; }
+.ppl__card .btn.ppl__btn .ppl__code,
+.ppl__bulk .btn.ppl__btn .ppl__code { color: inherit; opacity: 0.65; }
+
+/* Quiet action: reads as secondary next to Assign, same ink on hover */
+.ppl__card .btn.ppl__btn--quiet,
+.ppl__bulk .btn.ppl__btn--quiet {
+    border-color: #d0d5dd;
+    color: #6c757d;
+}
+.ppl__card .btn.ppl__btn--quiet:hover,
+.ppl__bulk .btn.ppl__btn--quiet:hover { background-color: #6c757d; border-color: #6c757d; color: #fff; }
+.ppl__card .btn.ppl__btn--quiet:disabled,
+.ppl__bulk .btn.ppl__btn--quiet:disabled { opacity: 0.4; background-color: #fff; color: #6c757d; }
+
+/* Destructive pair: outlined at rest so a row of actions stays monochrome-ish,
+   filled only on hover. Warn = cancel the leg, danger = drop the row. */
+.ppl__card .btn.ppl__btn--warn,
+.ppl__bulk .btn.ppl__btn--warn {
+    border-color: var(--brand-warning);
+    color: var(--brand-warning-text);
+}
+.ppl__card .btn.ppl__btn--warn:hover,
+.ppl__bulk .btn.ppl__btn--warn:hover {
+    background-color: var(--brand-warning);
+    border-color: var(--brand-warning);
+    color: #fff;
+}
+.ppl__card .btn.ppl__btn--danger,
+.ppl__bulk .btn.ppl__btn--danger {
+    border-color: var(--brand-danger);
+    color: var(--brand-danger);
+}
+.ppl__card .btn.ppl__btn--danger:hover,
+.ppl__bulk .btn.ppl__btn--danger:hover {
+    background-color: var(--brand-danger);
+    border-color: var(--brand-danger);
+    color: #fff;
+}
+.ppl__card .btn.ppl__btn--warn:disabled,
+.ppl__bulk .btn.ppl__btn--warn:disabled,
+.ppl__card .btn.ppl__btn--danger:disabled,
+.ppl__bulk .btn.ppl__btn--danger:disabled { opacity: 0.4; background-color: #fff; }
+
+/* Four actions can sit in one row cell — let them wrap instead of stretching it. */
+.ppl__table .ppl__td .btn.ppl__btn { margin-left: 0.25rem; margin-bottom: 0.15rem; }
+
+/* Multi-select: checkbox gutter + picked-row tint. The box itself is the
+   brand-kit .form-check-input component (yellow fill, dark tick) — it declares
+   every colour with !important, so only layout belongs here. */
+.ppl__th--check, .ppl__td--check { width: 2.25rem; padding-right: 0; }
+.ppl__table .ppl__check { cursor: pointer; vertical-align: middle; }
+.ppl__row--picked > .ppl__td { background-color: #f2f6fb; }
+
+/* Bulk bar: sits above the table, only while a selection exists */
+.ppl__bulk {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    background: #fff;
+    border: 1px solid #001f3f;
+    border-left-width: 3px;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    margin-bottom: 0.5rem;
+}
+.ppl__bulk[hidden] { display: none; }
+.ppl__bulk-count {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #001f3f;
+    white-space: nowrap;
+}
+.ppl__bulk-count strong { font-size: 0.95rem; letter-spacing: 0; }
+.ppl__bulk input.form-control.ppl__bulk-search {
+    font-size: 0.78rem;
+    border-color: #e5e7eb;
+    color: #1a1a2e;
+    padding: 0.24rem 0.5rem;
+    border-radius: 0.3rem;
+    min-width: 13rem;
+}
+.ppl__bulk input.form-control.ppl__bulk-search:focus {
+    border-color: #001f3f;
+    box-shadow: 0 0 0 0.15rem rgba(0, 31, 63, 0.12);
+}
 
 /* Assign panel: inset sheet with navy rule */
 .ppl__panel { background: #fafbfc; border-left: 3px solid #001f3f; padding: 0.75rem 1rem; }
@@ -20928,6 +21844,8 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 @media (max-width: 767.98px) {
     .ppl__hero { padding: 0.375rem 0.75rem; }
     .ppl__tally--alert { border-right: 0; padding-right: 0; }
+    .ppl__bulk { align-items: flex-start; }
+    .ppl__bulk input.form-control.ppl__bulk-search { min-width: 100%; }
 }
 
 /* ============================================================================
@@ -20958,6 +21876,52 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     color: #001f3f;
 }
 .pkl__title i { color: #b58900; margin-right: 0.3rem; }
+/* Where the leg actually stands — swatch + word, same language as the pool list */
+.pkl__state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: 0.5rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #4b5563;
+}
+.pkl__state::before {
+    content: "";
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 2px;
+    background: #d0d0d0;
+    flex-shrink: 0;
+}
+.pkl__state--pending { color: #b91c1c; }
+.pkl__state--pending::before { background: #ef4444; }
+.pkl__state--accepted::before,
+.pkl__state--in_progress::before,
+.pkl__state--arrived::before { background: #3b82f6; }
+.pkl__state--collected::before { background: #f7c000; }
+.pkl__state--dropped::before,
+.pkl__state--handed_off::before { background: #22c55e; }
+.pkl__state--cancelled { color: #9ca3af; }
+/* Delivery-leg statuses carry a --dl- prefix so they cannot collide with the
+   pickup words (both legs have a "pending" and a "cancelled"). */
+.pkl__state--dl-pending, .pkl__state--dl-for_review { color: #b91c1c; }
+.pkl__state--dl-pending::before, .pkl__state--dl-for_review::before { background: #ef4444; }
+.pkl__state--dl-assigned::before,
+.pkl__state--dl-accepted::before,
+.pkl__state--dl-picked_up::before,
+.pkl__state--dl-start_ride::before,
+.pkl__state--dl-in_transit::before,
+.pkl__state--dl-out_for_delivery::before { background: #3b82f6; }
+.pkl__state--dl-delivered::before,
+.pkl__state--dl-partial_delivery::before { background: #22c55e; }
+.pkl__state--dl-failed, .pkl__state--dl-rejected,
+.pkl__state--dl-dropsownlost { color: #b91c1c; }
+.pkl__state--dl-failed::before, .pkl__state--dl-rejected::before,
+.pkl__state--dl-dropsownlost::before { background: #ef4444; }
+.pkl__state--dl-cancelled { color: #9ca3af; }
 .pkl__meta { font-size: 0.7rem; color: #6b7280; }
 .pkl__driver {
     font-size: 0.68rem;
@@ -21191,7 +22155,1266 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 }
 .wfx__col:hover { background: var(--brand-grey-100, #fafafa); }
 .wfx__col input { margin: 0; flex-shrink: 0; }
+.wfx__scope {
+    color: var(--brand-navy, #001f3f);
+    border-left: 2px solid var(--brand-primary, #f7c000);
+    padding-left: 0.5rem;
+}
 @media (max-width: 575.98px) { .wfx__cols { grid-template-columns: 1fr; } }
+
+/* ---- Row-selection checkboxes on list tables (export-columns.js) ----
+   The cell is sized to the box so it does not steal width from the data. */
+.wfsel__cell {
+    width: 1px;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.wfsel__box {
+    margin: 0;
+    cursor: pointer;
+    border-color: var(--brand-grey-400, #adb5bd);
+}
+.wfsel__box:checked,
+.wfsel__box:indeterminate {
+    background-color: var(--brand-navy, #001f3f);
+    border-color: var(--brand-navy, #001f3f);
+}
+.wfsel__box:focus {
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.22);
+}
+/* "N selected" readout beside the export button */
+.wfsel__count {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--brand-navy, #001f3f);
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--brand-navy, #001f3f);
+    background: #fff;
+}
+.wfsel__count[hidden] { display: none; }
+
+/* "Export all N matching" toggle — sits next to the export button, appears only
+   once the whole page is ticked. Reads as a link, not a third competing button. */
+.wfsel__all {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.wfsel__all[hidden] { display: none; }
+/* Colour is inherited, not fixed: this sits on the orders list's dark toolbar
+   and on the drivers list's white filter bar, and must stay legible on both. */
+.wfsel__all-btn {
+    padding: 0.25rem 0.5rem;
+    border: 0;
+    border-bottom: 1px solid currentColor;
+    border-radius: 0;
+    background: none;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: inherit;
+    opacity: 0.85;
+    cursor: pointer;
+}
+.wfsel__all-btn:hover { opacity: 1; }
+.wfsel__all-btn[hidden] { display: none; }
+.wfsel__all-on {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid currentColor;
+    border-radius: 0.25rem;
+    background: rgba(127, 127, 127, 0.16);
+    color: inherit;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.wfsel__all-on[hidden] { display: none; }
+.wfsel__all-clear {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    line-height: 1;
+    opacity: 0.75;
+    cursor: pointer;
+}
+.wfsel__all-clear:hover { opacity: 1; }
 
 /* ── Order Auto/API: sheet row jump input (sits beside the shared pager) ── */
 .woa__goto-row { width: 4.5rem; }
+
+
+/* PAGE NOTES (wfnote__) moved to webpages/css/wfnote.css — shared with the
+   warehouse dashboard, which does not load workforce.css. */
+
+/* ============================================================================
+   PAGE HERO + STAT CARDS (wfhero__ / wfstat__) — shared console furniture.
+   Used by: the payout console pages (driver payout worksheet, client payout,
+   payout history, client charges) and available to any staff page that wants
+   the standard navy band instead of a page-specific masthead.
+   Notes: Same geometry as ppl__hero / pau__hero — navy band, yellow 3px rule,
+   eyebrow + title left, tallies and actions right. Stat cards below carry the
+   page's headline figures and stay clickable where they double as filters.
+   ============================================================================ */
+
+.wfhero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    background: #001f3f;
+    border-bottom: 3px solid #f7c000;
+    border-radius: 0.4rem 0.4rem 0 0;
+    padding: 0.375rem 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.wfhero__ident { min-width: 0; }
+.wfhero__eyebrow {
+    display: block;
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 0.2rem;
+}
+.wfhero__title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #fff;
+    margin: 0;
+    line-height: 1.15;
+}
+.wfhero__sub {
+    display: block;
+    font-size: 0.74rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0.15rem 0 0;
+    max-width: 46rem;
+}
+.wfhero__sub a { color: rgba(255, 255, 255, 0.85); }
+.wfhero__sep { color: rgba(255, 255, 255, 0.3); margin: 0 0.35rem; }
+.wfhero__code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.03em;
+}
+
+.wfhero__side { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0.75rem 1rem; }
+.wfhero__tallies { display: flex; align-items: flex-end; gap: 0.75rem; }
+.wfhero__tally {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    border-right: 3px solid #f7c000;
+    padding-right: 0.75rem;
+}
+.wfhero__tally:last-child { border-right: 0; padding-right: 0; }
+.wfhero__tally-num {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.1;
+}
+.wfhero__tally-lbl {
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+}
+
+.wfhero__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.375rem; }
+.wfhero .wfhero__ghost {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.85);
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 0.3rem;
+    padding: 0.24rem 0.6rem;
+    text-decoration: none;
+    white-space: nowrap;
+    line-height: 1.3;
+}
+.wfhero .wfhero__ghost:hover { color: #001f3f; background-color: #f7c000; border-color: #f7c000; }
+.wfhero .wfhero__ghost--alert:hover { background-color: #b91c1c; border-color: #b91c1c; color: #fff; }
+
+/* Stat cards: the page's headline figures. A card that is also a filter is an
+   <a> and lights its left rule; the card holding the money right now is --here. */
+.wfstat {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+.wfstat__card {
+    display: block;
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-left: 3px solid #dee2e6;
+    border-radius: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    color: inherit;
+    text-decoration: none;
+}
+a.wfstat__card:hover {
+    border-left-color: #001f3f;
+    box-shadow: 0 2px 8px rgba(0, 31, 63, 0.07);
+}
+.wfstat__label {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6c757d;
+}
+.wfstat__value {
+    display: block;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #001f3f;
+    line-height: 1.25;
+    margin-top: 0.1rem;
+}
+.wfstat__unit {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #6c757d;
+    margin-left: 0.3rem;
+}
+.wfstat__sub { display: block; font-size: 0.68rem; color: #6c757d; line-height: 1.35; }
+/* Where the money is sitting right now. */
+.wfstat__card--here { border-left-color: #f7c000; background: #fffdf4; }
+/* This card's filter is the one currently applied. */
+.wfstat__card--on { border-left-color: #001f3f; background: #f2f6fb; }
+/* Settled/closed figure — reads quieter than the live ones. */
+.wfstat__card--done .wfstat__value { color: #6c757d; }
+.wfstat__card--null .wfstat__value { color: #adb5bd; }
+
+@media (max-width: 767.98px) {
+    .wfhero__side { width: 100%; justify-content: space-between; }
+    .wfhero__tally { border-right: 0; padding-right: 0; align-items: flex-start; }
+    .wfstat { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 479.98px) {
+    .wfstat { grid-template-columns: 1fr; }
+}
+
+/* ---------------------------------------------------------------------------
+   Seller detail — Products tab inline table edit (sld__swatch / pe__)
+   Swatch colour is applied from data-swatch by JS so no inline styles are
+   needed for the per-row hex.
+--------------------------------------------------------------------------- */
+.sld__swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 0.3rem;
+    border-radius: 50%;
+    background: var(--brand-grey-300, #ccc);
+    border: 1px solid var(--brand-grey-200, #ddd);
+    vertical-align: middle;
+}
+
+.sld__products--editing tbody tr:hover > td {
+    background: transparent;
+}
+
+.sld__products--editing .pe__edit {
+    min-width: 7.5rem;
+}
+
+.sld__products--editing [data-pe-field="item_discription"] .pe__edit,
+.sld__products--editing [data-pe-field="item_name"] .pe__edit {
+    min-width: 11rem;
+}
+
+.sld__products--editing [data-pe-field="item_price"] .pe__edit {
+    min-width: 6rem;
+}
+
+/* Amended cell — same gold mark the Edit form uses, as a wash. */
+[data-pe-field].pe__cell--dirty {
+    background: var(--brand-warning-bg, #fef3c7);
+    box-shadow: inset 2px 0 0 var(--sld-gold, #f7c000);
+    border-radius: 0.2rem;
+}
+
+[data-pe-field].pe__cell--failed {
+    background: var(--brand-danger-bg, #fef2f2);
+    box-shadow: inset 2px 0 0 var(--brand-danger, #dc2626);
+    border-radius: 0.2rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Seller detail — shared panel furniture for the Products ledger and the
+   Amend-record form: panel head, action buttons, ledger caption, notes,
+   and the docked amendment bar that counts changes before they are written.
+--------------------------------------------------------------------------- */
+.sld__panel-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--sld-hair, #dee2e6);
+}
+.sld__panel-head .sld__section-title {
+    margin: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+.sld__panel-note {
+    margin: 0.2rem 0 0;
+    font-size: 0.72rem;
+    color: var(--sld-mute, #6b7280);
+}
+.sld__act-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+}
+.sld__act {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--sld-hair, #dee2e6);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    background: #fff;
+    color: var(--brand-grey-800, #1f1f1f);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.3;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.sld__act:hover {
+    background: var(--brand-grey-50, #f8f9fa);
+    border-color: var(--brand-grey-400, #b0b0b0);
+    color: var(--sld-navy, #001f3f);
+}
+.sld__act:focus-visible { outline: 2px solid var(--sld-gold, #f7c000); outline-offset: 1px; }
+.sld__act--primary {
+    background: var(--sld-navy, #001f3f);
+    border-color: var(--sld-navy, #001f3f);
+    color: #fff;
+}
+.sld__act--primary:hover {
+    background: var(--brand-navy-light, #003366);
+    border-color: var(--brand-navy-light, #003366);
+    color: #fff;
+}
+/* The page's single yellow action — only ever inside the amendment bar. */
+.sld__act--commit {
+    background: var(--sld-gold, #f7c000);
+    border-color: var(--sld-gold, #f7c000);
+    color: var(--sld-navy, #001f3f);
+}
+.sld__act--commit:hover {
+    background: var(--brand-primary-dark, #f4c20d);
+    border-color: var(--brand-primary-dark, #f4c20d);
+    color: var(--sld-navy, #001f3f);
+}
+.sld__act--commit:disabled {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.45);
+    cursor: not-allowed;
+}
+.sld__act--onDark {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.28);
+    color: rgba(255, 255, 255, 0.85);
+}
+.sld__act--onDark:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #fff;
+}
+
+/* Caption strip that names a ledger and tallies it. */
+.sld__ledger-cap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+}
+.sld__ledger-cap--api { margin-top: 1rem; }
+.sld__ledger-cap-label {
+    font-family: var(--sld-mono);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--sld-navy, #001f3f);
+}
+.sld__ledger-cap-count {
+    font-family: var(--sld-mono);
+    font-size: 0.66rem;
+    color: var(--sld-mute, #6b7280);
+}
+
+/* Inline result note — replaces the Bootstrap alert in the ledger. */
+.sld__note {
+    margin-bottom: 0.5rem;
+    padding: 0.375rem 0.625rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    border: 1px solid var(--sld-hair, #dee2e6);
+    font-size: 0.75rem;
+    color: var(--brand-grey-700, #333);
+    background: var(--brand-grey-50, #f8f9fa);
+}
+.sld__note--success { background: var(--brand-success-bg, #dcfce7); border-color: #bbf7d0; color: var(--brand-success, #15803d); }
+.sld__note--warning { background: var(--brand-warning-bg, #fef3c7); border-color: #fde68a; color: #92400e; }
+.sld__note--danger  { background: var(--brand-danger-bg, #fef2f2); border-color: #fecaca; color: var(--brand-danger, #dc2626); }
+.sld__note-list { margin: 0.25rem 0 0; padding-left: 1rem; }
+
+/* Amendment bar — docks under the toolbar and stays put while the ledger or the
+   form scrolls beneath it. Sticky to the TOP, not the bottom: as the last child
+   of its panel a bottom-stuck bar would have no travel and never pin. */
+.sld__commit {
+    position: sticky;
+    top: 0.25rem;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.75rem;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--sld-navy, #001f3f);
+    border-radius: var(--brand-radius-md, 0.75rem);
+    box-shadow: 0 6px 24px rgba(0, 31, 63, 0.28);
+}
+.sld__commit[hidden] { display: none; }
+.sld__commit-tally {
+    display: flex;
+    align-items: baseline;
+    gap: 0.375rem;
+}
+.sld__commit-count {
+    font-family: var(--sld-mono);
+    font-size: 1.375rem;
+    font-weight: 700;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.4);
+    transition: color 0.15s ease;
+}
+/* Something is actually pending — the tally comes up to full strength. */
+.sld__commit--armed .sld__commit-count { color: #fff; }
+.sld__commit-label {
+    font-family: var(--sld-mono);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.6);
+}
+.sld__commit-hint {
+    flex: 1 1 10rem;
+    min-width: 0;
+    margin: 0;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.55);
+}
+.sld__commit-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-left: auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Products ledger cells — identity leads, attributes group, numerals are mono.
+--------------------------------------------------------------------------- */
+.sld__row-num {
+    font-family: var(--sld-mono);
+    font-size: 0.7rem;
+    color: var(--brand-grey-450, #9ca3af);
+}
+.sld-col-act { width: 44px; }
+.sld-col-price { width: 5.5rem; white-space: nowrap; }
+.sld-col-date { width: 6rem; white-space: nowrap; }
+/* Beat Bootstrap's `.table > :not(caption) > * > *` padding so the price column
+   and the date beside it don't read as one run-on heading. */
+.sld__products > thead > tr > .sld-col-date,
+.sld__products > tbody > tr > .sld__date-cell { padding-left: 0.75rem; white-space: nowrap; }
+.sld__cell-stack > * + * { margin-top: 0.15rem; }
+.sld__prod-name {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+    line-height: 1.3;
+}
+.sld__prod-sku {
+    display: block;
+    font-family: var(--sld-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+    color: var(--sld-mute, #6b7280);
+}
+/* Size · unit · colour read as one attribute string, and split apart to edit.
+   The flex/grid lives on inner wrappers — never on the <td>, which must stay a
+   table-cell or the browser drops it out of the row and boxes it separately. */
+.sld__variant-summary { display: block; }
+.sld__vw { font-size: 0.75rem; color: var(--brand-grey-650, #374151); }
+.sld__vw--none { color: var(--brand-grey-400, #b0b0b0); }
+.sld__variant-summary .sld__vw + .sld__vw::before {
+    content: "·";
+    margin: 0 0.3rem;
+    color: var(--brand-grey-400, #b0b0b0);
+}
+.sld__variant-row { display: none; }
+/* Edit mode lays the three attributes out side by side so a product stays one
+   row tall — the table scrolls sideways rather than the rows growing. */
+.sld__products--editing .sld__variant-row {
+    display: flex;
+    gap: 0.375rem;
+}
+.sld__products--editing .sld__variant-row > * { flex: 1 1 7rem; min-width: 7rem; }
+.sld__products--editing .sld__variant-row .pe__edit { min-width: 0; }
+.pe__lbl {
+    display: block;
+    font-family: var(--sld-mono);
+    font-size: 0.55rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--brand-grey-450, #9ca3af);
+    margin-bottom: 0.1rem;
+}
+.sld__code {
+    font-family: var(--sld-mono);
+    font-size: 0.72rem;
+    color: var(--brand-grey-650, #374151);
+}
+.sld__cell-desc {
+    max-width: 15rem;
+    font-size: 0.72rem;
+    color: var(--sld-mute, #6b7280);
+}
+.sld__num {
+    font-family: var(--sld-mono);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--sld-navy, #001f3f);
+}
+.sld__unit {
+    margin-left: 0.25rem;
+    font-size: 0.58rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+}
+.sld__empty-msg-title {
+    margin: 0.375rem 0 0.15rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-650, #374151);
+}
+.sld__empty-msg-sub {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--sld-mute, #6b7280);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sld__act,
+    .sld__form-input,
+    .sld__switch-track,
+    .sld__switch-knob { transition: none; }
+}
+
+/* ============================================================================
+   WOA PICKUP LOCATION PICKER — option cards + inline "add location" card.
+   Used by: workforce/orders_add.html (Customer Information section).
+   Notes: cards wrap a real radio named pickup_location, so the POST payload is
+          unchanged from the select this replaced.
+   ============================================================================ */
+.woa__pl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
+    gap: 0.375rem;
+}
+.woa__pl-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.375rem 0.75rem 0.375rem 1.5rem;
+    background: #fff;
+    border: 1px solid var(--brand-grey-250, #dee2e6);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.woa__pl-card:hover { border-color: var(--brand-grey-400, #b0b0b0); }
+.woa__pl-card--on {
+    border-color: var(--brand-navy, #001f3f);
+    background: var(--brand-grey-50, #f8f9fa);
+    box-shadow: inset 3px 0 0 0 var(--brand-primary, #f7c000);
+}
+.woa__pl-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+.woa__pl-tick {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.55rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.7rem;
+    height: 0.7rem;
+    border: 1px solid var(--brand-grey-400, #b0b0b0);
+    border-radius: 50%;
+    background: #fff;
+    font-size: 0.4rem;
+    color: transparent;
+}
+.woa__pl-card--on .woa__pl-tick {
+    border-color: var(--brand-navy, #001f3f);
+    background: var(--brand-navy, #001f3f);
+    color: #fff;
+}
+.woa__pl-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+    line-height: 1.25;
+}
+.woa__pl-sub {
+    font-size: 0.7rem;
+    color: var(--brand-grey-550, #6b7280);
+}
+.woa__pl-code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.65rem;
+    letter-spacing: -0.01em;
+    color: var(--brand-grey-500, #6c757d);
+}
+.woa__pl-flag {
+    margin-top: 0.15rem;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-primary-text, #8f6b00);
+}
+
+/* --- Add card: dashed sibling of the option cards --- */
+.woa__pl-add {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    padding: 0.375rem 0.75rem;
+    background: transparent;
+    border: 1px dashed var(--brand-grey-300, #dcdcdc);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.woa__pl-add:hover,
+.woa__pl-add--open {
+    border-color: var(--brand-navy, #001f3f);
+    background: var(--brand-grey-50, #f8f9fa);
+}
+.woa__pl-add-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 0.35rem;
+    background: var(--brand-grey-150, #e9ecef);
+    color: var(--brand-navy, #001f3f);
+    font-size: 0.6rem;
+}
+.woa__pl-add-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-700, #333);
+}
+.woa__pl-add-sub {
+    font-size: 0.65rem;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+/* --- Inline create panel (opens under the grid) --- */
+.woa__pl-form {
+    margin-top: 0.375rem;
+    padding: 0.75rem;
+    background: var(--brand-grey-50, #f8f9fa);
+    border: 1px solid var(--brand-grey-250, #dee2e6);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+}
+.woa__pl-form-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.375rem;
+}
+.woa__pl-form-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+}
+.woa__pl-form-close {
+    padding: 0 0.25rem;
+    background: none;
+    border: 0;
+    color: var(--brand-grey-500, #6c757d);
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.woa__pl-form-close:hover { color: var(--brand-grey-800, #1f1f1f); }
+.woa__pl-form-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+.woa__pl-form-msg { font-size: 0.7rem; color: var(--brand-grey-500, #6c757d); }
+.woa__pl-form-msg--err { color: var(--brand-danger, #dc2626); }
+
+@media (prefers-reduced-motion: reduce) {
+    .woa__pl-card,
+    .woa__pl-add { transition: none; }
+}
+
+/* Add-panel action buttons match the delivery-address controls' field height
+   (those still carry an inline height; these use the class instead). */
+.woa__pl-qnas-btn,
+.woa__pl-map-btn {
+    height: 2.125rem;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.woa__pl-form .qnas-plate { margin-bottom: 0.75rem; }
+.woa__pl-form .oap__loc-drop { background: #fff; }
+
+/* --- Seller default gets a light wash + star; non-active locations are listed
+       but visibly stood down. Both sit under the selected state's navy border. --- */
+.woa__pl-card--default {
+    background: var(--brand-accent, #fef9e6);
+    border-color: #f0dfa8;
+}
+.woa__pl-card--default.woa__pl-card--on { border-color: var(--brand-navy, #001f3f); }
+.woa__pl-star {
+    margin-left: 0.2rem;
+    font-size: 0.6rem;
+    color: var(--brand-primary-text, #8f6b00);
+}
+.woa__pl-card--off { background: var(--brand-grey-100, #fafafa); }
+.woa__pl-card--off .woa__pl-title { color: var(--brand-grey-550, #6b7280); font-weight: 500; }
+.woa__pl-flag-off { color: var(--brand-grey-500, #6c757d); }
+
+/* ============================================================
+   wai__ — WhatsApp Instances console (ledger)
+   ------------------------------------------------------------
+   One row = one WhatsApp number, reachable through two
+   INDEPENDENT transports (Evolution, WAHA). Either can be up
+   while the other is down, so the two are given their own
+   lanes, divided by hairlines that run the full height of the
+   table. The rules are structural, not decorative: "which
+   system does this column belong to" was the actual confusion
+   this page caused.
+   Yellow budget for this view: the hero CTA + the default-row
+   flag. Nothing else.
+   ============================================================ */
+
+/* --- Ledger shell ---------------------------------------
+   The frame lives on the scroll container, not the table. Putting
+   the border/radius/overflow on the table itself stopped
+   .table-responsive from clipping it, and the whole PAGE scrolled
+   sideways on mobile instead of just the table. */
+.wai__wrap {
+    border: 1px solid var(--brand-grey-750, #e5e7eb);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+}
+.wai__table {
+    --bs-table-hover-bg: var(--brand-grey-50, #f8f9fa);
+    margin-bottom: 0;
+}
+
+/* --- Header: navy authority band + lane band -------------
+   !important is not decoration here: brandkit-overrides.css ships
+   `.table thead th { background: var(--brand-grey-200) !important }`
+   globally, so a plain declaration loses however specific it is.
+   Same restore-per-page pattern as the navy switches elsewhere. */
+.wai__table > thead > tr > th {
+    background: var(--brand-navy, #001f3f) !important;
+    color: #fff !important;   /* same override: grey ink on navy is unreadable */
+    border-bottom: 0;
+    vertical-align: middle;
+}
+.wai__table > thead > tr.wai__lanes > th {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.62);
+}
+.wai__table > thead > tr.wai__cols > th {
+    background: var(--brand-navy-light, #003366) !important;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+}
+/* Lane name: a hairline sits under it rather than a coloured pill,
+   so the two transports read as equals instead of competing chips. */
+.wai__lanes__tag {
+    display: inline-block;
+    padding-bottom: 0.125rem;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.35);
+    color: #fff;
+    letter-spacing: 0.1em;
+}
+
+/* --- The lane rules (the signature) ---------------------- */
+.wai__table > thead > tr > th.wai__lane-edge {
+    border-left: 1px solid rgba(255, 255, 255, 0.22);
+}
+.wai__table > tbody > tr > td.wai__lane-edge {
+    border-left: 1px solid var(--brand-grey-750, #e5e7eb);
+}
+
+/* --- Body ----------------------------------------------- */
+/* orders.css ships `tbody, tbody td, tbody th { font-size: 0.75rem !important }`
+   and it is loaded on every staff page, dragging this ledger below the 0.8rem
+   legibility floor. Restored explicitly rather than left broken. */
+.wai__table > tbody > tr > td {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem !important;
+    color: var(--brand-grey-800, #1f1f1f);
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+    vertical-align: middle;
+}
+.wai__table > tbody > tr:last-child > td { border-bottom: 0; }
+.wai__name { font-weight: 600; }
+.wai__num {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8125rem;
+    color: var(--brand-grey-700, #333);
+}
+/* Identifiers in mono ink. Bootstrap's <code> ships pink (#d63384),
+   which has no token here and fights the monochrome console. */
+.wai__id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--brand-grey-800, #1f1f1f);
+    background: none;
+    padding: 0;
+    word-break: break-all;
+}
+.wai__note {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: var(--brand-grey-500, #6c757d);
+}
+.wai__note--bad { color: var(--brand-danger-dark, #991b1b); }
+.wai__note a { color: var(--brand-navy-light, #003366); }
+
+/* --- Status: swatch + text, never a loud pill ------------ */
+.wai__st {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.wai__st::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    flex: none;
+    background: currentColor;
+}
+.wai__st--ok   { color: var(--brand-success, #15803d); }
+.wai__st--warn { color: #92400e; }
+.wai__st--bad  { color: var(--brand-danger-dark, #991b1b); }
+.wai__st--idle { color: var(--brand-grey-500, #6c757d); }
+/* Ring rather than a filled dot: "configured but nothing on the
+   other end" is visibly different from a live state. */
+.wai__st--idle::before {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+/* --- Default marker --------------------------------------
+   A sub-line under the instance/session name in both tables, not a
+   column of its own: exactly one row per table carries it, so a column
+   spent its whole width rendering dashes. One marker, not two — no
+   row-edge flag as well, which would say the same thing twice. */
+.wai__default {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-primary-text, #8f6b00);
+}
+.wai__dash { color: var(--brand-grey-400, #b0b0b0); }
+
+/* --- Send log panel: the evidence behind the status badge ----- */
+.wai__logrow > td { border-top: 0; }
+.wai__logs {
+    padding: 0.75rem 1rem;
+    background: var(--brand-grey-100, #fafafa);
+    border-top: 1px solid var(--brand-grey-300, #d4d4d4);
+}
+.wai__logs-head {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-600, #6b6b6b);
+    margin-bottom: 0.5rem;
+}
+.wai__log {
+    display: grid;
+    grid-template-columns: 7rem 4.5rem 8rem 6rem 1fr;
+    gap: 0.75rem;
+    align-items: baseline;
+    padding: 0.375rem 0;
+    font-size: 0.78rem;
+    border-top: 1px solid var(--brand-grey-200, #e8e8e8);
+}
+.wai__log--empty {
+    display: block;
+    color: var(--brand-grey-600, #6b6b6b);
+}
+.wai__log-time { font-variant-numeric: tabular-nums; color: var(--brand-grey-600, #6b6b6b); }
+.wai__log-to { font-family: var(--brand-font-mono, ui-monospace, monospace); }
+.wai__log-detail { color: var(--brand-grey-600, #6b6b6b); word-break: break-word; }
+.wai__log-via {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--brand-grey-600, #6b6b6b);
+}
+.wai__log-res {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.wai__log-res--ok  { color: var(--brand-success-dark, #166534); }
+.wai__log-res--bad { color: var(--brand-danger-dark, #991b1b); }
+
+@media (max-width: 575px) {
+    .wai__log { grid-template-columns: 1fr 1fr; row-gap: 0.25rem; }
+    .wai__log-detail { grid-column: 1 / -1; }
+}
+
+/* --- Row actions: real controls, not coloured glyphs ----- */
+.wai__acts { display: flex; gap: 0.375rem; justify-content: flex-end; }
+.wai__act {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.1rem;
+    height: 2.1rem;
+    padding: 0 0.375rem;
+    font-size: 0.8rem;
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-400, #b0b0b0);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    color: var(--brand-grey-800, #1f1f1f);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.wai__act:hover {
+    background: var(--brand-secondary, #fff7d6);
+    border-color: var(--brand-primary, #f7c000);
+    color: var(--brand-grey-800, #1f1f1f);
+}
+.wai__act--danger:hover {
+    background: var(--brand-danger-bg, #fef2f2);
+    border-color: var(--brand-danger, #dc2626);
+    color: var(--brand-danger-dark, #991b1b);
+}
+.wai__act:focus-visible {
+    outline: 2px solid var(--brand-navy-light, #003366);
+    outline-offset: 2px;
+}
+
+/* --- Empty state ---------------------------------------- */
+.wai__empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--brand-grey-500, #6c757d);
+    font-size: 0.8125rem;
+}
+.wai__empty i { font-size: 2rem; color: var(--brand-grey-300, #dcdcdc); }
+
+/* --- Modal sections: one fieldset per transport ---------- */
+.wai__sec {
+    border: 1px solid var(--brand-grey-750, #e5e7eb);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.wai__sec:last-child { margin-bottom: 0; }
+.wai__sec__hd {
+    float: none;
+    width: auto;
+    padding: 0;
+    margin-bottom: 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-550, #6b7280);
+}
+.wai__sec__hd b { color: var(--brand-grey-800, #1f1f1f); }
+.wai__sec--evo { border-left: 3px solid var(--brand-grey-400, #b0b0b0); }
+.wai__sec--waha { border-left: 3px solid var(--brand-navy-light, #003366); }
+.wai__sec .form-label { font-size: 0.75rem; margin-bottom: 0.25rem; }
+.wai__sec .form-control,
+.wai__sec .form-select { font-size: 0.85rem; min-height: 2.25rem; }
+.wai__sec .form-control:focus,
+.wai__sec .form-select:focus {
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: none;
+}
+.wai__hint { display: block; margin-top: 0.25rem; font-size: 0.72rem; color: var(--brand-grey-500, #6c757d); }
+/* Sits under a checkbox, indented to its label rather than beside it —
+   inside .form-check the hint competed for width and wrapped the label. */
+.wai__hint--check { margin-top: 0.125rem; padding-left: 1.5em; }
+
+/* --- Modal explainer ------------------------------------ */
+.wai__help {
+    border: 1px solid var(--brand-grey-750, #e5e7eb);
+    border-left: 3px solid var(--brand-navy, #001f3f);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--brand-grey-650, #374151);
+    background: var(--brand-grey-50, #f8f9fa);
+}
+.wai__help__hd {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-800, #1f1f1f);
+    margin-bottom: 0.375rem;
+}
+.wai__help ul { margin: 0.375rem 0 0.375rem 0; padding-left: 1rem; }
+.wai__help li { margin-bottom: 0.25rem; }
+.wai__tag {
+    display: inline-block;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--brand-grey-400, #b0b0b0);
+    color: var(--brand-grey-700, #333);
+    background: #fff;
+}
+.wai__tag--waha { border-color: var(--brand-navy-light, #003366); color: var(--brand-navy-light, #003366); }
+
+/* --- Section headers: one per transport -------------------
+   The two tables are separate systems, not two halves of one
+   list, so each gets a titled band above it. The WAHA band
+   carries a navy edge; Evolution a grey one — the same two
+   inks the modal fieldsets already use, so the pairing is
+   learned once and holds across the page. */
+.wai__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.375rem 0 0.375rem 0.75rem;
+    margin-bottom: 0.75rem;
+    border-left: 3px solid var(--brand-grey-400, #b0b0b0);
+}
+/* The second table needs air above it — it is a different system,
+   not the next page of the first one. */
+.wai__head--waha {
+    margin-top: 2rem;
+    border-left-color: var(--brand-navy-light, #003366);
+}
+/* Let the prose take the row's width and the button keep its own; without
+   this the flex parent squeezed the description into a 3-line column while
+   half the row sat empty. */
+.wai__head > div:first-child { flex: 1 1 26rem; min-width: 0; }
+.wai__head__title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+.wai__head__sub {
+    margin: 0.25rem 0 0;
+    max-width: 68ch;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--brand-grey-500, #6c757d);
+}
+.wai__head__sub b { color: var(--brand-grey-700, #333); font-weight: 600; }
+
+/* --- WAHA table: same ledger, navy header band ------------ */
+.wai__table--waha > thead > tr > th {
+    background: var(--brand-navy-light, #003366) !important;
+}
+/* The session name is the row's identifier and gets read back to WAHA by a
+   human. `word-break: break-all` on .wai__id was snapping it mid-token
+   ("EzzyMarketing60 / 00"), which is exactly the kind of misread that ends up
+   creating a second session. Give the column room instead. */
+.wai__table--waha > tbody > tr > td:first-child { min-width: 12rem; }
+.wai__table--waha > tbody > tr > td:first-child .wai__id { word-break: normal; }
+
+/* --- Row-level link picker ------------------------------- */
+.wai__link { margin: 0; }
+.wai__link__sel {
+    min-width: 11rem;
+    max-width: 16rem;
+    height: 2.1rem;
+    padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+    font-size: 0.78rem;
+    border-color: var(--brand-grey-400, #b0b0b0);
+}
+.wai__link__sel:focus {
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: none;
+}
+
+/* Disabled action (the undeletable default session): still visible
+   and still carries its tooltip, so the rule is legible rather than
+   the control just being absent. */
+.wai__act:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.wai__act:disabled:hover {
+    background: var(--brand-grey-100, #fafafa);
+    border-color: var(--brand-grey-400, #b0b0b0);
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+@media (max-width: 767.98px) {
+    .wai__table > tbody > tr > td,
+    .wai__table > thead > tr > th { white-space: normal; }
+    .wai__acts { justify-content: flex-start; flex-wrap: wrap; }
+    .wai__link__sel { min-width: 0; max-width: 100%; }
+}
+
+/* ==========================================================================
+   wasend — shared "send WhatsApp from the EZZY number" composer
+   Used by: workforce/parts/components/_wa_send_modal.html (driver, lead,
+   pricing-inquiry pages). Bootstrap supplies the modal, the button and the
+   form control; everything here is only the ink this console uses.
+   ========================================================================== */
+.wasend__panel {
+    border: 1px solid var(--brand-grey-300, #d9d9d9);
+    border-radius: 0.375rem;
+}
+.wasend__header {
+    background: var(--brand-grey-100, #fafafa);
+    border-bottom: 1px solid var(--brand-grey-300, #d9d9d9);
+}
+.wasend__title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--brand-grey-900, #14181f);
+}
+.wasend__title i { color: #25d366; }
+
+/* Sender/recipient plate: the two facts that decide whether this message is
+   safe to send, stated before the textarea rather than under it. */
+.wasend__meta {
+    border: 1px solid var(--brand-grey-300, #d9d9d9);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.625rem;
+    background: var(--brand-grey-100, #fafafa);
+}
+.wasend__meta-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--brand-grey-600, #6b7280);
+    min-width: 2.5rem;
+}
+.wasend__meta-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: var(--brand-grey-900, #14181f);
+}
+.wasend__meta-chip {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--brand-grey-600, #6b7280);
+    border: 1px solid var(--brand-grey-300, #d9d9d9);
+    border-radius: 0.25rem;
+    padding: 0 0.375rem;
+}
+.wasend__meta-chip:empty { display: none; }
+
+.wasend__textarea { font-size: 0.85rem; }
+
+.wasend__status {
+    font-size: 0.78rem;
+    font-weight: 600;
+    min-height: 1.1rem;
+    color: var(--brand-grey-600, #6b7280);
+}
+.wasend__status--ok { color: #15803d; }
+.wasend__status--error { color: #dc2626; }
+
+/* The shared staff hero band (.wfhero signature applied to every *__hero block)
+   lives in webpages/css/staff-hero.css — kept out of this file so the warehouse
+   shell can load it without pulling in all 636K of workforce.css. */

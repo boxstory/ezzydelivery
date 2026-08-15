@@ -28,6 +28,7 @@ from fleet import models as fleet_models
 from business import models as business_models
 from webpages import models as webpages_models
 from product import models as product_models
+from core.validators import image_validators
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +114,14 @@ class Order(models.Model):
     cod_status_by_staff = models.CharField(
         max_length=100, choices=COD_STATUS_BY_STAFF, blank=True, null=True)
     cod_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Waybill printing. Nothing recorded that a label had been produced, so the
+    # packing bench could not tell a printed parcel from an unprinted one and
+    # duplicates were structural. Stamped by workforce.views.wf_print_waybill.
+    label_printed_at = models.DateTimeField(
+        blank=True, null=True, db_index=True,
+        help_text="When a waybill for this order was last printed. Null = never printed.")
+    label_print_count = models.PositiveIntegerField(
+        default=0, help_text="How many times a waybill has been printed — reprints are expected, not errors.")
     dl_included = models.BooleanField(default=True)
     dl_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     order_type = models.CharField(
@@ -124,6 +133,23 @@ class Order(models.Model):
     scheduled_delivery = models.BooleanField(default=False, help_text="Whether delivery is scheduled for a specific time")
     scheduled_date = models.DateField(blank=True, null=True, help_text="Scheduled delivery date if scheduled_delivery is True")
     scheduled_time = models.TimeField(blank=True, null=True, help_text="Scheduled delivery time if scheduled_delivery is True")
+    SCHEDULED_OCCASION_CHOICES = [
+        ('', 'Not specified'),
+        ('birthday', 'Birthday'),
+        ('anniversary', 'Anniversary'),
+        ('wedding', 'Wedding'),
+        ('gift', 'Gift / Surprise'),
+        ('event', 'Event / Party'),
+        ('customer_request', 'Customer requested this day'),
+        ('restock', 'Restock / Business schedule'),
+        ('other', 'Other'),
+    ]
+    scheduled_occasion = models.CharField(
+        max_length=30, choices=SCHEDULED_OCCASION_CHOICES, blank=True, default='',
+        help_text="Why this order must land on the scheduled date (birthday, event, ...)")
+    scheduled_note = models.CharField(
+        max_length=160, blank=True, default='',
+        help_text="Instruction for the scheduled delivery, e.g. 'Birthday — do not deliver early'")
 
     # Preferred delivery time slot
     TIME_SLOT_CHOICES = [
@@ -226,6 +252,30 @@ class Order(models.Model):
         ('ai_estimate', 'AI Estimate'),
     ]
     coords_accuracy = models.CharField(max_length=15, choices=COORDS_ACCURACY, blank=True, null=True)
+
+    # --- Pickup → drop distance ---
+    # Stored rather than recomputed per screen so the order detail, the seller
+    # ledger and any export all quote the same number. Straight-line, not road
+    # distance. Kept current by orders.signals on every save.
+    route_distance_km = models.DecimalField(
+        max_digits=6, decimal_places=1, blank=True, null=True,
+        help_text="Straight-line distance from pickup to drop, in km"
+    )
+    route_distance_exact = models.BooleanField(
+        default=False,
+        help_text="False when either end fell back to its zone centre — the "
+                  "distance is an estimate, not a measurement"
+    )
+    ROUTE_DISTANCE_SOURCE = [
+        ('osrm', 'Road distance'),
+        ('straight_line', 'Straight line'),
+        ('zone_estimate', 'Zone estimate'),
+    ]
+    route_distance_source = models.CharField(
+        max_length=20, choices=ROUTE_DISTANCE_SOURCE, blank=True, default='',
+        help_text="Which method produced route_distance_km — a road distance is "
+                  "a measurement, the other two are approximations"
+    )
 
     # Delivery completion tracking
     delivered_at = models.DateTimeField(blank=True, null=True, help_text="When the order was delivered")
@@ -428,7 +478,8 @@ class OrderBarcode(models.Model):
         Order, on_delete=models.CASCADE, related_name='order_barcode')
     order_number = models.CharField(max_length=255, blank=True, null=True,)
     barcode =  models.ImageField(
-        upload_to="business/orders/", default="business/orders/barcode.png", blank=True, null=True)
+        upload_to="business/orders/", default="business/orders/barcode.png", blank=True, null=True,
+        validators=image_validators(max_mb=2))
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -597,6 +648,7 @@ class OrderStatusHistory(models.Model):
         ('cod_status_by_staff', 'COD Status'),
         ('dl_task_status', 'Delivery Task Status'),
         ('pickup_status', 'First-Mile Pickup'),
+        ('driver_change', 'Driver Assignment'),
         ('dl_task_publish', 'Published to Fleet'),
         ('order_edited', 'Order Edited'),
         ('task_edited', 'Task Edited'),
@@ -695,6 +747,10 @@ class OneDriveSource(models.Model):
     is_active = models.BooleanField(default=True)
     last_import_at = models.DateTimeField(blank=True, null=True)
     last_import_count = models.PositiveIntegerField(default=0)
+    last_sync_at = models.DateTimeField(blank=True, null=True,
+        help_text="Last successful automatic/manual sync fetch of this file")
+    last_sync_count = models.PositiveIntegerField(default=0,
+        help_text="Rows seen during the last sync fetch")
     last_import_by = models.ForeignKey(
         'auth.User', on_delete=models.SET_NULL, null=True, blank=True
     )

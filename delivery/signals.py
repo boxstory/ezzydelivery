@@ -34,6 +34,7 @@ def delivery_task_pre_save(sender, instance, **kwargs):
             instance._old_dl_task_status = old.dl_task_status
             instance._old_dl_task_publish = old.dl_task_publish
             instance._old_dl_task_date = old.dl_task_date
+            instance._old_driver_id = old.driver_id
 
             if instance.dl_task_status != old.dl_task_status:
 
@@ -240,6 +241,104 @@ def _send_location_verification_on_publish(task):
         logger.error(f"Error sending location verification on publish for task {task.pk}: {e}", exc_info=True)
 
 
+def _flag_location_discrepancy(task, distance_km, driver_lat, driver_lng,
+                               customer_lat, customer_lng, accuracy):
+    """Open (or refresh) a review when a delivery was completed far from the pin.
+
+    Deliberately does NOT move anything. Either the driver pressed "delivered"
+    away from the drop or the customer's saved coordinates are wrong, and the
+    only thing that can tell them apart is a person looking at both points.
+    A review already decided is left alone so a re-save cannot reopen it.
+    """
+    from django.conf import settings
+
+    threshold = getattr(settings, 'DELIVERY_GPS_FLAG_KM', 1.0)
+    if distance_km is None or distance_km < threshold:
+        return
+    if not (driver_lat and driver_lng and customer_lat and customer_lng):
+        return
+
+    try:
+        review, created = delivery_models.DeliveryLocationReview.objects.get_or_create(
+            task=task,
+            defaults={
+                'order': task.order,
+                'driver': task.driver,
+                'gap_km': distance_km,
+                'driver_latitude': driver_lat,
+                'driver_longitude': driver_lng,
+                'customer_latitude': customer_lat,
+                'customer_longitude': customer_lng,
+                'gps_accuracy': accuracy,
+            },
+        )
+        if not created and review.status == 'pending':
+            # Still open — keep the evidence current with the latest completion.
+            review.gap_km = distance_km
+            review.driver_latitude = driver_lat
+            review.driver_longitude = driver_lng
+            review.customer_latitude = customer_lat
+            review.customer_longitude = customer_lng
+            review.gps_accuracy = accuracy
+            review.save(update_fields=[
+                'gap_km', 'driver_latitude', 'driver_longitude',
+                'customer_latitude', 'customer_longitude', 'gps_accuracy',
+                'updated_at',
+            ])
+        if created:
+            logger.warning(
+                "LOCATION REVIEW: task %s delivered %.1f km from the customer pin",
+                task.dl_task_number, distance_km,
+            )
+    except Exception:
+        # Never let a review row block a delivery from completing.
+        logger.exception('Could not flag location discrepancy for task %s', task.pk)
+
+
+def _driver_label(driver):
+    """Name staff identify a driver by — Driver.__str__ is the login username."""
+    if not driver:
+        return ''
+    user = getattr(driver, 'user', None)
+    name = ((user.get_full_name() if user else '') or '').strip()
+    label = name or getattr(user, 'username', '') or f"Driver {driver.pk}"
+    code = getattr(driver, 'driver_code', '')
+    return f"{label} — {code}" if code else label
+
+
+def _log_driver_change(task, old_driver_id):
+    """Write a driver assign / reassign / unassign row to the order timeline."""
+    from fleet.models import Driver
+    from orders.models import OrderStatusHistory
+
+    old_driver = Driver.objects.select_related('user').filter(pk=old_driver_id).first() if old_driver_id else None
+    new_driver = task.driver
+
+    # Same attribute the order logger reads, so any caller that already names
+    # its user (staff endpoints, fleet PWA) attributes the row for free.
+    actor = getattr(task, '_status_changed_by', None)
+    if not getattr(actor, 'is_authenticated', False):
+        actor = None
+
+    if new_driver and old_driver:
+        note = 'Reassigned to another driver'
+    elif new_driver:
+        note = 'Driver assigned'
+    else:
+        note = 'Driver removed from the task'
+
+    OrderStatusHistory.objects.create(
+        order_id=task.order_id,
+        field_name='driver_change',
+        old_value=str(old_driver_id or ''),
+        new_value=str(task.driver_id or ''),
+        old_display=_driver_label(old_driver)[:100] or 'No driver',
+        new_display=_driver_label(new_driver)[:100] or 'No driver',
+        changed_by=actor,
+        notes=note,
+    )
+
+
 def _create_task_status_point(task, old_status, new_status):
     """Create a TaskStatusPoint with driver GPS and distance from delivery location."""
     from fleet import models as fleet_models
@@ -248,11 +347,11 @@ def _create_task_status_point(task, old_status, new_status):
     delivery_lat = delivery_lng = None
     distance_km = None
 
-    # Get latest driver GPS location
+    # Latest driver GPS location. A coarse fix is only stamped when the driver
+    # has no precise one at all — the position on a status change is evidence,
+    # so it must not silently degrade to a 500m cell tower reading.
     if task.driver_id:
-        latest_loc = fleet_models.DriverLocation.objects.filter(
-            driver_id=task.driver_id
-        ).order_by('-created_at').first()
+        latest_loc = fleet_models.DriverLocation.latest_for_driver(task.driver_id)
         if latest_loc:
             driver_lat = latest_loc.latitude
             driver_lng = latest_loc.longitude
@@ -308,6 +407,16 @@ def _create_task_status_point(task, old_status, new_status):
             f"{distance_km:.1f}km from delivery address"
         )
         DeliveryTask.objects.filter(pk=task.pk).update(delivery_distance_flag=True)
+
+    # Open a review when the driver's delivery GPS and the customer's marked
+    # location are far apart. One of the two is wrong and the system cannot tell
+    # which, so this only raises the question — staff answer it and the answer is
+    # what corrects the record. The flag above merely logs; this is the queue.
+    if new_status == 'delivered' and distance_km is not None:
+        _flag_location_discrepancy(
+            task, distance_km, driver_lat, driver_lng,
+            delivery_lat, delivery_lng, accuracy,
+        )
 
     # Fix 16: GPS spoofing detection — impossible jump between status points
     if distance_km is not None:
@@ -387,6 +496,18 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
         except Exception as e:
             logger.error(f"Error logging delivery task status history: {e}")
 
+    # Log driver assignment changes to the order timeline. Every path writes the
+    # task row — staff assign/reassign, bulk assign, the edit form, a driver
+    # accepting, a pickup hand-off — so the record is kept here rather than in
+    # each caller, where it was simply never written and reassignments vanished.
+    if not created and instance.order_id:
+        try:
+            old_driver_id = getattr(instance, '_old_driver_id', None)
+            if old_driver_id != instance.driver_id:
+                _log_driver_change(instance, old_driver_id)
+        except Exception as e:
+            logger.error(f"Error logging driver change for task {instance.pk}: {e}")
+
     # Capture GPS point on every status change
     if not created:
         old_status = getattr(instance, '_old_dl_task_status', None)
@@ -403,6 +524,17 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
         new_status = instance.dl_task_status
         if old_status is not None and old_status != new_status and instance.order_id:
             _sync_order_status_from_task(instance)
+
+            # The delivery leg ended — pull any first-mile pickup still sitting in the
+            # driver pool. 'failed'/'rejected' are left alone: those can be retried.
+            if new_status in ('cancelled', 'delivered', 'partial_delivery'):
+                try:
+                    from delivery.services.pickup import cancel_pickup_for_order
+                    label = 'cancelled' if new_status == 'cancelled' else 'delivered'
+                    cancel_pickup_for_order(
+                        instance.order, reason=f"Delivery task was {label}")
+                except Exception as e:
+                    logger.warning(f"Pickup cleanup failed for task {instance.pk}: {e}")
 
         # Fire COD collected trigger when delivered (incl. partial) with COD
         if old_status is not None and new_status in ('delivered', 'partial_delivery') and instance.cod_collected and instance.cod_collected_amount:

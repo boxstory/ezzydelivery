@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Full staff record for one driver — status, stats, deliveries, details, vehicles, documents, zones, settings
+Used by: workforce_views.driver_detail at /workforce/drivers/<driver_id>/
+Notes: Status changes are superadmin-gated in Settings; the hero dropdown writes immediately.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}{{ driver.user.first_name }} {{ driver.user.last_name }} - Driver Detail{% endblock title %}
 
@@ -135,8 +142,18 @@
             <small>({{ driver.driver_rating_count }})</small>
         </span>
         {% endif %}
+
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_driver_detail_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
 </div>
+
+<div class="wfnote" id="workforce_driver_detail_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_driver_detail_card_notes' %}" hidden></div>
 
 <!-- Stats Strip -->
 <div class="wdd__stats">
@@ -305,6 +322,12 @@
                         <a href="https://wa.me/974{{ driver.driver_whatsapp }}" target="_blank" class="wdd__action-btn wdd__action-btn--wa">
                             <i class="fa-brands fa-whatsapp"></i> WhatsApp
                         </a>
+                        <button type="button" class="wdd__action-btn wdd__action-btn--wa"
+                                data-wasend-open
+                                data-wasend-to="974{{ driver.driver_whatsapp }}"
+                                data-wasend-name="{{ driver.driver_name|default:driver.user.get_full_name|escape }}">
+                            <i class="fa-solid fa-paper-plane"></i> Send from EZZY
+                        </button>
                         {% endif %}
                     </div>
                 </div>
@@ -1037,6 +1060,8 @@
     </div>
 </div>
 {% endif %}
+
+{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="driver_onboarding" wa_message=wa_send_message %}
 
 {% endblock content %}
 

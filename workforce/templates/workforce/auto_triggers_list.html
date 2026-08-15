@@ -1,9 +1,17 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Catalogue of every automatic trigger — WhatsApp notifications + sender routing, webhook events, system auto-actions
+Used by: workforce_views.auto_triggers_list at /workforce/auto-triggers/
+Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+       Rows are already filtered to the viewer's departments in the view; the department
+       tabs below only narrow what is on screen (data-dept on every row).
+{% endcomment %}
 
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}?v=20260718f" rel="stylesheet" type="text/css" />
-<link href="{% static 'workforce/css/auto-triggers.css' %}?v=20260718f" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/auto-triggers.css' %}?v=20260807b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -13,46 +21,86 @@
         <h2><i class="fa-solid fa-bolt me-1" aria-hidden="true"></i>Auto Triggers</h2>
         <span class="oli__hero__subtitle">| Automated actions across the platform</span>
     </div>
+    <button type="button" class="wfnote__btn" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_auto_triggers_list_card_notes"
+            title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+    </button>
 </header>
 
 <div class="col-12 p-3 atl">
+
+    <div class="wfnote" id="workforce_auto_triggers_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_auto_triggers_list_card_notes' %}" hidden></div>
+
+    <!-- Department split: one tab per desk the viewer holds -->
+    {% if dept_tabs|length > 1 %}
+    <nav id="workforce_auto_triggers_nav_departments" class="atl__tabs d-flex flex-wrap align-items-center gap-1 mb-3"
+         aria-label="Filter triggers by department">
+        <span class="atl__tabs-label">Department</span>
+        <button type="button" class="atl__tab" data-dept-tab="all">
+            All<span class="atl__tab-count">{{ total_rows }}</span>
+        </button>
+        {% for tab in dept_tabs %}
+        <button type="button" class="atl__tab" data-dept-tab="{{ tab.code }}">
+            {{ tab.label }}<span class="atl__tab-count">{{ tab.count }}</span>
+        </button>
+        {% endfor %}
+    </nav>
+    {% elif dept_tabs %}
+    <p class="atl__deskline mb-3">
+        <i class="fa-solid fa-user-group me-1" aria-hidden="true"></i>
+        {{ dept_tabs.0.label }} desk — {{ dept_tabs.0.count }} trigger{{ dept_tabs.0.count|pluralize }} owned by your department.
+    </p>
+    {% endif %}
+
+    <div id="workforce_auto_triggers_empty_filter" class="atl__empty d-none">
+        <i class="fa-solid fa-inbox me-1" aria-hidden="true"></i>
+        No automatic triggers are assigned to this department yet.
+    </div>
 
     <!-- WhatsApp Notifications Section -->
     <div class="card mb-4">
         <div class="card-header d-flex align-items-center gap-2 wa-notif__header">
             <i class="fa-brands fa-whatsapp wa-notif__icon fs-5"></i>
             <strong>WhatsApp Notifications</strong>
-            <span class="badge wa-notif__channel-badge ms-auto">via Evolution API</span>
+            <span class="atl__live ms-auto" data-atl-live>
+                <span class="atl__live-on" data-atl-on>0</span>
+                <span class="atl__live-total">/ <span data-atl-total>0</span></span> on
+            </span>
+            <span class="badge wa-notif__channel-badge">via Evolution API</span>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th style="width:4%">#</th>
-                            <th style="width:14%">Trigger</th>
-                            <th style="width:16%">Description</th>
-                            <th style="width:14%">Action</th>
-                            <th style="width:9%">Pages</th>
-                            <th style="width:14%">From WhatsApp</th>
-                            <th style="width:7%">Status</th>
-                            <th style="width:9%" class="text-center">Enabled</th>
-                            <th style="width:10%" class="text-center">Edit</th>
+                            <th class="atl__col--num">#</th>
+                            <th class="atl__col--trigger">Trigger</th>
+                            <th class="atl__col--desc">Description</th>
+                            <th class="atl__col--action">Action</th>
+                            <th class="atl__col--pages">Pages</th>
+                            <th class="atl__col--from">From WhatsApp</th>
+                            <th class="atl__col--status">Status</th>
+                            <th class="atl__col--switch text-center">Enabled</th>
+                            <th class="atl__col--edit text-center">Edit</th>
                         </tr>
                     </thead>
                     <tbody>
                         <!-- Sub-group: Sender Routing -->
-                        <tr class="table-light">
+                        <tr class="table-light" data-dept-group-header="routes">
                             <td colspan="9" class="fw-bold text-uppercase small text-muted">
-                                <i class="fa-solid fa-route me-1"></i>Sender Routing — which number each section sends from
+                                <i class="fa-solid fa-route me-1"></i>Sender Routing — which number <em class="text-lowercase fw-normal">and channel</em> each section sends from
                             </td>
                         </tr>
                         {% for r in wa_routes %}
-                        <tr id="route-row-{{ r.section }}">
-                            <td>{{ forloop.counter }}</td>
+                        <tr id="route-row-{{ r.section }}" data-dept="{{ r.department }}" data-dept-group="routes">
+                            <td class="atl__rownum">{{ forloop.counter }}</td>
                             <td>
                                 <strong>{{ r.label }}</strong>
-                                <div><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ r.code }}</code></div>
+                                <div><code class="text-muted small user-select-all atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ r.code }}</code></div>
+                                <div class="atl__dept" data-dept-chip>{{ r.department_label }}</div>
                             </td>
                             <td>{{ r.description }}</td>
                             <td><code>{{ r.action }}</code></td>
@@ -83,13 +131,14 @@
                                         <span class="text-muted small">Not configured</span>
                                     {% endif %}
                                 </div>
-                                <div class="mt-1">
-                                    <span class="badge wa-notif__via-badge" title="Delivery channel for this route">
-                                        <i class="fa-solid fa-paper-plane me-1"></i>via Evolution API
+                                <div class="mt-1" id="route-viacell-{{ r.section }}" data-channel="{{ r.channel }}">
+                                    <span class="badge {% if r.channel_active %}wa-notif__via-badge{% else %}wa-notif__via-badge wa-notif__via-badge--off{% endif %}"
+                                          title="{{ r.channel_name }} — {{ r.channel_detail }}{% if not r.channel_active %} (not configured on this server){% endif %}">
+                                        <i class="fa-solid fa-paper-plane me-1"></i>via {{ r.channel_name }}
                                     </span>
                                 </div>
                             </td>
-                            <td>
+                            <td class="atl__cell--rail">
                                 <span class="badge {% if not r.is_enabled %}bg-secondary{% elif r.instance %}bg-success{% else %}bg-warning text-dark{% endif %}" id="route-badge-{{ r.section }}">
                                     {% if not r.is_enabled %}Disabled{% elif r.instance %}Active{% else %}Default{% endif %}
                                 </span>
@@ -109,18 +158,90 @@
                             </td>
                         </tr>
                         {% endfor %}
+                        <!-- Sub-group: Manual Composers -->
+                        <tr class="table-light" data-dept-group-header="composers">
+                            <td colspan="9" class="fw-bold text-uppercase small text-muted">
+                                <i class="fa-solid fa-keyboard me-1"></i>Manual Composers — where staff type a message <em class="text-lowercase fw-normal">and send it themselves</em>
+                            </td>
+                        </tr>
+                        {% for c in wa_composers %}
+                        <tr id="composer-row-{{ c.code }}" data-dept="{{ c.department }}" data-dept-group="composers">
+                            <td class="atl__rownum">{{ forloop.counter }}</td>
+                            <td>
+                                <strong>{{ c.label }}</strong>
+                                <div><code class="text-muted small user-select-all atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ c.code }}</code></div>
+                                <div class="atl__dept" data-dept-chip>{{ c.department_label }}</div>
+                            </td>
+                            <td>{{ c.description }}</td>
+                            <td><code>{{ c.action }}</code></td>
+                            <td>
+                                {% if c.links %}
+                                <div class="d-flex flex-column gap-1 align-items-start">
+                                    {% for name, url in c.links %}
+                                    <a href="{{ url }}" class="wa-notif__page-link">
+                                        {{ name }}<i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                    </a>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted small">every list &amp; detail page</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.section %}
+                                    {# The number is not set here — it is whatever the route above says. #}
+                                    <a href="#route-row-{{ c.section }}" class="atl__uses-route" title="Uses the {{ c.route_label }} sender route">
+                                        <i class="fa-solid fa-route me-1"></i>{{ c.route_label }}
+                                    </a>
+                                    {% if c.route %}
+                                    <div class="mt-1">
+                                        {% if c.route.instance %}
+                                            <span class="badge wa-notif__from-badge"><i class="fa-brands fa-whatsapp me-1"></i>{{ c.route.instance.phone_number|default:c.route.instance.instance_name }}</span>
+                                        {% elif wa_sender.number %}
+                                            <span class="badge wa-notif__from-badge wa-notif__from-badge--default"><i class="fa-brands fa-whatsapp me-1"></i>{{ wa_sender.number }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted small">Not routed here</span>
+                                {% endif %}
+                            </td>
+                            <td class="atl__cell--rail">
+                                {% if not c.template %}
+                                    <span class="badge bg-secondary-subtle text-secondary border" title="Staff type the whole message — there is no stored body to edit">Free text</span>
+                                {% elif c.template.is_enabled %}
+                                    <span class="badge bg-success">Pre-filled</span>
+                                {% else %}
+                                    <span class="badge bg-secondary" title="Composer opens blank — sending still works">Blank</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="text-muted small" title="A person sends this — there is nothing to switch off">Manual</span>
+                            </td>
+                            <td class="text-center">
+                                {% if c.template_url %}
+                                <a href="{{ c.template_url }}" class="btn btn-sm btn-outline-secondary" title="Edit the message body: {{ c.template.label }}">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </a>
+                                {% else %}
+                                <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
                         <!-- Sub-group: Notification Triggers -->
-                        <tr class="table-light">
+                        <tr class="table-light" data-dept-group-header="notif">
                             <td colspan="9" class="fw-bold text-uppercase small text-muted">
                                 <i class="fa-brands fa-whatsapp me-1"></i>Notification Triggers — automatic messages per event
                             </td>
                         </tr>
                         {% for t in wa_triggers %}
-                        <tr id="trigger-row-{{ t.trigger_key }}">
-                            <td>{{ forloop.counter }}</td>
+                        <tr id="trigger-row-{{ t.trigger_key }}" data-dept="{{ t.department }}" data-dept-group="notif">
+                            <td class="atl__rownum">{{ forloop.counter }}</td>
                             <td>
                                 <strong id="label-{{ t.trigger_key }}">{{ t.label }}</strong>
-                                <div><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ t.trigger_key }}</code></div>
+                                <div><code class="text-muted small user-select-all atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ t.trigger_key }}</code></div>
+                                <div class="atl__dept" data-dept-chip>{{ t.get_department_display }}</div>
                             </td>
                             <td><span id="desc-{{ t.trigger_key }}">{{ t.description }}</span></td>
                             <td><code id="action-{{ t.trigger_key }}">{{ t.action }}</code></td>
@@ -155,7 +276,7 @@
                                     {% endif %}
                                 </div>
                             </td>
-                            <td>
+                            <td class="atl__cell--rail">
                                 <span class="badge {% if t.is_enabled %}bg-success{% else %}bg-secondary{% endif %}" id="badge-{{ t.trigger_key }}">
                                     {% if t.is_enabled %}Active{% else %}Disabled{% endif %}
                                 </span>
@@ -188,33 +309,38 @@
         <div class="card-header d-flex align-items-center gap-2">
             <i class="fa-solid fa-globe text-primary fs-5"></i>
             <strong>Webhook Events</strong>
-            <span class="badge bg-primary ms-auto">API Webhooks</span>
+            <span class="atl__live ms-auto" data-atl-live>
+                <span class="atl__live-on" data-atl-on>0</span>
+                <span class="atl__live-total">/ <span data-atl-total>0</span></span> on
+            </span>
+            <span class="badge bg-primary">API Webhooks</span>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th style="width:4%">#</th>
-                            <th style="width:20%">Event</th>
-                            <th style="width:22%">Description</th>
-                            <th style="width:22%">Action</th>
-                            <th style="width:8%">Status</th>
-                            <th style="width:10%" class="text-center">Enabled</th>
-                            <th style="width:12%" class="text-center">Edit</th>
+                            <th class="atl__col--num">#</th>
+                            <th class="atl__col--trigger-wide">Event</th>
+                            <th class="atl__col--desc-wide">Description</th>
+                            <th class="atl__col--action-wide">Action</th>
+                            <th class="atl__col--status">Status</th>
+                            <th class="atl__col--switch text-center">Enabled</th>
+                            <th class="atl__col--edit text-center">Edit</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for t in wh_triggers %}
-                        <tr id="trigger-row-{{ t.trigger_key }}">
-                            <td>{{ forloop.counter }}</td>
+                        <tr id="trigger-row-{{ t.trigger_key }}" data-dept="{{ t.department }}">
+                            <td class="atl__rownum">{{ forloop.counter }}</td>
                             <td>
                                 <code id="label-{{ t.trigger_key }}">{{ t.label }}</code>
-                                <div><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ t.trigger_key }}</code></div>
+                                <div><code class="text-muted small user-select-all atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ t.trigger_key }}</code></div>
+                                <div class="atl__dept" data-dept-chip>{{ t.get_department_display }}</div>
                             </td>
                             <td><span id="desc-{{ t.trigger_key }}">{{ t.description }}</span></td>
                             <td><code id="action-{{ t.trigger_key }}">{{ t.action }}</code></td>
-                            <td>
+                            <td class="atl__cell--rail">
                                 <span class="badge {% if t.is_enabled %}bg-success{% else %}bg-secondary{% endif %}" id="badge-{{ t.trigger_key }}">
                                     {% if t.is_enabled %}Active{% else %}Disabled{% endif %}
                                 </span>
@@ -247,33 +373,38 @@
         <div class="card-header d-flex align-items-center gap-2">
             <i class="fa-solid fa-gears text-warning fs-5"></i>
             <strong>System Auto-Actions</strong>
-            <span class="badge bg-warning text-dark ms-auto">Django Signals</span>
+            <span class="atl__live ms-auto" data-atl-live>
+                <span class="atl__live-on" data-atl-on>0</span>
+                <span class="atl__live-total">/ <span data-atl-total>0</span></span> on
+            </span>
+            <span class="badge bg-warning text-dark">Django Signals</span>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th style="width:4%">#</th>
-                            <th style="width:22%">Action</th>
-                            <th style="width:22%">Description</th>
-                            <th style="width:22%">Action Taken</th>
-                            <th style="width:8%">Status</th>
-                            <th style="width:10%" class="text-center">Enabled</th>
-                            <th style="width:12%" class="text-center">Edit</th>
+                            <th class="atl__col--num">#</th>
+                            <th class="atl__col--trigger-wide">Trigger</th>
+                            <th class="atl__col--desc-wide">Description</th>
+                            <th class="atl__col--action-wide">Action</th>
+                            <th class="atl__col--status">Status</th>
+                            <th class="atl__col--switch text-center">Enabled</th>
+                            <th class="atl__col--edit text-center">Edit</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for t in sys_triggers %}
-                        <tr id="trigger-row-{{ t.trigger_key }}">
-                            <td>{{ forloop.counter }}</td>
+                        <tr id="trigger-row-{{ t.trigger_key }}" data-dept="{{ t.department }}">
+                            <td class="atl__rownum">{{ forloop.counter }}</td>
                             <td>
                                 <strong id="label-{{ t.trigger_key }}">{{ t.label }}</strong>
-                                <div><code class="text-muted small user-select-all" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast && showToast('Copied!','success'))" style="cursor:pointer">{{ t.trigger_key }}</code></div>
+                                <div><code class="text-muted small user-select-all atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ t.trigger_key }}</code></div>
+                                <div class="atl__dept" data-dept-chip>{{ t.get_department_display }}</div>
                             </td>
                             <td><span id="desc-{{ t.trigger_key }}">{{ t.description }}</span></td>
                             <td><code id="action-{{ t.trigger_key }}">{{ t.action }}</code></td>
-                            <td>
+                            <td class="atl__cell--rail">
                                 <span class="badge {% if t.is_enabled %}bg-success{% else %}bg-secondary{% endif %}" id="badge-{{ t.trigger_key }}">
                                     {% if t.is_enabled %}Active{% else %}Disabled{% endif %}
                                 </span>
@@ -324,6 +455,18 @@
                         {% endfor %}
                     </select>
                     <div class="form-text">All messages from this section will send from the selected number. Choose Default to use the platform default sender.</div>
+
+                    <label class="form-label fw-bold mt-3" for="editRouteChannel"><i class="fa-solid fa-paper-plane wa-notif__icon me-1"></i>Send via channel</label>
+                    <select class="form-select" name="route_channel" id="editRouteChannel">
+                        {% for val, lbl in route_channel_choices %}
+                        <option value="{{ val }}">{{ lbl }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        The same number can run on both stacks — Evolution addresses it by
+                        instance name, WAHA by session name — so each section picks its own.
+                        <a href="{% url 'workforce:whatsapp_instances_list' %}">Manage numbers &amp; sessions</a>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
@@ -391,11 +534,93 @@
 </div>
 
 <script>
+// --- Department tabs --------------------------------------------------------
+// The server already narrowed the rows to the departments this user holds; this
+// only decides which of those are on screen. Cards with nothing left are hidden
+// so a desk never stares at three empty tables.
+(function () {
+    var page = document.querySelector('.atl');
+    if (!page) return;
+    var tabs = Array.prototype.slice.call(page.querySelectorAll('[data-dept-tab]'));
+    var emptyBox = document.getElementById('workforce_auto_triggers_empty_filter');
+
+    // "n / m on" per section. Counts the rows currently ON SCREEN, so the reading
+    // follows the department tabs, and re-runs after every toggle. Exposed on
+    // window because toggleTrigger/toggleRoute live outside this closure.
+    function recount() {
+        page.querySelectorAll('.card').forEach(function (card) {
+            var live = card.querySelector('[data-atl-live]');
+            if (!live) return;
+            var rows = card.querySelectorAll('tbody tr[data-dept]:not(.d-none)');
+            var total = 0, on = 0;
+            rows.forEach(function (row) {
+                var box = row.querySelector('.form-check-input');
+                if (!box) return;
+                total++;
+                if (box.checked) on++;
+            });
+            live.querySelector('[data-atl-on]').textContent = on;
+            live.querySelector('[data-atl-total]').textContent = total;
+            live.classList.toggle('atl__live--none', on === 0);
+        });
+    }
+    window.atlRecount = recount;
+
+    function applyDept(dept) {
+        var totalVisible = 0;
+        page.querySelectorAll('.card').forEach(function (card) {
+            var shown = 0;
+            card.querySelectorAll('tbody tr[data-dept]').forEach(function (row) {
+                var show = (dept === 'all' || row.dataset.dept === dept);
+                row.classList.toggle('d-none', !show);
+                if (show) {
+                    shown++;
+                    var num = row.querySelector('.atl__rownum');
+                    if (num) num.textContent = shown;
+                }
+            });
+            // A sub-group heading survives only if its group still has a row.
+            card.querySelectorAll('tbody tr[data-dept-group-header]').forEach(function (hdr) {
+                var group = hdr.dataset.deptGroupHeader;
+                var alive = card.querySelector(
+                    'tbody tr[data-dept-group="' + group + '"]:not(.d-none)');
+                hdr.classList.toggle('d-none', !alive);
+            });
+            card.classList.toggle('d-none', shown === 0);
+            totalVisible += shown;
+        });
+        // Only one desk on screen at a time — drop the per-row department chip.
+        page.querySelectorAll('[data-dept-chip]').forEach(function (chip) {
+            chip.classList.toggle('d-none', dept !== 'all');
+        });
+        if (emptyBox) emptyBox.classList.toggle('d-none', totalVisible > 0);
+        recount();
+        tabs.forEach(function (btn) {
+            btn.classList.toggle('atl__tab--active', btn.dataset.deptTab === dept);
+        });
+        try {
+            var url = new URL(window.location.href);
+            if (dept === 'all') { url.searchParams.delete('dept'); }
+            else { url.searchParams.set('dept', dept); }
+            window.history.replaceState({}, '', url);
+        } catch (e) { /* history is a nicety, never break the filter over it */ }
+    }
+
+    tabs.forEach(function (btn) {
+        btn.addEventListener('click', function () { applyDept(btn.dataset.deptTab); });
+    });
+    applyDept("{{ active_dept|escapejs }}");
+})();
+
 function openRouteModal(section, label) {
     document.getElementById('editRouteSection').value = section;
     document.getElementById('editRouteTitle').textContent = label;
     var cell = document.getElementById('route-fromcell-' + section);
     document.getElementById('editRouteInstance').value = (cell && cell.dataset.instanceId) ? cell.dataset.instanceId : '';
+    // Preselect the channel the row is actually on, so saving the number back
+    // doesn't silently reset a WAHA section to Evolution.
+    var via = document.getElementById('route-viacell-' + section);
+    document.getElementById('editRouteChannel').value = (via && via.dataset.channel) ? via.dataset.channel : 'evolution';
     new bootstrap.Modal(document.getElementById('editRouteModal')).show();
 }
 
@@ -424,6 +649,7 @@ function toggleRoute(section, checkbox) {
                 badge.textContent = 'Default';
                 checkbox.checked = true;
             }
+            if (typeof window.atlRecount === 'function') window.atlRecount();
             if (typeof showToast === 'function') showToast(data.is_enabled ? 'Route enabled' : 'Route disabled — section unrestricted', 'success');
         } else {
             checkbox.checked = !checkbox.checked;
@@ -462,6 +688,7 @@ function toggleTrigger(key, checkbox) {
                 badge.textContent = 'Disabled';
                 checkbox.checked = false;
             }
+            if (typeof window.atlRecount === 'function') window.atlRecount();
             if (typeof showToast === 'function') showToast(data.is_enabled ? 'Trigger enabled' : 'Trigger disabled', 'success');
         } else {
             checkbox.checked = !checkbox.checked;

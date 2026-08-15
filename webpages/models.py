@@ -16,8 +16,12 @@ Related:
     - webpages.forms: Form classes for these models
 """
 
+import re as _re
+
 from django.conf import settings
 from django.db import models
+
+from core.email_normalize import EmailNormalizedModel
 
 
 # =============================================================================
@@ -25,7 +29,7 @@ from django.db import models
 # =============================================================================
 
 
-class ContactUs(models.Model):
+class ContactUs(EmailNormalizedModel, models.Model):
     """
     General contact form submissions from website visitors.
 
@@ -44,6 +48,8 @@ class ContactUs(models.Model):
     Admin:
         Accessible in Django admin under "Contact Us"
     """
+    EMAIL_FIELDS = ('email',)
+
     full_name = models.CharField(max_length=100)
     email = models.EmailField()
     mobile = models.BigIntegerField()
@@ -63,7 +69,7 @@ class ContactUs(models.Model):
 # =============================================================================
 
 
-class Careers(models.Model):
+class Careers(EmailNormalizedModel, models.Model):
     """
     Job application submissions from the careers page.
 
@@ -81,6 +87,8 @@ class Careers(models.Model):
     Admin:
         Accessible in Django admin under "Careers"
     """
+    EMAIL_FIELDS = ('email',)
+
     full_name = models.CharField(max_length=100)
     email = models.EmailField()
     mobile = models.BigIntegerField()
@@ -101,7 +109,7 @@ class Careers(models.Model):
 # =============================================================================
 
 
-class PricingEnquiry(models.Model):
+class PricingEnquiry(EmailNormalizedModel, models.Model):
     """
     Detailed pricing inquiry from potential business stores.
 
@@ -143,6 +151,8 @@ class PricingEnquiry(models.Model):
     Admin:
         Accessible in Django admin under "Pricing Inquiries"
     """
+    EMAIL_FIELDS = ('email',)
+
     # Personal Information
     full_name = models.CharField(max_length=100)
     business_name = models.CharField(max_length=100)
@@ -254,6 +264,144 @@ class PricingEnquiry(models.Model):
     def __str__(self):
         return self.business_name
 
+    # ── Online presence ───────────────────────────────────────────────────────
+    # These four columns are free text from a public form that asks for "username
+    # or profile URL", so in practice they hold anything: a full URL, a bare
+    # handle, a business name with spaces, an Instagram link typed into the
+    # website box, or filler like "N/A" and "under development". Staff screens
+    # need to know which of those can actually be opened, so the parsing lives
+    # here rather than in a template — a bare "ezzyshop.qa" put straight into an
+    # href would resolve against ezzydelivery.qa, and "https://N/A" opens nothing.
+
+    # Filler seen in the real table; these mean "nothing on file", not a name.
+    _PRESENCE_FILLER = {
+        'n/a', 'na', 'n.a', 'none', 'no', 'nil', 'nope', 'nothing', 'null', '-', '--',
+        '.', '..', 'tbd', 'x', 'xx', 'not available', 'not yet', 'under development',
+        'under construction', 'coming soon', 'www.', 'http://', 'https://', 'soon',
+    }
+    _HANDLE_OK = _re.compile(r'^[A-Za-z0-9._-]{2,60}$')
+    _DOMAINISH = _re.compile(r'^[^\s]*[a-z0-9-]+\.[a-z]{2,}(?:[/?#][^\s]*)?$', _re.IGNORECASE)
+
+    @staticmethod
+    def _absolute(value):
+        """Bare domain → https:// URL."""
+        value = (value or '').strip()
+        if value.startswith(('http://', 'https://')):
+            return value
+        return 'https://' + value.lstrip('/')
+
+    @classmethod
+    def _classify_presence(cls, raw, prefers):
+        """(url, kind) for one stored value. url is '' when nothing openable can be
+        made of it — that is what makes an icon render disabled instead of linking
+        somewhere broken. `prefers` names the column it came from, which is what
+        decides whether a bare handle means Instagram or Facebook."""
+        value = (raw or '').strip()
+        if not value or value.lower().strip('.:/ ') in cls._PRESENCE_FILLER:
+            return '', prefers
+
+        lowered = value.lower()
+        # Host wins over the column: people paste their Instagram into "website".
+        if 'instagram.com' in lowered:
+            return cls._absolute(value), 'instagram'
+        if 'facebook.com' in lowered or 'fb.com' in lowered:
+            return cls._absolute(value), 'facebook'
+        # In a social column, a value with no scheme and no path is a handle even
+        # when it contains a dot — "poolboat.store" and "aiwahome.qa" are Instagram
+        # handles, not websites, and the column the sender chose says which.
+        # Checked before the domain rule below, which would otherwise send the
+        # Instagram icon to a website.
+        if (prefers in ('instagram', 'facebook')
+                and not value.startswith(('http://', 'https://'))
+                and '/' not in value):
+            # Whitespace means a business name was typed ("Ara and co."), not a
+            # handle. Squashing the spaces would invent a profile that may not
+            # exist, so leave it unlinked and keep the text in the tooltip.
+            if not any(ch.isspace() for ch in value):
+                # Trailing decoration is common ("@ayecynluxe✨"); keep the part of
+                # the handle the platform would actually accept.
+                handle = ''.join(
+                    ch for ch in value.lstrip('@')
+                    if ch.isascii() and (ch.isalnum() or ch in '._-')
+                )
+                if cls._HANDLE_OK.match(handle) and any(c.isalnum() for c in handle):
+                    domain = 'instagram.com' if prefers == 'instagram' else 'facebook.com'
+                    return 'https://{}/{}'.format(domain, handle), prefers
+            return '', prefers
+
+        if cls._DOMAINISH.match(value):
+            return cls._absolute(value), 'website' if prefers == 'website' else prefers
+
+        # Nothing openable: a website column with no domain in it ("aiwahome",
+        # "ssdsgf"), or a legacy value that names no host.
+        return '', prefers
+
+    @property
+    def online_presence(self):
+        """Website / Facebook / Instagram (+ a legacy 'other') for staff screens.
+
+        Always returns the three fixed channels so a table row keeps its shape,
+        each with `url` ('' = show it disabled) and `raw` for the tooltip. A value
+        lands in the channel its host says it belongs to, and only falls back to
+        the column it was typed into when the host is not recognisable.
+        """
+        slots = {
+            'website': {'key': 'website', 'label': 'Website', 'icon': 'fa-solid fa-globe', 'url': '', 'raw': ''},
+            'facebook': {'key': 'facebook', 'label': 'Facebook', 'icon': 'fa-brands fa-facebook-f', 'url': '', 'raw': ''},
+            'instagram': {'key': 'instagram', 'label': 'Instagram', 'icon': 'fa-brands fa-instagram', 'url': '', 'raw': ''},
+            'other': {'key': 'other', 'label': 'Other profile', 'icon': 'fa-solid fa-link', 'url': '', 'raw': ''},
+        }
+        sources = (
+            (self.website_url, 'website'),
+            (self.facebook_profile, 'facebook'),
+            (self.instagram_profile, 'instagram'),
+            (self.social_profile, 'other'),      # legacy column, network unknown
+        )
+        for raw, prefers in sources:
+            raw = (raw or '').strip()
+            if not raw:
+                continue
+            url, kind = self._classify_presence(raw, prefers)
+            # A legacy value that named no known host is a plain link, not a website.
+            if prefers == 'other' and kind == 'other' and url:
+                kind = 'other'
+            target = slots.get(kind, slots['other'])
+            if target['url'] and url:
+                target = slots['other']          # channel already taken — keep both
+            if url and not target['url']:
+                target['url'] = url
+            # Keep the typed text either way: an unusable value ("Ara and co.") still
+            # tells staff something, so it shows in the disabled icon's tooltip.
+            if not target['raw']:
+                target['raw'] = raw
+
+        channels = [slots['website'], slots['facebook'], slots['instagram']]
+        if slots['other']['url'] or slots['other']['raw']:
+            channels.append(slots['other'])
+        return channels
+
+    def _presence_url(self, key):
+        for channel in self.online_presence:
+            if channel['key'] == key:
+                return channel['url']
+        return ''
+
+    @property
+    def website_link(self):
+        return self._presence_url('website')
+
+    @property
+    def facebook_link(self):
+        return self._presence_url('facebook')
+
+    @property
+    def instagram_link(self):
+        return self._presence_url('instagram')
+
+    @property
+    def has_online_presence(self):
+        return any(c['url'] for c in self.online_presence)
+
     class Meta:
         verbose_name_plural = "Pricing Inquiries"
 
@@ -301,8 +449,10 @@ class WhatsAppInquiry(models.Model):
         verbose_name_plural = "WhatsApp Inquiries"
 
 
-class DeliveryRequest(models.Model):
+class DeliveryRequest(EmailNormalizedModel, models.Model):
     """Model for delivery requests from users/non-sellers"""
+
+    EMAIL_FIELDS = ('customer_email',)
 
     DELIVERY_TYPE_CHOICES = (
         ('pick_and_delivery', 'Pick and Delivery'),

@@ -66,9 +66,11 @@ from business import forms as business_forms
 from business import models as business_models
 from core import forms as core_forms
 from core import models as core_models
+from core import signup_origin
 from core.context_processors import get_cached_profile, get_cached_business
 from fleet import forms as fleet_forms
 from fleet import models as fleet_models
+from core.validators import safe_int
 
 # Local aliases for commonly used models
 Profile = core_models.Profile
@@ -387,6 +389,79 @@ def join_driver_start_ar(request):
     return render(request, 'core/join_driver_start_ar.html', context)
 
 
+def _notify_driver_application_received(driver, profile):
+    """One-time 'thanks, we'll reach back' WhatsApp after an application is submitted.
+
+    Sent from the fleet admin number and guarded by
+    ``driver_meta['application_thanks_wa']`` so re-submissions and later edits
+    never message the applicant twice. Send failures are logged only — they must
+    never break the submission.
+    """
+    from core.whatsapp_utils import send_driver_application_thank_you
+
+    if driver is None or profile is None:
+        return
+    meta = driver.driver_meta or {}
+    if (meta.get('application_thanks_wa') or {}).get('sent_at'):
+        return
+    phone = (
+        profile.whatsapp or profile.phone
+        or driver.driver_whatsapp or driver.driver_phone or ''
+    ).strip()
+    if not phone:
+        logger.info("Driver %s has no WhatsApp number — thank-you message skipped", driver.pk)
+        return
+
+    try:
+        result = send_driver_application_thank_you(phone, profile.first_name or '')
+    except Exception:
+        logger.exception("Driver application thank-you WhatsApp failed for driver %s", driver.pk)
+        return
+
+    if not result.get('success'):
+        logger.warning(
+            "Driver application thank-you WhatsApp not sent for driver %s: %s",
+            driver.pk, result.get('error') or result.get('status_code'))
+        return
+
+    meta['application_thanks_wa'] = {
+        'sent_at': dj_timezone.now().isoformat(),
+        'phone': phone,
+    }
+    driver.driver_meta = meta
+    driver.save(update_fields=['driver_meta'])
+
+
+def _fire_driver_application_submitted(driver, profile, is_new):
+    """Run the staff-built AutoFlows for a submitted driver application.
+
+    Separate from the applicant thank-you above: that one message is fixed and
+    goes to the applicant, while these flows are whatever the marketing/fleet
+    desk wired on the Auto Triggers page (alert the recruiter group, ping the
+    assignee, open a webhook). Never allowed to break the submission.
+    """
+    if driver is None:
+        return
+    try:
+        from core.auto_flow_executor import execute_flows_for_trigger
+
+        phone = ((getattr(profile, 'whatsapp', '') or getattr(profile, 'phone', '')
+                  or driver.driver_whatsapp or driver.driver_phone or '')).strip()
+        name = ''
+        if profile is not None:
+            name = f"{profile.first_name or ''} {profile.last_name or ''}".strip() or profile.username or ''
+        execute_flows_for_trigger('driver_application_submitted', extra_context={
+            'driver_id': driver.pk,
+            'driver_name': name,
+            'driver_phone': phone,
+            'phone': phone,
+            'is_new_application': 'yes' if is_new else 'no',
+            'driver_url': f"https://ezzydelivery.qa/workforce/drivers/{driver.driver_id}/",
+        })
+    except Exception:
+        logger.exception("driver_application_submitted flows failed for driver %s", driver.pk)
+
+
 def join_driver(request):
     """Public driver application — Google sign-in, then 3 sections: profile, vehicle, documents.
 
@@ -413,7 +488,13 @@ def join_driver(request):
     is_verified_driver = False
 
     if request.user.is_authenticated:
-        profile, _ = core_models.Profile.objects.get_or_create(user=request.user)
+        profile = core_models.Profile.objects.filter(user=request.user).first()
+        if profile is None:
+            # Profile row created here rather than at core:profile_add — the
+            # session already carries the driver intent from this page view.
+            profile = signup_origin.apply_to(
+                core_models.Profile(user=request.user), request)
+            profile.save()
         if profile.is_staff:
             messages.warning(request, "Staff accounts cannot apply as drivers.")
             return redirect('workforce:wf_dashboard')
@@ -560,13 +641,19 @@ def join_driver(request):
                     slabs = [s for s in request.POST.getlist('work_time_slabs') if s in valid_slabs]
                     driver.work_time_slabs = ','.join(slabs)
 
-                    # Registration location captured by the browser at submit time
+                    # Registration location captured by the browser on submit, and
+                    # on any later save while it is still missing. Never overwritten:
+                    # the first capture is the one that means "where they applied".
                     try:
                         geo_lat = float(request.POST.get('geo_lat', ''))
                         geo_lng = float(request.POST.get('geo_lng', ''))
                     except (TypeError, ValueError):
                         geo_lat = geo_lng = None
-                    if geo_lat is not None and -90 <= geo_lat <= 90 and -180 <= geo_lng <= 180:
+                    has_location = bool(
+                        (driver.driver_meta or {}).get('registration_location', {}).get('lat')
+                    )
+                    if (geo_lat is not None and not has_location
+                            and -90 <= geo_lat <= 90 and -180 <= geo_lng <= 180):
                         meta = driver.driver_meta or {}
                         meta['registration_location'] = {
                             'lat': geo_lat,
@@ -615,6 +702,8 @@ def join_driver(request):
                 messages.success(request, "Progress saved! You can continue your application anytime.")
             else:
                 logger.info(f"Driver application submitted for user {request.user.id} (new={is_new_driver})")
+                _notify_driver_application_received(driver, profile)
+                _fire_driver_application_submitted(driver, profile, is_new_driver)
                 messages.success(request, "Application submitted! Our team will review it and contact you on WhatsApp.")
             return redirect('core:join_driver')
         else:
@@ -638,7 +727,7 @@ def join_driver(request):
             pform.initial['first_name'] = request.user.first_name
             pform.initial['last_name'] = request.user.last_name
         try:
-            initial_step = min(4, max(1, int(request.GET.get('step', 1))))
+            initial_step = safe_int(request.GET.get('step'), default=1, minimum=1, maximum=4)
         except (TypeError, ValueError):
             initial_step = 1
 
@@ -659,6 +748,13 @@ def join_driver(request):
          'icon': DOC_ICONS.get(dt, 'fa-file')}
         for dt in APPLY_DOC_TYPES
     ]
+
+    # Ask the browser for a location only while we still lack one — applicants who
+    # already have it (or who applied before the capture existed and are back to
+    # edit) should not be re-prompted on every save.
+    needs_location = not bool(
+        driver and (driver.driver_meta or {}).get('registration_location', {}).get('lat')
+    )
 
     # Verified drivers are locked to the status page; pending ones may still edit
     if is_verified_driver:
@@ -725,6 +821,7 @@ def join_driver(request):
         'show_status_only': show_status_only,
         'already_business': already_business,
         'progress': sections_progress,
+        'needs_location': needs_location,
         'user_email': request.user.email if request.user.is_authenticated else '',
     }
     return render(request, 'core/join_us_driver.html', context)
@@ -1206,8 +1303,13 @@ def profile_add(request):
             logger.info(f"Creating profile for user {request.user.id}")
             profile = profileaddform.save(commit=False)
             profile.user_id = request.user.id
+            # Attribute the signup from what the session recorded before/around login
+            signup_origin.apply_to(profile, request)
             profile.save()
-            logger.info(f"Profile created successfully for user {request.user.id}")
+            logger.info(
+                f"Profile created successfully for user {request.user.id} "
+                f"(source={profile.signup_source})"
+            )
             messages.success(request, 'Profile created! Now complete your details and choose your role.')
             return redirect('core:profile_complete_update')
         else:

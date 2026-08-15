@@ -1,0 +1,87 @@
+{% comment %}
+Purpose: "About this page" notes panel for auto_flow_logs.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_auto_flow_logs_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The run history for one <strong>automation flow</strong>. Every time the flow fires — for real or
+            as a test — a row is written here with what it did, how long it took, and what went wrong if it
+            failed. This is where you come when someone says "the message never arrived": the row tells you
+            whether the flow ran at all, and if it ran, which stage broke. The flow itself is edited and
+            switched on or off from <strong>Automation Flows</strong>.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Flow strip</dt>
+                        <dd class="wfnote__def">The bar under the header repeats what this flow is —
+                            its trigger, its action, and whether it is currently active or disabled.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Tallies</dt>
+                        <dd class="wfnote__def">Success, failed, test and total counts across the flow's
+                            whole history, not just the rows shown below.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Result</dt>
+                        <dd class="wfnote__def">The stage-by-stage trace of that run — config check, message
+                            render, connection check, send — each marked OK or failed.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Error</dt>
+                        <dd class="wfnote__def">A short label guessed from the message (timeout, auth,
+                            not found, server error) plus the raw text underneath.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Duration</dt>
+                        <dd class="wfnote__def">Milliseconds the whole run took. A long one usually means an
+                            outbound call waited on a timeout.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Back to Flows</dt>
+                        <dd class="wfnote__def">Returns to the list, where you can edit, toggle or test-run
+                            this flow.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Status values</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Success</dt>
+                        <dd class="wfnote__def">Every stage passed. For a WhatsApp or webhook flow that
+                            means the message or call actually went out.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Failed</dt>
+                        <dd class="wfnote__def">A stage raised an error and the run stopped there. The
+                            failing stage is named at the front of the error text.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Test</dt>
+                        <dd class="wfnote__def">The run came from the <em>Test</em> button on the flows list
+                            rather than a real event.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Only the <strong>50 most recent runs</strong> are listed. The tallies above count
+                    everything ever recorded, so they will usually be higher than the rows you can see.</li>
+                <li>A test run of a WhatsApp or webhook flow is <strong>not a dry run</strong> — it really
+                    sends the message or calls the URL. Status, driver-assignment, notification and
+                    create-task actions are simulated only.</li>
+                <li>An empty log does not mean the flow is broken: if the flow or its trigger is disabled,
+                    or no matching event happened, nothing is written at all.</li>
+                <li>This page is read-only. There is no retry and no delete — fix the flow's settings and
+                    let it fire again, or use <em>Test</em> to reproduce the failure.</li>
+            </ul>
+        </section>
+    

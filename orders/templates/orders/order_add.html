@@ -1,8 +1,9 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load business_console %}
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-mobile.css' %}?v=20260728g">
+<link rel="stylesheet" href="{% static 'business/css/business-mobile.css' %}?v=20260808a">
 {% endblock extra_css %}
 
 {% block content %}
@@ -162,6 +163,51 @@
       </div>
     </div>
 
+    <!-- Scheduled Delivery Section (Mobile) -->
+    <div class="pwa-form-section">
+      <div class="pwa-form-section__header">
+        <i class="fas fa-calendar-day"></i> Scheduled Delivery
+      </div>
+      <p class="oap__sched__intro">
+        For gifts and dated occasions — birthdays, anniversaries, events. The order is held
+        and delivered on the day you pick, not earlier.
+      </p>
+      <div class="form-check oap__sched__toggle">
+        <input type="checkbox" class="form-check-input" name="scheduled_delivery"
+               id="mobile_scheduled_delivery" value="on">
+        <label class="form-check-label" for="mobile_scheduled_delivery">Deliver on a specific date</label>
+      </div>
+      <div id="mobile_scheduled_fields" hidden>
+        <div class="pwa-form-group">
+          <label class="pwa-form-group__label" for="mobile_scheduled_date">Delivery Date</label>
+          <input type="date" name="scheduled_date" id="mobile_scheduled_date" class="pwa-form-group__input">
+        </div>
+        <div class="pwa-form-group">
+          <label class="pwa-form-group__label" for="mobile_scheduled_time">Preferred Hour (optional)</label>
+          <input type="time" name="scheduled_time" id="mobile_scheduled_time" class="pwa-form-group__input">
+        </div>
+        <div class="pwa-form-group">
+          <label class="pwa-form-group__label" for="mobile_scheduled_occasion">Occasion</label>
+          <select name="scheduled_occasion" id="mobile_scheduled_occasion" class="pwa-form-group__input">
+            <option value="">Not specified</option>
+            <option value="birthday">Birthday</option>
+            <option value="anniversary">Anniversary</option>
+            <option value="wedding">Wedding</option>
+            <option value="gift">Gift / Surprise</option>
+            <option value="event">Event / Party</option>
+            <option value="customer_request">Customer requested this day</option>
+            <option value="restock">Restock / Business schedule</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="pwa-form-group">
+          <label class="pwa-form-group__label" for="mobile_scheduled_note">Instruction</label>
+          <input type="text" name="scheduled_note" id="mobile_scheduled_note" maxlength="160"
+                 class="pwa-form-group__input" placeholder="e.g. Birthday — call before arriving">
+        </div>
+      </div>
+    </div>
+
     <!-- Products Section (Mobile) -->
     <div class="pwa-form-section" id="mobile_products_section">
       <div class="pwa-form-section__header">
@@ -229,14 +275,7 @@
 <div class="oap__page d-none d-md-block" id="orders_add_container_main">
   <!-- Page Header -->
   <div class="oap__header-bar">
-    <div class="oap__header-bar-content">
-      <div class="oap__title-section">
-        <h1 class="oap__title-main">
-          <i class="fas fa-plus-circle me-2"></i>Create New Order
-        </h1>
-        <p class="oap__subtitle-main">Fill in the details below to create a delivery order</p>
-      </div>
-
+    {% bconheader eyebrow="Orders" live="New" icon="fa-solid fa-plus-circle" title="Create New Order" subtitle="Fill in the details below to create a delivery order." %}
       <!-- View Toggle -->
       <div class="oap__view-toggle" id="view_toggle_container">
         <button type="button" class="oap__toggle-btn active" id="btn_form_view">
@@ -248,7 +287,7 @@
           <span>Bulk Entry</span>
         </button>
       </div>
-    </div>
+    {% endbconheader %}
 
     <!-- Quick Actions -->
     <div class="oap__quick-actions">
@@ -270,6 +309,10 @@
       </a>
     </div>
   </div>
+
+  {% if has_ecom_api %}
+  {% include "orders/parts/_shopify_import_panel.html" %}
+  {% endif %}
 
   <!-- Form View (Default) -->
   <div class="oap__form-wrap" id="form_view_container">
@@ -341,11 +384,134 @@
               </label>
               {{ form.delivery_speed }}
             </div>
-            <div class="col-md-6">
-              <label class="form-label" for="id_pickup_location">
+            <!-- Pickup Location — option cards + inline "add location" card
+                 (same picker as the staff Add Order page). The radios keep the
+                 form field name, so AddOrderForm validates it unchanged. -->
+            <div class="col-12">
+              <label class="form-label">
                 <i class="fas fa-store me-1 text-muted"></i>Pickup Location
               </label>
-              {{ form.pickup_location }}
+              <div class="oap__pl" id="oap_pickup_picker"
+                   data-add-url="{% url 'business:pickup_location_add_ajax' %}">
+                <div class="oap__pl-grid" id="oap_pickup_grid">
+                  {% for location in pickup_locations %}
+                  <label class="oap__pl-card{% if location.is_default %} oap__pl-card--default{% endif %}{% if location.pickup_status != 'active' %} oap__pl-card--off{% endif %}{% if location.id|stringformat:"s" == selected_pickup_id %} oap__pl-card--on{% endif %}">
+                    <input type="radio" class="oap__pl-input" name="pickup_location"
+                           value="{{ location.id }}" {% if location.id|stringformat:"s" == selected_pickup_id %}checked{% endif %}>
+                    <span class="oap__pl-tick"><i class="fa-solid fa-check"></i></span>
+                    <span class="oap__pl-title">
+                      {{ location.pickup_location_title }}
+                      {% if location.is_default %}<i class="fa-solid fa-star oap__pl-star" title="Your default"></i>{% endif %}
+                    </span>
+                    <span class="oap__pl-sub">{{ location.locality|default:"—" }}</span>
+                    <span class="oap__pl-code">
+                      Z {{ location.pickup_zone_no|default:"—" }} / S {{ location.pickup_street_no|default:"—" }} / B {{ location.pickup_building_no|default:"—" }}
+                    </span>
+                    {% if location.is_default or location.is_fulfilment_center or location.pickup_status != 'active' %}
+                    <span class="oap__pl-flag">
+                      {% if location.is_default %}Default{% endif %}
+                      {% if location.is_fulfilment_center %}{% if location.is_default %} · {% endif %}Fulfilment centre{% endif %}
+                      {% if location.pickup_status != 'active' %}<span class="oap__pl-flag-off">{% if location.is_default or location.is_fulfilment_center %} · {% endif %}{{ location.get_pickup_status_display }}</span>{% endif %}
+                    </span>
+                    {% endif %}
+                  </label>
+                  {% endfor %}
+                  <button type="button" class="oap__pl-add" id="oap_pickup_add_btn"
+                          aria-expanded="false" aria-controls="oap_pickup_form">
+                    <span class="oap__pl-add-icon"><i class="fa-solid fa-plus"></i></span>
+                    <span class="oap__pl-add-label">Add pickup location</span>
+                    <span class="oap__pl-add-sub">Saved to your stores</span>
+                  </button>
+                </div>
+
+                <div class="oap__pl-form" id="oap_pickup_form" hidden>
+                  <div class="oap__pl-form-head">
+                    <span class="oap__pl-form-title">New pickup location</span>
+                    <button type="button" class="oap__pl-form-close" id="oap_pickup_cancel_btn" title="Cancel">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                  <div class="row g-2 mb-2">
+                    <div class="col-md-6">
+                      <label class="form-label" for="oap_pl_title">Title <span class="text-danger">*</span></label>
+                      <input type="text" class="form-control form-control-sm" id="oap_pl_title" placeholder="e.g., Main Store">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="oap_pl_locality">Locality</label>
+                      <input type="text" class="form-control form-control-sm" id="oap_pl_locality" placeholder="e.g., West Bay">
+                    </div>
+                  </div>
+                  <div class="row g-2 mb-2">
+                    <div class="col-4 col-md-3">
+                      <label class="form-label" for="oap_pl_zone"><i class="fas fa-map me-1 text-muted"></i>Zone</label>
+                      <input type="number" class="form-control form-control-sm" id="oap_pl_zone" min="0" placeholder="e.g., 45">
+                    </div>
+                    <div class="col-4 col-md-3">
+                      <label class="form-label" for="oap_pl_street"><i class="fas fa-road me-1 text-muted"></i>Street</label>
+                      <input type="number" class="form-control form-control-sm" id="oap_pl_street" min="0" placeholder="e.g., 123">
+                    </div>
+                    <div class="col-4 col-md-3">
+                      <label class="form-label" for="oap_pl_building"><i class="fas fa-building me-1 text-muted"></i>Building</label>
+                      <input type="number" class="form-control form-control-sm" id="oap_pl_building" min="0" placeholder="e.g., 56">
+                    </div>
+                    <div class="col-auto d-flex align-items-end">
+                      <button type="button" class="btn btn-sm btn-outline-warning oap__pl-qnas-btn" id="oap_pl_qnas_btn"
+                              onclick="qnasValidateAndFill({zoneId:'oap_pl_zone', streetId:'oap_pl_street', buildingId:'oap_pl_building', latId:'oap_pl_lat', lngId:'oap_pl_lon', zoneNameId:'oap_pl_zone_name', resultId:'oap_pl_qnas_result', btnId:'oap_pl_qnas_btn', mapId:'oap_pl_map_link', accuracyId:'oap_pl_accuracy', accuracyBadgeId:'oap_pl_accuracy_badge'})">
+                        <i class="fa-solid fa-satellite-dish me-1"></i>Validate
+                      </button>
+                    </div>
+                  </div>
+                  <div class="row g-2 mb-2">
+                    <div class="col-12">
+                      <label class="form-label" for="oap_pl_loc_paste">Paste / Drop Shared Location</label>
+                      <div id="oap_pl_loc_drop" class="oap__loc-drop"
+                           ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+                           ondrop="locDropHandle(event, {latId:'oap_pl_lat', lngId:'oap_pl_lon', mapId:'oap_pl_map_link', accuracyId:'oap_pl_accuracy', accuracyBadgeId:'oap_pl_accuracy_badge', resultId:'oap_pl_loc_result', inputId:'oap_pl_loc_paste'})">
+                        <i class="fa-solid fa-location-dot oap__loc-drop__icon"></i>
+                        <input type="text" id="oap_pl_loc_paste" class="form-control form-control-sm oap__loc-drop__input"
+                               placeholder="Paste WhatsApp/Google Maps link (e.g. https://maps.google.com/?q=25.247,51.427) or drop the shared location here"
+                               oninput="whatsappLocationFill(this.value, {latId:'oap_pl_lat', lngId:'oap_pl_lon', mapId:'oap_pl_map_link', accuracyId:'oap_pl_accuracy', accuracyBadgeId:'oap_pl_accuracy_badge', resultId:'oap_pl_loc_result'})">
+                      </div>
+                      <div id="oap_pl_loc_result" class="mt-1"></div>
+                    </div>
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-4 col-md-3">
+                      <label class="form-label" for="oap_pl_lat">Latitude</label>
+                      <input type="text" class="form-control form-control-sm" id="oap_pl_lat" placeholder="--" readonly>
+                    </div>
+                    <div class="col-4 col-md-3">
+                      <label class="form-label" for="oap_pl_lon">Longitude</label>
+                      <input type="text" class="form-control form-control-sm" id="oap_pl_lon" placeholder="--" readonly>
+                    </div>
+                    <div class="col-4 col-md-3">
+                      <label class="form-label" for="oap_pl_zone_name">Zone Name</label>
+                      <input type="text" class="form-control form-control-sm" id="oap_pl_zone_name" placeholder="Auto-filled" readonly>
+                    </div>
+                    <div class="col-auto d-flex align-items-end gap-2">
+                      <a id="oap_pl_map_link" href="#" target="_blank" class="btn btn-sm btn-outline-secondary disabled oap__pl-map-btn" title="View on Google Maps">
+                        <i class="fa-solid fa-map-location-dot"></i>
+                      </a>
+                      <input type="hidden" id="oap_pl_accuracy" value="">
+                    </div>
+                  </div>
+                  <div class="d-flex gap-2 mt-2">
+                    <span id="oap_pl_accuracy_badge"></span>
+                    <div id="oap_pl_qnas_result"></div>
+                  </div>
+                  <div class="oap__pl-form-actions">
+                    <label class="oap__pl-default-check">
+                      <input type="checkbox" id="oap_pl_is_default">
+                      <span>Make this my default</span>
+                    </label>
+                    <button type="button" class="btn btn-primary btn-sm" id="oap_pickup_save_btn">
+                      <span class="oap-pl-idle"><i class="fa-solid fa-check me-1"></i>Save &amp; select</span>
+                      <span class="oap-pl-loading d-none"><span class="spinner-border spinner-border-sm me-1"></span>Saving…</span>
+                    </button>
+                    <span class="oap__pl-form-msg" id="oap_pickup_form_msg"></span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -521,6 +687,58 @@
               </label>
               {{ form.preferred_time_slot }}
               <div class="form-text">Customer's preferred delivery window</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scheduled Delivery — a date the order must land on, not before -->
+      <div class="oap__form-section oap__sched" id="oap_scheduled_section">
+        <div class="oap__form-section-header">
+          <i class="fas fa-calendar-day"></i>
+          <h3>Scheduled Delivery <span class="badge bg-secondary ms-1 fw-normal">Optional</span></h3>
+        </div>
+        <div class="oap__form-section-body">
+          <p class="oap__sched__intro">
+            Use this for gifts and dated occasions — birthdays, anniversaries, weddings, events.
+            The order is held and delivered <strong>on the day you pick</strong>, not earlier.
+            It stays off the daily dispatch board until the day before delivery.
+          </p>
+          <div class="form-check oap__sched__toggle">
+            {{ form.scheduled_delivery }}
+            <label class="form-check-label" for="id_scheduled_delivery">
+              Deliver on a specific date
+            </label>
+          </div>
+          <div class="row g-3 oap__sched__fields" id="oap_scheduled_fields" hidden>
+            <div class="col-md-4">
+              <label class="form-label" for="id_scheduled_date">
+                <i class="fas fa-calendar me-1 text-muted"></i>Delivery Date
+              </label>
+              {{ form.scheduled_date }}
+              {% if form.scheduled_date.errors %}<div class="invalid-feedback d-block">{{ form.scheduled_date.errors.0 }}</div>{% endif %}
+              <div class="form-text">The day it must arrive</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="id_scheduled_time">
+                <i class="fas fa-hourglass-half me-1 text-muted"></i>Preferred Hour
+              </label>
+              {{ form.scheduled_time }}
+              <div class="form-text">Optional — we aim for this hour</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="id_scheduled_occasion">
+                <i class="fas fa-gift me-1 text-muted"></i>Occasion
+              </label>
+              {{ form.scheduled_occasion }}
+              <div class="form-text">Helps the driver handle it right</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="id_scheduled_note">
+                <i class="fas fa-pen me-1 text-muted"></i>Instruction
+              </label>
+              {{ form.scheduled_note }}
+              <div class="form-text">e.g. "Birthday — call before arriving, do not mention the sender"</div>
             </div>
           </div>
         </div>
@@ -764,8 +982,9 @@
     // Pickup location data with lat/lon
     const pickupLocationData = {{ pickup_locations_json|safe }};
 
-    // Auto-fill zone/street/building from pickup location for fulfilled clients
-    $("#id_pickup_location").on("change", function() {
+    // Auto-fill zone/street/building from pickup location for fulfilled clients.
+    // Delegated on the card grid — the select became a set of radio cards.
+    $(document).on("change", "#oap_pickup_grid .oap__pl-input", function() {
       const selectedLocationId = $(this).val();
       if (selectedLocationId && pickupLocationData[selectedLocationId]) {
         const location = pickupLocationData[selectedLocationId];
@@ -789,11 +1008,150 @@
       }
     });
 
-    // Initialize select2 in pickuplocation search field
     if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
-      $("#id_pickup_location").select2();
       $("#id_product_list").select2();
     }
+
+    /* ---- Pickup location cards + inline "add location" panel ---- */
+    (function() {
+      const picker = document.getElementById('oap_pickup_picker');
+      if (!picker) return;
+      const grid    = document.getElementById('oap_pickup_grid');
+      const addBtn  = document.getElementById('oap_pickup_add_btn');
+      const panel   = document.getElementById('oap_pickup_form');
+      const cancel  = document.getElementById('oap_pickup_cancel_btn');
+      const saveBtn = document.getElementById('oap_pickup_save_btn');
+      const msg     = document.getElementById('oap_pickup_form_msg');
+      const csrfEl  = document.querySelector('[name=csrfmiddlewaretoken]');
+      const FIELD_IDS = ['oap_pl_title', 'oap_pl_locality', 'oap_pl_zone', 'oap_pl_street',
+                         'oap_pl_building', 'oap_pl_lat', 'oap_pl_lon', 'oap_pl_zone_name',
+                         'oap_pl_accuracy', 'oap_pl_loc_paste'];
+
+      function paintSelection() {
+        grid.querySelectorAll('.oap__pl-card').forEach(function(card) {
+          const input = card.querySelector('.oap__pl-input');
+          card.classList.toggle('oap__pl-card--on', !!(input && input.checked));
+        });
+      }
+      grid.addEventListener('change', function(e) {
+        if (e.target.classList.contains('oap__pl-input')) paintSelection();
+      });
+
+      function togglePanel(open) {
+        panel.hidden = !open;
+        addBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        addBtn.classList.toggle('oap__pl-add--open', open);
+        if (open) document.getElementById('oap_pl_title').focus();
+      }
+
+      // Blank every field, badge and result the location helpers wrote into.
+      function resetPanel() {
+        FIELD_IDS.forEach(function(id) {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        ['oap_pl_qnas_result', 'oap_pl_loc_result', 'oap_pl_accuracy_badge'].forEach(function(id) {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = '';
+        });
+        document.getElementById('oap_pl_is_default').checked = false;
+        const qBtn = document.getElementById('oap_pl_qnas_btn');
+        qBtn.disabled = false;
+        qBtn.className = 'btn btn-sm btn-outline-warning oap__pl-qnas-btn';
+        qBtn.innerHTML = '<i class="fa-solid fa-satellite-dish me-1"></i>Validate';
+        const map = document.getElementById('oap_pl_map_link');
+        map.href = '#';
+        map.className = 'btn btn-sm btn-outline-secondary disabled oap__pl-map-btn';
+      }
+
+      addBtn.addEventListener('click', function() { togglePanel(panel.hidden); });
+      cancel.addEventListener('click', function() { togglePanel(false); msg.textContent = ''; resetPanel(); });
+
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function(ch) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+        });
+      }
+
+      function addCard(loc) {
+        // Existing default loses its mark when the new one takes over
+        if (loc.is_default) {
+          grid.querySelectorAll('.oap__pl-card--default').forEach(function(c) {
+            c.classList.remove('oap__pl-card--default');
+            const star = c.querySelector('.oap__pl-star');
+            if (star) star.remove();
+          });
+        }
+        const label = document.createElement('label');
+        label.className = 'oap__pl-card oap__pl-card--on' + (loc.is_default ? ' oap__pl-card--default' : '');
+        label.innerHTML =
+          '<input type="radio" class="oap__pl-input" name="pickup_location" value="' + esc(loc.id) + '" checked>' +
+          '<span class="oap__pl-tick"><i class="fa-solid fa-check"></i></span>' +
+          '<span class="oap__pl-title">' + esc(loc.title) +
+          (loc.is_default ? ' <i class="fa-solid fa-star oap__pl-star" title="Your default"></i>' : '') + '</span>' +
+          '<span class="oap__pl-sub">' + esc(loc.locality || '—') + '</span>' +
+          '<span class="oap__pl-code">Z ' + esc(loc.zone || '—') + ' / S ' + esc(loc.street || '—') +
+          ' / B ' + esc(loc.building || '—') + '</span>' +
+          (loc.is_default ? '<span class="oap__pl-flag">Default</span>' : '');
+        grid.insertBefore(label, addBtn);
+        // Feed the new store into the auto-fill map, then run it
+        pickupLocationData[String(loc.id)] = {
+          id: loc.id, title: loc.title,
+          zone: loc.zone || null, street: loc.street || null, building: loc.building || null,
+          lat: loc.lat ? parseFloat(loc.lat) : null, lon: loc.lon ? parseFloat(loc.lon) : null
+        };
+        paintSelection();
+        $(label).find('.oap__pl-input').trigger('change');
+      }
+
+      saveBtn.addEventListener('click', function() {
+        const title = document.getElementById('oap_pl_title').value.trim();
+        if (!title) {
+          msg.className = 'oap__pl-form-msg oap__pl-form-msg--err';
+          msg.textContent = 'Title is required';
+          return;
+        }
+        const body = new FormData();
+        body.append('pickup_location_title', title);
+        body.append('locality', document.getElementById('oap_pl_locality').value.trim());
+        body.append('pickup_zone_no', document.getElementById('oap_pl_zone').value.trim());
+        body.append('pickup_street_no', document.getElementById('oap_pl_street').value.trim());
+        body.append('pickup_building_no', document.getElementById('oap_pl_building').value.trim());
+        body.append('pickup_lat', document.getElementById('oap_pl_lat').value.trim());
+        body.append('pickup_lon', document.getElementById('oap_pl_lon').value.trim());
+        if (document.getElementById('oap_pl_is_default').checked) body.append('is_default', 'on');
+
+        const idle = saveBtn.querySelector('.oap-pl-idle');
+        const loading = saveBtn.querySelector('.oap-pl-loading');
+        saveBtn.disabled = true; idle.classList.add('d-none'); loading.classList.remove('d-none');
+        msg.textContent = '';
+
+        fetch(picker.dataset.addUrl, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'X-CSRFToken': csrfEl ? csrfEl.value : '' },
+          body: body
+        }).then(function(resp) {
+          return resp.json();
+        }).then(function(data) {
+          if (data.success && data.location) {
+            addCard(data.location);
+            resetPanel();
+            togglePanel(false);
+          } else {
+            msg.className = 'oap__pl-form-msg oap__pl-form-msg--err';
+            msg.textContent = data.error || 'Could not save location';
+          }
+        }).catch(function() {
+          msg.className = 'oap__pl-form-msg oap__pl-form-msg--err';
+          msg.textContent = 'Network error';
+        }).finally(function() {
+          saveBtn.disabled = false; idle.classList.remove('d-none'); loading.classList.add('d-none');
+        });
+      });
+
+      paintSelection();
+    })();
 
     // ========== TABLE VIEW LOGIC ==========
     const tableBody = document.getElementById('orders_table_body');
@@ -1530,6 +1888,30 @@ $(document).ready(function () {
       checkMobileCodMismatch(total);
     });
   }
+});
+</script>
+
+<!-- Scheduled Delivery — reveal the date fields only when the box is ticked -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  function wireScheduled(toggleId, fieldsId, dateId) {
+    var toggle = document.getElementById(toggleId);
+    var fields = document.getElementById(fieldsId);
+    var dateEl = document.getElementById(dateId);
+    if (!toggle || !fields) return;
+
+    // Can't schedule into the past
+    if (dateEl && !dateEl.min) dateEl.min = new Date().toISOString().split('T')[0];
+
+    function sync() {
+      fields.hidden = !toggle.checked;
+      if (dateEl) dateEl.required = toggle.checked;
+    }
+    toggle.addEventListener('change', sync);
+    sync();  // a failed submit comes back with the box already ticked
+  }
+  wireScheduled('id_scheduled_delivery', 'oap_scheduled_fields', 'id_scheduled_date');
+  wireScheduled('mobile_scheduled_delivery', 'mobile_scheduled_fields', 'mobile_scheduled_date');
 });
 </script>
 {% endblock extra_js %}

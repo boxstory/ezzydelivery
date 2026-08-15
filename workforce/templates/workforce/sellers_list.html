@@ -1,5 +1,11 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff roster of every registered business/seller, with status + verification filters
+Used by: workforce_views.sellers_list at /workforce/sellers/
+Notes: Carries the shared page-notes card (wfnote__) under the hero, hidden on load; the hero help
+       button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 {% block title %}All Sellers - Ezzy Delivery{% endblock title %}
 {% block content %}
 <div class="sll">
@@ -13,7 +19,16 @@
             <span class="wfd__hero-count__num">{{ total_sellers|default:"0" }}</span>
             <span class="wfd__hero-count__label">Total Sellers</span>
         </div>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_sellers_list_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
+
+    <div class="wfnote" id="workforce_sellers_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_sellers_list_card_notes' %}" hidden></div>
 
     <!-- Post-hero console: tally strip, filters and roster read as one card -->
     <div class="wf-content sll__body">

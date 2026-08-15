@@ -1,0 +1,221 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{# Purpose: Configure one CRM board's kanban columns — add, rename, reorder, recolour, delete, and bind auto-file rules. #}
+{# Used by: workforce.crm_views.crm_stages_manage (posts to crm_stage_save / crm_stage_delete / crm_stage_reorder) #}
+{# Notes: crms__ namespace on top of shared crm__ blocks in crm.css; each editor is a native <details> in its own colspan row (inside the actions cell it was clipped by .crm__scroll's overflow-x) — crm_stages.js only adds the Edit shortcut and the ▲▼ reorder. #}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+{% if is_driver_board %}{% url 'workforce:crm_driver_leads_board' as board_url %}{% else %}{% url 'workforce:crm_leads_board' as board_url %}{% endif %}
+<div class="crm crms col-12 p-3">
+  <div class="crm__console">
+
+    <!-- HEADER BAR -->
+    <div class="crm__head">
+      <div class="crm__head-title">
+        <div class="crm__eyebrow">Pipeline Configuration</div>
+        <h1 class="crm__title">Board Columns</h1>
+        <p class="crm__subtitle">Add, rename and reorder the columns on the {% if is_driver_board %}driver recruitment{% else %}business sales{% endif %} board</p>
+        <div class="crm__board-tabs" role="tablist" aria-label="Boards">
+          <a href="{% url 'workforce:crm_stages_manage' %}?board=business"
+             class="crm__board-tab {% if not is_driver_board %}crm__board-tab--active{% endif %}"
+             hx-get="{% url 'workforce:crm_stages_manage' %}?board=business" hx-target="#main-content"
+             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+            <i class="fa-solid fa-briefcase"></i> Business
+          </a>
+          <a href="{% url 'workforce:crm_stages_manage' %}?board=driver"
+             class="crm__board-tab {% if is_driver_board %}crm__board-tab--active{% endif %}"
+             hx-get="{% url 'workforce:crm_stages_manage' %}?board=driver" hx-target="#main-content"
+             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+            <i class="fa-solid fa-motorcycle"></i> Drivers
+          </a>
+        </div>
+      </div>
+      <div class="crm__head-actions">
+        <a href="{{ board_url }}" class="crm__btn">
+          <i class="fa-solid fa-table-columns"></i> Back to board
+        </a>
+      </div>
+    </div>
+
+    <p class="crms__lede">
+      Each row below is one column on the board, left to right. On the driver board a column can
+      <strong>file cards by itself</strong>: tick the applicant conditions it should catch and any driver
+      matching one lands there on the next board load. Conditions are checked from the
+      <strong>rightmost column back</strong>, so an outcome column beats a progress column.
+      A column with <strong>no conditions ticked</strong> is a manual lane — cards only move in and out by
+      dragging, and nothing overwrites them.
+    </p>
+
+    <!-- COLUMN LIST -->
+    <div class="crm__scroll">
+      <table class="crm__table crms__table" id="workforce_crm_stages_table_list">
+        <thead>
+          <tr>
+            <th class="crms__col-order">Order</th>
+            <th>Column</th>
+            <th>Files cards when</th>
+            <th>On drop</th>
+            <th class="crms__col-num">Leads</th>
+            <th>Behaviour</th>
+            <th class="crms__col-act"></th>
+          </tr>
+        </thead>
+        <tbody id="workforce_crm_stages_tbody_rows">
+          {% for row in rows %}
+          <tr class="crms__row {% if not row.stage.is_active %}crms__row--off{% endif %}" data-stage-id="{{ row.stage.pk }}">
+            <td class="crms__order">
+              <span class="crms__pos">{{ forloop.counter }}</span>
+              <span class="crms__nudge">
+                <button type="button" class="crms__move" data-move="up" title="Move left"
+                        {% if forloop.first %}disabled{% endif %}>
+                  <i class="fa-solid fa-caret-up"></i><span class="visually-hidden">Move left</span>
+                </button>
+                <button type="button" class="crms__move" data-move="down" title="Move right"
+                        {% if forloop.last %}disabled{% endif %}>
+                  <i class="fa-solid fa-caret-down"></i><span class="visually-hidden">Move right</span>
+                </button>
+              </span>
+            </td>
+            <td>
+              <div class="crms__name">
+                <span class="crmb__col-dot crmb__col-dot--{{ row.stage.dot_swatch }}"></span>
+                {{ row.stage.label }}
+              </div>
+              <div class="crms__key">{{ row.stage.key }}</div>
+            </td>
+            <td>
+              {% if row.rule_labels %}
+              <ul class="crms__rules">
+                {% for label in row.rule_labels %}<li>{{ label }}</li>{% endfor %}
+              </ul>
+              {% else %}
+              <span class="crms__manual"><i class="fa-solid fa-hand"></i> Manual — staff drag only</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.stage.write_back %}
+              <span class="crms__writeback">Sets driver to <strong>{{ row.stage.get_write_back_display }}</strong></span>
+              {% if row.stage.needs_reason %}<div class="crms__hint">Asks for a reason</div>{% endif %}
+              {% else %}
+              <span class="crms__none">Board only</span>
+              {% endif %}
+            </td>
+            <td class="crm__num">{{ row.lead_count }}</td>
+            <td>
+              {% if row.stage.is_closed %}
+              <div class="crms__flag">Outcome column</div>
+              <div class="crms__hint">
+                {% if row.stage.hide_after_days %}Hides after {{ row.stage.hide_after_days }} days{% else %}Never hidden{% endif %}
+              </div>
+              {% else %}
+              <div class="crms__flag crms__flag--muted">In progress</div>
+              {% endif %}
+              {% if row.stage.is_fallback %}<div class="crms__hint">Catch-all for unmatched drivers</div>{% endif %}
+              {% if not row.stage.is_active %}<div class="crms__hint">Hidden from the board</div>{% endif %}
+            </td>
+            <td class="crms__acts">
+              <a class="crm__btn crms__btn-sm" href="#workforce_crm_stages_editor_{{ row.stage.pk }}"
+                 data-open-editor="workforce_crm_stages_editor_{{ row.stage.pk }}">
+                <i class="fa-solid fa-pen"></i> Edit
+              </a>
+            </td>
+          </tr>
+          {# Editor gets its own full-width row — in the last cell it was clipped by overflow-x. #}
+          <tr class="crms__exprow">
+            <td colspan="7">
+              <details class="crms__editor" id="workforce_crm_stages_editor_{{ row.stage.pk }}">
+                <summary class="crms__summary">
+                  <i class="fa-solid fa-sliders"></i> Settings for <strong>{{ row.stage.label }}</strong>
+                </summary>
+                <div class="crms__editor-body">
+                  <form method="post" action="{% url 'workforce:crm_stage_save' %}" class="crms__form">
+                    {% csrf_token %}
+                    <input type="hidden" name="board" value="{{ board }}">
+                    <input type="hidden" name="stage_id" value="{{ row.stage.pk }}">
+                    <input type="hidden" name="position" value="{{ row.stage.position }}">
+                    {% include "workforce/crm/parts/_stage_fields.html" with stage=row.stage is_driver_board=is_driver_board rule_groups=rule_groups swatch_choices=swatch_choices write_back_choices=write_back_choices %}
+                    <div class="crms__form-actions">
+                      <button type="submit" class="crm__btn crms__btn-save"><i class="fa-solid fa-check"></i> Save column</button>
+                    </div>
+                  </form>
+
+                  {% if row.stage.is_system %}
+                  <p class="crms__locked">
+                    <i class="fa-solid fa-lock"></i> Built-in column — it can be renamed, recoloured and
+                    reordered, but not deleted. Untick <em>Show on board</em> to hide it.
+                  </p>
+                  {% else %}
+                  <form method="post" action="{% url 'workforce:crm_stage_delete' %}" class="crms__delete"
+                        data-confirm-label="{{ row.stage.label }}">
+                    {% csrf_token %}
+                    <input type="hidden" name="board" value="{{ board }}">
+                    <input type="hidden" name="stage_id" value="{{ row.stage.pk }}">
+                    {% if row.lead_count %}
+                    <div>
+                      <label class="crms__label" for="workforce_crm_stages_select_move_{{ row.stage.pk }}">
+                        Move its {{ row.lead_count }} lead(s) to
+                      </label>
+                      <select class="form-select crms__input" name="move_to"
+                              id="workforce_crm_stages_select_move_{{ row.stage.pk }}">
+                        {% for key, label in move_targets %}
+                        {% if key != row.stage.key %}<option value="{{ key }}">{{ label }}</option>{% endif %}
+                        {% endfor %}
+                      </select>
+                    </div>
+                    {% endif %}
+                    <button type="submit" class="crm__btn crms__btn-danger">
+                      <i class="fa-solid fa-trash"></i> Delete column
+                    </button>
+                  </form>
+                  {% endif %}
+                </div>
+              </details>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="crms__empty">This board has no columns yet — add the first one below.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if orphan_count %}
+    <p class="crms__warn">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      {{ orphan_count }} lead(s) sit in a stage that has no column on this board. They show in an
+      <strong>Unsorted</strong> lane at the end of the board — drag them somewhere, or re-add the column.
+    </p>
+    {% endif %}
+
+    <!-- ADD COLUMN -->
+    <details class="crms__add">
+      <summary class="crm__btn crm__btn--primary"><i class="fa-solid fa-plus"></i> Add column</summary>
+      <form method="post" action="{% url 'workforce:crm_stage_save' %}" class="crms__form crms__form--add">
+        {% csrf_token %}
+        <input type="hidden" name="board" value="{{ board }}">
+        <input type="hidden" name="position" value="{{ next_position }}">
+        {% include "workforce/crm/parts/_stage_fields.html" with stage=None is_driver_board=is_driver_board rule_groups=rule_groups swatch_choices=swatch_choices write_back_choices=write_back_choices %}
+        <div class="crms__form-actions">
+          <button type="submit" class="crm__btn crms__btn-save"><i class="fa-solid fa-check"></i> Create column</button>
+        </div>
+      </form>
+    </details>
+
+  </div>
+</div>
+
+<!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
+<script>
+  window.CRMS_CONFIG = {
+    csrfToken: "{{ csrf_token }}",
+    board: "{{ board }}",
+    reorderUrl: "{% url 'workforce:crm_stage_reorder' %}"
+  };
+</script>
+<script src="{% static 'workforce/js/crm_stages.js' %}?v=20260807d"></script>
+{% endblock %}

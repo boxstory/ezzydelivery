@@ -1,6 +1,7 @@
 {% extends "business_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% load business_console %}
 
 {% block title %}New Inbound Request{% endblock %}
 
@@ -10,22 +11,11 @@
 
 {% block content %}
 <div class="bir">
-  <!-- Breadcrumb -->
-  <nav class="bir__breadcrumb">
-    <a href="{% url 'business:inbound_requests_list' %}">Inbound Requests</a>
-    <span class="bir__breadcrumb-sep">/</span>
-    <span>New Request</span>
-  </nav>
-
-  <!-- Hero Header -->
-  <div class="bir__detail-hero">
-    <div class="d-flex align-items-center gap-3">
-      <div>
-        <h1 class="bir__detail-title">New Inbound Request</h1>
-        <p class="bir__detail-subtitle">Send products to warehouse for storage and fulfillment</p>
-      </div>
-    </div>
-  </div>
+  {% bconheader eyebrow="Inbound Requests" live="New" icon="fa-solid fa-arrow-right-to-bracket" title="New Inbound Request" subtitle="Send products to warehouse for storage and fulfillment." %}
+    <a href="{% url 'business:inbound_requests_list' %}" class="bcon__btn bcon__btn--ghost">
+      <i class="fa-solid fa-arrow-left"></i> Back to Requests
+    </a>
+  {% endbconheader %}
 
   <form method="POST" id="inbound-create-form" class="mt-3">
     {% csrf_token %}

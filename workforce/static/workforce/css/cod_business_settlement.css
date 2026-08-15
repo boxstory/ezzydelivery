@@ -27,52 +27,7 @@
 
 .bcp__wrap { max-width: 1240px; margin: 0 auto; }
 
-/* ── Masthead ─────────────────────────────────────────────── */
-.bcp__masthead {
-  border-bottom: 2px solid var(--tlr-ink);
-  padding-bottom: 1rem;
-  margin-bottom: 1.25rem;
-}
-.bcp__masthead-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-.bcp__masthead-actions { display: flex; gap: 0.5rem; }
-.bcp__eyebrow {
-  font-family: var(--tlr-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--tlr-brass-deep);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-}
-.bcp__eyebrow::before {
-  content: "";
-  width: 9px; height: 9px;
-  background: var(--tlr-brass);
-  border-radius: 50%;
-}
-.bcp__title {
-  font-family: var(--tlr-cond);
-  font-weight: 700;
-  font-size: clamp(1.75rem, 4vw, 2.75rem);
-  letter-spacing: -0.01em;
-  line-height: 1;
-  text-transform: uppercase;
-  margin: 0.35rem 0 0.3rem;
-}
-.bcp__sub {
-  font-family: var(--tlr-mono);
-  font-size: 0.76rem;
-  color: var(--tlr-muted);
-  margin: 0;
-}
+/* ── Inline separator, used in the account group headers ──── */
 .bcp__sep { color: var(--tlr-rule-strong); margin: 0 0.35rem; }
 
 /* ── Buttons / links ──────────────────────────────────────── */
@@ -345,6 +300,20 @@
   white-space: nowrap;
 }
 
+/* Payout history: a voided payout keeps its row and its invoice — the money
+   came back, so it is struck through rather than removed from the record. */
+.bcp__row--void td { color: var(--tlr-muted); text-decoration: line-through; }
+.bcp__row--void .bcp__sub-line { text-decoration: none; }
+.bcp__table tfoot td {
+  border-top: 2px solid var(--tlr-rule-strong);
+  padding: 0.6rem 0.5rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
 /* Charge verification: a swatch and a word, never a coloured pill. */
 .bcp__status {
   display: flex;
@@ -369,7 +338,6 @@
 .bcp__status--published::before { background: var(--tlr-ink); }
 .bcp__status--rejected::before { background: var(--tlr-void); }
 
-/* ── Deduction ladder ─────────────────────────────────────── */
 /* The payout IS a subtraction, so the lines hang off one rail: gross at the top,
    each charge stepping down it, net cutting across the bottom. */
 .bcp__ladder {
@@ -522,7 +490,6 @@
   100% { transform: translateY(0); opacity: 1; }
 }
 
-/* ── Receipt (confirm modal) ──────────────────────────────── */
 /* Bootstrap moves/renders the modal outside .bcp, so the teller tokens are
    redeclared here — without them the sheet renders with no background at all. */
 .bcp__receipt {

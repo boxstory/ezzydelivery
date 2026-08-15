@@ -15,13 +15,24 @@
                 <p class="wh__subtitle">Live overview &mdash; {{ current_date|date:"D, M d Y \a\t h:i A" }}</p>
             </div>
         </div>
-        {% if user.profile.is_superadmin %}
-        <a href="{% url 'warehouse:warehouse_add' %}" class="wh__btn wh__btn--primary"
-           hx-get="{% url 'warehouse:warehouse_add' %}" hx-target="body" hx-push-url="true">
-            <i class="fa-solid fa-plus"></i> Add Warehouse
-        </a>
-        {% endif %}
+        <div class="d-flex align-items-center gap-2">
+            {% if user.profile.is_superadmin %}
+            <a href="{% url 'warehouse:warehouse_add' %}" class="wh__btn wh__btn--primary"
+               hx-get="{% url 'warehouse:warehouse_add' %}" hx-target="body" hx-push-url="true">
+                <i class="fa-solid fa-plus"></i> Add Warehouse
+            </a>
+            {% endif %}
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="warehouse_dashboard_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
+        </div>
     </div>
+
+    <div class="wfnote wfnote--inset" id="warehouse_dashboard_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_dashboard_card_notes' %}" hidden></div>
 
     <!-- Summary Stats — 8 tiles in a 4-column grid (2 rows) -->
     <div class="wh__stats wh__stats--4">
@@ -179,6 +190,16 @@
                 <a href="{% url 'warehouse:receive_stock' %}" class="wh__stat wh__stat--link">
                     <div class="wh__stat-icon wh__stat-icon--success"><i class="fa-solid fa-truck-loading"></i></div>
                     <div><div class="wh__stat-label">Receive Stock</div></div>
+                </a>
+                {% if is_staff %}
+                <a href="{% url 'warehouse:staff_product_add' %}" class="wh__stat wh__stat--link">
+                    <div class="wh__stat-icon wh__stat-icon--primary"><i class="fa-solid fa-box-open"></i></div>
+                    <div><div class="wh__stat-label">Add Product</div></div>
+                </a>
+                {% endif %}
+                <a href="{% url 'warehouse:stock_adjust' %}" class="wh__stat wh__stat--link">
+                    <div class="wh__stat-icon wh__stat-icon--warning"><i class="fa-solid fa-scale-balanced"></i></div>
+                    <div><div class="wh__stat-label">Stock Adjustment</div></div>
                 </a>
                 <a href="{% url 'warehouse:transaction_list' %}" class="wh__stat wh__stat--link">
                     <div class="wh__stat-icon wh__stat-icon--info"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>

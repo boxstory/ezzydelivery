@@ -1,0 +1,128 @@
+{% comment %}
+Purpose: "About this page" notes panel for order_edit.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_order_edit_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The correction screen for a single order — where staff fix a wrong phone number, sharpen a
+            vague address, adjust the cash to collect, or move the order along by hand. The order
+            number, client order code, business and order date are shown for reference but cannot be
+            changed; everything else on the page can. You reach it from the order's detail page, and
+            saving takes you straight back there.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Customer</dt>
+                        <dd class="wfnote__def">Name, phone and WhatsApp. These feed the driver's screen
+                            and the customer's messages, so a typo here is a failed delivery.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">AI Parse</dt>
+                        <dd class="wfnote__def">Reads the free-text address and proposes zone, street and
+                            building. Check the numbers before you trust them.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Verify QNAS</dt>
+                        <dd class="wfnote__def">Checks the zone/street/building triple against the national
+                            address service and fills in the zone name, coordinates and accuracy. The
+                            green badge only appears once the address is actually verified.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Coordinates</dt>
+                        <dd class="wfnote__def">Latitude and longitude can be typed if you have a reliable
+                            pin, but the accuracy box is filled by the verification, not by you.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pickup location</dt>
+                        <dd class="wfnote__def">Where the goods are collected from. Only this client's own
+                            locations are accepted; fulfilment centres are marked <em>FC</em>.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Package</dt>
+                        <dd class="wfnote__def">The one-line description, quantity and COD the driver
+                            sees. Changing it also refreshes the driver's copy on the delivery task.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Product items</dt>
+                        <dd class="wfnote__def">Searchable item lines with quantity and price. The tick
+                            saves that one line immediately, the bin removes it — they do not wait for
+                            the main save. A product must be picked before a line can be saved.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Money</dt>
+                        <dd class="wfnote__def">COD status, COD amount and the delivery fee. The total
+                            beside them is just the two added together.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Statuses</dt>
+                        <dd class="wfnote__def">Order status and address verification status, set by hand.
+                            Use them to unblock an order, not to invent history.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Task fields</dt>
+                        <dd class="wfnote__def">Preferred delivery time and payment method appear only once
+                            a delivery task exists, and are written onto the task rather than the order.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the fields</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">COD amount</dt>
+                        <dd class="wfnote__def">What the driver must collect from the customer at the door.
+                            Nothing else on the page changes it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">COD status</dt>
+                        <dd class="wfnote__def">Whether the customer still owes the money. Switching it to
+                            paid-online <strong>zeroes the COD amount</strong>, and setting an amount above
+                            zero on a paid or no-COD order flips it back to unpaid.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Delivery fee</dt>
+                        <dd class="wfnote__def">What we charge the client for the job. It is not collected
+                            from the customer and is not part of COD.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Order status</dt>
+                        <dd class="wfnote__def">Where the order sits in its life, from review through to
+                            delivered or cancelled.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Verification</dt>
+                        <dd class="wfnote__def">Whether the delivery address has been confirmed with the
+                            customer. Separate from the order status.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Accuracy</dt>
+                        <dd class="wfnote__def">How precisely the coordinates were resolved — a rough match
+                            is worth a phone call before dispatch.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Every save writes a <strong>field-by-field diff into the order timeline</strong> with
+                    your name on it. Nothing you change here is invisible.</li>
+                <li>Product lines are the exception to the save button — they are already stored the moment
+                    you press the tick or the bin. Cancel will not undo them.</li>
+                <li>Package changes are pushed onto the delivery task so the driver sees the same thing,
+                    but a task the driver has already finished is left alone.</li>
+                <li>Changing the delivery fee here does not re-price anything already settled or invoiced;
+                    money that has moved has to be sorted out on the payout side.</li>
+                <li>Saving fires the staff-edit automation, which can send messages out. Do not use an edit
+                    as a scratchpad.</li>
+                <li><em>Cancel</em> returns to the order without saving the form — but see the product-line
+                    point above.</li>
+            </ul>
+        </section>
+    

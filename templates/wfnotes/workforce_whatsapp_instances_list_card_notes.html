@@ -1,0 +1,98 @@
+{% comment %}
+Purpose: "About this page" notes panel for whatsapp_instances_list.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_whatsapp_instances_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+        Every WhatsApp message the platform sends — order updates, address-verification requests, driver
+        alerts, marketing blasts — leaves from one of the numbers listed here. Each row is one connected
+        WhatsApp line, matched against what the messaging server actually reports right now. This page is
+        where numbers are registered and named; deciding <em>which</em> part of the platform sends from which
+        number is done on the Auto Triggers page. Come here when messages have stopped going out, when a
+        number has been re-linked, or when a new line needs adding.
+    </p>
+
+    <div class="wfnote__cols">
+        <section class="wfnote__sec">
+            <h2 class="wfnote__h">What you can do here</h2>
+            <dl class="wfnote__list">
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Add Instance</dt>
+                    <dd class="wfnote__def">Registers a line by hand. The instance name must match the name on
+                        the messaging server exactly, or the row will never connect.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Label</dt>
+                    <dd class="wfnote__def">Your own name for the line — Main, Support, Fleet. This is what
+                        staff pick from when routing a section to a number, so make it obvious.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Default</dt>
+                    <dd class="wfnote__def">The line used whenever nothing more specific has been chosen. Only
+                        one row can hold it; ticking it on a second row silently takes it off the first.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Active</dt>
+                    <dd class="wfnote__def">Untick to retire a line without deleting it. Inactive lines cannot
+                        be picked when routing a section.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Edit</dt>
+                    <dd class="wfnote__def">Changes the label, names, number and flags. It does not touch the
+                        messaging server — nothing here connects or scans a QR code.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Delete</dt>
+                    <dd class="wfnote__def">Removes our record of the line. The line itself keeps existing on
+                        the messaging server.</dd>
+                </div>
+            </dl>
+        </section>
+
+        <section class="wfnote__sec">
+            <h2 class="wfnote__h">Status column</h2>
+            <dl class="wfnote__list">
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Connected</dt>
+                    <dd class="wfnote__def">The line is linked and able to send right now.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Disconnected</dt>
+                    <dd class="wfnote__def">The server knows the line but it is not linked — usually the phone
+                        has been logged out and the QR needs scanning again. The raw state is shown in the badge.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Not Active</dt>
+                    <dd class="wfnote__def">We have a record of it but the messaging server has no such line at
+                        all. Either the name is spelt differently there, or it was removed.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Unknown</dt>
+                    <dd class="wfnote__def">We could not reach the messaging server, so no live state could be
+                        read. The warning at the top of the page explains why.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Disabled</dt>
+                    <dd class="wfnote__def">Marked inactive by staff. Separate from the live state — a line can
+                        be connected and still be disabled here.</dd>
+                </div>
+            </dl>
+        </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+        <h2 class="wfnote__h">Worth knowing</h2>
+        <ul class="wfnote__notes">
+            <li>The list <strong>syncs itself on every page load</strong>. Any line found on the messaging
+                server that we do not already have is added automatically, named after its number.</li>
+            <li>Because of that sync, <strong>deleting a row that still exists on the server brings it
+                straight back</strong> on the next refresh, with a plain auto-generated label. To retire a
+                line properly, untick Active instead.</li>
+            <li>Editing a row here changes our record only. Connecting, restarting or re-scanning a line is
+                done on the messaging server's own dashboard.</li>
+            <li>The WAHA session field is for the same number reached through the other bridge. Leave it blank
+                unless someone has told you the session name — a wrong value is worse than an empty one.</li>
+            <li>This page is <strong>superuser-only</strong>, and a wrong change here silently stops messages
+                across the whole platform. Check the Auto Triggers routes after any change.</li>
+        </ul>
+    </section>

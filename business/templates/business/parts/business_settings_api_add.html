@@ -1,23 +1,22 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'business/css/business.css' %}">
+{# The bapi__ layer carries the Shopify setup guide included further down. #}
+<link rel="stylesheet" href="{% static 'business/css/business-api-console.css' %}?v=20260801e">
 {% endblock extra_css %}
 
 {% block content %}
 <div class="form-container" id="client_api_add_container_main">
-    <!-- Header -->
-    <div class="form-header" id="client_api_add_section_header">
-        <h1 id="client_api_add_title_form">
-            <i class="fa-solid fa-plug"></i>
-            {{ form_title|default:"Add API Integration" }}
-        </h1>
-        <a href="{% url 'business:business_settings' business.business_id %}" class="back-link">
-            <i class="fa-solid fa-arrow-left"></i>
-            Back to Settings
-        </a>
+    <div id="client_api_add_section_header">
+        {% bconheader eyebrow="Settings" live="Integrations" icon="fa-solid fa-plug" title=form_title|default:"Add API Integration" subtitle="Connect a store or marketplace to import its orders." %}
+            <a href="{% url 'business:business_settings' business.business_id %}" class="bcon__btn bcon__btn--ghost">
+                <i class="fa-solid fa-arrow-left"></i> Back to Settings
+            </a>
+        {% endbconheader %}
     </div>
 
     <!-- Form Card -->
@@ -45,7 +44,7 @@
                 </a>
                 <button type="submit" class="btn-submit" id="client_api_add_btn_submit">
                     <i class="fa-solid fa-plus"></i>
-                    Add API
+                    <span id="client_api_submit_label">Add API</span>
                 </button>
             </div>
         </form>
@@ -68,5 +67,5 @@
 {% endblock content %}
 
 {% block extra_js %}
-<script src="{% static 'business/js/api_form_fields.js' %}?v=20260523b"></script>
+<script src="{% static 'business/js/api_form_fields.js' %}?v=20260801d"></script>
 {% endblock extra_js %}

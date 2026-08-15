@@ -19,7 +19,7 @@ Notes: Mirrors join_driver_start.html; keep hreflang block identical on both pag
 {% endblock head_hreflang %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/driver-apply.css' %}?v=20260724a" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260801a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -127,10 +127,16 @@ Notes: Mirrors join_driver_start.html; keep hreflang block identical on both pag
         <!-- Earnings -->
         <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4">
             <h2 class="h5 mb-3">الأرباح</h2>
+            <div class="cja__pay d-flex flex-wrap align-items-center gap-3 mb-3">
+                <span class="cja__pay-figure">10&ndash;15 ريال قطري</span>
+                <span class="cja__pay-unit">لكل طلب مكتمل،<br class="d-none d-sm-inline">حسب نوع التوصيل</span>
+            </div>
             <p class="mb-0">تحصل على أجر مقابل كل عملية توصيل مكتملة — كلما أوصلت أكثر، ربحت أكثر. دفعات أسبوعية، ساعات عمل مرنة، وبدون مناوبات ثابتة.</p>
-            {% comment %}Enable only once Ezzy confirms a real figure — never publish a guessed number:
-            <p class="mb-0 mt-2">يحقق السائقون النشطون ما يصل إلى [CONFIRMED_NUMBER] ريال قطري شهرياً.</p>
-            {% endcomment %}
+            <p class="cja__pay-note mb-0 mt-2">
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                يتم الاتفاق على سعرك النهائي لكل طلب مع فريقنا بعد إكمال طلب الانضمام وإرساله —
+                نناقش الأسعار النهائية فقط مع الطلبات المكتملة.
+            </p>
         </div>
 
         <!-- Requirements -->
@@ -228,7 +234,12 @@ Notes: Mirrors join_driver_start.html; keep hreflang block identical on both pag
   "baseSalary": {
     "@type": "MonetaryAmount",
     "currency": "QAR",
-    "value": { "@type": "QuantitativeValue", "unitText": "DELIVERY" }
+    "value": {
+      "@type": "QuantitativeValue",
+      "minValue": 10,
+      "maxValue": 15,
+      "unitText": "DELIVERY"
+    }
   },
   "hiringOrganization": {
     "@type": "Organization",

@@ -1,11 +1,21 @@
 {% extends "wf_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% comment %}
+Purpose: Staff list of orders flagged with order_status = "reported"
+Used by: workforce_views.orders_reported at /workforce/orders/reported/
+Notes: Read-only; the flag is cleared by working the order's delivery task, not from this page.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block content %}
 <div class="orp">
     <!-- Hero Header -->
-    {% include "workforce/parts/components/_page_header.html" with title=page_title icon="fa-flag" subtitle="Orders that have been reported or flagged" %}
+    {% include "workforce/parts/components/_page_header.html" with title=page_title icon="fa-flag" subtitle="Orders that have been reported or flagged" notes_id="workforce_wf_orders_reported_card_notes" %}
+
+    <div class="wfnote wfnote--inset" id="workforce_wf_orders_reported_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_wf_orders_reported_card_notes' %}" hidden></div>
 
     <div class="wf-content">
     <div class="d-flex gap-2 px-3 mb-2">

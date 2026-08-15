@@ -1,187 +1,128 @@
+{# Purpose: Client API settings console — e-commerce integrations and issued API keys, with the key-generation modals. #}
+{# Used by: business/views.py business_settings_api_list (URL business:business_settings_api_list). #}
+{# Notes: Furniture comes from business-console.css (bcon__); the bapi__ layer lives in business-api-console.css. Each api row arrives with platform_slug / platform_code / link_state resolved in the view. #}
+
 {% extends "business_dashboard_base.html" %}
-{% load static %}
+{% load static business_console %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-api-console.css' %}?v=20260801e">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="col-12 api-settings-container" id="client_api_list_container_main">
+<div class="col-12 bapi__page" id="client_api_list_container_main">
 
-  <!-- Hero Header -->
-  <div class="bapi__hero" id="client_api_list_hero">
-    <div class="bapi__hero-content">
-      <div class="bapi__hero-text">
-        <h1>
-          <i class="fa-solid fa-plug-circle-check"></i>
-          API Settings
-        </h1>
-        <p>Manage your e-commerce integrations, API keys, and developer access</p>
-      </div>
-      <div class="bapi__hero-actions">
-        <a href="{% url 'business:business_settings_api_add' business.business_id %}"
-           class="bapi__btn-primary"
-           id="client_api_list_btn_new_integration">
-          <i class="fa-solid fa-plus"></i>
-          New Integration
-        </a>
-        <button class="bapi__btn-secondary"
-                data-bs-toggle="modal"
-                data-bs-target="#createApiKeyModal"
-                data-business-id="{{ business.business_id }}"
-                id="client_api_list_btn_generate_key_hero">
-          <i class="fa-solid fa-key"></i>
-          Generate API Key
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Command band -->
+  {# stringformat first: `add` returns "" when concatenating a str with an int. #}
+  {% with total_str=business_apis_total|default:"0"|stringformat:"s" %}{% with readout_note="of "|add:total_str %}
+  {% bconheader header_id="client_api_list_hero" eyebrow="Settings" live="API access" title="Integrations &amp; API keys" subtitle="Connect your store platform to import orders, and issue keys for your own applications." readout_label="Live connections" readout_value=verified_apis_total|default:"0" readout_note=readout_note %}
+    <a href="{% url 'business:business_settings_api_add' business.business_id %}"
+       class="bcon__command-cta"
+       id="client_api_list_btn_new_integration">
+      <i class="fa-solid fa-plus"></i>
+      Add integration
+    </a>
+  {% endbconheader %}
+  {% endwith %}{% endwith %}
 
-  <!-- Stats Row -->
-  <div class="bapi__stats-row" id="client_api_list_stats">
-    <div class="bapi__stat-card">
-      <div class="bapi__stat-icon bapi__stat-icon--integrations">
-        <i class="fa-solid fa-store"></i>
-      </div>
-      <div class="bapi__stat-info">
-        <h3>{{ business_apis|length|default:"0" }}</h3>
-        <p>Platform Integrations</p>
-      </div>
-    </div>
-    <div class="bapi__stat-card">
-      <div class="bapi__stat-icon bapi__stat-icon--keys">
-        <i class="fa-solid fa-key"></i>
-      </div>
-      <div class="bapi__stat-info">
-        <h3>{{ api_keys|length|default:"0" }}</h3>
-        <p>API Keys</p>
-      </div>
-    </div>
-    <div class="bapi__stat-card">
-      <div class="bapi__stat-icon bapi__stat-icon--active">
-        <i class="fa-solid fa-check-circle"></i>
-      </div>
-      <div class="bapi__stat-info">
-        <h3>{{ business_apis|length|default:"0" }}</h3>
-        <p>Active Connections</p>
-      </div>
-    </div>
-    <div class="bapi__stat-card">
-      <div class="bapi__stat-icon bapi__stat-icon--requests">
-        <i class="fa-solid fa-arrow-right-arrow-left"></i>
-      </div>
-      <div class="bapi__stat-info">
-        <h3>--</h3>
-        <p>API Requests Today</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- E-Commerce Integrations Section -->
+  <!-- E-Commerce Integrations -->
   <section class="bapi__section" id="client_api_list_section_ecommerce">
     <div class="bapi__section-header">
       <h2 class="bapi__section-title" id="client_api_list_title_ecommerce">
         <i class="fa-solid fa-store"></i>
-        E-Commerce Integrations
-        <span class="bapi__section-badge">{{ business_apis|length|default:"0" }}</span>
+        Store integrations
+        <span class="bapi__section-badge">{{ business_apis_total|default:"0" }}</span>
       </h2>
-      <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bapi__btn-section">
+      <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bapi__action">
         <i class="fa-solid fa-plus"></i>
-        Add Integration
+        Add integration
       </a>
     </div>
 
-    <div id="client_api_list_section_integrations_list">
+    <div class="bapi__section-body" id="client_api_list_section_integrations_list">
       {% if business_apis %}
       <div class="bapi__grid" id="client_api_list_grid_integrations">
         {% for api in business_apis %}
-        <article class="bapi__integration-card" id="client_api_list_card_integration_{{ api.id }}">
-          <div class="bapi__card-header">
-            <div class="bapi__card-info">
-              <div class="bapi__platform-logo bapi__platform-logo--{% if 'shopify' in api.api_type|lower %}shopify{% elif 'woo' in api.api_type|lower %}woocommerce{% elif 'magento' in api.api_type|lower %}magento{% elif 'custom' in api.api_type|lower %}custom{% else %}default{% endif %}">
-                {% if 'shopify' in api.api_type|lower %}
-                <i class="fa-brands fa-shopify"></i>
-                {% elif 'woo' in api.api_type|lower %}
-                <i class="fa-brands fa-wordpress"></i>
-                {% elif 'magento' in api.api_type|lower %}
-                <i class="fa-brands fa-magento"></i>
+        <article class="bapi__card bapi__card--{{ api.link_state }}" id="client_api_list_card_integration_{{ api.id }}">
+
+          <div class="bapi__card-head">
+            <div class="bapi__card-id">
+              <span class="bapi__mark bapi__mark--{{ api.platform_slug }}">
+                {% if api.platform_slug == 'shopify' %}<i class="fa-brands fa-shopify"></i>
+                {% elif api.platform_slug == 'woocommerce' %}<i class="fa-brands fa-wordpress"></i>
+                {% elif api.platform_slug == 'magento' %}<i class="fa-brands fa-magento"></i>
+                {% else %}<i class="fa-solid fa-code"></i>{% endif %}
+              </span>
+              <div>
+                <h3 class="bapi__card-title">{{ api.api_type }}</h3>
+                {% if api.site_api_url %}
+                <span class="bapi__card-host">{{ api.site_api_url }}</span>
                 {% else %}
-                <i class="fa-solid fa-code"></i>
+                <span class="bapi__card-host bapi__card-host--empty">No store URL saved</span>
                 {% endif %}
               </div>
-              <div>
-                <h3>{{ api.api_type }} Integration</h3>
-                <span class="bapi__platform-type">E-Commerce Platform</span>
-              </div>
-            </div>
-            {% if api.is_verify_api %}
-            <span class="bapi__status-pill bapi__status-pill--verified">
-              <i class="fa-solid fa-circle"></i>
-              Verified
-            </span>
-            {% else %}
-            <span class="bapi__status-pill bapi__status-pill--pending">
-              <i class="fa-solid fa-circle"></i>
-              Pending
-            </span>
-            {% endif %}
-          </div>
-
-          <div class="bapi__card-body">
-            <div class="bapi__url-display">
-              <span class="label">
-                <i class="fa-solid fa-link"></i>
-                Site URL
-              </span>
-              <span class="value">{{ api.site_api_url|default:"Not configured" }}</span>
-            </div>
-
-            <div class="bapi__details-grid">
-              <div class="bapi__detail-box">
-                <span class="label">Platform</span>
-                <span class="value">{{ api.api_type }}</span>
-              </div>
-              <div class="bapi__detail-box">
-                <span class="label">Country</span>
-                <span class="value">{{ api.site_contry|default:"N/A" }}</span>
-              </div>
-              <div class="bapi__detail-box">
-                <span class="label">Default</span>
-                <span class="value {% if api.is_default %}value-yes{% else %}value-no{% endif %}">
-                  {% if api.is_default %}
-                  <i class="fa-solid fa-circle-check"></i> Yes
-                  {% else %}
-                  <i class="fa-solid fa-circle-xmark"></i> No
-                  {% endif %}
-                </span>
-              </div>
-              <div class="bapi__detail-box">
-                <span class="label">Status</span>
-                <span class="value {% if api.is_verify_api %}value-active{% else %}value-pending{% endif %}">
-                  {% if api.is_verify_api %}Active{% else %}Pending{% endif %}
-                </span>
-              </div>
             </div>
           </div>
+
+          {# The handshake itself: solid pipe when live, dashed while unverified, broken with no token. #}
+          <div class="bapi__link bapi__link--{{ api.link_state }}">
+            <span class="bapi__link-node">{{ api.platform_code }}</span>
+            <span class="bapi__link-rule"></span>
+            <span class="bapi__link-joint">
+              {% if api.link_state == 'live' %}<i class="fa-solid fa-check"></i>
+              {% elif api.link_state == 'broken' %}<i class="fa-solid fa-xmark"></i>
+              {% else %}<i class="fa-solid fa-hourglass-half"></i>{% endif %}
+            </span>
+            <span class="bapi__link-rule"></span>
+            <span class="bapi__link-node bapi__link-node--ezzy">EZ</span>
+          </div>
+
+          <p class="bapi__link-state bapi__link-state--{{ api.link_state }}">
+            {% if api.link_state == 'live' %}Link established
+            {% elif api.link_state == 'broken' %}No access token
+            {% else %}Awaiting verification{% endif %}
+          </p>
+
+          <dl class="bapi__facts">
+            <div class="bapi__fact">
+              <dt>Country</dt>
+              <dd>{{ api.site_contry|default:"—" }}</dd>
+            </div>
+            <div class="bapi__fact">
+              <dt>Default source</dt>
+              <dd {% if not api.is_default %}class="bapi__fact-value--muted"{% endif %}>
+                {% if api.is_default %}Yes{% else %}No{% endif %}
+              </dd>
+            </div>
+          </dl>
 
           <div class="bapi__card-actions">
-            {% if 'shopify' in api.api_type|lower %}
-            <a href="{% url 'business:shopify_oauth_start' business.business_id api.id %}" class="bapi__action bapi__action--test"
+            {% if api.platform_slug == 'shopify' and api.link_state == 'broken' %}
+            <a href="{% url 'business:shopify_oauth_start' business.business_id api.id %}"
+               class="bapi__action bapi__action--connect"
                onclick="return confirm('You will be redirected to Shopify to authorize this app. Make sure Client ID, Client Secret, and Store URL are saved first. Continue?')">
               <i class="fa-solid fa-link"></i>
-              Connect (OAuth)
+              Connect with Shopify
+            </a>
+            {% elif api.platform_slug == 'shopify' %}
+            <a href="{% url 'business:shopify_oauth_start' business.business_id api.id %}"
+               class="bapi__action"
+               onclick="return confirm('You will be redirected to Shopify to authorize this app. Make sure Client ID, Client Secret, and Store URL are saved first. Continue?')">
+              <i class="fa-solid fa-link"></i>
+              Reconnect
             </a>
             {% endif %}
-            <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}" class="bapi__action bapi__action--test">
+            <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}" class="bapi__action">
               <i class="fa-solid fa-vial"></i>
               Test
             </a>
-            <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}" class="bapi__action bapi__action--edit">
+            <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}" class="bapi__action">
               <i class="fa-solid fa-pen"></i>
               Edit
             </a>
-            <a href="{% url 'business:business_settings_api_delete' business.business_id api.id %}" class="bapi__action bapi__action--delete"
-               onclick="return confirm('Are you sure you want to delete this integration?')">
+            <a href="{% url 'business:business_settings_api_delete' business.business_id api.id %}"
+               class="bapi__action bapi__action--danger"
+               onclick="return confirm('Delete this integration? Orders will stop importing from this store.')">
               <i class="fa-solid fa-trash"></i>
               Delete
             </a>
@@ -189,21 +130,23 @@
         </article>
         {% endfor %}
       </div>
+      {# A business has a handful of integrations — only show the pager once there is a second page. #}
+      {% if business_apis_page.has_other_pages %}
+      {% include "includes/components/_pagination.html" with page_obj=business_apis_page filter_params=business_apis_params per_page=per_page pagination_id="business_apis" variant="compact" show_goto="false" %}
+      {% endif %}
 
-      <div class="bapi__tip-banner">
-        <i class="fa-solid fa-lightbulb"></i>
-        <p><strong>Tip:</strong> Avoid setting multiple integrations as default to prevent order sync conflicts.</p>
+      <div class="bapi__advice">
+        <i class="fa-solid fa-circle-info"></i>
+        <p>Set one integration as the default source. Two defaults make the same order import twice.</p>
       </div>
       {% else %}
       <div class="bapi__empty-state" id="client_api_list_empty_integrations">
-        <div class="empty-state-icon">
-          <i class="fa-solid fa-plug"></i>
-        </div>
-        <h4>No Platform Integrations Yet</h4>
-        <p>Connect your e-commerce platform to automatically sync orders and streamline deliveries</p>
+        <i class="fa-solid fa-plug"></i>
+        <h4>No store connected</h4>
+        <p>Connect Shopify, WooCommerce, or Magento to import orders automatically instead of entering them by hand.</p>
         <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bapi__btn-empty">
           <i class="fa-solid fa-plus"></i>
-          Add Your First Integration
+          Add integration
         </a>
       </div>
       {% endif %}
@@ -215,87 +158,75 @@
     <script>document.getElementById('client_api_shopify_setup_help').style.display = '';</script>
   {% endif %}
 
-  <!-- API Keys Section -->
+  <!-- API Keys -->
   <section class="bapi__section" id="client_api_list_section_api_keys">
     <div class="bapi__section-header">
       <h2 class="bapi__section-title" id="client_api_list_title_api_keys">
         <i class="fa-solid fa-key"></i>
-        API Keys
-        <span class="bapi__section-badge">{{ api_keys|length|default:"0" }}</span>
+        API keys
+        <span class="bapi__section-badge">{{ active_keys_total|default:"0" }} active</span>
       </h2>
-      <button class="bapi__btn-section"
+      <button class="bapi__action"
               data-bs-toggle="modal"
               data-bs-target="#createApiKeyModal"
               data-business-id="{{ business.business_id }}"
               id="client_api_list_btn_generate_key">
         <i class="fa-solid fa-plus"></i>
-        Generate Key
+        Generate key
       </button>
     </div>
 
-    <div id="client_api_list_section_keys_list">
+    <div class="bapi__section-body" id="client_api_list_section_keys_list">
       {% if api_keys %}
       <div class="bapi__grid" id="client_api_list_grid_keys">
         {% for key in api_keys %}
-        <article class="bapi__key-card" id="client_api_list_card_key_{{ key.id }}">
-          <div class="bapi__key-header">
-            <div class="bapi__key-header-info">
-              <div class="bapi__key-icon">
-                <i class="fa-solid fa-key"></i>
-              </div>
-              <h3>{% if key.key_name %}{{ key.key_name }}{% else %}API Key #{{ key.id }}{% endif %}</h3>
+        <article class="bapi__card {% if key.is_active %}bapi__card--live{% else %}bapi__card--off{% endif %}"
+                 id="client_api_list_card_key_{{ key.id }}">
+
+          <div class="bapi__card-head">
+            <div class="bapi__card-id">
+              <h3 class="bapi__card-title">{% if key.key_name %}{{ key.key_name }}{% else %}Key #{{ key.id }}{% endif %}</h3>
             </div>
             {% if key.is_active %}
-            <span class="bapi__status-pill bapi__status-pill--active">
-              <i class="fa-solid fa-circle"></i>
-              Active
-            </span>
+            <span class="bcon__badge bcon__badge--success"><i class="fa-solid fa-circle-check"></i> Active</span>
             {% else %}
-            <span class="bapi__status-pill bapi__status-pill--inactive">
-              <i class="fa-solid fa-circle"></i>
-              Inactive
-            </span>
+            <span class="bcon__badge bcon__badge--muted"><i class="fa-solid fa-circle-minus"></i> Inactive</span>
             {% endif %}
           </div>
 
-          <div class="bapi__key-body">
-            <div class="bapi__key-display">
-              <div class="bapi__key-row">
-                <span class="label">API Key</span>
-                <span class="value">{{ key.key_prefix }}…••••••••</span>
-              </div>
-              <div class="bapi__key-row">
-                <span class="label">Scope</span>
-                <span class="value">{{ key.get_scope_display }}</span>
-              </div>
-              <div class="bapi__key-row">
-                <span class="label">API Secret</span>
-                <span class="value">Shown once at creation</span>
-              </div>
-            </div>
+          {# The prefix is how a developer tells one key from another, so it leads. #}
+          <code class="bapi__cred">{{ key.key_prefix }}…••••••••</code>
+          <p class="bapi__cred-note">Secret was shown once, at creation.</p>
 
-            <div class="bapi__key-meta">
-              <div class="bapi__meta-box">
-                <span class="label">Created</span>
-                <span class="value">{{ key.created_at|date:"M d, Y" }}</span>
-              </div>
-              <div class="bapi__meta-box">
-                <span class="label">Last Used</span>
-                <span class="value">{% if key.last_used %}{{ key.last_used|date:"M d" }}{% else %}Never{% endif %}</span>
-              </div>
-              <div class="bapi__meta-box">
-                <span class="label">Expires</span>
-                <span class="value">{% if key.expires_at %}{{ key.expires_at|date:"M d, Y" }}{% else %}Never{% endif %}</span>
-              </div>
+          <div class="bapi__facts bapi__facts--stack">
+            <div class="bapi__fact bapi__fact--row">
+              <span class="bapi__fact-label">Scope</span>
+              <span class="bapi__fact-value">{{ key.get_scope_display }}</span>
+            </div>
+            <div class="bapi__fact bapi__fact--row">
+              <span class="bapi__fact-label">Created</span>
+              <span class="bapi__fact-value">{{ key.created_at|date:"d M Y" }}</span>
+            </div>
+            <div class="bapi__fact bapi__fact--row">
+              <span class="bapi__fact-label">Last used</span>
+              <span class="bapi__fact-value {% if not key.last_used %}bapi__fact-value--muted{% endif %}">
+                {% if key.last_used %}{{ key.last_used|date:"d M Y" }}{% else %}Never{% endif %}
+              </span>
+            </div>
+            <div class="bapi__fact bapi__fact--row">
+              <span class="bapi__fact-label">Expires</span>
+              <span class="bapi__fact-value {% if not key.expires_at %}bapi__fact-value--muted{% endif %}">
+                {% if key.expires_at %}{{ key.expires_at|date:"d M Y" }}{% else %}Never{% endif %}
+              </span>
             </div>
           </div>
 
           <div class="bapi__card-actions">
-            <button class="bapi__action bapi__action--edit" onclick="alert('Edit feature coming soon!')">
+            <button class="bapi__action" onclick="alert('Renaming a key is not available yet. Generate a new key with the name you want, then revoke this one.')">
               <i class="fa-solid fa-pen"></i>
-              Edit
+              Rename
             </button>
-            <button class="bapi__action bapi__action--revoke" onclick="if(confirm('Revoke this API key? This cannot be undone.')) alert('Revoke feature coming soon!')">
+            <button class="bapi__action bapi__action--danger" onclick="alert('Revoking from this page is not available yet. Contact support to revoke a key immediately.')">
               <i class="fa-solid fa-ban"></i>
               Revoke
             </button>
@@ -303,19 +234,27 @@
         </article>
         {% endfor %}
       </div>
+      {% if api_keys_page.has_other_pages %}
+      {% include "includes/components/_pagination.html" with page_obj=api_keys_page filter_params=api_keys_params page_param="keys_page" per_page=per_page pagination_id="api_keys" variant="compact" show_goto="false" %}
+      {% endif %}
 
-      <div class="bapi__security-banner">
+      <div class="bapi__advice bapi__advice--secure">
         <i class="fa-solid fa-shield-halved"></i>
-        <p><strong>Security:</strong> Keep your API keys secure. Never share them publicly or commit them to version control.</p>
+        <p>Keep keys server-side. Never commit one to a repository or paste it into front-end code.</p>
       </div>
       {% else %}
       <div class="bapi__empty-state" id="client_api_list_empty_keys">
-        <div class="empty-state-icon">
-          <i class="fa-solid fa-key"></i>
-        </div>
-        <h4>No API Keys Generated</h4>
-        <p>Generate an API key to integrate your custom applications with Ezzy Delivery</p>
-        
+        <i class="fa-solid fa-key"></i>
+        <h4>No API keys yet</h4>
+        <p>Generate a key to let your own application create orders and read delivery status.</p>
+        <button class="bapi__btn-empty"
+                data-bs-toggle="modal"
+                data-bs-target="#createApiKeyModal"
+                data-business-id="{{ business.business_id }}"
+                id="client_api_list_btn_generate_key_empty">
+          <i class="fa-solid fa-plus"></i>
+          Generate key
+        </button>
       </div>
       {% endif %}
     </div>
@@ -329,36 +268,36 @@
       <div class="modal-header bapi__modal-header--dark">
         <h5 class="modal-title" id="createApiKeyModalLabel">
           <i class="fa-solid fa-key"></i>
-          Generate New API Key
+          Generate API key
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body" id="client_api_list_modal_create_body">
         <form id="createApiKeyForm">
           {% csrf_token %}
-          <div class="mb-4">
+          <div class="mb-3">
             <label for="keyName" class="form-label bapi__form-label">
               <i class="fa-solid fa-tag"></i>
-              Key Name (Optional)
+              Key name
             </label>
             <input type="text" class="form-control bapi__form-input" id="keyName" name="key_name"
-                   placeholder="e.g., Production API Key, Mobile App">
-            <div class="bapi__form-hint">A descriptive name helps identify this key later</div>
+                   placeholder="Production, Mobile app, Staging">
+            <div class="bapi__form-hint">Optional. Names make keys easier to tell apart later.</div>
           </div>
 
           <div class="mb-3">
             <label for="expiresAt" class="form-label bapi__form-label">
               <i class="fa-solid fa-calendar"></i>
-              Expiration Date (Optional)
+              Expiry date
             </label>
             <input type="date" class="form-control bapi__form-input" id="expiresAt" name="expires_at">
-            <div class="bapi__form-hint">Leave empty for no expiration</div>
+            <div class="bapi__form-hint">Optional. Leave empty and the key never expires.</div>
           </div>
 
           <div class="bapi__modal-info-box">
             <p>
-              <i class="fa-solid fa-info-circle"></i>
-              <span>Your API key will only be shown once after creation. Make sure to copy and store it securely.</span>
+              <i class="fa-solid fa-circle-info"></i>
+              <span>The key and secret appear once, right after you generate them. Copy them before closing.</span>
             </p>
           </div>
         </form>
@@ -367,7 +306,7 @@
         <button type="button" class="bapi__btn-modal--cancel" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="bapi__btn-modal--primary" onclick="generateApiKey()">
           <i class="fa-solid fa-plus"></i>
-          Generate Key
+          Generate key
         </button>
       </div>
     </div>
@@ -380,47 +319,46 @@
     <div class="modal-content" id="client_api_list_modal_success">
       <div class="modal-header bapi__modal-header--success">
         <h5 class="modal-title" id="apiKeySuccessModalLabel">
-          <i class="fa-solid fa-check-circle"></i>
-          API Key Generated!
+          <i class="fa-solid fa-circle-check"></i>
+          Key generated
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div class="bapi__modal-warning-box">
           <p>
-            <i class="fa-solid fa-exclamation-triangle"></i>
-            <span><strong>Important:</strong> This is the only time you'll see the full key. Copy it now!</span>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>This is the only time the full key is shown. Copy it now.</span>
           </p>
         </div>
 
         <div class="bapi__generated-key-box">
-          <label>API Key</label>
+          <label for="generatedApiKey">API key</label>
           <div class="input-group">
             <input type="text" class="form-control" id="generatedApiKey" readonly>
-            <button class="bapi__btn-copy-key" type="button" onclick="copyToClipboard(document.getElementById('generatedApiKey').value)">
+            <button class="bapi__btn-copy-key" type="button" aria-label="Copy API key"
+                    onclick="copyToClipboard(document.getElementById('generatedApiKey').value)">
               <i class="fa-solid fa-copy"></i>
             </button>
           </div>
         </div>
 
         <div class="bapi__generated-key-box d-none" id="apiSecretContainer">
-          <label>API Secret</label>
+          <label for="generatedApiSecret">API secret</label>
           <div class="input-group">
             <input type="text" class="form-control" id="generatedApiSecret" readonly>
-            <button class="bapi__btn-copy-key" type="button" onclick="copyToClipboard(document.getElementById('generatedApiSecret').value)">
+            <button class="bapi__btn-copy-key" type="button" aria-label="Copy API secret"
+                    onclick="copyToClipboard(document.getElementById('generatedApiSecret').value)">
               <i class="fa-solid fa-copy"></i>
             </button>
           </div>
         </div>
 
-        <div id="keyNameDisplay" class="d-none mt-3">
-          <small class="text-muted">
-            <i class="fa-solid fa-tag me-1"></i>
-            <strong>Name:</strong> <span id="displayKeyName"></span>
-          </small>
+        <div id="keyNameDisplay" class="d-none mt-2">
+          <div class="bapi__form-hint"><strong>Name:</strong> <span id="displayKeyName"></span></div>
         </div>
       </div>
-      <div class="modal-footer modal-footer-styled justify-content-center">
+      <div class="modal-footer bapi__modal-footer justify-content-center">
         <button type="button" class="bapi__btn-modal--success" onclick="window.location.reload()">
           <i class="fa-solid fa-check"></i>
           Done
@@ -435,27 +373,20 @@
     navigator.clipboard.writeText(text).then(function() {
       const toast = document.createElement('div');
       toast.className = 'bapi__toast';
-      toast.innerHTML = '<i class="fa-solid fa-check-circle"></i> Copied to clipboard!';
+      toast.innerHTML = '<i class="fa-solid fa-circle-check"></i> Copied';
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 2500);
     }, function(err) {
-      alert('Failed to copy to clipboard');
+      alert('Could not copy. Select the text and copy it manually.');
     });
   }
 
-  function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
-      }
-    }
-    return cookieValue;
+  // The API-key POST used getCookie('csrftoken'), which CSRF_COOKIE_HTTPONLY makes
+  // permanently empty — so creating a key always 403'd. Read the meta that
+  // business_dashboard_base ships, then the hidden input, same order as workforce.js.
+  function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+      || document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
   }
 
   function generateApiKey() {
@@ -472,7 +403,7 @@
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': getCookie('csrftoken')
+        'X-CSRFToken': getCsrfToken()
       },
       body: JSON.stringify(data)
     })
@@ -499,14 +430,14 @@
 
         document.getElementById('createApiKeyForm').reset();
       } else if (data.error) {
-        alert('Error: ' + data.error);
+        alert('Could not generate the key: ' + data.error);
       } else {
-        alert('An error occurred while generating the API key.');
+        alert('Could not generate the key. Try again.');
       }
     })
     .catch(error => {
       console.error('Error:', error);
-      alert('An error occurred while generating the API key.');
+      alert('Could not reach the server. Check your connection and try again.');
     });
   }
 </script>

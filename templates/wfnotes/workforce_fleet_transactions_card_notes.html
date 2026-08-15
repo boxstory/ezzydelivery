@@ -1,0 +1,149 @@
+{% comment %}
+Purpose: "About this page" notes panel for fleet_transactions.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_fleet_transactions_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            One driver's complete money ledger. Pick a driver and every financial row attached to them appears
+            — cash they collected from customers, the hand-ins where they gave that cash back to Ezzy, and the
+            earnings we owe them for the work. This is where COD is chased and signed off, and where a wrong
+            COD figure gets corrected. The other direction — actually paying a driver — starts on
+            <strong>Driver Payouts</strong>.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pick a driver</dt>
+                        <dd class="wfnote__def">Nothing loads until one is chosen. Once open, the pencil beside
+                            the name swaps to another driver while keeping your filters.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Date range or preset, transaction type, settled or pending,
+                            business, payment method, task number, and a minimum/maximum amount.
+                            <em>Clear</em> drops them all but keeps the driver.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sort</dt>
+                        <dd class="wfnote__def">Click the Date, Type or Amount headers to sort, and click again
+                            to reverse.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">View</dt>
+                        <dd class="wfnote__def">Opens a side drawer with the full detail of a COD row — every
+                            task inside a hand-in, its total, and a print button for a paper receipt.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Confirm hand-in</dt>
+                        <dd class="wfnote__def">In the drawer, marks a submission as both received and
+                            verified in one step — the point at which the cash is officially back with Ezzy.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Approve / Reject</dt>
+                        <dd class="wfnote__def">On the <em>Submit COD to Admin</em> tab only, for submissions
+                            not yet verified. Rejecting asks for a reason, which is written to the log.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit COD</dt>
+                        <dd class="wfnote__def">Corrects the amount and payment method on a delivery task whose
+                            COD is not settled yet. It updates the task, the linked transaction and the
+                            driver's balances together.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Settle selected</dt>
+                        <dd class="wfnote__def">Tick earnings rows to build a settlement receipt with a payment
+                            breakdown, choose the settlement date, then confirm to pay them off as a batch.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Export / Print</dt>
+                        <dd class="wfnote__def">Export CSV lets you choose columns and covers the whole
+                            filtered set, not just this page. Print produces a report carrying the active
+                            filters in its header.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Recalculate</dt>
+                        <dd class="wfnote__def">Rebuilds this driver's running COD balances from their tasks.
+                            Use it when the running totals look wrong after a correction.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The three tabs</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">COD with fleet</dt>
+                        <dd class="wfnote__def">Collections and hand-ins together — the full cash story. It also
+                            lists prepaid, zero-COD deliveries separately so the manifest is complete.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Submit COD</dt>
+                        <dd class="wfnote__def">Only the driver's hand-in submissions, which is the queue to
+                            approve or reject.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Earnings</dt>
+                        <dd class="wfnote__def">What the driver has earned and what has been paid out. This is
+                            the tab the settle action belongs to.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Row status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pending</dt>
+                        <dd class="wfnote__def">Not settled. For COD it means cash is still out; for earnings it
+                            means the driver has not been paid for it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Received</dt>
+                        <dd class="wfnote__def">Staff have physically taken the money, but nobody has checked it
+                            against the tasks yet.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Verified</dt>
+                        <dd class="wfnote__def">Checked against the tasks it claims to cover. Received and
+                            verified together read as <em>Settled</em>.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">With Ezzy</dt>
+                        <dd class="wfnote__def">Paid electronically — Fawran, POS, bank or ATM. That money
+                            reached us at the moment of collection, so the driver never held it and there is
+                            nothing to hand in.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Settled</dt>
+                        <dd class="wfnote__def">Closed. On an earnings row it links straight to the payout
+                            invoice that paid it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Changed</dt>
+                        <dd class="wfnote__def">The COD amount was edited after collection. Both the original
+                            and the corrected figure are shown so the edit is never hidden.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li><strong>Only cash is ever "in hand".</strong> Electronic COD reaches Ezzy at collection, so
+                    those rows are structurally zero in the balance column — that is correct, not a bug.</li>
+                <li>Rows already settled, deposited, or of type settlement cannot be ticked. If a checkbox is
+                    greyed out, that row has been dealt with.</li>
+                <li>Editing COD recalculates wallet balances immediately, so the totals at the top of the page
+                    can move as soon as you save. Add a reason — it is the audit trail.</li>
+                <li>The driver picker is not just approved drivers: anyone who has a ledger stays reachable
+                    however they are flagged now, because a blocked driver still holding cash is exactly who
+                    this screen exists to chase.</li>
+                <li>An empty tab does not mean an empty driver. The tabs filter by type, so a driver with rows
+                    can still show nothing under COD Submit — the empty message tells you their real total.</li>
+                <li>Searching a task number also surfaces matching tasks that have <strong>no</strong>
+                    transaction at all, so a delivery with a missed COD entry can still be found and fixed.</li>
+            </ul>
+        </section>
+    

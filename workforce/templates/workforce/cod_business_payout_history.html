@@ -1,0 +1,179 @@
+{# Purpose: Every business COD payout ever made — gross released, charges withheld, net transferred, void state. #}
+{# Used by: workforce.views.cod_business_payout_history (URL workforce:cod_business_payout_history) #}
+{# Notes: Reuses the payout desk's teller vocabulary (bcp__). A payout was previously only reachable in the seconds after it was made. #}
+{#        Carries the shared page-notes card (wfnote__) under the masthead, hidden on load and toggled by the masthead help button. #}
+{% extends "wf_dashboard_base.html" %}
+{% load static humanize %}
+
+{% block title %}Payout History{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260729b" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="bcp">
+  <div class="bcp__wrap">
+
+    <!-- Masthead -->
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Leg 3 · Ezzy ▸ Business</span>
+        <h1 class="wfhero__title">Payout History</h1>
+        <span class="wfhero__sub">
+          Every COD payout ever made to a business
+          <span class="wfhero__sep">·</span> voided payouts are excluded from the totals
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <div class="wfhero__tallies">
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ live_count|intcomma }}</span>
+            <span class="wfhero__tally-lbl">Payout{{ live_count|pluralize }}</span>
+          </div>
+          {% if void_count %}
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ void_count|intcomma }}</span>
+            <span class="wfhero__tally-lbl">Voided</span>
+          </div>
+          {% endif %}
+        </div>
+        <nav class="wfhero__actions">
+          <a href="{% url 'workforce:cod_business_settlement_report' %}" class="wfhero__ghost">New payout ▸</a>
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_cod_business_payout_history_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wfnote" id="workforce_cod_business_payout_history_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_cod_business_payout_history_card_notes' %}" hidden></div>
+
+    {% comment %}
+    The three money figures across the filtered list, and they must agree with the
+    table footer: voided payouts are left out of all of them, because that money
+    came back.
+    {% endcomment %}
+    <section class="wfstat" aria-label="Payout totals">
+      <div class="wfstat__card">
+        <span class="wfstat__label">COD released</span>
+        <span class="wfstat__value">{{ total_gross|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">gross customer cash covered</span>
+      </div>
+      <div class="wfstat__card">
+        <span class="wfstat__label">Charges withheld</span>
+        <span class="wfstat__value">{{ total_deductions|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">delivery fees and added lines</span>
+      </div>
+      <div class="wfstat__card wfstat__card--here">
+        <span class="wfstat__label">Net transferred</span>
+        <span class="wfstat__value">{{ total_net|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">what actually left the account</span>
+      </div>
+      <div class="wfstat__card {% if not void_count %}wfstat__card--null{% endif %}">
+        <span class="wfstat__label">Voided</span>
+        <span class="wfstat__value">{% if void_count %}{{ void_count|intcomma }}{% else %}—{% endif %}</span>
+        <span class="wfstat__sub">{% if void_count %}clawed back, excluded above{% else %}none clawed back{% endif %}</span>
+      </div>
+    </section>
+
+    <!-- Filters -->
+    <form method="GET" class="bcp__window" id="workforce_payout_history_form_filter">
+      <div class="bcp__field bcp__field--account">
+        <label class="bcp__field-label" for="workforce_payout_history_select_business">Account</label>
+        <select name="business_id" id="workforce_payout_history_select_business" class="bcp__select">
+          <option value="">All accounts</option>
+          {% for biz in all_businesses %}
+          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id|stringformat:"s" %}selected{% endif %}>
+            {{ biz.business_code|default:biz.business_id }} - {{ biz.business_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_payout_history_input_from">From</label>
+        <input type="date" name="date_from" id="workforce_payout_history_input_from" class="bcp__input" value="{{ date_from }}">
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_payout_history_input_to">To</label>
+        <input type="date" name="date_to" id="workforce_payout_history_input_to" class="bcp__input" value="{{ date_to }}">
+      </div>
+      <div class="bcp__window-actions">
+        <button type="submit" class="bcp__primary">Apply</button>
+        <a href="{% url 'workforce:cod_business_payout_history' %}" class="bcp__ghost">Clear</a>
+      </div>
+    </form>
+
+    {% if payouts %}
+    <!-- Ledger -->
+    <section>
+      <div class="bcp__table-wrap">
+        <table class="bcp__table" id="workforce_payout_history_table_view">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Invoice</th>
+              <th>Account</th>
+              <th>Deliveries</th>
+              <th class="bcp__num">COD Released</th>
+              <th class="bcp__num">Charges</th>
+              <th class="bcp__num">Paid Out</th>
+              <th>By</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in payouts %}
+            {% comment %} A voided payout keeps its row and its invoice — the money came back,
+               so it is struck through rather than hidden. {% endcomment %}
+            <tr {% if p.reversal %}class="bcp__row--void"{% endif %}>
+              <td class="bcp__date">{{ p.created_at|date:"d M Y" }}</td>
+              <td class="bcp__order">
+                <a href="{% url 'workforce:cod_business_payout_invoice' p.transaction_code %}">{{ p.transaction_code|default:"—" }}</a>
+                {% if p.reversal %}<span class="bcp__sub-line">Voided {{ p.reversal.created_at|date:"d M Y" }}</span>{% endif %}
+              </td>
+              <td class="bcp__truncate" title="{{ p.business.business_name|default:'' }}">
+                {{ p.business.business_name|default:"—" }}
+              </td>
+              <td class="bcp__date">{{ p.task_count }}</td>
+              <td class="bcp__num">{{ p.gross_cod|floatformat:2|intcomma }}</td>
+              <td class="bcp__num bcp__num--fee">
+                {% if p.deductions_total %}−{{ p.deductions_total|floatformat:2|intcomma }}{% else %}—{% endif %}
+              </td>
+              <td class="bcp__num bcp__num--cod">{{ p.net_paid|floatformat:2|intcomma }}</td>
+              <td class="bcp__truncate">{{ p.created_by.first_name|default:p.created_by.username|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4">Total (excludes voided)</td>
+              <td class="bcp__num">{{ total_gross|floatformat:2|intcomma }}</td>
+              <td class="bcp__num bcp__num--fee">{% if total_deductions %}−{{ total_deductions|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+              <td class="bcp__num bcp__num--cod">{{ total_net|floatformat:2|intcomma }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% include "includes/components/_pagination.html" with page_obj=payouts_page per_page=per_page pagination_id="payout_history" %}
+    </section>
+    {% else %}
+    <section class="bcp__empty">
+      <p class="bcp__empty-mark">NO PAYOUTS</p>
+      <p class="bcp__empty-text">
+        COD paid out to a business will appear here with its invoice.
+        <a href="{% url 'workforce:cod_business_settlement_report' %}">Open the payout desk ▸</a>
+      </p>
+    </section>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

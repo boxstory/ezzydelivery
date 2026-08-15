@@ -1,6 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% comment %}
+Purpose: Staff edit form for one delivery task and its order (routing, address, package, money)
+Used by: workforce.views.delivery_task_edit at /workforce/delivery-task/<id>/edit/
+Notes: One POST writes both the task and the order, then logs a change summary to the timeline.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block content %}
 <div class="col-12 p-2 p-md-3">
@@ -29,8 +36,17 @@
                hx-get="{% url 'workforce:delivery_task_detail' task.id %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fa-solid fa-times"></i> Cancel
             </a>
+            <button type="button" class="wfnote__btn flex-shrink-0" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_parts_delivery_task_edit_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_parts_delivery_task_edit_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_parts_delivery_task_edit_card_notes' %}" hidden></div>
 
     <form method="post" id="taskEditForm" novalidate>
         {% csrf_token %}

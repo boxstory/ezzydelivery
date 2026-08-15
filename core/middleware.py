@@ -10,7 +10,10 @@ from django.contrib import messages
 from django.conf import settings
 from django.db import connection
 from collections import Counter
+from urllib.parse import quote
 import logging
+
+from core import signup_origin
 
 logger = logging.getLogger(__name__)
 query_logger = logging.getLogger('queries')
@@ -275,6 +278,174 @@ class DriverStatusCheckMiddleware:
             except Exception:
                 pass
         return self.get_response(request)
+
+
+class StaffDepartmentMiddleware:
+    """
+    Enforce staff department sub-roles across the whole /workforce/ tree.
+
+    is_staff already decides who may enter the staff dashboard (via
+    @staff_required on each view). This adds the second question — which desk —
+    without touching 312 view functions: it reads the resolved URL name and
+    checks it against core.departments.URL_DEPARTMENTS.
+
+    Deliberate behaviours:
+      - Super admins bypass everything.
+      - Non-staff and anonymous users are left to @staff_required, which already
+        produces the right redirect/JSON. This middleware never widens access.
+      - An unclassified route is refused rather than allowed. workforce's
+        department test asserts the map covers every route, so a new URL is
+        caught in CI, not by a staff member losing a page in production.
+      - A staff user with no department assigned can still reach the shared
+        routes (dashboard, help, AJAX pickers) and is told to ask an admin.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        match = getattr(request, 'resolver_match', None)
+        if not match:
+            return None
+
+        # Cheapest checks first: this runs on every request in the project, so
+        # anonymous and public traffic must not pay for the override lookup.
+        user = request.user
+        if not user.is_authenticated:
+            return None  # staff_required handles the login redirect
+
+        from core.departments import (
+            can_access, departments_for, is_overridden, is_route_enabled,
+            DEPARTMENT_CHOICES, GATED_NAMESPACES)
+
+        # The workforce tree is gated wholesale. Anywhere else is enforced only
+        # once a super admin has explicitly classified the route, so classifying
+        # a page outside /workforce/ is opt-in and never a silent lockout.
+        if match.app_name not in GATED_NAMESPACES:
+            if not is_overridden(match.url_name):
+                return None
+
+        # Not staff at all — @staff_required owns that rejection.
+        profile = getattr(user, 'profile', None)
+        if not (user.is_staff or (profile and profile.is_staff)):
+            return None
+
+        if can_access(user, match.url_name):
+            return None
+
+        if not is_route_enabled(match.url_name):
+            logger.warning(
+                "Staff user %s hit disabled page '%s'", user.id, match.url_name)
+            return self._deny(
+                request, "That page has been switched off by an administrator.")
+
+        required = departments_for(match.url_name)
+        if required is None:
+            logger.error(
+                "Workforce route '%s' (%s) is not classified in core/departments.py — refused",
+                match.url_name, request.path,
+            )
+            reason = "This page has not been assigned to a department yet."
+        else:
+            labels = [label for code, label in DEPARTMENT_CHOICES if code in required]
+            reason = "This page belongs to: %s." % ", ".join(labels)
+
+        logger.warning(
+            "Staff user %s blocked from '%s' (needs %s)",
+            user.id, match.url_name, sorted(required) if required else 'classification',
+        )
+        return self._deny(request, reason)
+
+    @staticmethod
+    def _deny(request, reason):
+        """JSON for AJAX callers, a redirect with a message for page loads."""
+        wants_json = (
+            request.headers.get('x-requested-with') == 'XMLHttpRequest'
+            or 'application/json' in request.headers.get('accept', '')
+        )
+        if wants_json:
+            from django.http import JsonResponse
+            return JsonResponse(
+                {'success': False, 'error': f"Department access required. {reason}"},
+                status=403,
+            )
+
+        messages.error(
+            request,
+            f"You don't have access to that section. {reason} "
+            "Ask a super admin to add the department to your staff role."
+        )
+        return redirect('workforce:wf_dashboard')
+
+
+class SignupOriginMiddleware:
+    """
+    Remember how an anonymous visitor arrived so the signup can be attributed.
+
+    Records first-touch (landing path, off-site referrer, utm tags) once per
+    anonymous session and upgrades the source whenever the visitor opens an
+    intent page such as the driver join link. Logged-in visitors are only
+    recorded on those intent pages, so a normal browsing session costs one
+    session read and writes only when something actually changed.
+    core/views.py:profile_add stamps the result onto the new Profile.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.method == 'GET':
+            try:
+                signup_origin.capture(
+                    request, first_touch=not request.user.is_authenticated)
+            except Exception:
+                logger.exception("SignupOriginMiddleware failed for %s", request.path)
+        return self.get_response(request)
+
+
+class WeakPasswordWarningMiddleware:
+    """
+    Send users whose password failed the strength rules to the change-password nudge.
+
+    Only ordinary HTML page loads are intercepted — never POSTs, AJAX, the API, static
+    files, or the auth pages themselves — so a redirect loop cannot strand anyone, and
+    logging out is always reachable. Skipping snoozes the warning for the session;
+    Profile.WEAK_PASSWORD_MAX_SKIPS caps how many times that is allowed in total.
+    """
+
+    EXEMPT_PREFIXES = (
+        '/static/', '/media/', '/private-media/', '/api/', '/admin/', '/accounts/',
+        '/password/', '/waha/', '/__debug__/', '/favicon',
+    )
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.enabled = getattr(settings, 'WEAK_PASSWORD_WARNING_ENABLED', True)
+
+    def __call__(self, request):
+        if self.enabled and self._should_warn(request):
+            target = reverse('core:weak_password_warning')
+            if request.path != target:
+                return redirect(f"{target}?next={quote(request.get_full_path())}")
+        return self.get_response(request)
+
+    def _should_warn(self, request):
+        if request.method != 'GET' or not request.user.is_authenticated:
+            return False
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return False
+        if 'text/html' not in request.headers.get('accept', ''):
+            return False
+        if request.path.startswith(self.EXEMPT_PREFIXES):
+            return False
+        if request.session.get('weak_password_snoozed'):
+            return False
+
+        profile = getattr(request.user, 'profile', None)
+        return bool(profile and profile.weak_password)
 
 
 class SecurityHeadersMiddleware:

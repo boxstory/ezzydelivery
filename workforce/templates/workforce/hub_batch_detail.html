@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff detail page for one hub pickup batch — route, driver, earnings, status, orders on the ride
+Used by: workforce.views.hub_batch_detail at /workforce/hub/batches/<id>/
+Notes: Driver assignment, status change and cancel post JSON to their own endpoints and reload the page.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 {% block title %}{{ batch.batch_number }} – Hub Batch – EzzyDelivery{% endblock %}
 {% block content %}
 <div class="hub-bd">
@@ -25,8 +32,17 @@
             <a href="{% url 'workforce:hub_batch_list' %}" class="btn btn-outline-secondary">
                 <i class="fa-solid fa-arrow-left me-1"></i> All Batches
             </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_hub_batch_detail_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_hub_batch_detail_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_hub_batch_detail_card_notes' %}" hidden></div>
 
     <div class="row g-4">
 
@@ -43,9 +59,7 @@
                             <div class="fw-semibold">{{ batch.pickup_location.pickup_location_title|default:"—" }}</div>
                             <div class="text-muted small">{{ batch.pickup_location.locality|default:"" }}</div>
                             {% if batch.pickup_location.pickup_lat and batch.pickup_location.pickup_lon %}
-                            <a href="https://www.google.com/maps?q={{ batch.pickup_location.pickup_lat }},{{ batch.pickup_location.pickup_lon }}" target="_blank" class="btn btn-sm btn-outline-success mt-1">
-                                <i class="fa-solid fa-location-dot me-1"></i> Maps
-                            </a>
+                            {% include "includes/components/_map_point.html" with uid=batch.id|stringformat:"s"|add:"-hbpick" lat=batch.pickup_location.pickup_lat lon=batch.pickup_location.pickup_lon label="Pickup location" btn_label="Map" size="sm" %}
                             {% endif %}
                         </div>
                     </div>
@@ -56,9 +70,7 @@
                             <div class="text-muted small">{{ batch.hub_warehouse.name|default:"" }}</div>
                             <div class="text-muted small">{{ batch.hub_warehouse.address|default:"" }}</div>
                             {% if batch.hub_warehouse.latitude and batch.hub_warehouse.longitude %}
-                            <a href="https://www.google.com/maps?q={{ batch.hub_warehouse.latitude }},{{ batch.hub_warehouse.longitude }}" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
-                                <i class="fa-solid fa-location-dot me-1"></i> Maps
-                            </a>
+                            {% include "includes/components/_map_point.html" with uid=batch.id|stringformat:"s"|add:"-hbwh" lat=batch.hub_warehouse.latitude lon=batch.hub_warehouse.longitude label="Hub warehouse" btn_label="Map" size="sm" %}
                             {% endif %}
                         </div>
                     </div>

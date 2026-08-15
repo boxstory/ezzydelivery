@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff review queue for user verification — approve, review or reject sign-ups
+Used by: workforce.views.user_verification_list at /workforce/verification/
+Notes: Approve/reject/review POST to update_verification_status; team rows POST to update_team_status.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}User Verification - Staff Dashboard{% endblock title %}
 
@@ -22,7 +29,16 @@
             <div class="wfd__hero-stat wfd__hero-stat--ok"><span class="wfd__hero-stat__num">{{ status_counts.verified|default:"0" }}</span><span class="wfd__hero-stat__label">Verified</span></div>
         </div>
     </div>
+    <button type="button" class="wfnote__btn" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_user_verification_list_card_notes"
+            title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+    </button>
 </div>
+
+<div class="wfnote" id="workforce_user_verification_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_user_verification_list_card_notes' %}" hidden></div>
 
 <!-- Filter Pills -->
 {% with extra_qs=pills_params %}
@@ -74,6 +90,12 @@
         <option value="driver" {% if role_filter == 'driver' %}selected{% endif %}>Driver</option>
         <option value="user" {% if role_filter == 'user' %}selected{% endif %}>User Only</option>
     </select>
+    <select name="source" class="uvl__select" aria-label="Signup source filter">
+        <option value="all" {% if not source_filter or source_filter == 'all' %}selected{% endif %}>All Sources</option>
+        {% for value, label in signup_source_choices %}
+        <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
     <div class="uvl__daterange">
         <input type="date" name="date_from" value="{{ date_from }}" class="uvl__date" aria-label="From date">
         <span class="uvl__daterange__sep">→</span>
@@ -82,7 +104,7 @@
     <button type="submit" class="uvl__btn uvl__btn--apply" title="Apply filters">
         <i class="fa-solid fa-filter"></i><span class="uvl__btn__label"> Apply</span>
     </button>
-    {% if search_query or role_filter and role_filter != 'all' or date_from or date_to %}
+    {% if search_query or role_filter and role_filter != 'all' or source_filter and source_filter != 'all' or date_from or date_to %}
     <a href="?status={{ current_filter|default:'all' }}" class="uvl__btn uvl__btn--clear" title="Clear filters">
         <i class="fa-solid fa-xmark"></i><span class="uvl__btn__label"> Clear</span>
     </a>
@@ -211,35 +233,37 @@
                              style="width: {{ data.profile.get_profile_completion_percentage }}%"></div>
                     </div>
                     <div class="small text-muted mt-1">
-                        {% if data.profile.is_profile_completed %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
+                        {# Same percentage as the bar: the stored is_profile_completed flag drifts behind the fields #}
+                        {% if data.profile.get_profile_completion_percentage == 100 %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
                     </div>
                 </div>
             </div>
             <!-- Business/Driver Profile Completion -->
             <div class="col-sm-6">
+                {# Heading and bar follow the actual business/driver record, not the role flags, which lag behind an in-progress application #}
+                {% with role_completion=data.profile.get_role_profile_completion_percentage %}
                 <div class="uvl__progress-wrap">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="uvl__section-head">
-                            {% if data.profile.is_business %}<i class="fa-solid fa-building"></i> Business Profile{% elif data.profile.is_driver %}<i class="fa-solid fa-car"></i> Driver Profile{% else %}<i class="fa-solid fa-user"></i> Role Profile{% endif %}
+                            {% if data.business %}<i class="fa-solid fa-building"></i> Business Profile{% elif data.driver %}<i class="fa-solid fa-car"></i> Driver Profile{% else %}<i class="fa-solid fa-user"></i> Role Profile{% endif %}
+                            <span class="uvl__origin-note"
+                                  title="How this user arrived{% if data.profile.signup_landing_path %} — landed on {{ data.profile.signup_landing_path }}{% endif %}{% if data.profile.signup_referrer %} — referred by {{ data.profile.signup_referrer }}{% endif %}{% if data.profile.signup_source_inferred %} (guessed from the account, not tracked at signup){% endif %}">
+                                (via {{ data.profile.get_signup_source_display }}{% if data.profile.signup_source_inferred %} · inferred{% endif %})
+                            </span>
                         </span>
-                        {% with role_completion=data.profile.get_business_profile_completion_percentage|add:data.profile.get_driver_profile_completion_percentage %}
                         <span class="uvl__progress-pct {% if role_completion == 100 %}uvl__progress-pct--ok{% elif role_completion >= 50 %}uvl__progress-pct--warn{% else %}uvl__progress-pct--low{% endif %}">
                             {{ role_completion }}%
                         </span>
-                        {% endwith %}
                     </div>
                     <div class="uvl__progress-bar">
-                        {% with role_completion=data.profile.get_business_profile_completion_percentage|add:data.profile.get_driver_profile_completion_percentage %}
                         <div class="uvl__progress-fill {% if role_completion == 100 %}uvl__progress-fill--ok{% elif role_completion >= 50 %}uvl__progress-fill--warn{% else %}uvl__progress-fill--low{% endif %}"
                              style="width: {{ role_completion }}%"></div>
-                        {% endwith %}
                     </div>
                     <div class="small text-muted mt-1">
-                        {% with role_completion=data.profile.get_business_profile_completion_percentage|add:data.profile.get_driver_profile_completion_percentage %}
-                        {% if role_completion == 100 %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
-                        {% endwith %}
+                        {% if role_completion == 100 %}<i class="fa-solid fa-check text-success"></i> Complete{% elif not data.business and not data.driver %}<i class="fa-solid fa-minus text-muted"></i> No role yet{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
                     </div>
                 </div>
+                {% endwith %}
             </div>
         </div>
 

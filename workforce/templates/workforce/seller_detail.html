@@ -1,13 +1,14 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Full staff record for one client business — dossier header plus eight tabbed panels
+Used by: workforce.views.seller_detail at /workforce/sellers/<business_id>/
+Notes: Most panel actions save over AJAX without reloading. Carries the shared wfnote__ page-notes
+       card under the dossier, hidden on load; the help button in the dossier toggles it.
+{% endcomment %}
 {% block title %}{{ business.business_name|default:"Seller Detail" }} - Ezzy Delivery{% endblock title %}
 {% block content %}
 <div class="sld">
-
-    <!-- Back Link -->
-    <a href="{% url 'workforce:sellers_list' %}" class="sld__back">
-        <i class="fa-solid fa-arrow-left"></i> Back to Sellers
-    </a>
 
     <!-- Merchant Dossier Header -->
     <div class="sld__dossier">
@@ -99,6 +100,13 @@
                 </div>
                 {% endif %}
             </div>
+
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_seller_detail_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
 
         <!-- Ledger strip: the figures as one data record -->
@@ -129,6 +137,9 @@
             </div>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_seller_detail_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_seller_detail_card_notes' %}" hidden></div>
 
     <!-- Tabs -->
     <div class="sld__tabs" role="tablist">
@@ -655,9 +666,7 @@
                                 <div class="sld__location-title">{{ loc.pickup_location_title }}{% if loc.locality %} — {{ loc.locality }}{% endif %}</div>
                                 <div class="sld__location-addr">Zone {{ loc.pickup_zone_no|default:"N/A" }}, St {{ loc.pickup_street_no|default:"N/A" }}, Bldg {{ loc.pickup_building_no|default:"N/A" }}</div>
                                 {% if loc.pickup_lat and loc.pickup_lon %}
-                                <a class="sld__location-pin" href="https://www.google.com/maps?q={{ loc.pickup_lat }},{{ loc.pickup_lon }}" target="_blank" rel="noopener">
-                                    <i class="fa-solid fa-location-dot"></i> {{ loc.pickup_lat|floatformat:5 }}, {{ loc.pickup_lon|floatformat:5 }}
-                                </a>
+                                {% include "includes/components/_map_point.html" with uid=loc.id|stringformat:"s"|add:"-pl" lat=loc.pickup_lat lon=loc.pickup_lon label=loc.pickup_location_title text=loc.pickup_lat|floatformat:5|add:", "|add:loc.pickup_lon|floatformat:5 size="sm" %}
                                 {% else %}
                                 <span class="sld__location-pin sld__location-pin--none"><i class="fa-solid fa-location-crosshairs"></i> No map pin</span>
                                 {% endif %}
@@ -1008,6 +1017,7 @@
                         <th>Email</th>
                         <th>Phone</th>
                         <th class="text-end">Change Status</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1030,7 +1040,7 @@
                                 {{ member.team_status|title }}
                             </span>
                         </td>
-                        <td class="sld__text-muted">{{ member.team_email|default:member.user.email|default:"N/A" }}</td>
+                        <td class="sld__text-muted">{{ member.team_email|default:member.user.email|lower|default:"N/A" }}</td>
                         <td class="sld__text-muted">{{ member.team_phone|default:"N/A" }}</td>
                         <td class="text-end">
                             <select class="form-select form-select-sm w-auto d-inline-block sld__status-select"
@@ -1043,6 +1053,23 @@
                                 <option value="{{ value }}" {% if member.team_status == value %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-secondary sld__tm-info-btn"
+                                    id="workforce_seller_btn_team_info_{{ member.id }}"
+                                    data-member-id="{{ member.id }}"
+                                    data-url="{% url 'workforce:seller_team_member_detail' business.business_id member.id %}"
+                                    title="More info">
+                                <i class="fa-solid fa-circle-info"></i> Info
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary sld__tm-edit-btn"
+                                    id="workforce_seller_btn_team_edit_{{ member.id }}"
+                                    data-member-id="{{ member.id }}"
+                                    data-url="{% url 'workforce:seller_team_member_detail' business.business_id member.id %}"
+                                    data-save-url="{% url 'workforce:seller_team_member_update' business.business_id member.id %}"
+                                    title="Edit member">
+                                <i class="fa-solid fa-pen"></i> Edit
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -1272,62 +1299,166 @@
 
     <!-- Tab: Products -->
     <div id="panel-products" class="sld__panel">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <h3 class="sld__section-title mb-0">
-                <i class="fa-solid fa-boxes-stacked sld__section-icon"></i> Products
-            </h3>
-            <a href="{% url 'product:product_csv_import' %}?business_id={{ business.business_id }}"
-               class="btn btn-sm btn-warning fw-semibold" id="seller_detail_btn_csv_import">
-                <i class="fa-solid fa-file-csv me-1"></i> Import CSV
-            </a>
+        <div class="sld__panel-head">
+            <div class="sld__panel-head-main">
+                <h3 class="sld__section-title">
+                    <i class="fa-solid fa-boxes-stacked sld__section-icon"></i> Products
+                </h3>
+                <p class="sld__panel-note">Catalogue held on file for this seller. Edits here overwrite the seller's own record.</p>
+            </div>
+            <div class="sld__act-group">
+                <a href="{% url 'product:product_single_add' %}?business_id={{ business.business_id }}"
+                   class="sld__act sld__act--primary" id="seller_detail_btn_add_product">
+                    <i class="fa-solid fa-plus"></i> Add product
+                </a>
+                <a href="{% url 'product:product_csv_import' %}?business_id={{ business.business_id }}"
+                   class="sld__act" id="seller_detail_btn_csv_import">
+                    <i class="fa-solid fa-file-import"></i> Import CSV / Excel
+                </a>
+                {% if products_list %}
+                <button type="button" class="sld__act" id="seller_detail_btn_edit_products">
+                    <i class="fa-solid fa-pen-to-square"></i> Edit table
+                </button>
+                {% endif %}
+            </div>
         </div>
 
         <!-- Local Products Table -->
         {% if products_list %}
-        <h6 class="text-muted mb-2 mt-4"><i class="fa-solid fa-database me-1"></i> Local Products ({{ products_list.count }})</h6>
+        <div class="sld__ledger-cap">
+            <span class="sld__ledger-cap-label">Local catalogue</span>
+            <span class="sld__ledger-cap-count">{{ products_list.count }} item{{ products_list.count|pluralize }}</span>
+        </div>
+        <div id="seller_products_edit_result" class="sld__note d-none" role="status"></div>
+
+        {# Amendment bar — docks under the toolbar for the whole of edit mode. #}
+        <div class="sld__commit" id="seller_products_commit" hidden>
+            <div class="sld__commit-tally">
+                <span class="sld__commit-count" id="seller_products_dirty_count">0</span>
+                <span class="sld__commit-label" id="seller_products_dirty_label">fields changed</span>
+            </div>
+            <p class="sld__commit-hint">Only changed cells are written back.</p>
+            <div class="sld__commit-actions">
+                <button type="button" class="sld__act sld__act--onDark" id="seller_detail_btn_cancel_products">Discard</button>
+                <button type="button" class="sld__act sld__act--commit" id="seller_detail_btn_save_products" disabled>
+                    <i class="fa-solid fa-floppy-disk"></i> Save changes
+                </button>
+            </div>
+        </div>
+
         <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0">
+            <table class="table table-sm table-hover align-middle mb-0 sld__products" id="seller_products_table"
+                   data-business-id="{{ business.business_id }}"
+                   data-save-url="{% url 'product:product_staff_bulk_update' %}">
                 <thead>
                     <tr>
-                        <th style="width:36px">#</th>
-                        <th>Product Name</th>
-                        <th>SKU</th>
+                        <th class="sld-col-num">#</th>
+                        <th class="sld-col-img"><span class="visually-hidden">Photo</span></th>
+                        <th>Product / SKU</th>
                         <th>Brand</th>
-                        <th>Barcode</th>
-                        <th>Size</th>
-                        <th>Unit</th>
-                        <th>Color</th>
+                        <th>Variant</th>
                         <th>Category</th>
+                        <th>Barcode</th>
                         <th>Description</th>
-                        <th class="text-end">Price</th>
-                        <th>Image</th>
-                        <th>Created</th>
-                        <th class="text-end">Actions</th>
+                        <th class="text-end sld-col-price">Price</th>
+                        <th class="sld-col-date">Added</th>
+                        <th class="sld-col-act"><span class="visually-hidden">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for product in products_list %}
-                    <tr>
-                        <td class="text-muted">{{ forloop.counter }}</td>
-                        <td>{{ product.item_name }}</td>
-                        <td><code>{{ product.item_sku|default:"-" }}</code></td>
-                        <td>{{ product.brand_name|default:"-" }}</td>
-                        <td>{{ product.barcode|default:"-" }}</td>
-                        <td>{{ product.size|default:"-" }}</td>
-                        <td>{{ product.unit|default:"-" }}</td>
-                        <td>{% if product.color %}<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{{ product.color.hex_code|default:'#ccc' }};border:1px solid #ddd;vertical-align:middle;"></span> {{ product.color }}{% else %}-{% endif %}</td>
-                        <td>{{ product.product_category|default:"-" }}</td>
-                        <td class="small">{{ product.item_discription|default:"-"|truncatewords:10 }}</td>
-                        <td class="text-end">{{ product.item_price|default:"0" }} QAR</td>
-                        <td>{% if product.product_image %}<img src="{{ product.product_image.url }}" alt="" style="max-height:28px;border-radius:3px;cursor:pointer;" onclick="document.getElementById('sldProductImgOverlay').style.display='flex';document.getElementById('sldProductImgFull').src=this.src;">{% else %}-{% endif %}</td>
-                        <td class="small text-muted">{{ product.created_at|date:"d M Y" }}</td>
+                    <tr data-pe-id="{{ product.id }}">
+                        <td class="sld__row-num">{{ forloop.counter }}</td>
+                        <td>
+                            {% if product.product_image %}
+                            <img src="{{ product.product_image.url }}" alt="{{ product.item_name }}"
+                                 class="sld-thumb sld__product-photo" loading="lazy">
+                            {% else %}
+                            <span class="sld__product-photo--empty" title="No photo">
+                                <i class="fa-regular fa-image"></i>
+                            </span>
+                            {% endif %}
+                        </td>
+                        {# Identity: the name leads, the SKU is its filing code underneath. #}
+                        <td class="sld__cell-stack">
+                            <div data-pe-field="item_name">
+                                <span class="pe__view sld__prod-name">{{ product.item_name }}</span>
+                                <input type="text" class="form-control form-control-sm pe__edit d-none" maxlength="100"
+                                       value="{{ product.item_name|default:'' }}" aria-label="Product name">
+                            </div>
+                            <div data-pe-field="item_sku">
+                                <span class="pe__view sld__prod-sku">{{ product.item_sku|default:"—" }}</span>
+                                <input type="text" class="form-control form-control-sm pe__edit d-none" maxlength="100"
+                                       value="{{ product.item_sku|default:'' }}" aria-label="SKU">
+                            </div>
+                        </td>
+                        <td data-pe-field="brand_name">
+                            <span class="pe__view">{{ product.brand_name|default:"—" }}</span>
+                            <input type="text" class="form-control form-control-sm pe__edit d-none" maxlength="100"
+                                   value="{{ product.brand_name|default:'' }}" aria-label="Brand">
+                        </td>
+                        {# Variant: size, unit and colour read as one attribute string, edit as three. #}
+                        <td class="sld__cell-variant">
+                            <span class="pe__view sld__variant-summary">{% if product.size or product.unit or product.color %}{% if product.size %}<span class="sld__vw">{{ product.size }}</span>{% endif %}{% if product.unit %}<span class="sld__vw">{{ product.unit }}</span>{% endif %}{% if product.color %}<span class="sld__vw"><span class="sld__swatch" data-swatch="{{ product.color.hex_code|default:'#ccc' }}"></span>{{ product.color }}</span>{% endif %}{% else %}<span class="sld__vw sld__vw--none">—</span>{% endif %}</span>
+                            <div class="sld__variant-row">
+                                <div data-pe-field="size">
+                                    <label class="pe__lbl d-none">Size</label>
+                                    <input type="text" class="form-control form-control-sm pe__edit d-none" maxlength="100"
+                                           value="{{ product.size|default:'' }}" aria-label="Size">
+                                </div>
+                                <div data-pe-field="unit">
+                                    <label class="pe__lbl d-none">Unit</label>
+                                    <select class="form-select form-select-sm pe__edit d-none" aria-label="Unit" data-no-select2>
+                                        <option value="">—</option>
+                                        {% for u in product_units %}
+                                        <option value="{{ u.id }}" {% if product.unit_id == u.id %}selected{% endif %}>{{ u.unit_variant }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div data-pe-field="color">
+                                    <label class="pe__lbl d-none">Colour</label>
+                                    <select class="form-select form-select-sm pe__edit d-none" aria-label="Color" data-no-select2>
+                                        <option value="">—</option>
+                                        {% for cl in product_colors %}
+                                        <option value="{{ cl.id }}" {% if product.color_id == cl.id %}selected{% endif %}>{{ cl.color_variant }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </td>
+                        <td data-pe-field="product_category">
+                            <span class="pe__view">{{ product.product_category|default:"—" }}</span>
+                            <select class="form-select form-select-sm pe__edit d-none" aria-label="Category" data-no-select2>
+                                <option value="">—</option>
+                                {% for cat in product_cats %}
+                                <option value="{{ cat.id }}" {% if product.product_category_id == cat.id %}selected{% endif %}>{{ cat.category_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td data-pe-field="barcode">
+                            <span class="pe__view sld__code">{{ product.barcode|default:"—" }}</span>
+                            <input type="text" class="form-control form-control-sm pe__edit d-none" maxlength="100"
+                                   value="{{ product.barcode|default:'' }}" aria-label="Barcode">
+                        </td>
+                        <td class="sld__cell-desc" data-pe-field="item_discription">
+                            <span class="pe__view">{{ product.item_discription|default:"—"|truncatewords:10 }}</span>
+                            <input type="text" class="form-control form-control-sm pe__edit d-none" maxlength="100"
+                                   value="{{ product.item_discription|default:'' }}" aria-label="Description">
+                        </td>
+                        <td class="text-end" data-pe-field="item_price">
+                            <span class="pe__view"><span class="sld__num">{{ product.item_price|default:"0" }}</span><span class="sld__unit">QAR</span></span>
+                            <input type="number" min="0" step="1" class="form-control form-control-sm pe__edit d-none"
+                                   value="{{ product.item_price|default:'0' }}" aria-label="Price">
+                        </td>
+                        <td class="sld__date-cell">{{ product.created_at|date:"d M Y" }}</td>
                         <td class="text-end">
                             <form method="POST" action="{% url 'product:product_staff_delete' product.id %}"
                                   class="d-inline"
                                   onsubmit="return confirm('Delete &quot;{{ product.item_name|escapejs }}&quot;? This cannot be undone.');">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"
-                                        id="seller_detail_btn_del_product_{{ product.id }}" title="Delete product">
+                                <button type="submit" class="sld__row-btn sld__row-btn--danger"
+                                        id="seller_detail_btn_del_product_{{ product.id }}" title="Delete product"
+                                        aria-label="Delete {{ product.item_name }}">
                                     <i class="fa-solid fa-trash-can"></i>
                                 </button>
                             </form>
@@ -1337,164 +1468,183 @@
                 </tbody>
             </table>
         </div>
+
         {% endif %}
 
         {% if api_products_platform %}
-        <div class="mt-3 mb-2">
-            <button type="button" class="btn btn-sm btn-outline-primary" id="seller_btn_show_api_products"
+        <div class="sld__ledger-cap sld__ledger-cap--api">
+            <span class="sld__ledger-cap-label">{{ api_products_platform|title }} catalogue</span>
+            <button type="button" class="sld__act" id="seller_btn_show_api_products"
                     hx-get="{% url 'workforce:seller_api_products' business.business_id %}"
                     hx-target="#seller-api-products-container"
                     hx-swap="innerHTML"
                     hx-indicator="#seller-api-products-spinner">
-                <i class="fa-solid fa-cloud-arrow-down me-1"></i> Show {{ api_products_platform|title }} Products
+                <i class="fa-solid fa-cloud-arrow-down"></i> Fetch from {{ api_products_platform|title }}
             </button>
-            <span id="seller-api-products-spinner" class="htmx-indicator ms-2 text-muted small">
-                <i class="fa-solid fa-spinner fa-spin me-1"></i> Loading...
+            <span id="seller-api-products-spinner" class="htmx-indicator sld__ledger-cap-count">
+                <i class="fa-solid fa-spinner fa-spin"></i> Loading…
             </span>
         </div>
         <div id="seller-api-products-container"></div>
         {% endif %}
 
         {% if not api_products_platform and not products_list %}
-        <div class="text-center text-muted py-4">
-            <i class="fa-solid fa-box-open fa-2x mb-2 d-block"></i>
-            No products found.
+        <div class="sld__empty-msg">
+            <i class="fa-solid fa-box-open"></i>
+            <p class="sld__empty-msg-title">No products on file</p>
+            <p class="sld__empty-msg-sub">Add one by hand, or import the seller's catalogue from a CSV or Excel sheet.</p>
         </div>
         {% endif %}
     </div>
 
     <!-- Tab: Edit -->
     <div id="panel-edit" class="sld__panel">
-        <h3 class="sld__section-title">
-            <i class="fa-solid fa-pen-to-square sld__section-icon"></i> Update Seller
-        </h3>
-        <form id="updateForm">
+        <div class="sld__panel-head">
+            <div class="sld__panel-head-main">
+                <h3 class="sld__section-title">
+                    <i class="fa-solid fa-pen-to-square sld__section-icon"></i> Amend record
+                </h3>
+                <p class="sld__panel-note">Changed fields are marked as you type. Nothing is written until you save.</p>
+            </div>
+        </div>
+
+        <form id="updateForm" class="sld__form">
             {% csrf_token %}
 
-            <!-- Basic Information -->
-            <h4 class="sld__form-heading">
-                <i class="fa-solid fa-store sld__form-heading-icon"></i> Basic Information
-            </h4>
-            <div class="sld__form-grid">
-                <div class="sld__form-group">
-                    <label class="sld__form-label">Business Code</label>
-                    <input type="text" name="business_code" value="{{ business.business_code|default:'' }}" class="sld__form-input" placeholder="e.g., SHOP001">
+            {# Amendment bar — same device as the Products ledger, docked while the form is dirty. #}
+            <div class="sld__commit sld__commit--form" id="seller_edit_commit" hidden>
+                <div class="sld__commit-tally">
+                    <span class="sld__commit-count" id="seller_edit_dirty_count">0</span>
+                    <span class="sld__commit-label" id="seller_edit_dirty_label">fields changed</span>
                 </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">Business Name *</label>
-                    <input type="text" name="business_name" value="{{ business.business_name }}" class="sld__form-input" required>
-                </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">QID</label>
-                    <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="sld__form-input" maxlength="11" placeholder="11 digits">
-                </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">Product Category</label>
-                    <input type="text" name="business_product_category" value="{{ business.business_product_category|default:'' }}" class="sld__form-input" placeholder="e.g., Electronics, Fashion">
-                </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">Business Since</label>
-                    <input type="date" name="business_since" value="{{ business.business_since|date:'Y-m-d' }}" class="sld__form-input">
-                </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">Status</label>
-                    <select name="business_status" class="sld__form-input">
-                        <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
-                        <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
-                        <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
-                        <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
-                    </select>
-                </div>
-                <div class="sld__form-group sld__form-group--full">
-                    <label class="sld__form-label">Business Bio</label>
-                    <input type="text" name="business_bio" value="{{ business.business_bio|default:'' }}" class="sld__form-input" maxlength="225" placeholder="Short description of the business">
+                <p class="sld__commit-hint" id="seller_edit_dirty_names"></p>
+                <div class="sld__commit-actions">
+                    <button type="button" class="sld__act sld__act--onDark" id="seller_edit_btn_revert">Discard</button>
+                    <button type="submit" class="sld__act sld__act--commit">
+                        <i class="fa-solid fa-floppy-disk"></i> Save changes
+                    </button>
                 </div>
             </div>
+
+            <!-- Basic Information -->
+            <section class="sld__fieldset sld__fieldset--keyed">
+                <h4 class="sld__form-heading">
+                    <i class="fa-solid fa-store sld__form-heading-icon"></i> Identity
+                </h4>
+                <div class="sld__form-grid">
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_code">Business code</label>
+                        <input type="text" id="sld_f_code" name="business_code" value="{{ business.business_code|default:'' }}" class="sld__form-input sld__form-input--code" placeholder="SHOP001">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_name">Business name <span class="sld__form-req">required</span></label>
+                        <input type="text" id="sld_f_name" name="business_name" value="{{ business.business_name }}" class="sld__form-input" required>
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_qid">QID</label>
+                        <input type="text" id="sld_f_qid" name="business_qid" value="{{ business.business_qid|default:'' }}" class="sld__form-input sld__form-input--code" maxlength="11" placeholder="11 digits">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_cat">Product category</label>
+                        <input type="text" id="sld_f_cat" name="business_product_category" value="{{ business.business_product_category|default:'' }}" class="sld__form-input" placeholder="Electronics, fashion…">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_since">Trading since</label>
+                        <input type="date" id="sld_f_since" name="business_since" value="{{ business.business_since|date:'Y-m-d' }}" class="sld__form-input sld__form-input--code">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_status">Account standing</label>
+                        <select id="sld_f_status" name="business_status" class="sld__form-input sld__form-select">
+                            <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                            <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                        </select>
+                    </div>
+                    <div class="sld__form-group sld__form-group--full">
+                        <label class="sld__form-label" for="sld_f_bio">Bio</label>
+                        <input type="text" id="sld_f_bio" name="business_bio" value="{{ business.business_bio|default:'' }}" class="sld__form-input" maxlength="225" placeholder="One line on what the business sells">
+                    </div>
+                </div>
+            </section>
 
             <!-- Contact Information -->
-            <h4 class="sld__form-heading">
-                <i class="fa-solid fa-address-book sld__form-heading-icon"></i> Contact Information
-            </h4>
-            <div class="sld__form-grid">
-                <div class="sld__form-group">
-                    <label class="sld__form-label">Phone</label>
-                    <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="sld__form-input" placeholder="e.g., +974 1234 5678">
+            <section class="sld__fieldset">
+                <h4 class="sld__form-heading">
+                    <i class="fa-solid fa-address-book sld__form-heading-icon"></i> Contact
+                </h4>
+                <div class="sld__form-grid">
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_phone">Phone</label>
+                        <input type="text" id="sld_f_phone" name="business_phone" value="{{ business.business_phone|default:'' }}" class="sld__form-input sld__form-input--code" placeholder="+974 1234 5678">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_wa">WhatsApp</label>
+                        <input type="text" id="sld_f_wa" name="business_whatsapp" value="{{ business.business_whatsapp|default:'' }}" class="sld__form-input sld__form-input--code" placeholder="+974 1234 5678">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_email">Email</label>
+                        <input type="email" id="sld_f_email" name="business_email" value="{{ business.business_email|default:'' }}" class="sld__form-input" placeholder="business@example.com">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_web">Website</label>
+                        <input type="url" id="sld_f_web" name="business_website" value="{{ business_profile.business_website|default:'' }}" class="sld__form-input" placeholder="https://example.com">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_ig"><i class="fa-brands fa-instagram sld__form-label-icon"></i> Instagram</label>
+                        <input type="text" id="sld_f_ig" name="business_instagram" value="{{ business.business_instagram|default:'' }}" class="sld__form-input" placeholder="@username or URL">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_fb"><i class="fa-brands fa-facebook sld__form-label-icon"></i> Facebook</label>
+                        <input type="text" id="sld_f_fb" name="business_facebook_page" value="{{ business.business_facebook_page|default:'' }}" class="sld__form-input" placeholder="Page name or URL">
+                    </div>
                 </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">WhatsApp</label>
-                    <input type="text" name="business_whatsapp" value="{{ business.business_whatsapp|default:'' }}" class="sld__form-input" placeholder="e.g., +974 1234 5678">
-                </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">Email</label>
-                    <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="sld__form-input" placeholder="business@example.com">
-                </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">Website</label>
-                    <input type="url" name="business_website" value="{{ business_profile.business_website|default:'' }}" class="sld__form-input" placeholder="https://example.com">
-                </div>
-            </div>
-
-            <!-- Social Media -->
-            <h4 class="sld__form-heading">
-                <i class="fa-solid fa-share-nodes sld__form-heading-icon"></i> Social Media
-            </h4>
-            <div class="sld__form-grid">
-                <div class="sld__form-group">
-                    <label class="sld__form-label"><i class="fa-brands fa-instagram sld__form-label-icon"></i> Instagram</label>
-                    <input type="text" name="business_instagram" value="{{ business.business_instagram|default:'' }}" class="sld__form-input" placeholder="@username or URL">
-                </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label"><i class="fa-brands fa-facebook sld__form-label-icon"></i> Facebook</label>
-                    <input type="text" name="business_facebook_page" value="{{ business.business_facebook_page|default:'' }}" class="sld__form-input" placeholder="Page name or URL">
-                </div>
-            </div>
+            </section>
 
             <!-- Address -->
-            <h4 class="sld__form-heading">
-                <i class="fa-solid fa-location-dot sld__form-heading-icon"></i> Business Address
-            </h4>
-            <div class="sld__form-grid">
-                <div class="sld__form-group sld__form-group--full">
-                    <label class="sld__form-label">Street Address</label>
-                    <input type="text" name="business_address" value="{{ business_profile.business_address|default:'' }}" class="sld__form-input" placeholder="Street address">
+            <section class="sld__fieldset">
+                <h4 class="sld__form-heading">
+                    <i class="fa-solid fa-location-dot sld__form-heading-icon"></i> Address
+                </h4>
+                <div class="sld__form-grid">
+                    <div class="sld__form-group sld__form-group--full">
+                        <label class="sld__form-label" for="sld_f_addr">Street address</label>
+                        <input type="text" id="sld_f_addr" name="business_address" value="{{ business_profile.business_address|default:'' }}" class="sld__form-input" placeholder="Building, street, zone">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_city">City</label>
+                        <input type="text" id="sld_f_city" name="business_city" value="{{ business_profile.business_city|default:'' }}" class="sld__form-input" placeholder="Doha">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_state">State / area</label>
+                        <input type="text" id="sld_f_state" name="business_state" value="{{ business_profile.business_state|default:'' }}" class="sld__form-input" placeholder="Al Wakrah">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_zip">ZIP code</label>
+                        <input type="text" id="sld_f_zip" name="business_zip_code" value="{{ business_profile.business_zip_code|default:'' }}" class="sld__form-input sld__form-input--code" maxlength="10">
+                    </div>
+                    <div class="sld__form-group">
+                        <label class="sld__form-label" for="sld_f_country">Country</label>
+                        <input type="text" id="sld_f_country" name="business_country" value="{{ business_profile.business_country|default:'Qatar' }}" class="sld__form-input">
+                    </div>
                 </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">City</label>
-                    <input type="text" name="business_city" value="{{ business_profile.business_city|default:'' }}" class="sld__form-input" placeholder="e.g., Doha">
-                </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">State/Area</label>
-                    <input type="text" name="business_state" value="{{ business_profile.business_state|default:'' }}" class="sld__form-input" placeholder="e.g., Al Wakrah">
-                </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">ZIP Code</label>
-                    <input type="text" name="business_zip_code" value="{{ business_profile.business_zip_code|default:'' }}" class="sld__form-input" maxlength="10">
-                </div>
-                <div class="sld__form-group">
-                    <label class="sld__form-label">Country</label>
-                    <input type="text" name="business_country" value="{{ business_profile.business_country|default:'Qatar' }}" class="sld__form-input">
-                </div>
-            </div>
+            </section>
 
             <!-- Settings -->
-            <h4 class="sld__form-heading">
-                <i class="fa-solid fa-gear sld__form-heading-icon"></i> Service Settings
-            </h4>
-            <div class="sld__form-grid">
-                <div class="sld__form-group">
-                    <label class="sld__form-checkbox">
-                        <input type="checkbox" name="fulfillment_service_enabled" {% if business.fulfillment_service_enabled %}checked{% endif %}>
-                        Enable Fulfillment Service (WMS Integration)
-                    </label>
-                </div>
-            </div>
+            <section class="sld__fieldset">
+                <h4 class="sld__form-heading">
+                    <i class="fa-solid fa-gear sld__form-heading-icon"></i> Services
+                </h4>
+                <label class="sld__switch" for="sld_f_ffl">
+                    <input type="checkbox" id="sld_f_ffl" name="fulfillment_service_enabled" class="sld__switch-input" {% if business.fulfillment_service_enabled %}checked{% endif %}>
+                    <span class="sld__switch-track" aria-hidden="true"><span class="sld__switch-knob"></span></span>
+                    <span class="sld__switch-text">
+                        <span class="sld__switch-title">Fulfilment service</span>
+                        <span class="sld__switch-sub">Stock for this seller is held and picked in the Ezzy warehouse.</span>
+                    </span>
+                </label>
+            </section>
 
-            <div class="sld__form-actions">
-                <button type="submit" class="sld__btn-submit">
-                    <i class="fa-solid fa-save"></i> Save Changes
-                </button>
-                <a href="{% url 'workforce:sellers_list' %}" class="sld__btn-cancel">Cancel</a>
-            </div>
         </form>
         <div id="updateMessage" class="sld__toast"></div>
     </div>
@@ -1546,6 +1696,95 @@
     </div>
 </div>
 
+<!-- Team Member Info Modal -->
+<div id="sldTeamInfoModal" class="sld__modal-overlay sld__modal-overlay--wide" aria-hidden="true">
+    <div class="sld__modal sld__modal--team">
+        <div class="sld__modal-header">
+            <h4 class="sld__modal-title"><i class="fa-solid fa-circle-info me-2"></i>Team Member Details</h4>
+            <button type="button" class="sld__modal-close" id="sldTeamInfoClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="sld__modal-body" id="sldTeamInfoBody">
+            <div class="text-center text-muted py-4"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>
+        </div>
+        <div class="sld__modal-footer">
+            <button type="button" class="sld__modal-btn sld__modal-btn--primary" id="sldTeamInfoEditBtn">
+                <i class="fa-solid fa-pen me-1"></i> Edit
+            </button>
+            <button type="button" class="sld__modal-btn sld__modal-btn--secondary" id="sldTeamInfoCancel">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Team Member Edit Modal -->
+<div id="sldTeamEditModal" class="sld__modal-overlay sld__modal-overlay--wide" aria-hidden="true">
+    <div class="sld__modal sld__modal--team">
+        <div class="sld__modal-header">
+            <h4 class="sld__modal-title"><i class="fa-solid fa-pen-to-square me-2"></i>Edit Team Member</h4>
+            <button type="button" class="sld__modal-close" id="sldTeamEditClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="sld__modal-body">
+            <div class="sld__tm-account" id="sldTeamEditAccount">
+                <span class="sld__tm-account-lbl">Linked account</span>
+                <span class="sld__tm-account-val" id="sldTeamEditUsername">—</span>
+            </div>
+            <form id="sldTeamEditForm" class="row g-3 sld__tm-form">
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold" for="sldTeamEditName">Display Name</label>
+                    <input type="text" class="form-control form-control-sm" id="sldTeamEditName" name="team_name" maxlength="100">
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold" for="sldTeamEditCode">Team Code</label>
+                    <input type="text" class="form-control form-control-sm" id="sldTeamEditCode" name="team_code" maxlength="100">
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold" for="sldTeamEditEmail">Email</label>
+                    <input type="text" class="form-control form-control-sm" id="sldTeamEditEmail" name="team_email"
+                           maxlength="100" autocapitalize="off" autocorrect="off" spellcheck="false">
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold" for="sldTeamEditPhone">Phone</label>
+                    <input type="text" class="form-control form-control-sm" id="sldTeamEditPhone" name="team_phone" maxlength="100">
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold" for="sldTeamEditRole">Role</label>
+                    <select class="form-select form-select-sm" id="sldTeamEditRole" name="team_role">
+                        {% for value, label in team_role_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold" for="sldTeamEditStatus">Status</label>
+                    <select class="form-select form-select-sm" id="sldTeamEditStatus" name="team_status">
+                        {% for value, label in team_status_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small fw-semibold" for="sldTeamEditBio">Bio / Note</label>
+                    <input type="text" class="form-control form-control-sm" id="sldTeamEditBio" name="team_bio" maxlength="225">
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="sldTeamEditVerified" name="team_verifed">
+                        <label class="form-check-label small" for="sldTeamEditVerified">Verified member</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div id="sldTeamEditMsg" class="small"></div>
+                </div>
+            </form>
+        </div>
+        <div class="sld__modal-footer">
+            <button type="button" class="sld__modal-btn sld__modal-btn--primary" id="sldTeamEditSave">
+                <i class="fa-solid fa-save me-1"></i> Save Changes
+            </button>
+            <button type="button" class="sld__modal-btn sld__modal-btn--secondary" id="sldTeamEditCancel">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- Product Image Lightbox -->
 <div id="sldProductImgOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);align-items:center;justify-content:center;cursor:pointer;" onclick="this.style.display='none';">
     <img id="sldProductImgFull" src="" alt="" style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 4px 32px rgba(0,0,0,.5);">
@@ -1557,15 +1796,27 @@
 
 {% block extra_js %}
 <script>
-// Tab switching
+// Tab switching — the active tab is mirrored into the URL hash so a reload
+// (or a redirect back from import / add product) stays on the same tab.
 document.querySelectorAll('.sld__tab').forEach(function(btn) {
     btn.addEventListener('click', function() {
         document.querySelectorAll('.sld__tab').forEach(function(b) { b.classList.remove('active'); });
         document.querySelectorAll('.sld__panel').forEach(function(p) { p.classList.remove('active'); });
         this.classList.add('active');
-        document.getElementById('panel-' + this.getAttribute('data-tab')).classList.add('active');
+        var tab = this.getAttribute('data-tab');
+        document.getElementById('panel-' + tab).classList.add('active');
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', '#' + tab);
+        }
     });
 });
+
+(function openTabFromHash() {
+    var tab = (window.location.hash || '').replace('#', '');
+    if (!tab) return;
+    var btn = document.querySelector('.sld__tab[data-tab="' + tab + '"]');
+    if (btn) btn.click();
+})();
 
 // Document Modal
 var docModal = document.getElementById('docModal');
@@ -1749,13 +2000,13 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
         msg.className = 'sld__toast sld__toast--show sld__toast--' + (data.success ? 'success' : 'error');
         msg.innerHTML = '<i class="fa-solid fa-' + (data.success ? 'check-circle' : 'exclamation-circle') + '"></i> ' + (data.message || data.error || 'Done');
         if (data.success) setTimeout(function() { location.reload(); }, 1500);
-        else { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes'; }
+        else { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save changes'; }
     })
     .catch(function() {
         msg.className = 'sld__toast sld__toast--show sld__toast--error';
         msg.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Error saving';
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save changes';
     });
 });
 
@@ -2019,5 +2270,455 @@ document.body.addEventListener('htmx:responseError', function (e) {
     }
     alert(msg);
 });
+</script>
+
+<!-- Products tab: inline bulk edit of the local products table -->
+<script>
+(function () {
+    var table = document.getElementById('seller_products_table');
+    if (!table) return;
+
+    var btnEdit = document.getElementById('seller_detail_btn_edit_products');
+    var btnSave = document.getElementById('seller_detail_btn_save_products');
+    var btnCancel = document.getElementById('seller_detail_btn_cancel_products');
+    var commitBar = document.getElementById('seller_products_commit');
+    var dirtyCount = document.getElementById('seller_products_dirty_count');
+    var dirtyLabel = document.getElementById('seller_products_dirty_label');
+    var result = document.getElementById('seller_products_edit_result');
+
+    // Per-row colour swatches get their hex from data-swatch (no inline styles).
+    table.querySelectorAll('.sld__swatch[data-swatch]').forEach(function (dot) {
+        dot.style.backgroundColor = dot.getAttribute('data-swatch');
+    });
+
+    // Photo column: click a thumbnail to open it in the existing lightbox.
+    table.addEventListener('click', function (e) {
+        var img = e.target.closest('.sld__product-photo');
+        if (!img) return;
+        var overlay = document.getElementById('sldProductImgOverlay');
+        var full = document.getElementById('sldProductImgFull');
+        if (!overlay || !full) return;
+        full.src = img.src;
+        overlay.style.display = 'flex';
+    });
+
+    function controls() {
+        return Array.prototype.slice.call(table.querySelectorAll('.pe__edit'));
+    }
+
+    function snapshot() {
+        controls().forEach(function (c) { c.dataset.peOriginal = c.value; });
+    }
+
+    function setMode(editing) {
+        table.classList.toggle('sld__products--editing', editing);
+        table.querySelectorAll('.pe__view').forEach(function (v) { v.classList.toggle('d-none', editing); });
+        table.querySelectorAll('.pe__lbl').forEach(function (l) { l.classList.toggle('d-none', !editing); });
+        controls().forEach(function (c) { c.classList.toggle('d-none', !editing); });
+        btnEdit.classList.toggle('d-none', editing);
+        commitBar.hidden = !editing;
+        if (editing) retally();
+    }
+
+    // The amendment bar reports how many cells differ from what was filed.
+    function retally() {
+        var n = 0;
+        controls().forEach(function (c) {
+            if (c.value !== c.dataset.peOriginal) n++;
+        });
+        dirtyCount.textContent = n;
+        dirtyLabel.textContent = n === 1 ? 'field changed' : 'fields changed';
+        commitBar.classList.toggle('sld__commit--armed', n > 0);
+        btnSave.disabled = n === 0;
+        return n;
+    }
+
+    function markDirty(control) {
+        var cell = control.closest('[data-pe-field]');
+        if (cell) cell.classList.toggle('pe__cell--dirty', control.value !== control.dataset.peOriginal);
+        retally();
+    }
+
+    function collectChanges() {
+        var changes = [];
+        controls().forEach(function (c) {
+            var cell = c.closest('[data-pe-field]');
+            var row = c.closest('tr');
+            if (!cell || !row) return;
+            var dirty = c.value !== c.dataset.peOriginal;
+            cell.classList.toggle('pe__cell--dirty', dirty);
+            cell.classList.remove('pe__cell--failed');
+            if (dirty) {
+                changes.push({
+                    id: row.getAttribute('data-pe-id'),
+                    field: cell.getAttribute('data-pe-field'),
+                    value: c.value
+                });
+            }
+        });
+        return changes;
+    }
+
+    function showResult(kind, html) {
+        result.className = 'sld__note sld__note--' + kind;
+        result.innerHTML = html;
+    }
+
+    btnEdit.addEventListener('click', function () {
+        snapshot();
+        setMode(true);
+        var first = table.querySelector('.pe__edit');
+        if (first) first.focus();
+    });
+
+    btnCancel.addEventListener('click', function () {
+        controls().forEach(function (c) {
+            c.value = c.dataset.peOriginal;
+            var cell = c.closest('[data-pe-field]');
+            if (cell) cell.classList.remove('pe__cell--dirty', 'pe__cell--failed');
+        });
+        result.className = 'sld__note d-none';
+        setMode(false);
+        btnEdit.focus();
+    });
+
+    table.addEventListener('input', function (e) {
+        if (!e.target.classList.contains('pe__edit')) return;
+        markDirty(e.target);
+    });
+    table.addEventListener('change', function (e) {
+        if (!e.target.classList.contains('pe__edit')) return;
+        markDirty(e.target);
+    });
+
+    btnSave.addEventListener('click', function () {
+        var changes = collectChanges();
+        if (!changes.length) {
+            showResult('muted', 'No cells were changed.');
+            return;
+        }
+
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+
+        fetch(table.getAttribute('data-save-url'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': meta ? meta.getAttribute('content') : ''
+            },
+            body: JSON.stringify({
+                business_id: table.getAttribute('data-business-id'),
+                changes: changes
+            })
+        })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+            var d = res.data || {};
+            if (!res.ok && !d.errors) {
+                showResult('danger', d.message || 'Could not save changes.');
+                return;
+            }
+            if (d.errors && d.errors.length) {
+                showResult('warning',
+                    '<strong>' + (d.message || '') + '</strong><ul class="sld__note-list">' +
+                    d.errors.map(function (m) {
+                        return '<li>' + m.replace(/[<>&]/g, '') + '</li>';
+                    }).join('') + '</ul>');
+            } else {
+                showResult('success', (d.message || 'Saved.') + ' Reloading…');
+            }
+            if (d.updated) {
+                setTimeout(function () {
+                    window.location.hash = 'products';
+                    window.location.reload();
+                }, d.errors && d.errors.length ? 2500 : 700);
+            }
+        })
+        .catch(function () {
+            showResult('danger', 'Network error — nothing was saved.');
+        })
+        .finally(function () {
+            btnSave.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save changes';
+            retally();
+        });
+    });
+})();
+
+// Edit tab: mark amended fields and dock the commit bar while the form is dirty.
+(function () {
+    var form = document.getElementById('updateForm');
+    if (!form) return;
+
+    var bar = document.getElementById('seller_edit_commit');
+    var count = document.getElementById('seller_edit_dirty_count');
+    var label = document.getElementById('seller_edit_dirty_label');
+    var names = document.getElementById('seller_edit_dirty_names');
+    var revert = document.getElementById('seller_edit_btn_revert');
+
+    function fields() {
+        return Array.prototype.slice.call(
+            form.querySelectorAll('.sld__form-input, .sld__switch-input')
+        );
+    }
+
+    function valueOf(el) {
+        return el.type === 'checkbox' ? String(el.checked) : el.value;
+    }
+
+    function labelOf(el) {
+        var group = el.closest('.sld__form-group');
+        var lbl = group && group.querySelector('.sld__form-label');
+        if (lbl) {
+            // Drop the "required" tag so the bar lists plain field names.
+            var clone = lbl.cloneNode(true);
+            var req = clone.querySelector('.sld__form-req');
+            if (req) req.remove();
+            return clone.textContent.trim();
+        }
+        var title = el.closest('.sld__switch');
+        title = title && title.querySelector('.sld__switch-title');
+        return title ? title.textContent.trim() : el.name;
+    }
+
+    fields().forEach(function (el) { el.dataset.sldOriginal = valueOf(el); });
+
+    function retally() {
+        var changed = [];
+        fields().forEach(function (el) {
+            var dirty = valueOf(el) !== el.dataset.sldOriginal;
+            var group = el.closest('.sld__form-group') || el.closest('.sld__switch');
+            if (group) group.classList.toggle('sld__form-group--dirty', dirty);
+            if (dirty) changed.push(labelOf(el));
+        });
+        count.textContent = changed.length;
+        label.textContent = changed.length === 1 ? 'field changed' : 'fields changed';
+        names.textContent = changed.length
+            ? changed.slice(0, 4).join(', ') + (changed.length > 4 ? ' +' + (changed.length - 4) + ' more' : '')
+            : '';
+        bar.hidden = changed.length === 0;
+        bar.classList.toggle('sld__commit--armed', changed.length > 0);
+    }
+
+    form.addEventListener('input', retally);
+    form.addEventListener('change', retally);
+
+    revert.addEventListener('click', function () {
+        fields().forEach(function (el) {
+            if (el.type === 'checkbox') el.checked = el.dataset.sldOriginal === 'true';
+            else el.value = el.dataset.sldOriginal;
+        });
+        retally();
+    });
+})();
+
+// Team member: "Info" (read-only detail) + "Edit" (membership fields).
+// Both buttons hit the same detail endpoint; Edit just fills a form with it.
+(function () {
+    var infoModal = document.getElementById('sldTeamInfoModal');
+    if (!infoModal) return;
+    var infoBody = document.getElementById('sldTeamInfoBody');
+    var infoEditBtn = document.getElementById('sldTeamInfoEditBtn');
+    var editModal = document.getElementById('sldTeamEditModal');
+    var editMsg = document.getElementById('sldTeamEditMsg');
+    var editSave = document.getElementById('sldTeamEditSave');
+    var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    var current = null;      // last loaded member payload
+    var currentSaveUrl = ''; // update endpoint for that member
+
+    function esc(v) {
+        if (v === null || v === undefined || v === '') return '—';
+        return String(v).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    // Emails are stored lower-case, so keep the field lower-case as it's typed.
+    document.getElementById('sldTeamEditEmail').addEventListener('input', function () {
+        var pos = this.selectionStart;
+        this.value = this.value.toLowerCase();
+        this.setSelectionRange(pos, pos);
+    });
+
+    function open(el) { el.classList.add('show'); el.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
+    function close(el) { el.classList.remove('show'); el.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
+
+    function row(label, value) {
+        return '<div class="sld__tm-row"><span class="sld__tm-lbl">' + label +
+               '</span><span class="sld__tm-val">' + esc(value) + '</span></div>';
+    }
+
+    function renderInfo(m) {
+        var html = '';
+
+        html += '<div class="sld__tm-head">';
+        if (m.team_logo_url) {
+            html += '<img class="sld__tm-avatar" src="' + esc(m.team_logo_url) + '" alt="">';
+        }
+        html += '<div><div class="sld__tm-head-name">' + esc(m.team_name || m.username) + '</div>' +
+                '<div class="sld__tm-head-sub">' + esc(m.team_role_display) + ' &middot; ' + esc(m.team_status_display) +
+                (m.team_verifed ? ' &middot; <i class="fa-solid fa-circle-check"></i> Verified' : '') + '</div></div>';
+        html += '</div>';
+
+        html += '<div class="sld__tm-grid">';
+
+        html += '<div class="sld__tm-card"><div class="sld__tm-card-title">Membership</div>';
+        html += row('Display name', m.team_name);
+        html += row('Team code', m.team_code);
+        html += row('Role', m.team_role_display);
+        html += row('Status', m.team_status_display);
+        html += row('Verified', m.team_verifed ? 'Yes' : 'No');
+        html += row('Email', m.team_email);
+        html += row('Phone', m.team_phone);
+        html += row('Bio', m.team_bio);
+        html += '</div>';
+
+        html += '<div class="sld__tm-card"><div class="sld__tm-card-title">User Account</div>';
+        html += row('Username', m.username);
+        html += row('Full name', m.user_full_name);
+        html += row('Account email', m.user_email);
+        html += row('Account active', m.user_is_active ? 'Yes' : 'No');
+        html += row('User number', m.user_number);
+        html += row('Joined', m.date_joined);
+        html += row('Last login', m.last_login);
+        html += '</div>';
+
+        html += '<div class="sld__tm-card"><div class="sld__tm-card-title">Profile</div>';
+        html += row('Phone', m.profile_phone);
+        html += row('WhatsApp', m.profile_whatsapp);
+        html += row('Profile email', m.profile_email);
+        html += row('Address', m.profile_address);
+        html += row('Zone', m.profile_zone);
+        html += row('Verification', m.verification_status);
+        html += row('Signup source', m.signup_source);
+        html += '</div>';
+
+        html += '<div class="sld__tm-card"><div class="sld__tm-card-title">Invitation & History</div>';
+        html += row('Invited by', m.invited_by);
+        html += row('Invited at', m.invited_at);
+        html += row('Created', m.created_at);
+        html += row('Last updated', m.updated_at);
+        html += '</div>';
+
+        html += '</div>';
+
+        if (m.permissions && m.permissions.length) {
+            html += '<div class="sld__tm-card sld__tm-card--wide"><div class="sld__tm-card-title">Effective Permissions ' +
+                    '<span class="sld__badge sld__badge--muted sld__badge--sm">' + m.permissions.length + '</span></div>' +
+                    '<div class="sld__tm-perms">';
+            m.permissions.forEach(function (p) {
+                html += '<span class="sld__tm-perm">' + esc(p) + '</span>';
+            });
+            html += '</div></div>';
+        }
+
+        infoBody.innerHTML = html;
+    }
+
+    function fillEdit(m) {
+        document.getElementById('sldTeamEditUsername').textContent = m.username + (m.user_email ? ' · ' + m.user_email : '');
+        document.getElementById('sldTeamEditName').value = m.team_name || '';
+        document.getElementById('sldTeamEditCode').value = m.team_code || '';
+        document.getElementById('sldTeamEditEmail').value = (m.team_email || '').toLowerCase();
+        document.getElementById('sldTeamEditPhone').value = m.team_phone || '';
+        document.getElementById('sldTeamEditBio').value = m.team_bio || '';
+        document.getElementById('sldTeamEditRole').value = m.team_role;
+        document.getElementById('sldTeamEditStatus').value = m.team_status;
+        document.getElementById('sldTeamEditVerified').checked = !!m.team_verifed;
+        editMsg.innerHTML = '';
+    }
+
+    function load(url) {
+        return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function (data) {
+                if (!data.success) throw new Error(data.error || 'Failed to load');
+                current = data.member;
+                return data.member;
+            });
+    }
+
+    document.querySelectorAll('.sld__tm-info-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            currentSaveUrl = '';
+            infoBody.innerHTML = '<div class="text-center text-muted py-4"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+            open(infoModal);
+            load(this.dataset.url)
+                .then(renderInfo)
+                .catch(function (err) {
+                    infoBody.innerHTML = '<div class="text-danger small">' + esc(err.message) + '</div>';
+                });
+        });
+    });
+
+    document.querySelectorAll('.sld__tm-edit-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            currentSaveUrl = this.dataset.saveUrl;
+            load(this.dataset.url)
+                .then(function (m) { fillEdit(m); open(editModal); })
+                .catch(function (err) { alert(err.message || 'Failed to load member'); });
+        });
+    });
+
+    // "Edit" from inside the info modal — same member, no second fetch.
+    infoEditBtn.addEventListener('click', function () {
+        if (!current) return;
+        var btn = document.querySelector('.sld__tm-edit-btn[data-member-id="' + current.id + '"]');
+        currentSaveUrl = btn ? btn.dataset.saveUrl : '';
+        fillEdit(current);
+        close(infoModal);
+        open(editModal);
+    });
+
+    editSave.addEventListener('click', function () {
+        if (!currentSaveUrl) return;
+        var fd = new FormData();
+        fd.append('csrfmiddlewaretoken', csrf);
+        fd.append('team_name', document.getElementById('sldTeamEditName').value.trim());
+        fd.append('team_code', document.getElementById('sldTeamEditCode').value.trim());
+        fd.append('team_email', document.getElementById('sldTeamEditEmail').value.trim().toLowerCase());
+        fd.append('team_phone', document.getElementById('sldTeamEditPhone').value.trim());
+        fd.append('team_bio', document.getElementById('sldTeamEditBio').value.trim());
+        fd.append('team_role', document.getElementById('sldTeamEditRole').value);
+        fd.append('team_status', document.getElementById('sldTeamEditStatus').value);
+        if (document.getElementById('sldTeamEditVerified').checked) fd.append('team_verifed', 'on');
+
+        editSave.disabled = true;
+        editSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+        fetch(currentSaveUrl, { method: 'POST', body: fd })
+            .then(function (r) { return r.json().catch(function () { throw new Error('HTTP ' + r.status); }); })
+            .then(function (data) {
+                if (data.success) {
+                    window.location.hash = 'team';
+                    location.reload();
+                } else {
+                    editMsg.innerHTML = '<span class="text-danger">' + esc(data.error || 'Failed') + '</span>';
+                    editSave.disabled = false;
+                    editSave.innerHTML = '<i class="fa-solid fa-save me-1"></i> Save Changes';
+                }
+            })
+            .catch(function (err) {
+                editMsg.innerHTML = '<span class="text-danger">' + esc(err.message || 'Network error') + '</span>';
+                editSave.disabled = false;
+                editSave.innerHTML = '<i class="fa-solid fa-save me-1"></i> Save Changes';
+            });
+    });
+
+    document.getElementById('sldTeamInfoClose').addEventListener('click', function () { close(infoModal); });
+    document.getElementById('sldTeamInfoCancel').addEventListener('click', function () { close(infoModal); });
+    document.getElementById('sldTeamEditClose').addEventListener('click', function () { close(editModal); });
+    document.getElementById('sldTeamEditCancel').addEventListener('click', function () { close(editModal); });
+    infoModal.addEventListener('click', function (e) { if (e.target === infoModal) close(infoModal); });
+    editModal.addEventListener('click', function (e) { if (e.target === editModal) close(editModal); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (editModal.classList.contains('show')) close(editModal);
+        else if (infoModal.classList.contains('show')) close(infoModal);
+    });
+})();
 </script>
 {% endblock extra_js %}

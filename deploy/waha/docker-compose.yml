@@ -1,6 +1,15 @@
+# Purpose: Reproducible definition of the ezzy-waha container (WhatsApp HTTP API bridge, multi-session).
+# Used by: deploy/waha/RUNBOOK.md — `docker compose up -d` from this directory; secrets come from deploy/waha/.env.
+# Notes: This file IS the source of truth. The live container was once recreated by a hand-written `docker run`
+#        that drifted from here (WEBJS vs NOWEB, NODE_OPTIONS); recreate via compose so that can't recur.
+
 services:
   waha:
-    image: devlikeapro/waha:latest
+    # Pinned by digest, not by version tag: devlikeapro publishes no
+    # `2026.7.1` tag (only rolling ones like `latest`), so a version pin here
+    # fails to resolve and blocks every recreate. This digest IS 2026.7.1 —
+    # confirm with `curl -H "X-Api-Key: …" http://127.0.0.1:3000/api/version`.
+    image: devlikeapro/waha@sha256:dc134637dfa0bd65202010a65e4ff8176101791699176c75bb37d5aa9daf487c
     container_name: ezzy-waha
     restart: unless-stopped
     # Bind to loopback only — public exposure goes through nginx with auth.
@@ -9,16 +18,32 @@ services:
     volumes:
       - waha_sessions:/app/.sessions
       - waha_files:/app/.media
+    # One Chromium process per WEBJS session. The host has 15 GiB and NO swap,
+    # so an unbounded node heap can take the whole box down rather than just
+    # this container. Both numbers live in this one process — the cap is what
+    # keeps a runaway session from killing the other number with it.
+    mem_limit: 8g
     environment:
       # API key required in X-Api-Key on every request (nginx injects it).
       WHATSAPP_API_KEY: "${WAHA_API_KEY}"
       # Webhook target — HMAC-signed by WAHA, verified in whatsapp/auth.py.
+      # Applies to sessions that don't set their own config.webhooks.
       WHATSAPP_HOOK_URL: "https://ezzydelivery.qa/api/integrations/waha/webhook/"
       WHATSAPP_HOOK_EVENTS: "message,message.any,session.status"
       # HMAC-SHA512 over raw webhook body, sent in X-Webhook-Hmac header.
-      WHATSAPP_HOOK_HMAC: "${WAHA_WEBHOOK_HMAC_SECRET}"
-      WHATSAPP_HOOK_HMAC_ALGORITHM: "sha512"
-      # NOWEB engine — Core edition, single session.
+      # The var name is WHATSAPP_HOOK_HMAC_KEY — WAHA reads only that one
+      # (dist/core/config/GlobalWebhookConfig.js). Under the old name
+      # WHATSAPP_HOOK_HMAC it signed nothing, sent no header, and Django
+      # 403'd every delivery, so no inbound message reached the DB at all.
+      # The algorithm is hardcoded sha512 in WAHA; there is no env for it.
+      WHATSAPP_HOOK_HMAC_KEY: "${WAHA_WEBHOOK_HMAC_SECRET}"
+      # WEBJS (real WhatsApp Web under Puppeteer). Container-wide: WAHA has no
+      # per-session engine selector, so every session here runs WEBJS. Moving one
+      # number to a browserless engine would mean a second container.
+      WHATSAPP_DEFAULT_ENGINE: "WEBJS"
+      # Keep the node heap well under mem_limit so V8 GCs instead of the kernel
+      # OOM-killing the container. Was 16384, which exceeded physical RAM.
+      NODE_OPTIONS: "--max-old-space-size=4096"
       WAHA_LOG_FORMAT: "JSON"
       WAHA_LOG_LEVEL: "info"
       WAHA_PRINT_QR: "false"

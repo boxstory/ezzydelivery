@@ -45,6 +45,8 @@ from core import models as core_models
 from fleet import models as fleet_models
 from business import models as business_models
 from business.permissions import BusinessPermissions, ROLE_PERMISSIONS
+from core.forms_base import SanitizedForm, SanitizedFormMixin, SanitizedModelForm
+from core.net_guard import validate_public_url
 
 # Local aliases for commonly used models
 Business = business_models.Business
@@ -82,7 +84,7 @@ business_STATUS_CHOICES = (
 # =============================================================================
 
 
-class businessRegisterForm(forms.ModelForm):
+class businessRegisterForm(SanitizedModelForm):
     """
     Main business registration and update form.
 
@@ -249,7 +251,7 @@ class businessRegisterForm(forms.ModelForm):
 # =============================================================================
 
 
-class businessApiSettingsForm(forms.ModelForm):
+class businessApiSettingsForm(SanitizedModelForm):
     """
     E-commerce API integration settings form.
 
@@ -277,6 +279,8 @@ class businessApiSettingsForm(forms.ModelForm):
         - business is set in the view, not exposed in form
         - is_verify_api is excluded and set automatically after API test
         - TikTok fields are only shown when api_type is 'tiktokshop'
+        - shopify_setup_mode is a non-model field: it only drives which Shopify
+          credential fields the form shows and whether saving hands off to OAuth
 
     Template:
         business/parts/business_settings_api_add.html
@@ -286,6 +290,21 @@ class businessApiSettingsForm(forms.ModelForm):
         business.views.business_settings_api_add
         business.views.business_settings_api_update
     """
+
+    SHOPIFY_SETUP_MODE_CHOICES = [
+        ('oauth', 'Connect with OAuth — recommended, we fetch the token for you'),
+        ('custom_app', 'Custom App — I already have an Admin API access token'),
+    ]
+
+    shopify_setup_mode = forms.ChoiceField(
+        label='Shopify setup method',
+        required=False,
+        initial='oauth',
+        choices=SHOPIFY_SETUP_MODE_CHOICES,
+        widget=forms.RadioSelect(attrs={'class': 'shopify-setup-mode'}),
+        help_text='OAuth needs Client ID + Client Secret. Custom App needs only the Access Token.',
+    )
+
     class Meta:
         model = business_models.BusinessApiSettings
         fields = [
@@ -355,9 +374,64 @@ class businessApiSettingsForm(forms.ModelForm):
         self.fields['tiktok_shop_cipher'].required = False
         self.fields['tiktok_refresh_token'].required = False
 
+        # Open an existing Shopify integration in the mode it was actually set up
+        # in: a pasted token with no Client ID can only have come from a custom app.
+        instance = getattr(self, 'instance', None)
+        if instance is not None and instance.pk and instance.api_type == 'shopify':
+            if instance.api_access_token and not instance.api_key:
+                self.fields['shopify_setup_mode'].initial = 'custom_app'
+
+    def clean_site_api_url(self):
+        """Reject a store URL that points back inside our own network.
+
+        The server fetches this URL itself during API test and order import, so
+        an unchecked value is a server-side request forgery lever: a merchant
+        could aim it at 127.0.0.1, a private subnet, or the cloud metadata
+        endpoint and read the response back through the API test result page.
+        """
+        url = (self.cleaned_data.get('site_api_url') or '').strip()
+        if not url:
+            return url
+
+        # validate_public_url resolves DNS, and socket.getaddrinfo has no timeout.
+        # Running it on every submit blocks a gunicorn worker whenever the resolver
+        # is slow, and a transient resolver failure would stop the merchant saving
+        # any other field on this form. Only pay that cost when the URL changed.
+        if self.instance and self.instance.pk and 'site_api_url' not in self.changed_data:
+            return url
+
+        # Merchants routinely paste a bare hostname; assume https rather than
+        # failing them on a missing scheme.
+        if '://' not in url:
+            url = 'https://' + url
+
+        ok, reason = validate_public_url(url)
+        if not ok:
+            raise forms.ValidationError(f'Store URL is not reachable as a public address: {reason}')
+        return url
+
     def clean(self):
         cleaned_data = super().clean()
         api_type = cleaned_data.get('api_type')
+
+        # Shopify: enforce the credentials the chosen setup path actually needs,
+        # so a half-filled form fails here instead of as a 401 from Shopify later.
+        if api_type == 'shopify':
+            mode = cleaned_data.get('shopify_setup_mode') or 'oauth'
+            if mode == 'custom_app':
+                if not cleaned_data.get('api_access_token'):
+                    self.add_error(
+                        'api_access_token',
+                        'Access Token is required for a Shopify Custom App. '
+                        'It starts with "shpat_".',
+                    )
+            else:
+                if not cleaned_data.get('api_key'):
+                    self.add_error('api_key', 'Client ID is required to connect Shopify via OAuth.')
+                if not cleaned_data.get('api_secret'):
+                    self.add_error('api_secret', 'Client Secret is required to connect Shopify via OAuth.')
+                if not cleaned_data.get('site_api_url'):
+                    self.add_error('site_api_url', 'Store URL is required to connect Shopify via OAuth.')
 
         # Validate TikTok Shop specific requirements
         if api_type == 'tiktokshop':
@@ -378,7 +452,7 @@ class businessApiSettingsForm(forms.ModelForm):
 # =============================================================================
 
 
-class BusinessProfileForm(forms.ModelForm):
+class BusinessProfileForm(SanitizedModelForm):
     """
     Extended business profile information form.
 
@@ -509,7 +583,7 @@ class BusinessProfileForm(forms.ModelForm):
                 self.fields[field_name].label = label
 
 
-class BusinessLogoForm(forms.ModelForm):
+class BusinessLogoForm(SanitizedModelForm):
     """
     Business logo upload form.
 
@@ -538,7 +612,7 @@ class BusinessLogoForm(forms.ModelForm):
 # =============================================================================
 
 
-class PickupLocationsAddForm(forms.ModelForm):
+class PickupLocationsAddForm(SanitizedModelForm):
     """
     Pickup/warehouse location form.
 
@@ -550,10 +624,16 @@ class PickupLocationsAddForm(forms.ModelForm):
         - locality: Area/locality name
         - pickup_zone_no: Zone number
         - pickup_street_no: Street number
-        - pickup_building_no: Building number
-        - pickup_lat: GPS latitude
-        - pickup_lon: GPS longitude
+        - pickup_building_no: Building number (required on this form — the
+          model still allows blank for legacy rows, but a driver cannot find
+          a pickup point without it, so new/edited stores must supply one)
+        - pickup_lat: GPS latitude (filled by QNAS lookup or a pasted map pin)
+        - pickup_lon: GPS longitude (filled by QNAS lookup or a pasted map pin)
         - pickup_status: active, inactive, pending, suspended
+
+    The templates render each field individually (no crispy blob) so the
+    QNAS "Verify & Fill Coordinates" button and the WhatsApp/Google Maps
+    paste box can sit between the building number and the lat/lon fields.
 
     Template:
         business/parts/pickup_location_add.html
@@ -578,9 +658,55 @@ class PickupLocationsAddForm(forms.ModelForm):
             'is_default',
         ]
         exclude = ['business', 'updated_at', 'created_at']
+        widgets = {
+            'pickup_location_title': forms.TextInput(attrs={
+                'class': 'form-control', 'placeholder': 'e.g. Main Warehouse — Salwa Road'}),
+            'locality': forms.TextInput(attrs={
+                'class': 'form-control', 'placeholder': 'e.g. Al Sadd'}),
+            'pickup_zone_no': forms.NumberInput(attrs={
+                'class': 'form-control', 'placeholder': '0', 'min': 0}),
+            'pickup_street_no': forms.NumberInput(attrs={
+                'class': 'form-control', 'placeholder': '0', 'min': 0}),
+            'pickup_building_no': forms.NumberInput(attrs={
+                'class': 'form-control', 'placeholder': '0', 'min': 0}),
+            'pickup_lat': forms.TextInput(attrs={
+                'class': 'form-control', 'placeholder': '25.286106'}),
+            'pickup_lon': forms.TextInput(attrs={
+                'class': 'form-control', 'placeholder': '51.534817'}),
+            'pickup_status': forms.Select(attrs={'class': 'form-select'}),
+            'is_fulfilment_center': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_default': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'pickup_location_title': 'Store Name',
+            'locality': 'Locality / Area',
+            'pickup_zone_no': 'Zone',
+            'pickup_street_no': 'Street',
+            'pickup_building_no': 'Building',
+            'pickup_lat': 'Latitude',
+            'pickup_lon': 'Longitude',
+            'pickup_status': 'Status',
+            'is_fulfilment_center': 'This store is a fulfilment center',
+            'is_default': 'Use as default pickup location',
+        }
+        help_texts = {
+            'pickup_building_no': 'Required — drivers use the building number to '
+                                  'find your door, and QNAS needs it to return an '
+                                  'exact pin instead of a street-level guess.',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The model keeps building optional for legacy rows, but every store
+        # saved through this form must carry one.
+        self.fields['pickup_building_no'].required = True
+        self.fields['pickup_building_no'].error_messages['required'] = (
+            'Building number is required — a driver cannot locate the pickup '
+            'point without it.'
+        )
 
 
-class DriverDirectoryAddForm(forms.ModelForm):
+class DriverDirectoryAddForm(SanitizedModelForm):
     """
     Driver directory entry form.
 
@@ -606,7 +732,7 @@ class DriverDirectoryAddForm(forms.ModelForm):
 # =============================================================================
 
 
-class BusinessTeamProfileForm(forms.ModelForm):
+class BusinessTeamProfileForm(SanitizedModelForm):
     """
     Business team member profile form.
 
@@ -724,7 +850,7 @@ def resolve_user_identifier(identifier):
     return user, None
 
 
-class TeamMemberAddForm(forms.ModelForm):
+class TeamMemberAddForm(SanitizedModelForm):
     """
     Simplified form for adding new team members.
 
@@ -853,7 +979,7 @@ class TeamMemberAddForm(forms.ModelForm):
         return getattr(self, 'cleaned_user', None)
 
 
-class TeamPermissionForm(forms.Form):
+class TeamPermissionForm(SanitizedForm):
     """
     Form for managing individual team member permissions.
 
@@ -879,7 +1005,7 @@ class TeamPermissionForm(forms.Form):
     )
 
 
-class ChangeRoleForm(forms.Form):
+class ChangeRoleForm(SanitizedForm):
     """
     Form for changing a team member's role.
 

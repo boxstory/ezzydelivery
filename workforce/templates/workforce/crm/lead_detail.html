@@ -4,9 +4,10 @@
 {# Purpose: CRM lead detail — source summary, stage/assignee/follow-up editors, activity timeline, WA chat snippet. Linking to a Business happens on the Business Verification page. #}
 {# Used by: workforce.crm_views.crm_lead_detail #}
 {# Notes: crmd__ namespace; writes go through fetch-POST JSON endpoints via crm_lead_detail.js. #}
+{#        Carries the shared wfnote__ page-notes card under the hero, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260724b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -36,8 +37,8 @@
         </span>
       </div>
       <div class="crmd__hero-badges">
-        <span class="crm__stage crm__stage--{{ lead.stage }}" id="workforce_crm_detail_span_stage">
-          <i class="fa-solid fa-circle"></i>{{ lead.get_stage_display }}
+        <span class="crm__stage crm__stage--sw-{{ lead.stage_swatch }}" id="workforce_crm_detail_span_stage">
+          <i class="fa-solid fa-circle"></i>{{ lead.stage_label }}
         </span>
         {% if lead.is_overdue %}
         <span class="crm__stage crm__stage--overdue"><i class="fa-solid fa-triangle-exclamation"></i>Follow-up overdue</span>
@@ -55,9 +56,26 @@
       <a href="https://wa.me/{{ lead.phone }}" target="_blank" rel="noopener" class="crm__btn">
         <i class="fa-brands fa-whatsapp"></i> WhatsApp
       </a>
+      {# Same number, but sent from the platform line this conversation runs on: #}
+      {# the number picked on the chat panel, else the board's routed default. #}
+      <button type="button" class="crm__btn"
+              data-wasend-open
+              data-wasend-to="{{ lead.phone }}"
+              data-wasend-name="{{ lead.contact_name|default:lead.company_name|escape }}">
+        <i class="fa-solid fa-paper-plane"></i> Send from EZZY
+      </button>
       {% endif %}
+      <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+              aria-expanded="false" aria-controls="workforce_crm_lead_detail_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
     </div>
   </div>
+
+  <div class="wfnote" id="workforce_crm_lead_detail_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_lead_detail_card_notes' %}" hidden></div>
 
   <div class="crmd__grid">
 
@@ -169,13 +187,39 @@
       </div>
 
       <!-- FULL WHATSAPP CONVERSATION -->
-      {% if wa_messages %}
+      {% if lead.phone or lead.wa_chat_override %}
       <div class="crm__panel">
         <div class="crm__panel-hd">
           <i class="fa-brands fa-whatsapp"></i><h3>WhatsApp Conversation</h3>
           <span class="crmd__count">{{ wa_messages|length }}</span>
         </div>
-        <div class="crm__panel-body crmd__chat crmd__chat--full" id="workforce_crm_detail_div_chat">
+        {# Which of our numbers this thread runs on. Also decides which line the #}
+        {# "Send from EZZY" composer replies from — see wa_session on the include. #}
+        {% if wa_session_options %}
+        <div class="crmd__sess" role="tablist" aria-label="WhatsApp number">
+          {% for opt in wa_session_options %}
+          <a class="crmd__sess-tab{% if opt.active %} crmd__sess-tab--on{% endif %}"
+             href="?session={{ opt.name|urlencode }}#workforce_crm_detail_div_chat"
+             role="tab" aria-selected="{% if opt.active %}true{% else %}false{% endif %}"
+             title="{% if opt.status %}{{ opt.name }} — {{ opt.status }}{% else %}{{ opt.label }}{% endif %}">
+            <span class="crmd__sess-name">
+              {% if opt.status %}<span class="crmd__sess-dot{% if opt.status == 'WORKING' %} crmd__sess-dot--on{% endif %}"></span>{% endif %}
+              {{ opt.label }}
+            </span>
+            {% if opt.phone %}<span class="crmd__sess-num">+{{ opt.phone }}</span>{% endif %}
+            <span class="crmd__sess-count">{{ opt.count }}</span>
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if not wa_messages %}
+        <div class="crm__panel-body crmd__sess-empty">
+          No messages with this lead on this number.
+          {% if wa_total_messages %}Their {{ wa_total_messages }} message{{ wa_total_messages|pluralize }} {{ wa_total_messages|pluralize:"is,are" }} on another number — switch tabs above.
+          {% else %}Nothing has been exchanged on any of our numbers yet.{% endif %}
+        </div>
+        {% endif %}
+        <div class="crm__panel-body crmd__chat crmd__chat--full{% if not wa_messages %} d-none{% endif %}" id="workforce_crm_detail_div_chat">
           {% for msg in wa_messages %}
           <div class="crmd__msg crmd__msg--{{ msg.direction }}">
             {% if msg.media_proxy %}
@@ -287,11 +331,29 @@
           <div class="crmd__section">
             <div class="crmd__section-lbl">Pipeline Stage</div>
             <div class="crmd__stage-grid" id="workforce_crm_detail_div_stages">
-              {% for value, label in stage_choices %}
-              <button type="button" class="crmd__stage-opt crmd__stage-opt--{{ value }} {% if lead.stage == value %}active{% endif %}"
-                      data-stage="{{ value }}">{{ label }}</button>
+              {% for st in stage_choices %}
+              <button type="button" class="crmd__stage-opt crmd__stage-opt--{{ st.key }} {% if lead.stage == st.key %}active{% endif %}"
+                      data-stage="{{ st.key }}"
+                      {% if st.confirm_text %}data-confirm="{{ st.confirm_text }}"{% endif %}
+                      {% if st.needs_reason %}data-needs-reason="1"{% endif %}>{{ st.label }}</button>
               {% endfor %}
             </div>
+            {% include "workforce/crm/parts/_lead_merge_panel.html" %}
+
+            {% if lead.category == 'driver' %}
+            <div class="crmd__pinbar" id="workforce_crm_detail_div_pinbar"
+                 {% if not lead.stage_pinned %}hidden{% endif %}>
+              <span class="crmd__pinnote">
+                <i class="fa-solid fa-thumbtack"></i>
+                Pinned to <strong>{{ lead.stage_label }}</strong> — this card no longer follows the
+                driver's application status.
+              </span>
+              <button type="button" class="crm__btn crm__btn--sm" id="workforce_crm_detail_btn_unpin"
+                      data-unpin-url="{% url 'workforce:crm_lead_unpin_stage' lead.pk %}">
+                <i class="fa-solid fa-rotate"></i> Resume auto-filing
+              </button>
+            </div>
+            {% endif %}
           </div>
 
           <div class="crmd__section">
@@ -391,6 +453,17 @@
 
 </div>
 
+{# wa_send_session pins the composer to the number a staff member actually PICKED #}
+{# on the chat panel. Blank — nobody has chosen yet, or they are on "All numbers" #}
+{# which is not a line anything can be sent from — keeps the section's route. #}
+{# wa_send_message is the starter body from this lead's MessageTemplate, already #}
+{# rendered with the lead's details — staff edit it before sending. #}
+{% if lead.category == 'driver' %}
+{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="driver_onboarding" wa_session=wa_send_session wa_message=wa_send_message %}
+{% else %}
+{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="crm_leads" wa_session=wa_send_session wa_message=wa_send_message %}
+{% endif %}
+
 <!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
 <script>
   window.CRMD_CONFIG = {
@@ -402,8 +475,9 @@
     urlDeleteBase: "/workforce/crm/leads/{{ lead.pk }}/delete-activity/",
     urlLinkChat: "{% url 'workforce:crm_lead_link_chat' lead.pk %}",
     urlWaSearch: "{% url 'workforce:crm_wa_contact_search' %}",
+    leadName: "{{ lead.contact_name|default:lead.company_name|default:lead.phone|default:'this lead'|escapejs }}",
     csrfToken: "{{ csrf_token }}"
   };
 </script>
-<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260719a"></script>
+<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260807g"></script>
 {% endblock %}

@@ -2,6 +2,14 @@
 {% load business_dropdown %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% comment %}
+Purpose: Shared delivery-task list table + filter bar for every staff task slice
+Used by: workforce.views dl_list_all, fulfilled_clients_tasks, non_fulfilled_clients_tasks,
+         dl_list_incompleted_details, dl_list_published_to_dms, tasks_reported
+Notes: The hero title/subtitle and the filter/column flags come from the view, so one template
+       serves several routes. Carries the shared wfnote__ page-notes card under the hero, hidden
+       on load; the hero help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
@@ -13,6 +21,21 @@
         <span class="oli__hero__subtitle">| {{ page_subtitle|default:"Manage and track" }}</span>
     </div>
     <div class="oli__hero__right d-flex align-items-center gap-3">
+        {% if export_columns %}
+        {# Delivery sheet: same rows as the filter bar shows, or just the ticked ones #}
+        <div class="btn-group btn-group-sm" role="group" aria-label="Delivery sheet">
+            <button type="button" class="btn btn-light" id="workforce_tasks_btn_sheet_csv"
+                    title="Export delivery sheet (CSV)"
+                    data-bs-toggle="modal" data-bs-target="#wfExportModal">
+                <i class="fa-solid fa-file-csv me-1"></i>Sheet CSV
+            </button>
+            <a class="btn btn-light" id="workforce_tasks_btn_sheet_print" data-sheet-print
+               href="{{ sheet_print_url }}{% if filter_params %}?{{ filter_params }}{% endif %}"
+               target="_blank" rel="noopener" title="Print delivery sheet (A4)">
+                <i class="fa-solid fa-print me-1"></i>Print Sheet
+            </a>
+        </div>
+        {% endif %}
         <a href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}" class="btn btn-warning btn-sm">
             <i class="fa-solid fa-paper-plane me-1"></i>Unpublished
             <span class="badge bg-dark ms-1">{{ unpublished_count|default:"0" }}</span>
@@ -21,9 +44,18 @@
             <span class="oli__hero__count-value" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</span>
             <span class="oli__hero__count-label">tasks</span>
         </div>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_parts_lists_dl_list_all_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
 </header>
 <div class="col-12 p-3" role="main" aria-label="Delivery Tasks List">
+
+    <div class="wfnote" id="workforce_parts_lists_dl_list_all_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_parts_lists_dl_list_all_card_notes' %}" hidden></div>
 
     {% if show_filters %}
     <!-- Filter Panel -->
@@ -199,6 +231,35 @@
 
 <!-- Status Update Modal -->
 {% include "workforce/parts/components/_tasks_status_modal.html" %}
+
+{% if export_columns %}
+{% include "workforce/parts/components/_export_columns_modal.html" %}
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260807b"></script>
+<script>
+// Print sheet follows the row ticks the same way the CSV export does: ticked rows
+// win, none ticked prints the whole filter set. It also inherits the column pick
+// saved by the export modal, so both outputs show the same columns; the sheet has
+// its own Columns panel for changing them from there.
+(function () {
+    var link = document.querySelector('[data-sheet-print]');
+    if (!link) return;
+    var base = link.getAttribute('href');
+    link.addEventListener('click', function () {
+        var params = [];
+        var ids = Array.prototype.slice.call(document.querySelectorAll('.task-checkbox:checked'))
+                       .map(function (b) { return b.value; });
+        if (ids.length) params.push('ids=' + ids.join(','));
+        try {
+            var cols = JSON.parse(localStorage.getItem('{{ export_storage_key }}') || 'null');
+            if (cols && cols.length) params.push('columns=' + cols.join(','));
+        } catch (e) { /* storage may be unavailable */ }
+        link.setAttribute('href', params.length
+            ? base + (base.indexOf('?') === -1 ? '?' : '&') + params.join('&')
+            : base);
+    });
+})();
+</script>
+{% endif %}
 
 
 <!-- Scripts inside content block for HTMX compatibility -->

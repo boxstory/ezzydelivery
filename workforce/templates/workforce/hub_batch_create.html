@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff builder for a hub pickup batch — pick location + hub, tick orders, optionally assign driver
+Used by: workforce.views.hub_batch_create at /workforce/hub/batches/create/
+Notes: Posts JSON to the same URL and redirects to the new batch detail page.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 {% block title %}Create Hub Pickup Batch – EzzyDelivery{% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'workforce/css/hub_batch.css' %}">
@@ -16,8 +23,17 @@
             <a href="{% url 'workforce:hub_batch_list' %}" class="btn btn-outline-secondary">
                 <i class="fa-solid fa-arrow-left me-1"></i> Back to Batches
             </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_hub_batch_create_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_hub_batch_create_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_hub_batch_create_card_notes' %}" hidden></div>
 
     <div class="row g-4">
 

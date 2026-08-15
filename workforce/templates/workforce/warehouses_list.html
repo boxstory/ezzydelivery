@@ -1,6 +1,13 @@
 {% extends "workforce/wf_base_dashboard.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Staff console for linking fulfilment-enabled clients to warehouses
+Used by: workforce.views.warehouses_list at /workforce/warehouses/
+Notes: Link/unlink post to workforce:warehouse_link_business / warehouse_unlink_business; the link
+       row drives PickupLocation creation. Carries the shared wfnote__ page-notes card under the
+       header, hidden on load; the header help button toggles it via workforce.js.
+{% endcomment %}
 
 {% block title %}Warehouse Management - Business Links{% endblock %}
 
@@ -12,7 +19,7 @@
 <div class="wh__page">
 
   <!-- Page Header -->
-  <div class="wh__header">
+  <div class="wh__header d-flex align-items-start justify-content-between gap-2">
     <div>
       <h1 class="wh__title">
         <i class="fa-solid fa-warehouse"></i>
@@ -20,7 +27,16 @@
       </h1>
       <p class="wh__subtitle">{{ total_warehouses }} Warehouses • {{ total_links }} Active Links</p>
     </div>
+    <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_warehouses_list_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
   </div>
+
+  <div class="wfnote" id="workforce_warehouses_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_warehouses_list_card_notes' %}" hidden></div>
 
   <!-- Search & Filter Compact -->
   <div class="wh__filters">
@@ -173,6 +189,7 @@
   </div>
 
   {% endfor %}
+  {% include "includes/components/_pagination.html" with page_obj=warehouses_page per_page=per_page pagination_id="wf_warehouses" %}
 
 </div>
 

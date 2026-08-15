@@ -4,9 +4,10 @@
 {# Purpose: CRM leads list — unified pipeline table across all lead sources. #}
 {# Used by: workforce.crm_views.crm_leads_list #}
 {# Notes: crml__ namespace; shares tokens from crm.css; HTMX filters like pricing_inquiries_list. #}
+{#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260724b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -68,8 +69,17 @@
         <a href="{% url 'workforce:crm_lead_create' %}{% if category_filter == 'driver' %}?category=driver{% endif %}" class="crm__btn crm__btn--primary">
           <i class="fa-solid fa-plus"></i> New Lead
         </a>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_crm_leads_list_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
       </div>
     </div>
+
+    <div class="wfnote" id="workforce_crm_leads_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_leads_list_card_notes' %}" hidden></div>
 
     <!-- TOOLBAR -->
     <div class="crm__toolbar">
@@ -90,7 +100,7 @@
         </div>
 
         <div class="crm__facets">
-          <select name="stage" class="crm__facet-select" aria-label="Filter by stage"
+          <select name="stage" class="crm__facet-select {% if stage_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by stage"
                   hx-get="" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                   hx-include="#workforce_crm_leads_form_filter">
@@ -100,7 +110,7 @@
             {% endfor %}
           </select>
 
-          <select name="source" class="crm__facet-select" aria-label="Filter by source"
+          <select name="source" class="crm__facet-select {% if source_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by source"
                   hx-get="" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                   hx-include="#workforce_crm_leads_form_filter">
@@ -113,7 +123,7 @@
           {# Category is driven by the tabs above; kept here so other filters preserve the active tab #}
           <input type="hidden" name="category" value="{{ category_filter }}">
 
-          <select name="assigned" class="crm__facet-select" aria-label="Filter by assignee"
+          <select name="assigned" class="crm__facet-select {% if assigned_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by assignee"
                   hx-get="" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                   hx-include="#workforce_crm_leads_form_filter">
@@ -127,7 +137,7 @@
             {% endfor %}
           </select>
 
-          <select name="overdue" class="crm__facet-select" aria-label="Filter overdue"
+          <select name="overdue" class="crm__facet-select {% if overdue_filter %}crm__facet-select--on{% endif %}" aria-label="Filter overdue"
                   hx-get="" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                   hx-include="#workforce_crm_leads_form_filter">
@@ -136,13 +146,17 @@
           </select>
         </div>
 
-        <button type="submit" class="crm__btn crm__btn--primary">Search</button>
+        <button type="submit" class="crm__btn crm__btn--ink">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Search
+        </button>
 
         {% if search or stage_filter or source_filter or category_filter or assigned_filter or overdue_filter %}
         <a href="{% url 'workforce:crm_leads_list' %}" class="crm__clear-all"
            hx-get="{% url 'workforce:crm_leads_list' %}"
            hx-target="#main-content" hx-select="#main-content"
-           hx-swap="outerHTML" hx-push-url="true">Reset</a>
+           hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i> Reset
+        </a>
         {% endif %}
       </form>
     </div>
@@ -185,7 +199,7 @@
               <span class="crm__cat crm__cat--driver"><i class="fa-solid fa-motorcycle"></i> Driver</span>
               {% endif %}
             </td>
-            <td><span class="crm__stage crm__stage--{{ lead.stage }}"><i class="fa-solid fa-circle"></i>{{ lead.get_stage_display }}</span></td>
+            <td><span class="crm__stage crm__stage--sw-{{ lead.stage_swatch }}"><i class="fa-solid fa-circle"></i>{{ lead.stage_label }}</span></td>
             <td>{% if lead.assigned_to %}{{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }}{% else %}—{% endif %}</td>
             <td class="crm__num {% if lead.is_overdue %}crm__overdue-text{% endif %}">
               {{ lead.next_followup_at|date:"d M"|default:"—" }}

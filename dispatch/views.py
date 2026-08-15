@@ -14,6 +14,8 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Count, Sum, Q
 
+from core.pagination import paginate
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -453,9 +455,13 @@ def store_prep_queue(request):
         'batch_orders__order'
     ).order_by('created_at')
 
+    prep_page, prep_total = paginate(request, prep_batches, default=25)
+
     context = {
         'current_location': current_location,
-        'prep_batches': prep_batches,
+        'prep_batches': prep_page,
+        'prep_batches_page': prep_page,
+        'prep_batches_total': prep_total,
     }
 
     return render(request, 'dispatch/store/prep_queue.html', context)
@@ -478,9 +484,13 @@ def store_riders(request):
         scheduled_start__date=today
     ).select_related('rider').order_by('scheduled_start')
 
+    shifts_page, shifts_total = paginate(request, shifts, default=25)
+
     context = {
         'current_location': current_location,
-        'shifts': shifts,
+        'shifts': shifts_page,
+        'shifts_page': shifts_page,
+        'shifts_total': shifts_total,
     }
 
     return render(request, 'dispatch/store/riders.html', context)
@@ -564,6 +574,10 @@ def store_prep_queue_partial(request):
         'batch_orders__order'
     ).order_by('created_at')
 
+    prep_page, prep_total = paginate(request, prep_batches, default=25)
+
     return render(request, 'dispatch/store/partials/prep_queue.html', {
-        'prep_batches': prep_batches,
+        'prep_batches': prep_page,
+        'prep_batches_page': prep_page,
+        'prep_batches_total': prep_total,
     })

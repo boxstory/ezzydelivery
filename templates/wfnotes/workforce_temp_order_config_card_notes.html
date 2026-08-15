@@ -1,0 +1,86 @@
+{% comment %}
+Purpose: "About this page" notes panel for temp_order_config.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_temp_order_config_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The on/off switchboard for <strong>temp-order sync</strong> — the process that pulls a client's orders
+            out of their shop, sheet or link and parks them as raw rows for staff to check before they become real
+            orders. One row per client, with a switch on the right. The rest of the row is context for that
+            decision: what we already hold for them, which import sources they have, and which source is treated
+            as their default when a row is mapped.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Temp Sync</dt>
+                        <dd class="wfnote__def">The switch that turns syncing on or off for that client. It saves the
+                            moment you flip it — no Save button — and the counter above the table follows along. If the
+                            save fails the switch flips itself back.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit mapping</dt>
+                        <dd class="wfnote__def">The pencil in the Default Mapping column opens the mapping manager for
+                            that client, where you say which spreadsheet column or platform field feeds which order
+                            field.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Go to Orders</dt>
+                        <dd class="wfnote__def">Jumps to the real orders list — what these rows eventually become.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Back to Temp Orders</dt>
+                        <dd class="wfnote__def">Returns to the queue of raw rows waiting to be reviewed and imported.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the columns</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Temp Orders</dt>
+                        <dd class="wfnote__def">How many raw rows we already hold for that client, in any state.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">OneDrive</dt>
+                        <dd class="wfnote__def">Active OneDrive spreadsheet sources configured for them.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">API</dt>
+                        <dd class="wfnote__def">Store connections on file — Shopify, WooCommerce, TikTok Shop, Google
+                            Sheet. Counts all of them, approved or not.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Public Link</dt>
+                        <dd class="wfnote__def">Active public order-form links the client hands out.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Default Mapping</dt>
+                        <dd class="wfnote__def">Which source is the client's primary one, preferring an explicitly
+                            defaulted OneDrive sheet, then a default approved store connection, then a public link.
+                            A dash means nothing has been marked default.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Switching sync on with <strong>no source and no mapping</strong> achieves nothing — rows either never
+                    arrive or arrive unreadable. Check the source columns and the Default Mapping badge first.</li>
+                <li>Turning sync off stops <strong>new</strong> rows only. Rows already collected stay in Temp Orders and
+                    can still be imported.</li>
+                <li>Only clients switched on here appear on the <strong>Auto-Import Stages</strong> page, so switching a
+                    client off also removes their stage configuration from view.</li>
+                <li>Every business is listed regardless of account status, sorted active first. Check the Status badge
+                    before enabling — a suspended client should not normally be syncing.</li>
+                <li>The API count is a count of connections, not of working ones. A client can show a connection here
+                    that is still pending approval on the seller API configs page.</li>
+            </ul>
+        </section>
+    

@@ -1,23 +1,20 @@
 {% extends "business_dashboard_base.html" %}
-{% load static %}
+{% load static business_console %}
 
 {% block title %}Request Return - Order #{{ order.order_number }}{% endblock title %}
 
 {% block content %}
-<div class="flex-fill p-3 p-md-4" id="business_return_create_container">
+<div class="flex-fill biz-dash__page" id="business_return_create_container">
 
   <!-- Page Header -->
-  <div class="bcon__header mb-4">
-    <div class="bcon__header-main">
-      <div class="bcon__eyebrow">
-        <a href="{% url 'orders:order_details' order.id %}" class="text-decoration-none"><i class="fa-solid fa-arrow-left"></i> Order #{{ order.order_number }}</a>
-        <span class="bcon__eyebrow-sep"></span>
-        <span class="bcon__eyebrow-live">New Return</span>
-      </div>
-      <h1 class="bcon__title"><i class="fa-solid fa-rotate-left"></i> Request Return</h1>
-      <p class="bcon__subtitle">Create a return request for order <strong>#{{ order.order_number }}</strong></p>
-    </div>
-  </div>
+  {# The back-link moves out of the eyebrow into the actions slot — the eyebrow is plain text. #}
+  {% with return_sub="Create a return request for order #"|add:order.order_number %}
+  {% bconheader eyebrow="Returns" live="New Return" icon="fa-solid fa-rotate-left" title="Request Return" subtitle=return_sub %}
+    <a href="{% url 'orders:order_details' order.id %}" class="bcon__btn bcon__btn--ghost">
+      <i class="fa-solid fa-arrow-left"></i> Order #{{ order.order_number }}
+    </a>
+  {% endbconheader %}
+  {% endwith %}
 
   <form method="post" id="business_return_create_form">
     {% csrf_token %}

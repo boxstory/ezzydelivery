@@ -1,14 +1,30 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Diagnostics page — fires one live QNAS lookup and prints the raw result
+Used by: workforce.views.qnas_test at /workforce/qnas-test/
+Notes: Calls /api/qnas/location/<zone>/<street>/<building>/ from the browser. Carries the shared
+       wfnote__ page-notes card under the card header, hidden on load; the help button toggles it.
+{% endcomment %}
 
 {% block title %}QNAS API Test{% endblock %}
 
 {% block content %}
 <div class="container py-4">
     <div class="card">
-        <div class="card-header bg-primary text-white">
+        <div class="card-header bg-primary text-white d-flex align-items-center justify-content-between gap-2">
             <h4 class="mb-0"><i class="fa-solid fa-flask me-2"></i>QNAS API Connection Test</h4>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_qnas_test_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
+
+        <div class="wfnote m-3 mb-0" id="workforce_qnas_test_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_qnas_test_card_notes' %}" hidden></div>
+
         <div class="card-body">
             <div class="alert alert-info">
                 <strong><i class="fa-solid fa-info-circle me-2"></i>Before testing:</strong>
@@ -103,9 +119,14 @@ async function testQNASConnection() {
                         </tr>
                     </table>
                     <hr>
-                    <a href="https://www.google.com/maps?q=${data.latitude},${data.longitude}" target="_blank" class="btn btn-sm btn-success">
-                        <i class="fa-solid fa-map-marked-alt me-1"></i>View on Google Maps
-                    </a>
+                    <button type="button" class="btn btn-sm btn-success" aria-expanded="false"
+                            data-mappoint-toggle="mpt_map_qnastest">
+                        <i class="fa-solid fa-map-marked-alt me-1"></i>Show on map
+                    </button>
+                    <div class="mpt__panel" hidden>
+                      <div class="mpt__map" id="mpt_map_qnastest" data-lat="${data.latitude}"
+                           data-lon="${data.longitude}" data-label="QNAS result"></div>
+                    </div>
                 </div>
             `;
         } else {

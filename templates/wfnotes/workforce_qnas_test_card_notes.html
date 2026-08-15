@@ -1,0 +1,98 @@
+{% comment %}
+Purpose: "About this page" notes panel for qnas_test.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_qnas_test_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+            <p class="wfnote__lede">
+                A diagnostics tool, not an operations page. QNAS is Qatar's national addressing service —
+                we call it to turn a zone, street and building number into map coordinates, which is how a
+                delivery task gets a pin the driver can navigate to. This page fires <strong>one live
+                lookup</strong> with values you type and prints exactly what came back, so you can tell a
+                broken integration apart from a bad address. Nothing is saved and no order is touched.
+            </p>
+
+            <div class="wfnote__cols">
+                <section class="wfnote__sec">
+                    <h2 class="wfnote__h">What you can do here</h2>
+                    <dl class="wfnote__list">
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Zone / Street</dt>
+                            <dd class="wfnote__def">Both are required. These identify the street segment
+                                QNAS will return buildings for.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Building</dt>
+                            <dd class="wfnote__def">Optional. Give one to pin an exact building; leave it
+                                blank to get the street as a whole.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Test connection</dt>
+                            <dd class="wfnote__def">Sends the lookup through our own server, so it proves
+                                the whole chain — our endpoint, the stored token and QNAS itself.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Result panel</dt>
+                            <dd class="wfnote__def">On success: latitude, longitude, the building that was
+                                matched, the match type, and how many buildings that street has.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Google Maps</dt>
+                            <dd class="wfnote__def">Opens the returned coordinates on a map — the quickest
+                                sanity check that the pin is in the right part of Qatar.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Raw response</dt>
+                            <dd class="wfnote__def">Toggles the untouched JSON. Paste this into a bug
+                                report rather than describing the screen.</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="wfnote__sec">
+                    <h2 class="wfnote__h">Reading the result</h2>
+                    <dl class="wfnote__list">
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Exact</dt>
+                            <dd class="wfnote__def">The building number you asked for exists on that street
+                                and the coordinates are that building's own.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Street level</dt>
+                            <dd class="wfnote__def">The building was not found, so the first building on
+                                the street was used instead. The pin is in the right street, not at the
+                                right door.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Total buildings</dt>
+                            <dd class="wfnote__def">How many QNAS knows on that street. A long street with
+                                a street-level match can be far off.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">API error</dt>
+                            <dd class="wfnote__def">We reached QNAS but it gave nothing usable — usually a
+                                zone and street combination that does not exist.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Connection failed</dt>
+                            <dd class="wfnote__def">The request never completed. That is our side or the
+                                network, not the address.</dd>
+                        </div>
+                    </dl>
+                </section>
+            </div>
+
+            <section class="wfnote__sec wfnote__sec--note">
+                <h2 class="wfnote__h">Worth knowing</h2>
+                <ul class="wfnote__notes">
+                    <li>QNAS sits behind a bot challenge. If everything fails, open
+                        <strong>qnas.qa</strong> in another tab, clear the challenge, then come back and
+                        test again before assuming the integration is broken.</li>
+                    <li>A street-level match is still a usable coordinate, but it is not proof the address
+                        is correct — treat it as approximate when a driver reports not finding a customer.</li>
+                    <li>Persistent failures across every zone usually mean the QNAS token is missing or
+                        expired on the server, not that an address is wrong.</li>
+                    <li>Nothing here writes to an order. To fix a real delivery, correct the address on the
+                        order or the task itself.</li>
+                </ul>
+            </section>
+        

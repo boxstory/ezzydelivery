@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff reports landing page — to-do list, team notes, and the daily report generator form
+Used by: workforce_views.staff_reports at /workforce/reports/
+Notes: The report generator is not wired up yet — submitting shows a "coming soon" message.
+       Carries the shared page-notes card (wfnote__) under the hero, hidden on load; the hero help
+       button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Staff Reports - Ezzy Delivery{% endblock title %}
 
@@ -11,7 +18,16 @@
             <h1 class="str__hero-title"><i class="fa-solid fa-chart-bar me-2"></i>Staff Reports Dashboard</h1>
             <p class="str__hero-subtitle">To-do lists, team notes, and report generation</p>
         </div>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_staff_reports_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
+
+    <div class="wfnote" id="workforce_staff_reports_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_staff_reports_card_notes' %}" hidden></div>
 
     <!-- Staff To-Do List -->
     <div class="str__card">

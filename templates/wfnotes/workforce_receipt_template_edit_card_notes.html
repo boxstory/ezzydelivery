@@ -1,0 +1,122 @@
+{% comment %}
+Purpose: "About this page" notes panel for receipt_template_edit.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_receipt_template_edit_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      This is where the look of a printed receipt is decided — the paper it prints on, our details at
+      the top, the colour and typeface, and what appears at the bottom. One template covers one kind
+      of receipt, and whichever template is marked default for that kind is the one the system reaches
+      for when someone prints. The same form is used to create a new template and to edit an existing
+      one; the list at <strong>Receipt&nbsp;Templates</strong> is where you pick which to work on.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Name &amp; type</dt>
+            <dd class="wfnote__def">Both required. The name is only for staff to recognise it; the type
+              decides which printouts this template can serve.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Paper size</dt>
+            <dd class="wfnote__def">The physical stock it is laid out for — thermal roll widths or
+              office paper.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Set as default</dt>
+            <dd class="wfnote__def">Makes this the template used automatically for its type.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Company info</dt>
+            <dd class="wfnote__def">Name, phone, address and email printed in the header. Useful when a
+              receipt has to carry different contact details from the rest.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Logo</dt>
+            <dd class="wfnote__def">Show or hide it, and point it at a different image. Leave the URL
+              empty to use our standard logo.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Style</dt>
+            <dd class="wfnote__def">Accent colour (picker and hex box stay in step), font family, and
+              body font size between 8 and 16 pixels.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Content</dt>
+            <dd class="wfnote__def">Whether to print a signature line and a QR code, plus the footer
+              message at the bottom of the slip.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Custom CSS</dt>
+            <dd class="wfnote__def">Free-form styling appended to the receipt for anything the options
+              above cannot express. Leave it empty unless you know what you are writing.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Live preview</dt>
+            <dd class="wfnote__def">The mock receipt on the right redraws as you type, using sample
+              settlement figures.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">Template type</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Settlement</dt>
+            <dd class="wfnote__def">The slip a driver gets when their cash is settled with the office.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">COD deposit</dt>
+            <dd class="wfnote__def">Proof that collected cash was handed in.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Earnings</dt>
+            <dd class="wfnote__def">A driver's earnings statement rather than a cash receipt.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Transaction</dt>
+            <dd class="wfnote__def">A general one-off money movement.</dd>
+          </div>
+        </dl>
+
+        <h2 class="wfnote__h">Paper size</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Thermal</dt>
+            <dd class="wfnote__def">80mm or 58mm receipt rolls — narrow, monospaced, no wide tables.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">A4 / A5</dt>
+            <dd class="wfnote__def">Office sheets, for receipts that get filed or emailed.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Letter</dt>
+            <dd class="wfnote__def">US letter stock, for the same use as A4.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>Ticking <em>Set as default</em> <strong>silently un-defaults</strong> whatever template
+          currently holds that spot for the same type. Only one default per type can exist, and you
+          get no warning about the one you displaced.</li>
+        <li>The live preview is an approximation. It follows the company name, address, accent colour,
+          logo toggle, signature toggle and footer only — <strong>font, paper size, QR code and custom
+          CSS are not reflected</strong>. Use the preview action on the templates list to see the real
+          render.</li>
+        <li>Nothing is saved until you press the save button. Cancel throws away every change on the
+          form, including the ones you can see in the preview.</li>
+        <li>Custom CSS is applied as written, with no validation. A bad rule here shows up on every
+          receipt printed from this template.</li>
+        <li>Changes take effect on receipts printed from now on. Anything already printed or saved as a
+          PDF keeps the old look.</li>
+      </ul>
+    </section>
+  

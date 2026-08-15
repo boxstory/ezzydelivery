@@ -1,297 +1,245 @@
 {% extends "wf_dashboard_base.html" %}
-{% load static %}
+{% load static humanize %}
+{% comment %}
+Purpose: Fleet cash-exposure ledger — how much collected COD each approved driver is still holding, and for how long
+Used by: workforce.views.fleet_cod_in_hand at /workforce/fleet/cod-in-hand/
+Notes: With no date filter the amount is collected-but-unsettled COD and the age column applies; a date filter
+       switches it to COD collected in that window (settled or not), so the age column is withdrawn and the
+       column label changes with it. Share-bar widths come from data-share via JS — no inline styles.
+       The three selects carry data-no-select2: the global filter-bar enhancer only adds a search box
+       from 8 options and these have 4-7, so it contributed nothing but a 34px wrapper that overrode
+       the strip's control height.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero help button
+       toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}COD with Fleet - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/fleet_cod_in_hand.css' %}?v=20260224a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/fleet_cod_in_hand.css' %}?v=20260803g">
 {% endblock extra_css %}
 
 {% block content %}
 <div class="fch">
-    <!-- Hero Header -->
-    <div class="wfd__hero">
-        <div class="wfd__hero-content">
-            <h1 class="wfd__hero-title"><i class="fa-solid fa-sack-dollar"></i>COD with Fleet</h1>
-            <p class="wfd__hero-subtitle">Cash on delivery held by fleet drivers</p>
+
+    <header class="wfhero">
+        <div class="wfhero__ident">
+            <span class="wfhero__eyebrow">Fleet cash</span>
+            <h1 class="wfhero__title">COD in hand</h1>
+            <span class="wfhero__sub">
+                {% if is_filtered_by_date %}
+                    Cash collected in the selected window, whether or not it has since been handed in.
+                {% else %}
+                    Cash collected from customers and not yet handed in. Settle it on the settlement report.
+                {% endif %}
+            </span>
         </div>
-        <div class="wfd__hero-actions">
-            <a href="{% url 'workforce:cod_settlement_report' %}" class="btn btn-sm btn-warning fw-semibold">
-                <i class="fa-solid fa-file-invoice-dollar me-1"></i> COD Settlement Report
-            </a>
+        <div class="wfhero__side">
+            <div class="wfhero__tallies">
+                <div class="wfhero__tally">
+                    <span class="wfhero__tally-num">{{ total_cod|floatformat:2|intcomma }}</span>
+                    <span class="wfhero__tally-lbl">QAR {% if is_filtered_by_date %}collected{% else %}outstanding{% endif %}</span>
+                </div>
+            </div>
+            <nav class="wfhero__actions">
+                <a href="{% url 'workforce:cod_settlement_report' %}" class="fch__cta">Settlement report</a>
+                <button type="button" class="wfnote__btn" data-wfnote-toggle
+                        aria-expanded="false" aria-controls="workforce_fleet_cod_in_hand_card_notes"
+                        title="About this page">
+                    <i class="fa-solid fa-question" aria-hidden="true"></i>
+                    <span class="visually-hidden">Show notes</span>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <div class="wfnote" id="workforce_fleet_cod_in_hand_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_fleet_cod_in_hand_card_notes' %}" hidden></div>
+
+    {% comment %}
+    Three facts the amount alone does not carry: how concentrated the exposure
+    is, how old the oldest money is, and whether hand-ins are happening at all.
+    {% endcomment %}
+    <div class="wfstat" role="group" aria-label="Fleet cash summary">
+        {# No --here rail: yellow is already spent on the settlement action and the top share bar. #}
+        <div class="wfstat__card">
+            <span class="wfstat__label">{% if is_filtered_by_date %}Collected in window{% else %}Holding cash{% endif %}</span>
+            <span class="wfstat__value">{{ pending_settlements }}<span class="wfstat__unit">of {{ total_drivers }} drivers</span></span>
+            <span class="wfstat__sub">{% if is_filtered_by_date %}the rest collected nothing{% else %}the rest are square{% endif %}</span>
+        </div>
+        {% if is_filtered_by_date %}
+        {# A preset names the window but never its dates. This is the only place they appear. #}
+        <div class="wfstat__card">
+            <span class="wfstat__label">Window</span>
+            <span class="wfstat__value">{{ date_from|default:"—" }}</span>
+            <span class="wfstat__sub">to {{ date_to|default:"today" }}</span>
+        </div>
+        {% else %}
+        <div class="wfstat__card {% if longest_days >= overdue_days %}wfstat__card--late{% endif %}">
+            <span class="wfstat__label">Longest held</span>
+            <span class="wfstat__value">{% if longest_driver %}{{ longest_days }}<span class="wfstat__unit">days</span>{% else %}—{% endif %}</span>
+            <span class="wfstat__sub">
+                {% if longest_driver %}{{ longest_driver.user.first_name }} {{ longest_driver.user.last_name }}{% else %}no cash outstanding{% endif %}
+            </span>
+        </div>
+        {% endif %}
+        <div class="wfstat__card wfstat__card--done {% if not last_hand_in_at %}wfstat__card--null{% endif %}">
+            <span class="wfstat__label">Last hand-in</span>
+            <span class="wfstat__value">{% if last_hand_in_at %}{{ last_hand_in_at|date:"d M" }}{% else %}—{% endif %}</span>
+            <span class="wfstat__sub">
+                {% if last_hand_in_at %}{{ last_hand_in_at|timesince }} ago, fleet-wide{% else %}no settlement on record{% endif %}
+            </span>
         </div>
     </div>
 
-    <!-- Summary Stats -->
-    <div class="fch__stats">
-        <div class="fch__stat fch__stat--green">
-            <div class="fch__stat-top">
-                <span class="fch__stat-label">TOTAL COD</span>
-                <i class="fa-solid fa-money-bills fch__stat-icon"></i>
-            </div>
-            <div class="fch__stat-value">QAR {{ total_cod|floatformat:2|default:"0.00" }}</div>
-            <div class="fch__stat-desc">Across all drivers</div>
-        </div>
-        <div class="fch__stat">
-            <div class="fch__stat-top">
-                <span class="fch__stat-label">ACTIVE DRIVERS</span>
-                <i class="fa-solid fa-users fch__stat-icon"></i>
-            </div>
-            <div class="fch__stat-value">{{ drivers.paginator.count|default:"0" }}</div>
-            <div class="fch__stat-desc">With COD in hand</div>
-        </div>
-        <div class="fch__stat fch__stat--blue">
-            <div class="fch__stat-top">
-                <span class="fch__stat-label">PENDING SETTLEMENT</span>
-                <i class="fa-solid fa-clock fch__stat-icon"></i>
-            </div>
-            <div class="fch__stat-value">{{ pending_settlements|default:"0" }}</div>
-            <div class="fch__stat-desc">Drivers awaiting settlement</div>
-        </div>
-        <div class="fch__stat fch__stat--amber">
-            <div class="fch__stat-top">
-                <span class="fch__stat-label">AVERAGE COD</span>
-                <i class="fa-solid fa-chart-simple fch__stat-icon"></i>
-            </div>
-            <div class="fch__stat-value">QAR {{ avg_cod|floatformat:2|default:"0.00" }}</div>
-            <div class="fch__stat-desc">Per driver with COD</div>
-        </div>
-        <div class="fch__stat fch__stat--red">
-            <div class="fch__stat-top">
-                <span class="fch__stat-label">HIGHEST COD</span>
-                <i class="fa-solid fa-arrow-trend-up fch__stat-icon"></i>
-            </div>
-            <div class="fch__stat-value">QAR {{ max_cod|floatformat:2|default:"0.00" }}</div>
-            <div class="fch__stat-desc">Maximum COD held by single driver</div>
-        </div>
-        <div class="fch__stat fch__stat--grey">
-            <div class="fch__stat-top">
-                <span class="fch__stat-label">FLEET COVERAGE</span>
-                <i class="fa-solid fa-percentage fch__stat-icon"></i>
-            </div>
-            <div class="fch__stat-value">{{ pending_settlements }} / {{ total_drivers }}</div>
-            <div class="fch__stat-desc">Drivers with COD vs Total approved</div>
-        </div>
-    </div>
-
-    <!-- COD Distribution Breakdown -->
-    {% if cod_ranges %}
-    <div class="fch__card">
-        <div class="fch__card-header">
-            <i class="fa-solid fa-chart-pie fch__card-icon"></i>
-            <span class="fch__card-title">COD DISTRIBUTION BY AMOUNT RANGE</span>
-        </div>
-        <div class="fch__card-body">
-            <div class="fch__range-grid">
-                <div class="fch__range fch__range--green">
-                    <span class="fch__range-label">Under QAR 500</span>
-                    <span class="fch__range-value">{{ cod_ranges.under_500 }}</span>
-                    <span class="fch__range-desc">drivers</span>
-                </div>
-                <div class="fch__range fch__range--amber">
-                    <span class="fch__range-label">QAR 500 - 2,000</span>
-                    <span class="fch__range-value">{{ cod_ranges.between_500_2000 }}</span>
-                    <span class="fch__range-desc">drivers</span>
-                </div>
-                <div class="fch__range fch__range--red">
-                    <span class="fch__range-label">Above QAR 2,000</span>
-                    <span class="fch__range-value">{{ cod_ranges.above_2000 }}</span>
-                    <span class="fch__range-desc">drivers (high risk)</span>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% comment %}
+    This page only ever lists approved drivers, so cash held by someone who was
+    blocked or suspended after collecting it goes unseen. Named here rather than
+    added to the totals, which keep meaning "the approved fleet".
+    {% endcomment %}
+    {% if off_roster_cod %}
+    <a class="fch__offroster" href="{% url 'workforce:drivers_list' %}?{{ off_roster_query }}">
+        <span class="fch__offroster-mark" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></span>
+        <span class="fch__offroster-text">
+            <strong class="fch__offroster-amount">QAR {{ off_roster_cod|floatformat:2|intcomma }}</strong>
+            is held by {{ off_roster_drivers }} driver{{ off_roster_drivers|pluralize }} outside the approved roster
+            and is not counted above.
+        </span>
+        <span class="fch__offroster-go">Open drivers</span>
+    </a>
     {% endif %}
 
-    <!-- Filter Panel -->
-    <div class="fch__card">
-        <div class="fch__card-header">
-            <i class="fa-solid fa-filter fch__card-icon"></i>
-            <span class="fch__card-title">FILTERS</span>
+    <form method="get" id="filterForm" class="fch__controls">
+        <div class="fch__control">
+            <label class="fch__control-lbl" for="datePresetSelect">Period</label>
+            <select name="date_preset" id="datePresetSelect" class="fch__select" data-no-select2 onchange="toggleCustomDate(this.value)">
+                <option value="">All time</option>
+                <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Today</option>
+                <option value="yesterday" {% if date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
+                <option value="3days" {% if date_preset == '3days' %}selected{% endif %}>Last 3 days</option>
+                <option value="1week" {% if date_preset == '1week' %}selected{% endif %}>Last week</option>
+                <option value="1month" {% if date_preset == '1month' %}selected{% endif %}>Last month</option>
+                <option value="custom" {% if date_preset == 'custom' %}selected{% endif %}>Custom dates</option>
+            </select>
         </div>
-        <div class="fch__card-body">
-            <form method="get" id="filterForm">
-                <div class="fch__filter-row">
-                    <div class="fch__filter-group">
-                        <label class="fch__filter-label"><i class="fa-solid fa-calendar me-1"></i>Date Range</label>
-                        <select name="date_preset" id="datePresetSelect" class="fch__filter-select" onchange="toggleCustomDate(this.value)">
-                            <option value="">All Time</option>
-                            <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Today</option>
-                            <option value="yesterday" {% if date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
-                            <option value="3days" {% if date_preset == '3days' %}selected{% endif %}>Last 3 Days</option>
-                            <option value="1week" {% if date_preset == '1week' %}selected{% endif %}>Last 1 Week</option>
-                            <option value="1month" {% if date_preset == '1month' %}selected{% endif %}>Last 1 Month</option>
-                            <option value="custom" {% if date_preset == 'custom' %}selected{% endif %}>Custom Date</option>
-                        </select>
-                    </div>
-                    <div class="fch__filter-group fch__filter-group--custom" id="customDateFields" {% if date_preset != 'custom' %}hidden{% endif %}>
-                        <div class="fch__filter-dates">
-                            <div>
-                                <label class="fch__filter-label"><i class="fa-solid fa-calendar-day me-1"></i>From</label>
-                                <input type="date" name="date_from" value="{{ date_from }}" class="fch__filter-input" id="dateFromInput">
-                            </div>
-                            <div>
-                                <label class="fch__filter-label"><i class="fa-solid fa-calendar-day me-1"></i>To</label>
-                                <input type="date" name="date_to" value="{{ date_to }}" class="fch__filter-input" id="dateToInput">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="fch__filter-group">
-                        <label class="fch__filter-label"><i class="fa-solid fa-coins me-1"></i>COD In Hand</label>
-                        <select name="cod_filter" id="codFilterSelect" class="fch__filter-select" onchange="toggleCustomAmount(this.value)">
-                            <option value="">All</option>
-                            <option value="yes" {% if cod_filter == 'yes' %}selected{% endif %}>Yes</option>
-                            <option value="no" {% if cod_filter == 'no' %}selected{% endif %}>No</option>
-                            <option value="custom" {% if cod_filter == 'custom' %}selected{% endif %}>Custom Amount</option>
-                        </select>
-                    </div>
-                    <div class="fch__filter-group fch__filter-group--custom" id="customAmountFields" {% if cod_filter != 'custom' %}hidden{% endif %}>
-                        <div class="fch__filter-dates">
-                            <div>
-                                <label class="fch__filter-label">Min</label>
-                                <input type="number" name="min_amount" value="{{ min_amount }}" placeholder="0.00" step="0.01" class="fch__filter-input fch__filter-input--sm">
-                            </div>
-                            <div>
-                                <label class="fch__filter-label">Max</label>
-                                <input type="number" name="max_amount" value="{{ max_amount }}" placeholder="10000" step="0.01" class="fch__filter-input fch__filter-input--sm">
-                            </div>
-                        </div>
-                    </div>
-                    <input type="hidden" name="sort" value="{{ sort_by }}" id="sortInput">
-                    <input type="hidden" name="view" value="{{ view_mode }}" id="viewInput">
-                    <div class="fch__filter-actions">
-                        <button type="submit" class="fch__btn fch__btn--primary">
-                            <i class="fa-solid fa-filter me-1"></i>Apply
-                        </button>
-                        <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="fch__btn fch__btn--outline">
-                            <i class="fa-solid fa-times me-1"></i>Clear
-                        </a>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Toolbar -->
-    <div class="fch__toolbar">
-        <div class="fch__toolbar-left">
-            <div class="fch__sort-group">
-                <label for="sortSelect" class="fch__sort-label">Sort by:</label>
-                <select id="sortSelect" class="fch__filter-select" onchange="updateSort(this.value)">
-                    <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name (A-Z)</option>
-                    <option value="name_desc" {% if sort_by == 'name_desc' %}selected{% endif %}>Name (Z-A)</option>
-                    <option value="amount_desc" {% if sort_by == 'amount_desc' %}selected{% endif %}>Amount (High-Low)</option>
-                    <option value="amount_asc" {% if sort_by == 'amount_asc' %}selected{% endif %}>Amount (Low-High)</option>
-                    <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Last Settled (Recent)</option>
-                    <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>Last Settled (Oldest)</option>
-                </select>
+        <div class="fch__control fch__control--pair" id="customDateFields" {% if date_preset != 'custom' %}hidden{% endif %}>
+            <label class="fch__control-lbl" for="dateFromInput">From / to</label>
+            <div class="fch__control-fields">
+                <input type="date" name="date_from" value="{{ date_from }}" class="fch__input" id="dateFromInput" aria-label="From date">
+                <input type="date" name="date_to" value="{{ date_to }}" class="fch__input" id="dateToInput" aria-label="To date">
             </div>
-            <span class="fch__toolbar-count">{{ drivers.paginator.count }} driver{{ drivers.paginator.count|pluralize }}</span>
         </div>
-        <div class="fch__toolbar-right">
-            <div class="fch__view-toggle">
-                <button type="button" class="fch__view-btn {% if view_mode == 'grid' %}fch__view-btn--active{% endif %}" onclick="setView('grid')" title="Grid View">
-                    <i class="fa-solid fa-grid-2"></i>
-                </button>
-                <button type="button" class="fch__view-btn {% if view_mode == 'list' %}fch__view-btn--active{% endif %}" onclick="setView('list')" title="List View">
-                    <i class="fa-solid fa-list"></i>
-                </button>
+        <div class="fch__control">
+            <label class="fch__control-lbl" for="codFilterSelect">Balance</label>
+            <select name="cod_filter" id="codFilterSelect" class="fch__select" data-no-select2 onchange="toggleCustomAmount(this.value)">
+                <option value="">Any</option>
+                <option value="yes" {% if cod_filter == 'yes' %}selected{% endif %}>Holding cash</option>
+                <option value="no" {% if cod_filter == 'no' %}selected{% endif %}>Holding nothing</option>
+                <option value="custom" {% if cod_filter == 'custom' %}selected{% endif %}>Amount range</option>
+            </select>
+        </div>
+        <div class="fch__control fch__control--pair" id="customAmountFields" {% if cod_filter != 'custom' %}hidden{% endif %}>
+            <label class="fch__control-lbl" for="minAmountInput">Min / max</label>
+            <div class="fch__control-fields">
+                <input type="number" name="min_amount" id="minAmountInput" value="{{ min_amount }}" placeholder="0" step="0.01" class="fch__input fch__input--num" aria-label="Minimum amount">
+                <input type="number" name="max_amount" value="{{ max_amount }}" placeholder="10000" step="0.01" class="fch__input fch__input--num" aria-label="Maximum amount">
             </div>
-            <button type="button" class="fch__btn fch__btn--outline fch__btn--sm" onclick="window.print()">
-                <i class="fa-solid fa-print"></i> Print
-            </button>
-            <button type="button" class="fch__btn fch__btn--primary fch__btn--sm" onclick="exportToCSV()">
-                <i class="fa-solid fa-file-export"></i> Export
-            </button>
         </div>
-    </div>
+        <div class="fch__control">
+            <label class="fch__control-lbl" for="sortSelect">Order</label>
+            <select id="sortSelect" name="sort" class="fch__select" data-no-select2 onchange="document.getElementById('filterForm').submit()">
+                <option value="amount_desc" {% if sort_by == 'amount_desc' %}selected{% endif %}>Most held first</option>
+                <option value="amount_asc" {% if sort_by == 'amount_asc' %}selected{% endif %}>Least held first</option>
+                <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name A–Z</option>
+                <option value="name_desc" {% if sort_by == 'name_desc' %}selected{% endif %}>Name Z–A</option>
+                <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Settled most recently</option>
+                <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>Settled longest ago</option>
+            </select>
+        </div>
+        <div class="fch__controls-acts">
+            <button type="submit" class="fch__btn fch__btn--go">Apply</button>
+            <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="fch__btn">Clear</a>
+        </div>
+        <div class="fch__controls-tail">
+            <span class="fch__count">{{ drivers.paginator.count }} driver{{ drivers.paginator.count|pluralize }}</span>
+            <button type="button" class="fch__btn" onclick="window.print()">Print</button>
+            <button type="button" class="fch__btn" onclick="exportToCSV()">Export CSV</button>
+        </div>
+    </form>
 
     {% if drivers %}
-    <!-- Grid View -->
-    <div class="fch__grid {% if view_mode == 'grid' %}fch__grid--active{% endif %}" id="gridView">
-        {% for driver in drivers %}
-        <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}" class="fch__dcard" data-driver-name="{{ driver.user.first_name }} {{ driver.user.last_name }}">
-            <div class="fch__dcard-top">
-                <div class="fch__avatar">
-                    {{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}
-                </div>
-                <div class="fch__dcard-info">
-                    <h3 class="fch__dcard-name">{{ driver.user.first_name }} {{ driver.user.last_name }}</h3>
-                    <span class="fch__dcard-id">ID: {{ driver.driver_id }}</span>
-                </div>
-            </div>
-            <div class="fch__dcard-body">
-                <div class="fch__detail">
-                    <span class="fch__detail-label">{% if is_filtered_by_date %}COD Collected{% else %}COD In Hand{% endif %}</span>
-                    <span class="fch__detail-value {% if driver.period_cod > 0 %}fch__detail-value--positive{% else %}fch__detail-value--zero{% endif %}">QAR {{ driver.period_cod|floatformat:2|default:"0.00" }}</span>
-                </div>
-                <div class="fch__detail">
-                    <span class="fch__detail-label">Deliveries</span>
-                    <span class="fch__detail-value">{{ driver.period_orders|default:0 }}</span>
-                </div>
-                <div class="fch__detail fch__detail--last">
-                    <span class="fch__detail-label">Last Settled</span>
-                    <span class="fch__detail-value">{{ driver.last_settlement_date|date:"d M Y"|default:"Never" }}</span>
-                </div>
-            </div>
-        </a>
-        {% endfor %}
-    </div>
-
-    <!-- List View -->
-    <div class="fch__list {% if view_mode == 'list' %}fch__list--active{% endif %}" id="listView">
-        <div class="fch__table-wrap">
-            <table class="fch__table">
+    <div class="fch__ledger">
+        <div class="fch__scroll">
+            <table class="fch__table" id="workforce_cod_in_hand_table_ledger">
                 <thead>
                     <tr>
-                        <th class="fch__th--sort" onclick="updateSort('{% if sort_by == 'name_asc' %}name_desc{% else %}name_asc{% endif %}')">
-                            Driver
-                            {% if sort_by == 'name_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
-                            {% elif sort_by == 'name_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
-                            {% else %}<i class="fa-solid fa-sort ms-1 fch__sort-muted"></i>{% endif %}
+                        <th class="fch__col-who">
+                            <button type="button" class="fch__sort" onclick="updateSort('{% if sort_by == 'name_asc' %}name_desc{% else %}name_asc{% endif %}')">
+                                Driver{% if sort_by == 'name_asc' %} ↑{% elif sort_by == 'name_desc' %} ↓{% endif %}
+                            </button>
                         </th>
-                        <th>Driver ID</th>
-                        <th>Phone</th>
-                        <th class="fch__th--sort" onclick="updateSort('{% if sort_by == 'amount_asc' %}amount_desc{% else %}amount_asc{% endif %}')">
-                            {% if is_filtered_by_date %}COD Collected{% else %}COD In Hand{% endif %}
-                            {% if sort_by == 'amount_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
-                            {% elif sort_by == 'amount_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
-                            {% else %}<i class="fa-solid fa-sort ms-1 fch__sort-muted"></i>{% endif %}
+                        <th class="fch__num fch__col-money">
+                            <button type="button" class="fch__sort" onclick="updateSort('{% if sort_by == 'amount_desc' %}amount_asc{% else %}amount_desc{% endif %}')">
+                                {% if is_filtered_by_date %}Collected{% else %}In hand{% endif %}{% if sort_by == 'amount_asc' %} ↑{% elif sort_by == 'amount_desc' %} ↓{% endif %}
+                            </button>
                         </th>
-                        <th>Deliveries</th>
-                        <th>Wallet Balance</th>
-                        <th class="fch__th--sort" onclick="updateSort('{% if sort_by == 'date_asc' %}date_desc{% else %}date_asc{% endif %}')">
-                            Last Settlement
-                            {% if sort_by == 'date_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
-                            {% elif sort_by == 'date_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
-                            {% else %}<i class="fa-solid fa-sort ms-1 fch__sort-muted"></i>{% endif %}
+                        {% if not is_filtered_by_date %}<th class="fch__num">Days held</th>{% endif %}
+                        <th class="fch__num">Deliveries</th>
+                        <th class="fch__num">Wallet</th>
+                        <th class="fch__num">
+                            <button type="button" class="fch__sort" onclick="updateSort('{% if sort_by == 'date_desc' %}date_asc{% else %}date_desc{% endif %}')">
+                                Last hand-in{% if sort_by == 'date_asc' %} ↑{% elif sort_by == 'date_desc' %} ↓{% endif %}
+                            </button>
                         </th>
-                        <th>Actions</th>
+                        <th><span class="visually-hidden">Open</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for driver in drivers %}
-                    <tr>
-                        <td>
-                            <div class="fch__driver-cell">
-                                <div class="fch__avatar fch__avatar--sm">
-                                    {{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}
-                                </div>
-                                <strong>{{ driver.user.first_name }} {{ driver.user.last_name }}</strong>
+                    <tr class="fch__row {% if not driver.period_cod %}fch__row--square{% elif driver.share_pct == 100 %}fch__row--top{% endif %}"
+                        data-href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}">
+                        <td class="fch__col-who">
+                            <div class="fch__who">
+                                <span class="fch__initials" aria-hidden="true">{{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}</span>
+                                <span class="fch__who-text">
+                                    <span class="fch__name">{{ driver.user.first_name }} {{ driver.user.last_name }}</span>
+                                    <span class="fch__meta">{{ driver.driver_id }}<span class="fch__meta-sep">·</span>{{ driver.driver_phone|default:"no phone" }}</span>
+                                </span>
                             </div>
+                            {% comment %}
+                            The share bar: this driver's balance against the largest on the page.
+                            It is what tells you at a glance whether the exposure sits with one
+                            person or is spread — the question the old amount-range cards asked
+                            and answered only in buckets. Width comes from data-share via JS.
+                            {% endcomment %}
+                            {% if driver.period_cod %}
+                            <span class="fch__share" aria-hidden="true"><span class="fch__share-fill" data-share="{{ driver.share_pct }}"></span></span>
+                            {% endif %}
                         </td>
-                        <td>{{ driver.driver_id }}</td>
-                        <td>{{ driver.driver_phone }}</td>
-                        <td class="{% if driver.period_cod > 0 %}fch__amount--positive{% else %}fch__amount--zero{% endif %}">
-                            QAR {{ driver.period_cod|floatformat:2|default:"0.00" }}
+                        <td class="fch__num fch__col-money">
+                            <span class="fch__amount {% if not driver.period_cod %}fch__amount--nil{% endif %}">{{ driver.period_cod|floatformat:2|intcomma }}</span>
                         </td>
-                        <td>{{ driver.period_orders|default:0 }}</td>
-                        <td>QAR {{ driver.wallet_balance|floatformat:2|default:"0.00" }}</td>
-                        <td>{{ driver.last_settlement_date|date:"d M Y"|default:"Never" }}</td>
-                        <td>
-                            <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}" class="fch__btn fch__btn--outline fch__btn--xs">
-                                <i class="fa-solid fa-eye"></i> View
-                            </a>
+                        {% if not is_filtered_by_date %}
+                        <td class="fch__num">
+                            {% if driver.days_held is None %}
+                                <span class="fch__nil">—</span>
+                            {% else %}
+                                <span class="fch__age {% if driver.days_held >= overdue_days %}fch__age--overdue{% elif driver.days_held >= stale_days %}fch__age--stale{% endif %}"
+                                      title="Oldest uncollected hand-in dated {{ driver.oldest_held|date:'d M Y' }}">
+                                    {{ driver.days_held }}d
+                                </span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                        <td class="fch__num">{{ driver.period_orders|default:0 }}</td>
+                        <td class="fch__num fch__quiet">{{ driver.wallet_balance|floatformat:2|intcomma }}</td>
+                        <td class="fch__num fch__quiet">{{ driver.last_settlement_date|date:"d M Y"|default:"never" }}</td>
+                        <td class="fch__col-go">
+                            <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}"
+                               class="fch__go" aria-label="Open transactions for {{ driver.user.first_name }} {{ driver.user.last_name }}">Open</a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -300,14 +248,15 @@
         </div>
     </div>
 
+    {# One page of drivers needs no pager — the shared card is taller than the ledger it would page. #}
+    {% if drivers.paginator.num_pages > 1 %}
     {% include "includes/components/_pagination.html" with page_obj=drivers filter_params=filter_params %}
+    {% endif %}
 
     {% else %}
     <div class="fch__empty">
-        <i class="fa-solid fa-sack-dollar"></i>
-        <h3>No Fleet Drivers Found</h3>
-        <p>There are no drivers matching your filters.</p>
-        <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="fch__btn fch__btn--primary mt-3">Clear Filters</a>
+        <p class="fch__empty-line">No drivers match these filters.</p>
+        <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="fch__btn fch__btn--go">Clear filters</a>
     </div>
     {% endif %}
 </div>
@@ -316,48 +265,75 @@
 {% block extra_js %}
 <script>
     function updateSort(value) {
-        document.getElementById('sortInput').value = value;
-        document.getElementById('filterForm').submit();
-    }
-    function setView(mode) {
-        document.getElementById('viewInput').value = mode;
+        document.getElementById('sortSelect').value = value;
         document.getElementById('filterForm').submit();
     }
     function toggleCustomDate(value) {
-        var el = document.getElementById('customDateFields');
-        if (value === 'custom') { el.hidden = false; } else { el.hidden = true; }
+        document.getElementById('customDateFields').hidden = (value !== 'custom');
     }
     function toggleCustomAmount(value) {
-        var el = document.getElementById('customAmountFields');
-        if (value === 'custom') { el.hidden = false; } else { el.hidden = true; }
+        document.getElementById('customAmountFields').hidden = (value !== 'custom');
+    }
+    // Share-bar widths are data, not styling, so they arrive on the element as
+    // data-share and are applied here rather than as inline style attributes.
+    document.querySelectorAll('.fch__share-fill').forEach(function (el) {
+        el.style.width = Math.max(2, Math.min(100, parseInt(el.dataset.share, 10) || 0)) + '%';
+    });
+
+    // The whole row opens that driver's transactions. Delegated so it survives
+    // an HTMX swap of the table. The row is not a link element, so the OPEN
+    // button stays in the markup as the keyboard and middle-click path — and a
+    // click that already landed on a link or button is left alone rather than
+    // navigating twice. Selecting text in a row must not navigate either.
+    var ledger = document.getElementById('workforce_cod_in_hand_table_ledger');
+    if (ledger) {
+        ledger.addEventListener('click', function (e) {
+            if (e.target.closest('a, button')) return;
+            var row = e.target.closest('.fch__row[data-href]');
+            if (!row) return;
+            if (window.getSelection && String(window.getSelection())) return;
+            // Ctrl/Cmd/middle-click opens a new tab, matching link behaviour.
+            if (e.ctrlKey || e.metaKey) { window.open(row.dataset.href, '_blank'); return; }
+            window.location.href = row.dataset.href;
+        });
     }
     function exportToCSV() {
-        var csvData = [['Driver Name', 'Driver ID', 'Phone', 'COD In Hand', 'Wallet Balance', 'Last Settlement Date']];
-        var viewMode = '{{ view_mode }}';
-        if (viewMode === 'list') {
-            document.querySelectorAll('.fch__table tbody tr:not([style*="display: none"])').forEach(function(row) {
-                var cells = row.querySelectorAll('td');
-                csvData.push([cells[0].textContent.trim(), cells[1].textContent.trim(), cells[2].textContent.trim(), cells[3].textContent.replace('QAR','').trim(), cells[4].textContent.replace('QAR','').trim(), cells[5].textContent.trim()]);
-            });
-        } else {
-            document.querySelectorAll('.fch__dcard:not([style*="display: none"])').forEach(function(card) {
-                var name = card.getAttribute('data-driver-name');
-                var id = card.querySelector('.fch__dcard-id').textContent.replace('ID: ', '');
-                var cod = card.querySelector('.fch__detail-value').textContent.replace('QAR','').trim();
-                var settled = card.querySelectorAll('.fch__detail-value')[1].textContent.trim();
-                csvData.push([name, id, '', cod, '', settled]);
-            });
-        }
-        var csvContent = csvData.map(function(row) { return row.map(function(c) { return '"' + c + '"'; }).join(','); }).join('\n');
-        var blob = new Blob([csvContent], { type: 'text/csv' });
-        var url = window.URL.createObjectURL(blob);
+        var head = ['Driver', 'Driver ID', 'Phone', 'COD in hand', 'Days held', 'Deliveries', 'Wallet balance', 'Last hand-in'];
+        var rows = [head];
+        document.querySelectorAll('#workforce_cod_in_hand_table_ledger tbody tr').forEach(function (row) {
+            var meta = (row.querySelector('.fch__meta') || {}).textContent || '';
+            var parts = meta.split('·');
+            var age = row.querySelector('.fch__age');
+            var cells = row.querySelectorAll('td.fch__num');
+            // cells: amount, [age], deliveries, wallet, last hand-in
+            var tail = Array.prototype.slice.call(cells, cells.length - 3);
+            rows.push([
+                (row.querySelector('.fch__name') || {}).textContent.trim(),
+                (parts[0] || '').trim(),
+                (parts[1] || '').trim(),
+                (row.querySelector('.fch__amount') || {}).textContent.trim(),
+                age ? age.textContent.trim() : '',
+                tail[0].textContent.trim(),
+                tail[1].textContent.trim(),
+                tail[2].textContent.trim()
+            ]);
+        });
+        var csv = rows.map(function (r) {
+            return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+        }).join('\n');
+        var url = window.URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
         var a = document.createElement('a');
         a.href = url;
-        a.download = 'fleet_cod_in_hand_' + new Date().toISOString().split('T')[0] + '.csv';
+        a.download = 'cod_in_hand_' + new Date().toISOString().split('T')[0] + '.csv';
+        // Chromium ignores a click on an anchor that is not in the document, so
+        // the old detached-element version silently downloaded nothing.
+        a.hidden = true;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
     }
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); exportToCSV(); }
     });
 </script>

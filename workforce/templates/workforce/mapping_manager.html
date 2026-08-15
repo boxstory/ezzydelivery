@@ -1,6 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Staff console to map a source's column names onto EzzyDelivery order fields, per business and per platform.
+Used by: workforce_views.wf_mapping_manager at /workforce/import-wizard/mapping-manager/
+Notes: Mappings live in Business.import_mapping, nested by platform key; OneDrive / Google Sheet / Public Link
+       also keep a per-source copy. The page-notes card (wfnote__, shared) sits under the header, hidden on
+       load; the header help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Mapping Manager — Import Wizard{% endblock %}
 
@@ -30,9 +37,18 @@
                    style="color:rgba(201,209,224,0.6);border-color:rgba(255,255,255,0.1)">
                     <i class="fa-solid fa-arrow-left fa-sm"></i> Back
                 </a>
+                <button type="button" class="wfnote__btn" data-wfnote-toggle
+                        aria-expanded="false" aria-controls="workforce_mapping_manager_card_notes"
+                        title="About this page">
+                    <i class="fa-solid fa-question" aria-hidden="true"></i>
+                    <span class="visually-hidden">Show notes</span>
+                </button>
             </div>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_mapping_manager_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_mapping_manager_card_notes' %}" hidden></div>
 
     {# ── Business Selector ── #}
     <div class="mmap__selector-card">

@@ -1,26 +1,15 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% load crispy_forms_tags %}
 
 {% block content %}
 <div class="our" id="orders_upload_review_container_main">
-    <!-- Hero Header -->
-    <div class="our__hero">
-        <div class="our__hero-content">
-            <div class="our__hero-left">
-                <h1 class="our__title">
-                    <i class="fas fa-search-plus"></i>
-                    Review Data
-                </h1>
-                <p class="our__subtitle">Review and confirm imported order data before submitting</p>
-            </div>
-            <div class="our__hero-right">
-                <a href="{% url 'orders:orders_all_list' %}" class="btn btn-outline-light btn-sm">
-                    <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
-                </a>
-            </div>
-        </div>
-    </div>
+    {% bconheader eyebrow="Orders" live="Import Review" icon="fa-solid fa-magnifying-glass-plus" title="Review Data" subtitle="Review and confirm imported order data before submitting." %}
+        <a href="{% url 'orders:orders_all_list' %}" class="bcon__btn bcon__btn--secondary">
+            <i class="fa-solid fa-basket-shopping"></i> Go to Orders
+        </a>
+    {% endbconheader %}
 
     <!-- Review Card -->
     <div class="our__card">

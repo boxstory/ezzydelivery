@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Directory of every registered client business — card/table views, search, click through to the detail record
+Used by: workforce_views.business_licenses_list at /workforce/business-licenses/
+Notes: Search and view type are URL parameters, so a filtered list is shareable.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Businesses - Ezzy Delivery{% endblock title %}
 
@@ -17,7 +24,16 @@
       </h1>
       <p class="bll__hero-subtitle">{{ businesses.paginator.count }} registered business{{ businesses.paginator.count|pluralize:"es" }}</p>
     </div>
+    <button type="button" class="wfnote__btn" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_business_licenses_list_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
   </div>
+
+  <div class="wfnote" id="workforce_business_licenses_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_business_licenses_list_card_notes' %}" hidden></div>
 
   <!-- Filter Bar -->
   <div class="bll__filter-bar">

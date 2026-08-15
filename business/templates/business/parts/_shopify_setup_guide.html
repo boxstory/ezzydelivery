@@ -1,6 +1,6 @@
-{# Purpose: Shopify Custom App + OAuth setup guide note shown on API list / add / update pages. #}
+{# Purpose: Step-by-step Shopify Custom App + OAuth setup guide shown on API list / add / update pages. #}
 {# Used by: business/parts/business_settings_api_list.html, business_settings_api_add.html, business_settings_api_update.html #}
-{# Notes: Static content, no context required. Safe to include anywhere. #}
+{# Notes: Both mode blocks are toggled by api_form_fields.js. Needs shopify_oauth_redirect_uri + shopify_oauth_app_url in context. #}
 
 <section class="bapi__section" id="client_api_shopify_setup_help" style="display:none;">
     <div class="bapi__section-header">
@@ -10,27 +10,218 @@
         </h2>
     </div>
 
-    <div class="bapi__tip-banner">
-        <i class="fa-solid fa-circle-info"></i>
-        <div>
-            <p class="mb-2"><strong>To connect a Shopify store, choose one of the following:</strong></p>
+    <div class="bapi__section-body">
 
-            <p class="mb-1"><strong>Option 1 &mdash; Custom App (manual Access Token)</strong></p>
-            <ol class="mb-3">
-                <li>In Shopify Admin go to <em>Settings &rarr; Apps and sales channels &rarr; Develop apps &rarr; Create an app</em>.</li>
-                <li>Configure <em>Admin API scopes</em>: <code>read_orders</code>, <code>write_orders</code>, <code>read_products</code>, <code>read_customers</code>, <code>read_fulfillments</code>, <code>write_fulfillments</code>.</li>
-                <li>Install the app, then copy the <strong>Admin API access token</strong> (starts with <code>shpat_</code>).</li>
-                <li>Paste that token into the <strong>Access Token</strong> field on the Add / Edit Integration page on this dashboard.</li>
+        {# ---------------------------------------------------------------- #}
+        {# CUSTOM APP — merchant pastes a token they generate themselves    #}
+        {# ---------------------------------------------------------------- #}
+        <div id="client_api_shopify_guide_custom_app">
+            <div class="bapi__guide-intro">
+                <span class="bapi__guide-kicker">Custom App</span>
+                <p class="mb-0">You generate the access token inside your own Shopify admin and paste it here.
+                Client ID and Client Secret are <strong>not</strong> used on this path &mdash; leave them empty.</p>
+            </div>
+
+            <ol class="bapi__guide-steps">
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Open the app developer area</div>
+                    <p>In your Shopify admin, go to
+                    <span class="bapi__guide-path">Settings <i class="fa-solid fa-chevron-right"></i> Apps and sales channels <i class="fa-solid fa-chevron-right"></i> Develop apps</span>.
+                    If this is your first app, Shopify asks you to click <strong>Allow custom app development</strong> once.</p>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Create the app</div>
+                    <p>Click <strong>Create an app</strong>, name it <code>EzzyDelivery</code>, and confirm.</p>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Grant the Admin API scopes</div>
+                    <p>Open <strong>Configuration</strong> <i class="fa-solid fa-chevron-right"></i> <strong>Admin API integration</strong> <i class="fa-solid fa-chevron-right"></i> <strong>Edit</strong>, then tick these six:</p>
+                    <ul class="bapi__guide-scopes">
+                        <li><code>read_orders</code><span>we read the orders to deliver</span></li>
+                        <li><code>write_orders</code><span>we write the tracking number back</span></li>
+                        <li><code>read_products</code><span>product names and SKUs on the label</span></li>
+                        <li><code>read_customers</code><span>delivery name, phone and address</span></li>
+                        <li><code>read_fulfillments</code><span>skip what you already shipped</span></li>
+                        <li><code>write_fulfillments</code><span>mark delivered orders as fulfilled</span></li>
+                    </ul>
+                    <p class="mb-0">Click <strong>Save</strong>.</p>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Install the app</div>
+                    <p>Go to the <strong>API credentials</strong> tab and click <strong>Install app</strong> <i class="fa-solid fa-chevron-right"></i> <strong>Install</strong>.</p>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Copy the Admin API access token</div>
+                    <p>Under <strong>Admin API access token</strong>, click <strong>Reveal token once</strong> and copy it.
+                    It starts with <code>shpat_</code>.</p>
+                    <div class="bapi__guide-note bapi__guide-note--warn">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <div>Shopify shows this token <strong>once</strong>. If you close the page without copying it,
+                        you must uninstall and reinstall the app to get a new one.</div>
+                    </div>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Fill in this form</div>
+                    <dl class="bapi__guide-fields">
+                        <dt>Access Token</dt>
+                        <dd>the <code>shpat_&hellip;</code> value you just copied</dd>
+                        <dt>Store URL</dt>
+                        <dd>your <code>.myshopify.com</code> handle &mdash; see <em>Finding your Store URL</em> below</dd>
+                    </dl>
+                    <p class="mb-0">Click <strong>Save</strong>. There is no authorization step on this path.</p>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Test the connection</div>
+                    <p class="mb-0">Press <strong>Test Connection</strong> on the saved integration. A working setup lists
+                    your recent orders and product count. Anything else &mdash; check the troubleshooting table below.</p>
+                </li>
             </ol>
-
-            <p class="mb-1"><strong>Option 2 &mdash; OAuth flow (recommended)</strong></p>
-            <ol class="mb-2">
-                <li>Save your Shopify <strong>Client ID</strong>, <strong>Client Secret</strong>, and <strong>Store URL</strong> on the integration form.</li>
-                <li>Click <strong>Connect (OAuth)</strong> on the integration card on the API list page.</li>
-                <li>Authorize the app on Shopify; the platform exchanges the code for a permanent <code>shpat_</code> token automatically via <code>/business/shopify/oauth/callback/</code>.</li>
-            </ol>
-
-            <p class="mb-0"><small>Common error: pasting the <strong>API Secret</strong> into the Access Token field returns Shopify <code>401 Unauthorized</code>. Use a token that starts with <code>shpat_</code>.</small></p>
         </div>
+
+        {# ---------------------------------------------------------------- #}
+        {# OAUTH — we exchange the credentials for a token                  #}
+        {# ---------------------------------------------------------------- #}
+        <div id="client_api_shopify_guide_oauth">
+            <div class="bapi__guide-intro">
+                <span class="bapi__guide-kicker">OAuth</span>
+                <p class="mb-0">You give us the Client ID and Secret, and we fetch the access token for you.
+                This is <strong>two steps</strong>: save the credentials, then authorize.
+                Saving alone does <strong>not</strong> connect the store.</p>
+            </div>
+
+            <ol class="bapi__guide-steps">
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Open your app's configuration</div>
+                    <p class="mb-0">In your Shopify admin, go to
+                    <span class="bapi__guide-path">Settings <i class="fa-solid fa-chevron-right"></i> Apps and sales channels <i class="fa-solid fa-chevron-right"></i> Develop apps <i class="fa-solid fa-chevron-right"></i> your app <i class="fa-solid fa-chevron-right"></i> Configuration</span>.
+                    If your developer built the app in the Shopify <strong>Partner dashboard</strong>, the same two fields
+                    live under <span class="bapi__guide-path">Apps <i class="fa-solid fa-chevron-right"></i> your app <i class="fa-solid fa-chevron-right"></i> Configuration <i class="fa-solid fa-chevron-right"></i> URLs</span>.</p>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Set the App URL</div>
+                    <p>Paste this into the <strong>App URL</strong> field:</p>
+                    <div class="bapi__url-display mt-1 mb-1">
+                        <code id="client_api_shopify_app_url">{{ shopify_oauth_app_url }}</code>
+                        <button type="button" class="btn bapi__copy-btn ms-2"
+                                id="client_api_shopify_copy_app_url">Copy</button>
+                    </div>
+                    <div class="bapi__guide-note bapi__guide-note--warn">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <div>The App URL and the redirection URL in the next step must be on the
+                        <strong>same host</strong>. If they differ, Shopify blocks the install with
+                        <em>"the redirect_uri and application url must have matching hosts"</em> before you ever
+                        see the permission screen.</div>
+                    </div>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Add the redirection URL</div>
+                    <p>Paste this into <strong>Allowed redirection URL(s)</strong>, on its own line:</p>
+                    <div class="bapi__url-display mt-1 mb-1">
+                        <code id="client_api_shopify_redirect_uri">{{ shopify_oauth_redirect_uri }}</code>
+                        <button type="button" class="btn bapi__copy-btn ms-2"
+                                id="client_api_shopify_copy_redirect">Copy</button>
+                    </div>
+                    <p class="mb-0"><small>Use the <strong>Copy</strong> button rather than typing it. Shopify compares this
+                    character for character, including the trailing slash. Click <strong>Save</strong> in Shopify.</small></p>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Copy your Client ID and Client Secret</div>
+                    <p class="mb-0">Both are on the <strong>API credentials</strong> tab (Partner dashboard: <strong>Client credentials</strong>).
+                    The secret starts with <code>shpss_</code>. It is <em>not</em> an access token &mdash; it cannot call the
+                    API on its own, which is exactly why this OAuth step exists.</p>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Fill in this form</div>
+                    <dl class="bapi__guide-fields">
+                        <dt>Client ID</dt>
+                        <dd>from the API credentials tab</dd>
+                        <dt>Client Secret</dt>
+                        <dd>the <code>shpss_&hellip;</code> value</dd>
+                        <dt>Store URL</dt>
+                        <dd>your <code>.myshopify.com</code> handle &mdash; see <em>Finding your Store URL</em> below</dd>
+                    </dl>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Authorize</div>
+                    <p class="mb-0">Click <strong>Save &amp; Connect to Shopify</strong>. Shopify shows a permission screen &mdash;
+                    press <strong>Install</strong> / <strong>Update app</strong>. You land back here and the access token is
+                    stored automatically. <strong>Skipping this step is the single most common reason an integration sits
+                    dead:</strong> the credentials are saved, no token is ever issued, and every sync returns
+                    <code>401 Unauthorized</code>.</p>
+                </li>
+
+                <li class="bapi__guide-step">
+                    <div class="bapi__guide-step-title">Test the connection</div>
+                    <p class="mb-0">Press <strong>Test Connection</strong>. A working setup lists your recent orders and
+                    product count. Our team then approves the integration and orders begin importing automatically
+                    every hour.</p>
+                </li>
+            </ol>
+        </div>
+
+        {# ---------------------------------------------------------------- #}
+        {# SHARED — store URL + troubleshooting                             #}
+        {# ---------------------------------------------------------------- #}
+        <div class="bapi__guide-aside">
+            <div class="bapi__guide-aside-title">Finding your Store URL</div>
+            <p class="mb-0">We need the permanent <code>.myshopify.com</code> handle, <strong>not</strong> your customer-facing
+            domain. Find it in <span class="bapi__guide-path">Settings <i class="fa-solid fa-chevron-right"></i> Domains</span>
+            &mdash; it is the one labelled <em>myshopify.com</em>, for example <code>my-store-a1b2.myshopify.com</code>.
+            The Admin API does not answer on a custom domain.</p>
+        </div>
+
+        <div class="bapi__guide-aside">
+            <div class="bapi__guide-aside-title">If something goes wrong</div>
+            <div class="table-responsive">
+                <table class="table bapi__guide-table">
+                    <thead>
+                        <tr>
+                            <th>What Shopify says</th>
+                            <th>What it means</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>redirect_uri and application url must have matching hosts</td>
+                            <td>Your App URL and redirection URL are on different domains. Both must be
+                                <code>{{ shopify_oauth_app_url }}</code>. There is no <code>api.</code> subdomain &mdash;
+                                that address does not exist.</td>
+                        </tr>
+                        <tr>
+                            <td>the redirect_uri is not whitelisted</td>
+                            <td>The redirection URL does not match character for character. Re-copy it in step 3
+                                and confirm you saved the change in Shopify.</td>
+                        </tr>
+                        <tr>
+                            <td>401 Unauthorized</td>
+                            <td>No access token stored. On OAuth, the authorize step was never completed.
+                                On Custom App, the API Secret was pasted where the <code>shpat_</code> token belongs.</td>
+                        </tr>
+                        <tr>
+                            <td>Invalid API key or access token</td>
+                            <td>The token was revoked, or the app was uninstalled from the store. Reinstall the app
+                                and connect again.</td>
+                        </tr>
+                        <tr>
+                            <td>404 Not Found</td>
+                            <td>The Store URL is wrong &mdash; usually a custom domain instead of the
+                                <code>.myshopify.com</code> handle.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 </section>

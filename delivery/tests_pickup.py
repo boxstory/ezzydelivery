@@ -137,6 +137,92 @@ class PickupPoolScopingTestCase(PickupBaseTestCase):
         self.assertFalse(pickup_pool_for(self.driver).filter(order=order).exists())
 
 
+class PickupPoolStaleTestCase(PickupBaseTestCase):
+    """A finished order/delivery leg must not leave a claimable pickup behind."""
+
+    def make_task(self, order, status='pending'):
+        return DeliveryTask.objects.create(
+            order=order, business=self.business,
+            dl_task_number=f'DLPK{order.pk}', dl_task_description='Pickup test task',
+            dl_task_status_client='for_review', dl_task_status=status,
+        )
+
+    def test_pool_excludes_cancelled_delivery_task(self):
+        # The reported bug: task cancelled, order left on publish, pickup still pending
+        order = self.make_order('PKS01')
+        self.make_task(order, 'cancelled')
+        self.assertEqual(PickupTask.objects.get(order=order).status, 'pending')
+        self.assertFalse(pickup_pool_for(self.driver).filter(order=order).exists())
+
+    def test_pool_excludes_delivered_order(self):
+        order = self.make_order('PKS02')
+        order.order_status = 'delivered'
+        order.save(update_fields=['order_status'])
+        self.assertFalse(pickup_pool_for(self.driver).filter(order=order).exists())
+
+    def test_pool_includes_failed_delivery_task(self):
+        # Failed can be retried, so its first-mile pickup stays claimable
+        order = self.make_order('PKS03')
+        self.make_task(order, 'failed')
+        self.assertTrue(pickup_pool_for(self.driver).filter(order=order).exists())
+
+    def test_pool_includes_order_with_no_delivery_task(self):
+        # Guards the NULL annotation trap — no task yet must not hide the pickup
+        order = self.make_order('PKS04')
+        self.assertFalse(DeliveryTask.objects.filter(order=order).exists())
+        self.assertTrue(pickup_pool_for(self.driver).filter(order=order).exists())
+
+    def test_pool_uses_latest_task_only(self):
+        # Old cancelled task + newer live one (the reconfirm/retry case)
+        order = self.make_order('PKS05')
+        self.make_task(order, 'cancelled')
+        self.make_task(order, 'pending')
+        self.assertTrue(pickup_pool_for(self.driver).filter(order=order).exists())
+
+    def test_task_cancel_cancels_pending_pickup(self):
+        order = self.make_order('PKS06')
+        task = self.make_task(order, 'pending')
+        task.dl_task_status = 'cancelled'
+        task.save(update_fields=['dl_task_status'])
+        self.assertEqual(PickupTask.objects.get(order=order).status, 'cancelled')
+
+    def test_task_delivered_cancels_pending_pickup(self):
+        # Delivered without a first-mile pickup — the pickup is dead work
+        order = self.make_order('PKS07')
+        task = self.make_task(order, 'pending')
+        task.dl_task_status = 'delivered'
+        task.save(update_fields=['dl_task_status'])
+        self.assertEqual(PickupTask.objects.get(order=order).status, 'cancelled')
+
+    def test_executed_pickup_not_rewritten(self):
+        # Already dropped at the hub — the work happened, the row must stand
+        order = self.make_order('PKS08')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.driver = self.driver
+        pickup.status = 'dropped'
+        pickup.save()
+        task = self.make_task(order, 'pending')
+        task.dl_task_status = 'cancelled'
+        task.save(update_fields=['dl_task_status'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'dropped')
+
+    def test_collected_pickup_cancelled_and_driver_notified(self):
+        # Driver is holding the goods — pickup is pulled and they are told
+        order = self.make_order('PKS09')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.driver = self.driver
+        pickup.status = 'collected'
+        pickup.save()
+        task = self.make_task(order, 'pending')
+        task.dl_task_status = 'cancelled'
+        task.save(update_fields=['dl_task_status'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'cancelled')
+        self.assertTrue(fleet_models.DriverNotification.objects.filter(
+            driver=self.driver, title='Pickup cancelled').exists())
+
+
 class PickupAcceptTestCase(PickupBaseTestCase):
     def test_atomic_accept_first_wins(self):
         order = self.make_order('PK020')
@@ -238,6 +324,10 @@ class WorkforcePickupFleetTestCase(PickupBaseTestCase):
         super().setUp()
         self.staff = User.objects.create_user(
             username='pkstaff', password='x', is_staff=True)
+        # Pickup pages are an Operations desk; StaffDepartmentMiddleware fails
+        # closed, so the profile has to carry the department.
+        core_models.Profile.objects.create(
+            user=self.staff, is_staff=True, dept_operations=True)
         self.client.force_login(self.staff)
 
     def test_fleet_add_toggle_remove(self):
@@ -304,6 +394,8 @@ class WorkforcePickupAssignTestCase(PickupBaseTestCase):
         super().setUp()
         self.staff = User.objects.create_user(
             username='pkstaff2', password='x', is_staff=True)
+        core_models.Profile.objects.create(
+            user=self.staff, is_staff=True, dept_operations=True)
         self.client.force_login(self.staff)
 
     def test_staff_assign_pending_pickup(self):
@@ -352,3 +444,94 @@ class WorkforcePickupAssignTestCase(PickupBaseTestCase):
         resp = self.client.get('/workforce/pickups/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'PKA04')
+
+
+class WorkforcePickupCancelDeleteTestCase(PickupBaseTestCase):
+    """Staff cancel (leg only) and superadmin delete from the pool status page."""
+
+    def setUp(self):
+        super().setUp()
+        self.staff = User.objects.create_user(
+            username='pkstaff3', password='x', is_staff=True)
+        self.staff_profile = core_models.Profile.objects.create(
+            user=self.staff, is_staff=True, dept_operations=True)
+        self.client.force_login(self.staff)
+
+    def _claimed_pickup(self, code, status='accepted'):
+        order = self.make_order(code)
+        pickup = PickupTask.objects.get(order=order)
+        pickup.driver = self.driver
+        pickup.status = status
+        pickup.save()
+        return order, pickup
+
+    # -- cancel ------------------------------------------------------------
+    def test_cancel_closes_leg_and_notifies_driver(self):
+        order, pickup = self._claimed_pickup('PKC01')
+        resp = self.client.post('/workforce/pickups/cancel/', {
+            'pickup_id': pickup.pk, 'reason': 'Client rescheduled',
+        })
+        self.assertTrue(resp.json()['success'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'cancelled')
+        self.assertTrue(fleet_models.DriverNotification.objects.filter(
+            driver=self.driver, title='Pickup cancelled').exists())
+        # The order itself is untouched — only the first-mile leg died.
+        order.refresh_from_db()
+        self.assertNotEqual(order.order_status, 'cancelled')
+        self.assertTrue(orders_models.OrderStatusHistory.objects.filter(
+            order=order, field_name='pickup_status', new_value='cancelled',
+            changed_by=self.staff).exists())
+
+    def test_cancel_allowed_after_collection(self):
+        _, pickup = self._claimed_pickup('PKC02', status='collected')
+        resp = self.client.post('/workforce/pickups/cancel/', {'pickup_id': pickup.pk})
+        self.assertTrue(resp.json()['success'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'cancelled')
+
+    def test_cancel_refused_on_closed_leg(self):
+        _, pickup = self._claimed_pickup('PKC03', status='dropped')
+        resp = self.client.post('/workforce/pickups/cancel/', {'pickup_id': pickup.pk})
+        self.assertFalse(resp.json()['success'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'dropped')
+
+    def test_bulk_cancel_reports_skipped(self):
+        _, live = self._claimed_pickup('PKC04')
+        _, closed = self._claimed_pickup('PKC05', status='handed_off')
+        resp = self.client.post('/workforce/pickups/cancel/', {
+            'pickup_ids': [live.pk, closed.pk],
+        })
+        data = resp.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['updated'], 1)
+        self.assertEqual(len(data['failed']), 1)
+
+    # -- delete ------------------------------------------------------------
+    def test_delete_blocked_for_non_superadmin(self):
+        _, pickup = self._claimed_pickup('PKD01')
+        resp = self.client.post('/workforce/pickups/delete/', {'pickup_id': pickup.pk})
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(PickupTask.objects.filter(pk=pickup.pk).exists())
+
+    def test_superadmin_deletes_row_and_leaves_order(self):
+        self.staff_profile.is_superadmin = True
+        self.staff_profile.save(update_fields=['is_superadmin'])
+        order, pickup = self._claimed_pickup('PKD02')
+        resp = self.client.post('/workforce/pickups/delete/', {'pickup_id': pickup.pk})
+        self.assertTrue(resp.json()['success'])
+        self.assertFalse(PickupTask.objects.filter(pk=pickup.pk).exists())
+        self.assertTrue(Order.objects.filter(pk=order.pk).exists())
+        self.assertTrue(orders_models.OrderStatusHistory.objects.filter(
+            order=order, field_name='pickup_status', new_value='deleted').exists())
+        self.assertTrue(fleet_models.DriverNotification.objects.filter(
+            driver=self.driver, title='Pickup removed').exists())
+
+    def test_delete_refused_after_collection(self):
+        self.staff_profile.is_superadmin = True
+        self.staff_profile.save(update_fields=['is_superadmin'])
+        _, pickup = self._claimed_pickup('PKD03', status='collected')
+        resp = self.client.post('/workforce/pickups/delete/', {'pickup_id': pickup.pk})
+        self.assertFalse(resp.json()['success'])
+        self.assertTrue(PickupTask.objects.filter(pk=pickup.pk).exists())

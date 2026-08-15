@@ -1,0 +1,173 @@
+{% comment %}
+Purpose: Bottom-sheet for setting / changing / clearing an order's scheduled delivery date
+Used by: orders/parts/order_all_list_content.html (desktop table + mobile cards)
+Notes: Opened by any .oal__action-btn--schedule button; reads the current values off that
+       button's data-* attributes and POSTs to orders:set_order_scheduled_delivery.
+{% endcomment %}
+<div class="sched-modal" id="schedule_delivery_modal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="sched-modal__backdrop" data-sched-close></div>
+  <div class="sched-modal__sheet">
+    <div class="sched-modal__header">
+      <span class="sched-modal__title">
+        <i class="fas fa-calendar-day me-2"></i>Scheduled Delivery
+      </span>
+      <button type="button" class="sched-modal__close" data-sched-close aria-label="Close">
+        <i class="fas fa-xmark"></i>
+      </button>
+    </div>
+    <div class="sched-modal__body">
+      <p class="oap__sched__intro">
+        Hold this order for a specific day — birthdays, anniversaries, weddings, events.
+        We deliver <strong>on the date you pick</strong>, not earlier, and it stays off the
+        daily dispatch board until the day before.
+      </p>
+      <p class="sched-modal__hint mb-2">Order <strong id="schedule_modal_order_number">—</strong></p>
+
+      <div class="row g-2">
+        <div class="col-7">
+          <label class="sched-modal__label" for="schedule_modal_date">Delivery Date</label>
+          <input type="date" class="form-control" id="schedule_modal_date">
+        </div>
+        <div class="col-5">
+          <label class="sched-modal__label" for="schedule_modal_time">Hour (optional)</label>
+          <input type="time" class="form-control" id="schedule_modal_time">
+        </div>
+        <div class="col-12">
+          <label class="sched-modal__label" for="schedule_modal_occasion">Occasion</label>
+          <select class="form-select" id="schedule_modal_occasion">
+            <option value="">Not specified</option>
+            <option value="birthday">Birthday</option>
+            <option value="anniversary">Anniversary</option>
+            <option value="wedding">Wedding</option>
+            <option value="gift">Gift / Surprise</option>
+            <option value="event">Event / Party</option>
+            <option value="customer_request">Customer requested this day</option>
+            <option value="restock">Restock / Business schedule</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="sched-modal__label" for="schedule_modal_note">Instruction</label>
+          <input type="text" class="form-control" id="schedule_modal_note" maxlength="160"
+                 placeholder="e.g. Birthday — call before arriving, don't mention the sender">
+          <p class="sched-modal__hint">Shown to the driver with the delivery.</p>
+        </div>
+      </div>
+      <p class="sched-modal__error" id="schedule_modal_error" hidden></p>
+    </div>
+    <div class="sched-modal__footer">
+      <button type="button" class="btn btn-light sched-modal__btn sched-modal__btn--clear"
+              id="schedule_modal_clear" title="Remove the scheduled date">
+        <i class="fas fa-trash-can"></i>
+      </button>
+      <button type="button" class="btn btn-light sched-modal__btn" data-sched-close>Cancel</button>
+      <button type="button" class="btn btn-primary sched-modal__btn" id="schedule_modal_submit">
+        <i class="fas fa-check me-1"></i>Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var modal = document.getElementById('schedule_delivery_modal');
+  if (!modal) return;
+
+  var elNumber   = document.getElementById('schedule_modal_order_number');
+  var elDate     = document.getElementById('schedule_modal_date');
+  var elTime     = document.getElementById('schedule_modal_time');
+  var elOccasion = document.getElementById('schedule_modal_occasion');
+  var elNote     = document.getElementById('schedule_modal_note');
+  var elError    = document.getElementById('schedule_modal_error');
+  var btnSubmit  = document.getElementById('schedule_modal_submit');
+  var btnClear   = document.getElementById('schedule_modal_clear');
+  var currentOrderId = null;
+
+  elDate.min = new Date().toISOString().split('T')[0];
+
+  function csrf() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    var input = document.querySelector('[name="csrfmiddlewaretoken"]');
+    return (input && input.value) || (meta && meta.content) || '';
+  }
+
+  function open(btn) {
+    currentOrderId    = btn.dataset.orderId;
+    elNumber.textContent = btn.dataset.orderNumber || '—';
+    elDate.value      = btn.dataset.scheduledDate || '';
+    elTime.value      = btn.dataset.scheduledTime || '';
+    elOccasion.value  = btn.dataset.scheduledOccasion || '';
+    elNote.value      = btn.dataset.scheduledNote || '';
+    elError.hidden    = true;
+    btnClear.hidden   = !btn.dataset.scheduledDate;
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(function() { elDate.focus(); }, 50);
+  }
+
+  function close() {
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    currentOrderId = null;
+    btnSubmit.disabled = false;
+    btnSubmit.innerHTML = '<i class="fas fa-check me-1"></i>Save';
+  }
+
+  function save(clearIt) {
+    if (!currentOrderId) return;
+    if (!clearIt && !elDate.value) {
+      elError.textContent = 'Pick a delivery date first.';
+      elError.hidden = false;
+      return;
+    }
+    var body = new URLSearchParams();
+    body.append('scheduled_date', clearIt ? '' : elDate.value);
+    body.append('scheduled_time', clearIt ? '' : elTime.value);
+    body.append('scheduled_occasion', clearIt ? '' : elOccasion.value);
+    body.append('scheduled_note', clearIt ? '' : elNote.value);
+
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+
+    fetch('/orders/' + currentOrderId + '/scheduled-delivery/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrf(),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.success) {
+        location.reload();
+      } else {
+        elError.textContent = data.error || 'Could not save the delivery date.';
+        elError.hidden = false;
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = '<i class="fas fa-check me-1"></i>Save';
+      }
+    }).catch(function() {
+      elError.textContent = 'Request failed. Please try again.';
+      elError.hidden = false;
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = '<i class="fas fa-check me-1"></i>Save';
+    });
+  }
+
+  modal.addEventListener('click', function(e) {
+    if (e.target.closest('[data-sched-close]')) close();
+  });
+  btnSubmit.addEventListener('click', function() { save(false); });
+  btnClear.addEventListener('click', function() { save(true); });
+
+  // Delegated so it works for table rows and mobile cards alike
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.oal__action-btn--schedule');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    open(btn);
+  });
+
+  window.openScheduleDeliveryModal = open;
+})();
+</script>

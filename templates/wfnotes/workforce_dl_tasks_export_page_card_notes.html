@@ -1,0 +1,109 @@
+{% comment %}
+Purpose: "About this page" notes panel for dl_tasks_export_page.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_dl_tasks_export_page_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      A <strong>reporting tool for delivery tasks</strong>, built around the question clients actually ask:
+      "what did you deliver for me between these dates?" You pick one business, set a date range and optionally
+      a status, then read the result on screen or download it as Excel or CSV. It is read-only — nothing here
+      changes a task, a driver or an order. It works one client at a time by design, so a file can be sent
+      straight to that client.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Pick a client</dt>
+            <dd class="wfnote__def">Step one is a tile per active business with its all-time task count.
+              Choosing one moves you to the filter view; the breadcrumb takes you back.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Date From / To</dt>
+            <dd class="wfnote__def">Filters on the task's own delivery date. Left alone it shows yesterday and
+              today.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Task Status</dt>
+            <dd class="wfnote__def">Narrows to a single state, or leave it on all statuses.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Filter</dt>
+            <dd class="wfnote__def">Reloads the table with your choices. The filters live in the address bar,
+              so the view can be bookmarked or shared.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Export Excel</dt>
+            <dd class="wfnote__def">Downloads the filtered set as a spreadsheet, named with the date range.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Export CSV</dt>
+            <dd class="wfnote__def">The same rows as plain comma-separated text, for importing elsewhere.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Open a task</dt>
+            <dd class="wfnote__def">The task number and the order code are both links and open in a new tab,
+              so you keep the filtered list behind you.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Count badge</dt>
+            <dd class="wfnote__def">Next to the export buttons — how many tasks the current filter matched.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">Task statuses</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">New</dt>
+            <dd class="wfnote__def">Raised but not yet moving — no driver has taken it on.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Pending pickup</dt>
+            <dd class="wfnote__def">Accepted, waiting for the goods to be collected.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Out for delivery</dt>
+            <dd class="wfnote__def">On the road with a driver.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Delivered</dt>
+            <dd class="wfnote__def">Completed. The completed-at column and any COD collection apply here.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Failed</dt>
+            <dd class="wfnote__def">Attempted but not delivered. The failure reason column explains why.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Cancelled</dt>
+            <dd class="wfnote__def">Called off before delivery, usually with the order.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Returned</dt>
+            <dd class="wfnote__def">Goods came back to us instead of reaching the customer.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>Step one lists <strong>active businesses only</strong>. If a client is missing, check their account
+          status on their business record rather than assuming they have no tasks.</li>
+        <li>The number on a client's tile is their <strong>lifetime</strong> task count. It has nothing to do
+          with the dates you are about to choose.</li>
+        <li>Dates match the task date, not the day the task was completed. A task delivered late still reports
+          under the date it was scheduled for.</li>
+        <li>The table is not paginated, so a wide date range on a busy client renders every matching row at
+          once — narrow the dates before loading a whole year.</li>
+        <li>The download contains the same rows as the screen plus a resolved <em>Zone Name</em> column, and it
+          follows the filters currently in the address bar.</li>
+        <li>COD amounts here come from the order and the collected flag from the task. This is a delivery
+          report, not a settlement record — use the <strong>COD Ledger</strong> for money questions.</li>
+      </ul>
+    </section>
+  

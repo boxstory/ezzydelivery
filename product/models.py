@@ -37,6 +37,7 @@ from django.contrib.auth.models import User
 from django.utils.translation import gettext_lazy as _
 from business import models as business_models
 from product import models as product_models
+from core.validators import image_validators
 
 
 # =============================================================================
@@ -135,9 +136,11 @@ class Product(models.Model):
     )
 
     brand_logo = models.ImageField(
-        upload_to='product_images/brand_logo', null=True, blank=True)
+        upload_to='product_images/brand_logo', null=True, blank=True,
+        validators=image_validators(max_mb=5))
     product_image = models.ImageField(
-        upload_to='product_images/product_images', null=True, blank=True)
+        upload_to='product_images/product_images', null=True, blank=True,
+        validators=image_validators(max_mb=8))
     business = models.ForeignKey(
         business_models.Business, on_delete=models.SET_NULL, null=True, related_name='product', db_index=True)  # INDEX: Filtered in every product query
     product_category = models.ForeignKey(
@@ -243,7 +246,8 @@ class services(models.Model):
     service_name = models.CharField(max_length=100)
     discription = models.CharField(max_length=100)
     image = models.ImageField(
-        upload_to='services_images', null=True, blank=True, default="services_images/default.jpg")
+        upload_to='services_images', null=True, blank=True, default="services_images/default.jpg",
+        validators=image_validators(max_mb=5))
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     business = models.ForeignKey(

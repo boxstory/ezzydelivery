@@ -1,0 +1,156 @@
+{% comment %}
+Purpose: Shared "send WhatsApp from the EZZY number" composer — one modal any staff page can drop in.
+Used by: workforce driver_detail.html, crm/lead_detail.html, forms/pricing_inquiry_detail.html (include with wa_section + wa_to + wa_name).
+Notes: Sends through workforce:whatsapp_send_routed, so the number AND the channel come from the section's
+       sender route on the Auto Triggers page — never from the staff member's own phone. Pass the optional
+       wa_session to pin one conversation to a specific number (the CRM lead page does; the endpoint checks
+       it against the numbers we own). Pass wa_message to open with a starter body already typed — the
+       calling view renders it from a core.message_templates key, editable on the AI Config Messages tab.
+       Trigger it from any button carrying data-wasend-open plus data-wasend-to / data-wasend-name.
+{% endcomment %}
+<div class="modal fade wasend" id="workforce_wa_send_modal" tabindex="-1" aria-hidden="true"
+     data-wasend-section="{{ wa_section }}"
+     data-wasend-session="{{ wa_session|default:'' }}"
+     data-wasend-message="{{ wa_message|default:'' }}"
+     data-wasend-url="{% url 'workforce:whatsapp_send_routed' %}">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content wasend__panel">
+      <div class="modal-header wasend__header">
+        <h5 class="modal-title wasend__title">
+          <i class="fa-brands fa-whatsapp me-2" aria-hidden="true"></i>Send WhatsApp
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="wasend__meta mb-3">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="wasend__meta-label">From</span>
+            <span class="wasend__meta-value" data-wasend-sender>checking…</span>
+            <span class="wasend__meta-chip" data-wasend-channel></span>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
+            <span class="wasend__meta-label">To</span>
+            <span class="wasend__meta-value" data-wasend-recipient></span>
+          </div>
+        </div>
+        <label class="form-label fw-bold" for="workforce_wa_send_input_message">Message</label>
+        <textarea class="form-control wasend__textarea" id="workforce_wa_send_input_message"
+                  rows="6" maxlength="4000" placeholder="Type the message…"></textarea>
+        <div class="form-text d-flex justify-content-between">
+          <span>Goes out from the platform number, so replies come back to the team.</span>
+          <span data-wasend-count>0 / 4000</span>
+        </div>
+        <div class="wasend__status mt-2" data-wasend-status role="status" aria-live="polite"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success btn-sm" data-wasend-submit>
+          <i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Send
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Delegated so any number of buttons on the page (hero chip, action card, table
+// row) can open the same composer without each one wiring its own handler.
+(function () {
+  var modalEl = document.getElementById('workforce_wa_send_modal');
+  if (!modalEl) return;
+
+  var section = modalEl.dataset.wasendSection || '';
+  // Explicit number override for this page's conversation; '' = use the section route.
+  var session = modalEl.dataset.wasendSession || '';
+  // Starter body from the page's MessageTemplate; '' when the template is off.
+  var starter = modalEl.dataset.wasendMessage || '';
+  var endpoint = modalEl.dataset.wasendUrl;
+  var textarea = modalEl.querySelector('#workforce_wa_send_input_message');
+  var statusEl = modalEl.querySelector('[data-wasend-status]');
+  var countEl = modalEl.querySelector('[data-wasend-count]');
+  var senderEl = modalEl.querySelector('[data-wasend-sender]');
+  var channelEl = modalEl.querySelector('[data-wasend-channel]');
+  var recipientEl = modalEl.querySelector('[data-wasend-recipient]');
+  var sendBtn = modalEl.querySelector('[data-wasend-submit]');
+  var to = '';
+  var senderLoaded = false;
+
+  function csrf() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta && meta.content) return meta.content;
+    var input = document.querySelector('[name=csrfmiddlewaretoken]');
+    return input ? input.value : '';
+  }
+
+  function setStatus(text, kind) {
+    statusEl.textContent = text || '';
+    statusEl.className = 'wasend__status mt-2' + (kind ? ' wasend__status--' + kind : '');
+  }
+
+  // Which of our numbers this will arrive from — fetched once, then cached, so
+  // nobody has to guess whether they are about to message from the fleet line.
+  function loadSender() {
+    if (senderLoaded) return;
+    fetch(endpoint + '?section=' + encodeURIComponent(section)
+                   + (session ? '&session=' + encodeURIComponent(session) : ''), {
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.success) { senderEl.textContent = 'default number'; return; }
+        senderLoaded = true;
+        senderEl.textContent = data.sender_number
+          ? (data.sender_number + (data.sender_label ? ' · ' + data.sender_label : ''))
+          : 'platform default number';
+        channelEl.textContent = data.channel_label || '';
+      })
+      .catch(function () { senderEl.textContent = 'default number'; });
+  }
+
+  document.addEventListener('click', function (e) {
+    var opener = e.target.closest('[data-wasend-open]');
+    if (!opener) return;
+    e.preventDefault();
+    to = (opener.dataset.wasendTo || '').trim();
+    recipientEl.textContent = to
+      ? (to + (opener.dataset.wasendName ? ' · ' + opener.dataset.wasendName : ''))
+      : 'no number on file';
+    // Per-button text wins; otherwise the page's starter template, already
+    // rendered server-side with this lead's/driver's details filled in.
+    textarea.value = opener.dataset.wasendMessage || starter;
+    countEl.textContent = textarea.value.length + ' / 4000';
+    setStatus('');
+    sendBtn.disabled = !to;
+    loadSender();
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  });
+
+  textarea.addEventListener('input', function () {
+    countEl.textContent = textarea.value.length + ' / 4000';
+  });
+
+  sendBtn.addEventListener('click', function () {
+    var message = textarea.value.trim();
+    if (!message) { setStatus('Type a message first.', 'error'); return; }
+    sendBtn.disabled = true;
+    setStatus('Sending…');
+    fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+      body: JSON.stringify({section: section, session: session, phone_number: to, message: message})
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        sendBtn.disabled = false;
+        if (!data.success) { setStatus(data.error || 'Send failed.', 'error'); return; }
+        setStatus('Sent.', 'ok');
+        textarea.value = '';
+        countEl.textContent = '0 / 4000';
+      })
+      .catch(function () {
+        sendBtn.disabled = false;
+        setStatus('Network error — nothing was sent.', 'error');
+      });
+  });
+})();
+</script>

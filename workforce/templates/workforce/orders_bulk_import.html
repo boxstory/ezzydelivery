@@ -1,6 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Staff 4-step CSV/Excel order import — upload, map columns, preview/edit, import with live log
+Used by: workforce_views.wf_orders_bulk_import at /workforce/orders/bulk-import/ (rows post to wf_orders_bulk_save)
+Notes: The file is parsed in the browser; rows are sent one per request so failures are per-row and retryable.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Bulk Import Orders - Staff Dashboard{% endblock title %}
 
@@ -25,8 +32,17 @@
             <a href="{% url 'workforce:import_history' %}?source=csv_upload" class="btn btn-outline-light btn-sm">
                 <i class="fa-solid fa-clock-rotate-left me-1"></i>Import History
             </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_orders_bulk_import_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_orders_bulk_import_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_orders_bulk_import_card_notes' %}" hidden></div>
 
 <div class="p-3">
 

@@ -1,6 +1,13 @@
 {% extends "workforce/wf_base_dashboard.html" %}
 {% load static %}
 {% load custom_filters %}
+{% comment %}
+Purpose: Full staff view of one order — customer, address + verification, package, money, task, timeline
+Used by: workforce_views.order_detail at /workforce/orders/<id>/ (panel variant uses order_detail_panel.html)
+Notes: Hero actions are state-gated (publish only pre-task, cancel only while still open).
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Order {{ order.order_number }} - Workforce{% endblock %}
 
@@ -93,8 +100,17 @@
                 <i class="fa-solid fa-times me-1"></i> Cancel
             </button>
             {% endif %}
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_order_detail_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_order_detail_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_order_detail_card_notes' %}" hidden></div>
 
     <div class="row g-3 px-1 pt-0">
         <!-- Order Info -->
@@ -287,9 +303,15 @@
                     <div class="row g-3">
                         {% if order.pickup_location %}
                         <div class="col-12">
-                            <div class="wod__pickup-box">
-                                <label class="form-label text-muted small mb-1">Pickup Location</label>
-                                <p class="mb-0 fw-semibold"><i class="fa-solid fa-store me-1 text-primary"></i>{{ order.pickup_location.pickup_location_title }}{% if order.pickup_location.locality %} <span class="text-muted fw-normal small">· {{ order.pickup_location.locality }}</span>{% endif %}</p>
+                            <div class="wod__pickup-box d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                <div>
+                                    <label class="form-label text-muted small mb-1">Pickup Location</label>
+                                    <p class="mb-0 fw-semibold"><i class="fa-solid fa-store me-1 text-primary"></i>{{ order.pickup_location.pickup_location_title }}{% if order.pickup_location.locality %} <span class="text-muted fw-normal small">· {{ order.pickup_location.locality }}</span>{% endif %}</p>
+                                </div>
+                                {% comment %} Trip length — not the driver-to-drop proximity distance the
+                                   status timeline below reports. Shared component, so this and
+                                   every list on the site quote it the same way. {% endcomment %}
+                                {% include "includes/components/_route_distance.html" with order=order label="drive to drop" %}
                             </div>
                         </div>
                         {% endif %}
@@ -330,9 +352,10 @@
                                         <label class="form-label text-muted small">Lat / Long</label>
                                         <div class="odp__latlong-row" id="orderLatLng{{ order.id }}">
                                 {% if order.latitude and order.longitude %}
-                                <a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="odp__latlong-link">
+                                <span class="odp__latlong-link">
                                     <i class="fa-solid fa-map-pin"></i> {{ order.latitude }}, {{ order.longitude }}
-                                </a>
+                                </span>
+                                {% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-drop" lat=order.latitude lon=order.longitude label="Delivery location" size="sm" %}
                                 {% if order.coords_accuracy %}
                                 <span class="odp__loc-acc odp__loc-acc--{{ order.coords_accuracy }}">
                                     <i class="fa-solid fa-location-crosshairs"></i>
@@ -853,10 +876,18 @@ function wodRenderLatLng(orderId, lat, lng) {
     var box = document.getElementById('orderLatLng' + orderId);
     if (!box) return;
     var la = Number(lat).toFixed(6), lo = Number(lng).toFixed(6);
+    // Same markup shape the _map_point component emits, so the delegated
+    // handler in map-point.js picks it up without any extra wiring.
+    var mapId = 'mpt_map_js_' + orderId;
     box.innerHTML =
-        '<a href="https://www.google.com/maps?q=' + la + ',' + lo + '" target="_blank" class="odp__latlong-link">' +
+        '<span class="odp__latlong-link">' +
             '<i class="fa-solid fa-map-pin"></i> ' + la + ', ' + lo +
-        '</a>' +
+        '</span>' +
+        '<span class="mpt"><button type="button" class="mpt__btn" aria-expanded="false" ' +
+            'data-mappoint-toggle="' + mapId + '" title="Show on map">' +
+            '<i class="fa-solid fa-map-location-dot"></i></button></span>' +
+        '<div class="mpt__panel" hidden><div class="mpt__map mpt__map--sm" id="' + mapId + '" ' +
+            'data-lat="' + la + '" data-lon="' + lo + '" data-label="Delivery location"></div></div>' +
         '<span class="odp__loc-acc odp__loc-acc--by_staff">' +
             '<i class="fa-solid fa-location-crosshairs"></i> By Staff' +
         '</span>';

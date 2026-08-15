@@ -802,3 +802,75 @@ class OrderCODTestCase(TestCase):
         order.cod_status_by_staff = 'cod_settled_with_business'
         order.save()
         self.assertEqual(order.cod_status_by_staff, 'cod_settled_with_business')
+
+
+class ShopifyBillingOnlyRowTestCase(TestCase):
+    """A Shopify order with no shipping address must still yield an address.
+
+    Regression: stores whose orders carry only a billing address (Shopify omits
+    shipping_address entirely when nothing requires shipping) were imported with
+    a blank customer_address and customer_phone. Three things had to line up for
+    that: the single-order refetch built its row without the business mapping,
+    the resync writer read only the legacy flat keys, and those legacy keys were
+    derived from shipping_address alone.
+    """
+
+    class _StubAddr:
+        def __init__(self, **kw):
+            self.__dict__.update(kw)
+
+        def __getattr__(self, _):
+            return None
+
+    def _billing_only_order(self):
+        billing = self._StubAddr(
+            first_name='Saif', last_name='Almaadeed', name='Saif Almaadeed',
+            address1='Alwajbah', address2='4', city='Zone 53 / street 74',
+            province=None, country='Qatar', phone='50001149',
+            latitude=25.267765, longitude=51.3908046,
+        )
+        return self._StubAddr(
+            id=7850293199139, name='#1004',
+            shipping_address=None, billing_address=billing,
+            customer=self._StubAddr(first_name='Saif', last_name='Almaadeed'),
+            line_items=[], total_price='465.00', financial_status='paid',
+            created_at='2026-08-02T21:00:00+03:00',
+        )
+
+    def test_mapped_fields_survive_when_only_billing_address_exists(self):
+        from orders.tasks import _shopify_order_to_row, _api_row_to_temp_defaults
+
+        mapping = {
+            'customer_address': 'address.address',
+            'customer_phone': 'address.phone',
+        }
+        row = _shopify_order_to_row(self._billing_only_order(), mapping)
+
+        # address.* falls back to billing, and the mapping lands as db-field keys
+        self.assertEqual(row['address.address'], 'Alwajbah')
+        self.assertEqual(row['address.phone'], '50001149')
+        self.assertEqual(row['customer_address'], 'Alwajbah')
+        self.assertEqual(row['customer_phone'], '50001149')
+
+        defaults = _api_row_to_temp_defaults(row, None, 'shopify')
+        self.assertEqual(defaults['customer_address'], 'Alwajbah')
+        self.assertEqual(defaults['customer_phone'], '50001149')
+
+    def test_legacy_flat_keys_fall_back_to_billing_without_a_mapping(self):
+        """A feed with no saved mapping still has to produce an address."""
+        from orders.tasks import _shopify_order_to_row, _api_row_to_temp_defaults
+
+        row = _shopify_order_to_row(self._billing_only_order())
+        self.assertNotIn('customer_address', row)          # no mapping applied
+        self.assertEqual(row['address'], 'Alwajbah, 4')    # legacy flat fallback
+        self.assertEqual(row['phone'], '50001149')
+
+        defaults = _api_row_to_temp_defaults(row, None, 'shopify')
+        self.assertEqual(defaults['customer_address'], 'Alwajbah, 4')
+        self.assertEqual(defaults['customer_phone'], '50001149')
+
+    def test_paid_order_carries_no_cod(self):
+        from orders.tasks import _shopify_order_to_row, _api_row_to_temp_defaults
+
+        row = _shopify_order_to_row(self._billing_only_order())
+        self.assertEqual(_api_row_to_temp_defaults(row, None, 'shopify')['cod_amount'], '')

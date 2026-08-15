@@ -75,6 +75,17 @@ Usage:
                         <div class="odp__tl-meta"><i class="fa-regular fa-user"></i> {{ ev.actor }}</div>
                         {% endif %}
 
+                        {% comment %} A fixed place rather than a driver fix — the pickup / dispatch
+                           point, so the job's other end has a pin and a time too. {% endcomment %}
+                        {% if ev.map %}
+                        <div class="odp__tl-gps">
+                            <span class="odp__tl-gps__pin" title="{{ ev.map.label }}">
+                                <i class="fa-solid fa-location-dot"></i>
+                                {% include "includes/components/_map_point.html" with uid=ev.map.lat|stringformat:"s"|add:"-org" lat=ev.map.lat lon=ev.map.lng lat2=order.latitude lon2=order.longitude label=ev.map.label label2="Customer's saved location" colour="#8a6d00" colour2="#b4532a" text=ev.map.lat|stringformat:"s"|add:", "|add:ev.map.lng|stringformat:"s" size="sm" %}
+                            </span>
+                        </div>
+                        {% endif %}
+
                         {% if ev.gps %}
                         <div class="odp__tl-gps">
                             {% if ev.gps.verdict == 'none' %}
@@ -82,14 +93,19 @@ Usage:
                             {% else %}
                             <span class="odp__tl-gps__pin" title="Coordinate stamped on this status change">
                                 <i class="fa-solid fa-location-dot"></i>
-                                <a href="https://www.google.com/maps?q={{ ev.gps.lat }},{{ ev.gps.lng }}" target="_blank" rel="noopener">{{ ev.gps.lat }}, {{ ev.gps.lng }}</a>
+                                {% comment %} Driver's stamped position against the customer pin — the pair
+                                   is the evidence, so both go on one map. {% endcomment %}
+                                {% include "includes/components/_map_point.html" with uid=ev.gps.lat|stringformat:"s"|add:"-tl" lat=ev.gps.lat lon=ev.gps.lng lat2=ev.gps.ref_lat|default:order.latitude lon2=ev.gps.ref_lng|default:order.longitude label="Driver at this status change" label2=ev.gps.ref_label|default:"Customer's saved location" colour="#2f6f4f" colour2="#b4532a" text=ev.gps.lat|stringformat:"s"|add:", "|add:ev.gps.lng|stringformat:"s" size="sm" %}
                             </span>
                             {% if ev.gps.accuracy %}
                             <span class="odp__tl-gps__acc" title="GPS accuracy"><i class="fa-solid fa-crosshairs"></i> &plusmn;{{ ev.gps.accuracy|floatformat:0 }}m</span>
                             {% endif %}
+                            {% comment %} How far the DRIVER stood from the drop at this moment — evidence
+                               of presence, not the length of the trip. The trip distance is the
+                               separate "km drive to drop" figure beside the pickup location. {% endcomment %}
                             {% if ev.gps.distance is not None %}
-                            <span class="odp__tl-gps__dist {% if ev.gps.verdict == 'corroborated' %}odp__tl-gps__dist--stale{% elif ev.gps.verdict == 'far' %}odp__tl-gps__dist--far{% elif ev.gps.verdict == 'near' %}odp__tl-gps__dist--near{% elif ev.gps.verdict == 'stale' %}odp__tl-gps__dist--stale{% endif %}" title="Distance from delivery location">
-                                <i class="fa-solid fa-route"></i> {{ ev.gps.distance|floatformat:2 }} km
+                            <span class="odp__tl-gps__dist {% if ev.gps.verdict == 'corroborated' %}odp__tl-gps__dist--stale{% elif ev.gps.verdict == 'far' %}odp__tl-gps__dist--far{% elif ev.gps.verdict == 'near' %}odp__tl-gps__dist--near{% elif ev.gps.verdict == 'stale' %}odp__tl-gps__dist--stale{% endif %}" title="How far the driver was from the customer's location at this status change — not the trip distance">
+                                <i class="fa-solid fa-person-walking-arrow-right"></i> {{ ev.gps.distance|floatformat:2 }} km {{ ev.gps.dist_label|default:"from drop" }}
                             </span>
                             {% endif %}
                             {% if ev.gps.stale_seconds %}
@@ -104,7 +120,7 @@ Usage:
                         <div class="odp__tl-gps__fresh {% if ev.gps.verdict == 'corroborated' %}odp__tl-gps__fresh--ok{% endif %}">
                             <i class="fa-solid fa-satellite-dish"></i>
                             Next live fix {{ ev.gps.fresh.delay_seconds|duration_short }} later:
-                            <a href="https://www.google.com/maps?q={{ ev.gps.fresh.lat }},{{ ev.gps.fresh.lng }}" target="_blank" rel="noopener">{{ ev.gps.fresh.lat }}, {{ ev.gps.fresh.lng }}</a>
+                            {% include "includes/components/_map_point.html" with uid=ev.gps.fresh.lat|stringformat:"s"|add:"-fresh" lat=ev.gps.fresh.lat lon=ev.gps.fresh.lng lat2=order.latitude lon2=order.longitude label="Next live fix" label2="Customer's saved location" colour="#2f6f4f" colour2="#b4532a" text=ev.gps.fresh.lat|stringformat:"s"|add:", "|add:ev.gps.fresh.lng|stringformat:"s" size="sm" %}
                             {% if ev.gps.fresh.distance is not None %}<strong>{{ ev.gps.fresh.distance|floatformat:2 }} km</strong> from drop{% endif %}
                         </div>
                         {% endif %}
@@ -220,9 +236,7 @@ Usage:
                             {% if sp.latitude and sp.longitude %}
                             <span class="odp__tl-gps__pin" title="Driver GPS at status change">
                                 <i class="fa-solid fa-location-dot"></i>
-                                <a href="https://www.google.com/maps?q={{ sp.latitude }},{{ sp.longitude }}" target="_blank" rel="noopener">
-                                    {{ sp.latitude }}, {{ sp.longitude }}
-                                </a>
+                                {% include "includes/components/_map_point.html" with uid=sp.id|stringformat:"s"|add:"-sp" lat=sp.latitude lon=sp.longitude lat2=sp.delivery_latitude lon2=sp.delivery_longitude label="Driver at this status change" label2="Delivery location" colour="#2f6f4f" colour2="#b4532a" text=sp.latitude|stringformat:"s"|add:", "|add:sp.longitude|stringformat:"s" size="sm" %}
                             </span>
                             {% if sp.accuracy %}
                             <span class="odp__tl-gps__acc" title="GPS accuracy">
@@ -234,9 +248,10 @@ Usage:
                                 <i class="fa-solid fa-location-crosshairs"></i> No GPS
                             </span>
                             {% endif %}
+                            {# Driver-to-drop proximity at this status change, not trip distance. #}
                             {% if sp.distance_from_delivery is not None %}
-                            <span class="odp__tl-gps__dist {% if sp.distance_from_delivery > 5 %}odp__tl-gps__dist--far{% elif sp.distance_from_delivery < 0.5 %}odp__tl-gps__dist--near{% endif %}" title="Distance from delivery location">
-                                <i class="fa-solid fa-route"></i> {{ sp.distance_from_delivery|floatformat:2 }} km
+                            <span class="odp__tl-gps__dist {% if sp.distance_from_delivery > 5 %}odp__tl-gps__dist--far{% elif sp.distance_from_delivery < 0.5 %}odp__tl-gps__dist--near{% endif %}" title="How far the driver was from the customer's location at this status change — not the trip distance">
+                                <i class="fa-solid fa-person-walking-arrow-right"></i> {{ sp.distance_from_delivery|floatformat:2 }} km from drop
                             </span>
                             {% endif %}
                         </div>

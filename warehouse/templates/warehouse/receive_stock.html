@@ -6,15 +6,6 @@
 
 {% block content %}
 <div class="wh">
-    <!-- Breadcrumb -->
-    <div class="wh__breadcrumb">
-        <a href="{% url 'workforce:wf_dashboard' %}">Workforce</a>
-        <span class="wh__breadcrumb-sep">/</span>
-        <a href="{% url 'warehouse:dashboard' %}">Warehouse</a>
-        <span class="wh__breadcrumb-sep">/</span>
-        <span class="wh__breadcrumb-active">Receive Stock</span>
-    </div>
-
     <!-- Hero Header -->
     <div class="wrs__hero">
         <div class="wrs__hero-icon"><i class="fas fa-truck-loading"></i></div>
@@ -22,6 +13,24 @@
             <h1 class="wrs__hero-title">Receive Stock</h1>
             <p class="wrs__hero-subtitle">Verify and add incoming inventory to your warehouse</p>
         </div>
+        <button type="button" class="wfnote__btn wfnote__btn--end" data-wfnote-toggle
+                aria-expanded="false" aria-controls="warehouse_receive_stock_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
+    </div>
+
+    <div class="wfnote wfnote--inset" id="warehouse_receive_stock_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_receive_stock_card_notes' %}" hidden></div>
+
+    <!-- Breadcrumb (below hero) -->
+    <div class="wh__breadcrumb">
+        <a href="{% url 'workforce:wf_dashboard' %}">Workforce</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <a href="{% url 'warehouse:dashboard' %}">Warehouse</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <span class="wh__breadcrumb-active">Receive Stock</span>
     </div>
 
     <!-- ═══════════ INBOUND REQUESTS SECTION ═══════════ -->
@@ -83,7 +92,7 @@
     {% endif %}
 
     <!-- ═══════════ MANUAL / FORM SECTION ═══════════ -->
-    <div class="wrs__layout">
+    <div class="wrs__layout wrs__layout--full">
         <!-- Main Form -->
         <div class="wrs__main">
             <div class="wh__card">
@@ -169,8 +178,10 @@
                                 <thead>
                                     <tr>
                                         <th class="wh__th wh__th--center" width="50">#</th>
+                                        <th class="wh__th" width="60"></th>
                                         <th class="wh__th">Product</th>
                                         <th class="wh__th">SKU</th>
+                                        <th class="wh__th wh__th--center" width="90">In Stock</th>
                                         <th class="wh__th" width="100">Requested</th>
                                         <th class="wh__th" width="120">Receive Qty</th>
                                     </tr>
@@ -178,7 +189,7 @@
                                 <tbody id="products-tbody">
                                     {% if is_staff %}
                                     <tr id="no-products-row">
-                                        <td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">
+                                        <td class="wh__td" colspan="7" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">
                                             <i class="fa-solid fa-store" style="font-size:1.5rem;display:block;margin-bottom:0.5rem"></i>
                                             Select an inbound request above — or select a business to add products manually
                                         </td>
@@ -188,10 +199,18 @@
                                     <tr class="wrs__product-row">
                                         <td class="wh__td wh__td--center"><span class="wrs__row-num">{{ forloop.counter }}</span></td>
                                         <td class="wh__td">
+                                            {% if p.product_image %}
+                                            <img src="{{ p.product_image.url }}" alt="{{ p.item_name }}" class="wh__product-img">
+                                            {% else %}
+                                            <div class="wh__product-img-placeholder"><i class="fas fa-image"></i></div>
+                                            {% endif %}
+                                        </td>
+                                        <td class="wh__td">
                                             <span class="fw-semibold">{{ p.item_name }}</span>
                                             <input type="hidden" name="products[]" value="{{ p.id }}">
                                         </td>
                                         <td class="wh__td"><code>{{ p.item_sku|default:"—" }}</code></td>
+                                        <td class="wh__td wh__td--center wrs__stock wrs__stock--unknown">—</td>
                                         <td class="wh__td" style="color:var(--brand-grey-400)">—</td>
                                         <td class="wh__td">
                                             <input type="number" name="quantities[]" class="form-control form-control-sm" min="0" value="0" placeholder="0">
@@ -199,7 +218,7 @@
                                     </tr>
                                     {% empty %}
                                     <tr>
-                                        <td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">No products found</td>
+                                        <td class="wh__td" colspan="7" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">No products found</td>
                                     </tr>
                                     {% endfor %}
                                     {% endif %}
@@ -227,42 +246,22 @@
             </div>
         </div>
 
-        <!-- Tips Sidebar -->
-        <div class="wrs__aside">
-            <div class="wh__card">
-                <div class="wh__card-header wrs__tips-header">
-                    <div class="wh__card-header-left">
-                        <i class="fas fa-lightbulb"></i>
-                        <span>HOW IT WORKS</span>
-                    </div>
-                </div>
-                <div class="wh__card-body">
-                    <div class="wh__step"><span class="wh__step-number">1</span><div><div class="wh__step-desc">Seller creates an <strong>Inbound Request</strong> with products they're sending</div></div></div>
-                    <div class="wh__step"><span class="wh__step-number">2</span><div><div class="wh__step-desc">Products arrive at warehouse</div></div></div>
-                    <div class="wh__step"><span class="wh__step-number">3</span><div><div class="wh__step-desc">Staff selects the request above and verifies quantities</div></div></div>
-                    <div class="wh__step"><span class="wh__step-number wh__step-number--success">&#10003;</span><div><div class="wh__step-desc">Submit to <strong>receive into inventory</strong> and auto-complete the request</div></div></div>
-                </div>
-            </div>
-
-            <div class="wrs__info-card">
-                <div class="wrs__info-icon"><i class="fas fa-hand-pointer"></i></div>
-                <h6 class="wrs__info-title">From Inbound Request</h6>
-                <p class="wrs__info-text">Select a pending request at the top to auto-fill products. Adjust quantities if needed, then submit.</p>
-            </div>
-
-            <div class="wrs__info-card">
-                <div class="wrs__info-icon"><i class="fas fa-pen-to-square"></i></div>
-                <h6 class="wrs__info-title">Manual Entry</h6>
-                <p class="wrs__info-text">No request? Select a business to load all products and enter quantities manually.</p>
-            </div>
-        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+// The warehouse sidebar navigates by HTMX swap of #main-content, so this block
+// re-executes with DOMContentLoaded long gone — binding only on that event left
+// the business/warehouse pickers dead until a hard refresh.
+(function() {
+function initReceiveStock() {
+    // Guard: a swap re-runs this script, but never against an already-bound form.
+    var form = document.getElementById('receive-stock-form');
+    if (!form || form.dataset.wrsInit) return;
+    form.dataset.wrsInit = '1';
+
     // Set default date to today
     var dateInput = document.getElementById('receive_date');
     if (dateInput && !dateInput.value) {
@@ -281,10 +280,41 @@ document.addEventListener('DOMContentLoaded', function() {
     var submitBtn = document.getElementById('submit-btn');
     var inboundRows = document.querySelectorAll('.wrs__inbound-row');
 
+    function imageCell(url, name) {
+        if (!url) {
+            return '<td class="wh__td"><div class="wh__product-img-placeholder"><i class="fas fa-image"></i></div></td>';
+        }
+        return '<td class="wh__td"><img src="' + esc(url) + '" alt="' + esc(name) + '" class="wh__product-img" loading="lazy"></td>';
+    }
+
+    // A null figure means no warehouse is chosen yet — an em dash, not a zero,
+    // because "none on the shelf" and "not asked yet" are different answers.
+    function stockCell(quantity) {
+        if (quantity === null || quantity === undefined) {
+            return '<td class="wh__td wh__td--center wrs__stock wrs__stock--unknown">—</td>';
+        }
+        var cls = 'wrs__stock' + (quantity > 0 ? '' : ' wrs__stock--zero');
+        return '<td class="wh__td wh__td--center ' + cls + '">' + quantity + '</td>';
+    }
+    // Server-rendered table, kept so "Clear & Manual Entry" can put it back.
+    var initialTbodyHTML = tbody ? tbody.innerHTML : '';
+
+    // Product names/SKUs are seller-supplied and go into innerHTML below —
+    // escape them or a name containing markup breaks (or hijacks) the table.
+    function esc(v) {
+        if (v === null || v === undefined) return '';
+        return String(v).replace(/[&<>"']/g, function(c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     // ── Warehouse → storage locations ──
     if (warehouseSelect) {
         warehouseSelect.addEventListener('change', function() {
             var warehouseId = this.value;
+            // The "In Stock" column is per warehouse, so the sheet is re-read
+            // whenever the destination changes.
+            loadBusinessProducts();
             if (!warehouseId) {
                 locationSelect.innerHTML = '<option value="">Default Location</option>';
                 locationSelect.disabled = true;
@@ -310,6 +340,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     locationSelect.disabled = true;
                 });
         });
+        // The default warehouse is pre-selected server-side, but a pre-selected
+        // <select> never fires 'change' — so the location list stayed empty and
+        // staff could only ever receive into "Default Location".
+        if (warehouseSelect.value) {
+            warehouseSelect.dispatchEvent(new Event('change'));
+        }
     }
 
     // ── Load inbound request function ──
@@ -321,13 +357,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (radio) radio.checked = true;
 
         // Show loading in products area
-        tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:1.5rem;color:var(--brand-grey-400)"><i class="fa-solid fa-spinner fa-spin"></i> Loading request items...</td></tr>';
+        tbody.innerHTML = '<tr><td class="wh__td" colspan="7" style="text-align:center;padding:1.5rem;color:var(--brand-grey-400)"><i class="fa-solid fa-spinner fa-spin"></i> Loading request items...</td></tr>';
 
         fetch('/workforce/warehouse/api/inbound-request/' + reqId + '/items/')
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.error) {
-                    tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)"><i class="fas fa-exclamation-triangle" style="color:#dc2626"></i> ' + data.error + '</td></tr>';
+                    tbody.innerHTML = '<tr><td class="wh__td" colspan="7" style="text-align:center;padding:2rem;color:var(--brand-grey-400)"><i class="fas fa-exclamation-triangle" style="color:#dc2626"></i> ' + data.error + '</td></tr>';
                     return;
                 }
 
@@ -336,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Show badge
                 formModeBadge.style.display = 'inline-flex';
-                formModeReqnum.textContent = data.request_number;
+                formModeReqnum.textContent = data.request_number || '';
 
                 // Set warehouse
                 if (warehouseSelect) {
@@ -359,7 +395,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Fill products table from request items (supports partial fulfillment)
                 if (!data.items.length) {
-                    tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">No items in this request</td></tr>';
+                    tbody.innerHTML = '<tr><td class="wh__td" colspan="7" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">No items in this request</td></tr>';
                     if (countEl) countEl.textContent = '';
                 } else {
                     var html = '';
@@ -373,8 +409,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (remaining > 0) hasRemaining = true;
                         html += '<tr class="wrs__product-row">' +
                             '<td class="wh__td wh__td--center"><span class="wrs__row-num">' + (i+1) + '</span></td>' +
-                            '<td class="wh__td"><span class="fw-semibold">' + item.name + '</span><input type="hidden" name="products[]" value="' + item.product_id + '"></td>' +
-                            '<td class="wh__td"><code>' + (item.sku || '—') + '</code></td>' +
+                            imageCell(item.image, item.name) +
+                            '<td class="wh__td"><span class="fw-semibold">' + esc(item.name) + '</span><input type="hidden" name="products[]" value="' + esc(item.product_id) + '"></td>' +
+                            '<td class="wh__td"><code>' + (esc(item.sku) || '—') + '</code></td>' +
+                            stockCell(item.on_hand) +
                             '<td class="wh__td" style="font-weight:600;color:var(--brand-grey-500)">' + reqLabel + '</td>' +
                             '<td class="wh__td"><input type="number" name="quantities[]" class="form-control form-control-sm" min="0" value="' + remaining + '" placeholder="0"></td>' +
                             '</tr>';
@@ -398,7 +436,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(function(err) {
                 console.error('Error:', err);
-                tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">Error loading request items</td></tr>';
+                tbody.innerHTML = '<tr><td class="wh__td" colspan="7" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">Error loading request items</td></tr>';
             });
     }
 
@@ -429,57 +467,80 @@ document.addEventListener('DOMContentLoaded', function() {
             var notesInput = document.getElementById('notes');
             if (notesInput) notesInput.value = '';
 
-            // Reset products area
-            if (businessSelect) {
-                tbody.innerHTML = '<tr id="no-products-row"><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)"><i class="fa-solid fa-store" style="font-size:1.5rem;display:block;margin-bottom:0.5rem"></i>Select an inbound request above — or select a business to add products manually</td></tr>';
-                if (countEl) countEl.textContent = '';
-            }
+            // Restore the table exactly as the server rendered it: the staff
+            // placeholder, or the seller's own product list for manual entry.
+            // The old code only reset it when a business picker existed, so a
+            // seller's "manual" submit silently re-received the request's items.
+            tbody.innerHTML = initialTbodyHTML;
+            if (businessSelect) businessSelect.value = '';
+            if (countEl) countEl.textContent = '';
         });
     }
 
-    // ── Staff: business change → load all products (manual mode only) ──
-    if (businessSelect) {
-        businessSelect.addEventListener('change', function() {
-            if (inboundIdInput.value) return;
+    // ── Staff: business (or warehouse) change → load all products ──
+    // The warehouse is passed too: it decides the "In Stock" figure, so
+    // switching warehouse re-reads the shelf without touching typed quantities'
+    // meaning — the sheet is rebuilt, which is the honest thing to do when the
+    // destination changes.
+    function loadBusinessProducts() {
+        if (!businessSelect || inboundIdInput.value) return;
 
-            var bid = this.value;
-            if (!bid) {
-                tbody.innerHTML = '<tr id="no-products-row"><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)"><i class="fa-solid fa-store" style="font-size:1.5rem;display:block;margin-bottom:0.5rem"></i>Select an inbound request above — or select a business to add products manually</td></tr>';
-                if (countEl) countEl.textContent = '';
-                return;
-            }
-            tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:1.5rem;color:var(--brand-grey-400)"><i class="fa-solid fa-spinner fa-spin"></i> Loading products...</td></tr>';
-            fetch('/workforce/warehouse/api/business/' + bid + '/products/')
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (!data.length) {
-                        tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">No products found for this business</td></tr>';
-                        if (countEl) countEl.textContent = '';
-                        return;
-                    }
-                    var html = '';
-                    data.forEach(function(p, i) {
-                        html += '<tr class="wrs__product-row">' +
-                            '<td class="wh__td wh__td--center"><span class="wrs__row-num">' + (i+1) + '</span></td>' +
-                            '<td class="wh__td"><span class="fw-semibold">' + p.name + '</span><input type="hidden" name="products[]" value="' + p.id + '"></td>' +
-                            '<td class="wh__td"><code>' + (p.sku || '—') + '</code></td>' +
-                            '<td class="wh__td" style="color:var(--brand-grey-400)">—</td>' +
-                            '<td class="wh__td"><input type="number" name="quantities[]" class="form-control form-control-sm" min="0" value="0" placeholder="0"></td>' +
-                            '</tr>';
-                    });
-                    tbody.innerHTML = html;
-                    if (countEl) countEl.textContent = data.length + ' products';
-                })
-                .catch(function(err) {
-                    console.error('Error:', err);
-                    tbody.innerHTML = '<tr><td class="wh__td" colspan="5" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">Error loading products</td></tr>';
+        var bid = businessSelect.value;
+        if (!bid) {
+            tbody.innerHTML = '<tr id="no-products-row"><td class="wh__td" colspan="7" style="text-align:center;padding:2rem;color:var(--brand-grey-400)"><i class="fa-solid fa-store" style="font-size:1.5rem;display:block;margin-bottom:0.5rem"></i>Select an inbound request above — or select a business to add products manually</td></tr>';
+            if (countEl) countEl.textContent = '';
+            return;
+        }
+
+        var url = '/workforce/warehouse/api/business/' + encodeURIComponent(bid) + '/products/';
+        if (warehouseSelect && warehouseSelect.value) {
+            url += '?warehouse=' + encodeURIComponent(warehouseSelect.value);
+        }
+
+        tbody.innerHTML = '<tr><td class="wh__td" colspan="7" style="text-align:center;padding:1.5rem;color:var(--brand-grey-400)"><i class="fa-solid fa-spinner fa-spin"></i> Loading products...</td></tr>';
+        fetch(url)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.length) {
+                    tbody.innerHTML = '<tr><td class="wh__td" colspan="7" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">No products found for this business</td></tr>';
+                    if (countEl) countEl.textContent = '';
+                    return;
+                }
+                var html = '';
+                data.forEach(function(p, i) {
+                    html += '<tr class="wrs__product-row">' +
+                        '<td class="wh__td wh__td--center"><span class="wrs__row-num">' + (i+1) + '</span></td>' +
+                        imageCell(p.image, p.name) +
+                        '<td class="wh__td"><span class="fw-semibold">' + esc(p.name) + '</span><input type="hidden" name="products[]" value="' + esc(p.id) + '"></td>' +
+                        '<td class="wh__td"><code>' + (esc(p.sku) || '—') + '</code></td>' +
+                        stockCell(p.on_hand) +
+                        '<td class="wh__td" style="color:var(--brand-grey-400)">—</td>' +
+                        '<td class="wh__td"><input type="number" name="quantities[]" class="form-control form-control-sm" min="0" value="0" placeholder="0"></td>' +
+                        '</tr>';
                 });
-        });
+                tbody.innerHTML = html;
+                if (countEl) countEl.textContent = data.length + ' products';
+            })
+            .catch(function(err) {
+                console.error('Error:', err);
+                tbody.innerHTML = '<tr><td class="wh__td" colspan="7" style="text-align:center;padding:2rem;color:var(--brand-grey-400)">Error loading products</td></tr>';
+            });
+    }
+
+    if (businessSelect) {
+        businessSelect.addEventListener('change', loadBusinessProducts);
         // Trigger on load if business is pre-selected (only if no inbound mode)
         if (businessSelect.value && !inboundIdInput.value) {
-            businessSelect.dispatchEvent(new Event('change'));
+            loadBusinessProducts();
         }
     }
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initReceiveStock);
+} else {
+    initReceiveStock();
+}
+})();
 </script>
 {% endblock %}

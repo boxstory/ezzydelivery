@@ -2,6 +2,14 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% load custom_filters %}
+{% comment %}
+Purpose: Shared staff orders list — filter bar, bulk/AI toolbar, row actions and detail panel
+Used by: workforce.views wf_orders_all, fulfilled_clients_orders, non_fulfilled_clients_orders,
+         orders_to_publish, orders_published, orders_pending_verification
+Notes: One template, several routes — the queryset differs per view but the controls are identical
+       (the hero heading is always "All Orders"). Carries the shared wfnote__ page-notes card under
+       the hero, hidden on load; the hero help button toggles it via workforce.js.
+{% endcomment %}
 {% block extra_css %}
 {# workforce.css already loaded in wf_dashboard_base.html #}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
@@ -30,16 +38,28 @@
                     <span class="oli__hero__count-value">{{ orders.paginator.count|default:"0" }}</span>
                     <span class="oli__hero__count-label">orders</span>
                 </div>
+                <button type="button" class="wfnote__btn" data-wfnote-toggle
+                        aria-expanded="false" aria-controls="workforce_parts_lists_orders_list_view_card_notes"
+                        title="About this page">
+                    <i class="fa-solid fa-question" aria-hidden="true"></i>
+                    <span class="visually-hidden">Show notes</span>
+                </button>
             </div>
         </header>
         <div class="wf-content">
+
+        <div class="wfnote" id="workforce_parts_lists_orders_list_view_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_parts_lists_orders_list_view_card_notes' %}" hidden></div>
+
         <!-- Filter Section -->
         <div class="pg-filter">
-            <form id="filterForm" method="get" action="{{ request.path }}">
+            <form id="filterForm" method="get" action="{{ request.path }}" class="pg-filter__form">
 
                 <!-- Row 1: Business | DL Code | Name/Mobile | Actions -->
-                <div class="pg-filter__row mb-2">
-                    <select class="form-select form-select-sm pg-filter__select-biz" name="business" id="pgf_business">
+                <div class="pg-filter__row">
+                    <span class="pg-filter__label">Client</span>
+                    <select class="form-select form-select-sm pg-filter__select-biz" name="business" id="pgf_business"
+                            aria-label="Filter by business">
                         <option value="">All Businesses</option>
                         {% for biz in all_businesses %}
                         <option value="{{ biz.business_id }}"
@@ -53,6 +73,7 @@
                            name="dlCode"
                            id="pgf_dlCode"
                            placeholder="DL Code..."
+                           aria-label="Filter by DL code"
                            value="{{ filters.dlCode }}"
                            autocomplete="off">
                     <input type="text"
@@ -60,43 +81,60 @@
                            name="search"
                            id="pgf_search"
                            placeholder="Name / Mobile..."
+                           aria-label="Search by customer name or mobile"
                            value="{{ filters.search }}"
                            autocomplete="off">
-                    <button type="submit" class="btn btn-dark btn-sm">
-                        <i class="fa fa-search"></i>
-                    </button>
-                    <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-secondary btn-sm" title="Clear">
-                        <i class="fa fa-times"></i>
-                    </a>
-                    <button type="button" class="btn btn-outline-success btn-sm" title="Export CSV"
-                            data-bs-toggle="modal" data-bs-target="#wfExportModal">
-                        <i class="fa fa-file-csv"></i>
-                    </button>
+                    <div class="pg-filter__actions">
+                        <button type="submit" class="pg-filter__btn pg-filter__btn--go" title="Apply filters" aria-label="Apply filters">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        {% comment %} Clears back to this same list — it used to jump to All Orders. {% endcomment %}
+                        <a href="{{ request.path }}" class="pg-filter__btn" title="Clear filters" aria-label="Clear filters">
+                            <i class="fa fa-times"></i>
+                        </a>
+                        {% comment %}
+                        Only shown where the view supplies export_columns_context. The
+                        CSV endpoint starts from all orders, so on the scoped lists
+                        (fulfilled/non-fulfilled/to-publish/…) it would hand back rows
+                        the page never showed — a hidden button beats a wrong export.
+                        {% endcomment %}
+                        {% if export_columns %}
+                        <button type="button" class="pg-filter__btn" title="Export CSV" aria-label="Export CSV"
+                                data-bs-toggle="modal" data-bs-target="#wfExportModal">
+                            <i class="fa fa-file-csv"></i>
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
 
                 <!-- Row 2: Date quick-select | Order Status | DL Status -->
                 <div class="pg-filter__row">
-                    <span class="text-muted small text-nowrap"><i class="fa-solid fa-calendar-days"></i></span>
-                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == 'today' %}active{% endif %}" data-preset="today">Today</button>
-                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == 'yesterday' %}active{% endif %}" data-preset="yesterday">Yesterday</button>
-                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == '3days' %}active{% endif %}" data-preset="3days">3 Days</button>
-                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == 'week' %}active{% endif %}" data-preset="week">Last Week</button>
-                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == 'month' %}active{% endif %}" data-preset="month">Month</button>
-                    <button type="button" class="btn btn-xs pg-filter__date-btn {% if filters.datePreset == 'custom' %}active{% endif %}" data-preset="custom">Custom</button>
+                    <span class="pg-filter__label" id="pgf_period_label">Period</span>
+                    <div class="pg-filter__seg" role="group" aria-labelledby="pgf_period_label">
+                        <button type="button" class="pg-filter__date-btn {% if filters.datePreset == 'today' %}active{% endif %}" data-preset="today">Today</button>
+                        <button type="button" class="pg-filter__date-btn {% if filters.datePreset == 'yesterday' %}active{% endif %}" data-preset="yesterday">Yesterday</button>
+                        {# Today + yesterday — "Yesterday" alone excludes today's orders. #}
+                        <button type="button" class="pg-filter__date-btn {% if filters.datePreset == '2days' %}active{% endif %}" data-preset="2days">2 Days</button>
+                        <button type="button" class="pg-filter__date-btn {% if filters.datePreset == '3days' %}active{% endif %}" data-preset="3days">3 Days</button>
+                        <button type="button" class="pg-filter__date-btn {% if filters.datePreset == 'week' %}active{% endif %}" data-preset="week">Last Week</button>
+                        <button type="button" class="pg-filter__date-btn {% if filters.datePreset == 'month' %}active{% endif %}" data-preset="month">Month</button>
+                        <button type="button" class="pg-filter__date-btn {% if filters.datePreset == 'custom' %}active{% endif %}" data-preset="custom">Custom</button>
+                    </div>
                     <input type="hidden" name="datePreset" id="pgf_date_preset" value="{{ filters.datePreset }}">
                     <input type="hidden" name="dateFrom" id="pgf_dateFrom" value="{{ filters.dateFrom }}">
                     <input type="hidden" name="dateTo" id="pgf_dateTo" value="{{ filters.dateTo }}">
-                    <input type="date" class="form-control form-control-sm pg-filter__input-sm {% if filters.datePreset != 'custom' %}d-none{% endif %}" id="pgf_from_vis" value="{{ filters.dateFrom }}">
-                    <input type="date" class="form-control form-control-sm pg-filter__input-sm {% if filters.datePreset != 'custom' %}d-none{% endif %}" id="pgf_to_vis" value="{{ filters.dateTo }}">
+                    <input type="date" class="form-control form-control-sm pg-filter__input-sm {% if filters.datePreset != 'custom' %}d-none{% endif %}" id="pgf_from_vis" aria-label="From date" value="{{ filters.dateFrom }}">
+                    <input type="date" class="form-control form-control-sm pg-filter__input-sm {% if filters.datePreset != 'custom' %}d-none{% endif %}" id="pgf_to_vis" aria-label="To date" value="{{ filters.dateTo }}">
                     <span class="pg-filter__sep"></span>
-                    <select class="form-select form-select-sm pg-filter__input-sm" name="cStatus" id="pgf_cStatus">
+                    <span class="pg-filter__label">Status</span>
+                    <select class="form-select form-select-sm pg-filter__input-sm" name="cStatus" id="pgf_cStatus" aria-label="Filter by order status">
                         <option value="">Order Status</option>
                         <option value="to_review" {% if filters.cStatus == 'to_review' %}selected{% endif %}>To Review</option>
                         <option value="ready_to_pickup" {% if filters.cStatus == 'ready_to_pickup' %}selected{% endif %}>Ready to Pickup</option>
                         <option value="publish" {% if filters.cStatus == 'publish' %}selected{% endif %}>Publish</option>
                         <option value="cancelled" {% if filters.cStatus == 'cancelled' %}selected{% endif %}>Cancelled</option>
                     </select>
-                    <select class="form-select form-select-sm pg-filter__input-sm" name="dlTaskStatus" id="pgf_dlTaskStatus">
+                    <select class="form-select form-select-sm pg-filter__input-sm" name="dlTaskStatus" id="pgf_dlTaskStatus" aria-label="Filter by delivery status">
                         <option value="">DL Status</option>
                         <option value="for_review" {% if filters.dlTaskStatus == 'for_review' %}selected{% endif %}>For Review</option>
                         <option value="pending" {% if filters.dlTaskStatus == 'pending' %}selected{% endif %}>Pending</option>
@@ -114,12 +152,11 @@
                 </div>
 
             </form>
-        </div>
-        <!-- Active Filters Display -->
-        {% if filters.dlCode or filters.search or filters.cStatus or filters.dlTaskStatus or filters.datePreset or filters.business %}
-        <div class="active-filters-bar">
-            <span class="active-filters-label"><i class="fa-solid fa-filter me-1"></i>Active:</span>
-            <div class="active-filters-list">
+
+            {% comment %} Applied filters live inside the same card, so the bar reads as one object. {% endcomment %}
+            {% if filters.dlCode or filters.search or filters.cStatus or filters.dlTaskStatus or filters.datePreset or filters.business %}
+            <div class="pg-filter__applied">
+                <span class="pg-filter__applied-label">Applied</span>
                 {% if filters.business %}
                 <span class="pg-filter__tag">
                     <strong>Biz:</strong> {% for biz in all_businesses %}{% if biz.business_id|stringformat:"s" == filters.business %}{{ biz.business_name }}{% endif %}{% endfor %}
@@ -140,28 +177,29 @@
                 {% endif %}
                 {% if filters.cStatus %}
                 <span class="pg-filter__tag">
-                    <strong>Order:</strong> {{ filters.cStatus }}
+                    <strong>Order:</strong> {{ filters.cStatusLabel|default:filters.cStatus }}
                     <a href="?{% for key, value in request.GET.items %}{% if key != 'cStatus' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.dlTaskStatus %}
                 <span class="pg-filter__tag">
-                    <strong>DL Status:</strong> {{ filters.dlTaskStatus }}
+                    <strong>DL Status:</strong> {{ filters.dlTaskStatusLabel|default:filters.dlTaskStatus }}
                     <a href="?{% for key, value in request.GET.items %}{% if key != 'dlTaskStatus' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.datePreset %}
                 <span class="pg-filter__tag">
-                    <strong>Date:</strong> {% if filters.datePreset == 'custom' %}{{ filters.dateFrom }} → {{ filters.dateTo }}{% else %}{{ filters.datePreset }}{% endif %}
+                    <strong>Date:</strong> {% if filters.datePreset == 'custom' %}{{ filters.dateFrom }} → {{ filters.dateTo }}{% else %}{{ filters.datePresetLabel|default:filters.datePreset }}{% endif %}
                     <a href="?{% for key, value in request.GET.items %}{% if key != 'datePreset' and key != 'dateFrom' and key != 'dateTo' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
+                {% comment %} Clears back to this same list — it used to jump to All Orders. {% endcomment %}
+                <a href="{{ request.path }}" class="pg-filter__clear-all">
+                    <i class="fa-solid fa-times me-1"></i>Clear all
+                </a>
             </div>
-            <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-sm btn-outline-secondary ms-auto">
-                <i class="fa-solid fa-times me-1"></i>Clear All
-            </a>
+            {% endif %}
         </div>
-        {% endif %}
         <!-- AI Agent Toolbar (shows when orders selected) -->
         <div class="aim__actions-toolbar" id="aiActionsToolbar">
             <div class="aim__toolbar-info">
@@ -187,6 +225,14 @@
                         <button type="button" onclick="bulkSetOrderStatus('reported')"><span class="st-dot st-dot--err"></span> Reported</button>
                     </div>
                 </div>
+                {% comment %} Same modal as the filter-bar button; with rows ticked it exports just those. {% endcomment %}
+                {% if export_columns %}
+                <button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#wfExportModal"
+                        title="Export the selected orders to CSV">
+                    <i class="fa-solid fa-file-csv"></i> Export CSV
+                </button>
+                {% include "workforce/parts/components/_export_selectall.html" with total=orders.paginator.count noun="orders" limit=5000 %}
+                {% endif %}
                 <button type="button" class="btn btn-clear" onclick="clearOrderSelection()">
                     <i class="fa-solid fa-xmark"></i> Clear
                 </button>
@@ -199,7 +245,8 @@
             <div class="orc__list" id="ordersListContainer">
                 <!-- Header -->
                 <div class="orc__head">
-                    <div class="orc__hcell orc__hcell--chk"><input type="checkbox" class="orc__chk" id="selectAllOrders" title="Select all orders" onchange="toggleSelectAll(this)"></div>
+                    {# data-export-row-all also feeds the CSV export (export-columns.js) — same ticks, no second column #}
+                    <div class="orc__hcell orc__hcell--chk"><input type="checkbox" class="orc__chk" id="selectAllOrders" title="Select all orders" data-export-row-all onchange="toggleSelectAll(this)"></div>
                     <div class="orc__hcell">Order</div>
                     <div class="orc__hcell">Customer</div>
                     <div class="orc__hcell orc__hcell--addr">Address</div>
@@ -222,7 +269,7 @@
                 <!-- Rows -->
                 {% for order in orders %}
                 <div class="orc__row" data-order-id="{{ order.id }}" data-order-number="{{ order.order_number }}" data-customer-phone="{{ order.customer_phone }}" data-customer-address="{{ order.customer_address }}">
-                    <div class="orc__cell orc__cell--chk"><input type="checkbox" class="orc__chk order-select-checkbox" data-order-id="{{ order.id }}" onchange="updateOrderSelection()"></div>
+                    <div class="orc__cell orc__cell--chk"><input type="checkbox" class="orc__chk order-select-checkbox" data-order-id="{{ order.id }}" data-export-row value="{{ order.id }}" onchange="updateOrderSelection()"></div>
                     <div class="orc__cell orc__cell--id">
                         <a class="orc__id-link" href="{% url 'workforce:order_detail' order.id %}" hx-get="{% url 'workforce:order_detail' order.id %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">{{ order.order_number|default:order.client_order_code }}</a>
                         {% if order.is_transferred %}<span class="badge bg-success ms-1" style="font-size:0.6rem;vertical-align:middle;">Transferred</span>{% endif %}
@@ -234,20 +281,37 @@
                     </div>
                     <div class="orc__cell orc__cell--addr" title="{{ order.customer_address }}">
                         <span class="orc__zone-line">
-                            {% if order.latitude and order.longitude %}<a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="orc__map-pin" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-location-dot"></i></a>{% else %}<span class="orc__map-pin orc__map-pin--missing" title="Location not available"><i class="fa-solid fa-location-dot"></i></span>{% endif %}
+                            {% if order.latitude and order.longitude %}<button type="button" class="orc__map-pin" title="Show on map" aria-expanded="false" data-mappoint-toggle="mpt_map_ord{{ order.id }}"><i class="fa-solid fa-location-dot"></i></button>{% else %}<span class="orc__map-pin orc__map-pin--missing" title="Location not available"><i class="fa-solid fa-location-dot"></i></span>{% endif %}
+                            {% comment %} Area name beside the zone number — the same
+                               {% get_zone_display %} the task lists use, so a row reads the
+                               same on both screens. Falls back to "Zone N" when the number
+                               has no ZoneName row, and to the address when there is no zone. {% endcomment %}
+                            {% if order.dl_zone %}{% get_zone_display order as zone_display %}<strong class="orc__zone-name">{{ zone_display }}</strong>{% endif %}
                             {% if order.dl_zone or order.dl_street or order.dl_building %}
                             <span class="orc__zone">Z{{ order.dl_zone|default:"-" }} / S{{ order.dl_street|default:"-" }} / B{{ order.dl_building|default:"-" }}</span>
                             {% endif %}
+                            {% include "includes/components/_route_distance.html" with order=order %}
                         </span>
                         <span class="orc__addr">{{ order.customer_address }}</span>
                         {% if order.latitude and order.longitude %}
                         <span class="orc__coords">
-                            <a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="orc__coords-link" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-map-pin"></i>
-                            {{ order.latitude|floatformat:4 }}, {{ order.longitude|floatformat:4 }}</a>
+                            {% comment %} The pin in the zone line above opens the map for this row; these
+                               are the same coordinates, so they read as text, not a second link. {% endcomment %}
+                            <span class="orc__coords-link"><i class="fa-solid fa-map-pin"></i>
+                            {{ order.latitude|floatformat:4 }}, {{ order.longitude|floatformat:4 }}</span>
                             {% if order.coords_accuracy %}
                             <span class="orc__loc-acc orc__loc-acc--{{ order.coords_accuracy }}">{% if order.coords_accuracy == 'by_customer' %}By Client{% elif order.coords_accuracy == 'by_staff' %}By Staff{% elif order.coords_accuracy == 'by_driver' %}By Driver{% elif order.coords_accuracy == 'exact' %}Exact{% elif order.coords_accuracy == 'street' %}Street{% elif order.coords_accuracy == 'landmark' %}Landmark{% elif order.coords_accuracy == 'zone_center' %}Zone{% elif order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
                             {% endif %}
                         </span>
+                        {% endif %}
+                        {% if order.latitude and order.longitude %}
+                        {% comment %} Opened by the pin in the zone line above. Inside the cell so it
+                           expands the row rather than breaking the grid. {% endcomment %}
+                        <div class="mpt__panel" hidden>
+                          <div class="mpt__map mpt__map--sm" id="mpt_map_ord{{ order.id }}"
+                               data-lat="{{ order.latitude }}" data-lon="{{ order.longitude }}"
+                               data-label="{{ order.customer_name|default:'Delivery location' }}"></div>
+                        </div>
                         {% endif %}
                     </div>
                     <div class="orc__cell orc__cell--items">
@@ -358,8 +422,10 @@
         </div><!-- /.wf-content -->
     </div>
 
-    <!-- Export column picker -->
+    <!-- Export column picker — only where the view wired up the columns -->
+    {% if export_columns %}
     {% include "workforce/parts/components/_export_columns_modal.html" %}
+    {% endif %}
 
 
     <!-- Order Detail Slide Panel -->
@@ -929,5 +995,5 @@
     })();
 
     </script>
-<script src="{% static 'workforce/js/export-columns.js' %}?v=20260727b"></script>
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260807b"></script>
 {% endblock content %}

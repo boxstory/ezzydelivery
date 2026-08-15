@@ -22,6 +22,7 @@
                 <p class="whdt__hero-code"><i class="fa-solid fa-barcode"></i> {{ warehouse.code }}</p>
             </div>
         </div>
+    <div class="d-flex align-items-center gap-2">
         <div>
             {% if warehouse.is_active %}
             <span class="wh__badge wh__badge--success"><i class="fa-solid fa-check-circle"></i> Active</span>
@@ -29,7 +30,17 @@
             <span class="wh__badge wh__badge--muted"><i class="fa-solid fa-circle"></i> Inactive</span>
             {% endif %}
         </div>
+      <button type="button" class="wfnote__btn" data-wfnote-toggle
+              aria-expanded="false" aria-controls="warehouse_warehouse_detail_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
     </div>
+  </div>
+
+  <div class="wfnote wfnote--inset" id="warehouse_warehouse_detail_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_warehouse_detail_card_notes' %}" hidden></div>
 
     <!-- Rack Labeling Image -->
     <div class="wh__card">
@@ -100,7 +111,7 @@
             <div class="wh__card-header-left">
                 <i class="fa-solid fa-map-location-dot"></i>
                 <span>STORAGE LOCATIONS</span>
-                <span class="wh__count-badge">{{ locations|length }}</span>
+                <span class="wh__count-badge">{{ locations_total }}</span>
             </div>
             <a href="{% url 'warehouse:location_add' %}?warehouse={{ warehouse.pk }}" class="wh__btn wh__btn--primary">
                 <i class="fa-solid fa-plus"></i> Add Location
@@ -150,6 +161,7 @@
                 </tbody>
             </table>
         </div>
+        {% include "includes/components/_pagination.html" with page_obj=locations_page per_page=per_page pagination_id="warehouse_locations" %}
     </div>
 
     <!-- Tips & Workflow -->

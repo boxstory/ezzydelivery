@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Daily dispatch KPIs — batching rate, SLA compliance and throughput per rider for one date
+Used by: workforce.dispatch_views.kpi_dashboard at /workforce/dispatch/kpis/
+Notes: Rows are snapshots written by the nightly KPI job, not live queries. The page-notes card
+       (wfnote__, shared) sits under the hero, hidden on load; the hero help button toggles it via the
+       delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Dispatch KPI Dashboard{% endblock %}
 
@@ -19,9 +26,18 @@
                 <a href="{% url 'workforce:dispatch_dashboard' %}" class="dpk__back-btn">
                     <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
                 </a>
+                <button type="button" class="wfnote__btn" data-wfnote-toggle
+                        aria-expanded="false" aria-controls="workforce_dispatch_kpi_dashboard_card_notes"
+                        title="About this page">
+                    <i class="fa-solid fa-question" aria-hidden="true"></i>
+                    <span class="visually-hidden">Show notes</span>
+                </button>
             </div>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_dispatch_kpi_dashboard_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_dispatch_kpi_dashboard_card_notes' %}" hidden></div>
 
     <!-- Date Filter -->
     <div class="dpk__filter-bar">

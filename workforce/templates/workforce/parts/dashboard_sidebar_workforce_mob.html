@@ -21,14 +21,17 @@
         </a>
 
         <!-- Temp Orders (promoted to top-level) -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_temp_orders" class="wsm__nav-section">
             <a id="workforce_sidebar_mob_link_temp_orders" href="{% url 'workforce:temp_orders' %}" class="wsm__nav-link wsm__nav-link--top">
                 <i class="fa-solid fa-inbox"></i><span>Temp Orders{% if temp_orders_sync_errors %} <i class="fa-solid fa-triangle-exclamation wf-sidebar__inline-warning"></i>{% endif %}{% if temp_orders_count %} ({{ temp_orders_count }}){% endif %}</span>
             </a>
         </div>
+        {% endif %}
 
 
         <!-- Orders -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_orders" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('orders')">
                 <div class="wsm__nav-header-title">
@@ -65,8 +68,10 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <!-- Tasks -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_tasks" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('tasks')">
                 <div class="wsm__nav-header-title">
@@ -110,8 +115,10 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <!-- First-Mile Pickup -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_pickup" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('pickup')">
                 <div class="wsm__nav-header-title">
@@ -133,8 +140,10 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
-        <!-- Fleet Accounts (includes Drivers) -->
+        <!-- Fleet Accounts (includes Drivers) — driver rows are Operations, money rows Finance -->
+        {% if wf_dept_ops or wf_dept_fin %}
         <div id="workforce_sidebar_mob_section_fleet" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('accounts')">
                 <div class="wsm__nav-header-title">
@@ -144,6 +153,7 @@
                 <i class="fa-solid fa-chevron-down"></i>
             </div>
             <div class="wsm__nav-submenu" id="mobile-section-accounts">
+                {% if wf_dept_ops %}
                 <a id="workforce_sidebar_mob_link_all_drivers" href="{% url 'workforce:drivers_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-motorcycle"></i><span>All Drivers</span>
                 </a>
@@ -157,6 +167,8 @@
                 <a id="workforce_sidebar_mob_link_driver_tasks" href="{% url 'workforce:wf_driver_tasks' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list-check"></i><span>Driver Tasks</span>
                 </a>
+                {% endif %}
+                {% if wf_dept_fin %}
                 <a id="workforce_sidebar_mob_link_fleet_cod" href="{% url 'workforce:fleet_cod_in_hand' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-sack-dollar"></i><span>COD with Fleet</span>
                 </a>
@@ -169,10 +181,13 @@
                 <a id="workforce_sidebar_mob_link_fleet_transactions" href="{% url 'workforce:fleet_transactions' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-money-bill-transfer"></i><span>Transactions</span>
                 </a>
+                {% endif %}
             </div>
         </div>
+        {% endif %}
 
-        <!-- Sellers -->
+        <!-- Sellers — records are Operations, transactions Finance, API configs Super Admin -->
+        {% if wf_dept_ops or wf_dept_fin or wf_dept_admin %}
         <div id="workforce_sidebar_mob_section_sellers" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('sellers')">
                 <div class="wsm__nav-header-title">
@@ -182,22 +197,30 @@
                 <i class="fa-solid fa-chevron-down"></i>
             </div>
             <div class="wsm__nav-submenu" id="mobile-section-sellers">
+                {% if wf_dept_ops %}
                 <a id="workforce_sidebar_mob_link_all_sellers" href="{% url 'workforce:sellers_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Sellers</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_orders_by_seller" href="{% url 'workforce:wf_orders_by_seller' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-box"></i><span>Orders by Seller</span>
                 </a>
+                {% endif %}
+                {% if wf_dept_fin %}
                 <a id="workforce_sidebar_mob_link_seller_transactions" href="{% url 'workforce:seller_transactions' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-money-bill-transfer"></i><span>Seller Transactions</span>
                 </a>
+                {% endif %}
+                {% if wf_dept_admin %}
                 <a id="workforce_sidebar_mob_link_seller_api_configs" href="{% url 'workforce:wf_seller_api_configs' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-plug"></i><span>API Configs</span>
                 </a>
+                {% endif %}
             </div>
         </div>
+        {% endif %}
 
         <!-- Documents -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_documents" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('documents')">
                 <div class="wsm__nav-header-title">
@@ -221,8 +244,10 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <!-- Inventory -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_inventory" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('inventory')">
                 <div class="wsm__nav-header-title">
@@ -258,8 +283,10 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <!-- Finance -->
+        {% if wf_dept_fin %}
         <div id="workforce_sidebar_mob_section_finance" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('finance')">
                 <div class="wsm__nav-header-title">
@@ -287,6 +314,9 @@
                 <a id="workforce_sidebar_mob_link_business_cod_payout" href="{% url 'workforce:cod_business_settlement_report' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-building-columns"></i><span>Business COD Payout</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_business_payout_history" href="{% url 'workforce:cod_business_payout_history' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-receipt"></i><span>Payout History</span>
+                </a>
                 <a id="workforce_sidebar_mob_link_cod_reconciliation" href="{% url 'workforce:cod_legacy_reconciliation' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-scale-balanced"></i><span>COD Reconciliation</span>
                 </a>
@@ -296,15 +326,23 @@
                 <a id="workforce_sidebar_mob_link_finance_client_charges" href="{% url 'workforce:client_charge_verification' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-invoice"></i><span>Client Charges</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_finance_charges_collect" href="{% url 'workforce:client_charges_collect' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-hand-holding-dollar"></i><span>Charges to Collect</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_finance_charge_invoices" href="{% url 'workforce:client_charge_invoices' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-file-invoice-dollar"></i><span>Charge Invoices</span>
+                </a>
                 <a id="workforce_sidebar_mob_link_finance_driver_payouts" href="{% url 'workforce:fleet_drivers_earnings' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-money-bill-wave"></i><span>Driver Payouts</span>
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <div class="wsm__nav-divider"></div>
 
         <!-- Dispatch -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_dispatch" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('dispatch')">
                 <div class="wsm__nav-header-title">
@@ -331,9 +369,10 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
-        <!-- Auto Triggers (superuser only) -->
-        {% if user.profile.is_superadmin %}
+        <!-- Auto Triggers (catalogue open to every desk; plumbing is admin-only) -->
+        {% if wf_departments %}
         <div id="workforce_sidebar_mob_section_triggers" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('triggers')">
                 <div class="wsm__nav-header-title">
@@ -346,6 +385,7 @@
                 <a id="workforce_sidebar_mob_link_auto_triggers" href="{% url 'workforce:auto_triggers_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Triggers</span>
                 </a>
+                {% if wf_dept_admin %}
                 <a id="workforce_sidebar_mob_link_auto_flows" href="{% url 'workforce:auto_flows_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-diagram-project"></i><span>Flows</span>
                 </a>
@@ -361,11 +401,13 @@
                 <a id="workforce_sidebar_mob_link_webhook_imports" href="{% url 'workforce:wf_webhook_imports' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-satellite-dish"></i><span>Webhook Imports</span>
                 </a>
+                {% endif %}
             </div>
         </div>
         {% endif %}
 
         <!-- Zones & Maps -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_zones" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('zones')">
                 <div class="wsm__nav-header-title">
@@ -395,10 +437,12 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <div class="wsm__nav-divider"></div>
 
         <!-- Fulfillment -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_fulfillment" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('fulfillment')">
                 <div class="wsm__nav-header-title">
@@ -419,8 +463,10 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <!-- Warehouse -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_warehouse" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('warehouse')">
                 <div class="wsm__nav-header-title">
@@ -450,10 +496,12 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <div class="wsm__nav-divider"></div>
 
         <!-- Forms & CRM -->
+        {% if wf_dept_mkt %}
         <div id="workforce_sidebar_mob_section_forms" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('forms')">
                 <div class="wsm__nav-header-title">
@@ -468,8 +516,10 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <!-- WAHA WhatsApp (htpasswd-gated by nginx) -->
+        {% if wf_dept_mkt %}
         <div id="workforce_sidebar_mob_section_wa" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('wa')">
                 <div class="wsm__nav-header-title">
@@ -487,8 +537,10 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <!-- Import Config (renamed from Import; Temp Orders promoted to top-level) -->
+        {% if wf_dept_ops or wf_dept_admin %}
         <div id="workforce_sidebar_mob_section_import" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('import')">
                 <div class="wsm__nav-header-title">
@@ -524,15 +576,19 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <!-- Export Orders -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_export" class="wsm__nav-section">
             <a id="workforce_sidebar_mob_link_export" href="{% url 'workforce:wf_export_page' %}" class="wsm__nav-link wsm__nav-link--top">
                 <i class="fa-solid fa-file-export"></i><span>Export Orders</span>
             </a>
         </div>
+        {% endif %}
 
         <!-- Reports -->
+        {% if wf_dept_ops or wf_dept_fin %}
         <div id="workforce_sidebar_mob_section_reports" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('reports')">
                 <div class="wsm__nav-header-title">
@@ -553,10 +609,12 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <div class="wsm__nav-divider"></div>
 
         <!-- Verifications -->
+        {% if wf_dept_ops or wf_dept_mkt %}
         <div id="workforce_sidebar_mob_section_verifications" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('verifications')">
                 <div class="wsm__nav-header-title">
@@ -580,16 +638,33 @@
                 </a>
             </div>
         </div>
+        {% endif %}
 
         <div class="wsm__nav-divider"></div>
 
         <!-- Admin -->
+        {% if wf_dept_admin %}
+        <div id="workforce_sidebar_mob_section_staff_roles" class="wsm__nav-single">
+            <a id="workforce_sidebar_mob_link_staff_roles" href="{% url 'workforce:staff_roles_list' %}">
+                <i class="fa-solid fa-user-shield"></i>
+                <span>Staff Roles</span>
+            </a>
+        </div>
+
+        <div id="workforce_sidebar_mob_section_staff_pages" class="wsm__nav-single">
+            <a id="workforce_sidebar_mob_link_staff_pages" href="{% url 'workforce:staff_pages_list' %}">
+                <i class="fa-solid fa-sitemap"></i>
+                <span>Staff Pages</span>
+            </a>
+        </div>
+
         <div id="workforce_sidebar_mob_section_admin" class="wsm__nav-single">
             <a id="workforce_sidebar_mob_link_admin" href="{% url 'admin:index' %}">
                 <i class="fa-solid fa-screwdriver-wrench"></i>
                 <span>Admin Panel</span>
             </a>
         </div>
+        {% endif %}
 
         {% if user_profile %}
         <div id="workforce_sidebar_mob_section_profile" class="wsm__nav-single">
@@ -675,6 +750,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Finance COD pages live under /fleet/ — matched here so the generic
         // /workforce/fleet/ rule below does not claim them for Accounts.
         {re: /^\/workforce\/fleet\/cod-business-settlement\//,  section: 'finance',       link: 'workforce_sidebar_mob_link_business_cod_payout'},
+        {re: /^\/workforce\/client-charges\/invoices/,          section: 'finance',       link: 'workforce_sidebar_mob_link_finance_charge_invoices'},
+        {re: /^\/workforce\/client-charges\/collect/,           section: 'finance',       link: 'workforce_sidebar_mob_link_finance_charges_collect'},
         {re: /^\/workforce\/fleet\/cod-legacy-reconciliation\//,section: 'finance',       link: 'workforce_sidebar_mob_link_cod_reconciliation'},
         {re: /^\/workforce\/fleet\/cod-settlement\//,           section: 'accounts',      link: 'workforce_sidebar_mob_link_fleet_transactions'},
         {re: /^\/workforce\/drivers\/\d+/,                      section: 'accounts',      link: 'workforce_sidebar_mob_link_all_drivers'},

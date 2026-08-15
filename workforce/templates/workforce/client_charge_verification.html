@@ -1,6 +1,7 @@
 {# Purpose: Client delivery-charge verification console — agree the charge billed to each business, per delivery. #}
 {# Used by: workforce.views.client_charge_verification (URL workforce:client_charge_verification) #}
 {# Notes: Client-side mirror of the driver earnings screens; publishing books nothing — the charge posts when the business payout runs. #}
+{#        Carries the shared page-notes card (wfnote__) under the masthead, hidden on load and toggled by the masthead help button. #}
 {% extends "wf_dashboard_base.html" %}
 {% load static humanize %}
 
@@ -10,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/client_charge_verification.css' %}?v=20260728c" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_charge_verification.css' %}?v=20260813b" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -18,41 +19,67 @@
   <div class="ccv__wrap">
 
     <!-- Masthead -->
-    <header class="ccv__masthead">
-      <div class="ccv__masthead-row">
-        <div>
-          <p class="ccv__eyebrow">Client Billing</p>
-          <h1 class="ccv__title">Delivery Charge Verification</h1>
-          <p class="ccv__sub">
-            The figure the business is billed per delivery
-            <span class="ccv__sep">·</span> verified here, deducted on the payout
-          </p>
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Client Billing</span>
+        <h1 class="wfhero__title">Delivery Charge Verification</h1>
+        <span class="wfhero__sub">
+          The figure the business is billed per delivery
+          <span class="wfhero__sep">·</span> verified here, deducted on the payout
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <div class="wfhero__tallies">
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ stats.pending_count|intcomma }}</span>
+            <span class="wfhero__tally-lbl">Pending</span>
+          </div>
         </div>
-        <div class="ccv__masthead-actions">
-          <a href="{% url 'workforce:earnings_verification' %}" class="ccv__ghost">Driver earnings</a>
-          <a href="{% url 'workforce:cod_business_settlement_report' %}" class="ccv__ghost">Business payout ▸</a>
-        </div>
+        <nav class="wfhero__actions">
+          <a href="{% url 'workforce:earnings_verification' %}" class="wfhero__ghost">Driver earnings</a>
+          <a href="{% url 'workforce:cod_business_settlement_report' %}" class="wfhero__ghost">Business payout ▸</a>
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_client_charge_verification_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
       </div>
     </header>
 
-    <!-- Summary -->
-    <section class="ccv__summary">
-      <div class="ccv__sum-cell ccv__sum-cell--lead">
-        <span class="ccv__sum-label">Pending charge value</span>
-        <span class="ccv__sum-value">QAR {{ stats.total_pending_charge|floatformat:2|intcomma }}</span>
+    <div class="wfnote" id="workforce_client_charge_verification_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_client_charge_verification_card_notes' %}" hidden></div>
+
+    {% comment %}
+    The three status cards are also the status filter — clicking one is the same
+    as picking it in the Status dropdown, so the figure and the way into it are
+    the same control. Business and period are carried through untouched.
+    {% endcomment %}
+    <section class="wfstat" aria-label="Charge verification totals">
+      <div class="wfstat__card wfstat__card--here">
+        <span class="wfstat__label">Pending charge value</span>
+        <span class="wfstat__value">{{ stats.total_pending_charge|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">what is at stake in the queue</span>
       </div>
-      <div class="ccv__sum-cell">
-        <span class="ccv__sum-label">Pending</span>
-        <span class="ccv__sum-value">{{ stats.pending_count }}<span class="ccv__sum-unit">tasks</span></span>
-      </div>
-      <div class="ccv__sum-cell">
-        <span class="ccv__sum-label">Verified</span>
-        <span class="ccv__sum-value">{{ stats.verified_count }}<span class="ccv__sum-unit">tasks</span></span>
-      </div>
-      <div class="ccv__sum-cell">
-        <span class="ccv__sum-label">Published</span>
-        <span class="ccv__sum-value">{{ stats.published_count }}<span class="ccv__sum-unit">tasks</span></span>
-      </div>
+      <a href="?business={{ selected_business }}&amp;days={{ selected_days }}&amp;status=pending"
+         class="wfstat__card {% if selected_status == 'pending' %}wfstat__card--on{% endif %}">
+        <span class="wfstat__label">Pending</span>
+        <span class="wfstat__value">{{ stats.pending_count|intcomma }}</span>
+        <span class="wfstat__sub">deliver{{ stats.pending_count|pluralize:"y,ies" }} awaiting a figure</span>
+      </a>
+      <a href="?business={{ selected_business }}&amp;days={{ selected_days }}&amp;status=verified"
+         class="wfstat__card {% if selected_status == 'verified' %}wfstat__card--on{% endif %}">
+        <span class="wfstat__label">Verified</span>
+        <span class="wfstat__value">{{ stats.verified_count|intcomma }}</span>
+        <span class="wfstat__sub">agreed, still editable</span>
+      </a>
+      <a href="?business={{ selected_business }}&amp;days={{ selected_days }}&amp;status=published"
+         class="wfstat__card wfstat__card--done {% if selected_status == 'published' %}wfstat__card--on{% endif %}">
+        <span class="wfstat__label">Published</span>
+        <span class="wfstat__value">{{ stats.published_count|intcomma }}</span>
+        <span class="wfstat__sub">locked, billed on the payout</span>
+      </a>
     </section>
 
     <p class="ccv__note">
@@ -136,44 +163,80 @@
           </thead>
           <tbody>
             {% for task in tasks %}
-            <tr data-task-id="{{ task.id }}"{% if task.charge_verification_status == 'published' %} class="ccv__row--locked"{% endif %}>
+            {% comment %} Locked = published (figure agreed) or already paid to the business
+               (the figure is on an issued invoice — see settled_delivery_charge). {% endcomment %}
+            <tr data-task-id="{{ task.id }}"{% if task.charge_verification_status == 'published' or task.cod_client_settled %} class="ccv__row--locked"{% endif %}>
               <td class="ccv__col-check">
                 <input type="checkbox" class="form-check-input workforce_charges_task" value="{{ task.id }}"
-                       data-charge="{{ task.verified_delivery_charge|default:task.dl_price|default:0 }}"
-                       data-locked="{% if task.charge_verification_status == 'published' %}1{% else %}0{% endif %}">
+                       data-charge="{{ task.billable_charge|floatformat:2 }}"
+                       data-locked="{% if task.charge_verification_status == 'published' or task.cod_client_settled %}1{% else %}0{% endif %}">
               </td>
               <td class="ccv__mono">
                 {{ task.dl_task_number|default:task.id }}
-                <div class="ccv__line-desc">{{ task.order.order_number|default:"—"|truncatechars:18 }}</div>
+                {% comment %} The task code is minted from the order number, so the two
+                   match on virtually every row — only print it when it actually differs
+                   and carries something the line above does not. {% endcomment %}
+                {% if task.order.order_number and task.order.order_number != task.dl_task_number %}
+                <div class="ccv__line-desc">{{ task.order.order_number|truncatechars:18 }}</div>
+                {% endif %}
+                {% comment %} Who the job was for — staff querying a charge usually
+                   need to reach the customer, so name and number sit on the row. {% endcomment %}
+                <div class="ccv__cust" title="{{ task.order.customer_name|default:'' }}">
+                  {{ task.order.customer_name|default:"—"|truncatechars:22 }}
+                </div>
+                <div class="ccv__line-desc">{{ task.order.customer_phone|default:"—" }}</div>
               </td>
-              <td class="ccv__truncate" title="{{ task.order.business.business_name|default:'' }}">
-                {{ task.order.business.business_name|default:"—" }}
+              <td>
+                <div class="ccv__truncate" title="{{ task.order.business.business_name|default:'' }}">
+                  {{ task.order.business.business_name|default:"—" }}
+                </div>
+                {% comment %} The business's own reference for the job — their order
+                   code, or the source-platform id for imported orders. It is what
+                   they will quote when they query a charge. {% endcomment %}
+                <div class="ccv__line-desc ccv__mono ccv__truncate"
+                     title="{{ task.order.client_order_code|default:task.order.platform_id|default:'' }}">
+                  {{ task.order.client_order_code|default:task.order.platform_id|default:"—" }}
+                </div>
               </td>
               <td class="ccv__route">
                 <span class="ccv__route-leg">
                   {{ task.pickup_location.pickup_location_title|default:"No pickup"|truncatechars:20 }}
                   <span class="ccv__zone">Z{{ task.pickup_location.pickup_zone_no|default:"–" }}</span>
                 </span>
-                <span class="ccv__route-leg">
-                  {{ task.dl_to_address.area_name|default:"No drop"|truncatechars:20 }}
-                  <span class="ccv__zone">Z{{ task.dl_to_address.dl_zone|default:"–" }}</span>
+                {% comment %} drop_zone / drop_area are resolved in the view — the
+                   task's dl_to_address FK is usually null and area_name blank, so
+                   the zone comes off the order and the name off ZoneName. {% endcomment %}
+                <span class="ccv__route-leg" title="{{ task.drop_area }}">
+                  {{ task.drop_area|default:"No drop"|truncatechars:20 }}
+                  <span class="ccv__zone">Z{{ task.drop_zone|default:"–" }}</span>
                 </span>
               </td>
-              {# Pick the date first, format once. Formatting before `default`
-                 hands the second `date` filter a string, which yields ''. #}
+              {% comment %} Pick the date first, format once. Formatting before `default`
+                 hands the second `date` filter a string, which yields ''. {% endcomment %}
               <td class="ccv__mono">{{ task.completed_at|default:task.dl_task_date|date:"d M Y" }}</td>
               <td>
                 <span class="ccv__service">{{ task.dl_speed|default:"—" }}</span>
-                <div class="ccv__line-desc">{{ task.dl_category|default:"—" }}</div>
+                {% comment %} Second line carries the category plus the stored pickup→drop
+                   distance — the charge is judged against how far the job actually was. {% endcomment %}
+                <div class="ccv__line-desc">
+                  {{ task.dl_category|default:"—" }}
+                  {% if task.order.route_distance_km is not None %}
+                  <span class="ccv__sep">·</span>
+                  {% include "includes/components/_route_distance.html" with order=task.order %}
+                  {% endif %}
+                </div>
               </td>
               <td class="ccv__num ccv__mono ccv__muted">{{ task.dl_price|default:0|floatformat:2 }}</td>
               <td class="ccv__num">
                 <input type="number" class="ccv__amount-input"
                        id="workforce_charges_input_{{ task.id }}"
-                       value="{{ task.verified_delivery_charge|default:task.dl_price|default:0 }}"
-                       data-original="{{ task.verified_delivery_charge|default:task.dl_price|default:0 }}"
+                       {% comment %} billable_charge resolves on `is not None`, so a charge staff
+                          verified at 0.00 stays 0.00 instead of snapping back to dl_price. {% endcomment %}
+                       value="{{ task.billable_charge|floatformat:2 }}"
+                       data-original="{{ task.billable_charge|floatformat:2 }}"
                        step="0.01" min="0"
-                       {% if task.charge_verification_status == 'published' %}readonly title="Published — locked to the agreed figure"{% endif %}>
+                       {% if task.cod_client_settled %}readonly title="Already paid to the business — locked to the invoiced figure"
+                       {% elif task.charge_verification_status == 'published' %}readonly title="Published — locked to the agreed figure"{% endif %}>
               </td>
               <td>
                 <span class="ccv__status ccv__status--{{ task.charge_verification_status }}">

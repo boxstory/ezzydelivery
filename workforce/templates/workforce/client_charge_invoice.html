@@ -1,0 +1,372 @@
+{# Purpose: Printable charge invoice — the deliveries billed to a client and what is still due on them. #}
+{# Used by: workforce.views.client_charge_invoice_detail (staff) and business.views.business_charge_invoice (seller copy). #}
+{# Notes: Print-first document, same sheet as the COD payout invoice (bpi__). `seller_view` swaps the base template #}
+{#        and drops every staff control. The payment desk below the sheet is screen-only and never prints. #}
+{% extends seller_view|yesno:"business_dashboard_base.html,wf_dashboard_base.html" %}
+{% load static humanize %}
+
+{% block title %}Invoice {{ invoice.invoice_code }}{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/cod_payout_invoice.css' %}?v=20260815a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260808a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/invoice_preview.css' %}?v=20260815a" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="bpi">
+  <div class="bpi__toolbar d-flex flex-wrap align-items-center justify-content-between gap-2">
+    {% if seller_view %}
+    <a href="{% url 'business:business_charge_invoices' %}" class="bpi__ghost">◂ Back to invoices</a>
+    {% else %}
+    <a href="{% url 'workforce:client_charge_invoices' %}" class="bpi__ghost">◂ Back to invoices</a>
+    {% endif %}
+    <div class="d-flex align-items-center gap-2">
+      <button type="button" class="bpi__ghost" id="workforce_charge_invoice_btn_print">Print invoice</button>
+      <button type="button" class="bpi__ghost" id="workforce_charge_invoice_btn_preview"
+              data-bpi-preview-toggle aria-pressed="false">A4 preview</button>
+      {% if not seller_view %}
+      {% if not invoice.is_void %}
+      <button type="button" class="bpi__ghost" id="workforce_charge_invoice_btn_whatsapp">Send on WhatsApp</button>
+      {% if invoice.amount_due > 0 %}
+      <button type="button" class="bpi__ghost ccc__btn-pay" data-bs-toggle="modal" data-bs-target="#cccPayModal">Record payment</button>
+      {% endif %}
+      {% if not invoice.amount_paid %}
+      <button type="button" class="bpi__ghost ccc__btn-void" id="workforce_charge_invoice_btn_void">Void</button>
+      {% endif %}
+      {% endif %}
+      <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+              aria-expanded="false" aria-controls="workforce_client_charge_invoice_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if not seller_view %}
+  <div class="wfnote" id="workforce_client_charge_invoice_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'workforce_client_charge_invoice_card_notes' %}" hidden></div>
+  {% endif %}
+
+  <article class="bpi__sheet">
+   {# One-column table shell so the letterpad bands repeat on every printed page #}
+   <table class="bpi__page">
+    <thead>
+      <tr><td>
+        <img class="bpi__lp-top" src="{% static 'webpages/img/letterhead-top.png' %}"
+             alt="Ezzy Delivery Qatar — last mile delivery partner in Qatar · +974 66451589 · Fareej Sudan, Doha · info@ezzydelivery.qa · www.ezzydelivery.qa"
+             width="1600" height="487">
+      </td></tr>
+    </thead>
+    <tbody>
+      <tr><td>
+
+    <h2 class="bpi__doc-title">Delivery Charge Invoice</h2>
+
+    <header class="bpi__head">
+      <div class="bpi__head-left">
+        <p class="bpi__eyebrow">Invoice to</p>
+        <h1 class="bpi__biz">{{ business.business_name|default:"—" }}</h1>
+        {% if business.business_code %}<p class="bpi__biz-code">{{ business.business_code }}</p>{% endif %}
+      </div>
+      <div class="bpi__head-right">
+        <dl class="bpi__meta">
+          <div class="bpi__meta-row">
+            <dt>Invoice</dt><dd class="bpi__meta-code">{{ invoice.invoice_code }}</dd>
+          </div>
+          <div class="bpi__meta-row">
+            <dt>Date</dt><dd>{{ invoice.issued_at|date:"d M Y" }}</dd>
+          </div>
+          {% if invoice.period_from %}
+          <div class="bpi__meta-row">
+            <dt>Period</dt><dd>{{ invoice.period_from|date:"d M Y" }} – {{ invoice.period_to|date:"d M Y" }}</dd>
+          </div>
+          {% endif %}
+          <div class="bpi__meta-row">
+            <dt>Deliveries</dt><dd>{{ delivery_lines|length }}</dd>
+          </div>
+          {% if invoice.due_date %}
+          <div class="bpi__meta-row">
+            <dt>Due by</dt><dd>{{ invoice.due_date|date:"d M Y" }}</dd>
+          </div>
+          {% endif %}
+          <div class="bpi__meta-row">
+            <dt>Issued by</dt>
+            <dd>{% if invoice.issued_by %}{{ invoice.issued_by.get_full_name|default:invoice.issued_by.username }}{% else %}—{% endif %}</dd>
+          </div>
+        </dl>
+      </div>
+    </header>
+
+    {% if invoice.is_void %}
+    <p class="bpi__void-stamp">
+      Voided {{ invoice.voided_at|date:"d M Y" }}
+      {% if invoice.void_reason %}<span class="bpi__void-reason">{{ invoice.void_reason }}</span>{% endif %}
+    </p>
+    {% endif %}
+
+    <!-- Deliveries billed -->
+    <div class="bpi__table-wrap">
+      <table class="bpi__table">
+        <thead>
+          <tr>
+            <th class="bpi__col-idx">#</th>
+            <th>Order</th>
+            <th>Customer</th>
+            <th>Delivered</th>
+            <th>Payment</th>
+            <th class="bpi__num">Delivery charge</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in delivery_lines %}
+          <tr>
+            <td class="bpi__col-idx">{{ forloop.counter }}</td>
+            <td class="bpi__order">
+              {% if l.delivery_task.order %}#{{ l.delivery_task.order.order_number|default:l.delivery_task.order_id }}
+              {% else %}{{ l.label }}{% endif %}
+            </td>
+            <td>{% if l.delivery_task.order %}{{ l.delivery_task.order.customer_name|default:"—" }}{% else %}—{% endif %}</td>
+            <td class="bpi__date">{{ l.delivery_task.completed_at|date:"d M Y"|default:"—" }}</td>
+            <td>{% if l.delivery_task.cod_collected %}COD{% else %}Prepaid{% endif %}</td>
+            <td class="bpi__num bpi__num--fee">{{ l.amount|floatformat:2|intcomma }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="bpi__empty">No deliveries on this invoice.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="bpi__totals-row">
+            <td colspan="5">Total · {{ delivery_lines|length }} deliver{{ delivery_lines|length|pluralize:"y,ies" }}</td>
+            <td class="bpi__num bpi__num--fee">{{ delivery_total|floatformat:2|intcomma }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Invoice summary -->
+    <section class="bpi__summary">
+      <div class="bpi__summary-line">
+        <span>Delivery charges</span>
+        <span class="bpi__summary-val">{{ delivery_total|floatformat:2|intcomma }}</span>
+      </div>
+
+      {% for l in extra_lines %}
+      <div class="bpi__summary-line">
+        <span>{{ l.label }}<span class="bpi__kind">{{ l.get_kind_display }}</span></span>
+        <span class="bpi__summary-val">{{ l.amount|floatformat:2|intcomma }}</span>
+      </div>
+      {% endfor %}
+
+      {% if extra_lines %}
+      <div class="bpi__summary-line bpi__summary-line--sub">
+        <span>Other charges</span>
+        <span class="bpi__summary-val">{{ extra_total|floatformat:2|intcomma }}</span>
+      </div>
+      {% endif %}
+
+      <div class="bpi__summary-line bpi__summary-line--net">
+        <span>Total payable to EzzyDelivery</span>
+        <span class="bpi__summary-val">QAR {{ invoice.total_amount|floatformat:2|intcomma }}</span>
+      </div>
+
+      {% if payments %}
+      {% for p in payments %}
+      <div class="bpi__summary-line bpi__summary-line--deduct">
+        <span>Paid {{ p.received_on|date:"d M Y" }}<span class="bpi__kind">{{ p.get_payment_method_display }}{% if p.reference %} · {{ p.reference }}{% endif %}</span></span>
+        <span class="bpi__summary-val">− {{ p.amount|floatformat:2|intcomma }}</span>
+      </div>
+      {% endfor %}
+      <div class="bpi__summary-line bpi__summary-line--net">
+        <span>Balance due</span>
+        <span class="bpi__summary-val">QAR {{ invoice.amount_due|floatformat:2|intcomma }}</span>
+      </div>
+      {% endif %}
+    </section>
+
+    {% if invoice.notes %}
+    <p class="ccc__inv-note">{{ invoice.notes }}</p>
+    {% endif %}
+
+    <footer class="bpi__foot">
+      <div class="bpi__sign">
+        <span class="bpi__sign-rule"></span>
+        <span class="bpi__sign-label">Received by (business)</span>
+      </div>
+      <div class="bpi__sign">
+        <span class="bpi__sign-rule"></span>
+        <span class="bpi__sign-label">Issued by (EzzyDelivery)</span>
+      </div>
+    </footer>
+
+      </td></tr>
+    </tbody>
+    <tfoot>
+      <tr><td>
+        <img class="bpi__lp-bottom" src="{% static 'webpages/img/letterhead-bottom.png' %}"
+             alt="" width="1600" height="113">
+      </td></tr>
+    </tfoot>
+   </table>
+  </article>
+
+  {# A4 sheet preview — screen only, built from the sheet above by invoice_preview.js #}
+  <section class="bprev" aria-label="A4 page preview">
+    <p class="bprev__meta">Building preview…</p>
+    <div class="bprev__pages"></div>
+  </section>
+
+  {% if not seller_view and payments %}
+  <!-- Payment ledger: screen-only, the sheet above already itemises them -->
+  <section class="ccc__paylog">
+    <h2 class="ccc__paylog-title">Payments received</h2>
+    <table class="ccc__paylog-table">
+      <thead>
+        <tr>
+          <th>Received</th><th>Method</th><th>Reference</th><th>Recorded by</th><th class="bpi__num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in payments %}
+        <tr>
+          <td>{{ p.received_on|date:"d M Y"|default:"—" }}</td>
+          <td>{{ p.get_payment_method_display }}</td>
+          <td>{{ p.reference|default:"—" }}</td>
+          <td>{{ p.created_by.first_name|default:p.created_by.username|default:"—" }}</td>
+          <td class="bpi__num">{{ p.amount|floatformat:2|intcomma }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+</div>
+
+{% if not seller_view %}
+<!-- Record a payment -->
+<div class="modal fade" id="cccPayModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content ccc__paybox">
+      <div class="modal-header">
+        <h5 class="modal-title ccc__paybox-title">Record payment · {{ invoice.invoice_code }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="ccc__paybox-due">Balance due <strong>QAR {{ invoice.amount_due|floatformat:2|intcomma }}</strong></p>
+        <div class="mb-2">
+          <label class="ccc__label" for="ccc_pay_amount">Amount received</label>
+          <input type="number" id="ccc_pay_amount" class="ccc__input" step="0.01" min="0.01"
+                 max="{{ invoice.amount_due|floatformat:2 }}" value="{{ invoice.amount_due|floatformat:2 }}"
+                 inputmode="decimal">
+        </div>
+        <div class="mb-2">
+          <label class="ccc__label" for="ccc_pay_method">Paid by</label>
+          <select id="ccc_pay_method" class="ccc__input">
+            <option value="bank">Bank transfer</option>
+            <option value="cash">Cash</option>
+            <option value="fawran">Fawran</option>
+            <option value="pos">POS / Card</option>
+            <option value="atm">ATM deposit</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="ccc__label" for="ccc_pay_date">Received on</label>
+          <input type="date" id="ccc_pay_date" class="ccc__input" value="{% now 'Y-m-d' %}">
+        </div>
+        <div>
+          <label class="ccc__label" for="ccc_pay_ref">Reference</label>
+          <input type="text" id="ccc_pay_ref" class="ccc__input" placeholder="Transfer ref / cheque no.">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="bpi__ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="ccc__primary" id="ccc_confirm_pay">Record payment</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'workforce/js/invoice_preview.js' %}?v=20260813a"></script>
+<script>
+(function () {
+  const el = (id) => document.getElementById(id);
+  el('workforce_charge_invoice_btn_print')?.addEventListener('click', () => window.print());
+
+  {% if not seller_view %}
+  const csrftoken = '{{ csrf_token }}';
+  const code = '{{ invoice.invoice_code|escapejs }}';
+
+  el('ccc_confirm_pay')?.addEventListener('click', async function () {
+    const amount = (el('ccc_pay_amount').value || '').trim();
+    if (!amount || parseFloat(amount) <= 0) { alert('Enter the amount received'); return; }
+    this.disabled = true;
+    const body = new URLSearchParams();
+    body.append('invoice_code', code);
+    body.append('amount', amount);
+    body.append('payment_method', el('ccc_pay_method').value);
+    body.append('received_on', el('ccc_pay_date').value);
+    body.append('reference', el('ccc_pay_ref').value);
+    try {
+      const resp = await fetch('{% url "workforce:client_charge_invoice_payment" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      const data = await resp.json();
+      if (data.success) { window.location.reload(); }
+      else { alert(data.error || 'Could not record the payment'); this.disabled = false; }
+    } catch (e) { alert('Network error'); this.disabled = false; }
+  });
+
+  el('workforce_charge_invoice_btn_void')?.addEventListener('click', async function () {
+    const reason = prompt('Void ' + code + '? The deliveries go back on the desk to be billed again.\n\nReason:');
+    if (reason === null) return;
+    this.disabled = true;
+    const body = new URLSearchParams();
+    body.append('invoice_code', code);
+    body.append('reason', reason);
+    try {
+      const resp = await fetch('{% url "workforce:client_charge_invoice_void" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      const data = await resp.json();
+      if (data.success) { window.location.reload(); }
+      else { alert(data.error || 'Could not void the invoice'); this.disabled = false; }
+    } catch (e) { alert('Network error'); this.disabled = false; }
+  });
+
+  el('workforce_charge_invoice_btn_whatsapp')?.addEventListener('click', async function () {
+    const phone = prompt('Send invoice ' + code + ' on WhatsApp to:',
+                         '{{ business.business_phone|default:""|escapejs }}');
+    if (!phone) return;
+    this.disabled = true;
+    const body = new URLSearchParams();
+    body.append('invoice_code', code);
+    body.append('phone', phone);
+    try {
+      const resp = await fetch('{% url "workforce:client_charge_invoice_whatsapp" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      const data = await resp.json();
+      alert(data.success ? 'Sent to ' + data.phone : (data.error || 'Send failed'));
+    } catch (e) { alert('Network error'); }
+    this.disabled = false;
+  });
+  {% endif %}
+})();
+</script>
+{% endblock %}

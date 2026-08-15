@@ -1,0 +1,44 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/location_delete.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_location_delete_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Confirms <strong>removing a storage location</strong>. This cannot be undone, and it takes
+            everything nested underneath with it — deleting a zone deletes its racks, shelves and bins.
+            Check what is stored there before you confirm.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Before you confirm</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Is it empty?</dt>
+                        <dd class="wfnote__def">Stock rows point at this location. Move the units to
+                            another bin first — deleting is not a way to zero stock.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Children go too</dt>
+                        <dd class="wfnote__def">Deletion cascades down the tree, so a zone takes its
+                            whole branch with it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Is deactivating enough?</dt>
+                        <dd class="wfnote__def">If the shelf still exists but is out of use, editing it
+                            to inactive keeps the history and the codes intact.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>The deletion is logged</strong> with the location code and who did it.</li>
+                    <li><strong>Re-creating the same code later</strong> does not restore the old
+                        location or anything that pointed at it.</li>
+                    <li><strong>Rebuilding a whole layout?</strong> Use the capacity generator, which
+                        can clear and regenerate in one controlled step.</li>
+                </ul>
+            </section>
+        </div>

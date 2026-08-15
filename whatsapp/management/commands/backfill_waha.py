@@ -10,6 +10,7 @@ from django.core.management.base import BaseCommand
 from django.db import IntegrityError
 from django.utils import timezone as dj_timezone
 
+from whatsapp import sessions as wa_sessions
 from whatsapp.models import WhatsAppMessage
 
 logger = logging.getLogger(__name__)
@@ -60,12 +61,31 @@ def compute_qatar_today_start_ts():
 
 
 def upsert_message(m, session, chat_id):
+    # Same rule as the webhook: system notifications carry a sender but no
+    # message, and a stored one shows up in the CRM inbox as an unknown sender
+    # who never wrote to us. Single definition lives in waha_views.
+    from whatsapp.waha_views import is_system_event
+    if is_system_event(m):
+        return None, False
+
     waha_id = m['id']
     direction = 'outbound' if m.get('fromMe') is True else 'inbound'
     from_number = _strip_jid(m.get('from'))
     to_number = _strip_jid(m.get('to')) or _strip_jid(chat_id)
     body = m.get('body') or ''
     message_type = _map_type(m)
+
+    # Our own outbound auth messages come back through this ingest because the WAHA
+    # container is linked to the company number. Strip the code out of BOTH the body
+    # and the raw payload — staff can read any chat from the CRM panels, and a stored
+    # password-reset code there is an account takeover.
+    from whatsapp.secrets import redact_payload, redact_text
+    # Order matters: redact_payload decides whether to act by looking for a code in
+    # the text it is given, so it must see the ORIGINAL body. Handing it the already
+    # redacted body made it a no-op and left the code in raw_payload.
+    original_body = body
+    body, _ = redact_text(body)
+    m, _ = redact_payload(m, original_body)
 
     media = m.get('media') or {}
     media_url = media.get('url') or ''
@@ -78,7 +98,7 @@ def upsert_message(m, session, chat_id):
         received_at = dj_timezone.now()
 
     try:
-        obj = WhatsAppMessage.objects.get(waha_message_id=waha_id)
+        obj = WhatsAppMessage.objects.get(session=session, waha_message_id=waha_id)
     except WhatsAppMessage.DoesNotExist:
         try:
             obj = WhatsAppMessage.objects.create(
@@ -98,7 +118,7 @@ def upsert_message(m, session, chat_id):
             return obj, True
         except IntegrityError:
             # Race: webhook inserted same row between get() and create().
-            obj = WhatsAppMessage.objects.get(waha_message_id=waha_id)
+            obj = WhatsAppMessage.objects.get(session=session, waha_message_id=waha_id)
 
     # Update path: never clobber populated fields, only fill blanks.
     dirty = False
@@ -141,10 +161,20 @@ class Command(BaseCommand):
         parser.add_argument('--max-sleep', type=int, default=8)
         parser.add_argument('--skip-today', action='store_true')
         parser.add_argument('--force', action='store_true')
-        parser.add_argument('--session', type=str, default=settings.WAHA_DEFAULT_SESSION)
+        parser.add_argument('--session', type=str, default='',
+                            help='One WAHA session. Omit to backfill every linked number.')
 
     def handle(self, *args, **opts):
-        session = opts['session']
+        # No --session means every linked number, so adding a second one needs
+        # no crontab edit.
+        if opts['session']:
+            names = [wa_sessions.normalize(opts['session'])]
+        else:
+            names = [s['name'] for s in wa_sessions.list_sessions()]
+        for name in names:
+            self._run_session(name, opts)
+
+    def _run_session(self, session, opts):
         days = opts['days']
         cutoff_ts = int((dj_timezone.now() - timedelta(days=days)).timestamp())
         today_start_ts = compute_qatar_today_start_ts()
@@ -152,7 +182,7 @@ class Command(BaseCommand):
         try:
             chats = waha_get(f'/api/{session}/chats', params={'limit': 200})
         except requests.exceptions.RequestException as e:
-            self.stderr.write(self.style.ERROR(f'failed to list chats: {e}'))
+            self.stderr.write(self.style.ERROR(f'[{session}] failed to list chats: {e}'))
             return
 
         chats = chats[: opts['max_chats']]
@@ -162,11 +192,21 @@ class Command(BaseCommand):
         total_skipped_chats = 0
 
         for chat in chats:
+            if not isinstance(chat, dict):
+                continue
+            # WAHA now returns `id` as {server, user, _serialized} rather than a
+            # bare string. Interpolated raw it produces a URL the API answers
+            # with a 500, which silently stopped every backfill run.
             chat_id = chat.get('id')
+            if isinstance(chat_id, dict):
+                chat_id = chat_id.get('_serialized')
+            chat_id = str(chat_id or '')
             if not chat_id:
                 continue
 
-            cache_key = f'waha_backfill_done:{chat_id}'
+            # Keyed per session — the same chat id can exist on both numbers,
+            # and a shared key would mark the second one already done.
+            cache_key = f'waha_backfill_done:{session}:{chat_id}'
             if not opts['force'] and cache.get(cache_key):
                 total_skipped_chats += 1
                 continue
@@ -178,7 +218,7 @@ class Command(BaseCommand):
                     timeout=180,
                 )
             except requests.exceptions.RequestException as e:
-                self.stderr.write(self.style.WARNING(f'chat {chat_id}: fetch failed: {e}'))
+                self.stderr.write(self.style.WARNING(f'[{session}] chat {chat_id}: fetch failed: {e}'))
                 continue
 
             inserted = 0
@@ -202,11 +242,11 @@ class Command(BaseCommand):
                     inserted += 1
 
             cache.set(cache_key, '1', timeout=86400)
-            self.stdout.write(f'chat {chat_id}: {inserted} new / {len(msgs)} total')
+            self.stdout.write(f'[{session}] chat {chat_id}: {inserted} new / {len(msgs)} total')
             total_inserted += inserted
             time.sleep(random.uniform(opts['min_sleep'], opts['max_sleep']))
 
         self.stdout.write(self.style.SUCCESS(
-            f'done. chats={len(chats)} skipped_cached={total_skipped_chats} '
+            f'[{session}] done. chats={len(chats)} skipped_cached={total_skipped_chats} '
             f'msgs_seen={total_msgs} inserted={total_inserted}'
         ))

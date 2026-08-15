@@ -1,23 +1,33 @@
 {% load static %}
 
+<!-- Masthead: sits outside .wf-dashboard so the navy band runs full-bleed
+     while the content below keeps its own side padding. -->
+<header class="wfhero">
+    <div class="wfhero__ident">
+      <span class="wfhero__eyebrow">Staff console</span>
+      <h1 class="wfhero__title">Workforce Dashboard</h1>
+      <span class="wfhero__sub">Real-time operations overview</span>
+    </div>
+    <div class="wfhero__side">
+      <nav class="wfhero__actions">
+        <button type="button" class="wfhero__ghost" id="wf_dashboard_btn_refresh">
+          <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+          <span>Refresh</span>
+        </button>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_wf_base_dashboard_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
+      </nav>
+    </div>
+</header>
+
 <div class="wf-dashboard">
 
-  <!-- Dashboard Header -->
-  <div class="wf-dashboard__header">
-    <div class="wf-dashboard__title-group">
-      <h1 class="wf-dashboard__title">
-        <i class="fa-solid fa-gauge-high"></i>
-        Workforce Dashboard
-      </h1>
-      <p class="wf-dashboard__subtitle">Real-time operations overview</p>
-    </div>
-    <div class="wf-dashboard__header-actions">
-      <button class="wf-btn wf-btn--secondary" id="wf_dashboard_btn_refresh">
-        <i class="fa-solid fa-rotate"></i>
-        <span>Refresh</span>
-      </button>
-    </div>
-  </div>
+  <div class="wfnote" id="workforce_wf_base_dashboard_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'workforce_wf_base_dashboard_card_notes' %}" hidden></div>
 
   <!-- Operations Grid -->
   <div class="wf-dashboard__grid">
@@ -25,6 +35,8 @@
     <!-- Left Column: Status Cards -->
     <div class="wf-dashboard__left">
 
+      {# Both cards below are Operations queues — hidden for Finance/Marketing-only staff. #}
+      {% if wf_dept_ops %}
       <!-- Order Status Section -->
       <div class="wf-card">
         <div class="wf-card__header">
@@ -172,6 +184,7 @@
           </div>
         </div>
       </div>
+      {% endif %}
 
     </div>
 
@@ -181,6 +194,7 @@
       <!-- Key Metrics Row -->
       <div class="wf-metrics-row wf-metrics-row--in-grid">
         <!-- COD with Fleet -->
+        {% if wf_dept_fin %}
         <div class="wf-metric-card">
           <span class="wf-metric-card__label">COD with Fleet</span>
           <div class="wf-metric-card__row2">
@@ -196,8 +210,10 @@
             </a>
           </div>
         </div>
+        {% endif %}
 
         <!-- Total Orders Today -->
+        {% if wf_dept_ops %}
         <div class="wf-metric-card">
           <span class="wf-metric-card__label">Orders Today</span>
           <div class="wf-metric-card__row2">
@@ -250,6 +266,7 @@
             </a>
           </div>
         </div>
+        {% endif %}
       </div>
 
       <!-- Orders Trend Chart -->
@@ -276,117 +293,149 @@
         <div class="wf-card__body">
           <div class="wf-quick-actions">
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:wf_orders_add' %}" class="wf-quick-action wf-quick-action--primary" id="wf_dashboard_action_add_order">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-plus"></i>
               </div>
               <span class="wf-quick-action__label">Add Order</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:wf_orders_to_publish' %}" class="wf-quick-action wf-quick-action--primary" id="wf_dashboard_action_publish">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-paper-plane"></i>
               </div>
               <span class="wf-quick-action__label">Publish Orders</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:dl_list_all' %}" class="wf-quick-action wf-quick-action--success" id="wf_dashboard_action_tasks">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-truck-fast"></i>
               </div>
               <span class="wf-quick-action__label">View Tasks</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:tasks_live_map' %}" class="wf-quick-action wf-quick-action--success" id="wf_dashboard_action_live_map">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-map-location-dot"></i>
               </div>
               <span class="wf-quick-action__label">Live Map</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:dl_list_incompleted_details' %}" class="wf-quick-action wf-quick-action--warning" id="wf_dashboard_action_incompleted">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-triangle-exclamation"></i>
               </div>
               <span class="wf-quick-action__label">Incompleted Tasks</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:tasks_followup_list' %}" class="wf-quick-action wf-quick-action--warning" id="wf_dashboard_action_followup">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-phone-volume"></i>
               </div>
               <span class="wf-quick-action__label">Follow Up Tasks</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:user_verification_list' %}" class="wf-quick-action wf-quick-action--warning" id="wf_dashboard_action_verify">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-user-check"></i>
               </div>
               <span class="wf-quick-action__label">Verify Users</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_fin %}
             <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="wf-quick-action wf-quick-action--primary" id="wf_dashboard_action_cod">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-sack-dollar"></i>
               </div>
               <span class="wf-quick-action__label">COD Management</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_fin %}
             <a href="{% url 'workforce:staff_cod_submissions' %}" class="wf-quick-action wf-quick-action--success" id="wf_dashboard_action_cod_submissions">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-receipt"></i>
               </div>
               <span class="wf-quick-action__label">COD Submissions</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_fin %}
             <a href="{% url 'workforce:cod_settlement_report' %}" class="wf-quick-action wf-quick-action--primary" id="wf_dashboard_action_settlement">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-file-invoice-dollar"></i>
               </div>
               <span class="wf-quick-action__label">COD Settlement</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:drivers_active' %}" class="wf-quick-action wf-quick-action--success" id="wf_dashboard_action_drivers">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-motorcycle"></i>
               </div>
               <span class="wf-quick-action__label">Manage Fleet</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:wf_orders_bulk_import' %}" class="wf-quick-action wf-quick-action--primary" id="wf_dashboard_action_bulk_import">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-file-arrow-up"></i>
               </div>
               <span class="wf-quick-action__label">Bulk Import</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:temp_orders' %}" class="wf-quick-action {% if temp_orders_new %}wf-quick-action--warning{% else %}wf-quick-action--success{% endif %}" id="wf_dashboard_action_temp_orders">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-cloud-arrow-down"></i>
               </div>
               <span class="wf-quick-action__label">Temp Orders{% if temp_orders_new %} ({{ temp_orders_new }}){% endif %}</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_ops %}
             <a href="{% url 'workforce:dispatch_dashboard' %}" class="wf-quick-action wf-quick-action--success" id="wf_dashboard_action_dispatch">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-layer-group"></i>
               </div>
               <span class="wf-quick-action__label">Dispatch</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_mkt %}
             <a href="{% url 'workforce:pricing_inquiries_list' %}" class="wf-quick-action wf-quick-action--warning" id="wf_dashboard_action_inquiries">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-envelope-open-text"></i>
               </div>
               <span class="wf-quick-action__label">Pricing Inquiries</span>
             </a>
+            {% endif %}
 
+{% if wf_dept_fin %}
             <a href="{% url 'workforce:workforce_finance_dashboard' %}" class="wf-quick-action wf-quick-action--primary" id="wf_dashboard_action_finance">
               <div class="wf-quick-action__icon">
                 <i class="fa-solid fa-chart-pie"></i>
               </div>
               <span class="wf-quick-action__label">Finance</span>
             </a>
+            {% endif %}
 
           </div>
         </div>
@@ -397,6 +446,7 @@
   </div>
 
   <!-- Latest Orders Section -->
+  {% if wf_dept_ops %}
   <div class="wf-card">
     <div class="wf-card__header">
       <h2 class="wf-card__title">
@@ -420,6 +470,7 @@
       {% endif %}
     </div>
   </div>
+  {% endif %}
 
 </div>
 

@@ -1,5 +1,11 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff order-verification screen — review a whole order before it becomes a delivery task
+Used by: no view or URL currently renders this template; kept as a scaffold
+Notes: The page-notes card (wfnote__, shared) sits under the page title, hidden on load; the
+       title-row help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Verify Order - #{{ order.order_number }}{% endblock %}
 
@@ -16,9 +22,18 @@
         </ol>
     </nav>
 
-    <h1 class="page-title">
+    <h1 class="page-title d-flex align-items-center gap-2">
         <i class="fa-solid fa-clipboard-check me-2"></i>Verify Order
+        <button type="button" class="wfnote__btn wfnote__btn--ink ms-auto" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_parts_verify_order_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </h1>
+
+    <div class="wfnote" id="workforce_parts_verify_order_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_parts_verify_order_card_notes' %}" hidden></div>
 
     <div class="row">
         <div class="col-lg-8">

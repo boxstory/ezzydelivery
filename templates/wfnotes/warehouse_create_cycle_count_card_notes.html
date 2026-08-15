@@ -1,0 +1,69 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/create_cycle_count.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_create_cycle_count_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Sets up a <strong>stock count</strong>. Choose the warehouse, optionally narrow it to one
+            zone or bin, and give it a date — the count sheet is then filled in for you from whatever
+            currently holds stock there. Creating it changes nothing in inventory; it only decides what
+            will be counted.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The fields</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Warehouse</dt>
+                        <dd class="wfnote__def">Required. Staff see all active warehouses; a seller
+                            account only its linked ones.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Location</dt>
+                        <dd class="wfnote__def">Optional. Leave it blank to count the whole warehouse.
+                            Choosing a zone pulls in every bin beneath it, not just the zone itself.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Scheduled date</dt>
+                        <dd class="wfnote__def">Required. It orders the list and says when the count is
+                            meant to happen — it does not block counting earlier or later.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assign to</dt>
+                        <dd class="wfnote__def">Optional, staff users only. A pointer to who should do
+                            it, not a lock.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What gets counted</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Only stock on hand</dt>
+                        <dd class="wfnote__def">A line is created for every product with more than zero
+                            units in scope. Products showing zero are not offered — a count cannot find
+                            what the system says is not there.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">System quantity is frozen</dt>
+                        <dd class="wfnote__def">Each line stores the figure at creation time. That is
+                            what your count is compared against.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Next step</dt>
+                        <dd class="wfnote__def">You land on the count sheet. Start it, enter what you
+                            find, submit, and a staff member approves the differences.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Count small and often.</strong> A zone at a time finds errors sooner
+                        than a whole-warehouse count nobody finishes.</li>
+                    <li><strong>Time it for a quiet moment.</strong> Receipts and picks during counting
+                        show up as differences that are not really errors.</li>
+                </ul>
+            </section>
+        </div>

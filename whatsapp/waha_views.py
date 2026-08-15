@@ -22,8 +22,10 @@ from django.utils import timezone as dj_timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from . import sessions as wa_sessions
 from .auth import _bearer_ok, _verify_waha_hmac
 from .models import WhatsAppMessage
+from core.validators import safe_int
 
 
 logger = logging.getLogger(__name__)
@@ -77,7 +79,7 @@ def fetch_waha_session_status(session=None, timeout=4):
     """
     from django.core.cache import cache
 
-    session = session or getattr(settings, 'WAHA_DEFAULT_SESSION', 'default')
+    session = wa_sessions.normalize(session)
     used_for_orders = bool(getattr(settings, 'WAHA_ENABLED', False))
     used_for_verify = bool(getattr(settings, 'WAHA_VERIFY_USE_WAHA', False))
     api_key = getattr(settings, 'WAHA_API_KEY', '') or ''
@@ -155,6 +157,27 @@ def fetch_waha_session_status(session=None, timeout=4):
     return result
 
 
+def _log_instance_send(session, to_jid, ok, detail='', status_code=None):
+    """Attribute a WAHA send to the instance that owns this session, if any.
+
+    Sessions are mapped to instances on the WhatsApp instances page; a session
+    no instance claims simply is not logged there, because that console lists
+    per instance and an unclaimed row would have nowhere to appear.
+    """
+    from core.models import WhatsAppInstance
+    from core.whatsapp_utils import log_send_attempt
+
+    try:
+        inst = WhatsAppInstance.objects.filter(waha_session=session).first()
+        if inst is None:
+            return
+        log_send_attempt(inst.instance_name, _strip_jid(to_jid), ok,
+                         detail=detail, status_code=status_code, channel='waha')
+    except Exception:
+        # Logging must never break the send it describes.
+        logger.exception('Could not log WAHA send for session %s', session)
+
+
 def send_waha_text(to, text, session=None):
     """Send a WAHA outbound text and log a WhatsAppMessage row.
 
@@ -171,7 +194,10 @@ def send_waha_text(to, text, session=None):
     if not isinstance(to, str) or not isinstance(text, str):
         return False, {'error': 'to and text required'}
 
-    session = session or getattr(settings, 'WAHA_DEFAULT_SESSION', 'default')
+    session = wa_sessions.normalize(session)
+    # Which of our numbers this went out from — a constant display string was
+    # fine with one session, but is ambiguous once a second number exists.
+    sender = wa_sessions.sender_number(session)
 
     if '@' not in to:
         digits = re.sub(r'\D', '', to)
@@ -207,13 +233,22 @@ def send_waha_text(to, text, session=None):
         err = f'network error: {e}'
 
     success = (200 <= waha_status < 300) and err is None
+
+    # Mirror the attempt onto the sending number's log, so the WhatsApp
+    # instances console shows WAHA traffic too. Deliberately does NOT feed the
+    # Evolution failover health marker: a WAHA problem says nothing about
+    # whether that number's Evolution socket is alive.
+    _log_instance_send(session, to_jid, success,
+                       detail=(err or f'HTTP {waha_status}') if not success else '',
+                       status_code=waha_status)
+
     if not success:
         # Still log a failed-outbound row for audit, then return the error.
         WhatsAppMessage.objects.create(
             waha_message_id=f'out-fail-{uuid.uuid4().hex}',
             session=session,
             direction='outbound',
-            from_number=getattr(settings, 'WAHA_DEFAULT_FROM', '') or '',
+            from_number=sender,
             to_number=_strip_jid(to_jid),
             body=text,
             message_type='text',
@@ -236,13 +271,19 @@ def send_waha_text(to, text, session=None):
 
     raw_payload_store = waha_body if isinstance(waha_body, (dict, list)) else {'response': str(waha_body)[:4000]}
 
+    # Never persist a one-time code we just sent — the CRM chat panels let staff read
+    # any conversation, including a password reset for someone else's account.
+    from whatsapp.secrets import redact_payload, redact_text
+    stored_text, _ = redact_text(text)
+    raw_payload_store, _ = redact_payload(raw_payload_store, text)
+
     obj = WhatsAppMessage.objects.create(
         waha_message_id=str(wid),
         session=session,
         direction='outbound',
-        from_number=getattr(settings, 'WAHA_DEFAULT_FROM', '') or '',
+        from_number=sender,
         to_number=_strip_jid(to_jid),
-        body=text,
+        body=stored_text,
         message_type='text',
         status='processed',
         processed_at=dj_timezone.now(),
@@ -251,19 +292,37 @@ def send_waha_text(to, text, session=None):
     return True, {'message_obj': obj, 'message_id': str(wid), 'phone': _strip_jid(to_jid)}
 
 
-def _map_message_type(payload):
-    raw = None
+def _raw_message_type(payload):
     data = payload.get('_data') or {}
-    if isinstance(data, dict):
-        raw = data.get('type')
-    if not raw:
-        raw = payload.get('type')
+    raw = data.get('type') if isinstance(data, dict) else None
+    return str(raw or payload.get('type') or '').lower()
+
+
+def _map_message_type(payload):
+    raw = _raw_message_type(payload)
     if not raw:
         return 'text'
-    return _WAHA_TYPE_MAP.get(str(raw).lower(), 'unknown')
+    return _WAHA_TYPE_MAP.get(raw, 'unknown')
 
 
-def resolve_jid_to_phone(jid, timeout=4):
+# WhatsApp protocol chatter, not something a person sent: encryption-key
+# notices, hosted-account banners, group membership changes. They carry no
+# body, but they do carry a sender — so storing them invents an "unknown
+# sender" in the CRM inbox for someone who never wrote to us. Merely asking
+# WAHA whether a number exists is enough to produce one.
+# `call_log` and `revoked` are deliberately NOT here: a missed call or a
+# deleted message is a real person making contact, which is a lead signal.
+_SYSTEM_EVENT_TYPES = frozenset({
+    'e2e_notification', 'notification_template', 'gp2', 'protocol', 'ciphertext',
+})
+
+
+def is_system_event(payload):
+    """True for WhatsApp system notifications that should never become a row."""
+    return _raw_message_type(payload) in _SYSTEM_EVENT_TYPES
+
+
+def resolve_jid_to_phone(jid, timeout=4, session=None):
     """Resolve a WhatsApp JID (phone or @lid) to a digits-only phone number.
 
     WAHA returns sender JIDs in two forms:
@@ -272,8 +331,12 @@ def resolve_jid_to_phone(jid, timeout=4):
                                     Resolve via /api/contacts.
 
     Returns the digits-only phone (e.g. '97455555555'), or empty string if
-    we can't resolve. Cached 15 min keyed by JID so the webhook stays fast
-    even under burst.
+    we can't resolve. Cached 15 min keyed by (session, JID) so the webhook
+    stays fast even under burst.
+
+    The session matters: a LID is issued per linked device, so the same LID
+    string can mean different people on our two numbers. Callers must pass the
+    session the JID arrived on; None falls back to the default session.
     """
     if not jid:
         return ''
@@ -283,7 +346,8 @@ def resolve_jid_to_phone(jid, timeout=4):
         return jid.split('@', 1)[0]
 
     from django.core.cache import cache
-    cache_key = f'waha_lid_phone:{jid}'
+    sess = wa_sessions.normalize(session)
+    cache_key = f'waha_lid_phone:{sess}:{jid}'
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -292,7 +356,6 @@ def resolve_jid_to_phone(jid, timeout=4):
     if not api_key:
         return ''
     base = getattr(settings, 'WAHA_BASE_URL', 'http://127.0.0.1:3000').rstrip('/')
-    sess = getattr(settings, 'WAHA_DEFAULT_SESSION', 'default')
     try:
         resp = requests.get(
             f'{base}/api/contacts',
@@ -389,7 +452,7 @@ def _apply_inbound_location(msg):
     raw = msg.raw_payload if isinstance(msg.raw_payload, dict) else {}
     inner = raw.get('payload') if isinstance(raw, dict) else None
     raw_from_jid = (inner or {}).get('from') or msg.from_number
-    resolved_phone = resolve_jid_to_phone(raw_from_jid) or msg.from_number
+    resolved_phone = resolve_jid_to_phone(raw_from_jid, session=msg.session) or msg.from_number
 
     # Match against jobs by the resolved phone (digits only).
     job = (
@@ -484,6 +547,9 @@ def _serialize_message(obj):
     return {
         'id': obj.id,
         'waha_message_id': obj.waha_message_id,
+        # Which of our numbers this belongs to — consumers handling more than
+        # one need it to reply from the right sender.
+        'session': obj.session,
         'direction': obj.direction,
         'from_number': obj.from_number,
         'to_number': obj.to_number,
@@ -528,6 +594,12 @@ def waha_webhook(request):
         if payload.get("fromMe") is True:
             return JsonResponse({"ok": True, "ignored": "fromMe"}, status=200)
 
+        # Protocol chatter (encryption notices, group membership changes) has a
+        # sender but no message — storing it puts a phantom unknown sender in
+        # the CRM inbox.
+        if is_system_event(payload):
+            return JsonResponse({"ok": True, "ignored": "system"}, status=200)
+
         waha_message_id = payload.get("id")
         if not waha_message_id:
             return JsonResponse({"ok": False, "error": "missing payload.id"}, status=400)
@@ -556,13 +628,18 @@ def waha_webhook(request):
         else:
             received_at = dj_timezone.now()
 
-        session = data.get("session") or getattr(settings, 'WAHA_DEFAULT_SESSION', 'default')
+        # Validated, not trusted: the session name is written to the DB and
+        # interpolated into WAHA URLs by downstream lookups.
+        session = wa_sessions.normalize(data.get("session"))
 
-        # update_or_create on waha_message_id makes webhook re-deliveries idempotent.
+        # update_or_create on (session, waha_message_id) makes webhook
+        # re-deliveries idempotent. The session MUST be part of the lookup:
+        # WAHA ids are unique per chat, not per session, so keying on the id
+        # alone would let one number's message overwrite another's row.
         obj, created = WhatsAppMessage.objects.update_or_create(
+            session=session,
             waha_message_id=str(waha_message_id),
             defaults={
-                'session': session,
                 'direction': 'inbound',
                 'from_number': from_number,
                 'to_number': to_number,
@@ -611,7 +688,7 @@ def waha_messages_list(request):
         return JsonResponse({"error": f"invalid status: {status}"}, status=400)
 
     try:
-        limit = int(request.GET.get('limit', '50'))
+        limit = safe_int(request.GET.get('limit'), default=50, minimum=1, maximum=500)
     except (TypeError, ValueError):
         return JsonResponse({"error": "invalid limit"}, status=400)
     if limit < 1:
@@ -622,8 +699,20 @@ def waha_messages_list(request):
     mark_raw = (request.GET.get('mark_picked_up', '') or '').strip().lower()
     mark_picked_up = mark_raw in {'1', 'true', 'yes', 'y'}
 
+    # This is a CLAIM queue — picking a row up hides it from every other
+    # consumer. So it defaults to a single session rather than the whole table:
+    # a client written for one number must never silently start draining
+    # another number's inbox when a new session is added. `session=all` is the
+    # explicit opt-in for a cross-session drain.
+    session_raw = (request.GET.get('session', '') or '').strip().lower()
+    drain_all = session_raw == 'all'
+    session = None if drain_all else wa_sessions.from_request(request)
+
     with transaction.atomic():
-        qs = WhatsAppMessage.objects.filter(status=status).order_by('received_at')[:limit]
+        base_qs = WhatsAppMessage.objects.filter(status=status)
+        if not drain_all:
+            base_qs = base_qs.filter(session=session)
+        qs = base_qs.order_by('received_at')[:limit]
 
         if mark_picked_up and status == 'received':
             ids = list(qs.values_list('id', flat=True))
@@ -699,7 +788,7 @@ def waha_send(request):
     if not isinstance(to, str) or not isinstance(text, str):
         return JsonResponse({"error": "to and text required"}, status=400)
 
-    session = data.get('session') or getattr(settings, 'WAHA_DEFAULT_SESSION', 'default')
+    session = wa_sessions.normalize(data.get('session'))
 
     if '@' not in to:
         digits = re.sub(r'\D', '', to)
@@ -763,7 +852,7 @@ def waha_send(request):
         waha_message_id=str(wid),
         session=session,
         direction='outbound',
-        from_number=getattr(settings, 'WAHA_DEFAULT_FROM', '') or '',
+        from_number=wa_sessions.sender_number(session),
         to_number=_strip_jid(to),
         body=text,
         message_type='text',

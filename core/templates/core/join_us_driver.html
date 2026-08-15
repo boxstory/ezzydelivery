@@ -10,7 +10,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
 {% block title %}Join as Driver - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/driver-apply.css' %}?v=20260723f" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260801a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -26,6 +26,22 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
             <p class="mb-0">Apply in 4 quick steps — your details, your vehicle, your zones &amp; hours, and your documents.</p>
             {% endif %}
         </div>
+
+        {% if not show_status_only and not already_business %}
+        <!-- Pay slab — set expectations before the form, and say plainly that the
+             final rate follows a completed submission, not a saved draft. -->
+        <div class="cja__section-card cja__pay-card p-3 p-md-4 mx-auto col-12 col-md-10 col-lg-8 mb-4">
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                <span class="cja__pay-figure">QAR 10&ndash;15</span>
+                <span class="cja__pay-unit">per completed order,<br class="d-none d-sm-inline">depending on the delivery type</span>
+            </div>
+            <p class="cja__pay-note mb-0 mt-2">
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                Your exact per-order rate is agreed with our team once this application is
+                complete and submitted — we only discuss final pricing with completed applications.
+            </p>
+        </div>
+        {% endif %}
 
         {% if already_business %}
         <!-- Already registered as business -->
@@ -113,7 +129,8 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
             </ol>
 
             <form id="core_join_driver_form_apply" method="post" enctype="multipart/form-data" novalidate
-                  data-initial-step="{{ initial_step|default:1 }}">
+                  data-initial-step="{{ initial_step|default:1 }}"
+                  data-needs-location="{{ needs_location|yesno:'1,0' }}">
                 {% csrf_token %}
                 <input type="hidden" name="geo_lat" id="core_join_driver_input_geolat">
                 <input type="hidden" name="geo_lng" id="core_join_driver_input_geolng">
@@ -546,13 +563,35 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     updateDocMeter();
 
+    var needsLocation = form.dataset.needsLocation === '1';
+
+    // Ask the browser for a position, then let the form through either way —
+    // a refused or slow fix must never block the application.
+    function captureThen(done) {
+        if (!navigator.geolocation) { done(); return; }
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            document.getElementById('core_join_driver_input_geolat').value = pos.coords.latitude;
+            document.getElementById('core_join_driver_input_geolng').value = pos.coords.longitude;
+            document.getElementById('core_join_driver_input_geoacc').value = Math.round(pos.coords.accuracy);
+            done();
+        }, function() { done(); }, { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true });
+    }
+
     form.addEventListener('submit', function(e) {
         if (form.dataset.geoDone === '1') return;
 
-        // Save Progress: no minimum-doc check, no geolocation — plain submit
+        // Save Progress: no minimum-doc check. Location is still worth asking for
+        // on a save when the application has none yet — many applicants save
+        // several times before they ever reach the submit button.
         if (actionField.value === 'save') {
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving…';
+            if (!needsLocation) return;
+            e.preventDefault();
+            captureThen(function() {
+                form.dataset.geoDone = '1';
+                form.submit();
+            });
             return;
         }
 
@@ -579,13 +618,8 @@ document.addEventListener('DOMContentLoaded', function() {
             form.dataset.geoDone = '1';
             form.submit();
         }
-        if (!navigator.geolocation) { go(); return; }
-        navigator.geolocation.getCurrentPosition(function(pos) {
-            document.getElementById('core_join_driver_input_geolat').value = pos.coords.latitude;
-            document.getElementById('core_join_driver_input_geolng').value = pos.coords.longitude;
-            document.getElementById('core_join_driver_input_geoacc').value = Math.round(pos.coords.accuracy);
-            go();
-        }, function() { go(); }, { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true });
+        if (!needsLocation) { go(); return; }
+        captureThen(go);
     });
 });
 </script>

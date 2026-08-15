@@ -7,7 +7,11 @@ Notes: Mirrors _pickup_leg_card.html so both legs of the job read the same way. 
 {% if leg %}
 <div class="pkl">
     <div class="pkl__head">
-        <span class="pkl__title"><i class="fa-solid fa-truck-fast"></i> Delivery Leg</span>
+        <span class="pkl__title">
+            <i class="fa-solid fa-truck-fast"></i> Delivery Leg
+            {# Same as the pickup strip: the rail shades stages, this says where it stands. #}
+            <span class="pkl__state pkl__state--dl-{{ leg.status }}">{{ leg.status_label }}</span>
+        </span>
         <span class="pkl__meta">
             {% if leg.published %}Published to fleet{% else %}Not published{% endif %}
             {% if leg.speed %} · {{ leg.speed }}{% endif %}{% if leg.category %} · {{ leg.category }}{% endif %}

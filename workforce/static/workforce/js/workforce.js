@@ -88,243 +88,18 @@
 
     // ==================== FILTER FUNCTIONALITY ====================
 
-    const FilterManager = {
-        filterLabels: {
-            'dlCode': 'DL Code',
-            'cCode': 'Client Code',
-            'mobile': 'Mobile',
-            'driverName': 'Driver',
-            'cStatus': 'Client Status',
-            'dmsStatus': 'DMS Status',
-            'dateFrom': 'From',
-            'dateTo': 'To',
-            'business': 'Client'
-        },
+    /* FilterManager removed 2026-07-29.
+       It was a second, orphaned filter engine: initialised on every page but
+       keyed on ids (dlCode, cCode, mobile, driverName, cStatus, dmsStatus,
+       dateFrom, dateTo, business) that no template has rendered for a long time
+       — every list uses the pgf_* set. So getFilterValues() always returned
+       empty, its active-filter chips never drew, and its localStorage presets
+       were unreachable with no button bound to them.
 
-        init: function() {
-            this.bindEvents();
-            this.updateActiveFiltersDisplay();
-        },
-
-        bindEvents: function() {
-            // Filter toggle animation
-            const filterToggle = document.querySelector('.pg-filter__toggle');
-            const filterCollapse = document.getElementById('filterCollapse');
-
-            if (filterToggle && filterCollapse) {
-                filterCollapse.addEventListener('show.bs.collapse', () => {
-                    filterToggle.classList.add('active');
-                });
-                filterCollapse.addEventListener('hide.bs.collapse', () => {
-                    filterToggle.classList.remove('active');
-                });
-            }
-
-            // Clear filter button
-            const clearFilter = document.getElementById('clearFilter');
-            if (clearFilter) {
-                clearFilter.addEventListener('click', () => this.clearAllFilters());
-            }
-
-            // Clear filter from empty state
-            const clearFilterEmpty = document.getElementById('clearFilterEmpty');
-            if (clearFilterEmpty) {
-                clearFilterEmpty.addEventListener('click', () => this.clearAllFilters());
-            }
-
-            // Submit form on Enter key with debounce
-            const filterInputs = document.querySelectorAll('#filterForm input[type="text"]');
-            filterInputs.forEach(input => {
-                input.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        FilterManager.submitForm();
-                    }
-                });
-
-                // Optional: Auto-submit after typing stops (debounced)
-                input.addEventListener('input', debounce(() => {
-                    // Uncomment to enable auto-submit
-                    // htmx.trigger('#filterForm', 'submit');
-                }, 500));
-            });
-
-            // Save filter button
-            const saveFilter = document.getElementById('saveFilter');
-            if (saveFilter) {
-                saveFilter.addEventListener('click', () => this.saveFilterPreset());
-            }
-        },
-
-        getFilterValues: function() {
-            return {
-                dlCode: document.getElementById('dlCode')?.value || '',
-                cCode: document.getElementById('cCode')?.value || '',
-                mobile: document.getElementById('mobile')?.value || '',
-                driverName: document.getElementById('driverName')?.value || '',
-                cStatus: document.getElementById('cStatus')?.value || '',
-                dmsStatus: document.getElementById('dmsStatus')?.value || '',
-                dateFrom: document.getElementById('dateFrom')?.value || '',
-                dateTo: document.getElementById('dateTo')?.value || '',
-                business: document.getElementById('business')?.value || ''
-            };
-        },
-
-        submitForm: function() {
-            const form = document.getElementById('filterForm');
-            if (!form) return;
-            const p = new URLSearchParams(new FormData(form));
-            // Remove empty params
-            for (const [k, v] of [...p.entries()]) { if (!v) p.delete(k); }
-            window.location.href = window.location.pathname + (p.toString() ? '?' + p.toString() : '');
-        },
-
-        clearAllFilters: function() {
-            window.location.href = window.location.pathname;
-        },
-
-        removeFilter: function(filterKey) {
-            const element = document.getElementById(filterKey);
-            if (element) element.value = '';
-            this.submitForm();
-        },
-
-        updateActiveFiltersDisplay: function() {
-            const filters = this.getFilterValues();
-            const activeFilters = Object.entries(filters).filter(([key, value]) => value !== '');
-            const filterCount = activeFilters.length;
-
-            // Update count badge
-            const countDisplay = document.getElementById('activeFiltersCount');
-            const countBadge = document.getElementById('filterCountBadge');
-            if (countDisplay && countBadge) {
-                if (filterCount > 0) {
-                    countDisplay.classList.add('show');
-                    countBadge.textContent = filterCount;
-                } else {
-                    countDisplay.classList.remove('show');
-                }
-            }
-
-            // Update filter tags
-            const tagsContainer = document.getElementById('filterTagsContainer');
-            const tagsDisplay = document.getElementById('activeFilterTags');
-
-            if (tagsContainer && tagsDisplay) {
-                if (filterCount > 0) {
-                    tagsDisplay.classList.add('show');
-                    tagsContainer.innerHTML = '';
-
-                    activeFilters.forEach(([key, value]) => {
-                        let displayValue = value;
-                        // For select elements, show the selected option text
-                        if (['business', 'cStatus', 'dmsStatus'].includes(key)) {
-                            const selectEl = document.getElementById(key);
-                            if (selectEl && selectEl.selectedIndex >= 0) {
-                                displayValue = selectEl.options[selectEl.selectedIndex].text;
-                            }
-                        }
-                        const tag = document.createElement('span');
-                        tag.className = 'pg-filter__tag';
-                        tag.innerHTML = `
-                            <strong>${this.filterLabels[key]}:</strong> ${displayValue}
-                            <button type="button" class="btn-close btn-close-sm ms-1"
-                                    onclick="window.FilterManager.removeFilter('${key}')"
-                                    title="Remove filter"
-                                    aria-label="Remove ${this.filterLabels[key]} filter"></button>
-                        `;
-                        tagsContainer.appendChild(tag);
-                    });
-                } else {
-                    tagsDisplay.classList.remove('show');
-                }
-            }
-        },
-
-        quickFilter: function(type) {
-            // Clear all fields first
-            const filters = this.getFilterValues();
-            Object.keys(filters).forEach(key => {
-                const element = document.getElementById(key);
-                if (element) element.value = '';
-            });
-
-            switch(type) {
-                case 'today':
-                    const today = new Date().toISOString().split('T')[0];
-                    const dateFrom = document.getElementById('dateFrom');
-                    const dateTo = document.getElementById('dateTo');
-                    if (dateFrom) dateFrom.value = today;
-                    if (dateTo) dateTo.value = today;
-                    break;
-                case 'pending':
-                    const cStatus = document.getElementById('cStatus');
-                    if (cStatus) cStatus.value = 'for_review';
-                    break;
-                case 'in_transit':
-                    const dmsStatus = document.getElementById('dmsStatus');
-                    if (dmsStatus) dmsStatus.value = '4';
-                    break;
-                case 'week':
-                    const weekStart = new Date();
-                    weekStart.setDate(weekStart.getDate() - 7);
-                    const dateFromWeek = document.getElementById('dateFrom');
-                    const dateToWeek = document.getElementById('dateTo');
-                    if (dateFromWeek) dateFromWeek.value = weekStart.toISOString().split('T')[0];
-                    if (dateToWeek) dateToWeek.value = new Date().toISOString().split('T')[0];
-                    break;
-                case 'month':
-                    const monthStart = new Date();
-                    monthStart.setDate(1);
-                    const dateFromMonth = document.getElementById('dateFrom');
-                    const dateToMonth = document.getElementById('dateTo');
-                    if (dateFromMonth) dateFromMonth.value = monthStart.toISOString().split('T')[0];
-                    if (dateToMonth) dateToMonth.value = new Date().toISOString().split('T')[0];
-                    break;
-            }
-
-            this.submitForm();
-        },
-
-        saveFilterPreset: function() {
-            const filterName = prompt('Enter a name for this filter preset:');
-            if (filterName) {
-                const filters = {
-                    name: filterName,
-                    ...this.getFilterValues(),
-                    createdAt: new Date().toISOString()
-                };
-
-                // Save to localStorage
-                let savedFilters = JSON.parse(localStorage.getItem('taskFilters') || '[]');
-                savedFilters.push(filters);
-                localStorage.setItem('taskFilters', JSON.stringify(savedFilters));
-
-                showToast('Filter preset saved successfully!', 'success');
-            }
-        },
-
-        loadFilterPresets: function() {
-            return JSON.parse(localStorage.getItem('taskFilters') || '[]');
-        },
-
-        applyFilterPreset: function(preset) {
-            Object.keys(preset).forEach(key => {
-                if (key !== 'name' && key !== 'createdAt') {
-                    const element = document.getElementById(key);
-                    if (element) element.value = preset[key];
-                }
-            });
-            this.submitForm();
-        },
-
-        deleteFilterPreset: function(index) {
-            let savedFilters = this.loadFilterPresets();
-            savedFilters.splice(index, 1);
-            localStorage.setItem('taskFilters', JSON.stringify(savedFilters));
-            showToast('Filter preset deleted', 'info');
-        }
-    };
+       It also bound a SECOND Enter handler on '#filterForm input[type=text]'.
+       Both that and the pg-filter handler fired on one keypress and happened to
+       navigate to the same URL — coincidence, not design. Chips now come from
+       the server (see _page_filter.html applied_chips). */
 
     // ==================== TASK ACTIONS ====================
 
@@ -631,7 +406,6 @@
     // ==================== INITIALIZATION ====================
 
     function init() {
-        FilterManager.init();
         KeyboardShortcuts.init();
     }
 
@@ -815,7 +589,6 @@
     };
 
     // Expose to global scope for inline handlers
-    window.FilterManager = FilterManager;
     window.TaskActions = TaskActions;
     window.OrderDetailPanel = OrderDetailPanel;
     window.OrderActions = OrderActions;
@@ -823,8 +596,6 @@
     window.publishToDriverApp = TaskActions.publishToDriverApp.bind(TaskActions);
     window.setStatusModalTask = TaskActions.setStatusModalTask.bind(TaskActions);
     window.submitStatusUpdate = TaskActions.submitStatusUpdate.bind(TaskActions);
-    window.quickFilter = FilterManager.quickFilter.bind(FilterManager);
-    window.removeFilter = FilterManager.removeFilter.bind(FilterManager);
     // Order detail panel functions
     window.openOrderDetailPanel = OrderDetailPanel.open.bind(OrderDetailPanel);
     window.closeOrderDetailPanel = OrderDetailPanel.close.bind(OrderDetailPanel);
@@ -1080,19 +851,52 @@
     function el(id) { return document.getElementById(id); }
     function isoDate(d) { return d.toISOString().split('T')[0]; }
 
+    // Read a control only if this page has it. Print Labels shares this bar but
+    // carries no DL-code or status filters, and reading .value off a missing
+    // element threw before the URL was ever built.
+    function val(id) { var e = el(id); return e ? e.value : ''; }
+
+    // Repeated values (a multi-select client, checkbox status filters) have to
+    // survive as repeated keys — .value on a <select multiple> returns only the
+    // first option, which silently dropped every client but one.
+    function addMulti(p, key, id) {
+        var e = el(id);
+        if (!e) return;
+        if (e.multiple) {
+            Array.prototype.forEach.call(e.selectedOptions, function (o) {
+                if (o.value) p.append(key, o.value);
+            });
+        } else if (e.value) {
+            p.set(key, e.value);
+        }
+    }
+
+    // Checkbox-dropdown filters live outside the pgf_* set but inside the same
+    // form, so they are read straight off the form.
+    function addCheckboxFilters(p) {
+        var form = document.getElementById('filterForm');
+        if (!form) return;
+        form.querySelectorAll('.msf input[type="checkbox"]:checked').forEach(function (c) {
+            if (c.name && c.value) p.append(c.name, c.value);
+        });
+    }
+
     function pgFilterSubmit() {
         if (!el('pgf_business')) return;
         var basePath = window.location.pathname;
         var p = new URLSearchParams();
         function add(k, v) { if (v) p.set(k, v); }
-        add('business',     el('pgf_business').value);
-        add('dlCode',       el('pgf_dlCode').value);
-        add('search',       el('pgf_search').value);
-        add('cStatus',      el('pgf_cStatus').value);
-        add('dlTaskStatus', el('pgf_dlTaskStatus').value);
-        add('datePreset',   el('pgf_date_preset').value);
-        add('dateFrom',     el('pgf_dateFrom').value);
-        add('dateTo',       el('pgf_dateTo').value);
+        addMulti(p, 'business', 'pgf_business');
+        addCheckboxFilters(p);
+        add('sort',         val('pgf_sort'));
+        add('per_page',     val('pgf_per_page'));
+        add('dlCode',       val('pgf_dlCode'));
+        add('search',       val('pgf_search'));
+        add('cStatus',      val('pgf_cStatus'));
+        add('dlTaskStatus', val('pgf_dlTaskStatus'));
+        add('datePreset',   val('pgf_date_preset'));
+        add('dateFrom',     val('pgf_dateFrom'));
+        add('dateTo',       val('pgf_dateTo'));
         var qs = p.toString();
         window.location.href = basePath + (qs ? '?' + qs : '');
     }
@@ -1102,6 +906,9 @@
         var from = '', to = '';
         if (preset === 'today')          { from = to = isoDate(today); }
         else if (preset === 'yesterday') { var y=new Date(today); y.setDate(y.getDate()-1); from=to=isoDate(y); }
+        // Today + yesterday. "Yesterday" is that one day alone, which is not what
+        // a packing bench wants when it is working through the overnight orders.
+        else if (preset === '2days')     { var d2=new Date(today); d2.setDate(d2.getDate()-1); from=isoDate(d2); to=isoDate(today); }
         else if (preset === '3days')     { var d3=new Date(today); d3.setDate(d3.getDate()-2); from=isoDate(d3); to=isoDate(today); }
         else if (preset === 'week')      { var dw=new Date(today); dw.setDate(dw.getDate()-6); from=isoDate(dw); to=isoDate(today); }
         else if (preset === 'month')     { var dm=new Date(today); dm.setDate(dm.getDate()-29); from=isoDate(dm); to=isoDate(today); }
@@ -1127,7 +934,8 @@
 
     document.addEventListener('change', function(e) {
         var id = e.target.id;
-        if (id === 'pgf_business' || id === 'pgf_cStatus' || id === 'pgf_dlTaskStatus') {
+        if (id === 'pgf_business' || id === 'pgf_cStatus' || id === 'pgf_dlTaskStatus'
+            || id === 'pgf_sort' || id === 'pgf_per_page') {
             pgFilterSubmit();
         }
         if (id === 'pgf_from_vis') {
@@ -1148,3 +956,7 @@
         }
     });
 })();
+
+/* PAGE NOTES (wfnote) moved to webpages/js/wfnote.js — loaded for every
+ * dashboard from includes/main_dashboard_scripts.html, so the warehouse and
+ * delivery pages get the same help button without pulling in workforce.js. */

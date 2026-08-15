@@ -92,7 +92,16 @@ document.addEventListener('DOMContentLoaded', function() {
             <h1 class="swlf__hero-title">{% if is_create %}Add New Seller-Warehouse Link{% else %}Edit Link: {{ link.business.business_name }} &rarr; {{ link.warehouse.name }}{% endif %}</h1>
             <p class="swlf__hero-subtitle">{% if is_create %}Create a new connection between a seller and a warehouse{% else %}Update link settings (cannot change seller or warehouse){% endif %}</p>
         </div>
+        <button type="button" class="wfnote__btn wfnote__btn--end" data-wfnote-toggle
+                aria-expanded="false" aria-controls="warehouse_seller_warehouse_link_form_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
+
+    <div class="wfnote wfnote--inset" id="warehouse_seller_warehouse_link_form_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_seller_warehouse_link_form_card_notes' %}" hidden></div>
 
     <!-- Form -->
     <form method="post" action="" novalidate>

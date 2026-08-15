@@ -303,6 +303,43 @@
 .pil__biz-link { color: var(--pil-muted); font-size: 0.7rem; text-decoration: none; letter-spacing: 0.02em; }
 .pil__biz-link:hover { color: var(--pil-ink); text-decoration: underline; text-underline-offset: 2px; }
 
+/* Online presence icons — one slot per channel, present or not, so the eye can
+   scan the column. Live = bordered ink control; absent = dimmed placeholder that
+   is deliberately not a link and not focusable. */
+.pil__links { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.3rem; }
+.pil__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.72rem;
+  color: var(--pil-ink-2);
+  background: var(--brand-white);
+  border: 1px solid var(--pil-line-2);
+  border-radius: 5px;
+  text-decoration: none;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.pil__link:hover { color: var(--pil-ink); border-color: var(--pil-ink-2); background: var(--pil-canvas); }
+.pil__link:focus-visible {
+  outline: none;
+  border-color: var(--pil-accent);
+  box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.28);
+}
+/* Brand tint on hover only — the resting row stays monochrome. */
+.pil__link--facebook:hover { color: #1877f2; border-color: #1877f2; }
+.pil__link--instagram:hover { color: #c13584; border-color: #c13584; }
+.pil__link--off {
+  color: var(--pil-line-2);
+  border-color: var(--pil-line);
+  border-style: dashed;
+  background: var(--pil-canvas);
+  cursor: default;
+  /* No pointer-events reset here: the placeholder is a <span> so it cannot be
+     clicked or focused anyway, and it needs to stay hoverable for its title. */
+}
+
 .pil__contact { color: var(--pil-ink); font-variant-numeric: tabular-nums; }
 .pil__contact-alt { color: var(--pil-muted); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
 .pil__category { color: var(--pil-ink-2); }

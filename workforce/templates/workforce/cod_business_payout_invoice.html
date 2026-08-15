@@ -1,7 +1,8 @@
 {# Purpose: Printable invoice for one Leg-3 business COD payout — orders, totals, deductions, net paid. #}
-{# Used by: workforce.views.cod_business_payout_invoice (URL workforce:cod_business_payout_invoice) #}
-{# Notes: Print-first document. Voided payouts keep their invoice and carry a stamp. #}
-{% extends "wf_dashboard_base.html" %}
+{# Used by: workforce.views.cod_business_payout_invoice (staff) and business.views.business_cod_payout_invoice (seller copy). #}
+{# Notes: Print-first document. Voided payouts keep their invoice and carry a stamp. `seller_view` swaps the base template and drops the staff-only toolbar link. #}
+{#        Carries the shared page-notes card (wfnote__) in the screen-only toolbar — staff view only, since the seller base loads neither the wfnote CSS nor its toggle. Never inside the printed sheet. #}
+{% extends seller_view|yesno:"business_dashboard_base.html,wf_dashboard_base.html" %}
 {% load static humanize %}
 
 {% block title %}Payout Invoice {{ settle_txn.transaction_code }}{% endblock %}
@@ -10,21 +11,56 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/cod_payout_invoice.css' %}?v=20260728e" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_payout_invoice.css' %}?v=20260815a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/invoice_preview.css' %}?v=20260815a" type="text/css" />
 {% endblock %}
 
 {% block content %}
 <div class="bpi">
   <div class="bpi__toolbar d-flex flex-wrap align-items-center justify-content-between gap-2">
-    <a href="{% url 'workforce:cod_business_settlement_report' %}" class="bpi__ghost">◂ Back to payouts</a>
+    {% if seller_view %}
+    <a href="{% url 'business:business_cod_statement' %}" class="bpi__ghost">◂ Back to COD statement</a>
+    {% else %}
+    <a href="{% url 'workforce:cod_business_payout_history' %}" class="bpi__ghost">◂ Back to payout history</a>
+    {% endif %}
+    <div class="d-flex align-items-center gap-2">
     <button type="button" class="bpi__ghost" id="workforce_payout_invoice_btn_print">Print invoice</button>
+    <button type="button" class="bpi__ghost" id="workforce_payout_invoice_btn_preview"
+            data-bpi-preview-toggle aria-pressed="false">A4 preview</button>
+    {% if not seller_view %}
+    <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_cod_business_payout_invoice_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
+    {% endif %}
+    </div>
   </div>
 
+  {% if not seller_view %}
+  <div class="wfnote" id="workforce_cod_business_payout_invoice_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_cod_business_payout_invoice_card_notes' %}" hidden></div>
+  {% endif %}
+
   <article class="bpi__sheet">
+   {# One-column table shell so the letterpad bands repeat on every printed page #}
+   <table class="bpi__page">
+    <thead>
+      <tr><td>
+        <img class="bpi__lp-top" src="{% static 'webpages/img/letterhead-top.png' %}"
+             alt="Ezzy Delivery Qatar — last mile delivery partner in Qatar · +974 66451589 · Fareej Sudan, Doha · info@ezzydelivery.qa · www.ezzydelivery.qa"
+             width="1600" height="487">
+      </td></tr>
+    </thead>
+    <tbody>
+      <tr><td>
+
+    <h2 class="bpi__doc-title">COD Payout Invoice</h2>
 
     <header class="bpi__head">
       <div class="bpi__head-left">
-        <p class="bpi__eyebrow">COD Payout Invoice</p>
+        <p class="bpi__eyebrow">Payout to</p>
         <h1 class="bpi__biz">{{ business.business_name|default:"—" }}</h1>
         {% if business.business_code %}<p class="bpi__biz-code">{{ business.business_code }}</p>{% endif %}
       </div>
@@ -139,11 +175,27 @@
       </div>
     </footer>
 
+      </td></tr>
+    </tbody>
+    <tfoot>
+      <tr><td>
+        <img class="bpi__lp-bottom" src="{% static 'webpages/img/letterhead-bottom.png' %}"
+             alt="" width="1600" height="113">
+      </td></tr>
+    </tfoot>
+   </table>
   </article>
+
+  {# A4 sheet preview — screen only, built from the sheet above by invoice_preview.js #}
+  <section class="bprev" aria-label="A4 page preview">
+    <p class="bprev__meta">Building preview…</p>
+    <div class="bprev__pages"></div>
+  </section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'workforce/js/invoice_preview.js' %}?v=20260813a"></script>
 <script>
   document.getElementById('workforce_payout_invoice_btn_print')?.addEventListener('click', function () {
     window.print();

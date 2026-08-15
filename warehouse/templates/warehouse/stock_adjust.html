@@ -1,0 +1,396 @@
+{# Purpose: Correct on-hand stock to a physical count — writes adjust_in / adjust_out inventory transactions. #}
+{# Used by: warehouse.views.stock_adjust (URL warehouse:stock_adjust) #}
+{# Notes: Rows load over api_stock_levels after business + warehouse are chosen; the form posts the COUNTED figure, never a delta. #}
+{#        Init is swap-safe — the warehouse sidebar navigates by HTMX, so DOMContentLoaded does not fire on arrival. #}
+{% extends 'wh_dashboard_base.html' %}
+{% load business_dropdown %}
+{% load static %}
+
+{% block title %}Stock Adjustment{% endblock %}
+
+{% block content %}
+<div class="wh">
+    <!-- Breadcrumb -->
+    <div class="wh__breadcrumb">
+        <a href="{% url 'workforce:wf_dashboard' %}">Workforce</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <a href="{% url 'warehouse:dashboard' %}">Warehouse</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <span class="wh__breadcrumb-active">Stock Adjustment</span>
+    </div>
+
+    <!-- Hero Header -->
+    <div class="wrs__hero">
+        <div class="wrs__hero-icon"><i class="fas fa-scale-balanced"></i></div>
+        <div>
+            <h1 class="wrs__hero-title">Stock Adjustment</h1>
+            <p class="wrs__hero-subtitle">Correct on-hand quantities to match what is physically on the shelf</p>
+        </div>
+        <button type="button" class="wfnote__btn wfnote__btn--end" data-wfnote-toggle
+                aria-expanded="false" aria-controls="warehouse_stock_adjust_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
+    </div>
+
+    <div class="wfnote wfnote--inset" id="warehouse_stock_adjust_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_stock_adjust_card_notes' %}" hidden></div>
+
+    <div class="wrs__layout wrs__layout--full">
+        <!-- Main Form -->
+        <div class="wrs__main">
+            <div class="wh__card">
+                <div class="wh__card-header">
+                    <div class="wh__card-header-left">
+                        <i class="fas fa-scale-balanced"></i>
+                        <span>ADJUSTMENT SHEET</span>
+                    </div>
+                    <span class="wsa__header-hint" id="adjust-summary"></span>
+                </div>
+                <div class="wh__card-body">
+                    <form method="POST" id="stock-adjust-form" novalidate>
+                        {% csrf_token %}
+
+                        <div class="wha__row">
+                            {% if is_staff and businesses %}
+                            <div class="wha__field">
+                                <label for="business" class="wha__label"><i class="fas fa-store"></i> Business <span class="wha__required">*</span></label>
+                                <select name="business" id="business" class="wha__select" required>
+                                    <option value="">Select Business</option>
+                                    {% for b in businesses|code_last %}
+                                    <option value="{{ b.pk }}" {% if selected_business_id == b.pk|stringformat:"d" %}selected{% endif %}>{% if b.business_code %}{{ b.business_code }}{% else %}*{{ b.business_id }}{% endif %} - {{ b.business_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endif %}
+                            <div class="wha__field">
+                                <label for="warehouse" class="wha__label"><i class="fas fa-warehouse"></i> Warehouse <span class="wha__required">*</span></label>
+                                <select name="warehouse" id="warehouse" class="wha__select" required>
+                                    <option value="">Select Warehouse</option>
+                                    {% for wh in warehouses %}
+                                    <option value="{{ wh.id }}" {% if wh.is_default %}selected{% endif %}>{{ wh.name }} ({{ wh.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="wha__row">
+                            <div class="wha__field">
+                                <label for="location" class="wha__label"><i class="fas fa-location-dot"></i> Storage Location</label>
+                                <select name="location" id="location" class="wha__select">
+                                    <option value="">Default Location</option>
+                                </select>
+                                <span class="wha__hint"><i class="fas fa-info-circle"></i> Counts apply to this location only</span>
+                            </div>
+                            <div class="wha__field">
+                                <label for="reason" class="wha__label"><i class="fas fa-circle-question"></i> Reason <span class="wha__required">*</span></label>
+                                <select name="reason" id="reason" class="wha__select" required>
+                                    <option value="">Select Reason</option>
+                                    {% for value, label in reasons %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="wha__row">
+                            <div class="wha__field">
+                                <label for="reference" class="wha__label"><i class="fas fa-receipt"></i> Reference</label>
+                                <input type="text" class="wha__input" id="reference" name="reference" placeholder="e.g., Damage report DR-2026-04">
+                            </div>
+                            <div class="wha__field">
+                                <label for="notes" class="wha__label"><i class="fas fa-sticky-note"></i> Notes</label>
+                                <input type="text" class="wha__input" id="notes" name="notes" placeholder="What happened, who verified it">
+                            </div>
+                        </div>
+
+                        <div class="wha__divider"></div>
+
+                        <div class="wrs__products-header">
+                            <div class="wha__section-label"><i class="fas fa-boxes wha__section-icon"></i> COUNTED QUANTITIES <span class="wha__required">*</span></div>
+                            <div class="wsa__toolbar">
+                                <input type="search" id="product-search" class="wsa__search" placeholder="Filter products…" aria-label="Filter products" disabled>
+                                <span id="products-count" class="wsa__count"></span>
+                            </div>
+                        </div>
+
+                        <p class="wsa__stray-hint" id="adjust-stray-hint" hidden></p>
+
+                        <div class="wh__table-wrap wrs__table-wrap">
+                            <table class="wh__table" id="adjust-table">
+                                <thead>
+                                    <tr>
+                                        <th class="wh__th wh__th--center" width="50">#</th>
+                                        <th class="wh__th">Product</th>
+                                        <th class="wh__th">SKU</th>
+                                        <th class="wh__th">Color</th>
+                                        <th class="wh__th">Size</th>
+                                        <th class="wh__th">Unit</th>
+                                        <th class="wh__th">Barcode</th>
+                                        <th class="wh__th wh__th--center" width="90">On Hand</th>
+                                        <th class="wh__th wh__th--center" width="100">Other Locs</th>
+                                        <th class="wh__th wh__th--center" width="90">Reserved</th>
+                                        <th class="wh__th wh__th--center" width="120">Counted</th>
+                                        <th class="wh__th wh__th--center" width="90">Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adjust-tbody">
+                                    <tr id="no-products-row">
+                                        <td class="wh__td wsa__placeholder" colspan="12">
+                                            <i class="fa-solid fa-warehouse wsa__placeholder-icon"></i>
+                                            {% if is_staff %}Select a business and a warehouse to load current stock{% else %}Select a warehouse to load current stock{% endif %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="wha__actions">
+                            <button type="submit" class="wh__btn wh__btn--primary" id="submit-btn">
+                                <i class="fas fa-check"></i> Apply Adjustments
+                            </button>
+                            <a href="{% url 'warehouse:inventory_list' %}" class="wh__btn wh__btn--secondary"
+                               hx-get="{% url 'warehouse:inventory_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                                <i class="fas fa-xmark"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// The warehouse sidebar navigates by HTMX swap of #main-content, so this block
+// re-executes with DOMContentLoaded long gone — bind on arrival either way.
+(function() {
+function initStockAdjust() {
+    var form = document.getElementById('stock-adjust-form');
+    if (!form || form.dataset.wsaInit) return;
+    form.dataset.wsaInit = '1';
+
+    var businessSelect = document.getElementById('business');
+    var warehouseSelect = document.getElementById('warehouse');
+    var locationSelect = document.getElementById('location');
+    var reasonSelect = document.getElementById('reason');
+    var searchInput = document.getElementById('product-search');
+    var tbody = document.getElementById('adjust-tbody');
+    var countEl = document.getElementById('products-count');
+    var summaryEl = document.getElementById('adjust-summary');
+    var strayHint = document.getElementById('adjust-stray-hint');
+
+    // Product text is seller-supplied and goes into innerHTML below.
+    function esc(v) {
+        if (v === null || v === undefined) return '';
+        return String(v).replace(/[&<>"']/g, function(c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function placeholder(text, icon) {
+        tbody.innerHTML = '<tr id="no-products-row"><td class="wh__td wsa__placeholder" colspan="12">' +
+            '<i class="fa-solid ' + (icon || 'fa-warehouse') + ' wsa__placeholder-icon"></i>' + esc(text) + '</td></tr>';
+        if (countEl) countEl.textContent = '';
+        if (summaryEl) summaryEl.textContent = '';
+        if (strayHint) strayHint.hidden = true;
+        if (searchInput) { searchInput.disabled = true; searchInput.value = ''; }
+    }
+
+    // ── Warehouse → storage locations ──
+    if (warehouseSelect) {
+        warehouseSelect.addEventListener('change', function() {
+            var warehouseId = this.value;
+            locationSelect.innerHTML = '<option value="">Default Location</option>';
+            if (!warehouseId) {
+                locationSelect.disabled = true;
+                loadStock();
+                return;
+            }
+            locationSelect.disabled = true;
+            fetch('/workforce/warehouse/api/warehouses/' + warehouseId + '/storage-locations/')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    data.forEach(function(loc) {
+                        var opt = document.createElement('option');
+                        opt.value = loc.id;
+                        opt.textContent = loc.name + (loc.is_default ? ' (Default)' : '');
+                        locationSelect.appendChild(opt);
+                    });
+                    locationSelect.disabled = false;
+                })
+                .catch(function() { locationSelect.disabled = false; });
+            loadStock();
+        });
+    }
+
+    if (businessSelect) businessSelect.addEventListener('change', loadStock);
+    if (locationSelect) locationSelect.addEventListener('change', loadStock);
+
+    // ── Load current stock for business + warehouse + location ──
+    function loadStock() {
+        var warehouseId = warehouseSelect ? warehouseSelect.value : '';
+        var businessId = businessSelect ? businessSelect.value : '';
+
+        // Both are needed — on-hand is held per warehouse — but say which one is
+        // still missing, otherwise a chosen business with no warehouse reads as
+        // "the page did nothing".
+        if (!warehouseId || (businessSelect && !businessId)) {
+            if (businessSelect && !businessId && !warehouseId) {
+                placeholder('Select a business and a warehouse to load current stock');
+            } else if (businessSelect && !businessId) {
+                placeholder('Now choose a business to load its stock', 'fa-store');
+            } else {
+                placeholder('Now choose a warehouse — stock is counted per warehouse', 'fa-warehouse');
+            }
+            return;
+        }
+
+        var params = new URLSearchParams({ warehouse: warehouseId });
+        if (businessId) params.set('business', businessId);
+        if (locationSelect && locationSelect.value) params.set('location', locationSelect.value);
+
+        tbody.innerHTML = '<tr><td class="wh__td wsa__placeholder" colspan="12"><i class="fa-solid fa-spinner fa-spin"></i> Loading current stock…</td></tr>';
+
+        fetch('/workforce/warehouse/api/stock-levels/?' + params.toString())
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) { placeholder(data.error, 'fa-triangle-exclamation'); return; }
+                if (!data.length) { placeholder('No products found for this business', 'fa-box-open'); return; }
+
+                var html = '';
+                var strayTotal = 0;
+                data.forEach(function(p, i) {
+                    var sku = p.sku ? esc(p.sku) : '—';
+                    var search = [p.name, p.sku, p.color, p.size, p.unit, p.barcode]
+                        .join(' ').toLowerCase().replace(/"/g, '');
+                    // Stock this business holds in OTHER locations of the same
+                    // warehouse. The count only ever writes the selected
+                    // location, so this is shown but never adjusted.
+                    var other = p.elsewhere || 0;
+                    strayTotal += other;
+                    html += '<tr class="wrs__product-row wsa__row" data-search="' + esc(search) + '">' +
+                        '<td class="wh__td wh__td--center"><span class="wrs__row-num">' + (i + 1) + '</span></td>' +
+                        '<td class="wh__td"><span class="fw-semibold">' + esc(p.name) + '</span>' +
+                        '<input type="hidden" name="products[]" value="' + esc(p.id) + '"></td>' +
+                        '<td class="wh__td"><code>' + sku + '</code></td>' +
+                        '<td class="wh__td wsa__variant">' + (esc(p.color) || '—') + '</td>' +
+                        '<td class="wh__td wsa__variant">' + (esc(p.size) || '—') + '</td>' +
+                        '<td class="wh__td wsa__variant">' + (esc(p.unit) || '—') + '</td>' +
+                        '<td class="wh__td"><code class="wsa__barcode">' + (esc(p.barcode) || '—') + '</code></td>' +
+                        '<td class="wh__td wh__td--center wsa__onhand" data-on-hand="' + p.on_hand + '">' + p.on_hand + '</td>' +
+                        '<td class="wh__td wh__td--center wsa__other' + (other ? ' wsa__other--has' : '') + '">' + (other || '—') + '</td>' +
+                        '<td class="wh__td wh__td--center wsa__reserved">' + (p.reserved || '—') + '</td>' +
+                        '<td class="wh__td wh__td--center"><input type="number" name="counted[]" class="form-control form-control-sm wsa__input" min="0" placeholder="—"></td>' +
+                        '<td class="wh__td wh__td--center wsa__delta">—</td>' +
+                        '</tr>';
+                });
+                tbody.innerHTML = html;
+                if (countEl) countEl.textContent = data.length + ' products';
+                // Loud about it: 0 on hand with units sitting in bins is exactly
+                // the case that used to look like "the page failed to load stock".
+                if (strayTotal && strayHint) {
+                    strayHint.textContent = strayTotal + ' unit' + (strayTotal === 1 ? '' : 's') +
+                        ' of this business sit in other locations of this warehouse — switch Storage Location to count them.';
+                    strayHint.hidden = false;
+                } else if (strayHint) {
+                    strayHint.hidden = true;
+                }
+                if (searchInput) searchInput.disabled = false;
+                updateSummary();
+            })
+            .catch(function(err) {
+                console.error('Error:', err);
+                placeholder('Error loading stock levels', 'fa-triangle-exclamation');
+            });
+    }
+
+    // ── Live delta per row + header summary ──
+    function updateSummary() {
+        var rows = tbody.querySelectorAll('.wsa__row');
+        var changed = 0;
+        rows.forEach(function(row) {
+            var input = row.querySelector('.wsa__input');
+            var deltaCell = row.querySelector('.wsa__delta');
+            var onHand = parseInt(row.querySelector('.wsa__onhand').getAttribute('data-on-hand'), 10);
+            row.classList.remove('wsa__row--up', 'wsa__row--down');
+
+            if (!input || input.value.trim() === '') {
+                deltaCell.textContent = '—';
+                deltaCell.className = 'wh__td wh__td--center wsa__delta';
+                return;
+            }
+            var counted = parseInt(input.value, 10);
+            if (isNaN(counted)) { deltaCell.textContent = '—'; return; }
+
+            var delta = counted - onHand;
+            if (delta === 0) {
+                deltaCell.textContent = 'no change';
+                deltaCell.className = 'wh__td wh__td--center wsa__delta wsa__delta--flat';
+            } else {
+                changed += 1;
+                deltaCell.textContent = (delta > 0 ? '+' : '') + delta;
+                deltaCell.className = 'wh__td wh__td--center wsa__delta ' + (delta > 0 ? 'wsa__delta--up' : 'wsa__delta--down');
+                row.classList.add(delta > 0 ? 'wsa__row--up' : 'wsa__row--down');
+            }
+        });
+        if (summaryEl) {
+            summaryEl.textContent = changed ? changed + ' row' + (changed === 1 ? '' : 's') + ' changed' : '';
+        }
+    }
+
+    tbody.addEventListener('input', function(e) {
+        if (e.target.classList.contains('wsa__input')) updateSummary();
+    });
+
+    // ── Filter the sheet ──
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            var q = this.value.trim().toLowerCase();
+            tbody.querySelectorAll('.wsa__row').forEach(function(row) {
+                var hit = !q || row.getAttribute('data-search').indexOf(q) !== -1;
+                row.classList.toggle('wsa__row--hidden', !hit);
+            });
+        });
+    }
+
+    // ── Guard the submit: a reason and at least one real change ──
+    form.addEventListener('submit', function(e) {
+        if (reasonSelect && !reasonSelect.value) {
+            e.preventDefault();
+            reasonSelect.focus();
+            alert('Select a reason for this adjustment.');
+            return;
+        }
+        var changed = false;
+        tbody.querySelectorAll('.wsa__row').forEach(function(row) {
+            var input = row.querySelector('.wsa__input');
+            if (!input || input.value.trim() === '') return;
+            var onHand = parseInt(row.querySelector('.wsa__onhand').getAttribute('data-on-hand'), 10);
+            if (parseInt(input.value, 10) !== onHand) changed = true;
+        });
+        if (!changed) {
+            e.preventDefault();
+            alert('Nothing to adjust — enter a counted quantity that differs from the on-hand figure.');
+        }
+    });
+
+    // Warehouse may be pre-selected (default warehouse) — populate locations and,
+    // for a seller with an implicit business, the sheet itself.
+    if (warehouseSelect && warehouseSelect.value) {
+        warehouseSelect.dispatchEvent(new Event('change'));
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initStockAdjust);
+} else {
+    initStockAdjust();
+}
+})();
+</script>
+{% endblock %}

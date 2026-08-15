@@ -1,6 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Full paginated temp-order history for one business, with resync / mark-imported / auto-import
+Used by: workforce_views.temp_orders_browse at /workforce/temp-orders/browse/
+Notes: Requires a business filter before any rows are shown; auto-import is capped at 25 rows a batch.
+       Carries the shared page-notes card (wfnote__) under the hero, hidden on load; the hero help
+       button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}?v=2" rel="stylesheet" type="text/css" />
@@ -36,8 +43,17 @@
                 <span class="oli__hero__count-label">total rows</span>
             </div>
             {% endif %}
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_temp_orders_browse_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </header>
+
+    <div class="wfnote" id="workforce_temp_orders_browse_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_temp_orders_browse_card_notes' %}" hidden></div>
 
     <!-- Filter form -->
     <form method="get" class="card border-0 shadow-sm mb-3">

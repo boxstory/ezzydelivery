@@ -1,6 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% comment %}
+Purpose: Staff queue of delivery tasks that exist but have not been pushed to the fleet yet
+Used by: workforce.views.dl_list_ready_to_published_to_dms at /workforce/tasks/ready-to-publish/
+Notes: No filter bar — the queue is the filter (dl_task_publish=False, still open). Carries the
+       shared wfnote__ page-notes card under the hero, hidden on load; the hero help button
+       toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
@@ -26,9 +33,18 @@
             <span class="oli__hero__count-value" id="pageOrderCount">{{ dl_tasks.paginator.count|default:"0" }}</span>
             <span class="oli__hero__count-label">tasks</span>
         </div>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_parts_lists_dl_list_unpublished_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
 </header>
 <div class="col-12 p-3" role="main" aria-label="Unpublished Tasks List">
+
+    <div class="wfnote" id="workforce_parts_lists_dl_list_unpublished_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_parts_lists_dl_list_unpublished_card_notes' %}" hidden></div>
 
     {% if dl_tasks %}
     {% include "workforce/parts/components/_tasks_table_view.html" with tasks=dl_tasks %}

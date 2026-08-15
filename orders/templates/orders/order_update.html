@@ -1,37 +1,26 @@
 {% extends "business_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% load business_console %}
 
 {% block head_title %}Update Order #{{ order.order_number }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'orders/css/orders.css' %}?v=20260215e">
+<link rel="stylesheet" href="{% static 'orders/css/orders.css' %}?v=20260808a">
 {% endblock %}
 
 {% block content %}
 <div class="ou" id="orders_update_container_main">
 
-  <!-- Top Bar -->
-  <div class="ou__topbar">
-    <div class="ou__topbar-left">
-      <a class="ou__back-btn" href="{% url 'orders:orders_all_list' %}" id="orders_update_btn_back">
-        <i class="fa fa-arrow-left"></i>
-      </a>
-      <div class="ou__title-group">
-        <h1 class="ou__title">Edit Order</h1>
-        <div class="ou__meta">
-          <code class="ou__order-num">{{ order.order_number }}</code>
-          <span class="ob__ ob__--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
-          <span class="ou__date"><i class="fa-regular fa-calendar"></i> {{ order.order_date|date:"d M Y" }}</span>
-        </div>
-      </div>
-    </div>
-    <div class="ou__topbar-right">
-      <a class="btn btn-outline-secondary btn-sm" href="{% url 'delivery:all_delivery_tasks' %}" id="orders_update_btn_go_tasks">
-        <i class="fa-solid fa-truck me-1"></i> Go to Tasks
-      </a>
-    </div>
-  </div>
+  {% bconheader eyebrow="Orders" live=order.order_number icon="fa-solid fa-pen-to-square" title="Edit Order" subtitle=order.customer_name %}
+    <span class="ob__ ob__--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
+    <a class="bcon__btn bcon__btn--secondary" href="{% url 'delivery:all_delivery_tasks' %}" id="orders_update_btn_go_tasks">
+      <i class="fa-solid fa-truck"></i> Go to Tasks
+    </a>
+    <a class="bcon__btn bcon__btn--ghost" href="{% url 'orders:orders_all_list' %}" id="orders_update_btn_back">
+      <i class="fa-solid fa-arrow-left"></i> Back
+    </a>
+  {% endbconheader %}
 
   {% if form.non_field_errors %}
   <div class="alert alert-danger py-2 mb-2" role="alert">
@@ -314,6 +303,49 @@
             </label>
           </div>
           {% endif %}
+        </div>
+
+        <!-- Scheduled Delivery — hold the order for a specific day -->
+        <div class="ou__section">
+          <div class="ou__section-head">
+            <i class="fa-solid fa-calendar-day"></i>
+            <span>Scheduled Delivery</span>
+          </div>
+          <p class="oap__sched__intro">
+            For gifts and dated occasions — birthdays, anniversaries, weddings, events.
+            The order is held and delivered <strong>on the day you pick</strong>, not earlier,
+            and stays off the daily dispatch board until the day before.
+          </p>
+          <div class="ou__field">
+            <label class="ou__checkbox-row">
+              {{ form.scheduled_delivery }}
+              <span>Deliver on a specific date</span>
+            </label>
+          </div>
+          <div id="oap_scheduled_fields" hidden>
+            <div class="ou__field-grid ou__field-grid--2col">
+              <div class="ou__field">
+                <label class="ou__label" for="id_scheduled_date">Delivery Date</label>
+                {{ form.scheduled_date }}
+                {% if form.scheduled_date.errors %}<div class="ou__error">{{ form.scheduled_date.errors.0 }}</div>{% endif %}
+              </div>
+              <div class="ou__field">
+                <label class="ou__label" for="id_scheduled_time">Preferred Hour (optional)</label>
+                {{ form.scheduled_time }}
+                {% if form.scheduled_time.errors %}<div class="ou__error">{{ form.scheduled_time.errors.0 }}</div>{% endif %}
+              </div>
+            </div>
+            <div class="ou__field-grid ou__field-grid--2col">
+              <div class="ou__field">
+                <label class="ou__label" for="id_scheduled_occasion">Occasion</label>
+                {{ form.scheduled_occasion }}
+              </div>
+              <div class="ou__field">
+                <label class="ou__label" for="id_scheduled_note">Instruction</label>
+                {{ form.scheduled_note }}
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Submit -->
@@ -724,6 +756,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
   attachDeleteHandlers();
   checkCodMatch();
+
+  // Scheduled Delivery — reveal the date fields only when the box is ticked
+  var schedToggle = document.getElementById('id_scheduled_delivery');
+  var schedFields = document.getElementById('oap_scheduled_fields');
+  var schedDate   = document.getElementById('id_scheduled_date');
+  if (schedToggle && schedFields) {
+    if (schedDate && !schedDate.min) schedDate.min = new Date().toISOString().split('T')[0];
+    var syncSched = function() {
+      schedFields.hidden = !schedToggle.checked;
+      if (schedDate) schedDate.required = schedToggle.checked;
+    };
+    schedToggle.addEventListener('change', syncSched);
+    syncSched();
+  }
 });
 </script>
 {% endblock %}

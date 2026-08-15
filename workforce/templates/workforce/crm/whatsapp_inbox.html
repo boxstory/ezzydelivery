@@ -4,9 +4,10 @@
 {# Purpose: WAHA WhatsApp inbox — unknown inbound senders; staff promotes real prospects to leads or dismisses noise. #}
 {# Used by: workforce.crm_views.crm_whatsapp_inbox #}
 {# Notes: crmi__ namespace; promote/dismiss are fetch-POST JSON actions handled by inline delegated JS. #}
+{#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718l" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -61,8 +62,17 @@
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-table-columns"></i> Board
         </a>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_crm_whatsapp_inbox_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
       </div>
     </div>
+
+    <div class="wfnote" id="workforce_crm_whatsapp_inbox_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_whatsapp_inbox_card_notes' %}" hidden></div>
 
     {% if not waha_enabled %}
     <div class="crmi__notice">
@@ -88,9 +98,28 @@
                  hx-trigger="keyup changed delay:350ms, search"
                  hx-include="#workforce_crm_inbox_form_filter">
         </div>
-        <button type="submit" class="crm__btn crm__btn--primary">Search</button>
+        {% if wa_session_filter %}<input type="hidden" name="session" value="{{ wa_session_filter }}">{% endif %}
+        <button type="submit" class="crm__btn crm__btn--ink">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Search
+        </button>
       </form>
     </div>
+
+    {% if wa_sessions %}
+    <!-- One tab per linked WhatsApp number; only rendered once a second is added -->
+    <div class="crmi__sess" role="tablist">
+      <a class="crmi__sess-tab {% if not wa_session_filter %}crmi__sess-tab--on{% endif %}"
+         href="?{% if search %}search={{ search|urlencode }}{% endif %}">All numbers</a>
+      {% for s in wa_sessions %}
+      <a class="crmi__sess-tab {% if wa_session_filter == s.name %}crmi__sess-tab--on{% endif %}"
+         href="?session={{ s.name|urlencode }}{% if search %}&amp;search={{ search|urlencode }}{% endif %}"
+         title="{{ s.name }} — {{ s.status }}">
+        {{ s.push_name|default:s.name }}
+        {% if s.phone %}<span class="crmi__sess-num">+{{ s.phone }}</span>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
 
     <div class="crm__resultbar">
       Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} unknown senders
@@ -130,6 +159,7 @@
             <td class="crmi__actions">
               <div class="crmi__actions-row">
                 <button type="button" class="crm__btn crm__btn--sm crmi__chat-btn" data-chat="{{ row.from_number }}"
+                        data-chat-session="{{ row.session }}"
                         data-chat-promote="{{ row.real_number|default:row.from_number }}"
                         data-chat-lead="{{ row.existing_lead_id|default:'' }}"
                         data-chat-label="{% if row.contact_name %}{{ row.contact_name }}{% elif row.real_number %}+{{ row.real_number }}{% else %}{{ row.from_number }}{% endif %}">
@@ -314,6 +344,8 @@
       var title = chatEl('workforce_crm_inbox_h_chat_title');
       if (!ov || !body) return;
       ov.dataset.sender = btn.getAttribute('data-chat') || '';
+      // Which of our numbers this row arrived on — the preview is session-scoped.
+      ov.dataset.session = btn.getAttribute('data-chat-session') || '';
       ov.dataset.promote = btn.getAttribute('data-chat-promote') || '';
       var promoteBtn = chatEl('workforce_crm_inbox_btn_chat_promote');
       var driverBtn = chatEl('workforce_crm_inbox_btn_chat_driver');
@@ -336,7 +368,8 @@
       if (title) title.textContent = btn.getAttribute('data-chat-label') || 'Conversation';
       body.innerHTML = '<div class="crmi__chat-empty"><i class="fa-solid fa-rotate fa-spin"></i> Loading conversation…</div>';
       ov.hidden = false;
-      fetch(URL_CHAT + '?sender=' + encodeURIComponent(ov.dataset.sender))
+      fetch(URL_CHAT + '?sender=' + encodeURIComponent(ov.dataset.sender)
+                     + '&session=' + encodeURIComponent(ov.dataset.session || ''))
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (data.success) { renderChat(data.messages || []); }

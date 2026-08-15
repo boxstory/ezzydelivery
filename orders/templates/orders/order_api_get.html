@@ -2,6 +2,7 @@
 {% load core_filters %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% load business_console %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'orders/css/order_api_get.css' %}">
@@ -10,32 +11,23 @@
 {% block content %}
 <div class="oag" id="orders_get_api_container_main">
 
-    <!-- Header -->
-    <div class="oag__hero">
-        <div class="oag__hero-inner">
-            <div>
-                <div class="oag__hero-eyebrow">Integration Feed</div>
-                <h1 class="oag__hero-title">API Orders</h1>
-            </div>
-            <div class="oag__hero-actions">
-                <a href="{% url 'orders:orders_all_list' %}" class="oag__action-btn">
-                    <i class="fa fa-basket-shopping"></i> Go to Orders
-                </a>
-                <button type="button" class="oag__action-btn oag__action-btn--primary" id="orders_get_api_btn_api_upload" onclick="oagRunSync(this)">
-                    <i class="fa fa-cloud-download-alt"></i> <span id="oag_sync_label">API Upload</span>
-                </button>
-                <button type="button" class="oag__action-btn oag__action-btn--import{% if not ready_count %} d-none{% endif %}" id="oag_btn_import_selected" onclick="oagImportSelected(this)">
-                    <i class="fa fa-file-import"></i> <span id="oag_import_label">Import Selected (<span id="oag_selected_count">0</span>)</span>
-                </button>
-                <a href="{% url 'orders:order_upload_file' %}" class="oag__action-btn" id="orders_get_api_btn_upload_bulk">
-                    <i class="fa fa-file-upload"></i> Bulk Upload
-                </a>
-                <a href="{% url 'orders:add_order' %}" class="oag__action-btn" id="orders_get_api_btn_add_orders">
-                    <i class="fa fa-plus"></i> Add Order
-                </a>
-            </div>
-        </div>
-    </div>
+    {% bconheader eyebrow="Orders" live="Integration Feed" icon="fa-solid fa-code" title="API Orders" subtitle="Orders pulled from your connected stores, ready to import." %}
+        <a href="{% url 'orders:orders_all_list' %}" class="bcon__btn bcon__btn--secondary">
+            <i class="fa-solid fa-basket-shopping"></i> Go to Orders
+        </a>
+        <button type="button" class="bcon__btn bcon__btn--primary" id="orders_get_api_btn_api_upload" onclick="oagRunSync(this)">
+            <i class="fa-solid fa-cloud-arrow-down"></i> <span id="oag_sync_label">API Upload</span>
+        </button>
+        <button type="button" class="bcon__btn bcon__btn--secondary{% if not ready_count %} d-none{% endif %}" id="oag_btn_import_selected" onclick="oagImportSelected(this)">
+            <i class="fa-solid fa-file-import"></i> <span id="oag_import_label">Import Selected (<span id="oag_selected_count">0</span>)</span>
+        </button>
+        <a href="{% url 'orders:order_upload_file' %}" class="bcon__btn bcon__btn--secondary" id="orders_get_api_btn_upload_bulk">
+            <i class="fa-solid fa-file-arrow-up"></i> Bulk Upload
+        </a>
+        <a href="{% url 'orders:add_order' %}" class="bcon__btn bcon__btn--secondary" id="orders_get_api_btn_add_orders">
+            <i class="fa-solid fa-plus"></i> Add Order
+        </a>
+    {% endbconheader %}
 
     <!-- Filter -->
     <div class="oag__filter">

@@ -1,5 +1,11 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff console to test and approve one client's store/sheet integration (BusinessApiSettings).
+Used by: workforce_views.wf_test_api_config at /workforce/.../test/ ; results load via HTMX from wf_test_api_config_result.
+Notes: The test is read-only against the client's platform. The page-notes card (wfnote__, shared) sits under
+       the header, hidden on load, toggled by the header help button.
+{% endcomment %}
 
 {% block title %}Connection Test — {{ api.business.business_name }}{% endblock %}
 
@@ -8,6 +14,7 @@
     <!-- Header -->
     <div class="wftest__header">
         <h1><i class="fa-solid fa-flask me-2"></i>Connection Test Console</h1>
+        <div class="d-flex align-items-center gap-2">
         <a href="{% url 'workforce:wf_seller_api_configs' %}"
            hx-get="{% url 'workforce:wf_seller_api_configs' %}"
            hx-target="#main-content" hx-select="#main-content"
@@ -15,7 +22,17 @@
            class="btn btn-sm btn-outline-secondary">
             <i class="fa-solid fa-arrow-left me-1"></i>Back to API Configs
         </a>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_seller_api_test_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
+        </div>
     </div>
+
+    <div class="wfnote" id="workforce_seller_api_test_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_seller_api_test_card_notes' %}" hidden></div>
 
     <div class="row g-3">
         <!-- Config Panel -->

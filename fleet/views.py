@@ -58,6 +58,8 @@ from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from core.decorators import driver_required
+from core.exports import set_export_filename, safe_csv_writer
+from core.pagination import paginate, other_params
 
 from core import models as core_models
 from core import views as core_views
@@ -66,6 +68,8 @@ from delivery import models as delivery_models
 from fleet import forms as fleet_forms
 from fleet.wallet_service import WalletService, WalletAlertService
 from core.seo import SEOMetadata
+from core.json_utils import safe_json
+from core.validators import safe_int
 
 # Local aliases for commonly used models
 Driver = fleet_models.Driver
@@ -525,7 +529,7 @@ def cod_collection(request):
         )
         if date_cutoff:
             txn_qs = txn_qs.filter(created_at__gte=date_cutoff)
-        cod_transactions = txn_qs.order_by('-created_at')[:50]
+        cod_transactions_qs = txn_qs.order_by('-created_at')
 
         # Get COD currently in hand (unsettled) — filter by collection date.
         # Include zero-COD delivered orders (order.cod_amount == 0, e.g. prepaid) as
@@ -593,12 +597,25 @@ def cod_collection(request):
             id__in=cod_in_hand_list.values_list('order_id', flat=True)
         ).select_related('business', 'pickup_location').order_by('-created_at')
 
+        # Paginate the two display lists. The totals above are aggregated off the
+        # full querysets, and cod_in_hand_ids is still built from the whole
+        # in-hand queryset, so paging changes what is shown and nothing else.
+        # Two lists on one URL, so the submissions log carries its own param.
+        cod_in_hand_page, _ = paginate(request, cod_in_hand_list, default=25)
+        cod_transactions_page, cod_transactions_total = paginate(
+            request, cod_transactions_qs, default=25, page_param='txn_page')
+
         context = {
             'driver': driver,
             'wallet_status': wallet_status,
-            'cod_transactions': cod_transactions,
+            'cod_transactions': cod_transactions_page,
+            'cod_transactions_page': cod_transactions_page,
+            'cod_transactions_total': cod_transactions_total,
+            'cod_transactions_params': other_params(request, 'txn_page'),
             'cod_deliveries': cod_deliveries,
-            'cod_in_hand_list': cod_in_hand_list,
+            'cod_in_hand_list': cod_in_hand_page,
+            'cod_in_hand_page': cod_in_hand_page,
+            'cod_in_hand_params': other_params(request, 'page'),
             'cod_in_hand_total': cod_in_hand_total,
             'cod_in_hand_count': cod_in_hand_count,
             'cod_orders': cod_orders,
@@ -1084,15 +1101,15 @@ def cod_export(request):
             buffer.seek(0)
 
             response = HttpResponse(buffer, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="cod_report_{timezone.now().strftime("%Y%m%d_%H%M")}.pdf"'
+            set_export_filename(response, 'cod_report', code=driver, ext='pdf')
             return response
 
         else:
             # Generate CSV
             response = HttpResponse(content_type='text/csv')
-            response['Content-Disposition'] = f'attachment; filename="cod_report_{timezone.now().strftime("%Y%m%d_%H%M")}.csv"'
+            set_export_filename(response, 'cod_report', code=driver, ext='csv')
 
-            writer = csv.writer(response)
+            writer = safe_csv_writer(response)
             writer.writerow(['#', 'TXN Code', 'Task Number', 'Order Number', 'Business', 'Customer', 'Location', 'Delivered Date', 'Delivered Time', 'COD Amount (QR)'])
 
             total = 0
@@ -1387,7 +1404,7 @@ def cod_transaction_pdf(request):
         buffer.seek(0)
 
         response = HttpResponse(buffer, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="txn_{txn.transaction_code}.pdf"'
+        set_export_filename(response, f'txn_{txn.transaction_code}', code=driver, ext='pdf')
         return response
 
     except fleet_models.DriverTransaction.DoesNotExist:
@@ -1460,7 +1477,7 @@ def driver_earnings(request):
 
         # Get filter parameters
         try:
-            days = int(request.GET.get('days', 30))
+            days = safe_int(request.GET.get('days'), default=30, minimum=1, maximum=730)
         except (ValueError, TypeError):
             days = 30
         status_filter = request.GET.get('status', 'all')
@@ -1685,7 +1702,7 @@ def transaction_history(request):
         # Get filter parameters
         transaction_type = request.GET.get('type', 'all')
         try:
-            days = int(request.GET.get('days', 30))
+            days = safe_int(request.GET.get('days'), default=30, minimum=1, maximum=730)
         except (ValueError, TypeError):
             days = 30
 
@@ -1738,7 +1755,7 @@ def fleet_finance_summary(request):
         from django.db.models import Sum, Count, Q
         from decimal import Decimal
 
-        days = int(request.GET.get('days', 30))
+        days = safe_int(request.GET.get('days'), default=30, minimum=1, maximum=730)
         start_date = timezone.now() - timedelta(days=days)
 
         # Wallet status
@@ -2033,13 +2050,13 @@ def driver_analytics(request):
 
         context = {
             'driver': driver,
-            'monthly_data': json.dumps(monthly_data),
+            'monthly_data': safe_json(monthly_data),
             'delivery_categories': delivery_categories,
             'delivery_speeds': delivery_speeds,
             'peak_hours': peak_hours,
             'cod_count': cod_count,
             'prepaid_count': prepaid_count,
-            'hour_distribution': json.dumps(hour_distribution),
+            'hour_distribution': safe_json(hour_distribution),
         }
 
         return render(request, 'fleet/parts/driver_analytics.html', context)
@@ -3886,7 +3903,7 @@ def fleet_tasks_map(request):
     active_pin_count = len([p for p in pins if p['lat'] and not p['is_new']])
     context = {
         'driver': driver,
-        'pins_json': json.dumps(pins),
+        'pins_json': safe_json(pins),
         'pin_count': new_pin_count + active_pin_count,
         'new_pin_count': new_pin_count,
         'active_pin_count': active_pin_count,
@@ -3915,6 +3932,15 @@ def upload_delivery_proof(request, task_id):
     photo = request.FILES.get('photo')
     if not photo:
         return JsonResponse({'error': 'No photo uploaded'}, status=400)
+
+    # objects.create() never calls full_clean(), so the model's own validators do
+    # not fire on this path — enforce them here or the field guard is decorative.
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from core.validators import IMAGE_EXTENSIONS, validate_upload_file
+    try:
+        validate_upload_file(photo, IMAGE_EXTENSIONS, max_mb=10, field_label='Proof photo')
+    except DjangoValidationError as exc:
+        return JsonResponse({'error': exc.messages[0]}, status=400)
 
     proof = DeliveryProof.objects.create(
         delivery_task=task,

@@ -7,6 +7,11 @@
 {% url 'workforce:drivers_pending' as u_drivers_pending %}
 {% url 'workforce:pricing_inquiries_list' as u_pricing_inquiries_list %}
 {% url 'workforce:warehouses_list' as u_warehouses_list %}
+{% comment %}
+Mixed desk: verification queues are Operations, pricing inquiries Marketing.
+Pending Sellers is the acquisition funnel and belongs to both.
+{% endcomment %}
+{% if wf_dept_ops or wf_dept_mkt %}
 {% with active="user_verification_list,team_verification_list,business_verification_list,driver_verification_list,sellers_pending,drivers_pending,pricing_inquiries_list,pricing_inquiry_detail,warehouses_list" %}
 <li id="workforce_sidebar_menu_verifications" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_verifications" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-verifications" data-title="Onboarding">
@@ -16,15 +21,22 @@
   </div>
   <div id="submenu-verifications" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
     <ul class="nav flex-column">
+      {% if wf_dept_mkt %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_pricing_inquiries" url=u_pricing_inquiries_list icon="fa-solid fa-file-invoice" label="Pricing Inquiries" active_names="pricing_inquiries_list,pricing_inquiry_detail" %}
+      {% endif %}
+      {% if wf_dept_ops %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_verify_business" url=u_business_verification_list icon="fa-solid fa-building-circle-check" label="Business Verification" active_names="business_verification_list" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_verify_driver" url=u_driver_verification_list icon="fa-solid fa-id-card" label="Driver Verification" active_names="driver_verification_list" %}
+      {% endif %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_sellers_pending" url=u_sellers_pending icon="fa-solid fa-store-slash" label="Pending Sellers" active_names="sellers_pending" %}
+      {% if wf_dept_ops %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_drivers_pending" url=u_drivers_pending icon="fa-solid fa-clock" label="Pending Drivers" active_names="drivers_pending" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_verify_all" url=u_user_verification_list icon="fa-solid fa-list" label="All Users" active_names="user_verification_list" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_verify_team" url=u_team_verification_list icon="fa-solid fa-users" label="Team" active_names="team_verification_list" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_warehouses_list" url=u_warehouses_list icon="fa-solid fa-boxes-stacked" label="WH-Business Links" active_names="warehouses_list" %}
+      {% endif %}
     </ul>
   </div>
 </li>
 {% endwith %}
+{% endif %}

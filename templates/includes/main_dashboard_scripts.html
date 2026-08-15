@@ -3,6 +3,9 @@
      caused duplicate Bootstrap event delegation on [data-bs-toggle="dropdown"], which toggled
      the navbar user-dropdown twice per click (open → close), making it appear broken on dashboards. -->
 
+<!-- Page-notes help button (staff, warehouse, delivery dashboards) -->
+<script src="{% static 'webpages/js/wfnote.js' %}?v=20260730a"></script>
+
 <script
   src="https://unpkg.com/htmx.org@2.0.3"
   integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq"
@@ -150,7 +153,6 @@
         var el = this;
         var $el = jQuery(el);
 
-        if (el.multiple) return;
         if ($el.data('select2')) return;              // already enhanced
         if ($el.is('[data-no-select2]')) return;      // explicit opt-out
         // The pagination component's rows-per-page control is part of the
@@ -165,10 +167,16 @@
         // HTML5 validation with "not focusable" because the browser cannot
         // focus a hidden control.
         var form = el.form;
-        if (form && (form.method || 'get').toLowerCase() !== 'get') {
+        var isGetForm = !form || (form.method || 'get').toLowerCase() === 'get';
+        if (!isGetForm) {
           var isDriverPicker = /driver/i.test(el.name || '') || /driver/i.test(el.id || '');
           if (!isDriverPicker || el.required) return;
         }
+        // Multi-selects are enhanced only inside a GET filter bar, where the
+        // searchable tag box is the whole point — a client list runs past a
+        // hundred names. Everywhere else (posting forms, edit screens) a
+        // multiple stays native, which is what the old blanket skip protected.
+        if (el.multiple && !isGetForm) return;
 
         // A Select2 inside a Bootstrap modal must render its dropdown inside
         // that modal. Left on <body> the dropdown sits outside the modal's
@@ -190,6 +198,21 @@
         var inst = $el.data('select2');
         if (inst && inst.$container) inst.$container.addClass('ez-filter-select');
         if (inst && inst.$dropdown) inst.$dropdown.addClass('ez-filter-select__menu');
+
+        // The dropdown is parented to <body>, so CSS cannot see which bar it
+        // came from — and the bars are not one height (28px on the console
+        // filter rows, 34-36px on the older stacked forms). A single global
+        // value therefore reads as oversized on one page and undersized on the
+        // next, so the search field is handed its own host's height instead.
+        if (inst && inst.$container && inst.$dropdown) {
+          var ctrl = inst.$container.find('.select2-selection')[0];
+          var hostH = ctrl ? Math.round(ctrl.getBoundingClientRect().height) : 0;
+          // A picker built inside a hidden panel measures 0 — leave the CSS
+          // default in place rather than collapsing the field to nothing.
+          if (hostH > 16) {
+            inst.$dropdown[0].style.setProperty('--ez-filter-field-h', hostH + 'px');
+          }
+        }
 
         // A dialog that opts in with `picker-modal__body` reserves room for the
         // open list only while it is open, so a closed one stays compact.

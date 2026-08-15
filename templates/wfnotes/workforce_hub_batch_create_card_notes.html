@@ -1,0 +1,88 @@
+{% comment %}
+Purpose: "About this page" notes panel for hub_batch_create.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_hub_batch_create_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            This builds one <strong>hub pickup batch</strong> — a single driver ride that collects several of a
+            client's orders from one pickup point and drops them at a hub warehouse. Set the route and the pay on
+            the left, tick the orders that go on the ride on the right, then create. You land straight on the new
+            batch's page, and the batch also appears in <strong>Hub Pickup Batches</strong>.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pickup location</dt>
+                        <dd class="wfnote__def">Where the driver collects — a client's active pickup point.
+                            Required.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Hub warehouse</dt>
+                        <dd class="wfnote__def">Which active warehouse location the goods are dropped at.
+                            Required, and it becomes the origin of every last-mile task later.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assign driver</dt>
+                        <dd class="wfnote__def">Optional. Leave it unassigned and the batch is created
+                            <em>Pending</em>; pick an approved driver and it is created <em>Assigned</em>.
+                            You can assign or change it later on the batch page.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Driver earnings</dt>
+                        <dd class="wfnote__def">One flat amount in QAR for the whole ride, not per order.
+                            Defaults to 5.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Notes</dt>
+                        <dd class="wfnote__def">Free text kept on the batch for the driver or the next staff
+                            member. Optional.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Select orders</dt>
+                        <dd class="wfnote__def">Tick each order for the ride; the header checkbox ticks the whole
+                            visible list. The counter shows the running total and <em>Create Batch</em> stays
+                            disabled until at least one order is ticked.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Which orders appear</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Hub delivery</dt>
+                        <dd class="wfnote__def">The order has to be marked as a hub delivery. Ordinary
+                            door-to-door orders never show up here.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Verified</dt>
+                        <dd class="wfnote__def">Address verification must already be done. Unverified orders are
+                            held back until they clear.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Not batched</dt>
+                        <dd class="wfnote__def">An order can only ever be on one batch. Once it is on a ride it
+                            drops out of this list.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>The order list is <strong>not filtered by the pickup location you choose</strong> — every
+                    eligible order is listed. Check the Pickup Location column against your selection before
+                    ticking, or the driver will be sent to the wrong door.</li>
+                <li>The batch number is generated for you (<em>BATCH-date-sequence</em>) — there is nothing to type.</li>
+                <li>Anything ticked that has since been batched by someone else is silently dropped when you save,
+                    so confirm the order count on the batch page afterwards.</li>
+                <li>Creating the batch does <strong>not</strong> create any delivery task. Last-mile tasks are only
+                    raised when the batch reaches <strong>At Hub</strong>.</li>
+                <li>Only drivers with approved status can be selected, here or later.</li>
+            </ul>
+        </section>
+    

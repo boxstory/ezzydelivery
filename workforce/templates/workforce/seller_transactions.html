@@ -1,6 +1,14 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static humanize %}
+{% load zone_tags %}
+{% comment %}
+Purpose: Per-client COD position — roster of active sellers, then that seller's COD order ledger
+Used by: workforce_views.seller_transactions at /workforce/seller-transactions/
+Notes: Landing state is the roster of cards ordered by money owed; picking one opens its orders.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Seller Transactions - Ezzy Delivery{% endblock title %}
 
@@ -11,7 +19,10 @@
 {% block content %}
 <div class="ftr">
     <!-- Hero Header -->
-    {% include "workforce/parts/components/_page_header.html" with title="Seller Transactions" icon="fa-store" subtitle="Track and manage seller COD collections and settlements" %}
+    {% include "workforce/parts/components/_page_header.html" with title="Seller Transactions" icon="fa-store" subtitle="Track and manage seller COD collections and settlements" notes_id="workforce_seller_transactions_card_notes" %}
+
+    <div class="wfnote wfnote--inset" id="workforce_seller_transactions_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_seller_transactions_card_notes' %}" hidden></div>
 
     {% comment %}
     Landing state: a card per active seller instead of a bare dropdown. The
@@ -210,6 +221,9 @@
                         </th>
                         <th>Customer</th>
                         <th>From / To Location</th>
+                        <th class="ftr__th--dist" title="Driving distance from pickup to drop. A ~ marks a fallback estimate rather than a routed distance.">
+                            Distance
+                        </th>
                         <th class="ftr__th--sort" onclick="updateSort('{% if sort_by == 'amount_asc' %}amount_desc{% else %}amount_asc{% endif %}')">
                             COD Amount
                             {% if sort_by == 'amount_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
@@ -234,10 +248,42 @@
                                 <i class="fa-solid fa-store"></i>
                                 {% if order.pickup_location %}{{ order.pickup_location.pickup_location_title }}{% if order.pickup_location.pickup_zone_no %} · Zone {{ order.pickup_location.pickup_zone_no }}{% endif %}{% else %}-{% endif %}
                             </span>
+                            {% comment %} Lead with the official destination zone, not the free text
+                               typed into the address field — the two often disagree, and
+                               the typed value is sometimes blank. It is kept underneath as
+                               what the seller wrote, so a mismatch is visible rather than
+                               hidden behind one confusing line. {% endcomment %}
                             <span class="ftr__loc-line ftr__loc-line--to">
                                 <i class="fa-solid fa-location-dot"></i>
-                                {{ order.customer_address|default:"-" }}
+                                {% if order.dl_zone %}Zone {{ order.dl_zone }}{% with zname=zone_name_map|get_zone_name:order.dl_zone %}{% if zname %} · {{ zname }}{% endif %}{% endwith %}
+                                {% else %}<span class="ftr__loc-missing">No zone</span>{% endif %}
                             </span>
+                            {% if order.dl_street or order.dl_building %}
+                            <span class="ftr__loc-line ftr__loc-sub">
+                                {% if order.dl_street %}St {{ order.dl_street }}{% endif %}
+                                {% if order.dl_street and order.dl_building %} · {% endif %}
+                                {% if order.dl_building %}Bldg {{ order.dl_building }}{% endif %}
+                            </span>
+                            {% endif %}
+                            {% if order.customer_address %}
+                            <span class="ftr__loc-line ftr__loc-sub ftr__loc-sub--typed"
+                                  title="Address text supplied with the order">
+                                “{{ order.customer_address|truncatechars:40 }}”
+                            </span>
+                            {% endif %}
+                        </td>
+                        {% comment %} Routed road distance where we have one. A "~" means the row fell
+                           back to a straight line or a zone centre, which reads about a
+                           third short of the real drive. {% endcomment %}
+                        <td class="ftr__dist-cell">
+                            {% if order.route_km is not None %}
+                            <span class="ftr__dist{% if order.route_km_source != 'osrm' %} ftr__dist--approx{% endif %}"
+                                  title="{% if order.route_km_source == 'osrm' %}Driving distance along the road network{% elif order.route_km_source == 'zone_estimate' %}Estimated from zone centres — one end has no usable coordinates{% else %}Straight line — no route could be computed{% endif %}">
+                                {% if order.route_km_source != 'osrm' %}~{% endif %}{{ order.route_km|floatformat:1 }} <small>km</small>
+                            </span>
+                            {% else %}
+                            <span class="ftr__dist ftr__dist--none" title="Neither end could be located">—</span>
+                            {% endif %}
                         </td>
                         <td style="font-weight: 600; color: #059669;">
                             QAR {{ order.cod_amount|floatformat:2|default:"0.00" }}
@@ -314,7 +360,7 @@
 
 <!-- Export column picker -->
 {% include "workforce/parts/components/_export_columns_modal.html" %}
-<script src="{% static 'workforce/js/export-columns.js' %}?v=20260727b"></script>
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260807b"></script>
 <script src="{% static 'workforce/js/seller-roster.js' %}?v=20260728a"></script>
 
 {% endblock content %}

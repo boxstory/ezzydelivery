@@ -1,26 +1,16 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% block content %}
-<div class="btp" id="business_team_permissions_container_main">
+<div class="btp bcon__page" id="business_team_permissions_container_main">
 
-  <!-- Hero Banner -->
-  <div class="btp__hero">
-    <div class="d-flex align-items-center gap-3">
-      <div class="btp__hero-icon">
-        <i class="fa-solid fa-shield-halved"></i>
-      </div>
-      <div>
-        <h1 class="btp__hero-title">Manage Permissions</h1>
-        <p class="btp__hero-sub">
-          {{ team_member.team_name|default:team_member.user.username }}
-          <span class="btp__hero-count">{{ effective_count }} permissions</span>
-        </p>
-      </div>
-    </div>
-    <a href="{% url 'business:business_teams' business.business_id %}" class="btp__hero-back">
+  {% with member=team_member.team_name|default:team_member.user.username count=effective_count|stringformat:"s" %}
+  {% bconheader eyebrow="Team" live="Permissions" icon="fa-solid fa-shield-halved" title="Manage Permissions" subtitle=member|add:" · "|add:count|add:" permissions" %}
+    <a href="{% url 'business:business_teams' business.business_id %}" class="bcon__btn bcon__btn--ghost">
       <i class="fa fa-arrow-left"></i> Back to Team
     </a>
-  </div>
+  {% endbconheader %}
+  {% endwith %}
 
   <div class="row g-3">
     <!-- Left Column: Role & Info -->
@@ -39,7 +29,7 @@
                  class="btp__avatar-img">
           </div>
           <h3 class="btp__member-name">{{ team_member.team_name|default:team_member.user.username }}</h3>
-          <p class="btp__member-email">{{ team_member.team_email|default:team_member.user.email }}</p>
+          <p class="btp__member-email">{{ team_member.team_email|default:team_member.user.email|lower }}</p>
           {% if team_member.team_status == 'active' %}
             <span class="btp__badge btp__badge--success"><i class="fa-solid fa-circle-check"></i> Active</span>
           {% elif team_member.team_status == 'pending' %}

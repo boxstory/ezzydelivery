@@ -16,8 +16,9 @@ Qatar logistics operator. **Restrained enterprise console, not a consumer app.**
 ### Identity
 | Token | Value | Use |
 |---|---|---|
-| `--brand-primary` | `#f7c000` Ezzy Yellow | THE accent — primary CTA, active state, identity mark. Once per view. |
+| `--brand-primary` | `#f7c000` Ezzy Yellow | THE accent — primary CTA, active state, identity mark. Once per view. **Fills and borders only — never text on a light surface (1.68:1, unreadable).** |
 | `--brand-primary-dark` | `#f4c20d` | Hover/darker yellow |
+| `--brand-primary-text` | `#8f6b00` | **Yellow ink.** Any yellow *text* or icon on white/light. Same hue, darkened to AA 4.92:1. On navy, use `--brand-primary` instead (9.86:1). |
 | `--brand-secondary` | `#fff7d6` | Light yellow tint background |
 | `--brand-accent` | `#fef9e6` | Faintest yellow wash |
 | `--brand-navy` | `#001f3f` | Authority surfaces: heroes, table headers, footers |
@@ -61,7 +62,7 @@ Use before writing new CSS: `.bk-btn--primary|secondary|success|danger|gradient`
 .xyz__hero-kicker { font-size: 0.7rem; text-transform: uppercase;
   letter-spacing: 0.08em; color: var(--brand-primary); font-weight: 600; }
 ```
-Yellow appears only in the kicker/accent rule — the surface itself stays navy.
+Yellow appears only in the kicker/accent rule — the surface itself stays navy. This is the one place raw `--brand-primary` is correct *as text*, because the backing is navy. The same kicker on a white card must use `--brand-primary-text`.
 
 ### 2. Stat / KPI tile
 ```css
@@ -135,5 +136,87 @@ Vertical hairline (`grey-200`), 8px dots using semantic colors, current step dot
 2. Bootstrap utilities first for layout; custom CSS only for visual styling Bootstrap lacks.
 3. BEM with app prefix (`block__element--modifier`); never re-declare Bootstrap base styles in BEM classes.
 4. Yellow is scarce. If a design uses `--brand-primary` more than ~twice per view, cut it back.
-5. WCAG AA: body text ≥ grey-500 on white; never yellow text on white.
+5. WCAG AA: body text ≥ grey-500 on white; never raw `--brand-primary` as text on white — yellow ink is `--brand-primary-text` (`#8f6b00`). Beware `var(--brand-primary, #001f3f)`: the navy fallback never applies, so it renders yellow. If you mean navy, write `--brand-navy`.
 6. Padding starts at `0.375rem` and grows only when justified (see Type & spacing). Treat any `0.85rem`+/`p-3`/`1rem` block padding as a smell to fix, not a default.
+
+---
+
+## Redesign Rules (override any design skill's instincts)
+
+These come from mistakes made on real pages here. They outrank the generic
+advice in `frontend-design`, `impeccable`, `design-taste-frontend` and friends.
+
+### 1. "Improve the UI" NEVER means remove fields or features
+
+A request to improve a filter bar, toolbar, form or table is a request about
+**layout, sizing, grouping, wrapping and hierarchy**. It is not licence to
+delete controls, drop columns, cut options from a dropdown, or hide things
+behind a disclosure.
+
+- Keep every existing field. Adjust sizes and wrapping instead.
+- If a control looks redundant, dead, or impossible to satisfy — **say so and
+  ask.** Removing it is the user's call, never yours. Evidence that it returns
+  zero rows is an argument to raise, not a mandate to cut.
+- "Hidden behind a toggle" still counts as removed. A field the user could see
+  before and cannot see now is a regression to them.
+- Adding is safer than subtracting: active-filter chips, a count, a clearer
+  label — fine. Taking away — ask first.
+
+Restraint applies to *decoration*: icons that repeat the label, header rows
+holding one word, duplicated stat tiles, colour used for its own sake. It does
+not apply to functionality.
+
+### 2. Minimum legible sizes
+
+Dense console ≠ small text. Ezzy staff read these screens all day on 1440px
+monitors. Floors for any staff console:
+
+| Element | Floor | Typical |
+|---|---|---|
+| Field label (uppercase) | `0.72rem` | 0.72–0.75rem |
+| Input / select text | `0.82rem` | 0.85rem |
+| Input / select / button height | `2.1rem` (34px) | 2.25rem (36px) |
+| Button text | `0.8rem` | 0.82rem |
+| Table body | `0.8rem` | 0.85rem |
+| Table column head | `0.66rem` | 0.68rem |
+| Chip / badge | `0.72rem` | 0.78rem |
+
+Anything below these reads as broken, not as dense. The `0.375rem` padding
+baseline governs **spacing**, never type size or control height.
+
+### 3. Every button must look like a button
+
+A bare BEM button class that declares no surface inherits whatever it sits in —
+an `<a class="x__btn">` picks up the link colour and renders as yellow text on
+nothing. Secondary buttons get a real surface:
+
+```css
+background: var(--brand-grey-100);   /* fill  */
+border: 1px solid var(--brand-grey-400);  /* visible edge, not grey-300 */
+color: var(--brand-grey-800);
+/* hover → var(--brand-secondary) tint + var(--brand-primary) border */
+```
+
+Row-level actions ("View", "Open") are bordered controls, not underlined words —
+on a 50-row ledger an underlined word is a hard target to see and hit.
+
+### 4. Measure, don't guess
+
+Never conclude a layout is right (or wrong) from a screenshot alone. Read the
+computed values out of the browser:
+
+```js
+getBoundingClientRect()  // width, height, top — is every control on one line?
+getComputedStyle(el)     // display, color, gridTemplateColumns
+```
+
+Guessing has cost real time here. Real examples:
+- A grid looked "3 columns wide" — an existing `#filterForm { display:flex }`
+  had made it a flex item that shrink-wrapped to 512px of 1194.
+- A Select2 picker sat 2px proud of its neighbours: 34px against 36px.
+- A "broken stacked layout" was Cloudflare serving stale CSS, not the code —
+  see [[cloudflare-static-cache]]; curl the served file before believing a
+  screenshot.
+
+Also verify behaviour, not just looks: click the button, submit the form,
+download the export. An element that renders is not an element that works.

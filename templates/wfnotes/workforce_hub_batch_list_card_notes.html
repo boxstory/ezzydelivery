@@ -1,0 +1,97 @@
+{% comment %}
+Purpose: "About this page" notes panel for hub_batch_list.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_hub_batch_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            A <strong>hub pickup batch</strong> is the first leg of a two-leg hub delivery: one driver ride
+            that collects several of a client's orders from a single pickup location and drops them all at a
+            hub warehouse. Each row here is one batch. Batches are built on <em>New Batch</em>, driven by a
+            fleet driver, and once the goods land at the hub each order gets its own last-mile delivery task
+            for staff to publish and dispatch as normal.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">New Batch</dt>
+                        <dd class="wfnote__def">Opens the builder — pick a pickup location and hub warehouse,
+                            tick the orders that go on the ride, and optionally assign the driver up front.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Status tabs</dt>
+                        <dd class="wfnote__def">Narrow the list to one batch status. <em>All</em> clears the
+                            filter. The list is always newest batch first.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Row columns</dt>
+                        <dd class="wfnote__def">Batch number, the client pickup point, the receiving hub, the
+                            driver (or <em>Unassigned</em>), how many orders are on the ride, and what the
+                            driver is being paid for it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">View</dt>
+                        <dd class="wfnote__def">Opens the batch — that is where you assign or change the driver,
+                            edit earnings, move the status by hand, cancel the batch, and see each order's
+                            last-mile task.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Batch status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pending</dt>
+                        <dd class="wfnote__def">Built, but no driver on it yet. Nobody is going to collect it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assigned</dt>
+                        <dd class="wfnote__def">A driver has been put on the ride but has not accepted it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Accepted</dt>
+                        <dd class="wfnote__def">The driver has taken the ride.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">In Progress</dt>
+                        <dd class="wfnote__def">Driver is on the way to the client's pickup point.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Arrived</dt>
+                        <dd class="wfnote__def">Driver is at the pickup location.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Collected</dt>
+                        <dd class="wfnote__def">All packages are in the driver's hands, heading to the hub.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">At Hub</dt>
+                        <dd class="wfnote__def">Goods handed over at the warehouse. This is what triggers the
+                            last-mile tasks. Final state.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Cancelled</dt>
+                        <dd class="wfnote__def">The ride was called off. Final state.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Only orders flagged as hub delivery, already <strong>verified</strong>, and not already sitting
+                    in another batch can be put on a ride.</li>
+                <li>Moving a batch to <strong>At Hub</strong> auto-creates one last-mile delivery task per order and
+                    flips those orders to ready-to-pickup. The tasks land <em>for review</em> and unpublished — you
+                    still have to publish and dispatch each one.</li>
+                <li><strong>At Hub and Cancelled are terminal.</strong> Once a batch is in either state the driver,
+                    earnings and status can no longer be changed from the batch page.</li>
+                <li>Driver earnings is a single flat figure for the whole ride, not a per-order rate.</li>
+                <li>No cash is collected on this leg — any COD on those orders is collected by the last-mile driver.</li>
+            </ul>
+        </section>
+    

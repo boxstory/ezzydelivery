@@ -1,815 +1,441 @@
-/* ================================================
-   FLEET COD IN HAND - Premium Dashboard
-   BEM prefix: fch__
-   ================================================ */
+/* Purpose: Fleet cash-exposure ledger — driver rows carrying held COD, its age and its share of the page. */
+/* Used by: workforce/templates/workforce/fleet_cod_in_hand.html */
+/* Notes: Same ledger vocabulary as driver_payout_worksheet.css (--tlr-* tokens, IBM Plex trio, hairline
+   rules) so the two payout-side consoles read as one system. Ezzy yellow is spent exactly twice:
+   the settlement-report action, and the share bar of the driver holding the most. The page hero and
+   stat row are the shared wfhero__ / wfstat__ furniture from workforce.css — only --late is added here.
+   This file is also linked from wf_dashboard_base.html, so every rule stays scoped under .fch. */
 
-/* Container */
 .fch {
-    padding: 1.5rem;
-    background: #f8f9fa;
-    min-height: 100vh;
-}
-
-/* ================================================
-   HERO HEADER - Navy Gradient
-   ================================================ */
-.fch__hero {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, var(--brand-navy-light, #003366) 100%);
-    color: #fff;
-    padding: 1.25rem 1.5rem;
-    border-radius: var(--brand-radius-md, 0.75rem);
-    margin-bottom: 1.5rem;
-}
-
-.fch__hero-title {
-    font-size: 1.375rem;
-    font-weight: 700;
-    margin: 0 0 0.25rem;
-    display: flex;
-    align-items: center;
-    color: #fff;
-}
-
-.fch__hero-title i {
-    color: var(--brand-primary, #f7c000);
-}
-
-.fch__hero-subtitle {
-    font-size: 0.8125rem;
-    color: rgba(255,255,255,0.7);
-    margin: 0;
-}
-
-.fch__hero-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-/* ================================================
-   BUTTONS
-   ================================================ */
-.fch__btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: var(--brand-radius-sm, 0.5rem);
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-decoration: none;
-    white-space: nowrap;
-}
-
-.fch__btn--primary {
-    background: var(--brand-primary, #f7c000);
-    color: var(--brand-grey-800, #1f1f1f);
-}
-
-.fch__btn--primary:hover {
-    background: #d9ab00;
-    color: var(--brand-grey-800, #1f1f1f);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
-}
-
-.fch__btn--outline {
-    background: transparent;
-    color: var(--brand-grey-600, #555);
-    border: 1px solid var(--brand-grey-300, #dcdcdc);
-}
-
-.fch__btn--outline:hover {
-    background: var(--brand-grey-100, #fafafa);
-    border-color: var(--brand-grey-400, #b0b0b0);
-    color: var(--brand-grey-700, #333);
-}
-
-/* In hero context */
-.fch__hero .fch__btn--primary {
-    background: rgba(255,255,255,0.15);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,0.3);
-}
-
-.fch__hero .fch__btn--primary:hover {
-    background: rgba(255,255,255,0.25);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-}
-
-.fch__btn--sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.7rem;
-}
-
-.fch__btn--xs {
-    padding: 0.25rem 0.625rem;
-    font-size: 0.675rem;
-}
-
-/* ================================================
-   SUMMARY STATS - 6 cards
-   ================================================ */
-.fch__stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 0.875rem;
-    margin-bottom: 1.5rem;
-}
-
-.fch__stat {
-    background: #fff;
-    border-radius: var(--brand-radius-md, 0.75rem);
-    border: 1px solid var(--brand-grey-200, #f0f0f0);
-    padding: 1rem 1.125rem;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.fch__stat::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--brand-grey-300, #dcdcdc);
-    border-radius: var(--brand-radius-md, 0.75rem) var(--brand-radius-md, 0.75rem) 0 0;
-}
-
-.fch__stat:hover {
-    box-shadow: var(--brand-shadow-md, 0 0.25rem 0.5rem rgba(0,0,0,0.1));
-    transform: translateY(-2px);
-}
-
-.fch__stat--green::before { background: #22c55e; }
-.fch__stat--blue::before  { background: #3b82f6; }
-.fch__stat--amber::before { background: #f59e0b; }
-.fch__stat--red::before   { background: #ef4444; }
-.fch__stat--grey::before  { background: var(--brand-grey-400, #b0b0b0); }
-
-.fch__stat-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.625rem;
-}
-
-.fch__stat-label {
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--brand-grey-500, #6c757d);
-}
-
-.fch__stat-icon {
-    font-size: 0.875rem;
-    color: var(--brand-grey-400, #b0b0b0);
-}
-
-.fch__stat--green .fch__stat-icon { color: #22c55e; }
-.fch__stat--blue .fch__stat-icon  { color: #3b82f6; }
-.fch__stat--amber .fch__stat-icon { color: #f59e0b; }
-.fch__stat--red .fch__stat-icon   { color: #ef4444; }
-
-.fch__stat-value {
-    font-size: 1.375rem;
-    font-weight: 700;
-    color: var(--brand-grey-800, #1f1f1f);
-    line-height: 1.2;
-    margin-bottom: 0.25rem;
-}
-
-.fch__stat-desc {
-    font-size: 0.7rem;
-    color: var(--brand-grey-400, #b0b0b0);
-}
-
-/* ================================================
-   CARDS (Distribution, Filters)
-   ================================================ */
-.fch__card {
-    background: #fff;
-    border-radius: var(--brand-radius-md, 0.75rem);
-    border: 1px solid var(--brand-grey-200, #f0f0f0);
-    overflow: hidden;
-    margin-bottom: 1.25rem;
-}
-
-.fch__card-header {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.625rem 1rem;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--brand-grey-500, #6c757d);
-    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
-    background: var(--brand-grey-100, #fafafa);
-}
-
-.fch__card-icon {
-    color: var(--brand-primary, #f7c000);
-    font-size: 0.75rem;
-}
-
-.fch__card-title {
-    font-size: inherit;
-    font-weight: inherit;
-    color: inherit;
-    margin: 0;
-    text-transform: inherit;
-    letter-spacing: inherit;
-}
-
-.fch__card-body {
-    padding: 1rem;
-}
-
-/* ================================================
-   COD DISTRIBUTION RANGE
-   ================================================ */
-.fch__range-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0.75rem;
-}
-
-.fch__range {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0.875rem;
-    border-radius: var(--brand-radius-sm, 0.5rem);
-    text-align: center;
-    transition: transform 0.2s ease;
-}
-
-.fch__range:hover {
-    transform: translateY(-1px);
-}
-
-.fch__range--green {
-    background: #dcfce7;
-    border: 1px solid #bbf7d0;
-}
-
-.fch__range--amber {
-    background: #fef3c7;
-    border: 1px solid #fde68a;
-}
-
-.fch__range--red {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-}
-
-.fch__range-label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--brand-grey-600, #555);
-    margin-bottom: 0.375rem;
-}
-
-.fch__range-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--brand-grey-800, #1f1f1f);
-    line-height: 1.2;
-}
-
-.fch__range--green .fch__range-value { color: #15803d; }
-.fch__range--amber .fch__range-value { color: #92400e; }
-.fch__range--red .fch__range-value   { color: #dc2626; }
-
-.fch__range-desc {
-    font-size: 0.65rem;
-    color: var(--brand-grey-400, #b0b0b0);
-    margin-top: 0.125rem;
-}
-
-.fch__range--red .fch__range-desc { color: #ef4444; }
-
-/* ================================================
-   FILTER PANEL
-   ================================================ */
-.fch__filter-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.875rem;
-    align-items: flex-end;
-}
-
-.fch__filter-group {
-    flex: 1 1 180px;
-    min-width: 0;
-}
-
-.fch__filter-group--custom {
-    flex: 1 1 240px;
-}
-
-.fch__filter-label {
-    display: block;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--brand-grey-500, #6c757d);
-    margin-bottom: 0.375rem;
-}
-
-.fch__filter-label i {
-    color: var(--brand-primary, #f7c000);
-}
-
-select.fch__filter-select,
-input.fch__filter-input {
-    width: 100%;
-    min-height: 36px; max-height: 36px;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--brand-grey-300, #dcdcdc);
-    border-radius: var(--brand-radius-sm, 0.5rem);
-    font-size: 0.8125rem;
-    color: var(--brand-grey-700, #333);
-    background: #fff;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    appearance: auto;
-}
-
-select.fch__filter-select:focus,
-input.fch__filter-input:focus {
-    outline: none;
-    border-color: var(--brand-primary, #f7c000);
-    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.15);
-}
-
-.fch__filter-input--sm {
-    max-width: 120px;
-}
-
-.fch__filter-dates {
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-end;
-}
-
-.fch__filter-dates > div {
-    flex: 1;
-}
-
-.fch__filter-actions {
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-end;
-    padding-bottom: 1px;
-}
-
-/* ================================================
-   TOOLBAR
-   ================================================ */
-.fch__toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    padding: 0.625rem 1rem;
-    background: #fff;
-    border-radius: var(--brand-radius-md, 0.75rem);
-    border: 1px solid var(--brand-grey-200, #f0f0f0);
-}
-
-.fch__toolbar-left,
-.fch__toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.fch__sort-group {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-}
-
-.fch__sort-label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--brand-grey-500, #6c757d);
-    white-space: nowrap;
-}
-
-.fch__toolbar-count {
-    font-size: 0.75rem;
-    color: var(--brand-grey-400, #b0b0b0);
-    padding-left: 0.5rem;
-    border-left: 1px solid var(--brand-grey-200, #f0f0f0);
-}
-
-.fch__view-toggle {
-    display: inline-flex;
-    border: 1px solid var(--brand-grey-200, #f0f0f0);
-    border-radius: var(--brand-radius-sm, 0.5rem);
-    overflow: hidden;
-}
-
-.fch__view-btn {
-    padding: 0.375rem 0.625rem;
-    border: none;
-    background: transparent;
-    color: var(--brand-grey-400, #b0b0b0);
-    cursor: pointer;
-    font-size: 0.75rem;
-    transition: all 0.15s ease;
-}
-
-.fch__view-btn:hover {
-    color: var(--brand-grey-600, #555);
-    background: var(--brand-grey-100, #fafafa);
-}
-
-.fch__view-btn--active {
-    background: var(--brand-navy, #001f3f);
-    color: var(--brand-primary, #f7c000);
-}
-
-.fch__view-btn--active:hover {
-    background: var(--brand-navy, #001f3f);
-    color: var(--brand-primary, #f7c000);
-}
-
-/* ================================================
-   GRID VIEW - Driver Cards
-   ================================================ */
-.fch__grid {
-    display: none;
-}
-
-.fch__grid--active {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 0.875rem;
-    margin-bottom: 1.25rem;
-}
-
-.fch__dcard {
-    display: block;
-    background: #fff;
-    border-radius: var(--brand-radius-md, 0.75rem);
-    border: 1px solid var(--brand-grey-200, #f0f0f0);
-    padding: 1rem;
-    text-decoration: none;
-    color: inherit;
-    transition: all 0.2s ease;
-}
-
-.fch__dcard:hover {
-    border-color: var(--brand-grey-300, #dcdcdc);
-    box-shadow: var(--brand-shadow-md, 0 0.25rem 0.5rem rgba(0,0,0,0.1));
-    transform: translateY(-2px);
-    color: inherit;
-    text-decoration: none;
-}
-
-.fch__dcard:active {
-    transform: scale(0.98);
-}
-
-.fch__dcard-top {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.875rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--brand-grey-100, #fafafa);
-}
-
-.fch__avatar {
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 50%;
-    background: var(--brand-navy, #001f3f);
-    color: var(--brand-primary, #f7c000);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    flex-shrink: 0;
-}
-
-.fch__avatar--sm {
-    width: 2rem;
-    height: 2rem;
-    font-size: 0.675rem;
-}
-
-.fch__dcard-info {
-    min-width: 0;
-}
-
-.fch__dcard-name {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--brand-grey-800, #1f1f1f);
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.fch__dcard-id {
-    font-size: 0.7rem;
-    color: var(--brand-grey-400, #b0b0b0);
-    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
-}
-
-.fch__dcard-body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-}
-
-.fch__detail {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.3125rem 0;
-}
-
-.fch__detail:not(.fch__detail--last) {
-    border-bottom: 1px solid var(--brand-grey-100, #fafafa);
-}
-
-.fch__detail-label {
-    font-size: 0.7rem;
-    color: var(--brand-grey-500, #6c757d);
-}
-
-.fch__detail-value {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--brand-grey-700, #333);
-}
-
-.fch__detail-value--positive {
-    color: #15803d;
-    font-weight: 700;
-}
-
-.fch__detail-value--zero {
-    color: var(--brand-grey-400, #b0b0b0);
-}
-
-/* ================================================
-   LIST VIEW - Table
-   ================================================ */
-.fch__list {
-    display: none;
-}
-
-.fch__list--active {
-    display: block;
-    margin-bottom: 1.25rem;
-}
-
-.fch__table-wrap {
-    background: #fff;
-    border-radius: var(--brand-radius-md, 0.75rem);
-    border: 1px solid var(--brand-grey-200, #f0f0f0);
-    overflow: hidden;
-}
-
-.fch__table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8125rem;
-}
-
-.fch__table thead {
-    background: var(--brand-grey-100, #fafafa);
-}
-
-.fch__table th {
-    padding: 0.625rem 0.875rem;
-    font-size: 0.675rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--brand-grey-500, #6c757d);
-    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
-    white-space: nowrap;
-}
-
-.fch__th--sort {
-    cursor: pointer;
-    user-select: none;
-    transition: color 0.15s ease;
-}
-
-.fch__th--sort:hover {
-    color: var(--brand-navy, #001f3f);
-}
-
-.fch__sort-muted {
-    opacity: 0.3;
-}
-
-.fch__table td {
-    padding: 0.625rem 0.875rem;
-    color: var(--brand-grey-700, #333);
-    border-bottom: 1px solid var(--brand-grey-100, #fafafa);
-    vertical-align: middle;
-}
-
-.fch__table tbody tr {
-    transition: background 0.15s ease;
-}
-
-.fch__table tbody tr:hover {
-    background: var(--brand-grey-100, #fafafa);
-}
-
-.fch__table tbody tr:nth-child(even) {
-    background: rgba(250, 250, 250, 0.5);
-}
-
-.fch__table tbody tr:nth-child(even):hover {
-    background: var(--brand-grey-100, #fafafa);
-}
-
-.fch__driver-cell {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.fch__driver-cell strong {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--brand-grey-800, #1f1f1f);
-}
-
-.fch__amount--positive {
-    color: #15803d;
-    font-weight: 700;
-}
-
-.fch__amount--zero {
-    color: var(--brand-grey-400, #b0b0b0);
-}
+  /* Ledger vocabulary, anchored on the Brand Kit — no off-brand hexes. */
+  --tlr-ink: var(--brand-navy);
+  --tlr-paper: var(--brand-grey-100);
+  --tlr-card: var(--brand-white);
+  --tlr-rule: var(--brand-grey-200);
+  --tlr-rule-strong: var(--brand-grey-300);
+  --tlr-mark: var(--brand-primary);
+  --tlr-muted: var(--brand-grey-500);
+  --tlr-void: var(--brand-danger);
+  --tlr-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --tlr-cond: 'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --tlr-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+
+  background: var(--tlr-paper);
+  color: var(--tlr-ink);
+  font-family: var(--tlr-sans);
+  font-size: 0.875rem;
+  min-height: 100vh;
+  padding: 0.375rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Hero action. The one place Ezzy yellow is spent on a control: this is where
+   the cash the page reports actually gets settled, so it is the page's CTA.
+--------------------------------------------------------------------------- */
+.fch .fch__cta {
+  display: inline-flex;
+  align-items: center;
+  height: 2.1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--brand-navy);
+  background-color: var(--tlr-mark);
+  border: 1px solid var(--tlr-mark);
+  border-radius: 0.3rem;
+  padding: 0 0.9rem;
+  text-decoration: none;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.fch .fch__cta:hover { background-color: var(--brand-primary-dark); border-color: var(--brand-primary-dark); color: var(--brand-navy); }
+
+/* Shared stat card, plus the one state the payout console never needed:
+   an age that has crossed the overdue threshold. */
+.fch .wfstat__card--late { border-left-color: var(--tlr-void); }
+.fch .wfstat__card--late .wfstat__value { color: var(--tlr-void); }
+
+/* ---------------------------------------------------------------------------
+   Off-roster band. Cash sitting with a driver this page cannot list, because
+   the queryset is scoped to approved drivers. Stated once, in full, above the
+   ledger — it is the largest thing the page was previously hiding.
+--------------------------------------------------------------------------- */
+.fch__offroster {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule-strong);
+  border-left: 3px solid var(--tlr-void);
+  border-radius: 0.4rem;
+  padding: 0.375rem 0.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--tlr-ink);
+  text-decoration: none;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.fch__offroster:hover { color: var(--tlr-ink); border-color: var(--tlr-void); }
+.fch__offroster-mark { color: var(--tlr-void); font-size: 0.9rem; line-height: 1; }
+.fch__offroster-text { flex: 1 1 auto; min-width: 0; }
+.fch__offroster-amount {
+  font-family: var(--tlr-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--tlr-void);
+}
+.fch__offroster-go {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 1.75rem;
+  padding: 0 0.7rem;
+  font-family: var(--tlr-cond);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tlr-void);
+  background-color: var(--brand-danger-bg);
+  border: 1px solid var(--tlr-void);
+  border-radius: 0.3rem;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.fch__offroster:hover .fch__offroster-go { color: var(--brand-white); background-color: var(--tlr-void); }
+
+/* ---------------------------------------------------------------------------
+   Control strip. One hairline row, not a titled card — two selects never
+   needed a panel with its own header around them.
+--------------------------------------------------------------------------- */
+.fch__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.375rem 0.75rem;
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule);
+  border-radius: 0.4rem;
+  padding: 0.375rem 0.5rem;
+  margin-bottom: 0.375rem;
+}
+.fch__control { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; }
+.fch__control[hidden] { display: none; }
+.fch__control-lbl {
+  font-family: var(--tlr-cond);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+}
+.fch__control-fields { display: flex; gap: 0.25rem; }
+
+/* The global mobile-app rules target `input[type=…]` (0,1,1), which outranks a
+   bare BEM class — so every control here is scoped under .fch to win. Never a
+   `background:` shorthand: the select carries its arrow as a background-image. */
+.fch .fch__select,
+.fch .fch__input {
+  min-height: 0;
+  height: 2.1rem;
+  padding: 0.125rem 0.5rem;
+  font-family: var(--tlr-sans);
+  font-size: 0.8rem;
+  line-height: 1.25;
+  color: var(--tlr-ink);
+  background-color: var(--tlr-card);
+  border: 1px solid var(--tlr-rule-strong);
+  border-radius: 0.25rem;
+}
+.fch .fch__select {
+  padding-right: 1.4rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236c757d'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.3rem center;
+  background-size: 0.68rem;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.fch .fch__input--num { width: 6.25rem; font-family: var(--tlr-mono); }
+.fch .fch__select:focus,
+.fch .fch__input:focus {
+  outline: none;
+  border-color: var(--tlr-mark);
+  box-shadow: none;
+}
+
+.fch__controls-acts { display: flex; align-items: flex-end; gap: 0.25rem; }
+/* Pushes the read-only tail (count, print, export) to the far end, so the
+   left of the strip is what changes the query and the right is what leaves with it. */
+.fch__controls-tail {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-left: auto;
+}
+.fch__count {
+  font-family: var(--tlr-mono);
+  font-size: 0.78rem;
+  color: var(--tlr-muted);
+  white-space: nowrap;
+}
+
+/* Secondary buttons sat white-on-white behind a grey-300 hairline and read as
+   labels rather than controls. They now carry the Brand Kit's secondary
+   surface — grey-100 fill, grey-400 border, ink text — and warm to the yellow
+   tint on hover, which is the sanctioned way to give a secondary life without
+   spending a third resting yellow on the page. */
+.fch .fch__btn {
+  display: inline-flex;
+  align-items: center;
+  height: 2.1rem;
+  padding: 0 0.9rem;
+  font-family: var(--tlr-cond);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tlr-ink);
+  background-color: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-400);
+  border-radius: 0.3rem;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.fch .fch__btn:hover {
+  background-color: var(--brand-secondary);
+  border-color: var(--tlr-mark);
+  color: var(--tlr-ink);
+  box-shadow: var(--brand-shadow-sm);
+}
+.fch .fch__btn--go {
+  color: var(--brand-white);
+  background-color: var(--tlr-ink);
+  border-color: var(--tlr-ink);
+}
+.fch .fch__btn--go:hover {
+  background-color: var(--brand-navy-light);
+  border-color: var(--brand-navy-light);
+  color: var(--brand-white);
+  box-shadow: var(--brand-shadow-sm);
+}
+.fch .fch__btn:focus-visible,
+.fch .fch__cta:focus-visible,
+.fch .fch__sort:focus-visible,
+.fch .fch__go:focus-visible,
+.fch .fch__offroster:focus-visible { outline: 2px solid var(--tlr-mark); outline-offset: 2px; }
+
+/* ---------------------------------------------------------------------------
+   The ledger.
+--------------------------------------------------------------------------- */
+.fch__ledger {
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule);
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+/* Positioned so absolutely-placed descendants are clipped with the rest of the
+   table. Without it the `visually-hidden` label in the last header (which is
+   position:absolute) resolves its containing block outside the scroller,
+   escapes the clip, and drags the whole document into a horizontal scroll. */
+.fch__scroll { position: relative; overflow-x: auto; }
+.fch__table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.fch__table thead th {
+  font-family: var(--tlr-cond);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  text-align: left;
+  background: var(--tlr-card);
+  padding: 0.5rem 0.5rem;
+  border-bottom: 1px solid var(--tlr-rule-strong);
+  white-space: nowrap;
+}
+.fch__table tbody td {
+  padding: 0.5rem 0.5rem;
+  border-bottom: 1px solid var(--tlr-rule);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.fch__table tbody tr:last-child td { border-bottom: 0; }
+/* The whole row opens the driver (see the delegated handler in the template).
+   The OPEN button stays as the keyboard and middle-click path. */
+.fch__row[data-href] { cursor: pointer; }
+/* Grey, not a yellow wash — the Brand Kit's ledger rule is that row hover is
+   always a grey wash. Deeper than grey-100 so the row still announces itself
+   as clickable. */
+.fch__row:hover td { background: var(--brand-grey-150); }
+.fch__row--square:hover td { background: var(--tlr-paper); }
+.fch__num { text-align: right; font-family: var(--tlr-mono); font-variant-numeric: tabular-nums; }
+.fch__quiet { color: var(--tlr-muted); }
+/* grey-400 on white is 2.3:1 — placeholders still have to be readable. */
+.fch__nil { color: var(--tlr-muted); }
+/* One column absorbs the slack so the figures sit tight against each other
+   instead of drifting apart across a wide screen. */
+.fch__col-who { width: 100%; }
+.fch__col-go { width: 1%; }
+/* Everything left of this rule identifies the driver; everything right is money. */
+.fch__col-money { border-left: 1px solid var(--tlr-rule-strong); }
+
+/* Sortable heads are buttons, not clickable <th>s — they need to be reachable
+   from the keyboard, which the old onclick-on-th never was. */
+.fch .fch__sort {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.fch .fch__sort:hover { color: var(--tlr-ink); }
+
+.fch__who { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.fch__initials {
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.25rem;
+  background: var(--tlr-ink);
+  color: var(--brand-white);
+  font-family: var(--tlr-cond);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fch__who-text { min-width: 0; }
+.fch__name { display: block; font-weight: 600; color: var(--tlr-ink); line-height: 1.25; }
+/* Driver ID and phone used to be two full columns of their own, pushing the
+   figures off the fold. They are lookup keys, not comparands, so they ride
+   under the name at reading size instead. */
+.fch__meta {
+  display: block;
+  font-family: var(--tlr-mono);
+  font-size: 0.73rem;
+  color: var(--tlr-muted);
+  line-height: 1.3;
+}
+.fch__meta-sep { margin: 0 0.3rem; color: var(--brand-grey-400); }
+
+/* The share bar — this driver's balance against the largest on the page.
+   Concentration of exposure, stated exactly, in the space the three
+   amount-range cards used to take to state it in buckets. */
+.fch__share {
+  display: block;
+  height: 3px;
+  /* Capped, and short. The driver column absorbs the table's slack, so an
+     uncapped bar stretches to the full width of a wide screen and stops
+     reading as a measure — it becomes an underline. */
+  width: 13rem;
+  max-width: 100%;
+  margin: 0.35rem 0 0 2.25rem;
+  background: var(--tlr-rule);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.fch__share-fill { display: block; height: 100%; background: var(--tlr-ink); }
+/* The single largest holder — the second and last use of Ezzy yellow. Keyed off
+   the row's own share, not its position, so it stays true under any sort. */
+.fch__row--top .fch__share-fill { background: var(--tlr-mark); }
+
+.fch__amount { font-weight: 600; color: var(--tlr-ink); }
+.fch__amount--nil { font-weight: 400; color: var(--tlr-muted); }
+
+/* Age of the cash. Ink until it has been held past the thresholds the view
+   sets, then the semantic swatch pair — never a filled pill. */
+.fch__age { color: var(--tlr-ink); }
+.fch__age--stale { color: var(--brand-warning-text); font-weight: 600; }
+.fch__age--overdue { color: var(--tlr-void); font-weight: 600; }
+
+/* A driver holding nothing is context, not the subject of the page. */
+.fch__row--square td { color: var(--tlr-muted); }
+.fch__row--square .fch__name { font-weight: 400; color: var(--tlr-muted); }
+.fch__row--square .fch__initials { background: var(--tlr-muted); }
+
+/* The row action was an underlined word, which on a 50-row ledger is a hard
+   target to see and a harder one to hit. It is a bordered control now. */
+.fch .fch__go {
+  display: inline-flex;
+  align-items: center;
+  height: 1.75rem;
+  padding: 0 0.7rem;
+  font-family: var(--tlr-cond);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-white);
+  background-color: var(--tlr-ink);
+  border: 1px solid var(--tlr-ink);
+  border-radius: 0.3rem;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.fch .fch__go:hover {
+  color: var(--brand-white);
+  background-color: var(--brand-navy-light);
+  border-color: var(--brand-navy-light);
+}
+/* A driver holding nothing has nothing to settle — the action stays reachable
+   but stops competing with the rows that do. */
+.fch__row--square .fch__go { background-color: transparent; border-color: var(--brand-grey-400); color: var(--tlr-muted); }
+.fch__row--square .fch__go:hover { background-color: var(--tlr-muted); border-color: var(--tlr-muted); color: var(--brand-white); }
 
-/* ================================================
-   EMPTY STATE
-   ================================================ */
 .fch__empty {
-    text-align: center;
-    padding: 3rem 1.5rem;
-    background: #fff;
-    border-radius: var(--brand-radius-md, 0.75rem);
-    border: 1px solid var(--brand-grey-200, #f0f0f0);
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule);
+  border-radius: 0.4rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+.fch__empty-line { color: var(--tlr-muted); margin: 0 0 0.75rem; font-size: 0.9rem; }
+
+@media (max-width: 767.98px) {
+  .fch__controls-tail { margin-left: 0; width: 100%; }
+  .fch__control,
+  .fch__control-fields { width: 100%; }
+  .fch .fch__select,
+  .fch .fch__input { width: 100%; }
+  .fch .fch__input--num { width: 100%; }
 }
 
-.fch__empty i {
-    font-size: 2.5rem;
-    color: var(--brand-grey-300, #dcdcdc);
-    margin-bottom: 1rem;
-    display: block;
-}
-
-.fch__empty h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--brand-grey-700, #333);
-    margin: 0 0 0.375rem;
-}
-
-.fch__empty p {
-    font-size: 0.8125rem;
-    color: var(--brand-grey-400, #b0b0b0);
-    margin: 0;
-}
-
-/* ================================================
-   RESPONSIVE
-   ================================================ */
-@media (max-width: 768px) {
-    .fch {
-        padding: 1rem;
-    }
-
-    .fch__hero {
-        flex-direction: column;
-        align-items: flex-start;
-        padding: 1rem 1.125rem;
-    }
-
-    .fch__hero-title {
-        font-size: 1.125rem;
-    }
-
-    .fch__stats {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .fch__stat-value {
-        font-size: 1.125rem;
-    }
-
-    .fch__filter-row {
-        flex-direction: column;
-    }
-
-    .fch__filter-group {
-        flex: 1 1 100%;
-    }
-
-    .fch__toolbar {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .fch__toolbar-right {
-        flex-wrap: wrap;
-    }
-
-    .fch__grid--active {
-        grid-template-columns: 1fr;
-    }
-
-    .fch__range-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .fch__table-wrap {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-}
-
-@media (max-width: 480px) {
-    .fch__stats {
-        grid-template-columns: 1fr;
-    }
-
-    .fch__hero-actions {
-        width: 100%;
-    }
-
-    .fch__hero-actions .fch__btn {
-        flex: 1;
-        justify-content: center;
-    }
-}
-
-/* ================================================
-   PRINT STYLES
-   ================================================ */
+/* A handover sheet: chrome off, ledger on, rules dark enough to photocopy. */
 @media print {
-    .fch__hero-actions,
-    .fch__toolbar,
-    .fch__filter-actions,
-    .fch__btn {
-        display: none !important;
-    }
-
-    .fch {
-        padding: 0;
-        background: #fff;
-    }
-
-    .fch__hero {
-        background: #001f3f !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
-
-    .fch__stat,
-    .fch__card,
-    .fch__dcard,
-    .fch__table-wrap {
-        break-inside: avoid;
-    }
-
-    .fch__grid--active {
-        grid-template-columns: repeat(3, 1fr);
-    }
+  .fch { background: #fff; padding: 0; }
+  .fch__controls,
+  .fch__offroster-go,
+  .fch__col-go,
+  .wfnote,
+  .wfhero__actions { display: none !important; }
+  .fch__ledger { border: 0; }
+  .fch__table tbody td { border-bottom: 1px solid #999; }
+  .fch__share { display: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   Shared furniture, one step up. wfhero__ / wfstat__ are sized for pages that
+   carry four or five tallies; this page carries one tally and three cards, so
+   the headline figures can afford to be read from further back. Scoped under
+   .fch so every other page keeps the shared sizes.
+--------------------------------------------------------------------------- */
+.fch .wfhero { padding: 0.5rem 0.875rem; }
+.fch .wfhero__eyebrow { font-size: 0.7rem; }
+.fch .wfhero__title { font-size: 1.5rem; }
+.fch .wfhero__sub { font-size: 0.82rem; }
+.fch .wfhero__tally-num { font-size: 1.35rem; }
+.fch .wfhero__tally-lbl { font-size: 0.64rem; }
+
+.fch .wfstat { gap: 0.5rem; }
+.fch .wfstat__card { padding: 0.5rem 0.875rem; }
+.fch .wfstat__label { font-size: 0.66rem; }
+.fch .wfstat__value { font-size: 1.5rem; }
+.fch .wfstat__unit { font-size: 0.68rem; }
+.fch .wfstat__sub { font-size: 0.76rem; }

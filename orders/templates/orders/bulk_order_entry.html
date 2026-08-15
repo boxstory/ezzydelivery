@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'orders/css/orders.css' %}">
@@ -8,27 +9,20 @@
 
 {% block content %}
 <div class="bulk-entry-container" id="bulk-order-entry-container">
-  <!-- Header -->
-  <div class="bulk-entry-header">
-    <h1 class="bulk-entry-header__title">
-      <i class="fas fa-table"></i>
-      Bulk Order Entry
-    </h1>
-    <div class="bulk-entry-header__actions">
-      <a href="{% url 'orders:orders_all_list' %}" class="bulk-action-btn">
-        <i class="fas fa-basket-shopping"></i> Go to Orders
-      </a>
-      <button type="button" class="bulk-action-btn bulk-action-btn--primary" id="btn-add-row">
-        <i class="fas fa-plus"></i> Add Row
-      </button>
-      <button type="button" class="bulk-action-btn bulk-action-btn--danger" id="btn-delete-selected">
-        <i class="fas fa-trash"></i> Delete Selected
-      </button>
-      <button type="button" class="bulk-action-btn bulk-action-btn--info" id="btn-clear-all">
-        <i class="fas fa-eraser"></i> Clear All
-      </button>
-    </div>
-  </div>
+  {% bconheader eyebrow="Orders" live="Bulk Entry" icon="fa-solid fa-table" title="Bulk Order Entry" subtitle="Type or paste many orders straight into the grid." %}
+    <a href="{% url 'orders:orders_all_list' %}" class="bcon__btn bcon__btn--secondary">
+      <i class="fa-solid fa-basket-shopping"></i> Go to Orders
+    </a>
+    <button type="button" class="bcon__btn bcon__btn--primary" id="btn-add-row">
+      <i class="fa-solid fa-plus"></i> Add Row
+    </button>
+    <button type="button" class="bcon__btn bcon__btn--ghost" id="btn-delete-selected">
+      <i class="fa-solid fa-trash"></i> Delete Selected
+    </button>
+    <button type="button" class="bcon__btn bcon__btn--ghost" id="btn-clear-all">
+      <i class="fa-solid fa-eraser"></i> Clear All
+    </button>
+  {% endbconheader %}
 
   <!-- Upload Zone (for future Excel upload feature) -->
   <div class="bulk-upload-zone" id="bulk-upload-zone" style="display: none;">

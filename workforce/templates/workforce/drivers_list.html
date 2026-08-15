@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
-{% load static %}
+{% load static workforce_tags %}
+{% comment %}
+Purpose: Staff roster of every driver — tally segments, multi-filter search, CSV export
+Used by: workforce.views.drivers_list at /workforce/drivers/
+Notes: Filters and tally segments swap #main-content over HTMX and push the URL; default view is approved only.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 {% block title %}All Drivers - Ezzy Delivery{% endblock title %}
 {% block content %}
 <div class="drl">
@@ -13,7 +20,16 @@
             <span class="wfd__hero-count__num">{{ total_count|default:"0" }}</span>
             <span class="wfd__hero-count__label">Total Drivers</span>
         </div>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_drivers_list_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
+
+    <div class="wfnote" id="workforce_drivers_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_drivers_list_card_notes' %}" hidden></div>
 
     <!-- Post-hero console: tally strip, filters and roster read as one card -->
     <div class="wf-content drl__body">
@@ -108,41 +124,48 @@
                     </label>
                     {% include "workforce/parts/components/_multiselect_filter.html" with field_name="status" label="Driver Status" icon="filter" choices=status_choices selected=selected_statuses all_text="All Status" %}
                 </div>
+                {# Every narrowing filter is a checkbox dropdown, so any of them can take several values at once #}
                 <div class="drl__filter-group">
-                    <label for="jobTypeFilter" class="drl__filter-label">
+                    <label class="drl__filter-label">
                         <i class="fa-solid fa-business-time"></i> Work Preference
                     </label>
-                    <select id="jobTypeFilter" name="job_type" class="drl__filter-select"
-                            hx-get="{% url 'workforce:drivers_list' %}"
-                            hx-target="#main-content"
-                            hx-select="#main-content"
-                            hx-swap="outerHTML"
-                            hx-push-url="true"
-                            hx-include="closest form"
-                            hx-trigger="change">
-                        <option value="">All Types</option>
-                        {% for val, opt_label in job_type_choices %}
-                        <option value="{{ val }}" {% if selected_job_type == val %}selected{% endif %}>{{ opt_label }}</option>
-                        {% endfor %}
-                    </select>
+                    {% include "workforce/parts/components/_multiselect_filter.html" with field_name="job_type" label="Work Preference" icon="business-time" choices=job_type_choices selected=selected_job_types all_text="All Types" %}
                 </div>
                 <div class="drl__filter-group">
-                    <label for="slabFilter" class="drl__filter-label">
+                    <label class="drl__filter-label">
                         <i class="fa-solid fa-clock"></i> Working Hours
                     </label>
-                    <select id="slabFilter" name="slab" class="drl__filter-select"
-                            hx-get="{% url 'workforce:drivers_list' %}"
-                            hx-target="#main-content"
-                            hx-select="#main-content"
-                            hx-swap="outerHTML"
-                            hx-push-url="true"
-                            hx-include="closest form"
-                            hx-trigger="change">
-                        <option value="">Any Hours</option>
-                        {% for val, opt_label in work_time_slab_choices %}
-                        <option value="{{ val }}" {% if selected_slab == val %}selected{% endif %}>{{ opt_label }}</option>
-                        {% endfor %}
-                    </select>
+                    {% include "workforce/parts/components/_multiselect_filter.html" with field_name="slab" label="Working Hours" icon="clock" choices=work_time_slab_choices selected=selected_slabs all_text="Any Hours" %}
+                </div>
+                <div class="drl__filter-group">
+                    <label class="drl__filter-label">
+                        <i class="fa-solid fa-car-side"></i> Vehicle
+                    </label>
+                    {% include "workforce/parts/components/_multiselect_filter.html" with field_name="vehicle" label="Vehicle" icon="car-side" choices=vehicle_choices selected=selected_vehicles all_text="All Vehicles" %}
+                </div>
+                <div class="drl__filter-group">
+                    <label class="drl__filter-label">
+                        <i class="fa-solid fa-map-location-dot"></i> Zone
+                    </label>
+                    {% include "workforce/parts/components/_multiselect_filter.html" with field_name="zone" label="Zone" icon="map-location-dot" choices=zone_group_choices selected=selected_zones all_text="All Zones" %}
+                </div>
+                <div class="drl__filter-group">
+                    <label class="drl__filter-label">
+                        <i class="fa-solid fa-signal"></i> Availability
+                    </label>
+                    {% include "workforce/parts/components/_multiselect_filter.html" with field_name="availability" label="Availability" icon="signal" choices=availability_choices selected=selected_availability all_text="Any State" %}
+                </div>
+                <div class="drl__filter-group">
+                    <label class="drl__filter-label">
+                        <i class="fa-solid fa-language"></i> Language
+                    </label>
+                    {% include "workforce/parts/components/_multiselect_filter.html" with field_name="language" label="Language" icon="language" choices=language_choices selected=selected_languages all_text="All Languages" %}
+                </div>
+                <div class="drl__filter-group">
+                    <label class="drl__filter-label">
+                        <i class="fa-solid fa-user-check"></i> Verification
+                    </label>
+                    {% include "workforce/parts/components/_multiselect_filter.html" with field_name="verification" label="Verification" icon="user-check" choices=verification_choices selected=selected_verifications all_text="Any Verification" %}
                 </div>
                 <div class="drl__filter-group">
                     <label for="sortSelect" class="drl__filter-label">
@@ -175,6 +198,9 @@
                             data-bs-toggle="modal" data-bs-target="#wfExportModal">
                         <i class="fa-solid fa-file-csv"></i>
                     </button>
+                    {# Only shown once rows are ticked; the export then covers just those #}
+                    <span class="wfsel__count" data-export-count hidden></span>
+                    {% include "workforce/parts/components/_export_selectall.html" with total=page_obj.paginator.count noun="drivers" limit=2000 %}
                 </div>
             </form>
         </div>
@@ -186,6 +212,10 @@
             <table class="drl__table" id="workforce_drivers_table_list">
                 <thead>
                     <tr>
+                        <th class="wfsel__cell">
+                            <input type="checkbox" class="form-check-input wfsel__box" data-export-row-all
+                                   aria-label="Select every driver on this page">
+                        </th>
                         <th>Driver</th>
                         <th>Contact</th>
                         <th>Status</th>
@@ -199,6 +229,11 @@
                 <tbody>
                     {% for driver in page_obj %}
                     <tr>
+                        <td class="wfsel__cell">
+                            <input type="checkbox" class="form-check-input wfsel__box" data-export-row
+                                   value="{{ driver.driver_id }}"
+                                   aria-label="Select {{ driver.user.first_name }} {{ driver.user.last_name }}">
+                        </td>
                         <td>
                             <div class="drl__driver-cell">
                                 <div class="drl__driver-avatar">
@@ -248,13 +283,14 @@
                         <td>
                             {% with vehicle=driver.driver_vehicle.first %}
                             {% if vehicle %}
-                            <div class="drl__vehicle-type">{{ vehicle.vehicle_type|title }}</div>
-                            {% if vehicle.vehicle_no %}
+                            {# The band icon carries the vehicle type, so the word is not repeated #}
                             <span class="drl__plate">
-                                <span class="drl__plate-band">QAT</span>
-                                <span class="drl__plate-no">{{ vehicle.vehicle_no }}</span>
+                                <span class="drl__plate-band" title="{{ vehicle.get_vehicle_type_display }}">
+                                    <i class="fa-solid {{ vehicle.vehicle_type|vehicle_icon }}" aria-hidden="true"></i>
+                                    <span class="visually-hidden">{{ vehicle.get_vehicle_type_display }}</span>
+                                </span>
+                                <span class="drl__plate-no">{{ vehicle.vehicle_no|default:"—" }}</span>
                             </span>
-                            {% endif %}
                             {% else %}
                             <span class="drl__text-muted">No vehicle</span>
                             {% endif %}
@@ -302,5 +338,5 @@
 
 <!-- Export column picker -->
 {% include "workforce/parts/components/_export_columns_modal.html" %}
-<script src="{% static 'workforce/js/export-columns.js' %}?v=20260727b"></script>
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260807b"></script>
 {% endblock content %}

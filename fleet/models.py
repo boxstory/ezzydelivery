@@ -42,12 +42,17 @@ Related:
     - fleet.wallet_service: Business logic for wallet operations
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from decimal import Decimal
 from django.db import models
+from django.db.models import Q
+from django.db.models.functions import Coalesce
 from django.conf import settings
 from django.utils import timezone as dj_timezone
 import os
 from core import models as core_models
+from core.email_normalize import EmailNormalizedModel
+from core.validators import document_validators, image_validators
 
 
 # =============================================================================
@@ -334,7 +339,8 @@ class DriverVehicle(models.Model):
     vehicle_status = models.CharField(
         max_length=100, choices=VEHICLE_STATUS, default='inactive', db_index=True)  # INDEX: Filtered for active vehicles
     vehicle_photo = models.ImageField(
-        upload_to='fleet/vehicles/', blank=True, null=True)
+        upload_to='fleet/vehicles/', blank=True, null=True,
+        validators=image_validators(max_mb=8))
     vehicle_date = models.DateField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -382,9 +388,11 @@ class DriverDocument(models.Model):
     document_issued_from = models.CharField( max_length=100, blank=True, null=True)
     document_expiry_date = models.DateField( blank=True, null=True)
     document_file = models.ImageField(
-        upload_to=upload_path_handler, default='core/driver/default/doc_default.png', blank=True, null=True)
+        upload_to=upload_path_handler, default='core/driver/default/doc_default.png', blank=True, null=True,
+        validators=image_validators(max_mb=8))
     document_file_back = models.ImageField(
-        upload_to=upload_path_handler_back, blank=True, null=True)
+        upload_to=upload_path_handler_back, blank=True, null=True,
+        validators=image_validators(max_mb=8))
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -414,6 +422,7 @@ class DriverTransaction(models.Model):
         # Accounting
         'bills_payable': 'BPAY',
         'bills_receivable': 'BREC',
+        'client_payment': 'CPAY',
         # Earnings & Settlements
         'earning': 'EARN',
         'settlement': 'STLM',
@@ -439,6 +448,9 @@ class DriverTransaction(models.Model):
         # Accounting
         ('bills_payable', 'Bills Payable'),
         ('bills_receivable', 'Bills Receivable'),
+        # Money a business paid us against a charge invoice. Booked negative so
+        # it nets off the charges owed on the seller's finance dashboard.
+        ('client_payment', 'Client Payment Received'),
         # Earnings & Settlements
         ('earning', 'Task Earning'),
         ('settlement', 'Earnings Settlement'),
@@ -693,8 +705,10 @@ class DriverSettlement(models.Model):
         ordering = ['-created_at']
 
 
-class ReceiptTemplate(models.Model):
+class ReceiptTemplate(EmailNormalizedModel, models.Model):
     """Customizable receipt templates for settlements and transactions"""
+    EMAIL_FIELDS = ('company_email',)
+
     TEMPLATE_TYPES = (
         ('settlement', 'Settlement Receipt'),
         ('cod_deposit', 'COD Deposit Receipt'),
@@ -879,9 +893,25 @@ class DriverNotification(models.Model):
 
 class DriverLocation(models.Model):
     """
-    Periodic GPS pings from driver PWA (~every 30s while on active task).
-    Used for real-time tracking and proof-of-delivery location.
+    Periodic GPS pings from driver PWA (~every 30s while a driver page is open).
+
+    Two timestamps, and the difference matters:
+      * ``fixed_at``   — when the device actually took the fix.
+      * ``created_at`` — when the server received it.
+
+    They diverge whenever the browser hands back a cached position, or when a
+    ping was queued offline and replayed later. Anything asking "where was the
+    driver at this moment" must read :attr:`at`, never ``created_at`` alone.
+
+    Coarse fixes (``accuracy`` worse than :attr:`MAX_TRUSTED_ACCURACY`) are
+    stored rather than dropped — a rough position beats a hole in the trail —
+    so any consumer stamping a position onto a record should go through
+    :meth:`latest_for_driver`, which prefers a precise fix.
     """
+
+    #: Metres. Above this a fix is kept but treated as indicative only.
+    MAX_TRUSTED_ACCURACY = 100
+
     driver = models.ForeignKey(
         Driver, on_delete=models.CASCADE, related_name='locations', db_index=True
     )
@@ -894,10 +924,58 @@ class DriverLocation(models.Model):
         'delivery.DeliveryTask', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='driver_locations'
     )
+    fixed_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the device took the fix. Older than created_at for cached or replayed pings.",
+    )
+    queued = models.BooleanField(
+        default=False,
+        help_text="Replayed from the driver's offline queue rather than sent live.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"[{self.driver}] {self.latitude},{self.longitude} @ {self.created_at:%H:%M}"
+
+    @property
+    def at(self):
+        """When the driver was actually at this position."""
+        return self.fixed_at or self.created_at
+
+    @property
+    def is_precise(self):
+        """True when the fix is accurate enough to stamp onto a record."""
+        return self.accuracy is None or self.accuracy <= self.MAX_TRUSTED_ACCURACY
+
+    @property
+    def lag_seconds(self):
+        """How long the fix sat on the device before reaching the server."""
+        if not self.fixed_at:
+            return None
+        return int((self.created_at - self.fixed_at).total_seconds())
+
+    @classmethod
+    def latest_for_driver(cls, driver_id, prefer_precise=True, within_minutes=None):
+        """
+        Newest fix for a driver, ranked by when it was *taken*, not received.
+
+        With ``prefer_precise`` a coarse fix is only returned when the driver has
+        no precise one in the window — so admitting low-accuracy pings never
+        degrades a reading that used to come from a good one.
+        """
+        if not driver_id:
+            return None
+        qs = cls.objects.filter(driver_id=driver_id)
+        if within_minutes:
+            qs = qs.filter(created_at__gte=dj_timezone.now() - timedelta(minutes=within_minutes))
+        qs = qs.order_by(Coalesce('fixed_at', 'created_at').desc())
+        if prefer_precise:
+            precise = qs.filter(
+                Q(accuracy__isnull=True) | Q(accuracy__lte=cls.MAX_TRUSTED_ACCURACY)
+            ).first()
+            if precise:
+                return precise
+        return qs.first()
 
     class Meta:
         verbose_name = "Driver Location"
@@ -1026,4 +1104,197 @@ class BusinessPayoutDeduction(models.Model):
         ordering = ['id']
         indexes = [
             models.Index(fields=['settle_txn']),
+        ]
+
+
+class BusinessChargeInvoice(models.Model):
+    """Money a business owes EzzyDelivery — the receivable leg.
+
+    The payout leg (``BusinessPayoutDeduction``) can only recover a delivery
+    charge by withholding it from COD being handed back. A prepaid seller hands
+    back no COD, so before this model there was no way to bill one at all.
+
+    An invoice bills whole delivery tasks (one line each, amount frozen at issue
+    so a later edit in Client Charges cannot restate an issued document) plus any
+    hand-added lines. Issuing books the revenue transactions; payments are
+    recorded against the invoice and reduce ``amount_due``.
+    """
+
+    STATUS_ISSUED = 'issued'
+    STATUS_PART_PAID = 'part_paid'
+    STATUS_PAID = 'paid'
+    STATUS_VOID = 'void'
+    STATUS_CHOICES = [
+        (STATUS_ISSUED, 'Issued'),
+        (STATUS_PART_PAID, 'Partly Paid'),
+        (STATUS_PAID, 'Paid'),
+        (STATUS_VOID, 'Void'),
+    ]
+
+    invoice_code = models.CharField(max_length=40, unique=True, db_index=True, blank=True)
+    business = models.ForeignKey(
+        'business.Business', on_delete=models.PROTECT,
+        related_name='charge_invoices'
+    )
+
+    # The delivery window the invoice covers, stamped from the billed tasks.
+    period_from = models.DateField(null=True, blank=True)
+    period_to = models.DateField(null=True, blank=True)
+
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ISSUED, db_index=True)
+
+    due_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+
+    issued_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='charge_invoices_issued'
+    )
+
+    voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='charge_invoices_voided'
+    )
+    void_reason = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.invoice_code} - {self.business_id} - {self.total_amount} QR"
+
+    def save(self, *args, **kwargs):
+        if not self.invoice_code:
+            from django.db import IntegrityError
+            for attempt in range(5):
+                self.invoice_code = self._generate_invoice_code()
+                try:
+                    super().save(*args, **kwargs)
+                    return
+                except IntegrityError:
+                    if attempt == 4:
+                        raise
+                    continue
+        else:
+            super().save(*args, **kwargs)
+
+    def _generate_invoice_code(self):
+        """INVC-{YYYYMMDD}-{daily_seq:04d} — same shape as a transaction code."""
+        from django.db.models import Max
+
+        today_str = dj_timezone.localtime().strftime('%Y%m%d')
+        pattern = f"INVC-{today_str}-"
+        last = BusinessChargeInvoice.objects.filter(
+            invoice_code__startswith=pattern
+        ).aggregate(m=Max('invoice_code'))['m']
+        seq = 1
+        if last:
+            try:
+                seq = int(last.rsplit('-', 1)[1]) + 1
+            except (IndexError, ValueError):
+                seq = 1
+        return f"{pattern}{seq:04d}"
+
+    @property
+    def amount_due(self):
+        return (self.total_amount or Decimal('0')) - (self.amount_paid or Decimal('0'))
+
+    @property
+    def is_void(self):
+        return self.status == self.STATUS_VOID
+
+    @property
+    def days_outstanding(self):
+        """Age in days of an unpaid invoice — 0 once it is paid or voided."""
+        if self.status in (self.STATUS_PAID, self.STATUS_VOID) or not self.issued_at:
+            return 0
+        return (dj_timezone.now().date() - dj_timezone.localtime(self.issued_at).date()).days
+
+    class Meta:
+        verbose_name = "Business Charge Invoice"
+        verbose_name_plural = "Business Charge Invoices"
+        ordering = ['-issued_at', '-id']
+        indexes = [
+            models.Index(fields=['business', 'status']),
+            models.Index(fields=['-issued_at']),
+        ]
+
+
+class BusinessChargeInvoiceLine(models.Model):
+    """One line on a charge invoice — a billed delivery, or a hand-added charge.
+
+    ``amount`` is frozen at issue: the invoice never recomputes a charge from the
+    live task, so editing a verified charge afterwards cannot restate a document
+    the client has already been sent.
+    """
+
+    KIND_CHOICES = BusinessPayoutDeduction.KIND_CHOICES
+
+    invoice = models.ForeignKey(
+        BusinessChargeInvoice, on_delete=models.CASCADE, related_name='lines'
+    )
+    delivery_task = models.ForeignKey(
+        'delivery.DeliveryTask', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='charge_invoice_lines',
+        help_text="The delivery this line bills; blank for hand-added charges"
+    )
+    charge_txn = models.ForeignKey(
+        'DriverTransaction', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='invoice_lines',
+        help_text="Revenue transaction booked for this line"
+    )
+    kind = models.CharField(max_length=30, choices=KIND_CHOICES, default='delivery_charge')
+    label = models.CharField(max_length=120)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.label} - {self.amount} QR"
+
+    class Meta:
+        verbose_name = "Business Charge Invoice Line"
+        verbose_name_plural = "Business Charge Invoice Lines"
+        ordering = ['id']
+        indexes = [
+            models.Index(fields=['invoice']),
+            models.Index(fields=['delivery_task']),
+        ]
+
+
+class BusinessInvoicePayment(models.Model):
+    """A payment received from a business against a charge invoice."""
+
+    invoice = models.ForeignKey(
+        BusinessChargeInvoice, on_delete=models.CASCADE, related_name='payments'
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = models.CharField(
+        max_length=20, choices=DriverTransaction.PAYMENT_METHOD_CHOICES, default='bank'
+    )
+    reference = models.CharField(max_length=120, blank=True, null=True)
+    received_on = models.DateField(null=True, blank=True)
+    notes = models.CharField(max_length=255, blank=True, null=True)
+
+    payment_txn = models.ForeignKey(
+        'DriverTransaction', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='invoice_payments'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='invoice_payments_recorded'
+    )
+
+    def __str__(self):
+        return f"{self.invoice_id} - {self.amount} QR"
+
+    class Meta:
+        verbose_name = "Business Invoice Payment"
+        verbose_name_plural = "Business Invoice Payments"
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['invoice']),
         ]

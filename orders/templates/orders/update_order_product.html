@@ -1,31 +1,22 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% load crispy_forms_tags %}
 
 {% block title %}Update Order Products{% endblock %}
 
 {% block content %}
 <div class="uop" id="orders_update_product_container_main">
-    <!-- Hero Header -->
-    <div class="uop__hero">
-        <div class="uop__hero-content">
-            <div class="uop__hero-left">
-                <h1 class="uop__title">
-                    <i class="fas fa-pen-square"></i>
-                    Update Order Products
-                </h1>
-                <p class="uop__subtitle">Manage products for order #{{ order.client_order_code|default:order.order_number }}</p>
-            </div>
-            <div class="uop__hero-actions">
-                <a href="{% url 'orders:orders_all_list' %}" class="uop__btn uop__btn--outline" id="orders_update_product_btn_orders_list">
-                    <i class="fas fa-list"></i> Orders List
-                </a>
-                <a href="{% url 'orders:order_details' order.id %}" class="uop__btn uop__btn--outline d-none d-md-inline-flex" id="orders_update_product_btn_order_details">
-                    <i class="fas fa-eye"></i> Order Details
-                </a>
-            </div>
-        </div>
-    </div>
+    {% with code=order.client_order_code|default:order.order_number %}
+    {% bconheader eyebrow="Orders" live=code icon="fa-solid fa-pen-to-square" title="Update Order Products" subtitle="Manage products for this order." %}
+        <a href="{% url 'orders:orders_all_list' %}" class="bcon__btn bcon__btn--secondary" id="orders_update_product_btn_orders_list">
+            <i class="fa-solid fa-list"></i> Orders List
+        </a>
+        <a href="{% url 'orders:order_details' order.id %}" class="bcon__btn bcon__btn--secondary d-none d-md-inline-flex" id="orders_update_product_btn_order_details">
+            <i class="fa-solid fa-eye"></i> Order Details
+        </a>
+    {% endbconheader %}
+    {% endwith %}
 
     <!-- Order Info Card -->
     <div class="uop__card">

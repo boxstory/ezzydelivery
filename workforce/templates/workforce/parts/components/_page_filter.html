@@ -1,0 +1,140 @@
+{% comment %}
+Purpose: The shared staff-list filter bar — client, search, period presets, apply/clear, applied chips, page size.
+Used by: any staff list page; page-specific controls come in through `extra_filters_template`.
+Notes: Ids are the pgf_* set the pg-filter handler in workforce.js drives — do not rename them per page.
+
+WHY THIS EXISTS
+    Each list had hand-built its own bar, so the same control drifted page to
+    page: different ids, different widths, one page with raw date boxes where
+    every other had presets. The core lives here once; a page adds only what is
+    genuinely its own.
+
+PARAMS (all optional unless noted)
+    filters              REQUIRED. The view's `filters` dict. Reads .search,
+                         .business (list), .datePreset, .dateFrom, .dateTo.
+    all_businesses       Client dropdown options. Omit to hide the client filter.
+    client_multiple      True renders the client picker as multi-select.
+    search_placeholder   Placeholder for the search box. Omit to hide search.
+    show_period          Default True. The Today/Yesterday/3 Days/... presets.
+    extra_filters_template
+                         >>> THE PER-PAGE HOOK <<<
+                         Path to a template rendered at the end of row 2, inside
+                         the form, with the full page context. Put page-specific
+                         controls there (status pickers, DL code, sort, …). It
+                         receives everything the page view passed.
+    extra_actions_template
+                         Same idea for the button cluster on row 1 (export, etc).
+    applied_chips        List of {label, value, remove_url} for the applied strip.
+    applied_hint         Plain sentence for the applied strip (used when a page
+                         defaults a filter it wants to state, e.g. "last 3 days").
+    per_page_choices     e.g. [10, 25, 50, 100]. Omit to hide the page-size control.
+    per_page             Current page size.
+    reset_url            Where the clear button goes. Defaults to request.path.
+{% endcomment %}
+<div class="pg-filter">
+    <form id="filterForm" method="get" action="{{ filter_action|default:request.path }}" class="pg-filter__form">
+
+        <!-- Row 1: who and what -->
+        <div class="pg-filter__row">
+            {% if all_businesses %}
+            <span class="pg-filter__label">Client</span>
+            <select class="form-select form-select-sm pg-filter__select-biz" name="business" id="pgf_business"
+                    {% if client_multiple %}multiple data-placeholder="All Businesses"{% endif %}
+                    aria-label="Filter by client{% if client_multiple %} (choose one or more){% endif %}">
+                {% if not client_multiple %}<option value="">All Businesses</option>{% endif %}
+                {% for biz in all_businesses %}
+                <option value="{{ biz.business_id }}"
+                        {% if biz.business_id|stringformat:"s" in filters.business %}selected{% endif %}>
+                    {{ biz.business_name }} ({{ biz.business_code|default:biz.business_id }})
+                </option>
+                {% endfor %}
+            </select>
+            {% endif %}
+
+            {% if search_placeholder %}
+            <input type="text" class="form-control form-control-sm pg-filter__input-sm"
+                   name="search" id="pgf_search"
+                   placeholder="{{ search_placeholder }}"
+                   aria-label="{{ search_label|default:search_placeholder }}"
+                   value="{{ filters.search }}" autocomplete="off">
+            {% endif %}
+
+            <div class="pg-filter__actions">
+                {% if extra_actions_template %}{% include extra_actions_template %}{% endif %}
+                <button type="submit" class="pg-filter__btn pg-filter__btn--go" title="Apply filters" aria-label="Apply filters">
+                    <i class="fa fa-search" aria-hidden="true"></i>
+                </button>
+                <a href="{{ reset_url|default:request.path }}" class="pg-filter__btn" title="Clear filters" aria-label="Clear filters">
+                    <i class="fa fa-times" aria-hidden="true"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Row 2: when, then whatever this page adds -->
+        <div class="pg-filter__row">
+            {% if show_period|default_if_none:True %}
+            <span class="pg-filter__label" id="pgf_period_label">Period</span>
+            <div class="pg-filter__seg" role="group" aria-labelledby="pgf_period_label">
+                <button type="button" class="pg-filter__date-btn {% if filters.datePreset == 'today' %}active{% endif %}" data-preset="today">Today</button>
+                <button type="button" class="pg-filter__date-btn {% if filters.datePreset == 'yesterday' %}active{% endif %}" data-preset="yesterday">Yesterday</button>
+                {# Today + yesterday — "Yesterday" alone excludes today's orders. #}
+                <button type="button" class="pg-filter__date-btn {% if filters.datePreset == '2days' %}active{% endif %}" data-preset="2days">2 Days</button>
+                <button type="button" class="pg-filter__date-btn {% if filters.datePreset == '3days' %}active{% endif %}" data-preset="3days">3 Days</button>
+                <button type="button" class="pg-filter__date-btn {% if filters.datePreset == 'week' %}active{% endif %}" data-preset="week">Last Week</button>
+                <button type="button" class="pg-filter__date-btn {% if filters.datePreset == 'month' %}active{% endif %}" data-preset="month">Month</button>
+                <button type="button" class="pg-filter__date-btn {% if filters.datePreset == 'custom' %}active{% endif %}" data-preset="custom">Custom</button>
+            </div>
+            <input type="hidden" name="datePreset" id="pgf_date_preset" value="{{ filters.datePreset }}">
+            <input type="hidden" name="dateFrom" id="pgf_dateFrom" value="{{ filters.dateFrom }}">
+            <input type="hidden" name="dateTo" id="pgf_dateTo" value="{{ filters.dateTo }}">
+            <input type="date" class="form-control form-control-sm pg-filter__input-sm {% if filters.datePreset != 'custom' %}d-none{% endif %}" id="pgf_from_vis" aria-label="From date" value="{{ filters.dateFrom }}">
+            <input type="date" class="form-control form-control-sm pg-filter__input-sm {% if filters.datePreset != 'custom' %}d-none{% endif %}" id="pgf_to_vis" aria-label="To date" value="{{ filters.dateTo }}">
+            {% endif %}
+
+            {# The per-page hook. Everything after the separator belongs to this page alone. #}
+            {% if extra_filters_template %}
+            <span class="pg-filter__sep"></span>
+            {% include extra_filters_template %}
+            {% endif %}
+        </div>
+    </form>
+
+    {% comment %}
+    Applied strip. Chips are what is narrowing the list right now, each removable
+    on its own; the hint is for a filter the page applied by default and wants to
+    say out loud. Folded into the card so the bar reads as one object.
+    {% endcomment %}
+    {% if applied_chips or applied_hint or per_page_choices %}
+    <div class="pg-filter__applied">
+        {% if applied_chips %}
+        <span class="pg-filter__applied-label">Filtered by</span>
+        {% for chip in applied_chips %}
+        <span class="pg-filter__tag">
+            <strong>{{ chip.label }}:</strong> {{ chip.value }}
+            <a href="{{ chip.remove_url }}" class="pg-filter__tag-close" aria-label="Remove {{ chip.label }} filter"><i class="fa-solid fa-times" aria-hidden="true"></i></a>
+        </span>
+        {% endfor %}
+        {% elif applied_hint %}
+        <span class="pg-filter__applied-label">Showing</span>
+        <span class="pg-filter__hint">{{ applied_hint }}</span>
+        {% endif %}
+
+        {% if per_page_choices %}
+        <span class="pg-filter__perpage">
+            <label class="pg-filter__label" for="pgf_per_page">Rows</label>
+            <select class="form-select form-select-sm" name="per_page" id="pgf_per_page" aria-label="Rows per page">
+                {% for n in per_page_choices %}
+                <option value="{{ n }}" {% if per_page|stringformat:"s" == n|stringformat:"s" %}selected{% endif %}>{{ n }}</option>
+                {% endfor %}
+            </select>
+        </span>
+        {% endif %}
+
+        {% if applied_chips %}
+        <a href="{{ reset_url|default:request.path }}" class="pg-filter__clear-all">
+            <i class="fa-solid fa-times me-1" aria-hidden="true"></i>Clear all
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>

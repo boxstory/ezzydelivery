@@ -1,25 +1,20 @@
 {% extends "business_dashboard_base.html" %}
-{% load static %}
+{% load static business_console %}
 
 {% block title %}Return RET-{{ ret.return_number }}{% endblock title %}
 
 {% block content %}
-<div class="flex-fill p-3 p-md-4" id="business_return_detail_container">
+<div class="flex-fill biz-dash__page" id="business_return_detail_container">
 
   <!-- Page Header -->
-  <div class="bcon__header mb-4">
-    <div class="bcon__header-main">
-      <div class="bcon__eyebrow">
-        <a href="{% url 'business:returns_list' %}" class="text-decoration-none"><i class="fa-solid fa-arrow-left"></i> Returns</a>
-        <span class="bcon__eyebrow-sep"></span>
-        <span class="bcon__eyebrow-live">RET-{{ ret.return_number }}</span>
-      </div>
-      <h1 class="bcon__title"><i class="fa-solid fa-rotate-left"></i> RET-{{ ret.return_number }}</h1>
-    </div>
-    <div class="bcon__actions">
-      <span class="badge brt__badge--{{ ret.status }} fs-6">{{ ret.get_status_display }}</span>
-    </div>
-  </div>
+  {% with ret_title="RET-"|add:ret.return_number ret_sub="Order #"|add:ret.order.order_number %}
+  {% bconheader eyebrow="Returns" live=ret.get_status_display icon="fa-solid fa-rotate-left" title=ret_title subtitle=ret_sub %}
+    <span class="badge brt__badge--{{ ret.status }} fs-6">{{ ret.get_status_display }}</span>
+    <a href="{% url 'business:returns_list' %}" class="bcon__btn bcon__btn--ghost">
+      <i class="fa-solid fa-arrow-left"></i> Returns
+    </a>
+  {% endbconheader %}
+  {% endwith %}
 
   <div class="row g-3">
 
@@ -175,5 +170,5 @@
 {% endblock content %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-returns.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-returns.css' %}?v=20260729a">
 {% endblock extra_css %}

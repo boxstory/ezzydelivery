@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Sum, F, Q
 from django.http import JsonResponse
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
@@ -22,6 +23,7 @@ from warehouse.views_seller_links import (
     seller_warehouse_link_edit,
     seller_warehouse_link_delete
 )
+from core.validators import safe_int
 
 # Local aliases for commonly used models
 Warehouse = warehouse_models.Warehouse
@@ -68,15 +70,38 @@ def is_superuser_only(user):
     return _is_superadmin(user)
 
 
+def is_staff_user_obj(user):
+    """`is_staff_user` takes a request; user_passes_test hands us a user."""
+    return bool(user and user.is_authenticated
+                and (_is_staff(user) or _is_superadmin(user)))
+
+
+# Seller (non-staff) access to the warehouse section is OFF.
+#
+# It was never actually reachable: `get_cached_business_for_user` imported a model
+# name that does not exist and the bare except swallowed the ImportError, so this
+# function returned False for every non-staff user. That bug was load-bearing —
+# 34 object lookups in this module still resolve a bare pk from the URL with no
+# tenant filter (pick lists, dispatch batches, cycle counts, RMAs), so simply
+# repairing the lookup would have turned all of them into cross-tenant writes at
+# once. The lookup is now correct; this flag stays False until those endpoints are
+# scoped, and whether sellers should reach warehouse operations at all is a
+# product decision rather than a code fix.
+WAREHOUSE_SELLER_ACCESS_ENABLED = False
+
+
 def has_warehouse_access(user):
     """
     Check if user can access the warehouse section.
-    Allowed: superadmins, staff, or users whose business has an active SellerWarehouseLink.
+    Allowed: superadmins and staff. Sellers with an active SellerWarehouseLink are
+    gated behind WAREHOUSE_SELLER_ACCESS_ENABLED — see the note above.
     """
     if not user.is_authenticated:
         return False
     if _is_staff(user) or _is_superadmin(user):
         return True
+    if not WAREHOUSE_SELLER_ACCESS_ENABLED:
+        return False
     # Check if user's business is linked to any warehouse
     business = get_cached_business_for_user(user)
     if business:
@@ -88,13 +113,19 @@ def has_warehouse_access(user):
 
 def get_cached_business_for_user(user):
     """Get business for a user object (not request) — for use in decorators."""
+    # The model is BusinessTeamProfile; the old name raised ImportError into the
+    # bare except below, so this silently returned None for everyone and
+    # has_warehouse_access denied every non-staff user. Fixing the name turns
+    # seller warehouse access ON — the tenant scoping above had to be corrected
+    # first, or that would have gone live as a cross-tenant leak.
     try:
-        from business.models import BusinessTeam
-        team = BusinessTeam.objects.select_related('business').filter(
-            user=user, status='active'
+        from business.models import BusinessTeamProfile
+        team = BusinessTeamProfile.objects.select_related('business').filter(
+            user=user, team_status='active'
         ).first()
         return team.business if team else None
     except Exception:
+        logger.exception('warehouse: business lookup failed for user %s', getattr(user, 'pk', None))
         return None
 
 
@@ -113,7 +144,7 @@ def get_business_filter(request):
 def wh_per_page(request, default=25):
     """Validated ?per_page= for warehouse list pagination (10/25/50/100)."""
     try:
-        pp = int(request.GET.get('per_page', default))
+        pp = safe_int(request.GET.get('per_page'), default=default, minimum=1, maximum=200)
     except (ValueError, TypeError):
         return default
     return pp if pp in (10, 25, 50, 100) else default
@@ -310,7 +341,13 @@ def inventory_list(request):
             linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
                 business=business, is_active=True
             ).values_list('warehouse_id', flat=True)
-            stock_levels = warehouse_models.StockLevel.objects.filter(warehouse_id__in=linked_warehouse_ids)
+            # Scope by BUSINESS, not just by warehouse. One warehouse is shared by
+            # several sellers, so filtering on warehouse alone showed every seller
+            # in that building each other's stock levels and quantities.
+            stock_levels = warehouse_models.StockLevel.objects.filter(
+                warehouse_id__in=linked_warehouse_ids,
+                product__business=business,
+            )
             warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
 
         # Select related to avoid N+1 queries for product details
@@ -446,14 +483,93 @@ def stock_card(request, product_id):
 
 
 @login_required(login_url='account_login')
-@user_passes_test(has_warehouse_access, login_url='account_login')
+@user_passes_test(is_staff_user_obj, login_url='account_login')
+def staff_product_add(request):
+    """
+    Add a product to a seller's catalogue from inside the warehouse.
+
+    Same gate as the staff product edit, but a relaxed form: only the business
+    and the item name are demanded, because staff are describing a box that
+    turned up, not writing a catalogue entry. Nothing is stocked here — the
+    product is created at zero and stock arrives through Receive Stock, so the
+    two ledgers stay separate.
+    """
+    from warehouse import forms as warehouse_forms
+
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
+    selected_business_id = (request.POST.get('business') or request.GET.get('business') or '').strip()
+
+    if request.method == 'POST':
+        business = None
+        if selected_business_id:
+            business = business_models.Business.objects.filter(pk=selected_business_id).first()
+
+        # The business goes into the form because one rule depends on it: a
+        # fulfilment-enabled seller must have a SKU, and Product.save() raises a
+        # bare ValueError for that — a 500 where the user wants a red field.
+        form = warehouse_forms.StaffProductAddForm(request.POST, request.FILES, business=business)
+
+        if not business:
+            messages.error(request, "Choose the business this product belongs to.")
+            form.is_valid()  # populate errors so the rest of the form is marked up too
+        elif form.is_valid():
+            product = form.save(commit=False)
+            product.business = business
+            try:
+                product.save()
+            except ValueError as e:
+                # Any remaining model-level rule lands as a form error rather
+                # than a traceback the receiving desk cannot act on.
+                form.add_error(None, str(e))
+                messages.error(request, str(e))
+            else:
+                form.save_m2m()
+                messages.success(
+                    request,
+                    f"Product '{product.item_name}' added to {business.business_name} "
+                    f"({product.product_id}). Receive stock against it to put units on the shelf."
+                )
+                logger.info(
+                    f"Product {product.product_id} created by {request.user.username} "
+                    f"for business {business.pk}"
+                )
+                if 'save_and_add_another' in request.POST:
+                    return redirect(f"{reverse('warehouse:staff_product_add')}?business={business.pk}")
+                from django.utils.http import url_has_allowed_host_and_scheme
+                next_url = (request.POST.get('next') or '').strip()
+                if next_url and url_has_allowed_host_and_scheme(
+                        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+                    return redirect(next_url)
+                return redirect('warehouse:inventory_list')
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        business = None
+        if selected_business_id:
+            business = business_models.Business.objects.filter(pk=selected_business_id).first()
+        form = warehouse_forms.StaffProductAddForm(business=business)
+
+    context = {
+        'form': form,
+        'businesses': businesses,
+        'selected_business_id': selected_business_id,
+        'next_url': request.GET.get('next', ''),
+    }
+    return render(request, 'warehouse/staff_product_add.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(is_staff_user_obj, login_url='account_login')
 def staff_product_edit(request, product_id):
     """Staff-only product edit page reachable from the warehouse inventory.
 
     Unlike `product:product_single_update`, this view is not scoped to the
-    requesting user's business — staff/warehouse users can edit any
-    product. Non-staff with warehouse access can only edit products
-    belonging to a business linked to one of their warehouses.
+    requesting user's business — it can edit ANY product. That is why the gate
+    is staff, not `has_warehouse_access`: a seller merely linked to a shared
+    warehouse must not be able to edit another seller's catalogue.
     """
     from product import forms as product_forms
 
@@ -498,8 +614,10 @@ def staff_product_edit(request, product_id):
                 request,
                 f"Product '{product.item_name}' updated."
             )
-            next_url = request.POST.get('next') or request.GET.get('next')
-            if next_url:
+            from django.utils.http import url_has_allowed_host_and_scheme
+            next_url = (request.POST.get('next') or request.GET.get('next') or '').strip()
+            if next_url and url_has_allowed_host_and_scheme(
+                    next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
                 return redirect(next_url)
             return redirect('warehouse:inventory_list')
         messages.error(request, "Please correct the errors below.")
@@ -611,6 +729,8 @@ def receive_stock(request):
         return redirect('business:business_dashboard')
 
     if request.method == 'POST':
+        from django.db import transaction as db_transaction
+
         warehouse_id = request.POST.get('warehouse')
         location_id = request.POST.get('location')
         reference = request.POST.get('reference', '')
@@ -656,98 +776,116 @@ def receive_stock(request):
             total_items = 0
             fulfilled_items = {}  # product_id → qty for updating request items
 
-            for product_id, quantity_str in zip(product_ids, quantities):
-                if not product_id or not quantity_str:
-                    continue
-
-                quantity = int(quantity_str)
-                if quantity <= 0:
-                    continue
-
-                # Get product with business validation
-                if is_staff:
-                    product = product_models.Product.objects.get(pk=product_id)
-                else:
-                    product = product_models.Product.objects.get(pk=product_id, business=business)
-
-                # Get or create stock level
-                stock_level, created = warehouse_models.StockLevel.objects.get_or_create(
-                    product=product,
-                    warehouse=warehouse,
-                    location=location,
-                    defaults={'quantity_on_hand': 0}
-                )
-
-                old_quantity = stock_level.quantity_on_hand
-                stock_level.quantity_on_hand += quantity
-                stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
-
-                # Build transaction notes
-                parts = []
-                if receive_date:
-                    parts.append(f"Received: {receive_date}")
-                if reference:
-                    parts.append(f"Ref: {reference}")
-                if notes:
-                    parts.append(notes)
-                transaction_notes = " | ".join(parts)
-
-                # Create transaction record
-                warehouse_models.InventoryTransaction.objects.create(
-                    product=product,
-                    warehouse=warehouse,
-                    location=location,
-                    transaction_type='receive',
-                    quantity=quantity,
-                    quantity_before=old_quantity,
-                    quantity_after=stock_level.quantity_on_hand,
-                    reference_type='inbound_request' if inbound_req else '',
-                    reference_id=str(inbound_req.pk) if inbound_req else '',
-                    notes=transaction_notes,
-                    created_by=request.user
-                )
-
-                received_products.append(f"{product.item_name} ({quantity} units)")
-                put_away_items.append({'product': product, 'quantity': quantity, 'source_location': location})
-                total_items += quantity
-                fulfilled_items[int(product_id)] = quantity
-
-            # If from inbound request, update fulfilled quantities
-            # Supports partial fulfillment — only mark completed when ALL items fully received
-            if inbound_req and received_products:
-                for item in inbound_req.items.all():
-                    qty = fulfilled_items.get(item.product_id, 0)
-                    if qty > 0:
-                        item.quantity_fulfilled += qty
-                        item.save(update_fields=['quantity_fulfilled', 'updated_at'])
-
-                # Approve if still pending
-                if inbound_req.status == 'pending':
-                    inbound_req.status = 'approved'
-                    inbound_req.approved_by = request.user
-                    inbound_req.approved_at = timezone.now()
-                    inbound_req.save(update_fields=['status', 'approved_by', 'approved_at', 'updated_at'])
-
-                # Check if all items are fully fulfilled
-                all_fulfilled = all(
-                    item.is_fully_fulfilled
-                    for item in inbound_req.items.all()
-                )
-                if all_fulfilled:
-                    inbound_req.status = 'completed'
-                    inbound_req.completed_by = request.user
-                    inbound_req.completed_at = timezone.now()
-                    inbound_req.save(update_fields=['status', 'completed_by', 'completed_at', 'updated_at'])
-
-            # Auto-create put-away task
+            # Everything below writes stock — it must land as one unit. A failure
+            # halfway used to leave the first products already received, and the
+            # staff member would resubmit the whole form and double-count them.
             pa_task = None
-            if put_away_items:
-                pa_task = _create_put_away_task(
-                    warehouse=warehouse,
-                    products_received=put_away_items,
-                    user=request.user,
-                    inbound_request=inbound_req,
-                )
+            with db_transaction.atomic():
+                for product_id, quantity_str in zip(product_ids, quantities):
+                    if not product_id or not quantity_str.strip():
+                        continue
+
+                    try:
+                        quantity = int(quantity_str)
+                    except (TypeError, ValueError):
+                        raise ValueError(f"'{quantity_str}' is not a valid quantity")
+                    if quantity <= 0:
+                        continue
+
+                    # Get product with business validation
+                    if is_staff:
+                        product = product_models.Product.objects.get(pk=product_id)
+                    else:
+                        product = product_models.Product.objects.get(pk=product_id, business=business)
+
+                    # Get or create stock level
+                    stock_level, created = warehouse_models.StockLevel.objects.get_or_create(
+                        product=product,
+                        warehouse=warehouse,
+                        location=location,
+                        defaults={'quantity_on_hand': 0}
+                    )
+                    # Re-read under lock (same rule as stock_adjust): two people
+                    # receiving the same product at once would otherwise both add
+                    # to the same stale on-hand and lose one of the receipts.
+                    stock_level = warehouse_models.StockLevel.objects.select_for_update().get(pk=stock_level.pk)
+
+                    old_quantity = stock_level.quantity_on_hand
+                    stock_level.quantity_on_hand += quantity
+                    stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
+
+                    # Build transaction notes
+                    parts = []
+                    if receive_date:
+                        parts.append(f"Received: {receive_date}")
+                    if reference:
+                        parts.append(f"Ref: {reference}")
+                    if notes:
+                        parts.append(notes)
+                    transaction_notes = " | ".join(parts)
+
+                    # Create transaction record
+                    warehouse_models.InventoryTransaction.objects.create(
+                        product=product,
+                        warehouse=warehouse,
+                        location=location,
+                        transaction_type='receive',
+                        quantity=quantity,
+                        quantity_before=old_quantity,
+                        quantity_after=stock_level.quantity_on_hand,
+                        reference_type='inbound_request' if inbound_req else '',
+                        reference_id=str(inbound_req.pk) if inbound_req else '',
+                        notes=transaction_notes,
+                        created_by=request.user
+                    )
+
+                    received_products.append(f"{product.item_name} ({quantity} units)")
+                    put_away_items.append({'product': product, 'quantity': quantity, 'source_location': location})
+                    total_items += quantity
+                    # Accumulate: the same product can appear on more than one row.
+                    fulfilled_items[int(product_id)] = fulfilled_items.get(int(product_id), 0) + quantity
+
+                # If from inbound request, update fulfilled quantities
+                # Supports partial fulfillment — only mark completed when ALL items fully received
+                if inbound_req and received_products:
+                    for item in inbound_req.items.select_for_update():
+                        qty = fulfilled_items.get(item.product_id, 0)
+                        if qty > 0:
+                            item.quantity_fulfilled += qty
+                            item.save(update_fields=['quantity_fulfilled', 'updated_at'])
+
+                    # Approve if still pending
+                    if inbound_req.status == 'pending':
+                        inbound_req.status = 'approved'
+                        inbound_req.approved_by = request.user
+                        inbound_req.approved_at = timezone.now()
+                        inbound_req.save(update_fields=['status', 'approved_by', 'approved_at', 'updated_at'])
+
+                    # Check if all items are fully fulfilled
+                    all_fulfilled = all(
+                        item.is_fully_fulfilled
+                        for item in inbound_req.items.all()
+                    )
+                    if all_fulfilled:
+                        inbound_req.status = 'completed'
+                        inbound_req.completed_by = request.user
+                        inbound_req.completed_at = timezone.now()
+                        inbound_req.save(update_fields=['status', 'completed_by', 'completed_at', 'updated_at'])
+
+                # Auto-create put-away task
+                if put_away_items:
+                    pa_task = _create_put_away_task(
+                        warehouse=warehouse,
+                        products_received=put_away_items,
+                        user=request.user,
+                        inbound_request=inbound_req,
+                    )
+
+            # Nothing matched — tell the user instead of silently redirecting
+            # to inventory as if the receipt had gone through.
+            if not received_products:
+                messages.warning(request, "Nothing was received — enter a quantity greater than 0 for at least one product.")
+                return redirect('warehouse:receive_stock')
 
             # Success message
             if len(received_products) == 1:
@@ -819,6 +957,264 @@ def confirm_receive(request):
     """AJAX endpoint to confirm receipt"""
     # Placeholder for barcode scanning confirmation
     return JsonResponse({'status': 'ok'})
+
+
+# =============================================================================
+# STOCK ADJUSTMENT
+# =============================================================================
+
+# Why the books moved. Free text alone makes the transaction log unsearchable,
+# so the reason is a fixed vocabulary and lands in the transaction notes.
+ADJUSTMENT_REASON_CHOICES = [
+    ('damage', 'Damaged'),
+    ('loss', 'Lost / Stolen'),
+    ('found', 'Found / Recovered'),
+    ('expiry', 'Expired'),
+    ('return_supplier', 'Returned to Supplier'),
+    ('correction', 'Data Correction'),
+    ('other', 'Other'),
+]
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def stock_adjust(request):
+    """
+    Correct on-hand quantities to match a physical count.
+
+    The form posts the counted figure, never a delta: the delta is derived
+    inside the transaction from the row as it stands at that moment, so a
+    receive or a pick landing between page load and submit is not overwritten
+    with a stale number.
+    """
+    business, is_staff = get_business_filter(request)
+
+    if not is_staff and not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('business:business_dashboard')
+
+    if request.method == 'POST':
+        from django.db import transaction as db_transaction
+
+        warehouse_id = request.POST.get('warehouse')
+        location_id = request.POST.get('location') or ''
+        reason = request.POST.get('reason', '')
+        reference = request.POST.get('reference', '').strip()
+        notes = request.POST.get('notes', '').strip()
+        product_ids = request.POST.getlist('products[]')
+        counted_values = request.POST.getlist('counted[]')
+
+        try:
+            reason_label = dict(ADJUSTMENT_REASON_CHOICES).get(reason)
+            if not reason_label:
+                raise ValueError("Select a reason for this adjustment")
+
+            # Validate warehouse access (same rule as receiving)
+            if not is_staff:
+                if not warehouse_models.SellerWarehouseLink.objects.filter(
+                    business=business, warehouse_id=warehouse_id, is_active=True
+                ).exists():
+                    raise ValueError("Warehouse is not linked to your business")
+            warehouse = warehouse_models.Warehouse.objects.get(pk=warehouse_id)
+
+            location = None
+            if location_id:
+                location = warehouse_models.StorageLocation.objects.get(
+                    pk=location_id, warehouse=warehouse
+                )
+
+            note_parts = [f"Stock adjustment. Reason: {reason_label}"]
+            if reference:
+                note_parts.append(f"Ref: {reference}")
+            if notes:
+                note_parts.append(notes)
+            transaction_notes = " | ".join(note_parts)
+
+            adjusted = []
+            below_reserved = []
+            added = 0
+            removed = 0
+
+            with db_transaction.atomic():
+                for product_id, counted_str in zip(product_ids, counted_values):
+                    if not product_id or not counted_str.strip():
+                        continue
+
+                    new_quantity = int(counted_str)
+                    if new_quantity < 0:
+                        raise ValueError("Counted quantity cannot be negative")
+
+                    if is_staff:
+                        product = product_models.Product.objects.get(pk=product_id)
+                    else:
+                        product = product_models.Product.objects.get(pk=product_id, business=business)
+
+                    stock_level, _ = warehouse_models.StockLevel.objects.get_or_create(
+                        product=product,
+                        warehouse=warehouse,
+                        location=location,
+                        defaults={'quantity_on_hand': 0}
+                    )
+                    # Re-read under lock: the on-hand shown on the page may be
+                    # minutes old, and the delta must come from the live row.
+                    stock_level = warehouse_models.StockLevel.objects.select_for_update().get(pk=stock_level.pk)
+
+                    old_quantity = stock_level.quantity_on_hand
+                    delta = new_quantity - old_quantity
+                    if delta == 0:
+                        continue
+
+                    stock_level.quantity_on_hand = new_quantity
+                    stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
+
+                    warehouse_models.InventoryTransaction.objects.create(
+                        product=product,
+                        warehouse=warehouse,
+                        location=location,
+                        transaction_type='adjust_in' if delta > 0 else 'adjust_out',
+                        quantity=delta,
+                        quantity_before=old_quantity,
+                        quantity_after=new_quantity,
+                        reference_type='adjustment',
+                        reference_id=reference[:100],
+                        notes=transaction_notes,
+                        created_by=request.user
+                    )
+
+                    adjusted.append(f"{product.item_name} ({old_quantity} → {new_quantity})")
+                    if delta > 0:
+                        added += delta
+                    else:
+                        removed += -delta
+                    # Stock committed to open orders cannot be counted away
+                    # silently — the seller would see negative availability.
+                    if new_quantity < stock_level.quantity_reserved:
+                        below_reserved.append(product.item_name)
+
+            if not adjusted:
+                messages.info(request, "No changes applied — every counted quantity matched the current stock.")
+            else:
+                summary = ", ".join(adjusted[:3])
+                if len(adjusted) > 3:
+                    summary += f" and {len(adjusted) - 3} more"
+                msg = f"Adjusted {len(adjusted)} product{'s' if len(adjusted) != 1 else ''}: {summary}."
+                if added:
+                    msg += f" +{added} in."
+                if removed:
+                    msg += f" -{removed} out."
+                messages.success(request, msg)
+                if below_reserved:
+                    messages.warning(
+                        request,
+                        "Now below reserved quantity (open orders may not be fulfillable): "
+                        + ", ".join(below_reserved)
+                    )
+                logger.info(
+                    f"Stock adjustment by {request.user.username} at {warehouse.code}: "
+                    f"{len(adjusted)} products, reason={reason}"
+                )
+
+            return redirect('warehouse:inventory_list')
+
+        except Exception as e:
+            logger.exception(f"Error adjusting stock: {str(e)}")
+            messages.error(request, f"Error adjusting stock: {str(e)}")
+
+    # GET — build context
+    if is_staff:
+        warehouses = warehouse_models.Warehouse.objects.filter(is_active=True)
+        businesses = business_models.Business.objects.filter(business_status='active').order_by('business_name')
+        selected_business_id = request.GET.get('business', '')
+    else:
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
+        businesses = None
+        selected_business_id = str(business.pk)
+
+    context = {
+        'warehouses': warehouses,
+        'is_staff': is_staff,
+        'businesses': businesses,
+        'selected_business_id': selected_business_id,
+        'reasons': ADJUSTMENT_REASON_CHOICES,
+    }
+    return render(request, 'warehouse/stock_adjust.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(has_warehouse_access, login_url='account_login')
+def api_stock_levels(request):
+    """
+    Current on-hand for every product of a business at one warehouse/location.
+
+    Products with no stock row yet are still listed at 0 — an adjustment is
+    often the first time a product is counted into a location.
+    """
+    business, is_staff = get_business_filter(request)
+
+    try:
+        warehouse_id = safe_int(request.GET.get('warehouse'), default=0, minimum=1)
+        if not warehouse_id:
+            return JsonResponse({'error': 'Warehouse is required'}, status=400)
+
+        if is_staff:
+            business_id = safe_int(request.GET.get('business'), default=0, minimum=1)
+            if not business_id:
+                return JsonResponse({'error': 'Business is required'}, status=400)
+        else:
+            if not business:
+                return JsonResponse({'error': 'No business on this account'}, status=403)
+            business_id = business.pk
+            # A seller may only read a warehouse their business is linked to.
+            if not warehouse_models.SellerWarehouseLink.objects.filter(
+                business_id=business_id, warehouse_id=warehouse_id, is_active=True
+            ).exists():
+                return JsonResponse({'error': 'Warehouse is not linked to your business'}, status=403)
+
+        location_id = safe_int(request.GET.get('location'), default=0, minimum=1) or None
+
+        # Read the WHOLE warehouse, not just the selected location. Filtering on
+        # location_id=None meant "only rows with no location", so a business
+        # whose stock had been put away into bins showed 0 on hand everywhere.
+        levels = warehouse_models.StockLevel.objects.filter(
+            product__business_id=business_id,
+            warehouse_id=warehouse_id,
+        ).values('product_id', 'location_id', 'quantity_on_hand', 'quantity_reserved')
+
+        here = {}        # the row the count will actually overwrite
+        elsewhere = {}   # same warehouse, other locations — shown, never written
+        for row in levels:
+            pid = row['product_id']
+            if row['location_id'] == location_id:
+                here[pid] = row
+            else:
+                elsewhere[pid] = elsewhere.get(pid, 0) + row['quantity_on_hand']
+
+        products = product_models.Product.objects.filter(
+            business_id=business_id
+        ).select_related('color', 'unit').order_by('item_name')
+
+        data = []
+        for p in products:
+            row = here.get(p.id)
+            data.append({
+                'id': p.id,
+                'name': p.item_name,
+                'sku': p.item_sku or '',
+                'barcode': p.barcode or '',
+                'color': p.color.color_variant if p.color else '',
+                'size': p.size or '',
+                'unit': p.unit.unit_variant if p.unit else '',
+                'on_hand': row['quantity_on_hand'] if row else 0,
+                'reserved': row['quantity_reserved'] if row else 0,
+                'elsewhere': elsewhere.get(p.id, 0),
+            })
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        logger.error(f"Error fetching stock levels: {e}")
+        return JsonResponse({'error': str(e)}, status=400)
 
 
 # =============================================================================
@@ -2067,7 +2463,7 @@ def count_item(request, pk, item_id):
     item = get_object_or_404(warehouse_models.CycleCountItem, pk=item_id, cycle_count=cycle_count)
 
     try:
-        counted_qty = int(request.POST.get('counted_quantity', 0))
+        counted_qty = safe_int(request.POST.get('counted_quantity'), default=0, minimum=0, maximum=1000000)
         if counted_qty < 0:
             return JsonResponse({'error': 'Quantity cannot be negative'}, status=400)
     except (ValueError, TypeError):
@@ -2300,8 +2696,14 @@ def warehouse_list(request):
 
     warehouses = warehouses.order_by('name')
 
+    paginator = Paginator(warehouses, wh_per_page(request, 25))
+    warehouses_page = paginator.get_page(request.GET.get('page'))
+
     context = {
-        'warehouses': warehouses,
+        'warehouses': warehouses_page,
+        'warehouses_page': warehouses_page,
+        'warehouses_total': paginator.count,
+        'per_page': str(wh_per_page(request, 25)),
         'is_staff': is_staff,
     }
     return render(request, 'warehouse/warehouse_list.html', context)
@@ -2442,9 +2844,17 @@ def warehouse_detail(request, pk):
         total_reserved=Sum('quantity_reserved')
     )
 
+    # A configured warehouse generates a location per bin, so this list runs to
+    # hundreds of rows on a detail page that is otherwise a handful of cards.
+    locations_paginator = Paginator(locations, wh_per_page(request, 25))
+    locations_page = locations_paginator.get_page(request.GET.get('page'))
+
     context = {
         'warehouse': warehouse,
-        'locations': locations,
+        'locations': locations_page,
+        'locations_page': locations_page,
+        'locations_total': locations_paginator.count,
+        'per_page': str(wh_per_page(request, 25)),
         'stock_summary': stock_summary,
         'is_staff': is_staff,
     }
@@ -2459,10 +2869,10 @@ def warehouse_capacity_configure(request, pk):
 
     if request.method == 'POST':
         try:
-            total_zones = int(request.POST.get('total_zones', 0))
-            racks_per_zone = int(request.POST.get('racks_per_zone', 0))
-            shelves_per_rack = int(request.POST.get('shelves_per_rack', 0))
-            bins_per_shelf = int(request.POST.get('bins_per_shelf', 0))
+            total_zones = safe_int(request.POST.get('total_zones'), default=0, minimum=0, maximum=500)
+            racks_per_zone = safe_int(request.POST.get('racks_per_zone'), default=0, minimum=0, maximum=500)
+            shelves_per_rack = safe_int(request.POST.get('shelves_per_rack'), default=0, minimum=0, maximum=500)
+            bins_per_shelf = safe_int(request.POST.get('bins_per_shelf'), default=0, minimum=0, maximum=500)
 
             zone_naming_pattern = request.POST.get('zone_naming_pattern', 'A,B,C,D')
             rack_naming_pattern = request.POST.get('rack_naming_pattern', 'numeric')
@@ -3026,19 +3436,55 @@ def api_storage_locations(request, warehouse_id):
         return JsonResponse({'error': str(e)}, status=400)
 
 
+def _on_hand_by_product(business_id, warehouse_id, product_ids=None):
+    """
+    {product_id: total on hand} for one warehouse, summed over its locations.
+
+    Summed rather than per-location on purpose: the receiving desk wants the
+    shelf total for the building, and the storage location on the form only
+    decides where the incoming units land.
+    """
+    levels = warehouse_models.StockLevel.objects.filter(warehouse_id=warehouse_id)
+    if business_id:
+        levels = levels.filter(product__business_id=business_id)
+    if product_ids is not None:
+        levels = levels.filter(product_id__in=product_ids)
+    return {
+        row['product_id']: row['total']
+        for row in levels.values('product_id').annotate(total=Sum('quantity_on_hand'))
+    }
+
+
 @login_required(login_url='account_login')
 @user_passes_test(has_warehouse_access, login_url='account_login')
 def api_business_products(request, business_id):
-    """API endpoint to get products for a specific business."""
+    """
+    Products for a business, with the thumbnail and — when ?warehouse= is given
+    — what is already on hand there, so a receiver can see the shelf figure the
+    delivery is being added to.
+    """
+    business, is_staff = get_business_filter(request)
+    # A seller may only read its own catalogue, whatever id it asks for.
+    if not is_staff and (not business or business.pk != business_id):
+        return JsonResponse({'error': 'Not allowed'}, status=403)
+
     try:
         products = product_models.Product.objects.filter(
             business_id=business_id
         ).order_by('item_name')
+
+        warehouse_id = safe_int(request.GET.get('warehouse'), default=0, minimum=1)
+        on_hand = _on_hand_by_product(business_id, warehouse_id) if warehouse_id else {}
+
         products_data = [
             {
                 'id': p.id,
                 'name': p.item_name,
                 'sku': p.item_sku or '',
+                'image': p.product_image.url if p.product_image else '',
+                # 0, not None: with a warehouse chosen, "no stock row" is an
+                # answer — nothing on that shelf — not an unknown.
+                'on_hand': on_hand.get(p.id, 0) if warehouse_id else None,
             }
             for p in products
         ]
@@ -3058,11 +3504,18 @@ def api_inbound_request_items(request, request_id):
         ).get(pk=request_id)
 
         items = inbound_req.items.select_related('product').all()
+        on_hand = _on_hand_by_product(
+            None,
+            inbound_req.warehouse_id,
+            product_ids=[item.product_id for item in items],
+        )
         items_data = [
             {
                 'product_id': item.product.id,
                 'name': item.product.item_name,
                 'sku': item.product.item_sku or '',
+                'image': item.product.product_image.url if item.product.product_image else '',
+                'on_hand': on_hand.get(item.product_id, 0),
                 'quantity_requested': item.quantity_requested,
                 'quantity_fulfilled': item.quantity_fulfilled,
                 'remaining': item.remaining_quantity,

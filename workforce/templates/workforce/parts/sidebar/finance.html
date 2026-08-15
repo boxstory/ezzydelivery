@@ -9,7 +9,10 @@
 {% url 'workforce:fleet_drivers_earnings' as u_fleet_drivers_earnings %}
 {% url 'workforce:earnings_verification' as u_earnings_verification %}
 {% url 'workforce:client_charge_verification' as u_client_charge_verification %}
-{% with active="workforce_finance_dashboard,fleet_transactions,seller_transactions,cod_ledger,cod_settlement_report,cod_business_settlement_report,cod_business_payout_invoice,cod_legacy_reconciliation,fleet_drivers_earnings,earnings_verification,client_charge_verification,driver_payout_invoice,driver_payout_worksheet" %}
+{% url 'workforce:cod_business_payout_history' as u_cod_business_payout_history %}
+{% url 'workforce:client_charges_collect' as u_client_charges_collect %}
+{% url 'workforce:client_charge_invoices' as u_client_charge_invoices %}
+{% with active="workforce_finance_dashboard,fleet_transactions,seller_transactions,cod_ledger,cod_settlement_report,cod_business_settlement_report,cod_business_payout_invoice,cod_business_payout_history,cod_legacy_reconciliation,fleet_drivers_earnings,earnings_verification,client_charge_verification,client_charges_collect,client_charge_invoices,client_charge_invoice_detail,driver_payout_invoice,driver_payout_worksheet" %}
 <li id="workforce_sidebar_menu_finance" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_finance" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-finance" data-title="Finance">
     <i class="fa-solid fa-chart-line me-2"></i>
@@ -23,10 +26,13 @@
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_seller_transactions" url=u_seller_transactions icon="fa-solid fa-store" label="Seller Transactions" active_names="seller_transactions" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_cod_ledger" url=u_cod_ledger icon="fa-solid fa-book" label="COD Ledger" active_names="cod_ledger" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_cod_settlement" url=u_cod_settlement_report icon="fa-solid fa-file-invoice-dollar" label="COD Settlement Requests" active_names="cod_settlement_report" %}
-      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_business_cod_payout" url=u_cod_business_settlement_report icon="fa-solid fa-building-columns" label="Business COD Payout" active_names="cod_business_settlement_report,cod_business_payout_invoice" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_business_cod_payout" url=u_cod_business_settlement_report icon="fa-solid fa-building-columns" label="Business COD Payout" active_names="cod_business_settlement_report" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_business_payout_history" url=u_cod_business_payout_history icon="fa-solid fa-receipt" label="Payout History" active_names="cod_business_payout_history,cod_business_payout_invoice" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_cod_reconciliation" url=u_cod_legacy_reconciliation icon="fa-solid fa-scale-balanced" label="COD Reconciliation" active_names="cod_legacy_reconciliation" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_earnings_verification" url=u_earnings_verification icon="fa-solid fa-clipboard-check" label="Earnings Verification" active_names="earnings_verification" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_client_charges" url=u_client_charge_verification icon="fa-solid fa-file-invoice" label="Client Charges" active_names="client_charge_verification" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_charges_collect" url=u_client_charges_collect icon="fa-solid fa-hand-holding-dollar" label="Charges to Collect" active_names="client_charges_collect" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_charge_invoices" url=u_client_charge_invoices icon="fa-solid fa-file-invoice-dollar" label="Charge Invoices" active_names="client_charge_invoices,client_charge_invoice_detail" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_driver_earnings" url=u_fleet_drivers_earnings icon="fa-solid fa-money-bill-wave" label="Driver Payouts" active_names="fleet_drivers_earnings,driver_payout_invoice,driver_payout_worksheet" %}
     </ul>
   </div>

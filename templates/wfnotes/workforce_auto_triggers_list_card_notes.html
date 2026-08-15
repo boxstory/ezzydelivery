@@ -1,0 +1,110 @@
+{% comment %}
+Purpose: "About this page" notes panel for auto_triggers_list.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_auto_triggers_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The master list of everything the platform can do <strong>by itself</strong>. Each row is one
+            trigger — a named event the system already knows how to react to — and the switch on that row
+            decides whether it reacts at all. The WhatsApp table also carries <strong>sender routing</strong>:
+            which of our numbers each part of the platform sends from. Rules built on top of these triggers
+            (the actual messages, webhooks and status changes) live on <strong>Automation Flows</strong>.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Enabled</dt>
+                        <dd class="wfnote__def">Turns the trigger on or off straight away. Off means the
+                            event still happens but nothing automatic follows it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit trigger</dt>
+                        <dd class="wfnote__def">Rewrites the label, description and action text shown on this
+                            page. For WhatsApp rows it also sets which number and which channel that one
+                            trigger sends through.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sender routing</dt>
+                        <dd class="wfnote__def">The first block of the WhatsApp table. One row per section of
+                            the platform — orders and tasks, business leads, driver leads and the join form,
+                            marketing, follow-ups — each pinned to the number it should send from.
+                            Business leads and driver leads are deliberately separate rows: the two pipelines
+                            can run on different numbers <em>and</em> different channels.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit route</dt>
+                        <dd class="wfnote__def">Picks the sending number for that whole section (or Default to
+                            fall back to the platform sender) and the channel it goes out on — Evolution API
+                            or WAHA. The same number can serve both, so these are two separate choices.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pages</dt>
+                        <dd class="wfnote__def">Shortcuts to the pages a routing rule actually covers, so you
+                            can check the change where it lands.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Copy key</dt>
+                        <dd class="wfnote__def">Clicking the small grey code under a name copies the trigger
+                            key — handy when matching a flow or a log entry to its trigger.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the columns</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">From WhatsApp</dt>
+                        <dd class="wfnote__def">The number this row sends from. A solid badge is an explicit
+                            choice; the faded one means it is inheriting the platform default sender.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">via …</dt>
+                        <dd class="wfnote__def">The delivery channel actually in use — Evolution API, WAHA or
+                            n8n. A greyed badge marked <em>(off)</em> means that channel is not configured on
+                            the server.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Active</dt>
+                        <dd class="wfnote__def">Trigger is on. On a routing row it also means a specific
+                            number has been chosen.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Default</dt>
+                        <dd class="wfnote__def">Routing row only: the section is enabled but has no number of
+                            its own, so it uses the platform default sender.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Disabled</dt>
+                        <dd class="wfnote__def">Trigger is off, or the routing rule is no longer restricting
+                            its section.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Switching a trigger off also silences <strong>every automation flow built on it</strong> —
+                    the flow can look Active on its own page and still never run.</li>
+                <li>Disabling a sender route does <strong>not</strong> stop that section from messaging. It
+                    only removes the restriction, so the section falls back to the default sender.</li>
+                <li>Editing a label, description or action text changes what this page displays. It does not
+                    rewire what the trigger does — that is fixed by its key.</li>
+                <li>A number and a channel are two different settings. Picking a number does not make an
+                    unconfigured channel work; a <em>(off)</em> badge means nothing will go out through it.</li>
+                <li>Numbers come from the WhatsApp Instances page — only active instances appear in the
+                    dropdowns here.</li>
+                <li>The Marketing desk owns the lead and driver-onboarding rows: the join-form thank-you and
+                    reminder, the quote thank-you and sales alert, the daily follow-up digest, and the lead
+                    events (created / stage changed / won / lost) that flows can be built on.</li>
+                <li>The <em>Send from EZZY</em> button on driver, lead and quote pages sends through that
+                    section's route, so a staff message arrives from the same number as the automatic ones.
+                    The plain WhatsApp link next to it still opens the staff member's own WhatsApp.</li>
+            </ul>
+        </section>
+    

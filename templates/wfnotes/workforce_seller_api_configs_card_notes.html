@@ -1,0 +1,101 @@
+{% comment %}
+Purpose: "About this page" notes panel for seller_api_configs.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_seller_api_configs_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Every card here is one <strong>connection between a client's store and us</strong> — the credentials
+            we use to pull their orders in automatically instead of typing them. A client saves the connection
+            from their own dashboard; it arrives here as <em>Pending</em> and stays inert until a staff member
+            tests it and approves it. Once approved, the connection starts feeding rows into
+            <strong>Temp Orders</strong>, which is where those rows are reviewed and turned into real orders.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Narrow the list to <em>Pending</em> or <em>Approved</em>, and/or to one
+                            client. The two stack, so you can look at just one client's pending connections.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Google Sheet</dt>
+                        <dd class="wfnote__def">Pick a client, paste a Sheet link, add an optional label, press
+                            <em>Link</em>. That creates (or overwrites) their Google Sheet connection and marks it
+                            approved straight away — no separate approval step.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Test Connection</dt>
+                        <dd class="wfnote__def">Opens a test console for that connection and tries a live fetch of
+                            orders and products, so you can see whether the credentials really work before approving.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Approve / Revoke</dt>
+                        <dd class="wfnote__def">Flips the connection between approved and pending on the spot. The badge
+                            and the button both update without a page reload.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Seller Profile</dt>
+                        <dd class="wfnote__def">Jumps to that client's full profile page for context — contact details,
+                            status, history.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Connection types</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Shopify</dt>
+                        <dd class="wfnote__def">Pulls orders from a Shopify store using an access token. The store URL
+                            must be the <strong>.myshopify.com</strong> handle, not the shop's own domain.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">WooCommerce</dt>
+                        <dd class="wfnote__def">Key-and-secret access to a WordPress shop's REST API.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">TikTok Shop</dt>
+                        <dd class="wfnote__def">Shop id, cipher and refresh token for a TikTok Shop seller account.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Google Sheet</dt>
+                        <dd class="wfnote__def">A shared spreadsheet the client keeps their orders in. The label you type
+                            is what identifies the sheet later in the import screens.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Card fields</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Approved</dt>
+                        <dd class="wfnote__def">The connection is trusted and may be used to import. <em>Pending</em>
+                            means it is saved but not yet cleared for use.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Default</dt>
+                        <dd class="wfnote__def">Marks which connection is the client's primary one when they have more
+                            than one. Only one per client should say Yes.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Approving is a <strong>trust decision, not a test</strong> — nothing verifies the credentials for
+                    you. Run Test Connection first, or you approve a connection that silently imports nothing.</li>
+                <li>The API key on the card is <strong>truncated for display</strong>. Never treat what you see as the
+                    full key when comparing against what a client sent you.</li>
+                <li>Linking a Google Sheet for a client who already has one <strong>overwrites</strong> the existing
+                    sheet link rather than adding a second.</li>
+                <li>Google Sheet testing needs the server's Google authorisation to be in place; if sheet tests fail for
+                    every client at once, that is the cause, not the individual sheet.</li>
+                <li>Revoking stops future imports. Rows already pulled into Temp Orders and orders already created stay
+                    exactly where they are.</li>
+            </ul>
+        </section>
+    

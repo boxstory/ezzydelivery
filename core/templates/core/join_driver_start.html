@@ -16,7 +16,7 @@ Notes: Join button starts Google sign-in for anonymous visitors, links straight 
 {% endblock head_hreflang %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/driver-apply.css' %}?v=20260724a" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260801a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -124,10 +124,16 @@ Notes: Join button starts Google sign-in for anonymous visitors, links straight 
         <!-- Earnings -->
         <div class="cja__section-card p-4 p-md-5 mx-auto col-12 col-md-10 col-lg-8 mb-4">
             <h2 class="h5 mb-3">Earnings</h2>
+            <div class="cja__pay d-flex flex-wrap align-items-center gap-3 mb-3">
+                <span class="cja__pay-figure">QAR 10&ndash;15</span>
+                <span class="cja__pay-unit">per completed order,<br class="d-none d-sm-inline">depending on the delivery type</span>
+            </div>
             <p class="mb-0">You're paid for every completed delivery — the more you deliver, the more you earn. Weekly payouts, flexible hours, no fixed shifts.</p>
-            {% comment %}Enable only once Ezzy confirms a real figure — never publish a guessed number:
-            <p class="mb-0 mt-2">Active drivers earn up to QAR [CONFIRMED_NUMBER]/month.</p>
-            {% endcomment %}
+            <p class="cja__pay-note mb-0 mt-2">
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                Your exact per-order rate is agreed with our team after you complete and submit your
+                application — we only discuss final pricing with completed applications.
+            </p>
         </div>
 
         <!-- Requirements -->
@@ -225,7 +231,12 @@ Notes: Join button starts Google sign-in for anonymous visitors, links straight 
   "baseSalary": {
     "@type": "MonetaryAmount",
     "currency": "QAR",
-    "value": { "@type": "QuantitativeValue", "unitText": "DELIVERY" }
+    "value": {
+      "@type": "QuantitativeValue",
+      "minValue": 10,
+      "maxValue": 15,
+      "unitText": "DELIVERY"
+    }
   },
   "hiringOrganization": {
     "@type": "Organization",

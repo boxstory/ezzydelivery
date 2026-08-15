@@ -1,6 +1,7 @@
 {% extends "business_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% load business_console %}
 
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}?v=20260215e" rel="stylesheet" type="text/css" />
@@ -9,32 +10,20 @@
 {% block content %}
 <div class="oap" id="orders_api_list_container_main">
 
-  <!-- Page Header -->
-  <div class="oap__header">
-    <div class="oap__header-left">
-      <div class="oap__header-icon">
-        <i class="fa-solid fa-plug"></i>
-      </div>
-      <div>
-        <h1 class="oap__title">API Orders</h1>
-        <p class="oap__subtitle">{{ len }} order{{ len|pluralize }} from {{ api.api_type }}</p>
-      </div>
-    </div>
-    <div class="oap__header-actions">
-      <a href="{% url 'orders:orders_all_list' %}" class="oap__action-btn oap__action-btn--secondary" id="orders_api_list_btn_go_orders">
-        <i class="fa-solid fa-basket-shopping"></i> Go to Orders
-      </a>
-      <a href="{% url 'orders:get_order_by_api' %}" class="oap__action-btn oap__action-btn--primary" id="orders_api_list_btn_api_upload">
-        <i class="fa-solid fa-plug"></i> API Upload
-      </a>
-      <a href="{% url 'orders:order_upload_file' %}" class="oap__action-btn oap__action-btn--secondary" id="orders_api_list_btn_upload_bulk">
-        <i class="fa-solid fa-file-import"></i> Bulk Upload
-      </a>
-      <a href="{% url 'orders:add_order' %}" class="oap__action-btn oap__action-btn--secondary" id="orders_api_list_btn_add_orders">
-        <i class="fa-solid fa-plus"></i> Add Order
-      </a>
-    </div>
-  </div>
+  {% bconheader eyebrow="Orders" live=api.api_type icon="fa-solid fa-plug" title="API Orders" subtitle="Orders pulled from this connected store." %}
+    <a href="{% url 'orders:orders_all_list' %}" class="bcon__btn bcon__btn--secondary" id="orders_api_list_btn_go_orders">
+      <i class="fa-solid fa-basket-shopping"></i> Go to Orders
+    </a>
+    <a href="{% url 'orders:get_order_by_api' %}" class="bcon__btn bcon__btn--primary" id="orders_api_list_btn_api_upload">
+      <i class="fa-solid fa-plug"></i> API Upload
+    </a>
+    <a href="{% url 'orders:order_upload_file' %}" class="bcon__btn bcon__btn--secondary" id="orders_api_list_btn_upload_bulk">
+      <i class="fa-solid fa-file-import"></i> Bulk Upload
+    </a>
+    <a href="{% url 'orders:add_order' %}" class="bcon__btn bcon__btn--secondary" id="orders_api_list_btn_add_orders">
+      <i class="fa-solid fa-plus"></i> Add Order
+    </a>
+  {% endbconheader %}
 
   <!-- Date Filter -->
   <div class="oap__filter-bar">

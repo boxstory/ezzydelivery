@@ -1,6 +1,7 @@
 # Purpose: All CRM business logic — lead creation from each source, stage sync with PricingEnquiry.crm_status, convert-to-Business, follow-up digest.
 # Used by: workforce/crm_views.py, webpages/views.py hooks, workforce pricing_inquiry_update_status, crm management commands.
 # Notes: Stage<->crm_status sync is two one-way functions (set_lead_stage writes to inquiry; sync_lead_from_pricing_status writes to lead) so no loop is possible.
+#        Board columns are LeadStage rows, so which stage a driver lands in is data, not code — see crm/stage_rules.py.
 
 import logging
 import re
@@ -8,7 +9,8 @@ import re
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Lead, LeadActivity
+from . import stage_rules
+from .models import Lead, LeadActivity, LeadStage
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,31 @@ STAGE_TO_CRM_STATUS = {
 CRM_STATUS_TO_STAGE = {v: k for k, v in STAGE_TO_CRM_STATUS.items()}
 
 
+# ── Stage lookups ────────────────────────────────────────────────────────────
+# Everything that used to read Lead.STAGE_CHOICES / Lead.CLOSED_STAGES goes
+# through these so a staff-created column behaves like a built-in one.
+
+def board_stages(category):
+    """Active columns for one board, left→right."""
+    return LeadStage.board_columns(category)
+
+
+def closed_stage_keys(category=None):
+    """Terminal stage keys — for queryset filters like `exclude(stage__in=...)`.
+    Includes staff-created terminal columns, which is why callers must not use
+    Lead.CLOSED_STAGES directly."""
+    return list(LeadStage.closed_keys(category))
+
+
+def get_stage(category, key):
+    """The LeadStage row for one board+key, or None (unknown/inactive key)."""
+    return LeadStage.objects.filter(category=category, key=key).first()
+
+
+def is_closed_stage(category, key):
+    return key in LeadStage.closed_keys(category)
+
+
 def normalize_phone(raw):
     """Digits-only form used for phone matching (e.g. '+974 6645-1589' -> '97466451589').
     Strips a leading '00' international access code so pricing-form entries like
@@ -44,6 +71,35 @@ def _log_activity(lead, activity_type, body, user=None):
     )
 
 
+def fire_lead_trigger(trigger_key, lead, **extra):
+    """Run the AutoFlows staff built for a lead event (Auto Triggers → Marketing).
+
+    ``phone`` is in the context on purpose: it is what the "Person this event is
+    about" recipient resolves to, so a flow can message the lead itself. A flow
+    failure must never break lead creation or a stage move, so everything here
+    is swallowed and logged.
+    """
+    try:
+        from core.auto_flow_executor import execute_flows_for_trigger
+
+        context = {
+            'lead_id': lead.pk,
+            'lead_name': lead.contact_name or lead.company_name or '',
+            'lead_company': lead.company_name or '',
+            'lead_phone': lead.phone or '',
+            'phone': lead.phone or '',
+            'lead_stage': lead.stage_label,
+            'lead_source': lead.get_source_display(),
+            'lead_category': lead.get_category_display(),
+            'lead_url': f'{SITE_BASE_URL}/workforce/crm/leads/{lead.pk}/',
+            'assigned_to': (lead.assigned_to.get_username() if lead.assigned_to_id else ''),
+        }
+        context.update(extra)
+        execute_flows_for_trigger(trigger_key, extra_context=context)
+    except Exception:
+        logger.exception('crm: auto flow %s failed for lead %s', trigger_key, lead.pk)
+
+
 def create_lead_from_pricing_inquiry(inquiry):
     """Idempotent: OneToOne get_or_create keyed on the inquiry."""
     stage = CRM_STATUS_TO_STAGE.get(inquiry.crm_status, Lead.STAGE_NEW)
@@ -58,13 +114,19 @@ def create_lead_from_pricing_inquiry(inquiry):
             'stage': stage,
             # A lead born already won/lost must carry a close date or the
             # board's "last N days" window can never age it out.
-            'closed_at': timezone.now() if stage in Lead.CLOSED_STAGES else None,
+            'closed_at': timezone.now() if is_closed_stage(Lead.CATEGORY_BUSINESS, stage) else None,
             'assigned_to': inquiry.assigned_to,
         },
     )
     if created:
         _log_activity(lead, LeadActivity.TYPE_NOTE,
                       f'Lead created from pricing inquiry #{inquiry.id}')
+        fire_lead_trigger('lead_created', lead)
+        # Same number already chasing us on WhatsApp? One card, both sources.
+        try:
+            auto_merge_duplicate(lead)
+        except Exception:
+            logger.exception('crm: auto-merge failed for lead %s', lead.pk)
     return lead, created
 
 
@@ -89,6 +151,11 @@ def create_lead_from_whatsapp_inquiry(inquiry):
     if created:
         _log_activity(lead, LeadActivity.TYPE_NOTE,
                       f'Lead created from WhatsApp quick inquiry #{inquiry.id}')
+        fire_lead_trigger('lead_created', lead)
+        try:
+            auto_merge_duplicate(lead)
+        except Exception:
+            logger.exception('crm: auto-merge failed for lead %s', lead.pk)
     return lead, created
 
 
@@ -109,11 +176,96 @@ def _phone_variants(phone):
     return variants
 
 
+def platform_account_numbers():
+    """Every phone/WhatsApp number that belongs to a real platform account.
+
+    Conversations with these numbers are OUR OWN traffic with our own users, not
+    prospect chats — they carry auth messages, so the CRM must refuse to open them
+    rather than merely hide them from the inbox listing. Cached briefly because it is
+    checked on every chat read.
+    """
+    from django.core.cache import cache
+
+    key = 'crm_platform_account_numbers_v1'
+    numbers = cache.get(key)
+    if numbers is None:
+        from core.models import Profile
+
+        numbers = set()
+        for phone, whatsapp in Profile.objects.values_list('phone', 'whatsapp'):
+            for value in (phone, whatsapp):
+                normalized = normalize_phone(value)
+                if normalized:
+                    numbers.update(_phone_variants(normalized))
+        cache.set(key, numbers, 300)
+    return numbers
+
+
+def is_platform_account_number(*candidates):
+    """True when any candidate identifier resolves to a platform account's number."""
+    owned = platform_account_numbers()
+    if not owned:
+        return False
+    for candidate in candidates:
+        if not candidate:
+            continue
+        normalized = normalize_phone(candidate)
+        if not normalized:
+            continue
+        if _phone_variants(normalized) & owned:
+            return True
+    return False
+
+
+def wa_read_blocked(identifiers):
+    """'' when this conversation may be opened in the CRM, else the refusal reason.
+
+    Takes the resolved identifier set for a chat (phones and/or @lid values) and
+    resolves each back to a phone through the contact directory, because inbound rows
+    are keyed by LID and a LID lookup is the only way to spot a platform account.
+    """
+    from whatsapp.models import WhatsAppContact
+
+    phones = set()
+    lids = set()
+    for ident in identifiers or ():
+        raw = str(ident or '')
+        bare = raw.split('@')[0]
+        if '@lid' in raw or (bare.isdigit() and len(bare) > 13):
+            lids.add(bare)
+        else:
+            phones.add(bare)
+
+    if lids:
+        for lid, phone in WhatsAppContact.objects.filter(
+            lid__in=lids
+        ).values_list('lid', 'phone'):
+            if phone:
+                phones.add(phone)
+
+    if is_platform_account_number(*phones):
+        return (
+            'This number belongs to an EzzyDelivery account, so its conversation '
+            'cannot be opened here — it carries account and verification messages. '
+            'Use the account\'s own profile page instead.'
+        )
+    return ''
+
+
 def _wa_contact_for_phone(phone):
-    """WhatsAppContact directory row for a normalized phone, or None."""
+    """WhatsAppContact directory row for a normalized phone, or None.
+
+    A phone can have one row per WAHA session (the lid differs per linked
+    number); they describe the same person, so prefer whichever actually
+    carries a name rather than letting row order decide.
+    """
     try:
         from whatsapp.models import WhatsAppContact
         return WhatsAppContact.objects.filter(
+            phone__in=_phone_variants(phone)
+        ).order_by('saved_name', 'push_name').exclude(
+            saved_name='', push_name=''
+        ).first() or WhatsAppContact.objects.filter(
             phone__in=_phone_variants(phone)
         ).first()
     except Exception:
@@ -131,8 +283,8 @@ def create_lead_from_wa_number(phone, user=None, category=Lead.CATEGORY_BUSINESS
         category = Lead.CATEGORY_BUSINESS
 
     existing = (
-        Lead.objects.filter(phone__in=_phone_variants(phone))
-        .exclude(stage__in=Lead.CLOSED_STAGES)
+        Lead.objects.filter(phone__in=_phone_variants(phone), merged_into__isnull=True)
+        .exclude(stage__in=closed_stage_keys())
         .order_by('-created_at')
         .first()
     )
@@ -157,6 +309,7 @@ def create_lead_from_wa_number(phone, user=None, category=Lead.CATEGORY_BUSINESS
         else 'Lead created from inbound WhatsApp messages',
         user,
     )
+    fire_lead_trigger('lead_created', lead)
     return lead, True
 
 
@@ -192,29 +345,49 @@ def _recent_wa_messages_text(phone, limit=5, contact=None):
 
 
 def set_lead_stage(lead, new_stage, user=None):
-    """Validate + set stage, log activity, and sync the linked PricingEnquiry."""
-    valid = {s for s, _ in Lead.STAGE_CHOICES}
-    if new_stage not in valid:
-        raise ValueError(f'Invalid stage: {new_stage}')
+    """Validate + set stage, log activity, and sync the linked PricingEnquiry.
+
+    The stage must be a column on *this lead's own board*, so a business lead can
+    never be dropped into a driver-only column (or vice versa)."""
+    stage = get_stage(lead.category, new_stage)
+    if stage is None:
+        # Before the stages are seeded (fresh DB mid-migrate), fall back to the
+        # legacy constant rather than making every stage move impossible.
+        if not LeadStage.objects.exists() and new_stage in {s for s, _ in Lead.STAGE_CHOICES}:
+            stage = None
+        else:
+            raise ValueError(f'Invalid stage: {new_stage}')
     if new_stage == lead.stage:
         return lead
 
-    old_display = lead.get_stage_display()
+    old_display = lead.stage_label
     lead.stage = new_stage
     lead.stage_changed_at = timezone.now()
-    lead.closed_at = timezone.now() if new_stage in Lead.CLOSED_STAGES else None
+    closed = stage.is_closed if stage else new_stage in Lead.CLOSED_STAGES
+    lead.closed_at = timezone.now() if closed else None
     lead.save(update_fields=['stage', 'stage_changed_at', 'closed_at', 'updated_at'])
 
     _log_activity(lead, LeadActivity.TYPE_STAGE_CHANGE,
-                  f'Stage: {old_display} → {lead.get_stage_display()}', user)
+                  f'Stage: {old_display} → {lead.stage_label}', user)
 
-    # One-way sync back to the legacy pricing-inquiry CRM status
+    # One-way sync back to the legacy pricing-inquiry CRM status. A column with a
+    # blank crm_status (every staff-created one) simply doesn't mirror — this used
+    # to be a dict lookup that raised KeyError on any unmapped stage.
     inquiry = lead.pricing_enquiry
     if inquiry:
-        new_status = STAGE_TO_CRM_STATUS[new_stage]
-        if inquiry.crm_status != new_status:
+        new_status = stage.crm_status if stage else STAGE_TO_CRM_STATUS.get(new_stage, '')
+        if new_status and inquiry.crm_status != new_status:
             inquiry.crm_status = new_status
             inquiry.save(update_fields=['crm_status', 'date_modified'])
+
+    # Marketing auto-flows. The generic move always fires; won/lost fire on top
+    # so a flow can greet a won lead without having to test the stage itself.
+    fire_lead_trigger('lead_stage_changed', lead,
+                      old_stage=old_display, new_stage=lead.stage_label)
+    if new_stage == Lead.STAGE_WON:
+        fire_lead_trigger('lead_won', lead)
+    elif new_stage == Lead.STAGE_LOST:
+        fire_lead_trigger('lead_lost', lead)
     return lead
 
 
@@ -230,10 +403,10 @@ def sync_lead_from_pricing_status(inquiry):
     if new_stage and new_stage != lead.stage:
         lead.stage = new_stage
         lead.stage_changed_at = timezone.now()
-        lead.closed_at = timezone.now() if new_stage in Lead.CLOSED_STAGES else None
+        lead.closed_at = timezone.now() if is_closed_stage(lead.category, new_stage) else None
         updates += ['stage', 'stage_changed_at', 'closed_at']
         _log_activity(lead, LeadActivity.TYPE_STAGE_CHANGE,
-                      f'Stage set to {lead.get_stage_display()} (via pricing inquiry page)')
+                      f'Stage set to {lead.stage_label} (via pricing inquiry page)')
     if inquiry.assigned_to_id != lead.assigned_to_id:
         lead.assigned_to_id = inquiry.assigned_to_id
         updates.append('assigned_to')
@@ -305,8 +478,8 @@ def build_followup_digest():
     today = timezone.localdate()
     due = (
         Lead.objects
-        .filter(next_followup_at__lte=today)
-        .exclude(stage__in=Lead.CLOSED_STAGES)
+        .filter(next_followup_at__lte=today, merged_into__isnull=True)
+        .exclude(stage__in=closed_stage_keys())
         .select_related('assigned_to')
         .order_by('next_followup_at')
     )
@@ -332,12 +505,19 @@ def _format_digest_message(leads, heading):
 
 def send_followup_digests(dry_run=False):
     """Send one WhatsApp digest per assignee with due/overdue leads.
-    Unassigned due leads go to the admin number. Safe to re-run (read-only)."""
-    from core.whatsapp_utils import send_whatsapp_message_api, get_route_instance
+    Unassigned due leads go to the admin number. Safe to re-run (read-only).
+
+    Switched off with the ``wa_lead_followup_digest`` trigger (Auto Triggers →
+    Marketing); the sender number and channel come from the ``followups`` route.
+    """
+    from core.whatsapp_utils import send_routed_message, trigger_enabled
+
+    if not trigger_enabled('wa_lead_followup_digest'):
+        logger.info('crm digest: wa_lead_followup_digest is switched off — nothing sent')
+        return {'sent': 0, 'skipped': 0, 'recipients': [], 'errors': [], 'disabled': True}
 
     grouped = build_followup_digest()
     result = {'sent': 0, 'skipped': 0, 'recipients': [], 'errors': []}
-    sender_inst = get_route_instance('followups')
 
     for user, leads in grouped.items():
         if user is None:
@@ -360,10 +540,8 @@ def send_followup_digests(dry_run=False):
         if dry_run:
             continue
         try:
-            resp = send_whatsapp_message_api(
-                number, _format_digest_message(leads, heading),
-                instance_obj=sender_inst,
-            )
+            resp = send_routed_message(
+                'followups', number, _format_digest_message(leads, heading))
             if resp.get('success'):
                 result['sent'] += 1
             else:
@@ -445,113 +623,39 @@ def generate_lead_ai_summary(lead, wa_messages):
 
 
 # ── Driver lead ⇄ driver application status sync ─────────────────────────────
-# Driver-category leads mirror the applicant's real form status. The same
-# Lead.stage keys carry driver-funnel meaning on the driver board, driven by
-# the profile's verification_status:
-#   new         → New Application (no matched driver record yet)
-#   on_hold     → Incomplete       (verification_status 'incomplete' — form not submitted)
-#   contacted   → Applied          (verification_status 'pending' — form submitted)
-#   quoted      → Uploads Completed (applied AND all documents/sections done)
-#   negotiating → Under Review      (verification_status 'under_review')
-#   won         → Approved          (verified / driver approved)
-#   lost        → Rejected          (rejected / blocked)
+# Driver-category leads mirror the applicant's real form status. Which column a
+# driver lands in is NOT hardcoded here — each driver-board LeadStage row carries
+# `auto_rules` (see crm/stage_rules.py) and the columns are scanned right-to-left,
+# first match wins, so terminal columns beat progress ones. Staff can add a column
+# and bind it to a condition without a code change.
+#
+# A column with no auto_rules is a manual lane: reconcile never moves a card into
+# or out of it, so a staff drag sticks.
 
 def _driver_match_keys(*phones):
-    """Last-8-digit keys used to match a lead phone against a driver's numbers."""
+    """Last-8-digit keys used to match a lead phone against a driver's numbers.
+
+    Only genuine phone shapes contribute a key. WhatsApp LIDs are 15-digit privacy
+    identifiers that live in the same fields (`wa_chat_override`), and taking their
+    last 8 digits invented a key that could collide with a real number.
+    """
     keys = set()
     for p in phones:
         n = normalize_phone(p)
-        if len(n) >= 8:
+        # 8 = local Qatar, 9-13 = with a country code. Longer is a LID, not a phone.
+        if 8 <= len(n) <= 13:
             keys.add(n[-8:])
     return keys
 
 
-def driver_lead_target_stage(driver):
-    """Lead.stage a driver-category lead should sit in for this driver's status."""
-    from workforce.views import _driver_application_sections
+def driver_lead_target_stage(driver, stages=None):
+    """Stage key a driver-category lead should sit in for this driver's status.
 
-    prof = getattr(driver, 'profile', None)
-    vs = (getattr(prof, 'verification_status', '') or '') if prof else ''
-
-    # Negative terminal state wins even if an older 'verified' flag lingers.
-    if vs == 'rejected' or driver.driver_status in ('rejected', 'blocked', 'suspended'):
-        return Lead.STAGE_LOST
-    if vs == 'verified' or driver.driver_status == 'approved':
-        return Lead.STAGE_WON
-    if vs == 'under_review':
-        return Lead.STAGE_NEGOTIATING
-
-    # Form status is authoritative for the middle of the funnel.
-    if vs == 'pending':
-        # Submitted the application. If every section + document is in, show it
-        # as ready-for-review; otherwise it just sits as Applied.
-        sections = _driver_application_sections(driver)
-        if sections and all(s['done'] for s in sections):
-            return Lead.STAGE_QUOTED   # Uploads Completed
-        return Lead.STAGE_CONTACTED    # Applied
-
-    # 'incomplete' (default) or anything else — application not submitted.
-    return Lead.STAGE_ON_HOLD          # Incomplete
-
-
-def sync_driver_lead_stages(leads):
-    """Move each driver-category lead into the column matching its applicant's
-    current status. Mutates the passed Lead objects in place and persists only
-    the ones whose stage changed. Safe to call on every driver-board render."""
-    from django.db.models import Q
-    from fleet.models import Driver
-
-    driver_leads = [l for l in leads if l.category == Lead.CATEGORY_DRIVER]
-    if not driver_leads:
-        return
-
-    key_to_leads = {}
-    for lead in driver_leads:
-        for k in _driver_match_keys(lead.phone, lead.wa_chat_override):
-            key_to_leads.setdefault(k, []).append(lead)
-    if not key_to_leads:
-        return
-
-    q = Q()
-    for k in key_to_leads:
-        q |= Q(driver_phone__endswith=k) | Q(driver_whatsapp__endswith=k)
-    drivers = (
-        Driver.objects.select_related('profile')
-        .prefetch_related('driver_document', 'driver_vehicle', 'preferred_zone_groups')
-        .filter(q)
-    )
-
-    key_to_driver = {}
-    for d in drivers:
-        prof = getattr(d, 'profile', None)
-        for k in _driver_match_keys(d.driver_phone, d.driver_whatsapp, getattr(prof, 'whatsapp', '')):
-            cur = key_to_driver.get(k)
-            if cur is None or (d.updated_at and cur.updated_at and d.updated_at > cur.updated_at):
-                key_to_driver[k] = d
-
-    now = timezone.now()
-    changed = []
-    for lead in driver_leads:
-        driver = next(
-            (key_to_driver[k] for k in _driver_match_keys(lead.phone, lead.wa_chat_override)
-             if k in key_to_driver),
-            None,
-        )
-        if driver is None:
-            continue
-        target = driver_lead_target_stage(driver)
-        if not target or lead.stage == target:
-            continue
-        lead.stage = target
-        lead.stage_changed_at = now
-        lead.updated_at = now
-        lead.closed_at = now if target in Lead.CLOSED_STAGES else None
-        changed.append(lead)
-
-    if changed:
-        Lead.objects.bulk_update(
-            changed, ['stage', 'stage_changed_at', 'closed_at', 'updated_at']
-        )
+    `stages` lets callers that already fetched the driver board's columns avoid a
+    query per driver; omit it for one-off lookups."""
+    if stages is None:
+        stages = board_stages(Lead.CATEGORY_DRIVER)
+    return stage_rules.target_stage_key(driver, stages)
 
 
 def reconcile_driver_leads():
@@ -559,57 +663,103 @@ def reconcile_driver_leads():
     application has a driver-category lead, and set each lead's stage to match
     its driver's current form status. Creates missing leads, advances existing
     ones. Safe (and cheap) to call on every driver-board render."""
+    from django.db.models import Count
     from fleet.models import Driver
+
+    stages = board_stages(Lead.CATEGORY_DRIVER)
+    if not stages:
+        return 0, 0
+    closed = LeadStage.closed_keys(Lead.CATEGORY_DRIVER)
+    manual = stage_rules.manual_stage_keys(stages)
 
     drivers = (
         Driver.objects.select_related('user', 'profile')
         .prefetch_related('driver_document', 'driver_vehicle', 'preferred_zone_groups')
+        # Annotated so a `has_deliveries` rule costs no extra query per driver.
+        .annotate(dl_task_count=Count('deliverytask', distinct=True))
     )
-    existing = list(Lead.objects.filter(category=Lead.CATEGORY_DRIVER))
+    existing = list(Lead.objects.filter(
+        category=Lead.CATEGORY_DRIVER, merged_into__isnull=True))
 
-    # Index existing driver leads by every phone key they can match on.
-    key_to_lead = {}
+    # Already-bound leads are looked up by their FK. Unbound ones are offered by phone
+    # key and CLAIMED (popped) by the first driver that matches, so two drivers sharing
+    # a number end up with one card each instead of fighting over the same one — which
+    # is what left a real applicant with no card at all.
+    leads_by_driver = {l.driver_id: l for l in existing if l.driver_id}
+    unbound_by_key = {}
     for lead in existing:
+        if lead.driver_id:
+            continue
         for k in _driver_match_keys(lead.phone, lead.wa_chat_override):
-            key_to_lead.setdefault(k, lead)
+            unbound_by_key.setdefault(k, []).append(lead)
 
     now = timezone.now()
-    to_create, to_update = [], []
+    to_create, to_update, to_bind, newly_linked = [], [], [], []
     for d in drivers:
         prof = getattr(d, 'profile', None)
         keys = _driver_match_keys(d.driver_phone, d.driver_whatsapp, getattr(prof, 'whatsapp', ''))
         if not keys:
             continue
-        target = driver_lead_target_stage(d)
+        target = stage_rules.target_stage_key(d, stages)
+        if not target:
+            continue
         name = ''
         if d.user:
             name = (d.user.get_full_name() or d.user.username or '').strip()
 
-        lead = next((key_to_lead[k] for k in keys if k in key_to_lead), None)
+        lead = leads_by_driver.get(d.pk)
+        if lead is None:
+            for k in keys:
+                bucket = unbound_by_key.get(k)
+                while bucket:
+                    candidate = bucket.pop(0)
+                    if candidate.driver_id:
+                        continue          # claimed by an earlier driver this pass
+                    lead = candidate
+                    lead.driver = d
+                    leads_by_driver[d.pk] = lead
+                    to_bind.append(lead)
+                    # This card came in from WhatsApp (or by hand) and has now been
+                    # matched to a real application — the same "one card, both
+                    # origins" idea as a merge, recorded so it is not silent.
+                    newly_linked.append((lead, d))
+                    break
+                if lead is not None:
+                    break
+
         if lead is None:
             phone = normalize_phone(d.driver_phone or d.driver_whatsapp or (getattr(prof, 'whatsapp', '') or ''))
             new_lead = Lead(
                 category=Lead.CATEGORY_DRIVER,
-                source=Lead.SOURCE_MANUAL,
+                source=Lead.SOURCE_DRIVER_APP,
+                driver=d,
                 phone=phone[:50],
                 contact_name=name[:100],
                 stage=target,
                 stage_changed_at=now,
-                closed_at=now if target in Lead.CLOSED_STAGES else None,
+                closed_at=now if target in closed else None,
             )
             to_create.append(new_lead)
-            # Register so two drivers sharing a number don't double-create.
-            for k in keys:
-                key_to_lead.setdefault(k, new_lead)
-        elif lead.stage != target:
+        elif lead.stage != target and lead.stage not in manual and not lead.stage_pinned:
+            # Two things stop reconcile here: a card parked in a manual column, and a
+            # card a staff member pinned by moving it somewhere the application status
+            # does not justify. Both mean "a human decided this", so leave it alone.
             lead.stage = target
             lead.stage_changed_at = now
             lead.updated_at = now
-            lead.closed_at = now if target in Lead.CLOSED_STAGES else None
+            lead.closed_at = now if target in closed else None
             to_update.append(lead)
 
     if to_create:
         Lead.objects.bulk_create(to_create)
+    if to_bind:
+        Lead.objects.bulk_update(to_bind, ['driver'])
+        for lead, d in newly_linked:
+            _log_activity(
+                lead, LeadActivity.TYPE_NOTE,
+                f'Matched to driver application {d.driver_code or d.pk} by phone number — '
+                'this card now covers both the conversation and the application.',
+            )
     if to_update:
         Lead.objects.bulk_update(
             to_update, ['stage', 'stage_changed_at', 'closed_at', 'updated_at']
@@ -617,42 +767,246 @@ def reconcile_driver_leads():
     return len(to_create), len(to_update)
 
 
-# Reverse direction: staff moving a driver lead into a decision column writes
-# that outcome back to the applicant's real verification status (mirrors the
-# Approve / Reject / Under-review actions on the verification page, including
-# WhatsApp auto-flows). Only decision stages map back — the earlier funnel
-# columns reflect the applicant's own progress and can't be forced by a drag.
-LEAD_STAGE_TO_VERIFICATION = {
-    Lead.STAGE_WON: 'verified',
-    Lead.STAGE_LOST: 'rejected',
-    Lead.STAGE_NEGOTIATING: 'under_review',
-}
+# Reverse direction: staff moving a driver lead into a column that declares a
+# `write_back` applies that outcome to the applicant's real verification status
+# (mirrors the Approve / Reject / Under-review actions on the verification page,
+# including WhatsApp auto-flows). Columns with a blank write_back are board-only —
+# they reflect the applicant's own progress and can't be forced by a drag.
 
-
-def _driver_for_lead(lead):
-    """The fleet.Driver whose phone matches this lead, or None."""
+def driver_candidates_for_lead(lead):
+    """Every fleet.Driver whose number matches this lead. More than one means a
+    duplicate registration — the caller must not pick for the user."""
     from django.db.models import Q
     from fleet.models import Driver
 
     keys = _driver_match_keys(lead.phone, lead.wa_chat_override)
     if not keys:
-        return None
+        return []
     q = Q()
     for k in keys:
         q |= Q(driver_phone__endswith=k) | Q(driver_whatsapp__endswith=k)
-    return (
-        Driver.objects.select_related('profile')
-        .filter(q).order_by('-updated_at').first()
+    return list(Driver.objects.select_related('profile').filter(q).order_by('driver_id'))
+
+
+def _driver_for_lead(lead):
+    """The applicant this lead is about, or None.
+
+    The FK is authoritative once set, so the board, the detail page and the
+    verification write-back can never resolve to different drivers (they used to:
+    one matched by first-key, the other by newest-updated). Phone matching is only a
+    fallback for a lead that has not been bound yet, and it REFUSES to guess when the
+    number matches more than one applicant.
+    """
+    if lead.driver_id:
+        return lead.driver
+
+    candidates = driver_candidates_for_lead(lead)
+    if len(candidates) == 1:
+        return candidates[0]
+    if len(candidates) > 1:
+        logger.warning(
+            'crm: lead %s phone matches %s drivers (%s) — refusing to guess',
+            lead.pk, len(candidates), [d.pk for d in candidates],
+        )
+    return None
+
+
+# ── Duplicate leads: two cards in one ────────────────────────────────────────
+# The same prospect arrives twice — a pricing form and a WhatsApp chat, or a driver
+# application and an inbox promote. Rather than flattening them (which loses which
+# doors they came through) the newer card is absorbed INTO the older one: both rows
+# survive, the child renders as a sub-card inside the parent, and the parent's card
+# shows both source badges. Undoable, because nothing is destroyed.
+
+def duplicate_candidates(lead, limit=10):
+    """Other open leads on the same board whose number matches this one."""
+    if not lead.phone:
+        return []
+    variants = _phone_variants(normalize_phone(lead.phone))
+    if not variants:
+        return []
+    return list(
+        Lead.objects
+        .filter(category=lead.category, phone__in=variants, merged_into__isnull=True)
+        .exclude(pk=lead.pk)
+        .exclude(stage__in=closed_stage_keys(lead.category))
+        .select_related('assigned_to')
+        .order_by('created_at')[:limit]
     )
 
 
+def merge_leads(primary, duplicate, user=None):
+    """Absorb `duplicate` into `primary`. Returns (ok, error).
+
+    The duplicate keeps its own source, inquiry link and timeline — it is hidden from
+    the board and shown inside the primary card instead. A driver binding moves up to
+    the primary so its card keeps tracking the applicant.
+    """
+    if primary.pk == duplicate.pk:
+        return False, 'A lead cannot be merged into itself.'
+    if primary.category != duplicate.category:
+        return False, (
+            'These leads are on different boards — a business lead and a driver '
+            'applicant are not the same record.'
+        )
+    if duplicate.merged_into_id:
+        return False, f'Lead #{duplicate.pk} is already merged into #{duplicate.merged_into_id}.'
+    if primary.merged_into_id:
+        return False, (
+            f'Lead #{primary.pk} is itself merged into #{primary.merged_into_id} — '
+            'merge into that card instead.'
+        )
+
+    with transaction.atomic():
+        # Anything already nested under the duplicate moves up, so the tree stays one
+        # level deep and a card never hides another card's children.
+        for grandchild in duplicate.merged_children.all():
+            grandchild.merged_into = primary
+            grandchild.save(update_fields=['merged_into', 'updated_at'])
+
+        # Fill blanks on the survivor rather than overwrite — the primary is the card
+        # staff already know, so its own values win.
+        filled = []
+        for field in ('company_name', 'contact_name', 'phone', 'product_category',
+                      'wa_chat_override', 'wa_session'):
+            if not getattr(primary, field, '') and getattr(duplicate, field, ''):
+                setattr(primary, field, getattr(duplicate, field))
+                filled.append(field)
+        if primary.assigned_to_id is None and duplicate.assigned_to_id:
+            primary.assigned_to_id = duplicate.assigned_to_id
+            filled.append('assigned_to')
+        if primary.next_followup_at is None and duplicate.next_followup_at:
+            primary.next_followup_at = duplicate.next_followup_at
+            filled.append('next_followup_at')
+        if primary.driver_id is None and duplicate.driver_id:
+            primary.driver_id = duplicate.driver_id
+            filled.append('driver')
+        if primary.converted_business_id is None and duplicate.converted_business_id:
+            primary.converted_business_id = duplicate.converted_business_id
+            filled.append('converted_business')
+        if filled:
+            primary.save(update_fields=filled + ['updated_at'])
+
+        duplicate.merged_into = primary
+        duplicate.merged_at = timezone.now()
+        duplicate.merged_by = user
+        duplicate.save(update_fields=['merged_into', 'merged_at', 'merged_by', 'updated_at'])
+
+    _log_activity(
+        primary, LeadActivity.TYPE_NOTE,
+        f'Merged lead #{duplicate.pk} ({duplicate.get_source_display()}) into this card.'
+        + (f' Filled: {", ".join(filled)}.' if filled else ''),
+        user,
+    )
+    _log_activity(
+        duplicate, LeadActivity.TYPE_NOTE,
+        f'Merged into lead #{primary.pk} — this card is now shown inside that one.', user,
+    )
+    return True, ''
+
+
+def unmerge_lead(child, user=None):
+    """Put an absorbed lead back on the board as its own card."""
+    if not child.merged_into_id:
+        return False, 'That lead is not merged into anything.'
+    parent_id = child.merged_into_id
+    child.merged_into = None
+    child.merged_at = None
+    child.merged_by = None
+    child.save(update_fields=['merged_into', 'merged_at', 'merged_by', 'updated_at'])
+    _log_activity(child, LeadActivity.TYPE_NOTE,
+                  f'Un-merged from lead #{parent_id} — back on the board on its own.', user)
+    return True, ''
+
+
+def auto_merge_duplicate(lead, user=None):
+    """Fold a freshly created lead into an existing card for the same number.
+
+    The OLDER card stays primary: staff already know it, it carries the history, and
+    its id is the one in links and messages. Returns the surviving lead.
+    """
+    candidates = duplicate_candidates(lead, limit=1)
+    if not candidates:
+        return lead
+    other = candidates[0]
+    older, newer = (other, lead) if other.created_at <= lead.created_at else (lead, other)
+    ok, _error = merge_leads(older, newer, user)
+    return older if ok else lead
+
+
+def stage_move_conflict(lead, stage, stages=None):
+    """'' when this lead's column agrees with its driver's real application status,
+    otherwise a plain-English description of the disagreement.
+
+    A driver card's column is normally recomputed from the driver record on every board
+    render. Called AFTER a move (and after any write-back) to decide whether the card now
+    needs pinning: if the rules would file it somewhere else, a human has overridden the
+    data and reconcile must stop touching it.
+
+    Always agrees when the lead is not a driver lead or the column is a manual lane —
+    nothing auto-files those in the first place.
+    """
+    if lead.category != Lead.CATEGORY_DRIVER or stage is None:
+        return ''
+    if stage.is_manual:
+        return ''
+
+    if stages is None:
+        stages = board_stages(Lead.CATEGORY_DRIVER)
+    driver = _driver_for_lead(lead)
+    if driver is None:
+        return (
+            f'No driver record matches this number yet, so "{stage.label}" cannot be '
+            'confirmed from an application.'
+        )
+
+    target = stage_rules.target_stage_key(driver, stages)
+    if target == stage.key:
+        return ''
+
+    where = next((s.label for s in stages if s.key == target), target)
+    return (
+        f'This applicant\'s application status puts them in "{where}", not "{stage.label}".'
+    )
+
+
+def pin_lead_stage(lead, user=None, reason=''):
+    """Freeze this card where staff put it — reconcile stops overriding it."""
+    if lead.stage_pinned:
+        return False
+    lead.stage_pinned = True
+    lead.stage_pinned_at = timezone.now()
+    lead.save(update_fields=['stage_pinned', 'stage_pinned_at', 'updated_at'])
+    _log_activity(
+        lead, LeadActivity.TYPE_STAGE_CHANGE,
+        f'Pinned to "{lead.stage_label}" — auto-filing paused. {reason}'.strip(), user,
+    )
+    return True
+
+
+def unpin_lead_stage(lead, user=None):
+    """Hand this card back to auto-filing. The next board render re-files it from the
+    driver's real application status, which may move it immediately."""
+    if not lead.stage_pinned:
+        return False
+    lead.stage_pinned = False
+    lead.stage_pinned_at = None
+    lead.save(update_fields=['stage_pinned', 'stage_pinned_at', 'updated_at'])
+    _log_activity(
+        lead, LeadActivity.TYPE_STAGE_CHANGE,
+        'Unpinned — the card follows the driver\'s application status again.', user,
+    )
+    return True
+
+
 def sync_driver_status_from_lead(lead, user=None, rejection_reason=''):
-    """Apply a driver lead's decision stage to the matched driver's verification
-    status. No-op for non-driver leads, non-decision stages, or no match.
+    """Apply a driver lead's column to the matched driver's verification status.
+    No-op for non-driver leads, columns with no write_back, or no phone match.
     Returns the driver whose status changed, or None."""
     if lead.category != Lead.CATEGORY_DRIVER:
         return None
-    target = LEAD_STAGE_TO_VERIFICATION.get(lead.stage)
+    stage = get_stage(Lead.CATEGORY_DRIVER, lead.stage)
+    target = stage.write_back if stage else ''
     if not target:
         return None
     driver = _driver_for_lead(lead)

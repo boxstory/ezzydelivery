@@ -1,0 +1,25 @@
+{% comment %}
+Purpose: Button that pulls the latest Shopify/WooCommerce orders into a panel for one-click import
+Used by: orders/parts/order_all_list_content.html, orders/order_add.html (desktop views only)
+Notes: Loads on click, not on page load — the upstream store call takes up to 12s.
+       The button stays visible after loading so it also works as a retry when the store
+       call errors (that fragment branch renders no Refresh of its own).
+       IDs must stay unique per page: api_pending_orders_fragment.html hardcodes
+       hx-target="#orders_api_pending_panel" for its own Refresh/Import swaps.
+{% endcomment %}
+<div class="oal__api-pending mb-3" id="orders_api_pending_section">
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+    <button type="button" class="btn btn-sm btn-primary" id="orders_api_pending_load_btn"
+            hx-get="{% url 'orders:orders_api_pending_list' %}"
+            hx-target="#orders_api_pending_panel"
+            hx-swap="innerHTML"
+            hx-indicator="#orders_api_pending_load_spinner">
+      <i class="fa-solid fa-cloud-arrow-down me-1"></i> Import from Store
+    </button>
+    <span class="text-muted small">Fetches the latest 10 orders from your connected store.</span>
+    <span id="orders_api_pending_load_spinner" class="htmx-indicator text-muted small">
+      <i class="fa-solid fa-spinner fa-spin me-1"></i> Contacting your store...
+    </span>
+  </div>
+  <div id="orders_api_pending_panel"></div>
+</div>

@@ -35,10 +35,22 @@ class Command(BaseCommand):
             type=int,
             help='Recalculate for a specific driver_id only',
         )
+        parser.add_argument(
+            '--settle-tasks',
+            action='store_true',
+            help=(
+                'Also force cod_settled=True on delivery tasks to close a gap '
+                'derived from the ledger. OFF by default: the ledger is not task '
+                'truth, and a wrongly settled task becomes immediately payable to '
+                'the business on the Leg-3 payout queue. Without this flag the '
+                'command reports what it would have settled and changes nothing.'
+            ),
+        )
 
     def handle(self, *args, **options):
         apply = options['apply']
         driver_id = options.get('driver')
+        settle_tasks = options.get('settle_tasks')
 
         if apply:
             self.stdout.write(self.style.WARNING('APPLY MODE - Changes will be saved'))
@@ -210,12 +222,21 @@ class Command(BaseCommand):
                         if remaining <= Decimal('0'):
                             break
 
-                    if settle_ids:
+                    if settle_ids and settle_tasks:
                         DeliveryTask.objects.filter(id__in=settle_ids).update(
                             cod_settled=True, cod_settled_at=timezone.now()
                         )
                         self.stdout.write(self.style.SUCCESS(
                             f'  Marked {len(settle_ids)} delivery tasks as cod_settled'))
+                    elif settle_ids:
+                        # Reported, not applied. Marking a task settled says the
+                        # driver handed that cash in; getting it wrong puts money
+                        # the driver still holds onto the business payout queue.
+                        self.stdout.write(self.style.WARNING(
+                            f'  {len(settle_ids)} delivery task(s) look settled from the '
+                            f'ledger but were NOT marked — re-run with --settle-tasks '
+                            f'if the driver really handed this cash in.'))
+                        self.stdout.write(f'    task ids: {settle_ids}')
 
             self.stdout.write(self.style.SUCCESS('  Changes applied successfully'))
         else:

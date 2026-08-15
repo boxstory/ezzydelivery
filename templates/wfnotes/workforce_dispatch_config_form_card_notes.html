@@ -1,0 +1,97 @@
+{% comment %}
+Purpose: "About this page" notes panel for config_form.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_dispatch_config_form_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The batching rulebook for <strong>one pickup location</strong>. These numbers are read every time an
+            order at this store is verified: they decide how many orders may share a rider's trip, how long the
+            engine holds a lone order hoping for a second one to the same zone, what delivery time is being
+            promised, and how many jobs a rider may carry at once. Saving here changes behaviour for the next
+            batch built at this location — the resulting batches show up on the dispatch dashboard.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Batching and SLA</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Max batch</dt>
+                        <dd class="wfnote__def">Orders per trip. As soon as a batch reaches this number it is
+                            released at once and the timer is irrelevant.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Hold window</dt>
+                        <dd class="wfnote__def">Seconds a lone order waits for a partner to the same zone. When
+                            it expires, the batch is released as it stands — often as a single delivery.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Max hold</dt>
+                        <dd class="wfnote__def">The longer window used in place of the hold window during this
+                            location's peak hours, when a second order is likely.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">SLA target</dt>
+                        <dd class="wfnote__def">Minutes from the moment an order is created to the time it is
+                            supposed to be delivered. This sets each order's deadline, and the KPI dashboard
+                            scores compliance against it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">SLA buffer</dt>
+                        <dd class="wfnote__def">The rescue margin. When an order gets this close to its
+                            deadline, its batch is force-released rather than kept waiting.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Orders/rider</dt>
+                        <dd class="wfnote__def">How many live orders one rider may hold. A rider already at
+                            this number is skipped when a batch is being handed out.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Peaks and flags</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Peak hours</dt>
+                        <dd class="wfnote__def">Two windows, lunch and dinner. Inside them the engine waits the
+                            <em>Max Hold</em> time instead of the normal hold window, to squeeze more orders
+                            into each trip.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Batching</dt>
+                        <dd class="wfnote__def">Off means no grouping at all here: each order becomes its own
+                            batch and is released immediately, logged as an off-peak single release.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Auto-assign</dt>
+                        <dd class="wfnote__def">Off means released batches wait in <em>Ready</em> for a human.
+                            On means a background pass gives each one to the least-loaded approved rider on an
+                            Active shift at this location who has the COD headroom for it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Save</dt>
+                        <dd class="wfnote__def">Writes the settings, records a config-changed entry against
+                            your username, and returns you to the config list.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Saving stores the batch size, hold window, SLA target, SLA buffer, orders per rider and the
+                    two toggles. <strong>Max Hold and the peak-hour times are not written by this form</strong> —
+                    they are shown for reference and have to be changed in the admin.</li>
+                <li>A number the form cannot read is not rejected — it is quietly replaced with the system
+                    default, so check the value on the list page after saving.</li>
+                <li>Changes only affect batches built <strong>from now on</strong>. Anything already holding
+                    keeps the window and deadlines it was created with.</li>
+                <li>A long hold window buys batching at the cost of speed. Push it past the SLA buffer and the
+                    rescue release will simply cut it short anyway.</li>
+                <li>Raising orders per rider without raising batches per rider changes little — assignment stops
+                    at one live batch per rider by default.</li>
+            </ul>
+        </section>
+    

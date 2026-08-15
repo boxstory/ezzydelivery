@@ -1,0 +1,133 @@
+{% comment %}
+Purpose: "About this page" notes panel for driver_payout_worksheet.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_driver_payout_worksheet_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      Everything about <strong>one driver's pay</strong> on a single desk. The four cards across the top follow
+      the money through its stages and mark the one holding it right now. Below that are the two legs
+      of the job: <em>Ready to pay</em> is money already agreed and waiting for a payout to be written, and
+      <em>Verification queue</em> is the delivered work whose fee has not been settled yet. Set the fees in
+      the queue, publish them, then pay them out — the payout produces an invoice listed under
+      <strong>Recent payouts</strong>.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Stat cards</dt>
+            <dd class="wfnote__def">The first two are filters — click one to show only those deliveries.
+              <em>Ready to pay</em> jumps to the payment panel; <em>Last paid</em> opens that payout's
+              invoice.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Period</dt>
+            <dd class="wfnote__def">Limits the verification queue to work done in the last 7, 30, 90 or 365
+              days. It does not touch the Ready-to-pay panel, which shows everything unpaid regardless of age.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Rail filters</dt>
+            <dd class="wfnote__def">Cut the queue down to the rows that left the flat rate — priced from
+              the client charge, or adjusted by staff. <em>Show all</em> clears them.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Driver fee</dt>
+            <dd class="wfnote__def">Type the amount to pay for that one delivery. Zero is accepted and
+              respected — it will not snap back to the calculated figure.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Set selected to</dt>
+            <dd class="wfnote__def">Writes one amount across every ticked row at once.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Verify</dt>
+            <dd class="wfnote__def">Saves the fees on the ticked rows without committing them. They stay
+              editable.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Verify &amp; publish</dt>
+            <dd class="wfnote__def">Commits the fee and turns it into money owed — the row leaves the queue
+              and its earning appears in Ready to pay.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Reject</dt>
+            <dd class="wfnote__def">Marks a fee as refused so the row is visibly unresolved instead of
+              quietly sitting in the queue.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Log</dt>
+            <dd class="wfnote__def">Opens the driver's activity trail for that job — attempts, waiting,
+              partial delivery — the context behind an unusual fee.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Create payout</dt>
+            <dd class="wfnote__def">Pays the ticked lines in Ready to pay, using the <em>Paid by</em> method
+              and reference entered below the table. Untick any line to hold it back for later.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">How the fee is priced</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Flat rate</dt>
+            <dd class="wfnote__def">The default for an ordinary delivery, and for a hub leg. Most rows sit
+              here, which is why the rail counts the exceptions rather than these.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Metered</dt>
+            <dd class="wfnote__def">Pick-and-drop orders pay 80% of the charge billed to the client, so the
+              fee moves with the job instead of the flat rate.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Adjusted</dt>
+            <dd class="wfnote__def">Staff typed a figure that differs from the calculated one. The row shows
+              what it would otherwise have been.</dd>
+          </div>
+        </dl>
+
+        <h2 class="wfnote__h">Queue statuses</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Pending</dt>
+            <dd class="wfnote__def">Nobody has agreed the fee. Nothing is owed to the driver yet.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Verified</dt>
+            <dd class="wfnote__def">A figure is agreed and attributed, but still editable and still not
+              payable.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Published</dt>
+            <dd class="wfnote__def">Committed. The delivery leaves this queue for good and the money shows
+              up in Ready to pay.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Rejected</dt>
+            <dd class="wfnote__def">The fee was refused during review; the row stays in the queue until
+              someone sets it properly.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>The <strong>COD column is read-only context only</strong>. That is cash the driver holds for
+          EzzyDelivery, not money owed to them — it is settled on its own leg and is never part of a payout
+          total.</li>
+        <li>Publishing is the point of no return for the queue: the delivery disappears from it and becomes
+          a payable line. Fix a fee <em>before</em> publishing, not after.</li>
+        <li>Deduction lines show struck through and come off the net. The payout pays what the panel's
+          arithmetic says, not the earnings total.</li>
+        <li>The Ready-to-pay panel is only drawn when there is something to pay — an empty stat card
+          already says there is not.</li>
+        <li>The <em>Period</em> filter can hide old unverified deliveries. If a driver claims for work that
+          is not listed, widen it to a year before concluding it does not exist.</li>
+      </ul>
+    </section>
+  

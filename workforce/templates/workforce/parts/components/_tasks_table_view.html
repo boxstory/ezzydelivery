@@ -130,7 +130,8 @@ Each task should have select_related: order, driver, business, pickup_location, 
                 {% for dl in tasks %}
                 <tr class="dl-table__row" data-task-id="{{ dl.id }}" data-order-number="{{ dl.order.order_number|default:'' }}" data-client-order-code="{{ dl.order.client_order_code|default:'' }}" data-customer-phone="{{ dl.order.customer_phone|default:'' }}" data-customer-address="{{ dl.order.customer_address|default:'' }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
                     <td class="dl-table__td-check" onclick="event.stopPropagation();">
-                        <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" onchange="updateBulkSelection()">
+                        {# data-export-row also feeds the sheet CSV/print export (export-columns.js) — same ticks, no second column #}
+                        <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" data-export-row onchange="updateBulkSelection()">
                     </td>
                     <!-- Seller + Task # + Order # stacked -->
                     <td class="dl-table__td-id">
@@ -165,17 +166,19 @@ Each task should have select_related: order, driver, business, pickup_location, 
                     <td class="dl-table__td-zone">
                         <div class="dl-table__address-stack">
                             <div class="dl-table__address-line1">
-                                {% if dl.order.latitude and dl.order.longitude %}<a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__location-pin" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-location-dot"></i></a>{% else %}<span class="dl-table__location-pin dl-table__location-pin--missing" title="Location not available"><i class="fa-solid fa-location-dot"></i></span>{% endif %} {% if dl.order.dl_zone %}{% get_zone_display dl.order as zone_display %}<strong>{{ zone_display }}</strong>{% else %}<strong>—</strong>{% endif %}
+                                {% if dl.order.latitude and dl.order.longitude %}<button type="button" class="dl-table__location-pin" title="Show on map" aria-expanded="false" data-mappoint-toggle="mpt_map_tk{{ dl.id }}"><i class="fa-solid fa-location-dot"></i></button>{% else %}<span class="dl-table__location-pin dl-table__location-pin--missing" title="Location not available"><i class="fa-solid fa-location-dot"></i></span>{% endif %} {% if dl.order.dl_zone %}{% get_zone_display dl.order as zone_display %}<strong>{{ zone_display }}</strong>{% else %}<strong>—</strong>{% endif %}
                             </div>
                             {% if dl.order.dl_zone %}
                             <div class="dl-table__address-line2">
                                 Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}
+                                {% include "includes/components/_route_distance.html" with order=dl.order %}
                             </div>
                             {% endif %}
                             {% if dl.order.latitude and dl.order.longitude %}
                             <div class="dl-table__coords">
-                                <a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__coords-link" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-map-pin"></i>
-                                {{ dl.order.latitude|floatformat:4 }}, {{ dl.order.longitude|floatformat:4 }}</a>
+                                {# The pin above opens this row's map; same coordinates, so text. #}
+                                <span class="dl-table__coords-link"><i class="fa-solid fa-map-pin"></i>
+                                {{ dl.order.latitude|floatformat:4 }}, {{ dl.order.longitude|floatformat:4 }}</span>
                                 {% if dl.order.coords_accuracy %}
                                 <span class="orc__loc-acc orc__loc-acc--{{ dl.order.coords_accuracy }}">{% if dl.order.coords_accuracy == 'by_customer' %}By Client{% elif dl.order.coords_accuracy == 'by_staff' %}By Staff{% elif dl.order.coords_accuracy == 'by_driver' %}By Driver{% elif dl.order.coords_accuracy == 'exact' %}Exact{% elif dl.order.coords_accuracy == 'street' %}Street{% elif dl.order.coords_accuracy == 'landmark' %}Landmark{% elif dl.order.coords_accuracy == 'zone_center' %}Zone{% elif dl.order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
                                 {% endif %}
@@ -184,6 +187,14 @@ Each task should have select_related: order, driver, business, pickup_location, 
                             <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">
                                 {{ dl.order.customer_address|default:""|truncatechars:40 }}
                             </div>
+                            {% if dl.order.latitude and dl.order.longitude %}
+                            {# Opened by the pin above; inside the cell so the row expands. #}
+                            <div class="mpt__panel" hidden>
+                              <div class="mpt__map mpt__map--sm" id="mpt_map_tk{{ dl.id }}"
+                                   data-lat="{{ dl.order.latitude }}" data-lon="{{ dl.order.longitude }}"
+                                   data-label="{{ dl.order.customer_name|default:'Delivery location' }}"></div>
+                            </div>
+                            {% endif %}
                         </div>
                     </td>
                     <!-- COD / Verify -->

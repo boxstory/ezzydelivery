@@ -1,0 +1,156 @@
+/* ============================================================================
+   PAGE NOTES (wfnote__) — shared "what this page does" card.
+   Purpose: Styles the round help button in a page hero and the notes card it
+            opens. Lives here (not in workforce.css) because the staff, warehouse
+            and delivery dashboards all use it.
+   Used by: wf_dashboard_base.html + wh_dashboard_base.html; behaviour is in
+            webpages/js/wfnote.js, content is fetched from workforce:page_notes.
+   Notes:   The card ships EMPTY with data-wfnote-src and is filled on first
+            click, so pages carry no prose in their payload.
+
+   Markup contract:
+     <button type="button" class="wfnote__btn" data-wfnote-toggle
+             aria-expanded="false" aria-controls="ID" title="About this page">
+       <i class="fa-solid fa-question" aria-hidden="true"></i>
+       <span class="visually-hidden">Show notes</span>
+     </button>              <- last child of the hero
+     <div class="wfnote wfnote--inset" id="ID"
+          data-wfnote-src="{% url 'workforce:page_notes' 'ID' %}" hidden></div>
+   ============================================================================ */
+
+.wfnote__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+.wfnote__btn:hover { background-color: rgba(255, 255, 255, 0.16); color: #fff; }
+.wfnote__btn:focus-visible { outline: 2px solid #f7c000; outline-offset: 2px; }
+.wfnote__btn[aria-expanded="true"] {
+    background-color: #f7c000;
+    border-color: #f7c000;
+    color: #001f3f;
+}
+/* Light headers (white/grey band) need the ink treatment instead. */
+/* Hero has no trailing slot (icon + title only) — push the button to the far end. */
+.wfnote__btn--end { margin-left: auto; }
+
+.wfnote__btn--ink {
+    border-color: #d0d5dd;
+    background-color: #fff;
+    color: #001f3f;
+}
+.wfnote__btn--ink:hover { background-color: #001f3f; border-color: #001f3f; color: #fff; }
+
+.wfnote {
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-left: 3px solid #001f3f;
+    border-radius: 0.4rem;
+    padding: 0.625rem 0.875rem;
+    margin-bottom: 1rem;
+}
+.wfnote[hidden] { display: none; }
+/* Pages whose hero is the shared _page_header include sit on a 0.375rem gutter. */
+.wfnote--inset { margin-left: 0.375rem; margin-right: 0.375rem; }
+.wfnote__lede {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: #1a1a2e;
+    margin: 0;
+    max-width: 62rem;
+}
+.wfnote__lede strong { font-weight: 700; color: #001f3f; }
+
+/* Two reading columns on wide screens so the reference never becomes a scroll. */
+.wfnote__cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem 2rem;
+    margin-top: 0.625rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid #f0f0f0;
+}
+.wfnote__sec--note {
+    margin-top: 0.625rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid #f0f0f0;
+}
+.wfnote__h {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #6c757d;
+    margin: 0 0 0.375rem;
+}
+.wfnote__list + .wfnote__h { margin-top: 0.75rem; }
+.wfnote__list { margin: 0; }
+.wfnote__item {
+    display: grid;
+    grid-template-columns: 8rem 1fr;
+    gap: 0.25rem 0.75rem;
+    padding: 0.2rem 0;
+}
+.wfnote__term {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #001f3f;
+    line-height: 1.5;
+}
+.wfnote__def {
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: #6c757d;
+    margin: 0;
+}
+.wfnote__def em { color: #1a1a2e; font-style: normal; font-weight: 600; }
+.wfnote__notes {
+    margin: 0;
+    padding-left: 1rem;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: #6c757d;
+    columns: 2;
+    column-gap: 2rem;
+}
+.wfnote__notes li { margin-bottom: 0.25rem; break-inside: avoid; }
+.wfnote__notes strong { color: #001f3f; font-weight: 600; }
+
+/* The numbered walk-through some pages used to carry as a sidebar card. Read in
+   order, so it stays in one column — the two-column flow of .wfnote__notes
+   would put step 3 beside step 1. */
+.wfnote__flow {
+    columns: 1;
+    margin-top: 0.5rem;
+    padding-left: 1.1rem;
+}
+.wfnote__flow li { margin-bottom: 0.3rem; }
+.wfnote__flow::marker,
+.wfnote__flow li::marker { color: #001f3f; font-weight: 700; }
+.wfnote__lede--sub {
+    margin-top: 0.5rem;
+    color: #6c757d;
+    font-size: 0.75rem;
+}
+
+@media (max-width: 991.98px) {
+    .wfnote__cols { grid-template-columns: 1fr; gap: 0.75rem; }
+    .wfnote__notes { columns: 1; }
+}
+
+@media (max-width: 767.98px) {
+    .wfnote__item { grid-template-columns: 1fr; gap: 0; }
+}

@@ -1,0 +1,95 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/receive_stock.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_receive_stock_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Where stock <strong>enters the building</strong>. Receiving adds units to a warehouse,
+            writes a movement into the ledger, and opens a put-away task so someone shelves what just
+            arrived. There are two routes in: pick a pending inbound request the seller raised, or type
+            the products by hand. Everything else on the page is the same either way.
+        </p>
+
+        <ol class="wfnote__notes wfnote__flow">
+            <li>A seller raises an <strong>Inbound Request</strong> listing what they are sending.</li>
+            <li>The goods arrive at the warehouse.</li>
+            <li>Staff pick that request above and verify the quantities that actually turned up.</li>
+            <li>Submitting <strong>receives them into inventory</strong> and completes the request.</li>
+        </ol>
+        <p class="wfnote__lede wfnote__lede--sub">
+            No request behind the delivery? Choose a business instead and enter the quantities by hand —
+            the product list, with each item's photo and what is already on the shelf, loads once a
+            business and warehouse are picked.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The two routes</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">From an inbound request</dt>
+                        <dd class="wfnote__def">Selecting a pending request fills the form with what
+                            the seller said they were sending, so you only correct the quantities that
+                            actually turned up.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Manual entry</dt>
+                        <dd class="wfnote__def"><em>Clear &amp; manual entry</em> drops the request and
+                            lets you add products yourself — for stock that arrived without a request.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Business first (staff)</dt>
+                        <dd class="wfnote__def">The product list is empty until a business is chosen,
+                            because products belong to a seller. A seller account skips this — it only
+                            ever sees its own products.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Warehouse and location</dt>
+                        <dd class="wfnote__def">Warehouse is required. Location is optional, but stock
+                            received without one sits in the warehouse with no bin against it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Reference, date, notes</dt>
+                        <dd class="wfnote__def">All written into the movement record. Leave the
+                            reference blank on a request and the request number is used.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What happens on submit</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Stock goes up</dt>
+                        <dd class="wfnote__def">Each line adds to the on-hand figure for that product,
+                            warehouse and location, creating the stock row if it did not exist.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">A movement is recorded</dt>
+                        <dd class="wfnote__def">One <em>receive</em> transaction per product, with the
+                            before and after quantity and your name against it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">A put-away task opens</dt>
+                        <dd class="wfnote__def">Created automatically for what you just received, and
+                            you land on it — that is the step that moves stock to its bin.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">The request updates</dt>
+                        <dd class="wfnote__def">Fulfilled quantities go up. A pending request becomes
+                            approved, and only closes as completed once every line is fully received —
+                            short deliveries stay open for the rest.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Receive what arrived, not what was promised.</strong> Partial receipts
+                        are normal and keep the request open.</li>
+                    <li><strong>There is no undo.</strong> A receipt entered wrongly is corrected by a
+                        cycle count, which leaves both records visible.</li>
+                    <li><strong>Zero and blank lines are ignored</strong>, so an untouched row costs
+                        nothing.</li>
+                </ul>
+            </section>
+        </div>

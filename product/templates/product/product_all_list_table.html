@@ -1,8 +1,9 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260728g">
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260801a">
 Products - Table View
 {% endblock extra_head %}
 
@@ -10,28 +11,20 @@ Products - Table View
 
 {% block content %}
 <div class="pal__container" id="product_table_container">
-    <!-- Navy Hero Header -->
-    <div class="plt__header" id="product_table_header">
-        <div class="plt__header-left">
-            <div class="plt__header-icon">
-                <i class="fa-solid fa-boxes-stacked"></i>
-            </div>
-            <div>
-                <h2 class="plt__title" id="product_table_title">Products</h2>
-                <span class="plt__count">{{ products.count }} item{{ products.count|pluralize }}</span>
-            </div>
-        </div>
-        <div class="plt__header-right d-flex gap-2">
-            <a href="{% url 'product:product_csv_import' %}" id="product_table_btn_csv_import" class="plt__add-btn plt__add-btn--api">
+    <div id="product_table_header">
+        {% with total=products_total|stringformat:"s" %}
+        {% bconheader eyebrow="Catalogue" live="Products" icon="fa-solid fa-boxes-stacked" title="Products" subtitle=total|add:" item(s) in your catalogue." %}
+            <a href="{% url 'product:product_csv_import' %}" id="product_table_btn_csv_import" class="bcon__btn bcon__btn--secondary">
                 <i class="fa-solid fa-file-csv"></i> Import CSV
             </a>
-            <a href="{% url 'product:product_api_wizard' %}" id="product_table_btn_api_add" class="plt__add-btn plt__add-btn--api">
+            <a href="{% url 'product:product_api_wizard' %}" id="product_table_btn_api_add" class="bcon__btn bcon__btn--secondary">
                 <i class="fa-solid fa-cloud-arrow-down"></i> API Add Product
             </a>
-            <a href="{% url 'product:product_single_add' %}" id="product_table_btn_add" class="plt__add-btn">
+            <a href="{% url 'product:product_single_add' %}" id="product_table_btn_add" class="bcon__btn bcon__btn--primary">
                 <i class="fa-solid fa-plus"></i> Add Product
             </a>
-        </div>
+        {% endbconheader %}
+        {% endwith %}
     </div>
 
     <!-- Products Table -->
@@ -138,6 +131,7 @@ Products - Table View
             </tbody>
         </table>
     </div>
+    {% include "includes/components/_pagination.html" with page_obj=products_page per_page=per_page pagination_id="product_table" %}
 
     {% else %}
     <!-- Empty State -->

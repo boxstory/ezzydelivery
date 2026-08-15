@@ -231,3 +231,23 @@ def get_zone_display(order):
     except Exception as e:
         logger.debug(f"Error getting zone display: {e}")
         return "No Zone"
+
+
+@register.filter
+def to_json(value):
+    """Serialise a value to JSON for an HTML *attribute*.
+
+    Deliberately returns a plain str, not a SafeString, so Django autoescapes
+    the quotes for the attribute context. The browser decodes them again when
+    the value is read back via ``element.dataset.*``, so JSON.parse gets valid
+    JSON — no single-to-double quote substitution needed on the JS side.
+
+    For a value going inside a <script> block use core.json_utils.safe_json in
+    the view instead; that escapes < > & rather than the attribute delimiters.
+    """
+    import json as _json
+    from django.core.serializers.json import DjangoJSONEncoder
+    try:
+        return _json.dumps(value, cls=DjangoJSONEncoder)
+    except (TypeError, ValueError):
+        return 'null'

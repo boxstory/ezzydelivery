@@ -29,10 +29,11 @@ class Command(BaseCommand):
                              help='Report which leads would be checked without calling WAHA.')
         parser.add_argument('--min-sleep', type=float, default=1.5)
         parser.add_argument('--max-sleep', type=float, default=3.5)
+        parser.add_argument('--session', type=str, default='',
+                             help='WAHA session (WhatsApp number) to pull from. Default: the default session.')
 
     def handle(self, *args, **opts):
-        from django.conf import settings
-
+        from whatsapp import sessions as wa_sessions
         from whatsapp.models import WhatsAppContact
         from whatsapp.waha_backfill import pull_chat_history
         from workforce.crm_views import _annotate_wa_chats
@@ -50,7 +51,7 @@ class Command(BaseCommand):
             f'{len(candidates)} without a matched chat yet.'
         )
 
-        session = settings.WAHA_DEFAULT_SESSION
+        session = wa_sessions.normalize(opts['session'])
         checked = connected = inserted_total = lid_resolved = 0
 
         for lead in candidates:
@@ -61,8 +62,11 @@ class Command(BaseCommand):
                 continue
             variants = crm_services._phone_variants(base)
 
+            # Scoped to the session we're pulling from: a lid from our other
+            # number would build a chat id this session can't resolve.
             contact = (
                 WhatsAppContact.objects
+                .filter(session=session)
                 .filter(Q(phone__in=list(variants)) | Q(lid=base))
                 .exclude(lid='')
                 .first()

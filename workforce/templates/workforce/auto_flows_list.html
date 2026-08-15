@@ -1,5 +1,11 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: List every automation flow (trigger → action) with toggle, test-run, config view, edit, logs, delete
+Used by: workforce_views.auto_flows_list at /workforce/auto-flows/
+Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
@@ -15,10 +21,19 @@
         <a href="{% url 'workforce:auto_flow_add' %}" class="btn btn-primary btn-sm">
             <i class="fa-solid fa-plus me-1"></i>Add Flow
         </a>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_auto_flows_list_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
 </header>
 
 <div class="col-12 p-3">
+    <div class="wfnote" id="workforce_auto_flows_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_auto_flows_list_card_notes' %}" hidden></div>
+
     {% if flows %}
     <div class="card">
         <div class="card-body p-0">
@@ -109,6 +124,7 @@
                 </table>
             </div>
         </div>
+        {% include "includes/components/_pagination.html" with page_obj=flows_page per_page=per_page pagination_id="auto_flows" %}
     </div>
     {% else %}
     <div class="text-center py-5">
@@ -170,12 +186,8 @@ function getCSRFToken() {
     return null;
 }
 
-// Store config data from Django
-var flowConfigs = {
-    {% for flow in flows %}
-    {{ flow.id }}: {{ flow.action_config|safe }},
-    {% endfor %}
-};
+// Store config data from Django (script-escaped JSON built in the view)
+var flowConfigs = {{ flow_configs_json }};
 
 function showConfig(flowId, flowName) {
     document.getElementById('configModalTitle').textContent = flowName + ' — Config';

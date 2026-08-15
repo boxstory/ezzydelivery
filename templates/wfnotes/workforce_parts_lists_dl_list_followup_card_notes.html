@@ -1,0 +1,124 @@
+{% comment %}
+Purpose: "About this page" notes panel for dl_list_followup.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_parts_lists_dl_list_followup_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The chase list. Every row is a <strong>delivery that is still open</strong> — created, maybe
+            assigned, maybe halfway across town, but not finished — sorted so the ones nobody has touched in
+            the longest time surface first. Nothing here is delivered or cancelled; those drop off the list
+            on their own. The counters in the header split the same queue by how long it has been since the
+            last update, so you can see the shape of the backlog before you start working it.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Driver filter</dt>
+                        <dd class="wfnote__def">Narrow the list to one approved driver — the quickest way to
+                            prepare for a call with them.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Date range</dt>
+                        <dd class="wfnote__def">Filters on the task's delivery date. With no dates set it
+                            defaults to the <strong>last 30 days</strong>, so older stragglers are hidden
+                            until you widen it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Status pills</dt>
+                        <dd class="wfnote__def">Tick any number of statuses to show only those. Every change
+                            submits straight away; <em>Clear filters</em> resets the lot.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sorting</dt>
+                        <dd class="wfnote__def">Task number, last updated, driver, pickup, status and COD are
+                            all clickable — click again to flip the direction. Default is most recently
+                            updated first.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Update status</dt>
+                        <dd class="wfnote__def">The dot button beside the status badge opens the status modal
+                            for that task, pre-filled with its driver, customer and last failure reason.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Bulk actions</dt>
+                        <dd class="wfnote__def">Tick rows to reveal the bar: assign a driver, print, or set one
+                            status across the whole selection.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Retry</dt>
+                        <dd class="wfnote__def">Only on failed tasks with fewer than three attempts — puts the
+                            delivery back in play after you confirm.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">WhatsApp</dt>
+                        <dd class="wfnote__def">Opens a ready-made message to the customer with their
+                            location-verification link — the usual first move on a stale row.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Open a task</dt>
+                        <dd class="wfnote__def">Click the row or the eye icon for the full delivery-task page.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading a row</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Fresh</dt>
+                        <dd class="wfnote__def">Touched in the last 24 hours. Someone is on it — leave it alone.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Aging</dt>
+                        <dd class="wfnote__def">One to three days since the last update. Worth a call today.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Stale</dt>
+                        <dd class="wfnote__def">More than three days untouched. These are the ones that turn
+                            into complaints.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Unassigned</dt>
+                        <dd class="wfnote__def">Shown in red in the driver column — the delivery has nobody on
+                            it at all, whatever the status says.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pickup</dt>
+                        <dd class="wfnote__def">The first-mile leg, if the client uses pickup automation: its
+                            stage plus the plan — <em>Hub</em> (drop at the warehouse), <em>Self</em> (same
+                            driver delivers) or <em>Transfer</em> (handed to another driver). A dash means
+                            there is no pickup leg.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">COD</dt>
+                        <dd class="wfnote__def">Amount to collect, then where the cash is —
+                            <em>Not Collected</em>, <em>Partial</em>, <em>Collected</em>,
+                            <em>With Driver</em>, <em>With Ezzy</em> or <em>Settled</em>.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Zone</dt>
+                        <dd class="wfnote__def">A hollow pin means the order has no coordinates. The accuracy
+                            label says who set the point — client, staff, driver, or an estimate.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>"Updated" is the last time <strong>anything</strong> on the task changed — including a
+                    change you make here. Touching a row resets its tier to fresh whether or not the delivery
+                    actually moved.</li>
+                <li>The tier counts describe the whole filtered queue, not just the page in front of you.</li>
+                <li>Delivered, cancelled and failed tasks are not on this list by design. Look for those on
+                    the delivery-task lists or the reported tasks page.</li>
+                <li>Only tasks for <strong>active</strong> clients appear here.</li>
+                <li>The date filter uses the delivery date, not the last update — a very old task updated this
+                    morning still falls outside a narrow range.</li>
+            </ul>
+        </section>
+    

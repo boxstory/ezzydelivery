@@ -1,6 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Build or edit one automation flow — trigger + conditions on the left, action config on the right
+Used by: workforce_views.auto_flow_add / auto_flow_edit at /workforce/auto-flows/add/ and /edit/<id>/
+Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
@@ -16,10 +22,19 @@
         <a href="{% url 'workforce:auto_flows_list' %}" class="btn btn-outline-secondary btn-sm">
             <i class="fa-solid fa-arrow-left me-1"></i>Back to Flows
         </a>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_auto_flow_add_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
 </header>
 
 <div class="col-12 p-3">
+    <div class="wfnote" id="workforce_auto_flow_add_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_auto_flow_add_card_notes' %}" hidden></div>
+
     {% if error %}
     <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>{{ error }}</div>
     {% endif %}
@@ -305,8 +320,13 @@
                                         <option value="seller" {% if form_data.wa_recipient == 'seller' %}selected{% endif %}>Seller — Business Phone</option>
                                         <option value="seller_owner" {% if form_data.wa_recipient == 'seller_owner' %}selected{% endif %}>Seller — Owner Phone</option>
                                     </optgroup>
+                                    <optgroup label="Lead / Applicant">
+                                        <option value="context_phone" {% if form_data.wa_recipient == 'context_phone' %}selected{% endif %}>Person this event is about (lead / driver applicant)</option>
+                                    </optgroup>
                                     <optgroup label="Staff">
                                         <option value="staff_ops" {% if form_data.wa_recipient == 'staff_ops' %}selected{% endif %}>Operations Staff</option>
+                                        <option value="staff_fin" {% if form_data.wa_recipient == 'staff_fin' %}selected{% endif %}>Finance Staff</option>
+                                        <option value="staff_mkt" {% if form_data.wa_recipient == 'staff_mkt' %}selected{% endif %}>Marketing / Sales Staff</option>
                                         <option value="staff_all" {% if form_data.wa_recipient == 'staff_all' %}selected{% endif %}>All Staff Members</option>
                                     </optgroup>
                                     <optgroup label="Custom">

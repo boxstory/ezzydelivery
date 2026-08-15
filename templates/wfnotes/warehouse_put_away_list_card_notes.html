@@ -1,0 +1,62 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/put_away_list.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_put_away_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Stock that has been <strong>received but not yet shelved</strong>. Every receipt opens a
+            put-away task automatically, and the task is what moves those units out of the receiving
+            area and into a bin. Until it is done, the stock exists on the books but nobody knows where
+            it physically is.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Task status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pending</dt>
+                        <dd class="wfnote__def">Nobody has opened it yet. Opening the task claims it
+                            for you and starts it — there is no separate assign step.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">In progress</dt>
+                        <dd class="wfnote__def">Someone is shelving it now. The name shown is whoever
+                            opened it first.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Completed</dt>
+                        <dd class="wfnote__def">Every line has been placed and confirmed, so the stock
+                            now sits against real bins.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the list</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Task number</dt>
+                        <dd class="wfnote__def">Quoted on the movements it creates, so a bin transfer
+                            can always be traced back to the receipt it came from.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Inbound request</dt>
+                        <dd class="wfnote__def">Shown when the stock arrived against a seller's
+                            request. Blank means it was received manually.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Status filter</dt>
+                        <dd class="wfnote__def">Narrow to open work. Newest tasks are listed first.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Put-away moves stock, it does not add it.</strong> The quantity went up
+                        at receiving; this step only changes where it sits.</li>
+                    <li><strong>Leaving tasks open costs you later</strong> — pickers get bins with no
+                        stock and stock with no bin.</li>
+                </ul>
+            </section>
+        </div>

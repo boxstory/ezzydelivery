@@ -1,6 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Staff queue of warehouse inbound + outbound product requests, with approve/complete actions
+Used by: workforce_views.product_requests_list at /workforce/product-requests/
+Notes: Inbound and outbound are two separate models merged in Python, so paging is manual.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Product Requests{% endblock %}
 
@@ -20,8 +27,17 @@
       <a href="{% url 'business:inbound_request_create' %}" class="prl__btn prl__btn--primary">
         <i class="fa-solid fa-plus"></i> New Inbound Request
       </a>
+      <button type="button" class="wfnote__btn" data-wfnote-toggle
+              aria-expanded="false" aria-controls="workforce_product_requests_list_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
     </div>
   </div>
+
+  <div class="wfnote" id="workforce_product_requests_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_product_requests_list_card_notes' %}" hidden></div>
 
   <!-- Stats -->
   <div class="prl__stats">

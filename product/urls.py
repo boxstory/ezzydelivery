@@ -31,8 +31,9 @@ urlpatterns = [
     path('csv/import/', product_views.product_csv_import, name='product_csv_import'),
     path('csv/sample/', product_views.product_csv_sample, name='product_csv_sample'),
 
-    # Staff delete (from seller detail page)
+    # Staff actions (from seller detail page)
     path('<int:product_id>/staff-delete/', product_views.product_staff_delete, name='product_staff_delete'),
+    path('staff/bulk-update/', product_views.product_staff_bulk_update, name='product_staff_bulk_update'),
 
     # Product categories
     path('product_categories_list/', product_views.product_categories, name='product_categories'),

@@ -1,30 +1,19 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block title %}Orders List{% endblock %}
 
 {% block content %}
 <div class="olv" id="orders_list_view_container_main">
-    <!-- Hero Header -->
-    <div class="olv__hero">
-        <div class="olv__hero-content">
-            <div class="olv__hero-left">
-                <h1 class="olv__title">
-                    <i class="fas fa-clipboard-list"></i>
-                    Orders List
-                </h1>
-                <p class="olv__subtitle">View and manage your orders</p>
-            </div>
-            <div class="olv__hero-actions">
-                <a href="{% url 'delivery:all_delivery_tasks' %}" class="olv__btn olv__btn--outline" id="orders_list_view_btn_go_tasks">
-                    <i class="fas fa-truck"></i> Go to Tasks
-                </a>
-                <a href="{% url 'orders:add_order' %}" class="olv__btn olv__btn--primary" id="orders_list_view_btn_add">
-                    <i class="fas fa-plus"></i> Add Order
-                </a>
-            </div>
-        </div>
-    </div>
+    {% bconheader eyebrow="Orders" live="List" icon="fa-solid fa-clipboard-list" title="Orders List" subtitle="View and manage your orders." %}
+        <a href="{% url 'delivery:all_delivery_tasks' %}" class="bcon__btn bcon__btn--secondary" id="orders_list_view_btn_go_tasks">
+            <i class="fa-solid fa-truck"></i> Go to Tasks
+        </a>
+        <a href="{% url 'orders:add_order' %}" class="bcon__btn bcon__btn--primary" id="orders_list_view_btn_add">
+            <i class="fa-solid fa-plus"></i> Add Order
+        </a>
+    {% endbconheader %}
 
     <!-- Card -->
     <div class="olv__card">

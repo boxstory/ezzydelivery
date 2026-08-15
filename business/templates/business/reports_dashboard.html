@@ -1,29 +1,17 @@
 {% extends "business_dashboard_base.html" %}
-{% load static %}
+{% load static business_console %}
 
 {% block title %}Reports & Export{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-reports.css' %}?v=20260611a">
+<link rel="stylesheet" href="{% static 'business/css/business-reports.css' %}?v=20260729a">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="flex-fill p-3 p-md-4" id="business_reports_container_main">
+<div class="flex-fill biz-dash__page" id="business_reports_container_main">
 
   <!-- Page Header -->
-  <div class="bcon__header mb-4">
-    <div class="bcon__header-main">
-      <div class="bcon__eyebrow">
-        <span>{{ business.business_name|default:"Business"|truncatechars:22 }}</span>
-        <span class="bcon__eyebrow-sep"></span>
-        <span>Reports</span>
-        <span class="bcon__eyebrow-sep"></span>
-        <span class="bcon__eyebrow-live">CSV Export</span>
-      </div>
-      <h1 class="bcon__title"><i class="fa-solid fa-file-export"></i> Reports &amp; Export</h1>
-      <p class="bcon__subtitle">Download CSV reports for orders, COD reconciliation, and delivery performance.</p>
-    </div>
-  </div>
+  {% bconheader eyebrow="Reports" live="CSV Export" icon="fa-solid fa-file-export" title="Reports &amp; Export" subtitle="Download CSV reports for orders, COD reconciliation, and delivery performance." %}{% endbconheader %}
 
   <!-- Date Range Filter -->
   <div class="bcon__panel mb-4">

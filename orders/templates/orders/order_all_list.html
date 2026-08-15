@@ -5,7 +5,7 @@
 {% load business_pwa_tags %}
 <!-- extra css -->
 {% block extra_css %}
-  <link href="{% static 'orders/css/orders.css' %}?v=20260429a"
+  <link href="{% static 'orders/css/orders.css' %}?v=20260808a"
         rel="stylesheet"
         type="text/css" />
 {% endblock extra_css %}
@@ -747,6 +747,9 @@
     document.addEventListener('click', function(e) {
       var btn = e.target.closest('.pwa-card-actions__btn');
       if (!btn) return;
+      // Buttons in this row that aren't status changes (print, schedule) carry no
+      // data-status — leave them to their own handler / default action.
+      if (!btn.getAttribute('data-status')) return;
       e.preventDefault();
       e.stopPropagation();
 

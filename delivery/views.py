@@ -43,6 +43,7 @@ from django.forms.fields import DateTimeField
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from core.decorators import api_staff_required
+from core.pagination import paginate
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db import transaction, IntegrityError
@@ -62,6 +63,7 @@ from webpages import forms as webpages_forms
 from orders import forms as orders_forms
 from delivery import forms as delivery_forms
 from fleet import forms as fleet_forms
+from core.json_utils import safe_json
 
 # Local aliases for commonly used models
 DeliveryTask = delivery_models.DeliveryTask
@@ -332,15 +334,15 @@ def all_delivery_tasks(request):
     accepted_count = accepted_tasks.count()
     history_count = history_tasks.count()
 
-    # Select which tasks to show based on tab
-    if tab == 'all':
-        cards = all_tasks[:50]
-    elif tab == 'assigned':
-        cards = assigned_tasks[:50]
-    elif tab == 'accepted':
-        cards = accepted_tasks[:50]
-    else:  # tab == 'history'
-        cards = history_tasks[:50]
+    # Select which tasks to show based on tab.
+    # These used to be hard [:50] slices with no page navigation, so a driver
+    # with more than 50 tasks in a tab simply could not reach the rest.
+    tab_queryset = {
+        'all': all_tasks,
+        'assigned': assigned_tasks,
+        'accepted': accepted_tasks,
+    }.get(tab, history_tasks)
+    cards, cards_total = paginate(request, tab_queryset)
 
     logger.debug(f"Fetched tasks: {all_count} all, {assigned_count} assigned, {accepted_count} accepted, {history_count} history")
 
@@ -370,6 +372,8 @@ def all_delivery_tasks(request):
 
     context = {
         'cards': cards,
+        'cards_page': cards,
+        'cards_total': cards_total,
         'all_count': all_count,
         'assigned_count': assigned_count,
         'accepted_count': accepted_count,
@@ -778,10 +782,13 @@ def assigned_tasks(request):
             'task_qrcode',
         ).order_by('-id')
 
-        logger.info(f"Driver {driver.driver_id} has {assigned_tasks.count()} assigned tasks")
+        tasks_page, tasks_total = paginate(request, assigned_tasks)
+        logger.info(f"Driver {driver.driver_id} has {tasks_total} assigned tasks")
 
         context = {
-            'tasks': assigned_tasks,
+            'tasks': tasks_page,
+            'tasks_page': tasks_page,
+            'tasks_total': tasks_total,
             'driver': driver,
         }
         return render(request, 'delivery/parts/assigned_tasks.html', context)
@@ -931,7 +938,7 @@ def zone_map(request):
 
     context = {
         'zones': zones,
-        'zones_json': json.dumps(zones_data),
+        'zones_json': safe_json(zones_data),
         'zone_groups': zone_groups,
         'total_zones': total_zones,
         'zones_with_coords': zones_with_coords,
@@ -1115,8 +1122,8 @@ def edit_zone_polygon(request, zone_number):
 
     context = {
         'zone': zone,
-        'zone_polygon_json': json.dumps(zone.polygon if zone.polygon else []),
-        'all_polygons_json': json.dumps(all_polygons_data),
+        'zone_polygon_json': safe_json(zone.polygon if zone.polygon else []),
+        'all_polygons_json': safe_json(all_polygons_data),
         'center_lat': float(zone.latitude) if zone.latitude else 25.276987,
         'center_lng': float(zone.longitude) if zone.longitude else 51.520008,
     }

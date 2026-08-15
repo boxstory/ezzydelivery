@@ -1,0 +1,193 @@
+/* Purpose: Delivery Location Review console — the queue where staff judge driver GPS against the customer pin. */
+/* Used by: workforce/templates/workforce/delivery_location_reviews.html */
+/* Notes: Restrained evidence table — the gap figure carries the weight, colour is used only where it means severity. */
+
+.dgr {
+    --dgr-ink: var(--brand-navy, #001f3f);
+    --dgr-muted: var(--brand-grey-600, #555);
+    --dgr-faint: var(--brand-grey-500, #777);
+    --dgr-rule: var(--brand-grey-200, #e5e5e5);
+    --dgr-rule-strong: var(--brand-grey-400, #bbb);
+    --dgr-paper: #fff;
+    --dgr-card: var(--brand-grey-50, #fafafa);
+    --dgr-warn: #b4532a;
+    --dgr-severe: #8f2f22;
+    padding: var(--spacing-md, 1rem);
+    color: var(--dgr-ink);
+}
+
+/* The masthead and the four figures come from the shared staff furniture
+   (wfhero / wfstat in workforce.css) — this file styles only the queue below them. */
+
+/* ── Filters ────────────────────────────────────────────── */
+.dgr__filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.625rem;
+    align-items: end;
+    padding: 0.75rem;
+    background: var(--dgr-card);
+    border: 1px solid var(--dgr-rule);
+    margin-bottom: 0.875rem;
+}
+.dgr__label {
+    display: block;
+    font-size: 0.64rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dgr-faint);
+    margin-bottom: 0.25rem;
+}
+.dgr__field--actions { display: flex; gap: 0.375rem; }
+.dgr__btn-apply {
+    background: var(--dgr-ink);
+    color: #fff;
+    border: 1px solid var(--dgr-ink);
+}
+.dgr__btn-apply:hover { background: #16203a; color: #fff; }
+.dgr__btn-clear {
+    background: transparent;
+    color: var(--dgr-muted);
+    border: 1px solid var(--dgr-rule-strong);
+}
+
+/* ── Decision bar ───────────────────────────────────────── */
+.dgr__bar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--dgr-ink);
+    color: #fff;
+    margin-bottom: 0.625rem;
+}
+.dgr__bar-count { font-size: 0.8rem; }
+.dgr__bar-notes { max-width: 22rem; flex: 1 1 12rem; }
+.dgr__bar-actions { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-left: auto; }
+/* Only this one changes data, so it is the only one that looks like an action. */
+.dgr__btn-driver {
+    background: var(--brand-primary, #f7c000);
+    color: var(--dgr-ink);
+    border: none;
+    font-weight: 600;
+}
+.dgr__btn-driver:hover { background: #e0b30f; color: var(--dgr-ink); }
+.dgr__btn-customer,
+.dgr__btn-neutral {
+    background: transparent;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+}
+.dgr__btn-customer:hover,
+.dgr__btn-neutral:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+
+/* ── Table ──────────────────────────────────────────────── */
+.dgr__table-wrap { overflow-x: auto; border: 1px solid var(--dgr-rule); }
+.dgr__table { width: 100%; border-collapse: collapse; font-size: 0.8rem; background: var(--dgr-paper); }
+.dgr__table thead th {
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dgr-faint);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--dgr-rule-strong);
+    white-space: nowrap;
+}
+.dgr__table tbody td {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--dgr-rule);
+    vertical-align: top;
+}
+.dgr__table tbody tr:hover { background: var(--dgr-card); }
+.dgr__row--done td { color: var(--dgr-muted); }
+.dgr__col-check { width: 2.2rem; }
+.dgr__num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dgr__order { font-weight: 600; white-space: nowrap; }
+.dgr__date { color: var(--dgr-muted); white-space: nowrap; }
+.dgr__sub {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--dgr-faint);
+    font-weight: 400;
+    margin-top: 0.1rem;
+}
+.dgr__truncate { max-width: 11rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The gap is why the row exists — severity earns the only colour here. */
+.dgr__gap { font-weight: 700; font-size: 0.9rem; }
+.dgr__gap small { font-weight: 400; font-size: 0.68rem; color: var(--dgr-faint); }
+.dgr__gap--wide { color: var(--dgr-warn); }
+.dgr__gap--severe { color: var(--dgr-severe); }
+
+.dgr__pin-cell { white-space: nowrap; }
+.dgr__pin {
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--dgr-ink);
+    display: block;
+}
+.dgr__pin i { margin-right: 0.25rem; }
+/* The icon colours match the map markers, so the table and the map agree. */
+.dgr__pin-i--driver { color: #2f6f4f; }
+.dgr__pin-i--customer { color: var(--dgr-warn); }
+.dgr__acc { font-size: 0.66rem; color: var(--dgr-faint); }
+/* The zone under the coordinates: a place name is more use than the numbers, so it
+   reads as ink while the raw pair above it stays reference material. An approximate
+   match is greyed and italic so a nearest-centre guess can never be mistaken for a
+   polygon hit at a glance. */
+.dgr__zone {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--dgr-ink);
+    margin-top: 0.1rem;
+}
+.dgr__zone--approx {
+    color: var(--dgr-muted);
+    font-style: italic;
+    cursor: help;
+}
+.dgr__zone--none { color: var(--dgr-faint); }
+
+/* The side-by-side compare map is the shared `_map_point.html` component
+   (webpages/css/map-point.css) — it needs nothing from this file. */
+
+/* Verdict: a swatch and a word, not a coloured pill. */
+.dgr__verdict {
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.dgr__verdict::before {
+    content: "";
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-right: 0.35rem;
+    background: var(--dgr-rule-strong);
+}
+.dgr__verdict--open { color: var(--dgr-muted); }
+.dgr__verdict--open::before { background: var(--brand-primary, #f7c000); }
+.dgr__verdict--driver_correct::before { background: #2f6f4f; }
+.dgr__verdict--customer_correct::before { background: var(--dgr-warn); }
+.dgr__verdict--both_wrong::before { background: var(--dgr-severe); }
+.dgr__verdict--dismissed::before { background: var(--dgr-rule-strong); }
+
+/* ── Empty ──────────────────────────────────────────────── */
+.dgr__empty {
+    text-align: center;
+    padding: 3.5rem 1.5rem;
+    border: 1px dashed var(--dgr-rule-strong);
+    background: var(--dgr-card);
+}
+.dgr__empty-title { font-weight: 700; margin: 0; }
+.dgr__empty-note { color: var(--dgr-muted); font-size: 0.85rem; margin: 0.35rem 0 0; }
+
+@media (max-width: 768px) {
+    .dgr__bar-actions { margin-left: 0; width: 100%; }
+}

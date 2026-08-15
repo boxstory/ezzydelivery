@@ -15,13 +15,16 @@
   </div>
   <div id="submenu-triggers" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
     <ul class="nav flex-column">
+      {# Open to every desk — the page shows only the viewer's own triggers. #}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_auto_triggers" url=u_auto_triggers_list icon="fa-solid fa-list" label="All Triggers" active_names="auto_triggers_list" %}
+      {% if wf_dept_admin %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_auto_flows" url=u_auto_flows_list icon="fa-solid fa-diagram-project" label="Flows" active_names="auto_flows_list,auto_flow_edit,auto_flow_logs" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_auto_flow_add" url=u_auto_flow_add icon="fa-solid fa-plus" label="Add Flow" active_names="auto_flow_add" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wa_instances" url=u_whatsapp_instances_list icon="fa-brands fa-whatsapp" label="WA Instances" active_names="whatsapp_instances_list" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_ai_config" url=u_wf_ai_config icon="fa-solid fa-microchip" label="AI Config" active_names="wf_ai_config" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_seller_api_configs" url=u_wf_seller_api_configs icon="fa-solid fa-plug" label="API Configs" active_names="wf_seller_api_configs,wf_test_api_config" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_webhook_imports" url=u_wf_webhook_imports icon="fa-solid fa-satellite-dish" label="Webhook Imports" active_names="wf_webhook_imports" %}
+      {% endif %}
     </ul>
   </div>
 </li>

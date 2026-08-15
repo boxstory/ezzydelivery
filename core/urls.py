@@ -2,6 +2,7 @@ from django.urls import path
 from django.views.generic.base import RedirectView
 from core import views as core_views
 from core import password_reset_views
+from core import views_password_warning
 from webpages import views as webpages_views
 from delivery import views as delivery_views
 from orders import views as orders_views
@@ -58,6 +59,9 @@ urlpatterns = [
     path('password/reset/request/', password_reset_views.password_reset_request, name='password_reset_request'),
     path('password/reset/verify/', password_reset_views.password_reset_verify, name='password_reset_verify'),
     path('password/reset/confirm/', password_reset_views.password_reset_confirm, name='password_reset_confirm'),
+
+    # Weak-password nudge for existing accounts
+    path('password/weak/', views_password_warning.weak_password_warning, name='weak_password_warning'),
 
     # Temporary staff setup (remove after use)
     path('make-staff/', core_views.make_staff, name='make_staff'),

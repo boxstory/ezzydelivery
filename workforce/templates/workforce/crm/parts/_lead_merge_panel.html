@@ -1,0 +1,70 @@
+{# Purpose: "Two cards in one" panel — lists the leads absorbed into this one, and offers same-number duplicates to merge. #}
+{# Used by: workforce/crm/lead_detail.html (context from workforce.crm_views.crm_lead_detail: merged_children, duplicate_candidates) #}
+{# Notes: crmd__merge namespace; posts to crm_lead_merge / crm_lead_unmerge via crm_lead_detail.js. Absorbed leads keep their own row, source and timeline — merging is undoable. #}
+
+<div class="crmd__merge" id="workforce_crm_detail_div_merge">
+  {% if merged_children %}
+  <div class="crmd__merge-lbl">
+    <i class="fa-solid fa-layer-group"></i>
+    Merged into this card ({{ merged_children|length }})
+  </div>
+  {% for child in merged_children %}
+  <div class="crmd__mergecard" data-child-id="{{ child.pk }}">
+    <div class="crmd__mergecard-top">
+      <span class="crm__source crm__source--{{ child.source }}">{{ child.get_source_display }}</span>
+      <span class="crmd__mergecard-id">#{{ child.pk }}</span>
+    </div>
+    <div class="crmd__mergecard-body">
+      {% if child.company_name %}<div class="crmd__mergecard-name">{{ child.company_name }}</div>{% endif %}
+      {% if child.contact_name %}<div class="crmd__mergecard-sub">{{ child.contact_name }}</div>{% endif %}
+      {% if child.phone %}<div class="crmd__mergecard-sub">{{ child.phone }}</div>{% endif %}
+      <div class="crmd__mergecard-meta">
+        Arrived {{ child.created_at|date:"d M Y" }}
+        {% if child.merged_at %}· merged {{ child.merged_at|date:"d M Y" }}{% endif %}
+        {% if child.merged_by %}by {{ child.merged_by.get_full_name|default:child.merged_by.username }}{% endif %}
+        · {{ child.activities.count }} timeline entr{{ child.activities.count|pluralize:"y,ies" }}
+      </div>
+    </div>
+    <div class="crmd__mergecard-actions">
+      <a class="crm__view" href="{% url 'workforce:crm_lead_detail' child.pk %}">
+        <i class="fa-solid fa-arrow-right"></i> Open
+      </a>
+      <button type="button" class="crm__btn crm__btn--sm" data-unmerge-child="{{ child.pk }}"
+              data-unmerge-url="{% url 'workforce:crm_lead_unmerge' lead.pk %}">
+        <i class="fa-solid fa-link-slash"></i> Un-merge
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if duplicate_candidates %}
+  <div class="crmd__merge-lbl crmd__merge-lbl--warn">
+    <i class="fa-solid fa-clone"></i>
+    Same number, separate card{{ duplicate_candidates|length|pluralize }} — merge to keep one card per prospect
+  </div>
+  {% for candidate in duplicate_candidates %}
+  <div class="crmd__mergecand">
+    <span class="crm__source crm__source--{{ candidate.source }}">{{ candidate.get_source_display }}</span>
+    <span class="crmd__mergecand-name">
+      #{{ candidate.pk }} {{ candidate.company_name|default:candidate.contact_name|default:candidate.phone }}
+    </span>
+    <span class="crmd__mergecand-stage">{{ candidate.stage_label }}</span>
+    <button type="button" class="crm__btn crm__btn--sm" data-merge-duplicate="{{ candidate.pk }}"
+            data-merge-url="{% url 'workforce:crm_lead_merge' lead.pk %}"
+            data-merge-label="#{{ candidate.pk }} ({{ candidate.get_source_display }})">
+      <i class="fa-solid fa-layer-group"></i> Merge in
+    </button>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if lead.merged_into_id %}
+  <div class="crmd__merge-lbl crmd__merge-lbl--warn">
+    <i class="fa-solid fa-arrow-turn-up"></i>
+    This card is merged into
+    <a href="{% url 'workforce:crm_lead_detail' lead.merged_into_id %}">#{{ lead.merged_into_id }}</a>
+    — it does not appear on the board on its own.
+  </div>
+  {% endif %}
+</div>

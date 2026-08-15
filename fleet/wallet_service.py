@@ -31,6 +31,34 @@ class WalletService:
     """Service class for managing driver wallet operations"""
 
     @staticmethod
+    def payout_figures(settle_txn):
+        """Gross, deductions and net for one business COD payout.
+
+        The ``cod_client_settle`` row holds the NET — the cash that actually left
+        the bank — so every reader that wants the gross COD released must add the
+        withheld charges back from the invoice lines rather than assuming the
+        transaction is gross. Returns ``(gross, deductions, net)``.
+        """
+        net = abs(settle_txn.amount or Decimal('0'))
+        deductions = settle_txn.payout_deductions.aggregate(
+            total=Sum('amount'))['total'] or Decimal('0')
+        return net + deductions, deductions, net
+
+    @staticmethod
+    def payout_totals(txn_qs):
+        """Same three figures aggregated over a queryset of payout transactions.
+
+        One extra query for the deduction lines instead of one per payout.
+        """
+        from fleet.models import BusinessPayoutDeduction
+
+        net = abs(txn_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+        deductions = BusinessPayoutDeduction.objects.filter(
+            settle_txn__in=txn_qs
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        return net + deductions, deductions, net
+
+    @staticmethod
     def record_transaction(driver, transaction_type, amount, description,
                           delivery_task=None, settlement=None, created_by=None,
                           reference_number=None, notes=None, payment_method=None,
@@ -592,7 +620,7 @@ class WalletService:
     def settle_cod_with_client(business, amount, delivery_task_ids=None,
                                created_by=None, reference_number=None, notes=None,
                                payment_method=None, delivery_charge=None,
-                               deductions=None):
+                               deductions=None, charge_by_task=None):
         """
         Record COD settlement from EzzyDelivery to business client.
 
@@ -610,6 +638,10 @@ class WalletService:
                 taken off the gross at payout (delivery, fulfilment, cargo
                 handling, ad-hoc). Each becomes an invoice line, a revenue
                 transaction and a BusinessPayoutDeduction row.
+            charge_by_task: Optional ``{task_id: Decimal}`` — the delivery charge
+                each task is paying in this payout. Frozen onto the task so a
+                later edit in the Client Charges console cannot restate an
+                invoice that has already been issued.
 
         Returns:
             (DriverTransaction, settled_count)
@@ -713,6 +745,20 @@ class WalletService:
                         cod_client_settled_at=now,
                         cod_client_settle_txn=trans,
                     )
+                    # Freeze the fee each task actually paid. Without this the
+                    # invoice recomputes its fee column live, so editing a
+                    # verified charge afterwards would silently contradict the
+                    # frozen deduction line and the money that moved.
+                    if charge_by_task:
+                        frozen = [
+                            t for t in DeliveryTask.objects.filter(id__in=settled_ids)
+                            if t.id in charge_by_task
+                        ]
+                        for task in frozen:
+                            task.settled_delivery_charge = charge_by_task[task.id]
+                        if frozen:
+                            DeliveryTask.objects.bulk_update(
+                                frozen, ['settled_delivery_charge'], batch_size=200)
                     # Advance order COD status to 'settled with business', but only
                     # for orders whose every COD-collected task is now client-settled
                     # (last-task rule — handles multi-task orders correctly).
@@ -854,6 +900,9 @@ class WalletService:
                 cod_client_settled=False,
                 cod_client_settled_at=None,
                 cod_client_settle_txn=None,
+                # The frozen fee belongs to the voided payout — clearing it puts
+                # the task back on the live figure for whenever it is paid again.
+                settled_delivery_charge=None,
             )
             # Restore order COD status to 'with ezzy' (cash is back with EzzyDelivery)
             from orders.models import Order

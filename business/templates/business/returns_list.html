@@ -1,42 +1,31 @@
 {% extends "business_dashboard_base.html" %}
-{% load static %}
+{% load static business_console %}
 
 {% block title %}Returns{% endblock title %}
 
 {% block content %}
-<div class="flex-fill p-3 p-md-4" id="business_returns_container_main">
+<div class="flex-fill biz-dash__page" id="business_returns_container_main">
 
   <!-- Page Header -->
-  <div class="bcon__header mb-4">
-    <div class="bcon__header-main">
-      <div class="bcon__eyebrow">
-        <span>Orders</span>
-        <span class="bcon__eyebrow-sep"></span>
-        <span class="bcon__eyebrow-live">Returns</span>
-      </div>
-      <h1 class="bcon__title"><i class="fa-solid fa-rotate-left"></i> Returns</h1>
-      <p class="bcon__subtitle">Manage return requests for delivered orders.</p>
-    </div>
-    <div class="bcon__actions">
-      <form method="get" class="d-flex align-items-center gap-2">
-        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
-          <option value="">All Statuses</option>
-          {% for val, label in status_choices %}
-          <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-        {% if status_filter %}
-        <a href="{% url 'business:returns_list' %}" class="bcon__btn bcon__btn--ghost"><i class="fa-solid fa-times"></i> Clear</a>
-        {% endif %}
-      </form>
-    </div>
-  </div>
+  {% bconheader eyebrow="Orders" live="Returns" icon="fa-solid fa-rotate-left" title="Returns" subtitle="Manage return requests for delivered orders." readout_label="Requests" readout_value=returns_total %}
+    <form method="get" class="d-flex align-items-center gap-2">
+      <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All Statuses</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      {% if status_filter %}
+      <a href="{% url 'business:returns_list' %}" class="bcon__btn bcon__btn--ghost"><i class="fa-solid fa-times"></i> Clear</a>
+      {% endif %}
+    </form>
+  {% endbconheader %}
 
   <!-- Returns Table -->
   <div class="bcon__panel">
     <div class="bcon__panel-head">
       <h5 class="bcon__panel-title"><i class="fa-solid fa-rotate-left"></i> Return Requests</h5>
-      <span class="bcon__badge bcon__badge--muted">{{ returns|length }}</span>
+      <span class="bcon__badge bcon__badge--muted">{{ returns_total }}</span>
     </div>
     <div class="bcon__panel-body--flush bcon__ledger-wrap">
       <table class="bcon__ledger" id="business_returns_table">
@@ -68,11 +57,12 @@
         </tbody>
       </table>
     </div>
+    {% include "includes/components/_pagination.html" with page_obj=returns_page per_page=per_page pagination_id="business_returns" %}
   </div>
 
 </div>
 {% endblock content %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-returns.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-returns.css' %}?v=20260729a">
 {% endblock extra_css %}

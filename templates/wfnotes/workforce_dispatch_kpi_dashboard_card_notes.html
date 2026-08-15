@@ -1,0 +1,95 @@
+{% comment %}
+Purpose: "About this page" notes panel for kpi_dashboard.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_dispatch_kpi_dashboard_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The scorecard for one day of dispatch. Each row is <strong>one rider at one store on that date</strong>,
+            written overnight from the batches they completed and the hours they actually worked. Three things are
+            being measured: how much of their work was batched rather than delivered one order at a time, how much
+            of it landed inside the promised delivery time, and how many orders they got through per hour. Click a
+            rider to see the same figures across their last 30 days.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Date</dt>
+                        <dd class="wfnote__def">Picks the day being scored. It defaults to today, which is
+                            usually still empty — yesterday is the first day with a full set of figures.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Location</dt>
+                        <dd class="wfnote__def">Narrows to riders who worked that store. A rider who worked two
+                            stores in a day has a separate row for each.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Summary tiles</dt>
+                        <dd class="wfnote__def">The four figures at the top are for the rows currently shown:
+                            total orders, and the <strong>average across riders</strong> of batching rate, SLA
+                            compliance and orders per hour.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Rider link</dt>
+                        <dd class="wfnote__def">Opens that rider's 30-day KPI history.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sorting</dt>
+                        <dd class="wfnote__def">Fixed — busiest rider first by total orders. There is no column
+                            sorting or export on this page.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">How each number is worked out</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Total orders</dt>
+                        <dd class="wfnote__def">Orders inside the batches the rider <strong>completed</strong>
+                            that day. Batches still out, or cancelled, count for nothing.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Batched</dt>
+                        <dd class="wfnote__def">Orders that travelled in a batch of two or more. <em>Single</em>
+                            is the rest — trips where no partner order was found.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Batching %</dt>
+                        <dd class="wfnote__def">Batched orders divided by total orders. This is the efficiency
+                            number the whole batching engine exists to raise.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">SLA %</dt>
+                        <dd class="wfnote__def">Compliant orders over compliant plus breached. An order is
+                            compliant when its <strong>batch</strong> was completed on or before that order's own
+                            deadline. Green from 90%, amber from 70%, red below.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Orders/hour</dt>
+                        <dd class="wfnote__def">Total orders divided by hours worked, where hours come from
+                            clock-in to clock-out on completed shifts, minus break time.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>These rows are a <strong>nightly snapshot</strong>, not a live count. Figures for a day
+                    appear after the overnight run, so today's date normally shows nothing.</li>
+                <li>A rider is only scored if their shift for that day is <strong>Completed</strong>. A shift
+                    left on Active means the whole day is missing from this page — check the shift before
+                    assuming the rider did no work.</li>
+                <li>Hours come from actual clock-in and clock-out. A rider who worked without clocking in has no
+                    hours, so orders per hour reads as zero even with orders delivered.</li>
+                <li>A low batching percentage is often a config problem, not a rider problem — a short hold
+                    window or thin order flow at that store means there was simply nothing to pair with.</li>
+                <li>The tiles average the <strong>rider percentages</strong>, so a rider with two orders counts
+                    as much as one with forty. Read them as a mood, not a total.</li>
+            </ul>
+        </section>
+    

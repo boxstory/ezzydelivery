@@ -1,0 +1,100 @@
+{% comment %}
+Purpose: "About this page" notes panel for google_sheet_sources.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_google_sheet_sources_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Every client who keeps their orders in a Google Sheet has a row here. A row ties one sheet tab
+            to one business, and syncing it reads the rows and stages them as temp orders — it never
+            creates real orders on its own. Staff still review and import those rows on the Temp Orders
+            page. A sheet only produces usable rows once its columns have been mapped to our fields in the
+            Mapping Manager.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Add source</dt>
+                        <dd class="wfnote__def">Pick the business and paste the sheet's link. Share the
+                            sheet with the integration's Google account first, or reading it will fail. A
+                            tab GID is optional — blank uses the one in the link, or the first tab.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Mapping</dt>
+                        <dd class="wfnote__def">Opens the Mapping Manager for that business's Google Sheet
+                            platform, where each column is pointed at one of our order fields.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sync</dt>
+                        <dd class="wfnote__def">Reads the sheet immediately and reports how many rows were
+                            created and updated. Disabled while the source is inactive.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit</dt>
+                        <dd class="wfnote__def">Changes the sheet URL or the tab GID. The business a source
+                            belongs to cannot be changed — delete it and add it again.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Power button</dt>
+                        <dd class="wfnote__def">Flips the source between active and inactive. Inactive
+                            sources are skipped by the scheduled sync and cannot be synced by hand.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Delete</dt>
+                        <dd class="wfnote__def">Removes the source and every temp order staged from it.
+                            Orders already imported are untouched.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Import history</dt>
+                        <dd class="wfnote__def">The header link opens the import log already filtered to
+                            Google Sheet runs — go there to see why a sync produced nothing.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading a row</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Headers</dt>
+                        <dd class="wfnote__def">How many column headings were seen the last time the sheet
+                            was read. Zero means we have never successfully opened it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Mapping</dt>
+                        <dd class="wfnote__def">How many columns are mapped to our fields. Amber zero means
+                            the sheet will be skipped on sync — set the mapping first.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Status</dt>
+                        <dd class="wfnote__def"><em>Active</em> is in the sync rotation, <em>Inactive</em>
+                            is parked. New sources are created active.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Last sync</dt>
+                        <dd class="wfnote__def">When a row was last staged from this sheet, and how many
+                            temp orders it has produced in total. <em>Never</em> means nothing has ever
+                            come through.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Syncing stages rows only. Nothing reaches a customer until someone imports them from
+                    <strong>Temp Orders</strong>.</li>
+                <li>A sheet the integration account cannot open fails every time, silently on the schedule
+                    and loudly here — use <em>Sync</em> to see the real error.</li>
+                <li>Deleting a source <strong>also deletes its staged temp orders</strong>, so anything not
+                    yet imported is lost and has to be re-synced after re-adding.</li>
+                <li>Rows already staged are matched and updated on the next sync, so fixing a mistake in
+                    the client's sheet before import does carry through.</li>
+                <li>Changing the tab GID points the source at a different tab — the previously staged rows
+                    stay, which can look like duplicates.</li>
+            </ul>
+        </section>
+    

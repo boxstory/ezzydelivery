@@ -1,0 +1,93 @@
+/* Purpose: Upcoming Deliveries console — due-date column, reason plate, horizon gutter
+   Used by: workforce/parts/lists/dl_list_upcoming.html (wrapper .wfl.wfup)
+   Notes: Layers on followup-list.css (hero, filter pills, dl-table). Scoped under
+          .wfup so the Follow-Up console is untouched. Tokens only; the near-term
+          accent (tomorrow) is the single yellow moment on the page. */
+
+/* ── Hero horizon strip — nearest bucket carries the accent ── */
+.wfup__tier--tomorrow .wfl__tier__num,
+.wfup__tier--week .wfl__tier__num,
+.wfup__tier--later .wfl__tier__num {
+  border-left: 3px solid transparent;
+  padding-left: 0.4rem;
+}
+.wfup__tier--tomorrow .wfl__tier__num { border-left-color: var(--brand-primary, #f7c000); }
+.wfup__tier--week .wfl__tier__num { border-left-color: rgba(255, 255, 255, 0.45); }
+.wfup__tier--later .wfl__tier__num { border-left-color: rgba(255, 255, 255, 0.18); }
+
+/* ── Filter controls ── */
+.wfup .wfup__date-input { max-width: 150px; }
+.wfup .wfup__reason-select { max-width: 190px; }
+
+/* ── Row gutter — how close the delivery day is ── */
+.wfup .wfup__row--tomorrow td:first-child { box-shadow: inset 3px 0 0 var(--brand-primary, #f7c000); }
+.wfup .wfup__row--week td:first-child { box-shadow: inset 3px 0 0 var(--brand-navy, #001f3f); }
+.wfup .wfup__row--later td:first-child { box-shadow: inset 3px 0 0 var(--brand-grey-300, #dcdcdc); }
+
+/* ── Delivery day cell ── */
+.wfup .wfup__th-due,
+.wfup .wfup__due-cell { min-width: 8.5rem; }
+
+.wfup__due {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.wfup__due__date {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--brand-navy, #001f3f);
+  font-variant-numeric: tabular-nums;
+}
+.wfup__due__away {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--brand-grey-600, #6b6b6b);
+}
+.wfup__due__away--tomorrow { color: #92400e; }
+.wfup__due__slot {
+  font-size: 0.7rem;
+  color: var(--brand-grey-600, #6b6b6b);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Reason plate — swatch + text, no candy pills ── */
+.wfup .wfup__th-why,
+.wfup .wfup__why-cell { min-width: 11rem; }
+
+.wfup__why {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding-left: 0.45rem;
+  border-left: 3px solid var(--brand-grey-300, #dcdcdc);
+}
+.wfup__why__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--brand-navy, #001f3f);
+}
+.wfup__why__meta {
+  font-size: 0.7rem;
+  color: var(--brand-grey-600, #6b6b6b);
+}
+.wfup__why__note {
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--brand-grey-700, #4a4a4a);
+}
+
+.wfup__why--postponed { border-left-color: #7c3aed; }
+.wfup__why--postponed .wfup__why__label { color: #6d28d9; }
+.wfup__why--rescheduled { border-left-color: var(--brand-danger, #dc2626); }
+.wfup__why--rescheduled .wfup__why__label { color: var(--brand-danger, #dc2626); }
+.wfup__why--scheduled { border-left-color: var(--brand-success, #15803d); }
+.wfup__why--scheduled .wfup__why__label { color: var(--brand-success, #15803d); }
+
+@media (max-width: 575.98px) {
+  .wfup .wfup__date-input,
+  .wfup .wfup__reason-select { max-width: none; flex: 1 1 auto; }
+}

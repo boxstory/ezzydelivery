@@ -1,6 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
-{# COD bookkeeping ledger — all COD transactions with filters. View: workforce.views.cod_ledger #}
+{% comment %}
+Purpose: COD bookkeeping ledger — every COD transaction with date/type/driver/business/method/status filters
+Used by: workforce_views.cod_ledger at /workforce/cod-ledger/
+Notes: Read-only and append-only; the summary tiles reflect the active filter, not the whole table.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}COD Ledger{% endblock %}
 
@@ -27,8 +33,17 @@
       <a href="{% url 'workforce:cod_legacy_reconciliation' %}" class="btn btn-sm btn-outline-light">
         <i class="fa-solid fa-scale-unbalanced me-1"></i> Legacy Variance
       </a>
+      <button type="button" class="wfnote__btn" data-wfnote-toggle
+              aria-expanded="false" aria-controls="workforce_cod_ledger_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
     </div>
   </div>
+
+  <div class="wfnote" id="workforce_cod_ledger_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_cod_ledger_card_notes' %}" hidden></div>
 
   <!-- Summary tiles (reflect the current filter) -->
   <div class="codl__summary">

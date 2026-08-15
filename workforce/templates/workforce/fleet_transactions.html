@@ -1,13 +1,23 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Per-driver financial ledger — COD held, COD hand-ins to approve, and earnings
+Used by: workforce_views.fleet_transactions at /workforce/fleet/transactions/
+Notes: One driver at a time; three tabs filter the same ledger by transaction type.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Fleet Transactions - Ezzy Delivery{% endblock title %}
 
 {% block content %}
 <div class="ftr">
     <!-- Hero Header -->
-    {% include "workforce/parts/components/_page_header.html" with title="Fleet Transactions" icon="fa-money-bill-transfer" subtitle="View and manage driver financial transactions" %}
+    {% include "workforce/parts/components/_page_header.html" with title="Fleet Transactions" icon="fa-money-bill-transfer" subtitle="View and manage driver financial transactions" notes_id="workforce_fleet_transactions_card_notes" %}
+
+    <div class="wfnote wfnote--inset" id="workforce_fleet_transactions_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_fleet_transactions_card_notes' %}" hidden></div>
 
     {% comment %}
     Everything below the hero is one console. Driver, tabs, filters, actions and
@@ -80,96 +90,168 @@
     {% endif %}
 
 
-    <!-- Filter Panel -->
-    <div class="ftr__card ftr__card--filter">
-        <div class="ftr__card-header">
-            <i class="fa-solid fa-filter ftr__card-icon"></i>
-            <span class="ftr__card-title">FILTERS</span>
-        </div>
-        <div class="ftr__card-body">
-            <form method="get" id="filterForm">
-                <input type="hidden" name="driver_id" value="{{ selected_driver.driver_id }}">
-                <input type="hidden" name="sort" value="{{ sort_by }}" id="sortInput">
-                <input type="hidden" name="view" value="{{ view_type }}">
-                <div class="ftr__filter-row">
-                    <div class="ftr__filter-group">
-                        <label class="ftr__filter-label"><i class="fa-solid fa-calendar me-1"></i>Date Range</label>
-                        <select name="date_preset" id="datePresetSelect" class="ftr__filter-select" onchange="toggleCustomDate(this.value)">
-                            <option value="">All Time</option>
-                            <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Today</option>
-                            <option value="yesterday" {% if date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
-                            <option value="3days" {% if date_preset == '3days' %}selected{% endif %}>Last 3 Days</option>
-                            <option value="1week" {% if date_preset == '1week' %}selected{% endif %}>Last 1 Week</option>
-                            <option value="1month" {% if date_preset == '1month' %}selected{% endif %}>Last 1 Month</option>
-                            <option value="custom" {% if date_preset == 'custom' %}selected{% endif %}>Custom Date</option>
-                        </select>
-                    </div>
-                    <div class="ftr__filter-group ftr__filter-group--custom {% if date_preset != 'custom' %}ftr__hidden{% endif %}" id="customDateFrom">
-                        <label class="ftr__filter-label"><i class="fa-solid fa-calendar-day me-1"></i>From</label>
-                        <input type="date" name="date_from" value="{{ date_from }}" class="ftr__filter-input" id="dateFromInput">
-                    </div>
-                    <div class="ftr__filter-group ftr__filter-group--custom {% if date_preset != 'custom' %}ftr__hidden{% endif %}" id="customDateTo">
-                        <label class="ftr__filter-label"><i class="fa-solid fa-calendar-day me-1"></i>To</label>
-                        <input type="date" name="date_to" value="{{ date_to }}" class="ftr__filter-input" id="dateToInput">
-                    </div>
-                    <div class="ftr__filter-group">
-                        <label class="ftr__filter-label"><i class="fa-solid fa-tag me-1"></i>Type</label>
-                        <select name="type" class="ftr__filter-select">
-                            <option value="">All Types</option>
-                            {% for type_code, type_label in transaction_types %}
-                            <option value="{{ type_code }}" {% if txn_type == type_code %}selected{% endif %}>{{ type_label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="ftr__filter-group">
-                        <label class="ftr__filter-label"><i class="fa-solid fa-circle-check me-1"></i>Status</label>
-                        <select name="status" class="ftr__filter-select">
-                            <option value="">All Status</option>
-                            <option value="settled" {% if status == 'settled' %}selected{% endif %}>Settled</option>
-                            <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
-                        </select>
-                    </div>
-                    <div class="ftr__filter-group">
-                        <label class="ftr__filter-label"><i class="fa-solid fa-building me-1"></i>Business</label>
-                        <select name="business" class="ftr__filter-select">
-                            <option value="">All Businesses</option>
-                            {% for biz in driver_businesses|code_last %}
-                            <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id|stringformat:"s" %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="ftr__filter-group">
-                        <label class="ftr__filter-label"><i class="fa-solid fa-wallet me-1"></i>Payment Method</label>
-                        <select name="payment_method" class="ftr__filter-select">
-                            <option value="">All Methods</option>
-                            {% for pm_code, pm_label in payment_method_choices %}
-                            <option value="{{ pm_code }}" {% if payment_method_filter == pm_code %}selected{% endif %}>{{ pm_label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="ftr__filter-group">
-                        <label class="ftr__filter-label"><i class="fa-solid fa-hashtag me-1"></i>Task Number</label>
-                        <input type="text" name="task_search" value="{{ task_search }}" class="ftr__filter-input" placeholder="Search task #">
-                    </div>
-                    <div class="ftr__filter-group">
-                        <label class="ftr__filter-label"><i class="fa-solid fa-money-bill me-1"></i>Min Amount (QAR)</label>
-                        <input type="number" step="0.01" name="min_amount" value="{{ min_amount }}" class="ftr__filter-input" placeholder="0">
-                    </div>
-                    <div class="ftr__filter-group">
-                        <label class="ftr__filter-label"><i class="fa-solid fa-money-bill me-1"></i>Max Amount (QAR)</label>
-                        <input type="number" step="0.01" name="max_amount" value="{{ max_amount }}" class="ftr__filter-input" placeholder="9999">
-                    </div>
-                    <div class="ftr__filter-actions">
-                        <button type="submit" class="ftr__btn ftr__btn--primary">
-                            <i class="fa-solid fa-filter me-1"></i>Apply
-                        </button>
-                        <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ selected_driver.driver_id }}" class="ftr__btn ftr__btn--outline">
-                            <i class="fa-solid fa-times me-1"></i>Clear
-                        </a>
+    {% comment %}
+    Filter bar. Filters are added on demand from a searchable "+ Filter" menu and
+    each active one renders as a segmented chip: field | operator | value | x.
+    Nothing is removed — every filter still exists in the form at all times; an
+    inactive chip is hidden rather than dropped, so the GET form always posts the
+    full parameter set and a filter is one click away instead of one of nine
+    boxes competing for attention.
+
+    A chip is visible when the server says its filter is applied (the `--on`
+    class below) or when the user adds it from the menu. Removing a chip clears
+    its inputs and returns it to the menu. All server-rendered, no framework.
+
+    The operator segment states the semantics the query actually uses — "contains"
+    for the text search, "between" for the amount range — which were previously
+    invisible. It is a label, not a control: the view implements one comparison
+    per field, so a dropdown offering others would be a promise the backend does
+    not keep. Making them selectable is a backend change.
+    {% endcomment %}
+    <div class="ftr__bar" id="ftrFilterBar">
+        <form method="get" id="filterForm">
+            <input type="hidden" name="driver_id" value="{{ selected_driver.driver_id }}">
+            <input type="hidden" name="sort" value="{{ sort_by }}" id="sortInput">
+            <input type="hidden" name="view" value="{{ view_type }}">
+
+            <div class="ftr__bar-row">
+
+                {# ---- Period ---- #}
+                <div class="ftr__chip {% if date_preset or date_from or date_to %}ftr__chip--on{% endif %}"
+                     data-filter="period" data-label="Period">
+                    <span class="ftr__chip-field"><i class="fa-regular fa-calendar"></i>Period</span>
+                    <span class="ftr__chip-op">is</span>
+                    <select name="date_preset" id="datePresetSelect" class="ftr__chip-control" data-no-select2
+                            onchange="toggleCustomDate(this.value)">
+                        <option value="">All time</option>
+                        <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Today</option>
+                        <option value="yesterday" {% if date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
+                        <option value="3days" {% if date_preset == '3days' %}selected{% endif %}>Last 3 days</option>
+                        <option value="1week" {% if date_preset == '1week' %}selected{% endif %}>Last week</option>
+                        <option value="1month" {% if date_preset == '1month' %}selected{% endif %}>Last month</option>
+                        <option value="custom" {% if date_preset == 'custom' %}selected{% endif %}>Custom dates</option>
+                    </select>
+                    <span class="ftr__chip-extra {% if date_preset != 'custom' %}ftr__hidden{% endif %}" id="customDateFrom">
+                        <input type="date" name="date_from" value="{{ date_from }}" class="ftr__chip-control" id="dateFromInput" aria-label="From date">
+                        <span class="ftr__chip-op">to</span>
+                        <input type="date" name="date_to" value="{{ date_to }}" class="ftr__chip-control" id="dateToInput" aria-label="To date">
+                    </span>
+                    <button type="button" class="ftr__chip-x" data-chip-remove aria-label="Remove Period filter">&times;</button>
+                </div>
+
+                {# ---- Type ---- #}
+                <div class="ftr__chip {% if txn_type %}ftr__chip--on{% endif %}"
+                     data-filter="type" data-label="Type">
+                    <span class="ftr__chip-field"><i class="fa-solid fa-tag"></i>Type</span>
+                    <span class="ftr__chip-op">is</span>
+                    <select name="type" id="typeSelect" class="ftr__chip-control" data-no-select2>
+                        <option value="">All types</option>
+                        {% for type_code, type_label in transaction_types %}
+                        <option value="{{ type_code }}" {% if txn_type == type_code %}selected{% endif %}>{{ type_label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="ftr__chip-x" data-chip-remove aria-label="Remove Type filter">&times;</button>
+                </div>
+
+                {# ---- Status ---- #}
+                <div class="ftr__chip {% if status %}ftr__chip--on{% endif %}"
+                     data-filter="status" data-label="Status">
+                    <span class="ftr__chip-field"><i class="fa-regular fa-circle-check"></i>Status</span>
+                    <span class="ftr__chip-op">is</span>
+                    <select name="status" id="statusSelect" class="ftr__chip-control" data-no-select2>
+                        <option value="">All status</option>
+                        <option value="settled" {% if status == 'settled' %}selected{% endif %}>Settled</option>
+                        <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
+                    </select>
+                    <button type="button" class="ftr__chip-x" data-chip-remove aria-label="Remove Status filter">&times;</button>
+                </div>
+
+                {# ---- Reconciliation ---- #}
+                <div class="ftr__chip {% if recon_filter %}ftr__chip--on{% endif %}"
+                     data-filter="recon" data-label="Reconciliation">
+                    <span class="ftr__chip-field"><i class="fa-solid fa-building-columns"></i>Reconciliation</span>
+                    <span class="ftr__chip-op">is</span>
+                    <select name="recon" id="reconSelect" class="ftr__chip-control" data-no-select2>
+                        <option value="">All rows</option>
+                        <option value="electronic" {% if recon_filter == 'electronic' %}selected{% endif %}>Electronic COD only</option>
+                        <option value="pending" {% if recon_filter == 'pending' %}selected{% endif %}>Not reconciled</option>
+                        <option value="verified" {% if recon_filter == 'verified' %}selected{% endif %}>Reconciled</option>
+                    </select>
+                    <button type="button" class="ftr__chip-x" data-chip-remove aria-label="Remove Reconciliation filter">&times;</button>
+                </div>
+
+                {# ---- Business (keeps Select2: a driver can carry dozens of stores) ---- #}
+                <div class="ftr__chip {% if business_filter %}ftr__chip--on{% endif %}"
+                     data-filter="business" data-label="Business">
+                    <span class="ftr__chip-field"><i class="fa-regular fa-building"></i>Business</span>
+                    <span class="ftr__chip-op">is</span>
+                    <select name="business" id="businessSelect" class="ftr__chip-control ftr__chip-control--wide">
+                        <option value="">All businesses</option>
+                        {% for biz in driver_businesses|code_last %}
+                        <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id|stringformat:"s" %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="ftr__chip-x" data-chip-remove aria-label="Remove Business filter">&times;</button>
+                </div>
+
+                {# ---- Payment method ---- #}
+                <div class="ftr__chip {% if payment_method_filter %}ftr__chip--on{% endif %}"
+                     data-filter="payment_method" data-label="Payment method">
+                    <span class="ftr__chip-field"><i class="fa-regular fa-credit-card"></i>Payment</span>
+                    <span class="ftr__chip-op">is</span>
+                    <select name="payment_method" id="paymentSelect" class="ftr__chip-control" data-no-select2>
+                        <option value="">All methods</option>
+                        {% for pm_code, pm_label in payment_method_choices %}
+                        <option value="{{ pm_code }}" {% if payment_method_filter == pm_code %}selected{% endif %}>{{ pm_label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="ftr__chip-x" data-chip-remove aria-label="Remove Payment method filter">&times;</button>
+                </div>
+
+                {# ---- Task or reference ---- #}
+                <div class="ftr__chip {% if task_search %}ftr__chip--on{% endif %}"
+                     data-filter="task_search" data-label="Task or reference">
+                    <span class="ftr__chip-field"><i class="fa-solid fa-hashtag"></i>Task / ref</span>
+                    <span class="ftr__chip-op">contains</span>
+                    <input type="text" name="task_search" id="taskSearch" value="{{ task_search }}"
+                           class="ftr__chip-control" placeholder="task # or reference">
+                    <button type="button" class="ftr__chip-x" data-chip-remove aria-label="Remove Task or reference filter">&times;</button>
+                </div>
+
+                {# ---- Amount ---- #}
+                <div class="ftr__chip {% if min_amount or max_amount %}ftr__chip--on{% endif %}"
+                     data-filter="amount" data-label="Amount">
+                    <span class="ftr__chip-field"><i class="fa-solid fa-coins"></i>Amount</span>
+                    <span class="ftr__chip-op">between</span>
+                    <input type="number" step="0.01" name="min_amount" id="minAmount" value="{{ min_amount }}"
+                           class="ftr__chip-control ftr__chip-control--num" placeholder="min" aria-label="Minimum amount">
+                    <span class="ftr__chip-op">and</span>
+                    <input type="number" step="0.01" name="max_amount" value="{{ max_amount }}"
+                           class="ftr__chip-control ftr__chip-control--num" placeholder="max" aria-label="Maximum amount">
+                    <button type="button" class="ftr__chip-x" data-chip-remove aria-label="Remove Amount filter">&times;</button>
+                </div>
+
+                {# ---- Add filter ---- #}
+                <div class="ftr__add" id="ftrAdd">
+                    <button type="button" class="ftr__add-btn" id="ftrAddBtn"
+                            aria-expanded="false" aria-haspopup="listbox" aria-controls="ftrAddMenu">
+                        <i class="fa-solid fa-plus"></i> Filter
+                    </button>
+                    <div class="ftr__add-menu ftr__hidden" id="ftrAddMenu" role="dialog" aria-label="Add filter">
+                        <input type="text" class="ftr__add-search" id="ftrAddSearch"
+                               placeholder="Filter..." autocomplete="off" aria-controls="ftrAddList">
+                        <div class="ftr__add-list" id="ftrAddList" role="listbox"></div>
+                        <div class="ftr__add-empty ftr__hidden" id="ftrAddEmpty">No filters found.</div>
                     </div>
                 </div>
-            </form>
-        </div>
+
+                <div class="ftr__bar-acts">
+                    <button type="submit" class="ftr__btn ftr__btn--go">Apply</button>
+                    <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ selected_driver.driver_id }}&amp;view={{ view_type }}"
+                       class="ftr__btn" id="ftrClearAll">Clear</a>
+                </div>
+            </div>
+        </form>
     </div>
 
     <!-- Bulk Actions Bar -->
@@ -184,19 +266,27 @@
         <span class="ftr__bulk-amount">Total: QAR <span id="selectedAmount">0.00</span></span>
     </div>
 
-    <!-- Action Buttons -->
+    <!-- Action Buttons. Export drops its yellow: Apply is the page's one primary,
+         and two yellow buttons in a view is exactly what the Brand Kit forbids. -->
     <div class="ftr__toolbar">
-        <button type="button" class="ftr__btn ftr__btn--outline" onclick="window.print()">
+        <button type="button" class="ftr__btn" onclick="window.print()">
             <i class="fa-solid fa-print"></i> Print Report
         </button>
-        <button type="button" class="ftr__btn ftr__btn--primary" id="exportCsvLink"
+        <button type="button" class="ftr__btn" id="exportCsvLink"
                 data-bs-toggle="modal" data-bs-target="#wfExportModal">
             <i class="fa-solid fa-file-export"></i> Export CSV
         </button>
-        <button type="button" class="ftr__btn ftr__btn--outline" id="recalcBtn" onclick="recalculateBalances()">
+        <button type="button" class="ftr__btn" id="recalcBtn" onclick="recalculateBalances()">
             <i class="fa-solid fa-rotate"></i> Recalculate Balances
         </button>
         <span class="ftr__toolbar-count">{{ transactions.paginator.count }} transaction{{ transactions.paginator.count|pluralize }}</span>
+        {% if recon_pending_count %}
+        <a href="?driver_id={{ selected_driver.driver_id }}&view={{ view_type }}&recon=pending" class="ftr__toolbar-flag">
+            <i class="fa-solid fa-building-columns"></i>
+            QAR {{ recon_pending_amount|floatformat:2 }} electronic COD awaiting bank reconciliation
+            <span class="ftr__toolbar-flag-count">{{ recon_pending_count }}</span>
+        </a>
+        {% endif %}
     </div>
 
     <!-- Print-only header: shows in print preview only -->
@@ -225,17 +315,21 @@
                         <th class="ftr__th--check">
                             <input type="checkbox" class="ftr__checkbox" id="selectAll" onchange="toggleSelectAll(this)">
                         </th>
-                        <th class="ftr__th--code">TXN Code</th>
+                        {% comment %}Code and type describe the same thing, so they share one
+                        column and stack — the type keeps its own sort control on line two.{% endcomment %}
+                        <th class="ftr__th--code">
+                            <div>TXN Code</div>
+                            <div class="ftr__th-sub ftr__th--sort" onclick="updateSort('{% if sort_by == 'type_asc' %}type_desc{% else %}type_asc{% endif %}')">
+                                Type
+                                {% if sort_by == 'type_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
+                                {% elif sort_by == 'type_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
+                                {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
+                            </div>
+                        </th>
                         <th class="ftr__th--sort ftr__th--date" onclick="updateSort('{% if sort_by == 'date_asc' %}date_desc{% else %}date_asc{% endif %}')">
                             Date & Time
                             {% if sort_by == 'date_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
                             {% elif sort_by == 'date_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
-                            {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
-                        </th>
-                        <th class="ftr__th--sort ftr__th--type" onclick="updateSort('{% if sort_by == 'type_asc' %}type_desc{% else %}type_asc{% endif %}')">
-                            Type
-                            {% if sort_by == 'type_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
-                            {% elif sort_by == 'type_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
                             {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
                         </th>
                         <th class="ftr__th--desc">Description / Reference</th>
@@ -247,6 +341,7 @@
                         </th>
                         <th class="ftr__th--after">Balance After</th>
                         <th class="ftr__th--status">Status</th>
+                        <th class="ftr__th--recon" title="Bank reconciliation of the electronic COD leg">Bank Recon</th>
                         <th class="ftr__th--action">Action</th>
                     </tr>
                 </thead>
@@ -265,13 +360,14 @@
                                    onchange="updateBulkSelection()"
                                    {% if txn.settlement or txn.transaction_type == 'settlement' or txn.transaction_type == 'cod_deposit' or txn.reference_number in deposited_refs %}disabled{% endif %}>
                         </td>
-                        <td><code class="ftr__code">{{ txn.transaction_code|default:"-" }}</code></td>
-                        <td>{{ txn.created_at|date:"d M Y, h:i A" }}</td>
-                        <td>
+                        <td class="ftr__td--code">
+                            <code class="ftr__code">{{ txn.transaction_code|default:"-" }}</code>
                             <span class="ftr__txn-type ftr__txn-type--{{ txn.transaction_type }}">
                                 {{ txn.get_transaction_type_display }}
                             </span>
                         </td>
+                        {# Short date + 24h clock — the full form cannot hold one line at 100px. #}
+                        <td class="ftr__td--date">{{ txn.created_at|date:"d M y H:i" }}</td>
                         <td>
                             <div>{{ txn.description }}</div>
                             <div class="ftr__cell-ref">
@@ -346,13 +442,13 @@
                             </div>
                             {% endif %}
                         </td>
-                        <td>
+                        <td class="ftr__td--after">
                             {% if txn.transaction_type == 'cod_collection' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}
                                 {% comment %}Only cash is ever "in hand" — electronic COD reaches Ezzy
                                 at collection, so its rows are structurally zero and were reading as
                                 broken. Each electronic row appears only if it ever carries a value.{% endcomment %}
                                 <div class="ftr__split">
-                                    <div><i class="fa-solid fa-money-bill"></i> {{ txn.cod_cash_after|floatformat:0 }} <span class="ftr__split-note">in hand</span></div>
+                                    <div><i class="fa-solid fa-money-bill"></i> {{ txn.cod_cash_after|floatformat:0 }}</div>
                                     {% if txn.cod_fawran_after %}
                                     <div><i class="fa-solid fa-mobile-screen"></i> {{ txn.cod_fawran_after|floatformat:0 }}</div>
                                     {% endif %}
@@ -369,7 +465,7 @@
                             <div class="ftr__after"><i class="fa-solid fa-piggy-bank"></i>&nbsp;{{ txn.wallet_balance_after }}</div>
                             {% endif %}
                         </td>
-                        <td>
+                        <td class="ftr__td--status">
                             {% if txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' %}
                                 {% if txn.is_received and txn.is_verified %}
                                 <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
@@ -388,6 +484,17 @@
                                 <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
                                 {% elif txn.delivery_task and txn.delivery_task.cod_submission_txn and txn.delivery_task.cod_submission_txn.is_received and txn.delivery_task.cod_submission_txn.is_verified %}
                                 <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
+                                {% elif txn.prepaid_deposit %}
+                                {% comment %}Prepaid rows have no cod_submission_txn by design, so they
+                                are resolved to their hand-in via cod_settled_at (see the view).{% endcomment %}
+                                    {% if txn.prepaid_deposit.is_received and txn.prepaid_deposit.is_verified %}
+                                    <span class="ftr__txn-type ftr__txn-type--settlement" title="Closed in {{ txn.prepaid_deposit.transaction_code }}"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
+                                    {% else %}
+                                    <span class="ftr__txn-type ftr__txn-type--cod_deposit" title="Submitted in {{ txn.prepaid_deposit.transaction_code }}, awaiting verification">Deposited</span>
+                                    {% endif %}
+                                {% elif txn.delivery_task.cod_settled and not txn.delivery_task.cod_collected %}
+                                {% comment %}Settled prepaid whose hand-in could not be resolved (legacy rows).{% endcomment %}
+                                <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
                                 {% elif txn.reference_number in deposited_refs %}
                                 <span class="ftr__txn-type ftr__txn-type--cod_deposit">Deposited</span>
                                 {% elif txn.delivery_task.cod_settled and txn.delivery_task.payment_method in electronic_methods %}
@@ -404,6 +511,28 @@
                                class="ftr__txn-type ftr__txn-type--settlement" title="Open payout invoice {{ txn.settlement.settlement_code }}">Settled</a>
                             {% else %}
                             <span class="ftr__txn-type ftr__txn-type--pending">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td class="ftr__td--recon" data-task-id="{{ txn.recon.task_id|default:'' }}">
+                            {% if txn.recon %}
+                            <span class="ftr__recon ftr__recon--{{ txn.recon.state }}">
+                                {% if txn.recon.state == 'verified' %}Verified{% else %}Pending{% endif %}
+                            </span>
+                            <div class="ftr__recon-legs">
+                                {% for leg in txn.recon.legs %}<span>{{ leg.label }} {{ leg.amount|floatformat:0 }}</span>{% endfor %}
+                            </div>
+                            <div class="ftr__recon-meta">
+                                {% if txn.recon.reference %}<span class="ftr__recon-ref">{{ txn.recon.reference }}</span>{% endif %}
+                                {% if txn.recon.state == 'verified' %}
+                                <span>{{ txn.recon.by.get_full_name|default:txn.recon.by.username|default:"—" }} · {{ txn.recon.at|date:"d M Y" }}</span>
+                                {% endif %}
+                            </div>
+                            <button type="button" class="ftr__recon-btn"
+                                    onclick="openReconModal({{ txn.recon.task_id }}, '{{ txn.delivery_task.dl_task_number|escapejs }}', '{{ txn.recon.state }}', '{{ txn.recon.amount|floatformat:2 }}', '{{ txn.recon.reference|escapejs }}')">
+                                {% if txn.recon.state == 'verified' %}Revert{% else %}Verify{% endif %}
+                            </button>
+                            {% else %}
+                            <span class="ftr__recon ftr__recon--na">—</span>
                             {% endif %}
                         </td>
                         <td>
@@ -557,22 +686,50 @@
         <div class="ftr__card-header">
             <i class="fa-solid fa-box-open ftr__card-icon"></i>
             <span class="ftr__card-title">PREPAID / ZERO-COD DELIVERIES</span>
-            <span class="ftr__toolbar-count ms-2">{{ zero_cod_tasks|length }} task{{ zero_cod_tasks|length|pluralize }}</span>
+            <span class="ftr__toolbar-count ms-2">{{ zero_cod_tasks|length }} shown</span>
+            {% if zero_cod_pending_count %}
+            <span class="ftr__toolbar-count ftr__toolbar-count--warn ms-1">{{ zero_cod_pending_count }} pending</span>
+            {% endif %}
         </div>
         <div class="ftr__card-body">
             <p class="text-muted small mb-2">
                 <i class="fa-solid fa-circle-info me-1"></i>
                 Delivered orders with no COD to collect (prepaid). They carry no cash so they do not affect COD totals.
+                {% if zero_cod_truncated %}Showing the first 100 &mdash; narrow the date filter to see the rest.{% endif %}
             </p>
+
+            {% comment %}
+            Prepaid deliveries have no transaction row, so they cannot be ticked in
+            the ledger above. This is the only way to close them from staff side —
+            the alternative is waiting for the driver's next hand-in.
+            {% endcomment %}
+            {% if zero_cod_pending_count %}
+            <div class="ftr__bulk ftr__bulk--prepaid mb-2" id="prepaidBulkBar">
+                <span class="ftr__bulk-count"><span id="prepaidSelectedCount">0</span> selected</span>
+                <button type="button" class="ftr__btn ftr__btn--primary" id="btnMarkPrepaidSettled"
+                        onclick="markPrepaidSettled()" disabled>
+                    <i class="fa-solid fa-circle-check"></i> Mark Settled
+                </button>
+                <span class="text-muted small ms-2">No cash moves &mdash; this only closes the delivery.</span>
+            </div>
+            {% endif %}
+
             <div class="ftr__table-wrap">
                 <table class="ftr__table">
                     <thead>
                         <tr>
+                            {% if zero_cod_pending_count %}
+                            <th class="ftr__th-check">
+                                <input type="checkbox" id="prepaidSelectAll" onchange="togglePrepaidAll(this)"
+                                       title="Select all pending">
+                            </th>
+                            {% endif %}
                             <th>Task #</th>
                             <th>Order</th>
                             <th>Business</th>
                             <th>Status</th>
                             <th>COD</th>
+                            <th>Settlement</th>
                             <th>Completed</th>
                             <th>Action</th>
                         </tr>
@@ -580,6 +737,14 @@
                     <tbody>
                         {% for t in zero_cod_tasks %}
                         <tr>
+                            {% if zero_cod_pending_count %}
+                            <td class="ftr__th-check">
+                                {% if not t.cod_settled %}
+                                <input type="checkbox" class="ftr__prepaid-check" value="{{ t.id }}"
+                                       onchange="updatePrepaidSelection()">
+                                {% endif %}
+                            </td>
+                            {% endif %}
                             <td><code class="ftr__code">{{ t.dl_task_number }}</code></td>
                             <td>{% if t.order %}{{ t.order.order_number|default:t.order_id }}{% else %}-{% endif %}</td>
                             <td>{% if t.business %}{{ t.business.business_name }}{% elif t.order.business %}{{ t.order.business.business_name }}{% else %}-{% endif %}</td>
@@ -587,6 +752,29 @@
                                 <span class="ftr__txn-type">{{ t.get_dl_task_status_display|default:t.dl_task_status }}</span>
                             </td>
                             <td><span class="text-muted">No COD (Prepaid)</span></td>
+                            <td>
+                                {% if t.cod_settled %}
+                                <span class="ftr__cod-badge ftr__cod-badge--settled">
+                                    <i class="fa-solid fa-circle-check"></i> Settled
+                                </span>
+                                {% comment %}
+                                Which hand-in closed it. Opens that deposit's
+                                detail drawer, where this task is listed under
+                                Part 2, so the two views reconcile.
+                                {% endcomment %}
+                                {% if t.settled_deposit %}
+                                <button type="button" class="ftr__ref-link ftr__prepaid-dep"
+                                        onclick="openCodDrawer({{ t.settled_deposit.id }}, '{{ t.settled_deposit.transaction_code|escapejs }}', {{ t.settled_deposit.is_received|yesno:'true,false' }}, {{ t.settled_deposit.is_verified|yesno:'true,false' }})"
+                                        title="Submitted to admin in this deposit — click to open it">
+                                    <i class="fa-solid fa-receipt"></i> {{ t.settled_deposit.transaction_code }}
+                                </button>
+                                {% endif %}
+                                {% else %}
+                                <span class="ftr__cod-badge ftr__cod-badge--pending">
+                                    <i class="fa-solid fa-clock"></i> Pending
+                                </span>
+                                {% endif %}
+                            </td>
                             <td>{% if t.completed_at %}{{ t.completed_at|date:"d M Y, h:i A" }}{% else %}-{% endif %}</td>
                             <td>
                                 <a href="{% url 'workforce:delivery_task_detail' t.id %}" class="ftr__ref-link">
@@ -712,6 +900,40 @@
     </div>
 </div>
 
+<!-- Bank Reconciliation Modal (electronic COD only) -->
+<div class="modal fade" id="reconModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-building-columns me-2"></i>Bank Reconciliation — Task <code id="reconTaskNumber">-</code></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="reconTaskId" value="">
+                <input type="hidden" id="reconTargetState" value="true">
+                <div id="reconError" class="alert alert-danger d-none mb-3"></div>
+                <div class="mb-3 small text-muted">
+                    Electronic COD on this collection: <strong id="reconAmount">QAR 0.00</strong>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" for="reconReference">Bank / Terminal Reference <span class="text-muted small">(optional)</span></label>
+                    <input type="text" class="form-control" id="reconReference" maxlength="100" placeholder="e.g. Fawran transfer ref or POS batch no.">
+                </div>
+                <div class="alert alert-warning small mb-0" id="reconNote">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                    Confirm only once this amount is visible on the bank or terminal statement. It records who verified it and when.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="reconSubmitBtn" onclick="submitReconciliation()">
+                    <i class="fa-solid fa-check me-1"></i><span id="reconSubmitLabel">Mark Reconciled</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Settlement Receipt Modal -->
 <div class="ftr__modal" id="receiptModal">
     <div class="ftr__modal-content">
@@ -788,7 +1010,7 @@
 
 <!-- Export column picker -->
 {% include "workforce/parts/components/_export_columns_modal.html" %}
-<script src="{% static 'workforce/js/export-columns.js' %}?v=20260727b"></script>
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260807b"></script>
 {% endblock content %}
 
 {% block extra_js %}
@@ -848,17 +1070,158 @@ function updateSort(value) {
     document.getElementById('sortInput').value = value;
     document.getElementById('filterForm').submit();
 }
+// The From and To dates are one field pair inside the Period chip, so there is
+// a single group to reveal — the old version also reached for a #customDateTo
+// that no longer exists and threw before it could hide anything.
 function toggleCustomDate(value) {
-    var from = document.getElementById('customDateFrom');
-    var to = document.getElementById('customDateTo');
-    if (value === 'custom') {
-        from.style.display = ''; from.classList.remove('ftr__hidden');
-        to.style.display = ''; to.classList.remove('ftr__hidden');
-    } else {
-        from.style.display = 'none'; from.classList.add('ftr__hidden');
-        to.style.display = 'none'; to.classList.add('ftr__hidden');
-    }
+    var pair = document.getElementById('customDateFrom');
+    if (pair) pair.classList.toggle('ftr__hidden', value !== 'custom');
 }
+
+// ── Filter bar ────────────────────────────────────────────────────────────
+// Filters are added from a searchable menu and each active one is a chip.
+// Nothing is ever removed from the form: an inactive chip is hidden, so the GET
+// request always carries the full parameter set and every filter stays one
+// click away. A chip arrives visible when the server marked it --on.
+(function () {
+    var bar = document.getElementById('ftrFilterBar');
+    if (!bar) return;
+
+    var addWrap = document.getElementById('ftrAdd');
+    var addBtn = document.getElementById('ftrAddBtn');
+    var menu = document.getElementById('ftrAddMenu');
+    var search = document.getElementById('ftrAddSearch');
+    var list = document.getElementById('ftrAddList');
+    var empty = document.getElementById('ftrAddEmpty');
+    var chips = Array.prototype.slice.call(bar.querySelectorAll('.ftr__chip'));
+
+    function isOn(chip) { return chip.classList.contains('ftr__chip--on'); }
+
+    // Rebuild the menu from whatever is currently inactive, so the menu and the
+    // bar can never disagree about which filters are already showing.
+    function buildList() {
+        var q = (search.value || '').trim().toLowerCase();
+        list.innerHTML = '';
+        var shown = 0;
+        chips.forEach(function (chip) {
+            if (isOn(chip)) return;
+            var label = chip.dataset.label || '';
+            if (q && label.toLowerCase().indexOf(q) === -1) return;
+            var item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'ftr__add-item';
+            item.setAttribute('role', 'option');
+            var icon = chip.querySelector('.ftr__chip-field i');
+            item.innerHTML = (icon ? '<i class="' + icon.className + '"></i>' : '') +
+                             '<span>' + label + '</span>';
+            item.addEventListener('click', function () { activate(chip); });
+            list.appendChild(item);
+            shown++;
+        });
+        empty.classList.toggle('ftr__hidden', shown > 0);
+        // Nothing left to add — the button would be a dead offer.
+        addWrap.classList.toggle('ftr__hidden', chips.every(isOn));
+    }
+
+    function activate(chip) {
+        chip.classList.add('ftr__chip--on');
+        closeMenu();
+        var control = chip.querySelector('.ftr__chip-control');
+        if (control) {
+            // Select2 hides the real <select>, so focus its container instead.
+            var s2 = chip.querySelector('.select2-selection');
+            (s2 || control).focus();
+        }
+        buildList();
+    }
+
+    // Removing clears the chip's inputs before hiding it, so a hidden filter can
+    // never keep filtering from off screen.
+    function deactivate(chip) {
+        chip.classList.remove('ftr__chip--on');
+        chip.querySelectorAll('select').forEach(function (el) {
+            el.value = '';
+            if (window.jQuery && window.jQuery(el).data('select2')) {
+                window.jQuery(el).val('').trigger('change.select2');
+            }
+        });
+        chip.querySelectorAll('input').forEach(function (el) { el.value = ''; });
+        var extra = chip.querySelector('.ftr__chip-extra');
+        if (extra) extra.classList.add('ftr__hidden');
+        buildList();
+    }
+
+    bar.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-chip-remove]');
+        if (!btn) return;
+        e.preventDefault();
+        deactivate(btn.closest('.ftr__chip'));
+    });
+
+    function openMenu() {
+        menu.classList.remove('ftr__hidden');
+        addBtn.setAttribute('aria-expanded', 'true');
+        search.value = '';
+        buildList();
+        search.focus();
+    }
+    function closeMenu() {
+        menu.classList.add('ftr__hidden');
+        addBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    addBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        menu.classList.contains('ftr__hidden') ? openMenu() : closeMenu();
+    });
+    search.addEventListener('input', buildList);
+    search.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { closeMenu(); addBtn.focus(); }
+        // Enter takes the only remaining match — the fast path once you have
+        // typed enough to narrow it to one.
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            var items = list.querySelectorAll('.ftr__add-item');
+            if (items.length) items[0].click();
+        }
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            var first = list.querySelector('.ftr__add-item');
+            if (first) first.focus();
+        }
+    });
+    list.addEventListener('keydown', function (e) {
+        var items = Array.prototype.slice.call(list.querySelectorAll('.ftr__add-item'));
+        var i = items.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown') { e.preventDefault(); (items[i + 1] || items[0]).focus(); }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            i <= 0 ? search.focus() : items[i - 1].focus();
+        }
+        if (e.key === 'Escape') { closeMenu(); addBtn.focus(); }
+    });
+    document.addEventListener('click', function (e) {
+        if (!menu.classList.contains('ftr__hidden') && !addWrap.contains(e.target)) closeMenu();
+    });
+
+    // Every filter lives in the form whether or not its chip is showing, so a
+    // plain submit put `date_preset=&date_from=&type=&…` into the URL for the
+    // eight that were empty. Disabling them at submit time keeps them out of the
+    // query string without removing them from the form; the page navigates away
+    // immediately, so the disabled state is never seen.
+    var form = document.getElementById('filterForm');
+    if (form) {
+        form.addEventListener('submit', function () {
+            form.querySelectorAll('select, input[type="text"], input[type="number"], input[type="date"]')
+                .forEach(function (el) {
+                    if (!el.value) el.disabled = true;
+                });
+        });
+    }
+
+    buildList();
+})();
+
 function toggleSelectAll(checkbox) {
     document.querySelectorAll('.ftr__checkbox--row:not(:disabled)').forEach(function(cb) { cb.checked = checkbox.checked; });
     updateBulkSelection();
@@ -1111,7 +1474,10 @@ function openCodDrawer(txnId, txnCode, isReceived, isVerified) {
             (data.payment_method && data.payment_method !== '-' ? '<span class="ftr__drawer-meta-item"><strong>Method:</strong> ' + data.payment_method + '</span>' : '') +
             (data.notes ? '<span class="ftr__drawer-meta-item"><strong>Notes:</strong> ' + data.notes + '</span>' : '');
 
-        document.getElementById('drawerTotal').textContent = 'QAR ' + data.tasks_total.toFixed(2) + ' (' + data.tasks_count + ' order' + (data.tasks_count !== 1 ? 's' : '') + ')';
+        // The QAR figure is the CASH total — prepaid rows are 0 QAR and never move it.
+        // Caption carries the split so staff can reconcile against the driver's manifest.
+        document.getElementById('drawerTotal').textContent =
+            'QAR ' + data.tasks_total.toFixed(2) + ' · ' + codManifestCaption(data);
 
         if (!data.tasks || data.tasks.length === 0) {
             document.getElementById('codDrawerContent').innerHTML =
@@ -1119,25 +1485,60 @@ function openCodDrawer(txnId, txnCode, isReceived, isVerified) {
             return;
         }
 
-        var html = '<div class="ftr__cod-list">';
-        data.tasks.forEach(function(t, i) {
-            html += '<div class="ftr__cod-item">' +
-                '<div class="ftr__cod-item-num">' + (i + 1) + '</div>' +
-                '<div class="ftr__cod-item-info">' +
-                    '<div class="ftr__cod-item-task">' + t.task_number + (t.order_code && t.order_code !== '-' ? ' &nbsp;·&nbsp; ' + t.order_code : '') + '</div>' +
-                    '<div class="ftr__cod-item-meta">' + t.customer + (t.business && t.business !== '-' ? ' · ' + t.business : '') + (t.location && t.location !== '-' ? ' · ' + t.location : '') + '</div>' +
-                    '<div class="ftr__cod-item-meta">' + t.delivered_at + '</div>' +
+        // Two parts, because they are two different things to check: Part 1 is
+        // cash the driver actually handed over and must be counted; Part 2 is
+        // prepaid deliveries that carry nothing and are only reconciled against
+        // the manifest. Mixing them in one list made the cash count unreadable.
+        var cash = data.tasks.filter(function(t) { return !t.is_prepaid; });
+        var prepaid = data.tasks.filter(function(t) { return t.is_prepaid; });
+
+        function codSection(title, icon, items, subtitle, subtotalHtml) {
+            if (!items.length) { return ''; }
+            var s = '<div class="ftr__cod-section">' +
+                '<div class="ftr__cod-section-head">' +
+                    '<span class="ftr__cod-section-title"><i class="fa-solid ' + icon + '"></i> ' + title + '</span>' +
+                    '<span class="ftr__cod-section-sub">' + subtitle + '</span>' +
                 '</div>' +
-                '<div class="ftr__cod-item-amount">QAR ' + t.amount.toFixed(2) + '</div>' +
-                '<div class="ftr__cod-item-badges">' +
-                    '<span class="ftr__cod-badge ' + (t.cod_settled ? 'ftr__cod-badge--settled' : 'ftr__cod-badge--pending') + '">' +
-                        '<i class="fa-solid ' + (t.cod_settled ? 'fa-circle-check' : 'fa-clock') + '"></i> ' +
-                        (t.cod_settled ? 'Submitted' : 'Pending') +
-                    '</span>' +
-                '</div>' +
-            '</div>';
-        });
-        html += '</div>';
+                '<div class="ftr__cod-list">';
+            items.forEach(function(t, i) {
+                s += '<div class="ftr__cod-item">' +
+                    '<div class="ftr__cod-item-num">' + (i + 1) + '</div>' +
+                    '<div class="ftr__cod-item-info">' +
+                        '<div class="ftr__cod-item-task">' + t.task_number + (t.order_code && t.order_code !== '-' ? ' &nbsp;·&nbsp; ' + t.order_code : '') + '</div>' +
+                        '<div class="ftr__cod-item-meta">' + t.customer + (t.business && t.business !== '-' ? ' · ' + t.business : '') + (t.location && t.location !== '-' ? ' · ' + t.location : '') + '</div>' +
+                        '<div class="ftr__cod-item-meta">' + t.delivered_at + '</div>' +
+                    '</div>' +
+                    (t.is_prepaid
+                        ? '<div class="ftr__cod-item-amount ftr__cod-item-amount--prepaid">No COD</div>'
+                        : '<div class="ftr__cod-item-amount">QAR ' + t.amount.toFixed(2) + '</div>') +
+                    // Two facts, two badges. A prepaid row still needs to say it
+                    // was closed by this hand-in — showing only "Prepaid" read as
+                    // if it had never been settled, which is what it is NOT.
+                    '<div class="ftr__cod-item-badges">' +
+                        '<span class="ftr__cod-badge ' + (t.cod_settled ? 'ftr__cod-badge--settled' : 'ftr__cod-badge--pending') + '">' +
+                            '<i class="fa-solid ' + (t.cod_settled ? 'fa-circle-check' : 'fa-clock') + '"></i> ' +
+                            (t.cod_settled ? 'Settled' : 'Pending') +
+                        '</span>' +
+                        (t.is_prepaid
+                            ? '<span class="ftr__cod-badge ftr__cod-badge--prepaid">' +
+                                  '<i class="fa-solid fa-box-open"></i> Prepaid' +
+                              '</span>'
+                            : '') +
+                    '</div>' +
+                '</div>';
+            });
+            s += '</div>';
+            if (subtotalHtml) { s += '<div class="ftr__cod-section-foot">' + subtotalHtml + '</div>'; }
+            return s + '</div>';
+        }
+
+        var html =
+            codSection('Part 1 · COD Cash', 'fa-money-bill-wave', cash,
+                cash.length + ' order' + (cash.length !== 1 ? 's' : ''),
+                '<span>Cash subtotal</span><span class="ftr__cod-section-amt">' + codMoney(data.tasks_total) + '</span>') +
+            codSection('Part 2 · Prepaid Deliveries', 'fa-box-open', prepaid,
+                prepaid.length + ' order' + (prepaid.length !== 1 ? 's' : '') + ' · no cash',
+                '<span>Prepaid subtotal</span><span class="ftr__cod-section-amt">' + codMoney(0) + '</span>');
         document.getElementById('codDrawerContent').innerHTML = html;
     })
     .catch(function(err) {
@@ -1164,6 +1565,17 @@ function codMoney(v) {
     return 'QAR ' + (Number(v) || 0).toFixed(2);
 }
 
+// "25 cash + 30 prepaid (55 orders)" — or plain "3 orders" when the submission
+// has no prepaid leg, so single-leg submissions read exactly as they always did.
+function codManifestCaption(d) {
+    var total = Number(d.tasks_count) || 0;
+    var prepaid = Number(d.prepaid_count) || 0;
+    var cash = Number(d.cash_count) || 0;
+    var orders = total + ' order' + (total !== 1 ? 's' : '');
+    if (!prepaid) { return orders; }
+    return cash + ' cash + ' + prepaid + ' prepaid (' + orders + ')';
+}
+
 function printCodSubmission() {
     var d = _currentCodData;
     if (!d) {
@@ -1171,10 +1583,12 @@ function printCodSubmission() {
         return;
     }
 
-    var rowsHtml = '';
-    if (d.tasks && d.tasks.length) {
-        d.tasks.forEach(function(t, i) {
-            rowsHtml +=
+    // Same two parts as the drawer, so the printed voucher and the screen agree.
+    function codvTable(items, footLabel, footAmount) {
+        if (!items.length) { return ''; }
+        var rows = '';
+        items.forEach(function(t, i) {
+            rows +=
                 '<tr>' +
                     '<td class="codv__num">' + (i + 1) + '</td>' +
                     '<td class="codv__mono">' + codEsc(t.task_number) + '</td>' +
@@ -1183,24 +1597,46 @@ function printCodSubmission() {
                     '<td>' + codEsc(t.business) + '</td>' +
                     '<td>' + codEsc(t.location) + '</td>' +
                     '<td>' + codEsc(t.delivered_at) + '</td>' +
-                    '<td class="codv__amt">' + (Number(t.amount) || 0).toFixed(2) + '</td>' +
+                    '<td class="codv__amt">' +
+                        (t.is_prepaid ? '&mdash;' : (Number(t.amount) || 0).toFixed(2)) +
+                    '</td>' +
                 '</tr>';
         });
+        return '<table class="codv__table">' +
+                   '<thead><tr>' +
+                       '<th class="codv__num">#</th><th>Task No.</th><th>Order</th><th>Customer</th>' +
+                       '<th>Business</th><th>Area</th><th>Delivered</th><th class="codv__amt">Amount</th>' +
+                   '</tr></thead>' +
+                   '<tbody>' + rows + '</tbody>' +
+                   '<tfoot><tr>' +
+                       '<td colspan="7">' + footLabel + '</td>' +
+                       '<td class="codv__amt">' + footAmount + '</td>' +
+                   '</tr></tfoot>' +
+               '</table>';
     }
 
-    var tableHtml = rowsHtml
-        ? '<table class="codv__table">' +
-              '<thead><tr>' +
-                  '<th class="codv__num">#</th><th>Task No.</th><th>Order</th><th>Customer</th>' +
-                  '<th>Business</th><th>Area</th><th>Delivered</th><th class="codv__amt">Amount</th>' +
-              '</tr></thead>' +
-              '<tbody>' + rowsHtml + '</tbody>' +
-              '<tfoot><tr>' +
-                  '<td colspan="7">Total (' + d.tasks_count + ' order' + (d.tasks_count !== 1 ? 's' : '') + ')</td>' +
-                  '<td class="codv__amt">' + (Number(d.tasks_total) || 0).toFixed(2) + '</td>' +
-              '</tr></tfoot>' +
-          '</table>'
-        : '<div class="codv__empty">No delivery tasks linked to this submission.</div>';
+    var cash = (d.tasks || []).filter(function(t) { return !t.is_prepaid; });
+    var prepaid = (d.tasks || []).filter(function(t) { return t.is_prepaid; });
+
+    var tableHtml = '';
+    if (cash.length) {
+        tableHtml +=
+            '<div class="codv__section-title">Part 1 &middot; COD Cash Collected</div>' +
+            codvTable(cash,
+                'Cash total &middot; ' + cash.length + ' order' + (cash.length !== 1 ? 's' : ''),
+                (Number(d.tasks_total) || 0).toFixed(2));
+    }
+    if (prepaid.length) {
+        tableHtml +=
+            '<div class="codv__section-title">Part 2 &middot; Prepaid Deliveries (no cash)</div>' +
+            codvTable(prepaid,
+                'Prepaid &middot; ' + prepaid.length + ' order' + (prepaid.length !== 1 ? 's' : '') +
+                ' &mdash; carries no cash, listed for reconciliation only',
+                '0.00');
+    }
+    if (!tableHtml) {
+        tableHtml = '<div class="codv__empty">No delivery tasks linked to this submission.</div>';
+    }
 
     var printedOn = new Date().toLocaleString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -1236,11 +1672,12 @@ function printCodSubmission() {
 
             (d.notes ? '<div class="codv__notes">' + codEsc(d.notes) + '</div>' : '') +
 
-            '<div class="codv__section-title">COD Orders in this Submission</div>' +
             tableHtml +
 
+            // Signature line certifies CASH only. Prepaid rows are on the manifest
+            // for reconciliation and contribute nothing to this figure.
             '<div class="codv__total">' +
-                '<span>Total COD Collected</span>' +
+                '<span>Total COD Collected &middot; ' + codManifestCaption(d) + '</span>' +
                 '<span>' + codMoney(d.tasks_total) + '</span>' +
             '</div>' +
 
@@ -1335,7 +1772,10 @@ function confirmReceivedAndVerified() {
             // Update table row status to Settled
             var row = document.querySelector('tr[data-txn-id="' + _currentTxnId + '"]');
             if (row) {
-                var statusTd = row.querySelector('td:nth-child(9)');
+                // Class, not nth-child: the positional selectors pointed at the
+                // Action cell (9) and at nothing (10), so the drawer wrote its
+                // status badges into the wrong column.
+                var statusTd = row.querySelector('.ftr__td--status');
                 if (statusTd) {
                     statusTd.innerHTML =
                         '<div class="ftr__sub-status">' +
@@ -1353,7 +1793,7 @@ function confirmReceivedAndVerified() {
 }
 
 function updateRowStatusBadges(row, isReceived, isVerified, txnId) {
-    var statusTd = row.querySelector('td:nth-child(10)');
+    var statusTd = row.querySelector('.ftr__td--status');
     if (!statusTd) return;
     var type = row.dataset.type;
     if (type === 'cod_driver_settle' || type === 'cod_deposit') {
@@ -1430,6 +1870,70 @@ function rejectCodSubmission(txnId, txnCode) {
         }
     })
     .catch(e => alert('Error: ' + e));
+}
+
+// ── Prepaid (zero-COD) settle ─────────────────────────────────────
+// Prepaid deliveries have no transaction row, so they cannot be ticked in the
+// ledger. This closes them directly. No money moves — they are 0 QAR by
+// definition — so there is no amount to confirm, only a count.
+function prepaidChecks() {
+    return Array.prototype.slice.call(document.querySelectorAll('.ftr__prepaid-check'));
+}
+
+function updatePrepaidSelection() {
+    var checked = prepaidChecks().filter(function(c) { return c.checked; });
+    var countEl = document.getElementById('prepaidSelectedCount');
+    var btn = document.getElementById('btnMarkPrepaidSettled');
+    if (countEl) { countEl.textContent = checked.length; }
+    if (btn) { btn.disabled = checked.length === 0; }
+
+    var all = document.getElementById('prepaidSelectAll');
+    if (all) {
+        var total = prepaidChecks().length;
+        all.checked = total > 0 && checked.length === total;
+        all.indeterminate = checked.length > 0 && checked.length < total;
+    }
+}
+
+function togglePrepaidAll(cb) {
+    prepaidChecks().forEach(function(c) { c.checked = cb.checked; });
+    updatePrepaidSelection();
+}
+
+function markPrepaidSettled() {
+    var ids = prepaidChecks().filter(function(c) { return c.checked; })
+                             .map(function(c) { return c.value; });
+    if (!ids.length) { return; }
+    if (!confirm('Mark ' + ids.length + ' prepaid delivery(ies) as settled?\n\n' +
+                 'They carry no cash, so no balance changes — this only closes them.')) {
+        return;
+    }
+
+    var btn = document.getElementById('btnMarkPrepaidSettled');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+    fetch('{% url "workforce:mark_prepaid_settled" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driver_id: '{{ selected_driver.driver_id }}', task_ids: ids })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> ' + data.settled + ' settled';
+            setTimeout(function() { window.location.reload(); }, 900);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Mark Settled';
+            alert('Error: ' + (data.error || 'Failed'));
+        }
+    })
+    .catch(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Mark Settled';
+        alert('Error marking prepaid deliveries settled.');
+    });
 }
 
 function recalculateBalances() {
@@ -1549,6 +2053,73 @@ document.addEventListener('DOMContentLoaded', function() {
     var cb = document.getElementById('codCorrectCollected');
     if (cb) cb.addEventListener('change', toggleCodCorrectFields);
 });
+// -----------------------------------------------------------------------------
+
+// --- Bank reconciliation of the electronic COD leg ---------------------------
+// Cash is closed by the driver hand-in; Fawran/POS money lands in Ezzy's account
+// and is only closed by finance matching it to a statement line.
+function openReconModal(taskId, taskNumber, state, amount, reference) {
+    var modalEl = document.getElementById('reconModal');
+    if (!modalEl) return;
+    var reverting = state === 'verified';
+
+    document.getElementById('reconTaskId').value = taskId;
+    document.getElementById('reconTaskNumber').textContent = taskNumber || '-';
+    document.getElementById('reconTargetState').value = reverting ? 'false' : 'true';
+    document.getElementById('reconAmount').textContent = 'QAR ' + amount;
+    document.getElementById('reconReference').value = reference || '';
+    document.getElementById('reconSubmitLabel').textContent =
+        reverting ? 'Revert to Pending' : 'Mark Reconciled';
+    document.getElementById('reconNote').innerHTML = reverting
+        ? '<i class="fa-solid fa-triangle-exclamation me-1"></i>This puts the amount back on the outstanding list. The reference stays on the task.'
+        : '<i class="fa-solid fa-triangle-exclamation me-1"></i>Confirm only once this amount is visible on the bank or terminal statement. It records who verified it and when.';
+
+    var errorBox = document.getElementById('reconError');
+    errorBox.classList.add('d-none');
+    errorBox.textContent = '';
+
+    new bootstrap.Modal(modalEl).show();
+}
+
+function submitReconciliation() {
+    var btn = document.getElementById('reconSubmitBtn');
+    var errorBox = document.getElementById('reconError');
+    var label = document.getElementById('reconSubmitLabel').textContent;
+    var taskId = document.getElementById('reconTaskId').value;
+    var value = document.getElementById('reconTargetState').value;
+    var reference = document.getElementById('reconReference').value || '';
+
+    errorBox.classList.add('d-none');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving…';
+
+    fetch('/workforce/fleet/tasks/' + taskId + '/cod-reconcile/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: new URLSearchParams({ value: value, reference: reference }),
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+        if (res.ok && res.data.success) {
+            btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Saved';
+            setTimeout(function() { window.location.reload(); }, 500);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check me-1"></i><span id="reconSubmitLabel">' + label + '</span>';
+            errorBox.textContent = (res.data && res.data.error) || 'Failed to save reconciliation';
+            errorBox.classList.remove('d-none');
+        }
+    })
+    .catch(function(e) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i><span id="reconSubmitLabel">' + label + '</span>';
+        errorBox.textContent = 'Network error: ' + e;
+        errorBox.classList.remove('d-none');
+    });
+}
 // -----------------------------------------------------------------------------
 
 function getCookie(name) {

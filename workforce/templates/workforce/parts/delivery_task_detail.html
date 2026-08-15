@@ -2,10 +2,16 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% load custom_filters %}
+{% comment %}
+Purpose: Staff detail record for one last-mile delivery task (address, COD, driver, timeline, proof)
+Used by: workforce.views.delivery_task_detail at /workforce/delivery-task/<id>/
+Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block extra_css %}
 {# Leaflet CSS preloaded in wf_dashboard_base.html for HTMX compatibility #}
-<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=20260727c">
+<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=20260802d">
 {% endblock extra_css %}
 
 {% block content %}
@@ -36,9 +42,18 @@
                 <button type="button" class="dtd__back-btn dtd__back-btn--hero" onclick="history.back()">
                     <i class="fa-solid fa-arrow-left"></i> Back
                 </button>
+                <button type="button" class="wfnote__btn" data-wfnote-toggle
+                        aria-expanded="false" aria-controls="workforce_parts_delivery_task_detail_card_notes"
+                        title="About this page">
+                    <i class="fa-solid fa-question" aria-hidden="true"></i>
+                    <span class="visually-hidden">Show notes</span>
+                </button>
             </div>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_parts_delivery_task_detail_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_parts_delivery_task_detail_card_notes' %}" hidden></div>
 
     <div class="row">
         <!-- Left Column -->
@@ -135,9 +150,7 @@
                             {% endif %}
                             {% if task.pickup_location %}
                             {% if task.pickup_location.pickup_lat and task.pickup_location.pickup_lon %}
-                            <a href="https://www.google.com/maps?q={{ task.pickup_location.pickup_lat }},{{ task.pickup_location.pickup_lon }}" target="_blank" class="dtd__addr__map-btn mt-1" hx-boost="false">
-                                <i class="fa-solid fa-location-pin"></i> Pin
-                            </a>
+                            {% include "includes/components/_map_point.html" with uid=task.id|stringformat:"s"|add:"-pick" lat=task.pickup_location.pickup_lat lon=task.pickup_location.pickup_lon label="Pickup location" btn_label="Pin" size="sm" %}
                             {% elif task.pickup_location.locality %}
                             <a href="https://maps.google.com/?q={{ task.pickup_location.locality|urlencode }}" target="_blank" class="dtd__addr__map-btn mt-1" hx-boost="false">
                                 <i class="fa-solid fa-location-pin"></i> Pin
@@ -160,12 +173,8 @@
                                 </div>
                                 <div class="d-flex flex-column gap-1 flex-shrink-0">
                                     {% include "includes/components/_ai_parse_button.html" with address=task.order.customer_address|default:"" zone=task.order.dl_zone street=task.order.dl_street building=task.order.dl_building lat=task.order.latitude|default:task.dl_address_update.dl_latitude lng=task.order.longitude|default:task.dl_address_update.dl_longitude order_id=task.order.id order_number=task.order.order_number show_map="true" title="Dropoff Location" btn_label="AI Parse" %}
-                                    {% if task.order.latitude or task.dl_address_update.dl_latitude %}
-                                    <a href="https://www.google.com/maps?q={% if task.order.latitude %}{{ task.order.latitude }},{{ task.order.longitude }}{% else %}{{ task.dl_address_update.dl_latitude }},{{ task.dl_address_update.dl_longitude }}{% endif %}"
-                                       target="_blank" class="dtd__addr__map-btn" title="Open in Google Maps">
-                                        <i class="fa-solid fa-map-location-dot"></i> Map
-                                    </a>
-                                    {% endif %}
+                                    {% include "includes/components/_map_point.html" with uid=task.id|stringformat:"s"|add:"-drop" lat=task.order.latitude|default:task.dl_address_update.dl_latitude lon=task.order.longitude|default:task.dl_address_update.dl_longitude label="Delivery location" btn_label="Map" size="sm" %}
+                                    {% include "includes/components/_route_distance.html" with order=task.order label="from pickup" %}
                                 </div>
                             </div>
 
@@ -387,6 +396,10 @@
             </div>
             {% endif %}
 
+            <!-- First-Mile Pickup leg (only for orders with a pickup task) — sits
+                 above the delivery leg because collection happens first. -->
+            {% include "workforce/parts/_pickup_leg_card.html" with pickup=pickup_task pickup_gps_pings=pickup_gps_pings %}
+
             <!-- Driver App Updates -->
             <div class="dtd__card">
                 <div class="dtd__card__head">
@@ -514,9 +527,6 @@
                 </div>
             </div>
 
-            <!-- First-Mile Pickup leg (only for orders with a pickup task) -->
-            {% include "workforce/parts/_pickup_leg_card.html" with pickup=pickup_task pickup_gps_pings=pickup_gps_pings %}
-
             <!-- Status Timeline (reusable include) -->
             {% with order=task.order delivery_task=task timeline_count=status_history.count %}
             {% include "workforce/parts/status_timeline.html" %}
@@ -580,78 +590,59 @@
                 </div>
             </div>
 
-            <!-- WhatsApp Messaging -->
-            <div class="dtd__card dtd__whatsapp">
+            <!-- WhatsApp — routing sits in the head, the conversation in the body -->
+            <div class="dtd__card dtd__whatsapp"
+                 data-wa-to="{{ wa_default_to }}"
+                 data-wa-instance="{{ wa_default_instance }}">
                 <div class="dtd__card__head">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="fa-brands fa-whatsapp dtd__whatsapp__icon"></i>
-                            <span class="dtd__whatsapp__title">WhatsApp</span>
-                        </div>
+                    <div class="dtd__card__head-left">
+                        <i class="fa-brands fa-whatsapp dtd__whatsapp__icon"></i>
+                        <span class="dtd__whatsapp__title">WhatsApp</span>
+                    </div>
+                    <div class="dtd__whatsapp__route">
+                        {% if wa_sender_number %}
+                        <span class="dtd__whatsapp__route-from"
+                              title="Replies leave from this number. Set on Auto Triggers → Orders &amp; Delivery Tasks.">{{ wa_sender_number }}</span>
+                        {% else %}
+                        <span class="dtd__whatsapp__route-from dtd__whatsapp__route-from--unset"
+                              title="No sender routed for Orders &amp; Delivery Tasks. Set one on Auto Triggers.">No sender set</span>
+                        {% endif %}
+                        <i class="fa-solid fa-arrow-right-long dtd__whatsapp__route-arrow" aria-hidden="true"></i>
+                        {% if wa_default_to %}
+                        <a class="dtd__whatsapp__route-to" target="_blank" rel="noopener"
+                           href="https://wa.me/{{ wa_default_to }}"
+                           title="Open this chat in WhatsApp">
+                            <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>{{ task.order.customer_whatsapp|default:task.order.customer_phone }}
+                        </a>
+                        {% else %}
+                        <span class="dtd__whatsapp__route-from dtd__whatsapp__route-from--unset">No customer number</span>
+                        {% endif %}
                     </div>
                 </div>
 
-                <!-- Row 1: From + To (Compact) -->
                 <div class="dtd__whatsapp__body">
-                    <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;">
-                        <label class="dtd__whatsapp__compact-label" style="margin-bottom: 0; white-space: nowrap;">From</label>
-                        <div class="dtd__whatsapp__compact-value" id="whatsappInstanceDisplay" style="flex: 1;">6003432</div>
-                        <button type="button" class="dtd__whatsapp__edit-btn" onclick="toggleInstanceEdit()">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                        <button type="button" class="dtd__whatsapp__pin-btn" id="whatsappPinBtn" onclick="submitInstanceSelection()" title="Submit instance selection">
-                            <i class="fa-solid fa-location-pin"></i>
-                        </button>
-                        <select id="whatsappInstanceSelect" class="dtd__whatsapp__compact-select" style="display:none;">
-                            <option value="">Select Instance</option>
-                            <option value="EzzyWhatspp">66451589</option>
-                            <option value="Ezzy-COS-60003432" selected>6003432</option>
-                        </select>
-                    </div>
-                    <div class="dtd__whatsapp__compact-row" style="margin-top: 0.5rem;">
-                        <div class="dtd__whatsapp__compact-col">
-                            <label class="dtd__whatsapp__compact-label">To</label>
-                            <div class="dtd__whatsapp__compact-value d-flex align-items-center gap-2">
-                                {% if task.order.customer_whatsapp %}
-                                <a href="https://wa.me/{{ task.order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ task.order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ task.order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ task.order.order_number|urlencode }}%26key={{ task.order|verify_key }}" target="_blank" class="text-decoration-none text-success">
-                                    <i class="fa-brands fa-whatsapp me-1"></i>{{ task.order.customer_whatsapp }}
-                                </a>
-                                <button type="button"
-                                        class="odp__btn-wa-send"
-                                        title="Send WhatsApp via Evolution API"
-                                        onclick="EzzyOrderDetail.openWhatsAppModal()">
-                                    <i class="fa-solid fa-paper-plane"></i>
-                                </button>
-                                {% else %}
-                                {{ task.order.customer_phone }}
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Row 2: Last Message -->
-                    <div class="dtd__whatsapp__row dtd__whatsapp__row--message">
-                        <div class="dtd__whatsapp__msg-header">
-                            <label class="dtd__whatsapp__label">Last Message</label>
-                            <button type="button" class="dtd__whatsapp__refresh-btn" onclick="loadLastWhatsAppMessage('{{ task.order.customer_phone|escapejs }}')" title="Refresh">
-                                <i class="fa-solid fa-arrows-rotate"></i>
+                    <div>
+                        <div class="dtd__whatsapp__thread-head">
+                            <span class="dtd__whatsapp__label">Last message</span>
+                            <button type="button" class="dtd__whatsapp__refresh-btn"
+                                    data-wa-refresh title="Check for new messages">
+                                <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                                <span class="visually-hidden">Check for new messages</span>
                             </button>
                         </div>
-                        <div id="lastMessageContainer" class="dtd__whatsapp__message-display">
-                            <div id="lastMessageLoading" class="dtd__whatsapp__message-loading">Loading...</div>
-                            <div id="lastMessageContent" style="display:none;">
-                                <div class="dtd__whatsapp__message-text" id="lastMessageText"></div>
-                                <div class="dtd__whatsapp__message-meta" id="lastMessageMeta"></div>
-                            </div>
-                            <div id="lastMessageError" style="display:none;" class="dtd__whatsapp__message-error"></div>
+                        <div id="whatsappThread" class="dtd__whatsapp__thread" aria-live="polite">
+                            <span class="dtd__whatsapp__state">Checking for messages…</span>
                         </div>
                     </div>
 
-                    <!-- Row 3: Message Input + Send -->
-                    <div class="dtd__whatsapp__row dtd__whatsapp__row--input">
-                        <input type="text" id="whatsappMessageInput" class="dtd__whatsapp__input" placeholder="Type a message...">
-                        <button type="button" id="whatsappSendBtn" class="dtd__whatsapp__send-btn" onclick="sendWhatsAppMessage('{{ task.order.customer_phone|escapejs }}')">
-                            <i class="fa-solid fa-paper-plane"></i>
+                    <div class="dtd__whatsapp__reply">
+                        <label class="visually-hidden" for="whatsappMessageInput">Reply to the customer</label>
+                        <input type="text" id="whatsappMessageInput" class="dtd__whatsapp__input"
+                               placeholder="Reply to the customer" autocomplete="off"
+                               {% if not wa_default_to %}disabled{% endif %}>
+                        <button type="button" id="whatsappSendBtn" class="dtd__whatsapp__send"
+                                data-wa-send {% if not wa_default_to %}disabled{% endif %}>
+                            <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>Send
                         </button>
                     </div>
                 </div>
@@ -699,10 +690,9 @@
                         </div>
                         {% endif %}
                     </div>
-                    <a href="https://www.google.com/maps?q={{ task.completion_latitude }},{{ task.completion_longitude }}"
-                       target="_blank" class="dtd__addr__map-btn">
-                        <i class="fa-solid fa-map-location-dot"></i> View on Google Maps
-                    </a>
+                    {% comment %} Completion point against the customer's pin — the same comparison the
+                       Location Review queue is built on, shown here on the task itself. {% endcomment %}
+                    {% include "includes/components/_map_point.html" with uid=task.id|stringformat:"s"|add:"-done" lat=task.completion_latitude lon=task.completion_longitude lat2=task.order.latitude lon2=task.order.longitude label="Driver completed here" label2="Customer's saved location" colour="#2f6f4f" colour2="#b4532a" btn_label="Compare with customer pin" %}
                     {% else %}
                     <div class="dtd__empty">
                         <i class="fa-solid fa-location-crosshairs d-block mb-1"></i>
@@ -1153,63 +1143,117 @@
         });
     })();
 
-    function toggleInstanceEdit() {
-        const display = document.getElementById('whatsappInstanceDisplay');
-        const select = document.getElementById('whatsappInstanceSelect');
-        const isEditing = select.style.display !== 'none';
+    /* ── WhatsApp card ──────────────────────────────────────────────
+       The sender is decided by the Orders & Delivery Tasks routing rule
+       (Auto Triggers), so this card only reads it. Both endpoints below
+       already existed; the client half was never written, which is why
+       the thread sat on "Loading..." and Send threw ReferenceError. */
+    (function () {
+        const card = document.querySelector('.dtd__whatsapp');
+        if (!card) return;
 
-        if (isEditing) {
-            const selectedOption = select.options[select.selectedIndex];
-            display.textContent = selectedOption.text;
-            select.style.display = 'none';
-            display.parentElement.style.display = 'flex';
-        } else {
-            select.style.display = 'block';
-            display.parentElement.style.display = 'none';
-        }
-    }
+        const thread = document.getElementById('whatsappThread');
+        const input = document.getElementById('whatsappMessageInput');
+        const sendBtn = card.querySelector('[data-wa-send]');
+        const refreshBtn = card.querySelector('[data-wa-refresh]');
+        const to = card.dataset.waTo || '';
+        const instance = card.dataset.waInstance || '';
 
-    function submitInstanceSelection() {
-        const select = document.getElementById('whatsappInstanceSelect');
-        const pinBtn = document.getElementById('whatsappPinBtn');
-        const selectedValue = select.value;
-
-        if (!selectedValue) {
-            alert('Please select an instance first');
-            return;
+        function esc(v) {
+            const d = document.createElement('div');
+            d.textContent = v == null ? '' : String(v);
+            return d.innerHTML;
         }
 
-        pinBtn.disabled = true;
-        pinBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        function state(text, isError) {
+            thread.innerHTML = '<span class="dtd__whatsapp__state' +
+                (isError ? ' dtd__whatsapp__state--error' : '') + '">' + esc(text) +
+                (isError ? ' <button type="button" class="dtd__whatsapp__state-retry" data-wa-retry>Try again</button>' : '') +
+                '</span>';
+        }
 
-        fetch(`/workforce/delivery-task/{{ task.id }}/update-whatsapp-instance/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-            body: JSON.stringify({ instance: selectedValue })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                pinBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i>';
-                pinBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                setTimeout(() => {
-                    pinBtn.innerHTML = '<i class="fa-solid fa-location-pin"></i>';
-                    pinBtn.style.background = '';
-                    pinBtn.disabled = false;
-                }, 2000);
-            } else {
-                pinBtn.disabled = false;
-                pinBtn.innerHTML = '<i class="fa-solid fa-location-pin"></i>';
-                alert('Error: ' + (data.error || 'Failed to update instance'));
+        function renderMessage(data) {
+            if (!data.message || data.sender === 'N/A') {
+                state('No messages yet. Send the first one below.');
+                return;
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            pinBtn.disabled = false;
-            pinBtn.innerHTML = '<i class="fa-solid fa-location-pin"></i>';
-            alert('Request failed: ' + error);
+            const out = !!data.from_me;
+            const who = out ? 'Ezzy' : 'Customer';
+            const when = data.timestamp ? ' · ' + esc(data.timestamp) : '';
+            thread.innerHTML =
+                '<div class="dtd__whatsapp__slip' + (out ? ' dtd__whatsapp__slip--out' : '') + '">' +
+                    // dir="auto" so an Arabic message reads right-to-left and an
+                    // English one left-to-right, in the same bubble component.
+                    '<div class="dtd__whatsapp__slip-text" dir="auto">' + esc(data.full_message || data.message) + '</div>' +
+                    '<div class="dtd__whatsapp__slip-meta">' + who + when + '</div>' +
+                '</div>';
+
+            // Offer the rest only when there is a rest to offer.
+            const slip = thread.querySelector('.dtd__whatsapp__slip');
+            const textEl = thread.querySelector('.dtd__whatsapp__slip-text');
+            if (textEl.scrollHeight > textEl.clientHeight + 2) {
+                const more = document.createElement('button');
+                more.type = 'button';
+                more.className = 'dtd__whatsapp__slip-more';
+                more.textContent = 'Show full message';
+                more.addEventListener('click', function () {
+                    const open = slip.classList.toggle('dtd__whatsapp__slip--open');
+                    more.textContent = open ? 'Show less' : 'Show full message';
+                });
+                slip.insertBefore(more, slip.querySelector('.dtd__whatsapp__slip-meta'));
+            }
+        }
+
+        function loadLast() {
+            if (!to) { state('No customer number on this order.'); return; }
+            state('Checking for messages…');
+            fetch('{% url "workforce:whatsapp_last_message" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ phone_number: to, instance_name: instance })
+            })
+            .then(r => r.json())
+            .then(d => { if (d.success) { renderMessage(d); } else { state(d.error || 'Could not reach WhatsApp.', true); } })
+            .catch(() => state('Could not reach WhatsApp.', true));
+        }
+
+        function send() {
+            const text = (input.value || '').trim();
+            if (!text) { input.focus(); return; }
+            if (!instance) { state('No sender is routed for delivery tasks. Set one on Auto Triggers.', true); return; }
+            const label = sendBtn.innerHTML;
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>Sending';
+            fetch('{% url "workforce:whatsapp_send_message" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ phone_number: to, message: text, instance_name: instance })
+            })
+            .then(r => r.json())
+            .then(d => {
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = label;
+                if (d.success) { input.value = ''; loadLast(); }
+                else { state(d.error || 'The message did not send.', true); }
+            })
+            .catch(() => {
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = label;
+                state('The message did not send. Check the connection and retry.', true);
+            });
+        }
+
+        if (sendBtn) sendBtn.addEventListener('click', send);
+        if (refreshBtn) refreshBtn.addEventListener('click', loadLast);
+        if (input) input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); send(); }
         });
-    }
+        thread.addEventListener('click', function (e) {
+            if (e.target.closest('[data-wa-retry]')) loadLast();
+        });
+
+        loadLast();
+    })();
 
     function publishToFleets(taskId) {
         if (confirm('Publish this task to Fleet drivers?')) {

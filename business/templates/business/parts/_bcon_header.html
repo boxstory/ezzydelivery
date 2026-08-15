@@ -1,0 +1,28 @@
+{# Purpose: The single page-header markup for every client-dashboard page — navy command band with eyebrow, title, subtitle, optional live readout and actions slot. #}
+{# Used by: the {% bconheader %} block tag (business/templatetags/business_console.py); never included directly. #}
+{# Notes: bcon__ namespace, styled in business/css/business-console.css which the dashboard base loads globally. Action markup comes from the calling page and is restyled for the navy field by `.bcon__command .bcon__btn--*`, so pages keep using the same button classes. #}
+<header class="bcon__command"{% if header_id %} id="{{ header_id }}"{% endif %}>
+  <div class="bcon__command-main">
+    {% if eyebrow or live %}
+    <div class="bcon__eyebrow">
+      {% if eyebrow %}<span>{{ eyebrow }}</span>{% endif %}
+      {% if eyebrow and live %}<span class="bcon__eyebrow-sep"></span>{% endif %}
+      {% if live %}<span class="bcon__eyebrow-live">{{ live }}</span>{% endif %}
+    </div>
+    {% endif %}
+    <h1 class="bcon__command-title">{% if icon %}<i class="{{ icon }}"></i>{% endif %}{{ title }}</h1>
+    {% if subtitle %}<p class="bcon__command-sub"{% if subtitle_id %} id="{{ subtitle_id }}"{% endif %}>{{ subtitle }}</p>{% endif %}
+  </div>
+  {# A readout of 0 is a real reading, so test against "unset", not falsiness. #}
+  {% if readout_value != "" or actions %}
+  <div class="bcon__command-right">
+    {% if readout_value != "" %}
+    <div class="bcon__command-readout">
+      {% if readout_label %}<p class="bcon__command-readout-label">{{ readout_label }}</p>{% endif %}
+      <p class="bcon__command-readout-value"{% if readout_id %} id="{{ readout_id }}"{% endif %}>{{ readout_value }}{% if readout_note %}<small>&nbsp;{{ readout_note }}</small>{% endif %}</p>
+    </div>
+    {% endif %}
+    {% if actions %}<div class="bcon__actions">{{ actions|safe }}</div>{% endif %}
+  </div>
+  {% endif %}
+</header>

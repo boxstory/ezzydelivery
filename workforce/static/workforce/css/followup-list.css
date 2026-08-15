@@ -96,6 +96,88 @@
   background: rgba(255, 255, 255, 0.14);
 }
 
+/* Right-hand cluster: backlog shape, driver filter and the notes button read as one group */
+.wfl__hero__aside {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  /* Takes the room the title leaves rather than sizing to its own content —
+     otherwise the cluster shrink-wraps and breaks the picker onto a second line. */
+  flex: 1 1 auto;
+  margin-left: auto;
+}
+
+/* Driver picker on the navy surface — brand kit dark-surface field treatment */
+.wfl .wfl__hero__select {
+  width: auto;
+  max-width: 11rem;
+  padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.08);
+  /* Longhands only — a background shorthand would wipe the arrow tile */
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 12px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+}
+.wfl .wfl__hero__select:hover { background-color: rgba(255, 255, 255, 0.14); }
+.wfl .wfl__hero__select:focus {
+  border-color: var(--brand-primary, #f7c000);
+  background-color: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+  color: #fff;
+}
+.wfl .wfl__hero__select option { color: #1a1a2e; background: #fff; }
+
+/* The staff dashboard turns every filter select into a Select2, which hides the
+   native control and inserts a sibling container — so the rules above only apply
+   if Select2 fails to load. The picker the user actually sees is this container,
+   sized to the hero's own metrics (1.75rem, matching the notes button) and given
+   the same dark-surface treatment. Select2 writes width inline, hence !important. */
+.wfl__hero__aside > .select2-container.ez-filter-select {
+  width: auto !important;
+  flex: 0 1 11rem;
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--single {
+  height: 1.75rem;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.wfl__hero__aside .select2-container.ez-filter-select:hover .select2-selection--single {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--single .select2-selection__rendered {
+  height: 1.625rem;
+  line-height: 1.625rem;
+  padding-left: 0.5rem;
+  padding-right: 1.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--single .select2-selection__arrow {
+  height: 1.625rem;
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection__arrow b {
+  border-top-color: rgba(255, 255, 255, 0.7);
+}
+.wfl__hero__aside .select2-container--open .select2-selection--single,
+.wfl__hero__aside .select2-container--focus .select2-selection--single {
+  border-color: var(--brand-primary, #f7c000);
+  background-color: rgba(255, 255, 255, 0.14);
+}
+.wfl__hero__aside .select2-container--open .select2-selection__arrow b {
+  border-bottom-color: rgba(255, 255, 255, 0.7);
+}
+
 /* ── Filter chips — restrained ink/navy, replaces the white-on-yellow candy pill ── */
 .wfl .followup-filter-pill {
   border: 1px solid var(--brand-grey-300, #dcdcdc);
@@ -207,7 +289,11 @@
 
 @media (max-width: 575.98px) {
   .wfl__hero { align-items: flex-start; }
+  .wfl__hero__aside { margin-left: 0; width: 100%; gap: 0.5rem; }
+  .wfl__hero__aside > .wfl__hero__div { display: none; }
   .wfl__hero__shape { gap: 0.75rem; }
   .wfl__tier { min-width: 2.75rem; }
   .wfl__tier__num { font-size: 1.15rem; }
+  .wfl .wfl__hero__select { flex: 1 1 auto; max-width: none; }
+  .wfl__hero__aside > .select2-container.ez-filter-select { flex: 1 1 auto; }
 }

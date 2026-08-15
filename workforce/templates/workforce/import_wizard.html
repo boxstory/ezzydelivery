@@ -1,5 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Shared 3-step import wizard (map columns → verify/edit → confirm) for one import batch
+Used by: workforce_views.import_wizard at /workforce/import-wizard/<import_log_id>/
+Notes: Step 1 is skipped when a saved mapping already exists; source can be CSV, OneDrive,
+       temp orders, Shopify, WooCommerce or Google Sheet.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Import Wizard — {{ business.business_name }}{% endblock %}
 
@@ -23,8 +31,17 @@
             <button type="button" class="btn btn-outline-light btn-sm" onclick="window.history.back()">
                 <i class="fa-solid fa-arrow-left me-1"></i>Back
             </button>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_import_wizard_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_import_wizard_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_import_wizard_card_notes' %}" hidden></div>
 
     <div class="p-3">
         {% csrf_token %}
@@ -449,18 +466,21 @@ function iwizBuildMapping() {
 
         const row = document.createElement('div');
         row.className = 'd-flex gap-2 align-items-center py-2 border-bottom';
+        // srcCol and sample are merchant-supplied spreadsheet content (column
+        // header and cell value) rendered into ops staff's DOM — escape both,
+        // including inside the data-col attribute.
         row.innerHTML = `
             <div style="flex:1;" class="small">
-                <span class="fw-semibold text-primary">${srcCol}</span>
+                <span class="fw-semibold text-primary">${escHtml(srcCol)}</span>
             </div>
             <div style="width:30px;text-align:center;"><i class="fa-solid fa-arrow-right text-muted"></i></div>
             <div style="flex:1;" class="small">
                 <span class="badge ${isRequired ? 'bg-danger' : 'bg-secondary'} me-1">${isRequired ? '★' : '·'}</span>
-                <span class="fw-semibold">${fieldLabel}</span>
-                <span class="text-muted ms-1" style="font-size:0.7rem;">(${dbField})</span>
-                <input type="hidden" class="iwiz-map-select" data-col="${srcCol}" value="${dbField}">
+                <span class="fw-semibold">${escHtml(fieldLabel)}</span>
+                <span class="text-muted ms-1" style="font-size:0.7rem;">(${escHtml(dbField)})</span>
+                <input type="hidden" class="iwiz-map-select" data-col="${escHtml(srcCol)}" value="${escHtml(dbField)}">
             </div>
-            <div style="flex:1;" class="small text-muted fst-italic">${sample}</div>
+            <div style="flex:1;" class="small text-muted fst-italic">${escHtml(sample)}</div>
         `;
         container.appendChild(row);
     });
@@ -674,7 +694,7 @@ function iwizBuildVerifyTable(data) {
                 const sm = statusMap[lv];
                 td.innerHTML = sm
                     ? `<span class="badge bg-${sm[0]}" style="font-size:0.7rem;">${sm[1]}</span>`
-                    : `<span class="text-muted small">${display}</span>`;
+                    : `<span class="text-muted small">${escHtml(display)}</span>`;
             } else if (f.name === 'client_order_code' || f.name === 'cod_amount') {
                 td.className = 'fw-semibold';
                 td.textContent = display;

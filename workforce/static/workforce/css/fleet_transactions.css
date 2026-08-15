@@ -436,9 +436,9 @@
     margin-bottom: 0.375rem;
 }
 
-.ftr__filter-label i {
-    color: var(--brand-primary, #f7c000);
-}
+/* Filter label icons were removed from the markup — a calendar beside
+   "DATE RANGE" said nothing the label did not, and ten yellow glyphs in one
+   panel spent the whole page's accent budget. Rule kept out. */
 
 select.ftr__filter-select,
 input.ftr__filter-input {
@@ -552,6 +552,33 @@ input.ftr__filter-input:focus {
     margin-left: auto;
     font-size: 0.75rem;
     color: var(--brand-grey-400, #b0b0b0);
+}
+/* A backlog waiting on staff — darker than the plain count so it reads as work,
+   not decoration. Ink weight only, no chip. */
+.ftr__toolbar-count--warn {
+    margin-left: 0;
+    font-weight: 700;
+    color: var(--brand-grey-700, #333);
+}
+
+/* ── Prepaid settle bar ───────────────────────────────────────────
+   Always visible while a backlog exists (unlike .ftr__bulk, which is a
+   selection overlay), and light rather than navy so the explanatory line
+   beside the button stays readable. */
+.ftr__bulk--prepaid {
+    display: flex;
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    animation: none;
+}
+.ftr__bulk--prepaid .ftr__bulk-count {
+    color: var(--brand-grey-700, #333);
+}
+
+/* Checkbox gutter — just wide enough for the control. */
+.ftr__th-check {
+    width: 2.25rem;
+    text-align: center;
 }
 
 /* ================================================
@@ -797,8 +824,8 @@ input.ftr__filter-input:focus {
 
 /* From / To Location cell — two stacked lines in one column */
 .ftr__loc-cell {
-    min-width: 200px;
-    max-width: 320px;
+    min-width: 250px;
+    max-width: 340px;
 }
 .ftr__loc-line {
     display: block;
@@ -807,18 +834,66 @@ input.ftr__filter-input:focus {
     white-space: normal;
     word-break: break-word;
 }
+/* Pickup name stays on one line — wrapping "WH: EzzyDelivery FC- Sudan" over two
+   rows made the cell taller than the data in it warranted. */
+.ftr__loc-line--from {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .ftr__loc-line i {
     width: 1rem;
     text-align: center;
     margin-right: 0.25rem;
 }
+/* Navy, not --brand-primary: that token is Ezzy Yellow (#f7c000), which on a
+   white table cell was near-unreadable for a label. */
 .ftr__loc-line--from {
-    color: var(--brand-primary, #1F2A44);
+    color: var(--brand-navy, #001f3f);
     font-weight: 600;
 }
 .ftr__loc-line--to {
     color: var(--brand-grey-600, #555);
     margin-top: 0.15rem;
+}
+/* Destination detail under the zone: street/building, and the raw address text
+   the order arrived with. Quieter than the zone so the official value leads. */
+.ftr__loc-sub {
+    padding-left: 1.25rem;
+    font-size: 0.72rem;
+    color: var(--brand-grey-500, #777);
+}
+.ftr__loc-sub--typed {
+    font-style: italic;
+}
+.ftr__loc-missing {
+    color: var(--brand-grey-500, #777);
+    font-style: italic;
+}
+
+/* Pickup→drop distance. Tabular figures so the column reads as a column. */
+.ftr__th--dist,
+.ftr__dist-cell {
+    text-align: right;
+    white-space: nowrap;
+}
+.ftr__dist {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--brand-navy, #001f3f);
+}
+.ftr__dist small {
+    font-weight: 400;
+    color: var(--brand-grey-500, #777);
+}
+/* Estimated from a zone centre rather than a real coordinate. */
+.ftr__dist--approx {
+    font-weight: 500;
+    color: var(--brand-grey-600, #555);
+}
+.ftr__dist--none {
+    font-weight: 400;
+    color: var(--brand-grey-500, #777);
 }
 
 /* Transaction Type Badges */
@@ -932,6 +1007,25 @@ input.ftr__filter-input:focus {
 
 .ftr__ref-link:hover {
     color: var(--brand-primary, #f7c000);
+}
+
+/* Deposit reference on a settled prepaid row. It is a <button> because it opens
+   the drawer rather than navigating — strip the chrome so it reads as the link
+   it behaves like, and drop it to a second line under the badge. */
+.ftr__prepaid-dep {
+    display: block;
+    margin-top: 0.2rem;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font-family: var(--brand-font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace);
+    font-size: 0.68rem;
+    text-align: left;
+}
+.ftr__prepaid-dep i {
+    margin-right: 0.15rem;
+    color: var(--brand-grey-400, #b0b0b0);
 }
 
 /* Reference shown as 2nd line under Description (merged column) */
@@ -1424,6 +1518,63 @@ input.ftr__filter-input:focus {
     background: #fef3c7;
     color: #92400e;
 }
+/* ── Submission report parts ──────────────────────────────────────
+   Cash and prepaid are two different checks, so they get two boxes with
+   their own subtotal rather than one mixed list. */
+.ftr__cod-section + .ftr__cod-section { margin-top: 0.75rem; }
+
+.ftr__cod-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+.ftr__cod-section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-navy, #001f3f);
+}
+.ftr__cod-section-title i {
+    color: var(--brand-primary, #f7c000);
+    margin-right: 0.25rem;
+}
+.ftr__cod-section-sub {
+    font-size: 0.65rem;
+    color: var(--brand-grey-500, #6c757d);
+    white-space: nowrap;
+}
+.ftr__cod-section-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.375rem 0.5rem;
+    border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--brand-grey-600, #555);
+}
+.ftr__cod-section-amt {
+    font-weight: 700;
+    color: var(--brand-navy, #001f3f);
+}
+
+/* Prepaid = nothing to collect, not a status win. Neutral ink + hairline so it
+   reads as an absence of cash rather than competing with the settled badge. */
+.ftr__cod-badge--prepaid {
+    background: transparent;
+    color: var(--brand-grey-600, #6b7280);
+    border: 1px solid var(--brand-grey-300, #d1d5db);
+}
+/* Same rule for its amount cell: no green, because no money moved. */
+.ftr__cod-item-amount--prepaid {
+    font-weight: 500;
+    font-style: italic;
+    color: var(--brand-grey-500, #9ca3af);
+}
 
 .ftr__drawer-footer {
     display: flex;
@@ -1478,6 +1629,101 @@ input.ftr__filter-input:focus {
     background: #f8fafc;
     color: #64748b;
     border: 1px solid #e2e8f0;
+}
+
+/* Bank reconciliation cell — swatch + text, not another loud pill. The Status
+   column already carries badges; this second state has to read as a quieter
+   annotation beside them. */
+.ftr__recon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+
+.ftr__recon::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+
+.ftr__recon--verified { color: var(--brand-success, #15803d); }
+.ftr__recon--pending  { color: #92400e; }
+
+.ftr__recon--na {
+    color: var(--brand-grey-400, #b0b0b0);
+    font-weight: 400;
+}
+
+.ftr__recon--na::before { display: none; }
+
+.ftr__recon-legs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.65rem;
+    color: var(--brand-grey-600, #555);
+}
+
+.ftr__recon-meta {
+    font-size: 0.6rem;
+    line-height: 1.3;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+.ftr__recon-ref {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--brand-grey-700, #333);
+    overflow-wrap: anywhere;
+}
+
+.ftr__recon-btn {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    cursor: pointer;
+}
+
+.ftr__recon-btn:hover {
+    background: var(--brand-secondary, #fff7d6);
+}
+
+/* Outstanding-electronic flag in the toolbar — one line, links into the
+   "Not reconciled" filter so the figure is always clickable to its rows. */
+.ftr__toolbar-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #92400e;
+    background: var(--brand-warning-bg, #fef3c7);
+    border: 1px solid #fde68a;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    text-decoration: none;
+}
+
+.ftr__toolbar-flag:hover {
+    color: #92400e;
+    border-color: var(--brand-warning, #d97706);
+}
+
+.ftr__toolbar-flag-count {
+    padding: 0 0.375rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: #fff;
+    border-radius: 999px;
 }
 
 /* ================================================
@@ -1654,14 +1900,22 @@ input.ftr__filter-input:focus {
     .modal-backdrop,
     .pg-hdr,
     .pg-filter,
-    footer,
-    .footer {
+    /* Only the site chrome footer — a bare `footer` here also hid page-level
+       <footer> blocks (e.g. the payout invoice signature strip), because
+       wf_dashboard_base loads this file on every workforce page. */
+    #sticky-footer,
+    .site-footer {
         display: none !important;
     }
 
-    /* Strip surrounding layout */
+    /* Strip surrounding layout.
+       Bootstrap columns only: a bare [class*="col-"] also matches any BEM class
+       containing "col-" (e.g. the invoice ledger's `bpi__col-idx`) and, being
+       !important, blew those table cells out of the table with display:block.
+       Same footgun as the `footer` selector above — this file prints on every
+       workforce page, so every selector here has to be anchored. */
     html, body, main, #main-content, .container, .container-fluid,
-    .row, .col, [class*="col-"], .d-flex {
+    .row, .col, [class^="col-"], [class*=" col-"], .d-flex {
         display: block !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -1813,13 +2067,6 @@ input.ftr__filter-input:focus {
     margin-top: 4px;
     font-weight: 700;
     color: var(--brand-grey-800, #1f1f1f);
-}
-
-/* Qualifier on the cash figure — the only balance a driver actually holds */
-.ftr__split-note {
-    font-size: 0.65rem;
-    font-weight: 400;
-    color: var(--brand-grey-500, #6c757d);
 }
 
 /* Single payment-method note under an amount */
@@ -1981,26 +2228,64 @@ input.ftr__filter-input:focus {
    squeeze inside the horizontally-scrolling wrap. */
 .ftr__table {
     table-layout: fixed;
-    min-width: 1080px;
+    min-width: 1180px;
 }
 
 .ftr__th--code   { width: 9.5rem; }
-.ftr__th--date   { width: 8.5rem; }
-.ftr__th--type   { width: 8rem; }
 .ftr__th--desc   { width: auto; min-width: 16rem; }
-.ftr__th--amount { width: 8.5rem; }
-.ftr__th--after  { width: 8rem; }
-.ftr__th--status { width: 9rem; }
 .ftr__th--action { width: 10.5rem; }
+
+/* Code column carries the type under the code — one column, two lines. */
+.ftr__th-sub {
+    margin-top: 0.1875rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: var(--brand-grey-400, #b0b0b0);
+}
+
+.ftr__table td.ftr__td--code {
+    white-space: normal;
+}
+
+.ftr__td--code .ftr__code {
+    display: inline-block;
+    margin-bottom: 0.1875rem;
+}
+
+.ftr__td--code .ftr__txn-type {
+    display: block;
+    width: fit-content;
+}
+
+/* The five data columns hold a fixed 100px each. At that width the default
+   0.75rem cell gutter eats a quarter of the room, so these columns pad to the
+   0.375rem baseline instead. */
+.ftr__th--date,
+.ftr__th--amount,
+.ftr__th--after,
+.ftr__th--status,
+.ftr__th--recon { width: 100px; }
+
+.ftr__table th.ftr__th--date,
+.ftr__table th.ftr__th--amount,
+.ftr__table th.ftr__th--after,
+.ftr__table th.ftr__th--status,
+.ftr__table th.ftr__th--recon,
+.ftr__table td.ftr__td--date,
+.ftr__table td.ftr__td-amount,
+.ftr__table td.ftr__td--status,
+.ftr__table td.ftr__td--recon { padding-left: 0.375rem; padding-right: 0.375rem; }
 
 /* With fixed layout, let long descriptions wrap instead of clipping */
 .ftr__table td {
     overflow-wrap: break-word;
 }
 
-/* Date cell: let "08 Jul 2026," and the time wrap onto tidy lines */
-.ftr__table td:nth-child(3) {
-    white-space: normal;
+/* Date cell: one line, never a stray "PM" on a line of its own. */
+.ftr__table td.ftr__td--date {
+    white-space: nowrap;
+    font-size: 0.7rem;
+    color: var(--brand-grey-600, #555);
 }
 
 /* Payment-method icon colors (ops scan cue): cash green, card blue,
@@ -2020,3 +2305,276 @@ input.ftr__filter-input:focus {
 .ftr__split .fa-building-columns,
 .ftr__pm-note .fa-building-columns,
 .ftr__bd-row .fa-building-columns { color: #8b5cf6; }
+
+
+/* ================================================
+   FILTER BAR (ftr__bar) — add-on-demand chips
+   ================================================
+   Each active filter is one segmented chip: field | operator | value | x, joined
+   by hairlines so it reads as a single object rather than four controls. An
+   inactive chip is hidden, never removed — the GET form always carries every
+   parameter, and "+ Filter" brings any of them back. Sizes follow the Brand Kit
+   floors: 0.8rem control text in a 2.125rem control. No yellow except Apply. */
+.ftr__bar { padding: 0.625rem 0.75rem; }
+.ftr__bar #filterForm { display: block; width: 100%; }
+.ftr__bar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* A hidden chip keeps its inputs in the form; only its box leaves the layout. */
+.ftr__chip { display: none; }
+.ftr__chip--on {
+    display: inline-flex;
+    align-items: stretch;
+    background: #fff;
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: 0.375rem;
+    overflow: hidden;
+    max-width: 100%;
+}
+.ftr__chip--on:focus-within { border-color: var(--brand-primary, #f7c000); }
+
+/* Field name — the chip's anchor, so it carries the only tinted segment. */
+.ftr__chip-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0 0.625rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+    background: var(--brand-grey-100, #fafafa);
+    border-right: 1px solid var(--brand-grey-200, #f0f0f0);
+    white-space: nowrap;
+}
+/* Icons are wayfinding, not accent — grey, never Ezzy yellow. */
+.ftr__chip-field i { font-size: 0.78rem; color: var(--brand-grey-500, #6c757d); }
+
+/* The comparison the query actually performs. A label, not a control: the view
+   implements one comparison per field, so a dropdown offering others would be a
+   promise the backend does not keep. */
+.ftr__chip-op {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.5rem;
+    font-size: 0.76rem;
+    font-style: italic;
+    color: var(--brand-grey-500, #6c757d);
+    background: #fff;
+    white-space: nowrap;
+}
+
+/* Controls sit flush inside the chip — the chip supplies the frame. */
+.ftr .ftr__chip-control {
+    min-height: 0;
+    height: 2.125rem;
+    max-height: none;
+    width: auto;
+    min-width: 7rem;
+    padding: 0 0.5rem;
+    font-size: 0.8rem;
+    line-height: 1.25;
+    color: var(--brand-grey-800, #1f1f1f);
+    background-color: #fff;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+.ftr .ftr__chip-control:focus,
+.ftr .ftr__chip-control:focus-visible { outline: none; box-shadow: none; }
+/* An <input> at width:auto falls back to the browser's 20-character default —
+   measured 265px for the text field and 184px per number field, both far wider
+   than their content. Selects are left auto: they size to their longest option,
+   which is what we want. */
+.ftr input.ftr__chip-control { width: 11rem; min-width: 0; }
+.ftr input.ftr__chip-control[type="date"] { width: 9rem; }
+/* Same (0,2,1) weight as the input rule above, and later, so it wins. */
+.ftr input.ftr__chip-control--num { width: 5.5rem; min-width: 0; font-family: ui-monospace, monospace; }
+.ftr .ftr__chip-control--wide { min-width: 11rem; }
+.ftr select.ftr__chip-control {
+    padding-right: 1.4rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236c757d'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.35rem center;
+    background-size: 0.68rem;
+    appearance: none;
+    -webkit-appearance: none;
+}
+.ftr__chip-extra { display: inline-flex; align-items: stretch; }
+.ftr__chip-extra.ftr__hidden { display: none !important; }
+
+.ftr__chip-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    flex: 0 0 auto;
+    font-size: 1.05rem;
+    line-height: 1;
+    color: var(--brand-grey-500, #6c757d);
+    background: #fff;
+    border: 0;
+    border-left: 1px solid var(--brand-grey-200, #f0f0f0);
+    cursor: pointer;
+}
+.ftr__chip-x:hover {
+    color: var(--brand-danger, #dc2626);
+    background: var(--brand-danger-bg, #fef2f2);
+}
+
+/* ── Add filter ─────────────────────────────────────────────────────── */
+.ftr__add { position: relative; }
+.ftr__add.ftr__hidden { display: none !important; }
+.ftr__add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 2.125rem;
+    padding: 0 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px dashed var(--brand-grey-400, #b0b0b0);
+    border-radius: 0.375rem;
+    cursor: pointer;
+}
+.ftr__add-btn:hover {
+    border-style: solid;
+    border-color: var(--brand-primary, #f7c000);
+    background: var(--brand-secondary, #fff7d6);
+}
+.ftr__add-btn i { font-size: 0.72rem; color: var(--brand-grey-500, #6c757d); }
+
+.ftr__add-menu {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    width: 15rem;
+    background: #fff;
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 24px rgba(0, 31, 63, 0.12);
+    overflow: hidden;
+}
+.ftr__add-menu.ftr__hidden { display: none !important; }
+.ftr .ftr__add-search {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    height: 2.125rem;
+    padding: 0 0.625rem;
+    font-size: 0.82rem;
+    color: var(--brand-grey-800, #1f1f1f);
+    background: #fff;
+    border: 0;
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: 0;
+}
+.ftr .ftr__add-search:focus { outline: none; box-shadow: none; }
+.ftr__add-list { max-height: 15rem; overflow-y: auto; padding: 0.25rem; }
+.ftr__add-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.82rem;
+    color: var(--brand-grey-800, #1f1f1f);
+    text-align: left;
+    background: none;
+    border: 0;
+    border-radius: 0.3rem;
+    cursor: pointer;
+}
+.ftr__add-item i { width: 1rem; font-size: 0.78rem; color: var(--brand-grey-500, #6c757d); }
+.ftr__add-item:hover,
+.ftr__add-item:focus-visible {
+    background: var(--brand-grey-100, #fafafa);
+    outline: none;
+}
+.ftr__add-empty {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.8rem;
+    text-align: center;
+    color: var(--brand-grey-500, #6c757d);
+}
+.ftr__add-empty.ftr__hidden { display: none !important; }
+
+.ftr__bar-acts { display: flex; align-items: center; gap: 0.375rem; margin-left: auto; }
+
+/* Business keeps its Select2 picker — a driver can carry dozens of stores and
+   the search box earns its place. It just has to sit flush inside the chip
+   instead of at Select2's own boxed default. */
+.ftr .ftr__chip .select2-container { width: auto !important; min-width: 11rem; height: 2.125rem; }
+.ftr .ftr__chip .select2-container--default .select2-selection--single {
+    box-sizing: border-box;
+    height: 2.125rem;
+    border: 0;
+    border-radius: 0;
+    background: #fff;
+}
+.ftr .ftr__chip .select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 2.125rem;
+    padding-left: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+.ftr .ftr__chip .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 2.125rem;
+}
+
+@media (max-width: 575.98px) {
+    .ftr__bar-row { gap: 0.375rem; }
+    .ftr__chip--on { width: 100%; }
+    .ftr .ftr__chip-control { flex: 1 1 auto; min-width: 0; }
+    .ftr__bar-acts { margin-left: 0; width: 100%; }
+    .ftr__bar-acts .ftr__btn { flex: 1 1 0; justify-content: center; }
+}
+
+@media print {
+    .ftr__bar { display: none !important; }
+}
+
+/* ================================================
+   BUTTON VISIBILITY (ftr__btn)
+   ================================================
+   The base .ftr__btn declares no colour and no surface, so a bare one inherited
+   whatever it sat in — the Clear anchor came out in link yellow on no
+   background, and the toolbar buttons had only their icon to prove they were
+   controls. Every unmodified .ftr__btn now carries the Brand Kit's secondary
+   surface and warms to the yellow tint on hover, which is how a secondary gets
+   life without spending a second resting yellow. */
+.ftr .ftr__btn {
+    height: 2.125rem;
+    padding: 0 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+    background-color: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-400, #b0b0b0);
+    border-radius: 0.375rem;
+}
+.ftr .ftr__btn:hover {
+    color: var(--brand-grey-800, #1f1f1f);
+    background-color: var(--brand-secondary, #fff7d6);
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0,0,0,0.08));
+}
+.ftr .ftr__btn--primary { background-color: var(--brand-primary, #f7c000); border-color: var(--brand-primary, #f7c000); }
+.ftr .ftr__btn--go {
+    color: #fff;
+    background-color: var(--brand-navy, #001f3f);
+    border-color: var(--brand-navy, #001f3f);
+}
+.ftr .ftr__btn--go:hover {
+    background-color: var(--brand-navy-light, #003366);
+    border-color: var(--brand-navy-light, #003366);
+    color: #fff;
+}
+.ftr .ftr__btn:focus-visible { outline: 2px solid var(--brand-primary, #f7c000); outline-offset: 2px; }
+.ftr__toolbar .ftr__btn i { font-size: 0.85rem; }

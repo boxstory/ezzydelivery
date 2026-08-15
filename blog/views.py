@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from django.db.models import Count
 from .models import BlogPost, BlogCategory
 from core.seo import SEOMetadata
+from core.json_utils import safe_json
 
 def blog_category(request, slug=None):
     """
@@ -80,7 +81,10 @@ def blog_post_detail(request, slug):
         'post': post,
         'related_posts': related_posts,
         'trending_posts': trending_posts,
-        'schema_markup': post.get_schema_markup(),
+        # Serialise here: rendering the dict straight into the template emitted a
+        # Python repr (single quotes, None) which is not valid JSON-LD, so search
+        # engines silently dropped the block.
+        'schema_markup': safe_json(post.get_schema_markup()),
     }
     return render(request, 'blog/post_detail.html', data)
 

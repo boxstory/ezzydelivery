@@ -1,0 +1,124 @@
+{% comment %}
+Purpose: "About this page" notes panel for ai_config.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_ai_config_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      This is the control panel for the <strong>AI agent</strong> — the assistant behind the client
+      dashboard chat, order-text extraction, address zone lookup and the automatic WhatsApp replies to
+      customers. Everything here is written straight into the server's environment file and the server is
+      reloaded for you, so a save takes effect immediately with no deploy. The page is split into five
+      tabs and each tab saves only its own fields.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Master switches</dt>
+            <dd class="wfnote__def">The two switches in the header save the moment you flip them.
+              <em>AI Agent</em> turns the whole assistant on or off; <em>WhatsApp AI</em> only stops the
+              automatic replies to inbound customer messages.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Overview</dt>
+            <dd class="wfnote__def">Calls, tokens and spend for today and this month, how much of the daily
+              and monthly budget is gone, live conversations in the last 24 hours, and a table of which
+              provider and model each surface is currently calling.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Chat AI</dt>
+            <dd class="wfnote__def">Pick the provider and model for the dashboard chat, order text
+              extraction and zone lookup, plus an optional fallback pair.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">WhatsApp AI</dt>
+            <dd class="wfnote__def">The same primary and fallback choice, but for the customer WhatsApp
+              auto-replies. It is a separate setting — changing one does not change the other.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Test message</dt>
+            <dd class="wfnote__def">Sends one real request with the settings shown on screen and prints the
+              result under the form, so you can prove a key works before relying on it.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Provider keys</dt>
+            <dd class="wfnote__def">Open a row to add or replace that provider's API key. 9Router also
+              takes a gateway base URL. Stored keys are only ever shown masked.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Conversation API</dt>
+            <dd class="wfnote__def">The inbound side — the endpoint and sample call for n8n and other
+              workflows, a service token you can generate and copy, and a rate limit for it.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Budgets</dt>
+            <dd class="wfnote__def">Daily and monthly spend caps, the token ceiling on a single reply,
+              per-user / per-business / global daily request caps, and the WhatsApp numbers that get the
+              budget alerts.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">Key states</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Set</dt>
+            <dd class="wfnote__def">A key is stored for that provider. The masked value beside it is the
+              first and last few characters only.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Needed</dt>
+            <dd class="wfnote__def">That provider is selected as a primary somewhere but has nothing
+              stored — calls to it will fail. Rows in this state open by themselves.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Not set</dt>
+            <dd class="wfnote__def">No key, and nothing is selected to use it, so nothing is broken.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">In use</dt>
+            <dd class="wfnote__def">That provider is currently a primary or a fallback for Chat or
+              WhatsApp. Replacing its key changes live behaviour.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">No key</dt>
+            <dd class="wfnote__def">Shown on a provider row in the picker. You can still select it, but it
+              will not answer until a key is added on the API Access tab.</dd>
+          </div>
+        </dl>
+
+        <h2 class="wfnote__h">Status badge</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Online</dt>
+            <dd class="wfnote__def">The chat service loaded and reports itself usable.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Offline</dt>
+            <dd class="wfnote__def">It could not start — the reason is printed in the red bar at the
+              bottom of the Overview tab. Usually a missing or rejected key.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>Saving any section <strong>restarts the web server</strong>. It is a graceful reload, but do
+          not save repeatedly in the middle of a busy import or dispatch run.</li>
+        <li>Leaving a key or token field blank <strong>keeps what is already stored</strong> — blank never
+          wipes a credential. To change one you must paste a new value.</li>
+        <li>Saving a new Conversation API token takes effect at once and the old token stops working, so
+          any n8n workflow still using it starts failing until you update it there.</li>
+        <li>The fallback provider is only tried when the primary hits a rate limit or times out — it is
+          not a load balancer, and a fallback without a key is the same as no fallback.</li>
+        <li>When a budget cap is reached the agent stops calling the provider until the window resets;
+          the alert numbers are notified at 80% and again at 100%.</li>
+        <li>Spend figures are estimates from logged token counts, not the provider's invoice.</li>
+      </ul>
+    </section>
+  

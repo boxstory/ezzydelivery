@@ -39,13 +39,52 @@
 }
 .bpi__ghost:hover { background: var(--tlr-card); color: var(--tlr-brass-deep); }
 
-/* ── The sheet ────────────────────────────────────────────── */
+/* ── The sheet ────────────────────────────────────────────────
+   Printed on the company letterpad: the top and bottom band artwork
+   are full-bleed images cropped from the stationery PDF, and the faint
+   bag watermark is the sheet's own background. Side padding lives in
+   --bpi-pad-x so the bands can cancel it out and reach both edges. */
 .bpi__sheet {
+  --bpi-pad-x: 2.25rem;
+  --bpi-pad-y: 1.5rem;
   max-width: 900px;
   margin: 0 auto;
-  background: var(--tlr-card);
+  background: #fff url('../../webpages/img/letterhead-watermark.png') no-repeat left 8% bottom 6% / 42% auto;
   border: 1px solid var(--tlr-rule);
-  padding: 2rem 2.25rem 1.5rem;
+  padding: 0 var(--bpi-pad-x) 0;
+}
+
+/* Page shell — the sheet rides in a one-column table so the letterpad bands can
+   live in <thead>/<tfoot>. Print engines repeat those groups on every sheet of
+   paper, which is the only reliable way to get a running header and footer;
+   position:fixed and display:table on a plain div both fail in Chrome. On screen
+   the table collapses to the same single stack it always was. */
+.bpi__page { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.bpi__page > thead > tr > td,
+.bpi__page > tfoot > tr > td,
+.bpi__page > tbody > tr > td { padding: 0; vertical-align: top; }
+
+/* Letterpad bands — bleed past the sheet padding to both edges */
+.bpi__lp-top,
+.bpi__lp-bottom {
+  display: block;
+  width: calc(100% + (2 * var(--bpi-pad-x)));
+  height: auto;
+  margin-left: calc(-1 * var(--bpi-pad-x));
+  margin-right: calc(-1 * var(--bpi-pad-x));
+}
+.bpi__lp-bottom { margin-top: var(--bpi-pad-y); }
+
+/* Document title — centred over the head rule */
+.bpi__doc-title {
+  font-family: var(--tlr-cond);
+  font-weight: 700;
+  font-size: clamp(1.15rem, 2.6vw, 1.55rem);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  text-align: center;
+  color: var(--tlr-ink);
+  margin: 0.75rem 0 1.1rem;
 }
 
 .bpi__head {
@@ -142,7 +181,9 @@
 .bpi__totals-row td {
   border-top: 2px solid var(--tlr-ink);
   border-bottom: none;
-  padding-top: 0.6rem;
+  /* Full shorthand, not just padding-top: this cell sits in <tfoot> so the
+     tbody padding rule never reaches it, and it has to stay column-aligned. */
+  padding: 0.6rem 0.6rem 0;
   font-family: var(--tlr-mono);
   font-weight: 600;
   text-transform: uppercase;
@@ -215,11 +256,23 @@
 /* A4 portrait, dashboard chrome stripped, the sheet alone on the page. The base
    template wraps the invoice in flex/overflow containers, so those are unwound
    here — otherwise the ledger clips at the right edge on paper. */
-@page { size: A4 portrait; margin: 12mm; }
+/* Small page margin on purpose: the sheet's own --bpi-pad-x does the insetting,
+   so the text block keeps its padding even when the print dialog is set to
+   "Margins: None" (which throws this rule away). It also lets the letterpad
+   bands sit closer to a true bleed. Total text inset = this + --bpi-pad-x. */
+@page { size: A4 portrait; margin: 6mm; }
 
 @media print {
   html, body { background: #fff !important; }
-  body { display: block !important; min-height: 0 !important; }
+  body { display: block !important; min-height: 0 !important; margin: 0; }
+
+  /* workforce.css carries a legacy unscoped print block (a leftover receipt
+     sheet) that paints `th, td { border: 1px solid #ddd; padding: 8px }` and a
+     grey `th` on EVERY table in the app. It loads before this file, so fence it
+     off the invoice here — the sheet's own rules below out-specify this reset
+     and put the hairlines back where they belong. */
+  .bpi th,
+  .bpi td { border: 0; background: none; }
 
   /* Dashboard chrome */
   .site-nav,
@@ -253,18 +306,81 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .bpi__sheet { border: none; max-width: none; padding: 0; background: #fff; }
+  /* Keep the watermark background from the base rule — only drop the frame.
+     The side padding stays on so the ledger and the text block are inset from
+     the paper edge; the bands cancel it with their own negative margins and
+     still run edge to edge. Units matter: a bare 0 makes
+     calc(100% + 2 * var(--bpi-pad-x)) invalid and the bands fall back to
+     their intrinsic 1600px width. */
+  /* --bpi-band-h reserves the closing band's strip at the foot of every page.
+     The artwork is 1600x113, so across a 198mm page area it lands at ~14mm;
+     the rest is breathing room between the last row and the band. */
+  .bpi__sheet { border: none; max-width: none; --bpi-pad-x: 10mm; --bpi-band-h: 20mm; }
+
+  /* Watermark, once per sheet of paper. As a background on .bpi__sheet it
+     painted against an element that spans the whole document, so it appeared a
+     single time and landed on the last page. Moved onto a fixed layer — which
+     repeats per page — anchored to the page area so it sits in the same spot
+     the on-screen A4 preview puts it. */
+  .bpi__sheet { background-image: none; }
+  .bpi__sheet::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: url('../../webpages/img/letterhead-watermark.png') no-repeat left 8% bottom 6% / 42% auto;
+    z-index: 0;
+  }
+  .bpi__page { position: relative; z-index: 1; }
 
   .bpi__table-wrap { overflow: visible !important; margin-top: 1rem; }
   .bpi__table { font-size: 0.72rem; width: 100% !important; }
   .bpi__table thead { display: table-header-group; }
   .bpi__table tfoot { display: table-footer-group; }
   .bpi__table tr { break-inside: avoid; page-break-inside: avoid; }
+  /* One delivery, one line. Only the free-text columns may wrap — the order
+     code, date and money are fixed-width tokens and must not break, or the
+     ledger turns into a two-line-per-row mess once the side padding is on. */
   .bpi__table td { word-break: break-word; }
   .bpi__num,
   .bpi__order,
-  .bpi__date { white-space: normal; }
+  .bpi__date { white-space: nowrap; word-break: normal; }
 
+  /* Running letterpad: the band groups repeat at the top and bottom of every
+     printed page, so page 2 onwards keeps the letterhead and page 1 keeps the
+     closing band. Explicit here even though these are the default for a table. */
+  .bpi__page > thead { display: table-header-group; }
+  .bpi__page > tfoot { display: table-footer-group; }
+
+  /* The ledger's own <tfoot> must NOT repeat: it carries the grand total, and
+     printing "Total · 22 deliveries · 550.00" under the 17 rows that happen to
+     fit on page 1 reads as a per-page subtotal. Demote it to an ordinary row
+     group so it renders once, after the last row. The column header above it
+     still repeats — that one genuinely helps on every page. */
+  .bpi__table > tfoot { display: table-row-group; }
+  .bpi__page > thead > tr > td,
+  .bpi__page > tfoot > tr > td { break-inside: avoid; page-break-inside: avoid; }
+
+  /* Closing band sits on the page edge, not wherever the content happens to
+     stop. position:fixed repeats on every printed page in Chrome and resolves
+     against the page area, so bottom:0 pins it to the foot of every sheet
+     including the last. The <tfoot> above stays in the table for one reason
+     only — to reserve this strip on every page so no row can run underneath. */
+  .bpi__page > tfoot > tr > td { height: var(--bpi-band-h); }
+  .bpi__lp-bottom {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    /* Must be 100%, never auto: for an out-of-flow replaced element `auto`
+       resolves to the image's intrinsic 1600px and `right` is then ignored, so
+       the band rendered at ~2x page width and twice as tall — deep enough to
+       print over the last ledger row. */
+    width: 100%;
+    margin: 0;
+  }
+
+  .bpi__lp-top,
+  .bpi__lp-bottom,
+  .bpi__doc-title,
   .bpi__head,
   .bpi__summary,
   .bpi__foot { break-inside: avoid; page-break-inside: avoid; }
@@ -274,7 +390,7 @@
 
 @media (max-width: 575.98px) {
   .bpi { padding: 1rem 0.75rem 2rem; }
-  .bpi__sheet { padding: 1.25rem 1rem; }
+  .bpi__sheet { --bpi-pad-x: 1rem; }
   .bpi__meta-row { justify-content: flex-start; }
   .bpi__summary { max-width: none; }
 }

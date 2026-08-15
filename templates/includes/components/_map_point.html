@@ -1,0 +1,33 @@
+{# Purpose: Show a coordinate (or two, compared) on an inline Leaflet map instead of linking out to Google Maps. #}
+{# Used by: staff order/task/location screens. Include map-point.css + map-point.js once per page (see below). #}
+{# Notes: Params — lat, lon (required); lat2/lon2 for compare mode; label, label2, colour, colour2, zoom, text, size. #}
+{#        Do NOT use for driver turn-by-turn navigation — that stays a Google Maps deep link. #}
+{% if lat and lon %}
+{% with uid=uid|default:lat|stringformat:"s" %}
+<span class="mpt">
+  {% if text %}<span class="mpt__text">{{ text }}</span>{% endif %}
+  <button type="button" class="mpt__btn" aria-expanded="false"
+          data-mappoint-toggle="mpt_map_{{ uid|slugify }}_{{ lon|slugify }}"
+          title="{{ label|default:'Show on map' }}">
+    <i class="fa-solid fa-map-location-dot"></i>{% if btn_label %} {{ btn_label }}{% endif %}
+  </button>
+</span>
+<div class="mpt__panel" hidden>
+  <div class="mpt__map {% if size == 'sm' %}mpt__map--sm{% elif size == 'lg' %}mpt__map--lg{% endif %}"
+       id="mpt_map_{{ uid|slugify }}_{{ lon|slugify }}"
+       data-lat="{{ lat }}" data-lon="{{ lon }}"
+       {% if lat2 and lon2 %}data-lat2="{{ lat2 }}" data-lon2="{{ lon2 }}"{% endif %}
+       {% if label %}data-label="{{ label }}"{% endif %}
+       {% if label2 %}data-label2="{{ label2 }}"{% endif %}
+       {% if colour %}data-colour="{{ colour }}"{% endif %}
+       {% if colour2 %}data-colour2="{{ colour2 }}"{% endif %}
+       {% if zoom %}data-zoom="{{ zoom }}"{% endif %}></div>
+  {% if lat2 and lon2 %}
+  <p class="mpt__legend">
+    <span class="mpt__key" style="background:{{ colour|default:'#1F2A44' }}"></span>{{ label|default:"Point A" }}
+    <span class="mpt__key" style="background:{{ colour2|default:'#b4532a' }}"></span>{{ label2|default:"Point B" }}
+  </p>
+  {% endif %}
+</div>
+{% endwith %}
+{% endif %}

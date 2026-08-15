@@ -247,7 +247,8 @@ def fulfill_stock_reservation(order):
 def _direct_deduct_stock(order):
     """
     Directly deduct stock for an order that had no prior reservation.
-    Finds the linked warehouse via SellerWarehouseLink and deducts quantity_on_hand.
+    Prefers the warehouses linked via SellerWarehouseLink; falls back to wherever
+    the product's stock actually sits when no link is configured.
     """
     from warehouse.models import StockLevel, InventoryTransaction, SellerWarehouseLink
     from orders.models import OrderItem
@@ -261,12 +262,19 @@ def _direct_deduct_stock(order):
         ).values_list('warehouse_id', flat=True)
     )
 
+    # A missing SellerWarehouseLink used to abort the deduction entirely, so every
+    # delivered order left on-hand untouched and inventory drifted upward forever
+    # with nothing but a buried warning to show for it. The link is a routing
+    # preference, not a tenancy boundary — the StockLevel rows below are already
+    # reached through product=item.product, which belongs to this business — so
+    # deduct from wherever the stock is and make the missing config loud instead.
+    warehouse_scope = {'warehouse_id__in': linked_warehouse_ids} if linked_warehouse_ids else {}
     if not linked_warehouse_ids:
-        logger.warning(
-            f"No warehouse linked to business {order.business.business_name} "
-            f"for order {order.order_number} — skipping direct deduction"
+        logger.error(
+            f"No active SellerWarehouseLink for business {order.business.business_name} "
+            f"(order {order.order_number}) — deducting from whichever warehouse holds "
+            f"the stock. Link the business to its warehouse to restore correct routing."
         )
-        return
 
     for item in order_items:
         if not item.product:
@@ -274,8 +282,8 @@ def _direct_deduct_stock(order):
 
         stock_levels = StockLevel.objects.filter(
             product=item.product,
-            warehouse_id__in=linked_warehouse_ids,
-            quantity_on_hand__gt=0
+            quantity_on_hand__gt=0,
+            **warehouse_scope
         ).select_for_update().order_by('-quantity_on_hand')
 
         remaining_qty = item.quantity
@@ -307,9 +315,14 @@ def _direct_deduct_stock(order):
             remaining_qty -= deduct_qty
 
         if remaining_qty > 0:
-            logger.warning(
-                f"Insufficient stock for direct deduction: order {order.order_number}, "
-                f"product {item.product.item_sku}, short by {remaining_qty}"
+            # Shipped goods we could not take off the books. Left unresolved this
+            # is exactly how on-hand ends up overstating the shelf: the units left
+            # the warehouse but no 'ship' row was ever written for them.
+            logger.error(
+                f"Unrecorded shipment: order {order.order_number}, product "
+                f"{item.product.item_sku} short by {remaining_qty} of {item.quantity} — "
+                f"on-hand now overstates physical stock by that amount. "
+                f"Receive the stock, then adjust to correct it."
             )
 
     logger.info(f"Stock fulfilled (direct deduction) for order {order.order_number}")

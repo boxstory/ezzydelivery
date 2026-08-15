@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
-{% load static %}
+{% load static workforce_tags %}
+{% comment %}
+Purpose: Staff review queue for driver applications — expand a case, approve / review / reject, WhatsApp nudge
+Used by: workforce.views.driver_verification_list at /workforce/driver-verification/
+Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via the modals at the foot of the page.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Driver Verification - Staff Dashboard{% endblock title %}
 
@@ -22,44 +29,81 @@
             <div class="wfd__hero-stat wfd__hero-stat--muted"><span class="wfd__hero-stat__num">{{ approved_account_count|default:"0" }}</span><span class="wfd__hero-stat__label">Approved a/c</span></div>
         </div>
     </div>
+    <button type="button" class="wfnote__btn" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_driver_verification_list_card_notes"
+            title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+    </button>
 </div>
 
-<!-- Filter Bar -->
-<form method="get" class="uvl__filterbar">
-    {% if current_filter and current_filter != 'all' %}<input type="hidden" name="status" value="{{ current_filter }}">{% endif %}
-    <div class="uvl__filterbar-search">
-        <i class="fa-solid fa-magnifying-glass uvl__filterbar-search-icon"></i>
-        <input type="text" name="search" value="{{ search }}" class="form-control" placeholder="Search name, email, phone, code…">
+<div class="wfnote" id="workforce_driver_verification_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_driver_verification_list_card_notes' %}" hidden></div>
+
+<!-- Secondary filter bar — the shared pg-filter system the staff order lists use.
+     Ids are page-local on purpose: the pgf_* set is a contract with the pg-filter
+     handler in workforce.js, whose submit builds a fixed param list with no
+     vehicle/job/zone/account in it, so borrowing those ids would swallow the
+     Enter key and drop half this page's filters. Plain GET submit is enough. -->
+<div class="pg-filter">
+    <form method="get" class="pg-filter__form">
+        {% if current_filter and current_filter != 'all' %}<input type="hidden" name="status" value="{{ current_filter }}">{% endif %}
+        <div class="pg-filter__row">
+            {% comment %}
+            No cluster labels: the placeholder names the search box and every
+            dropdown carries its own name on its toggle, so "Find" / "Narrow by"
+            only added chrome. Screen readers keep the aria-label below.
+            {% endcomment %}
+            <input type="text" name="search" value="{{ search }}" autocomplete="off"
+                   id="workforce_driver_verification_input_search"
+                   class="form-control form-control-sm"
+                   placeholder="Name, email, phone, code…" aria-label="Search applicants">
+
+            {# Same checkbox dropdowns as the driver roster, so both queues filter alike #}
+            {% include "workforce/parts/components/_multiselect_filter.html" with field_name="vehicle" label="Vehicle" icon="car-side" choices=vehicle_choices selected=selected_vehicles all_text="All vehicles" %}
+            {% include "workforce/parts/components/_multiselect_filter.html" with field_name="job" label="Job type" icon="business-time" choices=job_choices selected=selected_jobs all_text="All job types" %}
+            {% include "workforce/parts/components/_multiselect_filter.html" with field_name="slab" label="Working hours" icon="clock" choices=slab_choices selected=selected_slabs all_text="Any hours" %}
+            {% include "workforce/parts/components/_multiselect_filter.html" with field_name="zone" label="Zone" icon="map-location-dot" choices=zone_group_choices selected=selected_zones all_text="All zones" %}
+            {% include "workforce/parts/components/_multiselect_filter.html" with field_name="account" label="Account status" icon="id-badge" choices=account_choices selected=selected_accounts all_text="All accounts" %}
+            {% include "workforce/parts/components/_multiselect_filter.html" with field_name="availability" label="Availability" icon="signal" choices=availability_choices selected=selected_availability all_text="Any state" %}
+            {% include "workforce/parts/components/_multiselect_filter.html" with field_name="language" label="Language" icon="language" choices=language_choices selected=selected_languages all_text="All languages" %}
+
+            <div class="pg-filter__actions">
+                <button type="submit" class="pg-filter__btn pg-filter__btn--go"
+                        title="Apply filters" aria-label="Apply filters">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                </button>
+                <a href="{{ reset_url }}" class="pg-filter__btn"
+                   title="Clear filters" aria-label="Clear filters">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </a>
+                <button type="button" class="pg-filter__btn" title="Export CSV" aria-label="Export CSV"
+                        data-bs-toggle="modal" data-bs-target="#wfExportModal">
+                    <i class="fa-solid fa-file-csv" aria-hidden="true"></i>
+                </button>
+                {# Both only appear once cases are ticked — see export-columns.js #}
+                <span class="wfsel__count" data-export-count hidden></span>
+                {% include "workforce/parts/components/_export_selectall.html" with total=page_obj.paginator.count noun="applications" limit=2000 %}
+            </div>
+        </div>
+    </form>
+
+    {% if applied_chips %}
+    <div class="pg-filter__applied">
+        <span class="pg-filter__applied-label">Filtered by</span>
+        {% for chip in applied_chips %}
+        <span class="pg-filter__tag">
+            <strong>{{ chip.label }}:</strong> {{ chip.value }}
+            <a href="{{ chip.remove_url }}" class="pg-filter__tag-close"
+               aria-label="Remove {{ chip.label }} filter"><i class="fa-solid fa-xmark" aria-hidden="true"></i></a>
+        </span>
+        {% endfor %}
+        <a href="{{ reset_url }}" class="pg-filter__clear-all">
+            <i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>Clear all
+        </a>
     </div>
-    <select name="vehicle" class="form-select uvl__filterbar-select" aria-label="Vehicle">
-        <option value="">All vehicles</option>
-        {% for val, label in vehicle_choices %}
-        <option value="{{ val }}" {% if vehicle_filter == val %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-    </select>
-    <select name="job" class="form-select uvl__filterbar-select" aria-label="Job type">
-        <option value="">All job types</option>
-        {% for val, label in job_choices %}
-        <option value="{{ val }}" {% if job_filter == val %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-    </select>
-    <select name="zone" class="form-select uvl__filterbar-select" aria-label="Zone">
-        <option value="">All zones</option>
-        {% for zg in zone_groups %}
-        <option value="{{ zg.id }}" {% if zone_filter == zg.id|stringformat:"s" %}selected{% endif %}>{{ zg.name }}</option>
-        {% endfor %}
-    </select>
-    <select name="account" class="form-select uvl__filterbar-select" aria-label="Account status">
-        <option value="">All accounts</option>
-        {% for val, label in account_choices %}
-        <option value="{{ val }}" {% if account_filter == val %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-    </select>
-    <button type="submit" class="btn uvl__filterbar-apply"><i class="fa-solid fa-filter"></i> Apply</button>
-    {% if search or has_secondary_filter %}
-    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}{% endif %}" class="btn uvl__filterbar-clear"><i class="fa-solid fa-xmark"></i> Clear</a>
     {% endif %}
-</form>
+</div>
 
 <!-- Filter Pills -->
 <div class="uvl__filters">
@@ -89,11 +133,51 @@
     </a>
 </div>
 
+<!-- Applicant Map -->
+<details class="dvmap" id="workforce_driver_verification_map">
+    <summary class="dvmap__summary">
+        <span class="dvmap__summary-title"><i class="fa-solid fa-map-location-dot"></i> Applicant locations</span>
+        <span class="dvmap__summary-meta">
+            {{ map_point_count }} pinned{% if map_outside_count %} &middot; {{ map_outside_count }} outside Qatar{% endif %}{% if map_missing_count %} &middot; {{ map_missing_count }} without a captured location{% endif %}
+        </span>
+        <i class="fa-solid fa-chevron-down dvmap__chev" aria-hidden="true"></i>
+    </summary>
+    <div class="dvmap__body">
+        {% if map_points %}
+        <div class="dvmap__canvas" id="workforce_driver_verification_map_canvas"></div>
+        <div class="dvmap__legend">
+            <span class="dvmap__key dvmap__key--pending"></span> Pending
+            <span class="dvmap__key dvmap__key--under_review"></span> Review
+            <span class="dvmap__key dvmap__key--verified"></span> Verified
+            <span class="dvmap__key dvmap__key--rejected"></span> Rejected
+            <span class="dvmap__key dvmap__key--incomplete"></span> Incomplete
+            {% if map_outside_count %}
+            <button type="button" class="dvmap__fitall" id="workforce_driver_verification_map_fitall">
+                <i class="fa-solid fa-maximize"></i> Show the {{ map_outside_count }} pin{{ map_outside_count|pluralize }} outside Qatar
+            </button>
+            {% endif %}
+        </div>
+        <p class="dvmap__note">
+            <i class="fa-solid fa-circle-info"></i>
+            Self-reported by each applicant's browser when they submitted the form — indicative
+            of where they live or applied from, not live tracking. Pins follow the filters above.
+        </p>
+        {% else %}
+        <p class="dvmap__empty">No applicant in this filter captured a location at registration.</p>
+        {% endif %}
+    </div>
+</details>
+{{ map_points|json_script:"workforce_driver_verification_map_data" }}
+
 <!-- Driver Manifest -->
 {% if page_obj.object_list %}
     <div class="dvm__manifest">
-        <div class="dvm__header" aria-hidden="true">
-            <span></span>
+        <div class="dvm__header">
+            <span class="dvm__pick">
+                <input type="checkbox" class="form-check-input wfsel__box" data-export-row-all
+                       aria-label="Select every application on this page">
+            </span>
+            <span aria-hidden="true"></span>
             <span>Applicant</span>
             <span>Code</span>
             <span>Vehicle</span>
@@ -107,6 +191,16 @@
         {% for driver in page_obj %}
         <details class="dvm__row">
             <summary class="dvm__summary">
+                {% comment %}
+                stopPropagation, not preventDefault: the click must not reach the
+                <summary> (which would expand the case), but cancelling it would
+                also undo the tick.
+                {% endcomment %}
+                <span class="dvm__pick">
+                    <input type="checkbox" class="form-check-input wfsel__box" data-export-row
+                           value="{{ driver.driver_id }}" onclick="event.stopPropagation()"
+                           aria-label="Select {{ driver.user.get_full_name|default:driver.user.email }}">
+                </span>
                 <span class="dvm__stamp dvm__stamp--{{ driver.profile.verification_status }}">{{ driver.stamp_label }}</span>
                 <span class="dvm__who">
                     <span class="dvm__name">{{ driver.user.get_full_name|default:driver.user.email }}</span>
@@ -114,11 +208,32 @@
                         {% if driver.user.email %}{{ driver.user.email }}{% endif %}
                         {% if driver.driver_phone %}<span class="dvm__dot">&middot;</span>{{ driver.driver_phone }}{% endif %}
                     </span>
+                    {# Arrival source + account creation date — not the applied/updated dates on the right #}
+                    <span class="dvm__contact dvm__origin">
+                        <span class="uvl__origin-note"
+                              title="How this user arrived{% if driver.profile.signup_landing_path %} — landed on {{ driver.profile.signup_landing_path }}{% endif %}{% if driver.profile.signup_referrer %} — referred by {{ driver.profile.signup_referrer }}{% endif %}{% if driver.profile.signup_source_inferred %} (guessed from the account, not tracked at signup){% endif %}">via {{ driver.profile.get_signup_source_display }}{% if driver.profile.signup_source_inferred %} · inferred{% endif %}</span>
+                        <span class="dvm__dot">&middot;</span>
+                        <span class="uvl__origin-note" title="Account created {{ driver.user.date_joined|date:'d M Y H:i' }}">Registered {{ driver.user.date_joined|date:"d M Y" }}</span>
+                    </span>
                 </span>
                 <span class="dvm__code" data-label="Code">{{ driver.driver_code|default:"—" }}</span>
+                {% comment %}
+                Same reading as the fleet roster at /workforce/drivers/ — type on
+                top, the shared QAT plate mark below — so one driver looks the
+                same in the review queue as in the roster.
+                {% endcomment %}
                 <span class="dvm__vehicle" data-label="Vehicle">
                     {% with vehicle=driver.driver_vehicle.all|first %}
-                    {% if vehicle %}{{ vehicle.vehicle_type|title }}{% if vehicle.vehicle_no %} <span class="dvm__vehicle-no">{{ vehicle.vehicle_no }}</span>{% endif %}{% else %}—{% endif %}
+                    {% if vehicle %}
+                        {# The band icon carries the vehicle type, so the word is not repeated #}
+                        <span class="drl__plate">
+                            <span class="drl__plate-band" title="{{ vehicle.get_vehicle_type_display }}">
+                                <i class="fa-solid {{ vehicle.vehicle_type|vehicle_icon }}" aria-hidden="true"></i>
+                                <span class="visually-hidden">{{ vehicle.get_vehicle_type_display }}</span>
+                            </span>
+                            <span class="drl__plate-no">{{ vehicle.vehicle_no|default:"—" }}</span>
+                        </span>
+                    {% else %}—{% endif %}
                     {% endwith %}
                 </span>
                 <span class="dvm__docs {% if driver.doc_count %}dvm__docs--has{% else %}dvm__docs--none{% endif %}" data-label="Docs"
@@ -126,7 +241,7 @@
                     <i class="fa-solid fa-file-lines" aria-hidden="true"></i> {{ driver.doc_count }}
                 </span>
                 <span class="dvm__lang" data-label="Languages">{{ driver.get_driver_languages_display|default:"—" }}</span>
-                <span class="dvm__meter" data-label="Readiness" title="User profile {{ driver.profile.get_profile_completion_percentage }}% &middot; Driver profile {% if driver.profile.is_driver_profile_completed %}100{% else %}0{% endif %}%">
+                <span class="dvm__meter" data-label="Readiness" title="User profile {{ driver.profile.get_profile_completion_percentage }}% &middot; Driver profile {{ driver.profile.get_driver_profile_completion_percentage }}%">
                     <span class="dvm__meter-track"><span class="dvm__meter-fill" style="width:{{ driver.readiness_pct }}%"></span></span>
                     <span class="dvm__meter-pct">{{ driver.readiness_pct }}%</span>
                 </span>
@@ -355,7 +470,7 @@
             <div class="uvl__modal__header-icon"><i class="fa-brands fa-whatsapp"></i></div>
             <div>
                 <h3 class="uvl__modal__title">Send completion reminder</h3>
-                <p class="uvl__modal__subtitle" id="uvlRemindUser"></p>
+                <p class="uvl__modal__subtitle" id="uvlRemindSender">Sending from —</p>
             </div>
             <button type="button" class="uvl__modal__close" id="uvlRemindClose"><i class="fa-solid fa-xmark"></i></button>
         </div>
@@ -378,6 +493,10 @@
         </div>
     </div>
 </div>
+
+<!-- Export column picker -->
+{% include "workforce/parts/components/_export_columns_modal.html" %}
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260807b"></script>
 
 {% endblock content %}
 
@@ -550,7 +669,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function openRemindModal(btn) {
         remindTriggerBtn = btn;
         remindDriverId = btn.dataset.driverId;
-        document.getElementById('uvlRemindUser').textContent = '';
+        document.getElementById('uvlRemindSender').textContent = 'Sending from —';
         document.getElementById('uvlRemindPhone').textContent = '—';
         document.getElementById('uvlRemindMessage').textContent = 'Loading…';
         document.getElementById('uvlRemindLast').textContent = '';
@@ -565,6 +684,13 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            // Sender is known even when the reminder itself can't be built.
+            var sender = data.sender_phone || '';
+            // Labels are often just the number again — only add a real name.
+            if (sender && data.sender_label && data.sender_label.replace(/\D/g, '') !== sender.replace(/\D/g, ''))
+                sender += ' · ' + data.sender_label;
+            document.getElementById('uvlRemindSender').textContent =
+                'Sending from ' + (sender || data.sender_label || 'default WhatsApp number');
             if (data.success) {
                 document.getElementById('uvlRemindPhone').textContent = data.phone || '—';
                 document.getElementById('uvlRemindMessage').textContent = data.message || '';
@@ -627,6 +753,90 @@ document.addEventListener('DOMContentLoaded', function() {
             else if (action === 'reject') openRejectModal(this);
         });
     });
+
+    /* ---------- APPLICANT MAP ---------- */
+    // Leaflet ships with wf_dashboard_base. The map is built the first time the
+    // panel is opened, because Leaflet cannot size a hidden container.
+    var mapPanel = document.getElementById('workforce_driver_verification_map');
+    var mapData = document.getElementById('workforce_driver_verification_map_data');
+    var mapBuilt = false;
+
+    var STATUS_COLOUR = {
+        pending: '#b45309',
+        under_review: '#1d4ed8',
+        verified: '#15803d',
+        rejected: '#b91c1c',
+        incomplete: '#6b7280'
+    };
+
+    function escapeHtml(value) {
+        var div = document.createElement('div');
+        div.textContent = value == null ? '' : String(value);
+        return div.innerHTML;
+    }
+
+    function popupHtml(point) {
+        var rows = [
+            ['Status', point.status_label],
+            ['Account', point.account],
+            ['Code', point.code],
+            ['Vehicle', point.vehicle],
+            ['Zones', point.zones],
+            ['Captured', point.captured_at + (point.accuracy_m ? ' (±' + point.accuracy_m + ' m)' : '')]
+        ];
+        var body = rows.filter(function (r) { return r[1]; }).map(function (r) {
+            return '<div class="dvmap__pop-row"><span>' + r[0] + '</span><strong>' +
+                escapeHtml(r[1]) + '</strong></div>';
+        }).join('');
+        return '<div class="dvmap__pop"><div class="dvmap__pop-name">' + escapeHtml(point.name) +
+            '</div>' + body + '<a class="dvmap__pop-link" href="' + point.url + '">View progress</a></div>';
+    }
+
+    function buildMap() {
+        if (mapBuilt || !mapData || !window.L) return;
+        var points = JSON.parse(mapData.textContent || '[]');
+        if (!points.length) return;
+        mapBuilt = true;
+
+        var map = L.map('workforce_driver_verification_map_canvas', { scrollWheelZoom: false });
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19
+        }).addTo(map);
+
+        var all = [];
+        var local = [];
+        points.forEach(function (point) {
+            var colour = STATUS_COLOUR[point.status] || STATUS_COLOUR.incomplete;
+            L.circleMarker([point.lat, point.lng], {
+                radius: 7, weight: 2, color: '#fff', fillColor: colour, fillOpacity: 0.95
+            }).addTo(map).bindPopup(popupHtml(point));
+            all.push([point.lat, point.lng]);
+            if (point.in_qatar) local.push([point.lat, point.lng]);
+        });
+
+        // Frame Qatar by default — an applicant who applied from abroad would
+        // otherwise zoom the whole cluster down to an unreadable dot.
+        function fit(coords) {
+            if (coords.length === 1) map.setView(coords[0], 13);
+            else map.fitBounds(coords, { padding: [30, 30] });
+        }
+        fit(local.length ? local : all);
+
+        var fitAllBtn = document.getElementById('workforce_driver_verification_map_fitall');
+        if (fitAllBtn) {
+            fitAllBtn.addEventListener('click', function () { fit(all); });
+        }
+
+        // The panel animates open; settle the tiles once it has finished.
+        setTimeout(function () { map.invalidateSize(); }, 200);
+    }
+
+    if (mapPanel) {
+        mapPanel.addEventListener('toggle', function () {
+            if (mapPanel.open) buildMap();
+        });
+        if (mapPanel.open) buildMap();
+    }
 });
 </script>
 {% endblock extra_js %}

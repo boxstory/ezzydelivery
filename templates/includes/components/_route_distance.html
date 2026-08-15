@@ -1,0 +1,10 @@
+{# Purpose: Show an order's stored pickup→drop driving distance, marking any fallback estimate. #}
+{# Used by: order/task lists and detail screens. Styles live in webpages/css/map-point.css. #}
+{# Notes: Reads the STORED figure (computed by OSRM at save time) — never routes during a page render. #}
+{#        Params: order (required), label (optional suffix, e.g. "to drop"). #}
+{% if order.route_distance_km is not None %}
+<span class="rdist{% if order.route_distance_source != 'osrm' %} rdist--approx{% endif %}"
+      title="{% if order.route_distance_source == 'osrm' %}Driving distance from pickup to drop{% elif order.route_distance_source == 'zone_estimate' %}Estimated from zone centres — one end has no usable coordinates{% else %}Straight line — no route could be computed{% endif %}">
+  <i class="fa-solid fa-route"></i>{% if order.route_distance_source != 'osrm' %}~{% endif %}{{ order.route_distance_km|floatformat:1 }} km{% if label %} {{ label }}{% endif %}
+</span>
+{% endif %}

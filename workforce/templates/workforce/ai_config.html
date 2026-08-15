@@ -3,10 +3,10 @@
 
 {# Purpose: Staff AI configuration console — providers, models, keys, budgets, conversation API. Tabbed, per-section AJAX save, live tests. #}
 {# Used by: workforce.views.wf_ai_config (+ wf_ai_config_test, wf_ai_models_api) #}
-{# Notes: aic__ namespace; each tab is its own form saved via fetch (section=…); toggles instant-save; model selects populate from wf_ai_models_api. #}
+{# Notes: aic__ namespace; each tab is its own form saved via fetch (section=…); toggles instant-save; model selects populate from wf_ai_models_api. Carries the shared wfnote__ page-notes card under the hero (hidden on load, toggled by the hero help button). #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/ai-config.css' %}?v=15" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/ai-config.css' %}?v=17" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -37,8 +37,17 @@
       {% else %}
         <span class="aic__status-badge aic__status-badge--err"><i class="fa-solid fa-circle-xmark"></i> Offline</span>
       {% endif %}
+      <button type="button" class="wfnote__btn" data-wfnote-toggle
+              aria-expanded="false" aria-controls="workforce_ai_config_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
     </div>
   </header>
+
+  <div class="wfnote" id="workforce_ai_config_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_ai_config_card_notes' %}" hidden></div>
 
   <!-- Global toast -->
   <div class="aic__toast" id="aic_toast" role="status" aria-live="polite"></div>
@@ -63,6 +72,11 @@
     <li class="nav-item" role="presentation">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aic-tab-api" type="button" role="tab">
         <i class="fa-solid fa-key me-1"></i>API Access
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aic-tab-messages" type="button" role="tab">
+        <i class="fa-solid fa-comment-dots me-1"></i>Messages
       </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -436,6 +450,68 @@
       </form>
     </div>
 
+    <!-- ============ MESSAGES ============ -->
+    <div class="tab-pane fade" id="aic-tab-messages" role="tabpanel">
+
+      <div class="aic__brief">
+        <span class="aic__brief-kicker">Messages</span>
+        <span class="aic__brief-text">WhatsApp wording the platform owns — the messages it sends on its own, and the starter text a staff composer opens with. Edit any of it, or switch one off.</span>
+      </div>
+
+      {% for tpl in message_templates %}
+      <form class="aic__form card mb-3" data-section="templates" id="msg-{{ tpl.key }}">
+        <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+          <i class="fa-brands fa-whatsapp"></i><strong>{{ tpl.label }}</strong>
+          {% if tpl.kind == 'composer' %}<span class="aic__cred-state aic__cred-state--kind aic__cred-state--inline">Composer starter</span>{% endif %}
+          {% if tpl.is_customised %}<span class="aic__cred-state aic__cred-state--set aic__cred-state--inline">Edited</span>{% endif %}
+          {% if tpl.toggle_owner %}
+          {# On/off belongs to a trigger row — showing a second switch here would let #}
+          {# one page silently contradict the other. Point at the real one instead. #}
+          <a class="aic__cred-help ms-auto text-decoration-none"
+             href="{% url 'workforce:auto_triggers_list' %}#trigger-row-{{ tpl.toggle_owner }}">
+            On/off lives on the <code>{{ tpl.toggle_owner }}</code> trigger
+            <i class="fa-solid fa-arrow-up-right-from-square ms-1"></i>
+          </a>
+          {% else %}
+          <label class="aic__switch ms-auto">
+            <input type="checkbox" role="switch" name="is_enabled" value="1" {% if tpl.is_enabled %}checked{% endif %}>
+            <span class="aic__switch-track"></span>
+            <span class="aic__switch-label">{% if tpl.is_enabled %}Sending{% else %}Off{% endif %}</span>
+          </label>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="templates">
+          <input type="hidden" name="template_key" value="{{ tpl.key }}">
+
+          <div class="aic__cred-help mb-2">{{ tpl.description }}</div>
+          <div class="aic__plate aic__plate--block aic__plate--quiet mb-3">
+            <span class="aic__plate-method">FROM</span>
+            <span class="aic__plate-text">{{ tpl.sender_label }}</span>
+          </div>
+
+          <label class="form-label" for="aic_tpl_{{ tpl.key }}">Message body</label>
+          <textarea class="form-control form-control-sm aic__textarea" id="aic_tpl_{{ tpl.key }}"
+                    name="body" rows="14" data-default="{{ tpl.default_body }}">{{ tpl.body }}</textarea>
+          <div class="aic__cred-help mt-1">
+            Placeholders: <code>&#123;{{ tpl.placeholders }}&#125;</code> — filled in at send time.
+            WhatsApp formatting: <code>*bold*</code>, <code>_italic_</code>.
+          </div>
+        </div>
+        <div class="aic__form-foot">
+          <button type="button" class="btn btn-sm aic__btn-test" data-tpl-reset="#aic_tpl_{{ tpl.key }}">
+            <i class="fa-solid fa-rotate-left me-1"></i>Restore default text
+          </button>
+          <button type="submit" class="btn btn-sm aic__btn-save ms-auto"><i class="fa-solid fa-floppy-disk me-1"></i>Save message</button>
+        </div>
+        <div class="aic__form-feedback" data-feedback></div>
+      </form>
+      {% empty %}
+      <div class="card"><div class="card-body">No editable messages registered.</div></div>
+      {% endfor %}
+    </div>
+
     <!-- ============ BUDGETS & LIMITS ============ -->
     <div class="tab-pane fade" id="aic-tab-limits" role="tabpanel">
 
@@ -675,6 +751,23 @@
           }
         })
         .catch(function () { btn.disabled = false; btn.innerHTML = orig; if (box) { box.hidden = false; box.className = 'aic__test-result aic__test-result--err'; box.textContent = 'Network error'; } });
+    });
+  });
+
+  // --- message templates: restore shipped text + live switch label ---
+  document.querySelectorAll('[data-tpl-reset]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const ta = document.querySelector(btn.dataset.tplReset);
+      if (!ta) return;
+      ta.value = ta.dataset.default || '';
+      ta.focus();
+      toast('Default text restored — save to apply', true);
+    });
+  });
+  document.querySelectorAll('form[data-section="templates"] input[name="is_enabled"]').forEach(function (sw) {
+    sw.addEventListener('change', function () {
+      const lbl = sw.parentElement.querySelector('.aic__switch-label');
+      if (lbl) lbl.textContent = sw.checked ? 'Sending' : 'Off';
     });
   });
 

@@ -1,6 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static custom_filters %}
+{% comment %}
+Purpose: Staff queue of WhatsApp address-verification jobs (auto-import + delivery-recovery)
+Used by: workforce.views.temp_verify_queue at /workforce/orders/temp/verify-queue/
+Notes: Row actions POST to temp_verify_queue_action; the WAHA banner toggle is a global send kill switch.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'workforce/css/verify_queue.css' %}?v=20260514a">
@@ -20,8 +27,17 @@
             <a href="{% url 'workforce:temp_auto_stages' %}" class="vfq__hero-btn">
                 <i class="fa-solid fa-list-check"></i>Stage Config
             </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_temp_verify_queue_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </header>
+
+    <div class="wfnote" id="workforce_temp_verify_queue_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_temp_verify_queue_card_notes' %}" hidden></div>
 
     <!-- WAHA Connection Status -->
     {% if waha_status %}
@@ -235,10 +251,7 @@
                         </td>
                         <td data-label="Applied Coords">
                             {% if j.applied_latitude and j.applied_longitude %}
-                                <a href="https://maps.google.com/?q={{ j.applied_latitude }},{{ j.applied_longitude }}"
-                                   target="_blank" class="vfq__coord-link" title="View on Google Maps">
-                                    <i class="fa-solid fa-map-location-dot"></i>{{ j.applied_latitude|floatformat:5 }}, {{ j.applied_longitude|floatformat:5 }}
-                                </a>
+                                {% include "includes/components/_map_point.html" with uid=j.id|stringformat:"s"|add:"-vfq" lat=j.applied_latitude lon=j.applied_longitude label="Applied coordinates" text=j.applied_latitude|floatformat:5|add:", "|add:j.applied_longitude|floatformat:5 size="sm" %}
                             {% else %}<span class="vfq__time--muted">—</span>{% endif %}
                         </td>
                         <td data-label="Last Error">

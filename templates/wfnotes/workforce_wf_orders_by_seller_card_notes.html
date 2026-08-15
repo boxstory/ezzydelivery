@@ -1,0 +1,92 @@
+{% comment %}
+Purpose: "About this page" notes panel for wf_orders_by_seller.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_wf_orders_by_seller_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The same order book as the main Orders list, but counted up client by client instead of listed one
+            order at a time. Each row is a client, showing how many orders they gave us in the period you pick
+            and how those orders ended up. Use it to see who is busy this week, who has gone quiet, and which
+            client is carrying an unusual number of stuck or cancelled orders. The arrow at the end of a row
+            takes you into the full order list already filtered to that client and date range.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Search</dt>
+                        <dd class="wfnote__def">Finds a client by name, code, email, or phone. Press the search
+                            button or Enter to apply.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Date buttons</dt>
+                        <dd class="wfnote__def">Today, yesterday, last 3 days, last week, or last month — one
+                            click sets the range and reloads. <em>Custom</em> reveals two date boxes and applies
+                            once both are filled.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Seller pills</dt>
+                        <dd class="wfnote__def">A shortcut row of every active client with their lifetime order
+                            count. Clicking one jumps straight to that client.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Clear</dt>
+                        <dd class="wfnote__def">The cross button drops the search and the dates and puts you back
+                            on the full list.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">View orders</dt>
+                        <dd class="wfnote__def">Opens the Orders page filtered to that client, carrying your date
+                            range across so the numbers match what you were looking at.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the columns</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Total</dt>
+                        <dd class="wfnote__def">Every order that client created inside the date range, whatever
+                            became of it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pending</dt>
+                        <dd class="wfnote__def">Still sitting at the front of the pipe — not yet moved into
+                            processing. A high number here on an old date range is worth chasing.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Processing</dt>
+                        <dd class="wfnote__def">Accepted and in motion, somewhere between our hands and the customer's.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Done</dt>
+                        <dd class="wfnote__def">Delivered. This is the only column that means money earned.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Failed</dt>
+                        <dd class="wfnote__def">Cancelled orders. It does not count failed delivery attempts —
+                            a task that failed but is still alive stays under Processing.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>The five counts follow your <strong>date range</strong>; the numbers on the pills do not —
+                    those are lifetime totals and will not agree with the table.</li>
+                <li>Clicking a pill <strong>clears your dates</strong>, because it is a plain name search. Set
+                    the range again afterwards if you were mid-investigation.</li>
+                <li>Rows are ordered by busiest first, and clients with zero orders in the period are still
+                    listed — including ones whose account is no longer active. The pills only show active clients.</li>
+                <li>Search matches the client's stored name exactly as typed, so a pill for a renamed client
+                    can come back empty. Search the client code instead.</li>
+                <li>Totals here count <strong>orders, not deliveries</strong>. One order with several attempts
+                    is still one row of the total.</li>
+            </ul>
+        </section>
+    

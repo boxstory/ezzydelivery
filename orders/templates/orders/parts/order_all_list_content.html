@@ -1,6 +1,7 @@
 {# Purpose: Main content for the client dashboard orders list page (mobile PWA + desktop table) #}
 {# Used by: orders/order_all_list.html via {% include %} #}
 {% load custom_filters %}
+{% load business_console %}
 {% load business_pwa_tags %}
   <!-- ==========================================
        Mobile PWA View (visible < 768px only)
@@ -151,6 +152,14 @@
                   <span>{% get_zone_display order %}</span>
                 </span>
               </div>
+              {% if order.scheduled_delivery and order.scheduled_date %}
+              <span class="oap__sched-plate mt-1">
+                <span class="oap__sched-plate__date"><i class="fa-solid fa-calendar-day me-1"></i>Deliver {{ order.scheduled_date|date:"D, d M" }}</span>
+                <span class="oap__sched-plate__meta">
+                  {% if order.scheduled_occasion %}{{ order.get_scheduled_occasion_display }}{% else %}Scheduled{% endif %}{% if order.scheduled_time %} · {{ order.scheduled_time|time:"H:i" }}{% endif %}{% if order.scheduled_note %} · {{ order.scheduled_note|truncatechars:32 }}{% endif %}
+                </span>
+              </span>
+              {% endif %}
               <div class="pwa-order-card-full__footer">
                 <span class="pwa-order-card-full__cod">
                   <i class="fas fa-money-bill-wave"></i> QAR {{ order.cod_amount|default:0 }}
@@ -167,6 +176,17 @@
               <i class="fas fa-print"></i>
             </a>
             {% if order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+            <button type="button"
+                    class="pwa-card-actions__btn oal__action-btn--schedule{% if order.scheduled_delivery and order.scheduled_date %} pwa-card-actions__btn--active{% endif %}"
+                    data-order-id="{{ order.id }}"
+                    data-order-number="{{ order.order_number }}"
+                    data-scheduled-date="{% if order.scheduled_delivery and order.scheduled_date %}{{ order.scheduled_date|date:'Y-m-d' }}{% endif %}"
+                    data-scheduled-time="{% if order.scheduled_time %}{{ order.scheduled_time|time:'H:i' }}{% endif %}"
+                    data-scheduled-occasion="{{ order.scheduled_occasion }}"
+                    data-scheduled-note="{{ order.scheduled_note }}"
+                    title="Set a delivery date">
+              <i class="fas fa-calendar-day"></i>
+            </button>
             <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--review" data-status="to_review" title="Hold for Review">
               <i class="fas fa-clock"></i>
             </button>
@@ -208,20 +228,9 @@
   <div class="col-12" id="orders_all_list_container_main">
     <section class="d-block" id="orders_all_list_section_main">
       <div class="col-12 pb-2">
-        <div class="px-2 px-md-3">
-          <div class="bcon__header mb-3" id="orders_all_list_header">
-            <div class="bcon__header-main">
-              <div class="bcon__eyebrow">
-                <span>Orders</span>
-                <span class="bcon__eyebrow-sep"></span>
-                <span class="bcon__eyebrow-live">Manifest</span>
-              </div>
-              <h1 class="bcon__title" id="orders_all_list_title">
-                <i class="fa-solid fa-basket-shopping"></i> Orders
-                <span class="bcon__badge bcon__badge--navy">{{ len }}</span>
-              </h1>
-            </div>
-            <div class="bcon__actions" id="orders_all_list_nav_actions">
+        <div class="bcon__page">
+          <div id="orders_all_list_header">
+            {% bconheader eyebrow=business.business_name live="Manifest" icon="fa-solid fa-basket-shopping" title="Orders" subtitle="Every order you have sent to Ezzy, and where each one stands." %}
               <a class="bcon__btn bcon__btn--secondary"
                  href="{% url 'orders:get_order_by_api' %}"
                  id="orders_all_list_btn_api_upload">
@@ -235,10 +244,13 @@
               <a class="bcon__btn bcon__btn--primary"
                  href="{% url 'orders:add_order' %}"
                  id="orders_all_list_btn_add_orders">
-                <i class="fa-solid fa-plus"></i> Add Order
+                <i class="fa-solid fa-plus"></i> Add order
               </a>
-            </div>
+            {% endbconheader %}
           </div>
+
+          <!-- Tally rail: segment counts that double as status filters -->
+          {% include "orders/parts/_orders_tally_rail.html" %}
 
           <!-- Filter Section -->
           <div class="ofb__section mb-2">
@@ -273,9 +285,9 @@
                     </div>
                   </div>
                   <div class="ofb__pills">
+                    <span class="ofb__pills-label">Jump to</span>
                     <button type="button" class="oal__quick-pill btn-quick-filter" data-filter="today">Today</button>
-                    <button type="button" class="oal__quick-pill btn-quick-filter" data-filter="pending">Pending</button>
-                    <button type="button" class="oal__quick-pill btn-quick-filter" data-filter="with_cod">COD</button>
+                    <button type="button" class="oal__quick-pill btn-quick-filter" data-filter="with_cod">COD orders</button>
                   </div>
                 </div>
               </div>
@@ -325,6 +337,7 @@
                       <label for="dlStatus" class="form-label mb-0">Delivery</label>
                       <select class="form-select form-select-sm" name="dlStatus" id="dlStatus">
                         <option value="">All</option>
+                        <option value="active" {% if filters.dlStatus == 'active' %}selected{% endif %}>In transit (any stage)</option>
                         <option value="delivered" {% if filters.dlStatus == 'delivered' %}selected{% endif %}>Delivered</option>
                         <option value="assigned" {% if filters.dlStatus == 'assigned' %}selected{% endif %}>Assigned</option>
                         <option value="out_for_delivery" {% if filters.dlStatus == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
@@ -392,23 +405,7 @@
           </div>
 
           {% if has_ecom_api %}
-          <div class="oal__api-pending mb-3" id="orders_api_pending_section">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <h5 class="mb-0">
-                    <i class="fa-solid fa-cloud-arrow-down me-1 text-primary"></i>
-                    New Orders to Import
-                </h5>
-                <span class="text-muted small">— Latest 10 from your store</span>
-            </div>
-            <div id="orders_api_pending_panel"
-                 hx-get="{% url 'orders:orders_api_pending_list' %}"
-                 hx-trigger="load"
-                 hx-swap="innerHTML">
-                <div class="text-muted small py-2">
-                    <i class="fa-solid fa-spinner fa-spin me-1"></i> Fetching latest orders from your store...
-                </div>
-            </div>
-          </div>
+          {% include "orders/parts/_shopify_import_panel.html" %}
           {% endif %}
 
           <div id="orders_table_view" class="orders-view-container">
@@ -429,10 +426,10 @@
                 <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--cancel" id="orders_bulk_btn_cancel">
                   <i class="fa-solid fa-ban"></i> Cancel
                 </button>
-                <button type="button" class="bulk-action-bar__btn" id="orders_bulk_btn_parse" style="background:var(--brand-primary);color:#fff;">
+                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--parse" id="orders_bulk_btn_parse">
                   <i class="fa-solid fa-robot"></i> Parse Location
                 </button>
-                <button type="button" class="bulk-action-bar__btn" id="orders_bulk_btn_print" style="background:var(--brand-navy, #001f3f);color:#fff;">
+                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--print" id="orders_bulk_btn_print">
                   <i class="fa-solid fa-print"></i> Print Labels
                 </button>
               </div>
@@ -463,3 +460,4 @@
   </div>
 
   {% include "orders/parts/_reconfirm_modal.html" %}
+  {% include "orders/parts/_schedule_delivery_modal.html" %}

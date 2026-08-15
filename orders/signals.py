@@ -107,9 +107,31 @@ def order_pre_save_receiver(sender, instance, *args, **kwargs):
             pass
 
 
+def _refresh_route_distance(instance):
+    """Keep the stored pickup→drop distance in step with the address.
+
+    Written with a queryset update rather than instance.save() so it also lands
+    when the caller saved with update_fields (a coords-only save would otherwise
+    leave the distance stale), and so it cannot recurse back into this receiver.
+    """
+    from delivery.geo import apply_route_distance
+
+    try:
+        if apply_route_distance(instance):
+            Order.objects.filter(pk=instance.pk).update(
+                route_distance_km=instance.route_distance_km,
+                route_distance_exact=instance.route_distance_exact,
+            )
+    except Exception:
+        # A distance is never worth failing an order save over.
+        logger.warning('Could not refresh route distance for order %s', instance.pk,
+                       exc_info=True)
+
+
 @receiver(post_save, sender=Order, dispatch_uid='orders.order_post_save')
 def order_post_save_receiver(sender, instance, created, *args, **kwargs):
     logger.debug('order_post_save_receiver')
+    _refresh_route_distance(instance)
     if created:
         logger.debug(f'New order created: {instance}')
         if not instance.order_number or instance.order_number == "":
@@ -613,46 +635,54 @@ def _create_delivery_task_from_order(order):
         _HUMAN_PINS = ('by_customer', 'by_staff', 'by_driver')
         _has_pin = (order.latitude and order.longitude
                     and order.latitude != Decimal('0') and order.longitude != Decimal('0'))
-        if _has_pin and (not order.dl_zone or order.coords_accuracy in _HUMAN_PINS):
-            zone_obj, match = delivery_models.ZoneName.find_by_coords(
-                order.latitude, order.longitude
+        # Advisory only — a failure here must never stop the delivery task from
+        # being created, or the order silently stalls at "published with no task".
+        try:
+            if _has_pin and (not order.dl_zone or order.coords_accuracy in _HUMAN_PINS):
+                zone_obj, match = delivery_models.ZoneName.find_by_coords(
+                    order.latitude, order.longitude
+                )
+                if zone_obj is not None:
+                    if not order.dl_zone:
+                        # Backfill: order had a pin but no zone text
+                        order.dl_zone = zone_obj.zone_number
+                        order.save(update_fields=['dl_zone'])
+                        if not address_update.dl_zone:
+                            address_update.dl_zone = zone_obj.zone_number
+                            address_update.save(update_fields=['dl_zone'])
+                        logger.info(
+                            f"Reverse-resolved zone from coords ({order.latitude}, {order.longitude}) "
+                            f"-> zone {zone_obj.zone_number} via {match['method']}"
+                            + (f" ({match['distance_m']:.0f}m)" if match.get('distance_m') else "")
+                        )
+                    elif zone_obj.zone_number != order.dl_zone \
+                            and order.coords_accuracy in _HUMAN_PINS:
+                        # Discrepancy: human pin disagrees with the typed zone.
+                        dist = f" ({match['distance_m']:.0f}m)" if match.get('distance_m') else ""
+                        logger.warning(
+                            f"ZONE MISMATCH order={order.pk}: typed zone {order.dl_zone} but "
+                            f"{order.coords_accuracy} pin ({order.latitude}, {order.longitude}) "
+                            f"resolves to zone {zone_obj.zone_number} via {match['method']}{dist}"
+                        )
+                        marker = "[ZONE-MISMATCH]"
+                        note_line = (
+                            f"{marker} pin ({order.coords_accuracy}) resolves to zone "
+                            f"{zone_obj.zone_number} ({zone_obj.zone_name}) but typed zone is "
+                            f"{order.dl_zone} — verify address."
+                        )
+                        existing = address_update.notes or ''
+                        # Drop any prior mismatch line, then re-add the current one
+                        kept = [ln for ln in existing.splitlines() if marker not in ln]
+                        kept.append(note_line)
+                        new_notes = '\n'.join(kept).strip()
+                        if new_notes != existing:
+                            address_update.notes = new_notes
+                            address_update.save(update_fields=['notes'])
+        except Exception as e:
+            logger.warning(
+                f"Zone reverse-resolve/mismatch check failed for order {order.pk}: {e}",
+                exc_info=True,
             )
-            if zone_obj is not None:
-                if not order.dl_zone:
-                    # Backfill: order had a pin but no zone text
-                    order.dl_zone = zone_obj.zone_number
-                    order.save(update_fields=['dl_zone'])
-                    if not address_update.dl_zone:
-                        address_update.dl_zone = zone_obj.zone_number
-                        address_update.save(update_fields=['dl_zone'])
-                    logger.info(
-                        f"Reverse-resolved zone from coords ({order.latitude}, {order.longitude}) "
-                        f"-> zone {zone_obj.zone_number} via {match['method']}"
-                        + (f" ({match['distance_m']:.0f}m)" if match.get('distance_m') else "")
-                    )
-                elif zone_obj.zone_number != order.dl_zone \
-                        and order.coords_accuracy in _HUMAN_PINS:
-                    # Discrepancy: human pin disagrees with the typed zone.
-                    dist = f" ({match['distance_m']:.0f}m)" if match.get('distance_m') else ""
-                    logger.warning(
-                        f"ZONE MISMATCH order={order.pk}: typed zone {order.dl_zone} but "
-                        f"{order.coords_accuracy} pin ({order.latitude}, {order.longitude}) "
-                        f"resolves to zone {zone_obj.zone_number} via {match['method']}{dist}"
-                    )
-                    marker = "[ZONE-MISMATCH]"
-                    note_line = (
-                        f"{marker} pin ({order.coords_accuracy}) resolves to zone "
-                        f"{zone_obj.zone_number} ({zone_obj.zone_name}) but typed zone is "
-                        f"{order.dl_zone} — verify address."
-                    )
-                    existing = address_update.notes or ''
-                    # Drop any prior mismatch line, then re-add the current one
-                    kept = [ln for ln in existing.splitlines() if marker not in ln]
-                    kept.append(note_line)
-                    new_notes = '\n'.join(kept).strip()
-                    if new_notes != existing:
-                        address_update.notes = new_notes
-                        address_update.save(update_fields=['notes'])
 
         # Map delivery_speed → dl_speed
         _dl_speed_map = {'same_day': 'Same Day', 'express': 'On Demand'}

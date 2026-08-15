@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff reference view of zone groups — the wider delivery areas zones are bundled into
+Used by: delivery.views.zone_groups at /delivery/zone-groups/
+Notes: Read-only (search only); groups are created/edited in the admin. Carries the shared wfnote__
+       page-notes card under the hero, hidden on load; the hero help button toggles it via the
+       delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Zone Groups{% endblock title %}
 
@@ -18,7 +25,16 @@
       <h1 class="zng__hero-title">Zone Groups</h1>
       <p class="zng__hero-sub">Organize delivery zones into logical groups</p>
     </div>
+    <button type="button" class="wfnote__btn ms-auto" data-wfnote-toggle
+            aria-expanded="false" aria-controls="delivery_zone_groups_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
   </div>
+
+  <div class="wfnote" id="delivery_zone_groups_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'delivery_zone_groups_card_notes' %}" hidden></div>
 
   <!-- Stats -->
   <div class="zng__stats">

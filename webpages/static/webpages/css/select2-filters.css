@@ -57,23 +57,40 @@
 }
 
 .ez-filter-select__menu .select2-search--dropdown {
-    padding: 0.4rem;
+    padding: 0.375rem;
 }
 
-/* The search field is the whole point of this picker — give it the same box
-   as the filter inputs it sits under. */
+/* The search field is the whole point of this picker, so it carries the brand
+   filter-input box — 0.375rem padding baseline, radius-sm, yellow focus ring.
+   Height tracks the control it dropped from: the initialiser writes
+   `--ez-filter-field-h` onto the dropdown (see main_dashboard_scripts.html),
+   because the dropdown lives on <body> and CSS cannot see its host bar. The
+   1.75rem fallback is the brand filter-field height. Select2's own field is
+   taller than either and read as oversized next to the bar it filters. */
 .ez-filter-select__menu .select2-search--dropdown .select2-search__field {
-    height: 30px;
-    padding: 0.25rem 0.5rem;
+    height: var(--ez-filter-field-h, 1.75rem);
+    /* mobile-app.css puts a 44px touch floor on every text/search input from
+       576px up, and Select2's field is type="search" — without this the height
+       above is ignored and the box stands 16px taller than the bar it filters.
+       Same release valve the filter bars use. */
+    min-height: 0;
+    padding: 0.1875rem 0.5rem;
     font-size: 0.78rem;
+    line-height: 1.25;
     border: 1px solid var(--brand-grey-300, #d5dbe3);
-    border-radius: 0.3rem;
-    color: var(--brand-navy, #001f3f);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    color: var(--brand-grey-800, #1f1f1f);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ez-filter-select__menu .select2-search--dropdown .select2-search__field::placeholder {
+    color: var(--brand-grey-450, #9ca3af);
 }
 
 .ez-filter-select__menu .select2-search--dropdown .select2-search__field:focus {
     outline: none;
     border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.18);
 }
 
 .ez-filter-select__menu .select2-results__option {

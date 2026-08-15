@@ -2,6 +2,7 @@
 {# Used by: workforce.views.cod_business_settlement_report (URL workforce:cod_business_settlement_report) #}
 {# Notes: Same "teller tape" vocabulary as the driver payout worksheet. The POST contract to #}
 {#        cod_business_settlement_action is fixed — task_ids[] / deduct_charges / deduction_*[] must not change. #}
+{#        Carries the shared page-notes card (wfnote__) under the masthead, hidden on load and toggled by the masthead help button. #}
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static humanize %}
@@ -12,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260728d" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260729b" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -20,24 +21,61 @@
   <div class="bcp__wrap">
 
     <!-- Masthead -->
-    <header class="bcp__masthead">
-      <div class="bcp__masthead-row">
-        <div>
-          <p class="bcp__eyebrow">Leg 3 · Ezzy ▸ Business</p>
-          <h1 class="bcp__title">Client Payout</h1>
-          <p class="bcp__sub">
-            {% if date_from or date_to %}{{ date_from|default:"…" }} → {{ date_to|default:"…" }}{% else %}All COD held{% endif %}
-            <span class="bcp__sep">·</span> {{ task_count }} deliver{{ task_count|pluralize:"y,ies" }} awaiting payout
-            <span class="bcp__sep">·</span> {{ all_businesses|length }} account{{ all_businesses|length|pluralize }} with COD held
-          </p>
-        </div>
-        <div class="bcp__masthead-actions">
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Leg 3 · Ezzy ▸ Business</span>
+        <h1 class="wfhero__title">Client Payout</h1>
+        <span class="wfhero__sub">
+          {% if date_from or date_to %}{{ date_from|default:"…" }} → {{ date_to|default:"…" }}{% else %}All COD held{% endif %}
+          <span class="wfhero__sep">·</span> COD sitting with us that belongs to the client
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <nav class="wfhero__actions">
           <a href="{% url 'workforce:cod_business_settlement_pdf' %}{% if business_filter %}?business_id={{ business_filter }}{% endif %}"
-             class="bcp__ghost" target="_blank" rel="noopener">Statement PDF</a>
-          <a href="#bcp-void" class="bcp__ghost bcp__ghost--void">Void a payout</a>
-        </div>
+             class="wfhero__ghost" target="_blank" rel="noopener">Statement PDF</a>
+          <a href="{% url 'workforce:cod_business_payout_history' %}" class="wfhero__ghost">Payout history</a>
+          <a href="#bcp-void" class="wfhero__ghost wfhero__ghost--alert">Void a payout</a>
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_cod_business_settlement_report_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
       </div>
     </header>
+
+    <div class="wfnote" id="workforce_cod_business_settlement_report_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_cod_business_settlement_report_card_notes' %}" hidden></div>
+
+    {% comment %}
+    What is on the desk before an account is picked. These are the whole board,
+    not the selected account — the payout ladder further down does the arithmetic
+    for the one account being paid.
+    {% endcomment %}
+    <section class="wfstat" aria-label="COD awaiting payout">
+      <div class="wfstat__card wfstat__card--here">
+        <span class="wfstat__label">COD held</span>
+        <span class="wfstat__value">{{ grand_total|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">collected, settled, not yet handed back</span>
+      </div>
+      <div class="wfstat__card">
+        <span class="wfstat__label">Charges to withhold</span>
+        <span class="wfstat__value">{{ grand_total_fee|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">delivery fees due to come off the top</span>
+      </div>
+      <div class="wfstat__card">
+        <span class="wfstat__label">Awaiting payout</span>
+        <span class="wfstat__value">{{ task_count|intcomma }}</span>
+        <span class="wfstat__sub">deliver{{ task_count|pluralize:"y,ies" }} on the desk</span>
+      </div>
+      <div class="wfstat__card">
+        <span class="wfstat__label">Accounts</span>
+        <span class="wfstat__value">{{ business_count|intcomma }}</span>
+        <span class="wfstat__sub">business{{ business_count|pluralize:",es" }} with COD held</span>
+      </div>
+    </section>
 
     <!-- Teller window: pick an account -->
     <form method="GET" class="bcp__window" id="workforce_client_payout_form_filter">
@@ -46,8 +84,8 @@
         <select name="business_id" id="workforce_client_payout_select_business" class="bcp__select">
           <option value="">Choose a business…</option>
           {% for biz in all_businesses|code_last %}
-          {# The outstanding figure rides on the option so staff can see which
-             accounts are owed money without selecting each one in turn. #}
+          {% comment %} The outstanding figure rides on the option so staff can see which
+             accounts are owed money without selecting each one in turn. {% endcomment %}
           <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}{% if biz.pending_count %} — {{ biz.pending_total|floatformat:0|intcomma }} QR held{% else %} — nothing held{% endif %}</option>
           {% endfor %}
         </select>
@@ -137,9 +175,12 @@
             {% for t in g.tasks %}
             <tr>
               <td class="bcp__col-check">
+                {% comment %} data-fee is 0 for a delivery already on a client invoice — the
+                   fee is being collected there, so withholding it here as well would
+                   charge the same delivery twice. The action view drops it too. {% endcomment %}
                 <input type="checkbox" class="bcp__task-check" data-business="{{ g.business.business_id }}"
                        value="{{ t.id }}" data-amount="{{ t.cod_collected_amount|floatformat:2 }}"
-                       data-fee="{{ t.verified_delivery_charge|default_if_none:t.dl_price|default:0|floatformat:2 }}"
+                       data-fee="{% if t.billed_elsewhere %}0.00{% else %}{{ t.billable_charge|floatformat:2 }}{% endif %}"
                        data-order="{% if t.order %}{{ t.order.order_number|default:t.order_id }}{% else %}{{ t.id }}{% endif %}">
               </td>
               <td class="bcp__order">
@@ -154,11 +195,17 @@
               <td class="bcp__date">{{ t.completed_at|date:"d M Y"|default:"—" }}</td>
               <td class="bcp__date">{{ t.cod_settled_at|date:"d M Y"|default:"—" }}</td>
               <td class="bcp__num bcp__num--fee">
-                {# default_if_none, not default: a charge deliberately verified at 0.00 must stay 0.00
-                   rather than falling back to dl_price. Mirrors the view's `is not None` resolution. #}
-                {{ t.verified_delivery_charge|default_if_none:t.dl_price|default:0|floatformat:2|intcomma }}
+                {% comment %} One resolver, shared with the settle action and the invoice
+                   (delivery/charges.py) — resolves on `is not None`, so a charge
+                   verified at 0.00 stays 0.00 instead of falling back to dl_price. {% endcomment %}
+                {{ t.billable_charge|floatformat:2|intcomma }}
+                {% if t.billed_elsewhere %}
+                <span class="bcp__status bcp__status--published"
+                      title="Already billed on a client charge invoice — not withheld here">Invoiced</span>
+                {% else %}
                 <span class="bcp__status bcp__status--{{ t.charge_verification_status|default:'pending' }}"
                       title="Client delivery-charge verification">{{ t.charge_verification_status|default:"pending"|title }}</span>
+                {% endif %}
               </td>
               <td class="bcp__num bcp__num--cod">{{ t.cod_collected_amount|floatformat:2|intcomma }}</td>
             </tr>
@@ -496,10 +543,20 @@
         body: body.toString(),
       });
       const data = await resp.json();
+      // Name any account that did not go through. A partial run used to look
+      // identical to a clean one, so a failure read as a completed payout.
+      const problems = (data.failed_businesses || []).concat(data.skipped_businesses || [])
+        .map(p => '· ' + p.business + ' — ' + (p.error || p.reason)).join('\n');
       // Land on the invoice — the payout is not done until there is a document.
+      if (data.success && data.partial && problems) {
+        alert('Paid ' + data.settled_count + ' account(s). Not paid:\n' + problems);
+      }
       if (data.success && data.invoice_url) { window.location.href = data.invoice_url; }
       else if (data.success) { window.location.reload(); }
-      else { alert(data.error || 'Handover failed'); this.disabled = false; }
+      else {
+        alert((data.error || 'Handover failed') + (problems ? '\n\n' + problems : ''));
+        this.disabled = false;
+      }
     } catch (e) { alert('Network error'); this.disabled = false; }
   });
 

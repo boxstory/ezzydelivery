@@ -1,6 +1,7 @@
 {# Purpose: Printable payout invoice for one driver settlement — earnings only, no COD. #}
 {# Used by: workforce.views.driver_payout_invoice (URL workforce:driver_payout_invoice) #}
 {# Notes: COD is the driver's hand-in leg, not money owed — it never appears here by design. #}
+{#        Carries the shared page-notes card (wfnote__) in the screen-only toolbar, never inside the printed sheet. #}
 {% extends "wf_dashboard_base.html" %}
 {% load static humanize %}
 
@@ -10,21 +11,48 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/cod_payout_invoice.css' %}?v=20260728e" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_payout_invoice.css' %}?v=20260815a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/invoice_preview.css' %}?v=20260815a" type="text/css" />
 {% endblock %}
 
 {% block content %}
 <div class="bpi">
   <div class="bpi__toolbar d-flex flex-wrap align-items-center justify-content-between gap-2">
     <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}" class="bpi__ghost">◂ Back to transactions</a>
+    <div class="d-flex align-items-center gap-2">
     <button type="button" class="bpi__ghost" id="workforce_driver_payout_btn_print">Print invoice</button>
+    <button type="button" class="bpi__ghost" id="workforce_driver_payout_btn_preview"
+            data-bpi-preview-toggle aria-pressed="false">A4 preview</button>
+    <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_driver_payout_invoice_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
+    </div>
   </div>
 
+  <div class="wfnote" id="workforce_driver_payout_invoice_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_driver_payout_invoice_card_notes' %}" hidden></div>
+
   <article class="bpi__sheet">
+   {# One-column table shell so the letterpad bands repeat on every printed page #}
+   <table class="bpi__page">
+    <thead>
+      <tr><td>
+        <img class="bpi__lp-top" src="{% static 'webpages/img/letterhead-top.png' %}"
+             alt="Ezzy Delivery Qatar — last mile delivery partner in Qatar · +974 66451589 · Fareej Sudan, Doha · info@ezzydelivery.qa · www.ezzydelivery.qa"
+             width="1600" height="487">
+      </td></tr>
+    </thead>
+    <tbody>
+      <tr><td>
+
+    <h2 class="bpi__doc-title">Driver Payout Invoice</h2>
 
     <header class="bpi__head">
       <div class="bpi__head-left">
-        <p class="bpi__eyebrow">Driver Payout</p>
+        <p class="bpi__eyebrow">Payout to</p>
         <h1 class="bpi__biz">
           {% if driver.user %}{{ driver.user.first_name }} {{ driver.user.last_name }}{% else %}{{ driver.driver_code|default:"—" }}{% endif %}
         </h1>
@@ -121,11 +149,27 @@
       </div>
     </footer>
 
+      </td></tr>
+    </tbody>
+    <tfoot>
+      <tr><td>
+        <img class="bpi__lp-bottom" src="{% static 'webpages/img/letterhead-bottom.png' %}"
+             alt="" width="1600" height="113">
+      </td></tr>
+    </tfoot>
+   </table>
   </article>
+
+  {# A4 sheet preview — screen only, built from the sheet above by invoice_preview.js #}
+  <section class="bprev" aria-label="A4 page preview">
+    <p class="bprev__meta">Building preview…</p>
+    <div class="bprev__pages"></div>
+  </section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'workforce/js/invoice_preview.js' %}?v=20260813a"></script>
 <script>
   document.getElementById('workforce_driver_payout_btn_print')?.addEventListener('click', function () {
     window.print();

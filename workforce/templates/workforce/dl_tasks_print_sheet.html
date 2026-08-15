@@ -1,0 +1,167 @@
+{% load static %}
+{% comment %}
+Purpose: A4 landscape delivery sheet for the staff All Tasks list (print / hand to fleet)
+Used by: workforce.views dl_tasks_print_sheet
+Notes: Columns and values come from the view's shared registry (dl_sheet_export_columns),
+       the same one the CSV export uses — never re-list columns here. The last two
+       columns are intentionally blank for the fleet to fill in by hand.
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delivery Sheet — {{ printed_on|date:"d M Y" }}</title>
+    <link href="{% static 'workforce/css/dl-task-sheet.css' %}?v=20260808d" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="dlsht">
+
+    <div class="dlsht__bar dlsht__no-print">
+        <a href="javascript:history.back()" class="dlsht__btn">
+            <i class="fa-solid fa-arrow-left"></i> Back
+        </a>
+        <span class="dlsht__bar-info">
+            {{ row_count }} task{{ row_count|pluralize }}{% if selection_only %} — selected rows only{% endif %}{% if columns_narrowed %} · {{ headers|length }} of {{ all_columns|length }} columns{% endif %}
+        </span>
+        <span class="dlsht__bar-actions">
+            <button type="button" class="dlsht__btn" id="workforce_sheet_btn_columns" data-cols-toggle
+                    aria-expanded="false" aria-controls="workforce_sheet_panel_columns">
+                <i class="fa-solid fa-table-columns"></i> Columns
+            </button>
+            <button type="button" class="dlsht__btn dlsht__btn--print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print sheet
+            </button>
+        </span>
+    </div>
+
+    <!-- Column config: which columns this sheet prints. Screen only. -->
+    <section class="dlsht__cols dlsht__no-print" id="workforce_sheet_panel_columns" hidden>
+        <div class="dlsht__cols-head">
+            <span class="dlsht__cols-title">Columns on this sheet</span>
+            <span class="dlsht__cols-tools">
+                <button type="button" class="dlsht__link" data-cols-all>Select all</button>
+                <button type="button" class="dlsht__link" data-cols-none>Clear</button>
+            </span>
+        </div>
+        <div class="dlsht__cols-grid">
+            {% for col in all_columns %}
+            <label class="dlsht__cols-item">
+                <input type="checkbox" value="{{ col.key }}" {% if col.checked %}checked{% endif %}>
+                <span>{{ col.label }}</span>
+            </label>
+            {% endfor %}
+        </div>
+        <div class="dlsht__cols-foot">
+            <label class="dlsht__cols-remember">
+                <input type="checkbox" data-cols-remember checked>
+                Remember for next time
+            </label>
+            <button type="button" class="dlsht__btn dlsht__btn--print" data-cols-apply>
+                <i class="fa-solid fa-check"></i> Apply to sheet
+            </button>
+        </div>
+    </section>
+
+    {% if truncated %}
+    <div class="dlsht__notice dlsht__no-print">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        Showing the first {{ limit }} tasks only — narrow the filters to print the rest.
+    </div>
+    {% endif %}
+
+    <div class="dlsht__page">
+        <header class="dlsht__head">
+            <div class="dlsht__brand">
+                <img src="{% static 'webpages/img/ezzy-logo-512-512.png' %}" alt="Ezzy Delivery" class="dlsht__logo">
+                <div>
+                    <h1 class="dlsht__title">EZZY Delivery Qatar</h1>
+                    <p class="dlsht__sub">Delivery Sheet</p>
+                </div>
+            </div>
+            <div class="dlsht__meta">
+                <div><span class="dlsht__meta-key">Printed</span> {{ printed_on|date:"d M Y H:i" }}</div>
+                <div><span class="dlsht__meta-key">Tasks</span> {{ row_count }}</div>
+                <div class="dlsht__sign"><span class="dlsht__meta-key">Received by</span> <span class="dlsht__rule"></span></div>
+            </div>
+        </header>
+
+        {% if rows %}
+        <table class="dlsht__table">
+            <thead>
+                <tr>
+                    <th class="dlsht__num">#</th>
+                    {% for h in headers %}<th class="dlsht__c--{{ h.key }}">{{ h.label }}</th>{% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td class="dlsht__num">{{ forloop.counter }}</td>
+                    {% for cell in row %}<td class="dlsht__c--{{ cell.key }}">{{ cell.value }}</td>{% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="dlsht__empty">No tasks match the current filters.</p>
+        {% endif %}
+
+        <footer class="dlsht__foot">
+            <div class="dlsht__sign"><span class="dlsht__meta-key">Fleet signature</span> <span class="dlsht__rule"></span></div>
+            <div class="dlsht__sign"><span class="dlsht__meta-key">Staff signature</span> <span class="dlsht__rule"></span></div>
+        </footer>
+    </div>
+
+<script>
+// Columns panel: rebuilds the sheet URL with ?columns=. The pick is stored under
+// the same localStorage key the list page's CSV picker uses, so choosing columns
+// in either place carries over to the other.
+(function () {
+    var panel = document.getElementById('workforce_sheet_panel_columns');
+    if (!panel) return;
+    var STORAGE_KEY = '{{ export_storage_key }}';
+
+    function boxes() {
+        return Array.prototype.slice.call(panel.querySelectorAll('.dlsht__cols-item input'));
+    }
+
+    document.querySelector('[data-cols-toggle]').addEventListener('click', function (e) {
+        panel.hidden = !panel.hidden;
+        e.currentTarget.setAttribute('aria-expanded', String(!panel.hidden));
+    });
+
+    panel.addEventListener('click', function (e) {
+        var t = e.target.closest('[data-cols-all],[data-cols-none],[data-cols-apply]');
+        if (!t) return;
+        if (t.hasAttribute('data-cols-all')) {
+            boxes().forEach(function (b) { b.checked = true; });
+        } else if (t.hasAttribute('data-cols-none')) {
+            boxes().forEach(function (b) { b.checked = false; });
+        } else {
+            apply();
+        }
+    });
+
+    function apply() {
+        var picked = boxes().filter(function (b) { return b.checked; })
+                            .map(function (b) { return b.value; });
+        if (!picked.length) {
+            alert('Pick at least one column.');
+            return;
+        }
+        var remember = panel.querySelector('[data-cols-remember]');
+        try {
+            if (remember && remember.checked) localStorage.setItem(STORAGE_KEY, JSON.stringify(picked));
+            else localStorage.removeItem(STORAGE_KEY);
+        } catch (err) { /* storage may be unavailable */ }
+
+        // Keep the filters/ids already on the URL — only the columns change.
+        var u = new URL(window.location.href);
+        u.searchParams.set('columns', picked.join(','));
+        window.location.href = u.pathname + '?' + u.searchParams.toString();
+    }
+})();
+</script>
+</body>
+</html>

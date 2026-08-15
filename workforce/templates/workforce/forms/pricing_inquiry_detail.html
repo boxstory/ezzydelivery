@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Full CRM record for one 3PL pricing inquiry — read, edit, stage, assign and log activity
+Used by: workforce.views.pricing_inquiry_detail at /workforce/forms/pricing-inquiries/<id>/
+Notes: pid__ namespace; view/edit panels are two copies of the same fields toggled by Edit.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block extra_css %}
 {# workforce.css already loaded in wf_dashboard_base.html #}
@@ -74,16 +81,32 @@
         <a href="https://wa.me/{{ inquiry.business_contact_number|cut:'+' }}" target="_blank" class="pid__hero__btn pid__hero__btn--wa">
           <i class="fa-brands fa-whatsapp"></i>WhatsApp
         </a>
+        {# Business lead: sends from the CRM — Business Leads number/channel. #}
+        <button type="button" class="pid__hero__btn pid__hero__btn--wa"
+                data-wasend-open
+                data-wasend-to="{{ inquiry.business_contact_number|cut:'+' }}"
+                data-wasend-name="{{ inquiry.business_name|escape }}">
+          <i class="fa-solid fa-paper-plane"></i>Send from EZZY
+        </button>
         <button type="button" class="pid__hero__btn pid__hero__btn--manage" id="pid-edit-toggle" onclick="toggleEditMode()">
           <i class="fa-solid fa-pen-to-square"></i>Edit
         </button>
         <a href="#manage-panel" class="pid__hero__btn pid__hero__btn--manage">
           <i class="fa-solid fa-sliders"></i>Manage
         </a>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_forms_pricing_inquiry_detail_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
       </div>
 
     </div>
   </div>
+
+  <div class="wfnote" id="workforce_forms_pricing_inquiry_detail_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_forms_pricing_inquiry_detail_card_notes' %}" hidden></div>
 
   <!-- ══════════════════════════════════════
        STATS ROW
@@ -983,5 +1006,7 @@
   });
 </script>
 <script src="{% static 'workforce/js/pricing_inquiry_detail.js' %}"></script>
+
+{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="crm_leads" wa_message=wa_send_message %}
 
 {% endblock %}

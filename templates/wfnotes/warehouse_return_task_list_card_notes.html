@@ -1,0 +1,62 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/return_task_list.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_return_task_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Stock that was <strong>picked for an order that then fell through</strong>, and now has to
+            go back on the shelf. A return task is created automatically when an order is cancelled
+            after its items were already picked. Until the task is worked, those units are off the shelf
+            but belong to nobody.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Task status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pending</dt>
+                        <dd class="wfnote__def">Nobody has picked it up. Opening the task claims it and
+                            starts it in one move.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">In progress</dt>
+                        <dd class="wfnote__def">Someone is walking the items back. Lines are confirmed
+                            one at a time.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Completed</dt>
+                        <dd class="wfnote__def">Everything is back on its shelf and the stock figures
+                            have been put right.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the list</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Order and pick list</dt>
+                        <dd class="wfnote__def">The cancelled order and the batch it was picked in —
+                            enough to trace why the units left the shelf.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Reason</dt>
+                        <dd class="wfnote__def">Currently always an order cancellation; the note on the
+                            task carries the detail.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Status filter</dt>
+                        <dd class="wfnote__def">Use it to keep only open work. Newest tasks first.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Not to be confused with</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Customer returns (RMA)</strong> — goods a customer sends back after
+                        delivery. These never left the warehouse.</li>
+                    <li><strong>Put-away</strong> — newly received stock being shelved for the first
+                        time, not stock coming back.</li>
+                </ul>
+            </section>
+        </div>

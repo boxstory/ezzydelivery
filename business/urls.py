@@ -20,6 +20,8 @@ urlpatterns = [
          business_views.pickup_location_choose, name='pickup_location_choose'),
     path('settings/pickup_location/add/',
          business_views.pickup_location_add, name='pickup_location_add'),
+    path('settings/pickup_location/add/ajax/',
+         business_views.pickup_location_add_ajax, name='pickup_location_add_ajax'),
     path('settings/pickup_location/<int:pickup_location_id>/update/',
          business_views.pickup_location_update, name='pickup_location_update'),
     path('settings/pickup_location/<int:pickup_location_id>/delete/',
@@ -107,6 +109,9 @@ urlpatterns = [
     path('finance/', business_views.business_finance_dashboard, name='business_finance_dashboard'),
     path('finance/transactions/', business_views.business_transactions, name='business_transactions'),
     path('finance/cod-statement/', business_views.business_cod_statement, name='business_cod_statement'),
+    path('finance/cod-payout/<str:txn_code>/', business_views.business_cod_payout_invoice, name='business_cod_payout_invoice'),
+    path('finance/invoices/', business_views.business_charge_invoices, name='business_charge_invoices'),
+    path('finance/invoices/<str:invoice_code>/', business_views.business_charge_invoice, name='business_charge_invoice'),
 
     # Live Tracking Map
     path('tracking/', business_views.live_tracking_map, name='live_tracking_map'),

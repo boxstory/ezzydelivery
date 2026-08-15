@@ -6,8 +6,7 @@
 
 import logging
 
-from django.conf import settings
-
+from whatsapp import sessions as wa_sessions
 from whatsapp.management.commands.backfill_waha import _strip_jid, upsert_message, waha_get
 
 logger = logging.getLogger(__name__)
@@ -15,14 +14,14 @@ logger = logging.getLogger(__name__)
 
 def pull_chat_history(chat_id, session=None, page_size=100, max_pages=5):
     """Fetch up to max_pages*page_size messages for chat_id from WAHA and upsert
-    them into WhatsAppMessage (deduped on waha_message_id). Returns
+    them into WhatsAppMessage (deduped on (session, waha_message_id)). Returns
     (total_seen, total_inserted, counterparties) — counterparties is the set of
     customer-side identifiers (bare digits or "<lid>@lid") actually seen in the
     payloads. Querying a chat by phone JID doesn't guarantee the messages come
     back tagged with that same phone: some contacts' chats are privacy-LID-indexed,
     so WAHA can resolve the phone-based chatId fine but every message inside is
     stamped with a LID the caller has no other way of discovering."""
-    session = session or settings.WAHA_DEFAULT_SESSION
+    session = wa_sessions.normalize(session)
     total_seen = 0
     total_inserted = 0
     counterparties = set()

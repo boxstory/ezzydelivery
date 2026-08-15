@@ -37,20 +37,101 @@
     var stageBtn = e.target.closest && e.target.closest('.crmd__stage-opt');
     if (stageBtn) {
       var stage = stageBtn.getAttribute('data-stage');
-      post(cfg().urlUpdateStage, { stage: stage }).then(function (data) {
+      // Same guard as the board: a column that rewrites the driver's real status (and
+      // WhatsApps them) must confirm first. This grid used to post straight through, so
+      // a mis-clicked "Rejected" chip messaged the applicant with no dialog.
+      var confirmText = stageBtn.getAttribute('data-confirm') || '';
+      var needsReason = stageBtn.getAttribute('data-needs-reason') === '1';
+      var who = (cfg().leadName || 'this lead');
+      var rejectionReason = '';
+      if (needsReason) {
+        var reason = prompt('This will ' + (confirmText || 'change this driver\'s status') +
+          ' (' + who + ') and update their real application status.\n\nReason (optional):', '');
+        if (reason === null) return;
+        rejectionReason = reason;
+      } else if (confirmText) {
+        if (!confirm('This will ' + confirmText + ' (' + who + ') and update their real application status. Continue?')) {
+          return;
+        }
+      }
+
+      post(cfg().urlUpdateStage, { stage: stage, rejection_reason: rejectionReason }).then(function (data) {
         if (data.success) {
           document.querySelectorAll('.crmd__stage-opt').forEach(function (b) {
             b.classList.toggle('active', b.getAttribute('data-stage') === data.stage);
           });
           var badge = document.getElementById('workforce_crm_detail_span_stage');
           if (badge) {
-            badge.className = 'crm__stage crm__stage--' + data.stage;
-            badge.innerHTML = '<i class="fa-solid fa-circle"></i>' + data.stage_display;
+            badge.className = 'crm__stage crm__stage--sw-' + (data.stage_swatch || 'grey');
+            // textContent, not innerHTML: stage_display is a staff-editable column label.
+            badge.textContent = '';
+            var icon = document.createElement('i');
+            icon.className = 'fa-solid fa-circle';
+            badge.appendChild(icon);
+            badge.appendChild(document.createTextNode(data.stage_display));
+          }
+          var pinbar = document.getElementById('workforce_crm_detail_div_pinbar');
+          if (pinbar) pinbar.hidden = !data.pinned;
+          if (data.warning) {
+            // The card was accepted but pinned — staff must know it has stopped
+            // tracking the application, so this cannot be a fading flash.
+            alert(data.warning);
           }
           flash('workforce_crm_detail_div_feedback', 'Stage updated to ' + data.stage_display);
         } else {
+          alert(data.error || 'Failed to update stage');
           flash('workforce_crm_detail_div_feedback', data.error || 'Failed to update stage', true);
         }
+      });
+      return;
+    }
+
+    // Merge a same-number duplicate into this card (both rows survive)
+    var mergeBtn = e.target.closest && e.target.closest('[data-merge-duplicate]');
+    if (mergeBtn) {
+      var label = mergeBtn.getAttribute('data-merge-label') || 'that lead';
+      if (!confirm('Merge ' + label + ' into this card? Both cards are kept — the other one '
+                   + 'will show inside this card instead of on the board. You can un-merge later.')) {
+        return;
+      }
+      post(mergeBtn.getAttribute('data-merge-url'),
+           { duplicate_id: mergeBtn.getAttribute('data-merge-duplicate') }).then(function (data) {
+        if (!data.success) { alert(data.error || 'Could not merge'); return; }
+        flash('workforce_crm_detail_div_feedback', 'Merged — reloading');
+        setTimeout(function () { window.location.reload(); }, 700);
+      });
+      return;
+    }
+
+    // Put an absorbed card back on the board on its own
+    var unmergeBtn = e.target.closest && e.target.closest('[data-unmerge-child]');
+    if (unmergeBtn) {
+      if (!confirm('Un-merge this card? It goes back on the board as its own lead.')) return;
+      post(unmergeBtn.getAttribute('data-unmerge-url'),
+           { child_id: unmergeBtn.getAttribute('data-unmerge-child') }).then(function (data) {
+        if (!data.success) { alert(data.error || 'Could not un-merge'); return; }
+        flash('workforce_crm_detail_div_feedback', 'Un-merged — reloading');
+        setTimeout(function () { window.location.reload(); }, 700);
+      });
+      return;
+    }
+
+    // Resume automatic filing for a pinned driver card
+    var unpinBtn = e.target.closest && e.target.closest('#workforce_crm_detail_btn_unpin');
+    if (unpinBtn) {
+      if (!confirm('Hand this card back to automatic filing? It will move to whatever the driver\'s application status says, which may not be the current column.')) {
+        return;
+      }
+      post(unpinBtn.getAttribute('data-unpin-url'), {}).then(function (data) {
+        if (!data.success) {
+          alert(data.error || 'Could not resume auto-filing');
+          return;
+        }
+        var pinbar = document.getElementById('workforce_crm_detail_div_pinbar');
+        if (pinbar) pinbar.hidden = true;
+        flash('workforce_crm_detail_div_feedback',
+          data.moves_to ? 'Auto-filing resumed — moving to ' + data.moves_to : 'Auto-filing resumed');
+        setTimeout(function () { window.location.reload(); }, 900);
       });
       return;
     }
@@ -149,12 +230,15 @@
     var resultItem = e.target.closest && e.target.closest('.crmd__link-result-item');
     if (resultItem) {
       var phone = resultItem.getAttribute('data-phone');
+      // Which WhatsApp number this contact was found on — the lid only
+      // resolves against that session.
+      var waSession = resultItem.getAttribute('data-session') || '';
       var searchInput = document.getElementById('workforce_crm_detail_input_wa_search');
       var linkResults = document.getElementById('workforce_crm_detail_div_wa_results');
       if (searchInput) searchInput.value = phone;
       if (linkResults) linkResults.classList.remove('show');
       flash('workforce_crm_detail_span_link_feedback', 'Linking…');
-      post(cfg().urlLinkChat, { identifier: phone }).then(function (data) {
+      post(cfg().urlLinkChat, { identifier: phone, session: waSession }).then(function (data) {
         if (data.success) {
           flash('workforce_crm_detail_span_link_feedback', data.message || 'Linked.');
           if (data.connected) setTimeout(function () { window.location.reload(); }, 900);
@@ -200,13 +284,14 @@
       return;
     }
     resultsEl.innerHTML = results.map(function () {
-      return '<div class="crmd__link-result-item" data-phone="">' +
+      return '<div class="crmd__link-result-item" data-phone="" data-session="">' +
         '<span class="crmd__link-result-name"></span>' +
         '<span class="crmd__link-result-phone"></span>' +
       '</div>';
     }).join('');
     resultsEl.querySelectorAll('.crmd__link-result-item').forEach(function (el, i) {
       el.setAttribute('data-phone', results[i].phone);
+      el.setAttribute('data-session', results[i].session || '');
       el.querySelector('.crmd__link-result-name').textContent = results[i].name || results[i].phone;
       el.querySelector('.crmd__link-result-phone').textContent = results[i].phone;
     });

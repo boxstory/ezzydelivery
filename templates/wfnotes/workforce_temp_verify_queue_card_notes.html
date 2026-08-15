@@ -1,0 +1,127 @@
+{% comment %}
+Purpose: "About this page" notes panel for temp_verify_queue.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_temp_verify_queue_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Every row here is one <strong>WhatsApp message we owe a customer</strong> asking them to drop a
+            location pin, so the order gets exact coordinates instead of a typed address. Jobs are raised
+            automatically — either by the auto-import stage when an order lands, or 10 minutes after a driver
+            marks a delivery failed. A background worker drains the queue and sends the messages; when the
+            customer replies with a pin, the coordinates are written back to the order on their own. This page
+            is where you watch that happen and step in when it doesn't. Orders themselves live on
+            <strong>Temp Orders</strong>, and the rules that raise these jobs live on <strong>Stage Config</strong>.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Messaging switch</dt>
+                        <dd class="wfnote__def">The master kill switch in the WAHA banner. Turning it off stops
+                            the worker sending anything at all — jobs pile up as queued until you turn it back on.
+                            Use it when the number is misbehaving or a bad batch is about to go out.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Status and kind chips narrow the list in one click; the bar below
+                            filters by client, created-date range, and a search across phone, order number, and
+                            customer name. <em>Reset</em> clears everything.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Send now</dt>
+                        <dd class="wfnote__def">Sends a queued or failed job immediately instead of waiting for the
+                            next worker tick or its scheduled time.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Re-send</dt>
+                        <dd class="wfnote__def">Puts an already-sent job back in the queue so the customer gets the
+                            message again. Also clears the attempt count, so a job that ran out of retries gets a fresh start.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Re-queue all</dt>
+                        <dd class="wfnote__def">The button in the red banner does the same thing to every failed job
+                            at once, one after another.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Apply pin</dt>
+                        <dd class="wfnote__def">Copies the location the customer sent onto the order. Use
+                            <em>Apply pin</em> for this job's own order, or the shuffle button to attach the same pin
+                            to a different order by its numeric ID.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Mark verified</dt>
+                        <dd class="wfnote__def">Closes the job by hand when you've sorted the address another way —
+                            by phone, say. No coordinates are written.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Cancel</dt>
+                        <dd class="wfnote__def">Kills the job so nothing is ever sent for it. Use it when the order is
+                            void or the customer has already been reached.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Queued</dt>
+                        <dd class="wfnote__def">Waiting for the worker. Nothing has been sent yet.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sent</dt>
+                        <dd class="wfnote__def">The message went out and we're waiting on the customer's reply.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Verified</dt>
+                        <dd class="wfnote__def">Done — coordinates were applied, or someone closed it by hand.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Manual review</dt>
+                        <dd class="wfnote__def">A reply came back but couldn't be matched to the order on its own.
+                            These are the rows that actually need you.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Failed</dt>
+                        <dd class="wfnote__def">Sending gave up after the retry limit. The reason is in Last Error.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Cancelled</dt>
+                        <dd class="wfnote__def">Stopped by staff. It will never send.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Kind</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Import</dt>
+                        <dd class="wfnote__def">Raised when the order was imported, to get a pin before dispatch.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Recovery</dt>
+                        <dd class="wfnote__def">Raised after a driver failed the delivery. The message carries the
+                            driver's reason plus a fresh link — hover the tag to read the note.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>While messaging is paused, <strong>Send now is refused</strong> — it is not a way around the
+                    switch. Turn messaging back on first.</li>
+                <li>Recovery jobs sit on a <strong>10-minute hold</strong> after the failure so the driver can undo.
+                    The Scheduled column shows the earliest send time.</li>
+                <li>Applying a pin overwrites the order's coordinates, marks them exact, moves it to
+                    <em>Address verified</em>, and writes a line into the order's history. It cannot be undone from here.</li>
+                <li>Applying a pin to a different order also <strong>moves the job</strong> onto that order — the row
+                    stops belonging to the one it started with.</li>
+                <li>Verified and cancelled jobs can't be cancelled again, and cancelled jobs can't be re-sent.</li>
+                <li>The status counts on the chips ignore the status filter, so they stay useful while you're
+                    looking at one slice.</li>
+            </ul>
+        </section>
+    

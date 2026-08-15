@@ -1,0 +1,117 @@
+{% comment %}
+Purpose: "About this page" notes panel for cod_business_settlement_report.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_cod_business_settlement_report_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+      <p class="wfnote__lede">
+        This is the desk where <strong>COD is handed back to the client</strong> — the last leg of the
+        cash journey. A delivery only appears here once the customer has paid the driver and the driver
+        has settled that cash with EzzyDelivery, so the money is sitting with us and belongs to the
+        business. You pick one account, tick the deliveries you are paying for, decide what comes off the
+        top, and hand over. The payout writes an invoice you land on straight afterwards, and it is listed
+        forever on <strong>Payout History</strong>.
+      </p>
+
+      <div class="wfnote__cols">
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">What you can do here</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Account</dt>
+              <dd class="wfnote__def">Choose the business to pay. Nothing is listed until you do. Each
+                option already shows how much COD is held for that account, so you can see who is owed
+                money without opening them one by one.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">From / To</dt>
+              <dd class="wfnote__def">Restrict to deliveries completed in a date window. Leave both empty
+                to pay out everything held.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Count all</dt>
+              <dd class="wfnote__def">Ticks or clears every delivery in that account's panel. Individual
+                rows can still be unticked afterwards.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Delivery charges</dt>
+              <dd class="wfnote__def">On by default — recovers the delivery fee for the ticked rows out of
+                the COD being released. Untick it to hand over the full COD and bill the fees separately.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Add deduction</dt>
+              <dd class="wfnote__def">Extra invoice lines for this payout: fulfilment, cargo/handling or
+                any other charge, each with its own description and amount.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Hand over</dt>
+              <dd class="wfnote__def">Opens a receipt listing every ticked order, then asks how it was paid
+                (bank, cash, Fawran) and for a reference before it commits.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Void a payout</dt>
+              <dd class="wfnote__def">Paste a payout's invoice code with a reason to claw the COD back —
+                use it when a settled order comes back.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Statement PDF</dt>
+              <dd class="wfnote__def">Downloads a manifest of the COD still awaiting payout, for the
+                selected account or all of them.</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">The charge on each row</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Pending</dt>
+              <dd class="wfnote__def">Nobody has agreed this charge yet. The system figure will be
+                deducted as it stands unless someone changes it in Client Charges first.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Verified</dt>
+              <dd class="wfnote__def">Staff have checked the job and agreed the figure, but it is still
+                editable.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Published</dt>
+              <dd class="wfnote__def">The agreed figure is locked and can no longer be edited.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Rejected</dt>
+              <dd class="wfnote__def">The charge was refused during verification. The row still pays out —
+                fix the figure in Client Charges before handing over.</dd>
+            </div>
+          </dl>
+
+          <h2 class="wfnote__h">The money strip</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">COD held</dt>
+              <dd class="wfnote__def">Everything on the account awaiting payout, whether ticked or not.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Net payable</dt>
+              <dd class="wfnote__def">COD selected, less delivery charges, less any lines you added — the
+                exact figure to transfer.</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+
+      <section class="wfnote__sec wfnote__sec--note">
+        <h2 class="wfnote__h">Worth knowing</h2>
+        <ul class="wfnote__notes">
+          <li>The net is <strong>recalculated on the server</strong> from the rows it locks, so what the
+            screen shows is what gets paid — but the totals do not refresh on their own if someone else
+            settles the same account while you are looking.</li>
+          <li>Deductions can never exceed the COD selected. The button disables and the payout is refused.</li>
+          <li>Hand-added deduction lines belong to one invoice, so a payout carrying them can only cover
+            <strong>one account at a time</strong>.</li>
+          <li>The charge each row pays is frozen onto that delivery at payout, so a later edit in Client
+            Charges cannot restate an invoice that has already been issued.</li>
+          <li>A payout is not undone by editing anything here — use <em>Void a payout</em>, which returns
+            those deliveries to this desk as unpaid.</li>
+        </ul>
+      </section>
+    

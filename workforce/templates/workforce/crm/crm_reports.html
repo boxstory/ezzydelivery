@@ -4,9 +4,10 @@
 {# Purpose: CRM funnel and conversion reports — stat tiles, stage funnel, monthly leads by source, per-staff and per-source tables. #}
 {# Used by: workforce.crm_views.crm_reports #}
 {# Notes: crmr__ namespace; ApexCharts loaded globally via head-dashboard.html; chart data passed via json_script. Series colors follow the source entity (fixed map), tables provide the accessible view. #}
+{#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718e" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -25,8 +26,17 @@
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-table-columns"></i> Board
         </a>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_crm_crm_reports_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
       </div>
     </div>
+
+    <div class="wfnote" id="workforce_crm_crm_reports_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_crm_reports_card_notes' %}" hidden></div>
 
     <!-- STAT TILES -->
     <div class="crmr__tiles">
@@ -58,12 +68,19 @@
 
     <!-- CHARTS -->
     <div class="crmr__charts">
+      {# One funnel per board: the two boards share stage keys but not meanings, so a #}
+      {# merged chart added "Quoted" and "Uploads Completed" together. #}
+      {% for funnel in funnels %}
       <div class="crm__panel">
-        <div class="crm__panel-hd"><i class="fa-solid fa-filter"></i><h3>Pipeline by Stage</h3></div>
+        <div class="crm__panel-hd"><i class="fa-solid fa-filter"></i>
+          <h3>{{ funnel.label }} pipeline <span class="crmr__panel-note">{{ funnel.total }} leads</span></h3>
+        </div>
         <div class="crm__panel-body">
-          <div id="workforce_crm_reports_chart_stages" class="crmr__chart"></div>
+          <div id="workforce_crm_reports_chart_stages_{{ funnel.category }}" class="crmr__chart"
+               data-funnel-category="{{ funnel.category }}"></div>
         </div>
       </div>
+      {% endfor %}
       <div class="crm__panel">
         <div class="crm__panel-hd"><i class="fa-solid fa-chart-column"></i><h3>Leads per Month by Source</h3></div>
         <div class="crm__panel-body">
@@ -127,7 +144,7 @@
   </div>
 </div>
 
-{{ stage_data|json_script:"workforce_crm_reports_data_stages" }}
+{{ funnels|json_script:"workforce_crm_reports_data_funnels" }}
 {{ monthly_chart|json_script:"workforce_crm_reports_data_monthly" }}
 
 <!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
@@ -146,14 +163,16 @@
       'Manual': '#eda100'
     };
 
-    var stagesEl = document.getElementById('workforce_crm_reports_chart_stages');
-    var stageData = JSON.parse(document.getElementById('workforce_crm_reports_data_stages').textContent);
-    if (stagesEl && !stagesEl.dataset.rendered) {
-      stagesEl.dataset.rendered = '1';
-      new ApexCharts(stagesEl, {
+    // One chart per board — the funnels arrive already split by category.
+    var funnels = JSON.parse(document.getElementById('workforce_crm_reports_data_funnels').textContent);
+    funnels.forEach(function (funnel) {
+      var el = document.getElementById('workforce_crm_reports_chart_stages_' + funnel.category);
+      if (!el || el.dataset.rendered) return;
+      el.dataset.rendered = '1';
+      new ApexCharts(el, {
         chart: { type: 'bar', height: 300, toolbar: { show: false }, fontFamily: 'inherit' },
-        series: [{ name: 'Leads', data: stageData.map(function (s) { return s.count; }) }],
-        xaxis: { categories: stageData.map(function (s) { return s.label; }),
+        series: [{ name: 'Leads', data: funnel.rows.map(function (s) { return s.count; }) }],
+        xaxis: { categories: funnel.rows.map(function (s) { return s.label; }),
                  labels: { style: { colors: MUTED } }, axisBorder: { color: GRID }, axisTicks: { show: false } },
         yaxis: { labels: { style: { colors: MUTED } } },
         colors: [INK],
@@ -162,7 +181,7 @@
         grid: { borderColor: GRID, strokeDashArray: 0 },
         tooltip: { y: { title: { formatter: function () { return 'Leads:'; } } } }
       }).render();
-    }
+    });
 
     var monthlyEl = document.getElementById('workforce_crm_reports_chart_monthly');
     var monthly = JSON.parse(document.getElementById('workforce_crm_reports_data_monthly').textContent);

@@ -1,0 +1,79 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/stock_adjust.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_stock_adjust_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Where the books are made to <strong>agree with the shelf</strong>. An adjustment does not
+            move stock anywhere — it corrects the recorded figure when the recorded figure is wrong,
+            and leaves a movement in the ledger explaining why.
+        </p>
+
+        <ol class="wfnote__notes wfnote__flow">
+            <li>Pick the business, the warehouse and — if it matters — the storage location.</li>
+            <li>The sheet loads every product with its photo and the figure currently on record.</li>
+            <li>Type <strong>what you counted</strong>. The change is worked out for you and shown per row.</li>
+            <li>Give a reason, submit, and each corrected line writes an adjustment movement.</li>
+        </ol>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">How the sheet behaves</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Counted, not the difference</dt>
+                        <dd class="wfnote__def">Enter the physical count. The delta is derived at submit
+                            time from the live figure, so a receipt or a pick landing while you type is
+                            never overwritten with a stale number.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Blank rows are skipped</dt>
+                        <dd class="wfnote__def">Only rows you fill in are considered, and a row that
+                            matches the current figure writes nothing at all.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Per location</dt>
+                        <dd class="wfnote__def">The count applies to the location chosen above. Leave it
+                            on default and you are counting the stock held against no bin.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Reason is required</dt>
+                        <dd class="wfnote__def">Damaged, lost, found, expired, returned to supplier,
+                            data correction or other — it is written into the movement, so the ledger
+                            can be read months later.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What happens on submit</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">The stock figure is replaced</dt>
+                        <dd class="wfnote__def">Set to what you counted, creating the stock row if the
+                            product had never been counted into that location.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">A movement is recorded</dt>
+                        <dd class="wfnote__def">One <em>adjustment in</em> or <em>adjustment out</em> per
+                            corrected product, with the before and after figure and your name on it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Reserved stock is flagged</dt>
+                        <dd class="wfnote__def">Counting a product below what open orders have reserved
+                            still applies, but you are told which products — those orders may no longer
+                            be fulfillable.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>There is no undo.</strong> A wrong adjustment is corrected by another
+                        one, and both stay visible in the ledger.</li>
+                    <li><strong>Counting a whole warehouse?</strong> Use a cycle count instead — it is
+                        built for a full sweep and keeps the "last counted" record.</li>
+                    <li><strong>Adjustments are not receiving.</strong> Goods that arrived from a seller
+                        belong on the Receive Stock page, which also opens a put-away task.</li>
+                </ul>
+            </section>
+        </div>
