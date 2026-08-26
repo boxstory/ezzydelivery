@@ -220,3 +220,77 @@ Guessing has cost real time here. Real examples:
 
 Also verify behaviour, not just looks: click the button, submit the form,
 download the export. An element that renders is not an element that works.
+
+### 5. Staff pages use the shared shell — never invent another hero prefix
+
+The staff dashboard grew 96 different `*__hero` class names for what is one
+masthead. Do not add the 97th. The shared furniture lives in
+**`webpages/static/webpages/css/staff-hero.css`**, loaded by both
+`wf_dashboard_base.html` and `wh_dashboard_base.html`, and everything in it is
+scoped to `[data-dashboard="staff"]` — the public webpages heroes, the driver
+PWA and the business console are deliberately outside it.
+
+**Applied automatically, no markup change needed.** Any class ending in
+`__hero` gets the navy band, the 3px yellow rule and the `0.7rem 1.1rem` inner
+inset. Any class ending in `__card-header` / `__card__header` gets the quiet
+white ledger header, and its leading `<i>` becomes a 1.4rem tinted tile. This
+is why you must not re-declare band colours or header gradients in a page
+stylesheet — you are fighting the shell, and the shell loads last.
+
+**The canonical page skeleton.** Two sections: the hero runs edge to edge, the
+body carries the page's own hairline padding.
+
+```html
+<div class="wfpage">                        <!-- no padding, no max-width -->
+  <div class="xxx__hero">                   <!-- keep your prefix; band is automatic -->
+    <div class="wfhero__content">           <!-- left column -->
+      <nav aria-label="breadcrumb">
+        <ol class="wfhero__crumbs">
+          <li class="wfhero__crumb"><a class="wfhero__crumb-link" href="…">…</a></li>
+          <li class="wfhero__crumb wfhero__crumb--active">…</li>
+        </ol>
+      </nav>
+      <h1 class="wfhero__heading">…</h1>
+      <p class="wfhero__record">            <!-- mono: IDs, codes, dates -->
+        <span class="wfhero__tag">CODE</span>
+        <span class="wfhero__dot">·</span> ID 61
+      </p>
+    </div>
+    <div class="wfhero__bank">              <!-- right column -->
+      <div class="d-flex flex-wrap justify-content-end gap-2">
+        <a class="wfhero__btn">…</a>        <!-- translucent on navy -->
+      </div>
+      <div class="wfhero__contacts">        <!-- wrapped chip row, banked right -->
+        <span class="wfhero__contacts-label">Contact</span>
+        <a class="wfhero__contact" href="tel:…" title="Call 60003432">
+          <i class="fa-solid fa-phone"></i>
+          <span class="wfhero__contact-val">···3432</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wfpage__body">                <!-- 0 .325rem .325rem -->
+    <div class="wfcard">
+      <div class="wfcard__header"><i class="fa-solid fa-…"></i> Section name</div>
+      <div class="wfcard__body">…</div>
+    </div>
+  </div>
+</div>
+```
+
+Rules that go with it:
+
+- **Contact chips carry the last four digits only** (`···3432`), with the full
+  value in `href`, `title` and a `visually-hidden` span. The hero stays two
+  lines tall; the full number lives on the record's Details tab.
+- **`.wfmono`** for any coded logistics figure — order numbers, IDs, money,
+  lat/long, plates. Tabular numerals, navy ink.
+- **`.wfcard--form`** caps an editable form at `60rem`. Read-only sheets run
+  full width; a 1900px-wide input row is unreadable.
+- Colour-variant card headers (`--primary`, `--info`, `--success`) are flattened
+  by the shell on purpose. If a section needs emphasis, use the tinted icon tile
+  or a left border, not a coloured header bar.
+- A page-specific rule only earns its place when it is genuinely specific to
+  that page (a state strip, a per-page grid). Anything another page would want
+  belongs in `staff-hero.css`.

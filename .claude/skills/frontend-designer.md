@@ -5,6 +5,15 @@ Use this skill when designing UI components, creating landing pages, or building
 **Complements:** `frontend.md` skill (Bootstrap, HTMX, jQuery implementation)
 **Focus:** Visual design, brand consistency, modern UI patterns, aesthetics
 
+> **Staff dashboard pages — read this first.** The masthead, page shell and
+> section-card look are shared furniture in
+> `webpages/static/webpages/css/staff-hero.css` (`.wfpage` / `.wfhero__*` /
+> `.wfcard__*`), applied automatically to any `*__hero` and `*__card-header`
+> under `[data-dashboard="staff"]`. Never invent a new `*__hero` prefix and
+> never re-declare the band or header colours in a page stylesheet — the shell
+> loads last and you will only be fighting it. Full skeleton and rules:
+> "Staff pages use the shared shell" in `.claude/skills/brandkit.md`.
+
 ---
 
 ## Brand Identity
