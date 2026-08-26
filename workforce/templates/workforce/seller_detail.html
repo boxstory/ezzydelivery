@@ -496,17 +496,23 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                 </tbody>
             </table>
         </div>
-        <div class="sld__view-all">
-            <a href="{% url 'workforce:wf_orders_by_seller' %}?business={{ business.business_id }}" class="sld__action-btn">
-                <i class="fa-solid fa-external-link"></i> View All Orders
-            </a>
-        </div>
         {% else %}
         <div class="sld__empty-msg">
             <i class="fa-solid fa-box"></i>
             No orders yet
         </div>
         {% endif %}
+
+        <div class="sld__view-all d-flex flex-wrap gap-2">
+            {% if recent_orders %}
+            <a href="{% url 'workforce:wf_orders_by_seller' %}?business={{ business.business_id }}" class="sld__action-btn">
+                <i class="fa-solid fa-external-link"></i> View All Orders
+            </a>
+            {% endif %}
+            <a href="{% url 'workforce:wf_mapping_manager' %}?business={{ business.business_id }}" class="sld__action-btn">
+                <i class="fa-solid fa-diagram-project"></i> Column Mapping
+            </a>
+        </div>
 
         {% if api_products_platform %}
         <div class="d-flex flex-wrap align-items-center gap-2 mt-4 mb-2">
@@ -1452,16 +1458,24 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                         </td>
                         <td class="sld__date-cell">{{ product.created_at|date:"d M Y" }}</td>
                         <td class="text-end">
-                            <form method="POST" action="{% url 'product:product_staff_delete' product.id %}"
-                                  class="d-inline"
-                                  onsubmit="return confirm('Delete &quot;{{ product.item_name|escapejs }}&quot;? This cannot be undone.');">
-                                {% csrf_token %}
-                                <button type="submit" class="sld__row-btn sld__row-btn--danger"
-                                        id="seller_detail_btn_del_product_{{ product.id }}" title="Delete product"
-                                        aria-label="Delete {{ product.item_name }}">
-                                    <i class="fa-solid fa-trash-can"></i>
-                                </button>
-                            </form>
+                            <div class="sld__row-actions">
+                                <a href="{% url 'product:product_single_update' product.id %}?business_id={{ business.business_id }}"
+                                   class="sld__row-btn"
+                                   id="seller_detail_btn_edit_product_{{ product.id }}" title="Edit product"
+                                   aria-label="Edit {{ product.item_name }}">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </a>
+                                <form method="POST" action="{% url 'product:product_staff_delete' product.id %}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Delete &quot;{{ product.item_name|escapejs }}&quot;? This cannot be undone.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="sld__row-btn sld__row-btn--danger"
+                                            id="seller_detail_btn_del_product_{{ product.id }}" title="Delete product"
+                                            aria-label="Delete {{ product.item_name }}">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}

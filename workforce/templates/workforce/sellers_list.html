@@ -15,16 +15,18 @@ Notes: Carries the shared page-notes card (wfnote__) under the hero, hidden on l
             <h1 class="wfd__hero-title"><i class="fa-solid fa-store"></i>All Sellers</h1>
             <p class="wfd__hero-subtitle">Manage registered businesses and sellers</p>
         </div>
-        <div class="wfd__hero-count">
-            <span class="wfd__hero-count__num">{{ total_sellers|default:"0" }}</span>
-            <span class="wfd__hero-count__label">Total Sellers</span>
+        <div class="wfd__hero-bank">
+            <div class="wfd__hero-count">
+                <span class="wfd__hero-count__num">{{ total_sellers|default:"0" }}</span>
+                <span class="wfd__hero-count__label">Total Sellers</span>
+            </div>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_sellers_list_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
-        <button type="button" class="wfnote__btn" data-wfnote-toggle
-                aria-expanded="false" aria-controls="workforce_sellers_list_card_notes"
-                title="About this page">
-            <i class="fa-solid fa-question" aria-hidden="true"></i>
-            <span class="visually-hidden">Show notes</span>
-        </button>
     </div>
 
     <div class="wfnote" id="workforce_sellers_list_card_notes"
@@ -77,6 +79,15 @@ Notes: Carries the shared page-notes card (wfnote__) under the hero, hidden on l
                 <div class="sll__stat-body">
                     <div class="sll__stat-value">{{ inactive_sellers }}</div>
                     <div class="sll__stat-label">Inactive Sellers</div>
+                </div>
+            </a>
+            <a href="?status=suspended" class="sll__stat-card sll__stat-card--link {% if status == 'suspended' %}sll__stat-card--active{% endif %}">
+                <div class="sll__stat-icon sll__stat-icon--danger">
+                    <i class="fa-solid fa-ban"></i>
+                </div>
+                <div class="sll__stat-body">
+                    <div class="sll__stat-value">{{ suspended_sellers }}</div>
+                    <div class="sll__stat-label">Suspended</div>
                 </div>
             </a>
         </div>

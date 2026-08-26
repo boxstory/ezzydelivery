@@ -5,9 +5,10 @@
 {% url 'workforce:fleet_drivers_earnings' as u_fleet_drivers_earnings %}
 {% url 'workforce:earnings_verification' as u_earnings_verification %}
 {% url 'workforce:delivery_location_reviews' as u_delivery_location_reviews %}
+{% url 'workforce:driver_devices' as u_driver_devices %}
 {# Mixed desk: driver records are Operations, the money rows are Finance. #}
 {% if wf_dept_ops or wf_dept_fin %}
-{% with active="fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,drivers_list,drivers_active,drivers_inactive,driver_detail,wf_driver_tasks,delivery_location_reviews" %}
+{% with active="fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,drivers_list,drivers_active,drivers_inactive,driver_detail,wf_driver_tasks,delivery_location_reviews,driver_devices" %}
 <li id="workforce_sidebar_menu_fleet" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_fleet" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-accounts" data-title="Fleet A/Cs">
     <i class="fa-solid fa-wallet me-2"></i>
@@ -19,6 +20,7 @@
       {% if wf_dept_ops %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_all_drivers" url=u_drivers_list icon="fa-solid fa-motorcycle" label="All Drivers" active_names="drivers_list,driver_detail" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_driver_tasks" url=u_wf_driver_tasks icon="fa-solid fa-list-check" label="Driver Tasks" active_names="wf_driver_tasks" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_driver_devices" url=u_driver_devices icon="fa-solid fa-mobile-screen-button" label="Driver Devices" active_names="driver_devices" %}
       {% endif %}
       {% if wf_dept_fin %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_fleet_cod" url=u_fleet_cod_in_hand icon="fa-solid fa-sack-dollar" label="COD with Fleet" active_names="fleet_cod_in_hand" %}

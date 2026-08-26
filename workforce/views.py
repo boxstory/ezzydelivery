@@ -7350,6 +7350,7 @@ def cancel_order(request, order_id):
             order.cancellation_reason = cancellation_reason
         if cancellation_notes:
             order.cancellation_notes = cancellation_notes
+        order._status_changed_by = request.user  # names the staffer on the history row
         order.save()
 
         # Cancel related delivery task (if not already picked up — already guarded above)
@@ -7913,6 +7914,7 @@ def publish_order_to_delivery(request, order_id):
         # Update order status to publish (triggers auto delivery task creation signal)
         order.order_status = 'publish'
         order.task_status = 'dl_task_listed'
+        order._status_changed_by = request.user  # names the staffer on the history row
         order.save()
 
         # Refresh to get updated delivery_task after signal runs
@@ -7951,11 +7953,11 @@ def publish_order_to_delivery(request, order_id):
 @staff_required
 def update_order_status(request, order_id):
     """AJAX endpoint to update order status"""
-    # Valid status values for validation
-    VALID_ORDER_STATUSES = [
-        'to_review', 'to_publish', 'published', 'processing', 'ready_to_pickup',
-        'in_transit', 'delivered', 'failed', 'cancelled', 'returned', 'reported'
-    ]
+    # Derived from the model so it can never drift out of sync again. The old
+    # hand-written list omitted the real value 'publish' while accepting
+    # 'published', which is not a choice at all (order_status is a plain
+    # CharField, so nothing else validates it).
+    VALID_ORDER_STATUSES = [c[0] for c in orders_models.ORDER_STATUS_BY_CLIENT]
     VALID_TASK_STATUSES = [
         'pending', 'dl_task_listed', 'assigned', 'in_progress', 'completed',
         'failed', 'cancelled'
@@ -8004,6 +8006,7 @@ def update_order_status(request, order_id):
             order.task_status = status
         else:
             order.order_status = status
+        order._status_changed_by = request.user  # names the staffer on the history row
         order.save()
 
         # Log the status update
@@ -8034,10 +8037,8 @@ def update_order_status(request, order_id):
 @require_http_methods(["POST"])
 def bulk_update_order_status(request):
     """Bulk update order status for multiple orders"""
-    VALID_ORDER_STATUSES = [
-        'to_review', 'to_publish', 'publish', 'published', 'processing', 'ready_to_pickup',
-        'in_transit', 'delivered', 'failed', 'cancelled', 'returned', 'reported'
-    ]
+    # Derived from the model — see update_order_status() above.
+    VALID_ORDER_STATUSES = [c[0] for c in orders_models.ORDER_STATUS_BY_CLIENT]
     try:
         data = json.loads(request.body)
         order_ids = data.get('order_ids', [])
@@ -9375,6 +9376,8 @@ def update_task_status(request, task_id):
         # Optional fields
         driver_id = data.get('driver_id')
         notes = data.get('notes', '')
+        failure_reason = (data.get('failure_reason') or '').strip()
+        failure_notes = (data.get('failure_notes') or '').strip()
         time_str = data.get('time', '')
         delivered_date_str = data.get('delivered_date', '')
         cod_amount_str = data.get('cod_amount', '')
@@ -9393,6 +9396,20 @@ def update_task_status(request, task_id):
                 'success': False,
                 'error': f"Cannot change from '{current_status}' to '{status}'. Allowed: {allowed_list}."
             }, status=400)
+
+        # A close-out status has to carry a reason, exactly as the driver app
+        # demands one on its Failed sheet — otherwise the task ends with no
+        # explanation on the record.
+        REASON_REQUIRED_STATUSES = {'failed', 'rejected', 'cancelled', 'dropsownlost'}
+        REASON_STATUSES = REASON_REQUIRED_STATUSES | {'non_reachable'}
+        valid_reason_keys = {k for k, _ in delivery_models.DeliveryTask.FAILURE_REASON_CHOICES}
+        if status in REASON_REQUIRED_STATUSES and not failure_reason:
+            return JsonResponse({
+                'success': False,
+                'error': f"A reason is required when setting status to '{status}'."
+            }, status=400)
+        if failure_reason and failure_reason not in valid_reason_keys:
+            failure_reason = 'other'
 
         # Update both task status fields
         task._status_actor = actor
@@ -9456,10 +9473,33 @@ def update_task_status(request, task_id):
                 except (ValueError, TypeError):
                     pass
 
-        # Save notes to task description if provided
-        if notes:
+        # Persist the reason on the same fields the driver app writes, so the
+        # task detail, the CSV exports and the WhatsApp recovery flow all read
+        # one place regardless of who made the change.
+        if status in REASON_STATUSES:
+            if failure_reason:
+                task.failure_reason = failure_reason
+                update_fields.append('failure_reason')
+            reason_label = dict(
+                delivery_models.DeliveryTask.FAILURE_REASON_CHOICES
+            ).get(failure_reason, failure_reason)
+            task.failure_notes = failure_notes or None
+            update_fields.append('failure_notes')
+            if status in ('rejected', 'cancelled'):
+                task.rejection_reason = (
+                    f"{reason_label} — {failure_notes}" if failure_notes else reason_label
+                ) or None
+                update_fields.append('rejection_reason')
+            # Timeline note on OrderStatusHistory (delivery/signals.py picks this up)
+            task._status_notes = notes or (
+                f"{reason_label} — {failure_notes}" if failure_notes else reason_label
+            )
+        elif notes:
+            # Non-reason statuses keep the old behaviour: free-text goes to the
+            # task description.
             task.dl_task_description = notes
             update_fields.append('dl_task_description')
+            task._status_notes = notes
 
         # COD handling on delivered — sync with driver API flow
         # Staff can pass cod_amount in the request to indicate partial collection
@@ -9526,6 +9566,86 @@ def update_task_status(request, task_id):
 
 
 # USER VERIFICATION VIEWS --------------------------------------------------------------------------------------------------------------
+
+_CRM_NAME_NOISE = re.compile(
+    r'\b(w\.?\s?l\.?\s?l|wll|llc|inc|ltd|co|company|trading|trade|est|establishment|'
+    r'group|store|stores|shop|qatar|doha|qa|the|and)\b'
+)
+
+
+# Industry words that two unrelated shops share all the time — they may not, on
+# their own, make one lead look like a match for a business.
+_CRM_GENERIC_TOKENS = {
+    'perfume', 'perfumes', 'cosmetics', 'beauty', 'fashion', 'boutique', 'home',
+    'house', 'gift', 'gifts', 'store', 'stores', 'shop', 'mart', 'market', 'food',
+    'foods', 'foodstuff', 'kitchen', 'cafe', 'restaurant', 'bakery', 'sweets',
+    'services', 'service', 'delivery', 'collection', 'center', 'centre', 'gulf',
+    'international', 'general', 'online', 'traders', 'supplies', 'solutions',
+}
+
+
+def _crm_norm_name(value):
+    """Lowercase a company/person name and drop legal-suffix noise so two spellings
+    of the same shop ("Aasl Books W.L.L" vs "aasl books") compare equal."""
+    text = (value or '').lower()
+    text = _CRM_NAME_NOISE.sub(' ', text)
+    text = re.sub(r'[^a-z0-9\u0600-\u06ff]+', ' ', text)
+    return ' '.join(text.split())
+
+
+def _crm_name_score(a, b):
+    """0..1 similarity between two normalized names. Deliberately strict — only a
+    shared real word, one name containing the other, or a near-identical spelling
+    counts, so "Jazeera Mart" never gets offered "MACNOA"."""
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    score = 0.0
+    # Whole-word containment only — "Home" must not match "aiwahome"
+    padded_a, padded_b = f' {a} ', f' {b} '
+    if len(a) >= 4 and len(b) >= 4 and (padded_a in padded_b or padded_b in padded_a):
+        score = 0.9
+    sig_a = {t for t in a.split() if len(t) >= 4 and t not in _CRM_GENERIC_TOKENS}
+    sig_b = {t for t in b.split() if len(t) >= 4 and t not in _CRM_GENERIC_TOKENS}
+    shared = sig_a & sig_b
+    if shared:
+        coverage = len(shared) / min(len(sig_a), len(sig_b))
+        score = max(score, 0.7 + 0.2 * coverage)
+    ratio = difflib.SequenceMatcher(None, a, b).ratio()
+    if ratio >= 0.78:
+        score = max(score, ratio)
+    return score
+
+
+def _crm_suggest_leads(biz_name, biz_phones, lead_rows, limit=5):
+    """Rank open CRM leads against one business: exact phone hit first, then
+    name similarity against the lead's company AND contact name."""
+    suggestions = []
+    for row in lead_rows:
+        phone_hit = bool(biz_phones & row['variants'])
+        name_score = max(
+            _crm_name_score(biz_name, row['norm_company']),
+            _crm_name_score(biz_name, row['norm_contact']),
+        )
+        if not phone_hit and name_score < 0.7:
+            continue
+        if phone_hit:
+            why = 'Same phone number'
+        else:
+            why = f'Name {int(round(name_score * 100))}% match'
+        suggestions.append({
+            'pk': row['pk'],
+            'label': row['label'],
+            'sub': row['sub'],
+            'why': why,
+            'rank': (1 if phone_hit else 0, round(name_score, 3)),
+        })
+    suggestions.sort(key=lambda s: s['rank'], reverse=True)
+    for s in suggestions:
+        s.pop('rank')
+    return suggestions[:limit]
+
 
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -18143,6 +18263,7 @@ def sellers_list(request):
         inactive=Count('business_id', filter=DQ(business_status='inactive')),
         not_applied=Count('business_id', filter=DQ(profile__isnull=True)),
         biz_pending=Count('business_id', filter=DQ(business_status='pending')),
+        suspended=Count('business_id', filter=DQ(business_status='suspended')),
     )
 
     # Paginate
@@ -18157,6 +18278,7 @@ def sellers_list(request):
         'inactive_sellers': stats['inactive'],
         'not_applied_sellers': stats['not_applied'],
         'biz_pending_sellers': stats['biz_pending'],
+        'suspended_sellers': stats['suspended'],
         'search': search,
         'selected_statuses': statuses,
         'selected_verifications': verification_statuses,
@@ -18256,11 +18378,12 @@ def sellers_inactive(request):
     """
     View to display inactive or suspended sellers
     """
-    # Get inactive businesses
+    # Both deliberate "stopped" states live here — a suspended seller is otherwise
+    # reachable only through the multi-select on the all-sellers page.
     businesses = business_models.Business.objects.select_related(
         'profile', 'business_profile'
     ).filter(
-        business_status='inactive'
+        business_status__in=['inactive', 'suspended']
     ).order_by('-business_since', '-business_id')
 
     # Apply search filter
@@ -18283,6 +18406,45 @@ def sellers_inactive(request):
     }
 
     return render(request, 'workforce/sellers_inactive.html', context)
+
+
+def _retire_fulfilment_pickup_locations(business):
+    """Switching a client off fulfilment: settle its FC-flagged pickup rows.
+
+    Two very different rows wear `is_fulfilment_center=True`:
+
+      * A real warehouse address, created by `warehouse.signals
+        .seller_warehouse_link_post_save` and backed by an active
+        SellerWarehouseLink. The client no longer uses that warehouse, so the
+        address stops being offered for collection — but the flag stays, because
+        the row genuinely IS a warehouse and un-flagging it would send drivers
+        to collect goods that are already at the hub.
+
+      * The client's own shop address wearing a stale stamp from the old
+        `create_fulfillment_store_on_service_enable` signal, with no link behind
+        it (see the note in business/signals.py). Deactivating that one leaves
+        the client with no collectable address at all and first-mile pickup
+        refuses forever on 'fulfilment_center'. Clear the flag instead and keep
+        the address usable.
+    """
+    from business.models import PickupLocation
+    from warehouse.models import SellerWarehouseLink
+
+    linked_warehouse_ids = set(
+        SellerWarehouseLink.objects.filter(business=business, is_active=True)
+        .values_list('warehouse_id', flat=True)
+    )
+    for loc in PickupLocation.objects.filter(business=business, is_fulfilment_center=True):
+        if loc.warehouse_id and loc.warehouse_id in linked_warehouse_ids:
+            if loc.pickup_status != 'inactive':
+                loc.pickup_status = 'inactive'
+                loc.save(update_fields=['pickup_status'])
+        else:
+            loc.is_fulfilment_center = False
+            loc.save(update_fields=['is_fulfilment_center'])
+            logger.info(
+                "[fulfilment-off] cleared stale FC flag on pickup location %s "
+                "(%s) for %s", loc.pk, loc.pickup_location_title, business.business_name)
 
 
 @login_required(login_url='/accounts/login/')
@@ -18424,12 +18586,18 @@ def seller_detail(request, business_id):
             if fulfillment_enabled and not business.fulfillment_service_enabled:
                 business.fulfillment_service_enabled = True
                 business.fulfillment_activated_at = timezone.now()
+                # Deliberately NOT setting fulfillment_service_status='active' —
+                # that requires a warehouse, which only the Fulfilment section
+                # (section == 'fulfillment') collects. This switch arms the
+                # service; onboarding it is a separate, explicit step.
             elif not fulfillment_enabled:
                 business.fulfillment_service_enabled = False
-                from business.models import PickupLocation
-                PickupLocation.objects.filter(
-                    business=business, is_fulfilment_center=True
-                ).update(pickup_status='inactive')
+                # Half the codebase reads `status`, not `enabled`, so leaving a
+                # disabled client sitting at 'active' keeps it in every
+                # fulfilment queue and report.
+                if business.fulfillment_service_status == 'active':
+                    business.fulfillment_service_status = 'none'
+                _retire_fulfilment_pickup_locations(business)
 
             business.save()
 
