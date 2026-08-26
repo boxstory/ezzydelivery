@@ -73,6 +73,8 @@ urlpatterns = [
 
      # Bulk Import (Client Dashboard)
      path('bulk-import/', orders_views.bulk_import_orders, name='bulk_import_orders'),
+     path('bulk-import/sample.xlsx', orders_views.bulk_import_sample_xlsx, name='bulk_import_sample_xlsx'),
+     path('bulk-import/sample.csv', orders_views.bulk_import_sample_csv, name='bulk_import_sample_csv'),
      path('bulk-import/preview/', orders_views.bulk_import_preview, name='bulk_import_preview'),
      path('bulk-import/save/', orders_views.bulk_import_save, name='bulk_import_save'),
      path('bulk-import/save-mapping/', orders_views.bulk_import_save_mapping, name='bulk_import_save_mapping'),

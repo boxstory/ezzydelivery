@@ -34,17 +34,7 @@ Parameters:
             <div class="col-6">
                 <div class="odp__field">
                     <span class="odp__field__label">Status</span>
-                    {% if order.order_status == 'to_review' %}
-                    <span class="odp__badge odp__badge--warning">To Review</span>
-                    {% elif order.order_status == 'to_publish' %}
-                    <span class="odp__badge odp__badge--info">To Publish</span>
-                    {% elif order.order_status == 'published' %}
-                    <span class="odp__badge odp__badge--success">Published</span>
-                    {% elif order.order_status == 'cancelled' %}
-                    <span class="odp__badge odp__badge--danger">Cancelled</span>
-                    {% else %}
-                    <span class="odp__badge odp__badge--muted">{{ order.order_status }}</span>
-                    {% endif %}
+                    <span class="odp__badge odp__badge--{{ order.order_status|order_status_badge }}">{{ order.get_order_status_display }}</span>
                 </div>
             </div>
             <div class="col-6">
@@ -211,6 +201,7 @@ Parameters:
             <thead>
                 <tr>
                     <th>Product</th>
+                    <th>SKU</th>
                     <th>Qty</th>
                     <th>Unit Price</th>
                     <th>Total</th>
@@ -221,6 +212,7 @@ Parameters:
                 {% for item in order_items %}
                 <tr>
                     <td>{{ item.product|default:item.notes|truncatechars:30 }}</td>
+                    <td><span class="wf-sku">{{ item.display_sku|default:"—" }}</span></td>
                     <td>{{ item.quantity }}</td>
                     <td>{{ item.unit_price|default:"0.00" }} QAR</td>
                     <td class="odp__table__amount">{{ item.total_price|default:"0.00" }} QAR</td>
@@ -359,7 +351,7 @@ Parameters:
     </a>
     {% endif %}
 
-    {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
+    {% if order.order_status != 'cancelled' and order.order_status != 'publish' %}
     <button type="button"
             class="odp__btn odp__btn--danger-outline"
             hx-post="/workforce/orders/{{ order.id }}/cancel/"

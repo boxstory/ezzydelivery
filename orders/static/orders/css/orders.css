@@ -2421,17 +2421,21 @@ textarea.ulv__input::placeholder {
 
 /* Page Container */
 .oap__page {
-  padding: 1.5rem;
-  max-width: 1000px;
+  padding: 1.125rem;
+  max-width: 1320px;   /* two columns need the room the 1000px cap denied them */
   margin: 0 auto;
+  /* Published so the command band cancels this gutter and runs flush across the
+     top, like every other client page (see business_dashboard_base.css). */
+  --bcon-root-gutter: 1.125rem;
 }
 
-/* Full width for table view - break out of dashboard padding */
+/* Full width for table view - break out of dashboard padding.
+   Offsets must match .oap__page's padding above, or the table sits inset. */
 .oap__page.oap__page--table-active {
   max-width: 100%;
   padding: 0;
-  margin: -1.5rem;
-  width: calc(100% + 3rem);
+  margin: -1.125rem;
+  width: calc(100% + 2.25rem);
 }
 
 /* Remove extra padding from form view container (page already has padding) */
@@ -2462,9 +2466,13 @@ textarea.ulv__input::placeholder {
   overflow-x: auto;
 }
 
+/* Sixteen columns do not fit 1200px. Give the table a real minimum so the
+   wrapper's overflow-x scrolls it, instead of crushing Pickup/Notes/Status
+   into unreadable slivers. */
 .excel-table {
   width: 100%;
-  max-width: 100%;
+  max-width: none;
+  min-width: 1680px;
 }
 
 /* View Toggle */
@@ -2536,12 +2544,24 @@ textarea.ulv__input::placeholder {
   color: var(--brand-primary, #ffd33b);
 }
 
-/* Form Container */
+/* Form Container.
+   No `overflow: hidden` here — it makes this the sticky containment box and
+   the dispatch bar silently stops sticking. Corners are handled per-child. */
 .oap__form-wrap {
   background: var(--brand-white, #fff);
-  border-radius: 1rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  overflow: hidden;
+  border-radius: var(--brand-radius-lg, 1.125rem);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  border: 1px solid var(--brand-grey-200, #e9ecef);
+}
+
+.oap__form-wrap > form > .oap__form-section--ai {
+  border-top-left-radius: var(--brand-radius-lg, 1.125rem);
+  border-top-right-radius: var(--brand-radius-lg, 1.125rem);
+}
+
+.oap__form-wrap .oap__form-submit {
+  border-bottom-left-radius: var(--brand-radius-lg, 1.125rem);
+  border-bottom-right-radius: var(--brand-radius-lg, 1.125rem);
 }
 
 /* Form Sections */
@@ -2553,13 +2573,23 @@ textarea.ulv__input::placeholder {
   border-bottom: none;
 }
 
+/* Console section header — a labelled rule, not a filled bar. Nine of these
+   stack on this page, so the old 48px gradient tile cost ~430px of pure chrome. */
 .oap__form-section-header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1.5rem;
-  background: linear-gradient(135deg, var(--brand-grey-50, #f8f9fa) 0%, var(--brand-grey-100, #f1f3f4) 100%);
-  border-bottom: 1px solid var(--brand-grey-200, #e9ecef);
+  gap: 0.5rem;
+  padding: 0.75rem 1.125rem 0.375rem;
+  background: transparent;
+  border-bottom: 0;
+}
+
+/* Hairline that runs from the label to the edge of the section */
+.oap__form-section-header::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--brand-grey-200, #e9ecef);
 }
 
 /* Shared-location (WhatsApp/Google Maps) paste & drop zone */
@@ -2604,6 +2634,44 @@ textarea.ulv__input::placeholder {
   font-weight: 500;
   color: var(--brand-grey-400, #a0a0a0);
 }
+
+/* Bulk table — per-row shared-location paste/drop cell */
+.col-location { width: 200px; }
+
+.oap__bulk-loc {
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+
+/* Drag-over state — a pin is being dropped onto this row */
+.oap__bulk-loc--over {
+  background: #e8f8ee;
+  box-shadow: inset 0 0 0 2px #25d366;
+}
+
+.excel-table .oap__bulk-loc__input--ok {
+  border-color: #25d366;
+  background: #f2fbf6;
+}
+
+.excel-table .oap__bulk-loc__input--bad {
+  border-color: var(--brand-warning, #f0ad4e);
+  background: #fff9ec;
+}
+
+/* Result line under the input — coordinates set, or why they weren't */
+.oap__bulk-loc__status {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.62rem;
+  line-height: 1.2;
+  color: var(--brand-grey-600, #6c757d);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.oap__bulk-loc__input--ok ~ .oap__bulk-loc__status { color: #1a9c4d; }
+.oap__bulk-loc__input--bad ~ .oap__bulk-loc__status { color: #b26a00; }
 
 /* WhatsApp Notifications — brand-accurate palette (#25D366 green / #075E54 teal) */
 .wa-notif__header {
@@ -2731,35 +2799,46 @@ textarea.ulv__input::placeholder {
 }
 
 /* AI Auto-fill section */
+/* Intake panel — the page's characteristic action (a WhatsApp message goes in,
+   a filled order comes out), so it gets the one navy surface and the one
+   yellow CTA. Was indigo/violet, which belongs to no Ezzy surface. */
 .oap__form-section--ai {
-  border: 1.5px solid #c7d7fe;
-  border-radius: 10px;
+  background: var(--brand-gradient-navy, linear-gradient(135deg, #001f3f 0%, #003366 100%));
+  border: 0;
+  border-radius: var(--brand-radius-sm, 0.5rem);
   overflow: hidden;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.75rem;
 }
 
 .oap__form-section-header--ai {
-  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-  border-bottom: 1px solid #c7d7fe;
+  background: transparent;
+  border-bottom: 0;
+  padding-bottom: 0.375rem;
+}
+
+.oap__form-section-header--ai::after {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .oap__form-section-header--ai i {
-  color: #4f46e5;
+  color: var(--brand-primary, #f7c000);
 }
 
+/* Yellow as text is only correct here because the backing is navy */
 .oap__form-section-header--ai h3 {
-  color: #3730a3;
+  color: var(--brand-primary, #f7c000);
 }
 
 .oap__ai-badge {
-  font-size: 0.6rem;
-  font-weight: 700;
+  font-size: 0.62rem;
+  font-weight: 600;
   letter-spacing: 0.06em;
-  background: #4f46e5;
-  color: #fff;
-  padding: 0.1rem 0.45rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+  padding: 0.05rem 0.4rem;
   border-radius: 99px;
-  margin-left: auto;
+  order: 3;
 }
 
 .oap__ai-wrap {
@@ -2768,17 +2847,27 @@ textarea.ulv__input::placeholder {
   align-items: flex-start;
 }
 
-.oap__ai-textarea {
+/* Field on a dark surface — Brand Kit navy-form recipe */
+.oap__ai-textarea,
+.oap__page .oap__ai-textarea {
   flex: 1;
   resize: vertical;
-  font-size: 0.875rem;
-  min-height: 70px;
-  border-color: #c7d7fe;
+  font-size: 0.85rem;
+  min-height: 66px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
 }
 
-.oap__ai-textarea:focus {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+.oap__ai-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.oap__page .oap__ai-textarea:focus {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
+  color: #fff;
 }
 
 .oap__ai-actions {
@@ -2789,58 +2878,64 @@ textarea.ulv__input::placeholder {
   flex-shrink: 0;
 }
 
-.oap__ai-btn {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  border: none;
+/* The page's single yellow CTA */
+.oap__page .oap__ai-btn {
+  background: var(--brand-primary, #f7c000);
+  border: 1px solid var(--brand-primary, #f7c000);
+  color: var(--brand-navy, #001f3f);
   white-space: nowrap;
-  font-size: 0.875rem;
-  padding: 0.5rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.375rem 0.75rem;
+  min-height: 2.25rem;
 }
 
-.oap__ai-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #4338ca, #6d28d9);
+.oap__page .oap__ai-btn:hover:not(:disabled) {
+  background: var(--brand-primary-dark, #f4c20d);
+  border-color: var(--brand-primary-dark, #f4c20d);
+  color: var(--brand-navy, #001f3f);
 }
 
-.oap__ai-btn:disabled {
-  opacity: 0.7;
+.oap__page .oap__ai-btn:disabled {
+  opacity: 0.6;
 }
 
 .oap__ai-status {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   display: none;
+  max-width: 12rem;
 }
 
 .oap__ai-status--success {
   display: block;
-  color: #1a7a3c;
+  color: #7ee2a8;
 }
 
 .oap__ai-status--error {
   display: block;
-  color: #b91c1c;
+  color: #ffb4ab;
 }
 
+/* Icon rides at text size — a wayfinding mark, not a yellow badge */
 .oap__form-section-header i {
-  
-  color: var(--brand-primary, #ffd33b);
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--brand-white, #fff);
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  font-size: 0.75rem;
+  color: var(--brand-grey-400, #b0b0b0);
+  flex-shrink: 0;
 }
 
+/* The heading outranks the labels under it: bolder, larger, darker ink. */
 .oap__form-section-header h3 {
-  font-weight: 600;
-  color: var(--brand-grey-800, #343a40);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--brand-grey-700, #333);
   margin: 0;
+  white-space: nowrap;
 }
 
 .oap__form-section-body {
-  padding: 1.25rem 1.5rem;
+  padding: 0.375rem 1.125rem 1.125rem;
 }
 
 /* Scheduled Delivery — held-until-the-day section (order add / order list modal).
@@ -2855,13 +2950,125 @@ textarea.ulv__input::placeholder {
   color: var(--brand-grey-700, #495057);
 }
 
+/* The scheduling control is a *mode*, not a tick — it decides which dispatch run
+   the order enters — so it reads as a switch on a clickable plate with the
+   resulting mode spelled out on the right. The whole plate is the <label>, so
+   there is no small hit target.
+
+   Brandkit pins .form-check-input to 18px and forces `background-image: none
+   !important`, which kills Bootstrap's .form-switch (its knob IS a background
+   image). The knob here is therefore the same ::after brandkit uses for its
+   tick, and every size override carries !important to clear both brandkit and
+   the dashboard-wide 1rem checkbox rule. */
 .oap__sched__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
   margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--brand-grey-200, #f0f0f0);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  background: var(--brand-white, #fff);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.oap__sched__toggle .form-check-label {
+.oap__sched__toggle:hover {
+  border-color: var(--brand-grey-400, #b0b0b0);
+}
+
+/* Switched on, the plate steps forward: navy hairline over a faint grey wash. */
+.oap__sched__toggle:has(.form-check-input:checked) {
+  border-color: var(--brand-navy, #001f3f);
+  background: var(--brand-grey-50, #f8f9fa);
+}
+
+.oap__sched__toggle-title {
+  font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--brand-grey-900, #212529);
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+/* Mode read-back — mono, the way every other state on the order pages is set */
+.oap__sched__toggle-mode {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-grey-500, #6c757d);
+  white-space: nowrap;
+}
+
+.oap__sched__toggle-mode--held,
+.oap__sched__toggle .form-check-input:checked ~ .oap__sched__toggle-mode .oap__sched__toggle-mode--standard {
+  display: none;
+}
+
+.oap__sched__toggle .form-check-input:checked ~ .oap__sched__toggle-mode .oap__sched__toggle-mode--held {
+  display: inline;
+  color: var(--brand-navy, #001f3f);
+}
+
+/* ---- the switch ----
+   The block class is repeated on purpose: business_dashboard_base.css sizes
+   every dashboard checkbox at 1rem through
+   `.business-dashboard input[type="checkbox"].form-check-input` (0,3,1), which
+   outranks a single-class selector here. Doubling the class buys (0,4,0)
+   without tying this component to a body class it may not always sit under. */
+.oap__sched__toggle.oap__sched__toggle .form-check-input[type="checkbox"] {
+  width: 2.25rem !important;
+  min-width: 2.25rem !important;
+  height: 1.25rem !important;
+  flex: 0 0 auto;
+  float: none;
+  margin: 0 !important;
+  padding: 2px !important;
+  border-radius: 999px !important;
+  border: 1px solid var(--brand-grey-400, #b0b0b0) !important;
+  background-color: var(--brand-grey-200, #f0f0f0) !important;
+  justify-content: flex-start !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.oap__sched__toggle.oap__sched__toggle .form-check-input[type="checkbox"]:checked {
+  background-color: var(--brand-navy, #001f3f) !important;
+  border-color: var(--brand-navy, #001f3f) !important;
+}
+
+/* Knob. Brandkit draws a rotated tick in ::after on :checked, so each of its
+   properties (border, transform, margin) has to be reset or the tick geometry
+   leaks into the knob. `flex: 0 0 auto` keeps the knob from being shrunk by the
+   inline-flex track. Track 36px − 2px border − 4px padding = 30px inner;
+   14px knob leaves exactly 1rem of travel. */
+.oap__sched__toggle.oap__sched__toggle .form-check-input[type="checkbox"]::after,
+.oap__sched__toggle.oap__sched__toggle .form-check-input[type="checkbox"]:checked::after {
+  content: "" !important;
+  display: block !important;
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  background: var(--brand-white, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  margin: 0;
+  transform: translateX(0);
+  transition: transform 0.2s ease;
+}
+
+.oap__sched__toggle.oap__sched__toggle .form-check-input[type="checkbox"]:checked::after {
+  transform: translateX(1rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oap__sched__toggle,
+  .oap__sched__toggle.oap__sched__toggle .form-check-input[type="checkbox"],
+  .oap__sched__toggle.oap__sched__toggle .form-check-input[type="checkbox"]::after {
+    transition: none;
+  }
 }
 
 /* Read-back plate — where a scheduled date is shown on lists and detail pages */
@@ -2885,31 +3092,273 @@ textarea.ulv__input::placeholder {
   color: var(--brand-grey-600, #6c757d);
 }
 
-/* Submit Section */
-.oap__form-submit {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  padding: 1.5rem;
-  background: var(--brand-grey-50, #f8f9fa);
-  border-top: 1px solid var(--brand-grey-200, #e9ecef);
+/* ============================================================
+ * Order intake grid
+ * Nine equally-weighted cards used to stack into ~2700px with half the
+ * width empty. Short sections now pair up; the ones that genuinely need
+ * the room (pickup picker, address, products) still span both columns.
+ * Grid rather than Bootstrap row/col so no wrapper divs are introduced
+ * around sections that JS already queries by id.
+ * ============================================================ */
+.oap__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1px;                       /* the gap IS the divider */
+  background: var(--brand-grey-200, #e9ecef);
 }
 
-.oap__form-submit .btn {
-  padding: 0.75rem 1.5rem;
+.oap__grid > .oap__form-section {
+  background: var(--brand-white, #fff);
+  min-width: 0;
+}
+
+.oap__grid > .oap__form-section--wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 991.98px) {
+  .oap__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Legible controls. Everything on this page computed to 12px text in a 32px
+   box — under the console floors (0.82rem / 2.1rem). Dense is not the same as
+   small: these are read all day. Scoped to the page so other forms are
+   untouched. */
+.oap__page .form-control,
+.oap__page .form-select,
+.oap__page .input-group-text {
+  font-size: 0.85rem;
+  min-height: 2.25rem;
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+.oap__page .form-control-sm,
+.oap__page .form-select-sm {
+  font-size: 0.82rem;
+  min-height: 2.1rem;
+}
+
+/* A field label is the quietest thing in its group — it names the input, it
+   does not compete with the section heading above it. Was 0.75rem/600, which
+   rendered LARGER and just as heavy as the heading, so the two read as one rank. */
+.oap__page .form-label {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--brand-grey-500, #6c757d);
+  margin-bottom: 0.25rem;
+}
+
+/* Helper text sits under the field it explains — quiet, but not unreadable */
+.oap__page .form-text {
+  font-size: 0.72rem;
+  color: var(--brand-grey-500, #6c757d);
+  margin-top: 0.2rem;
+}
+
+/* Numbers read as data: zone/street/building, coordinates, money */
+.oap__page input[type="number"],
+.oap__page #id_dl_zone,
+.oap__page #id_dl_street,
+.oap__page #id_dl_building,
+.oap__page #id_latitude,
+.oap__page #id_longitude {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Assist buttons (Validate, AI Parse) are secondary controls, not accents.
+   A bare outline-warning rendered as yellow-on-white — 1.68:1, unreadable. */
+.oap__page .btn-outline-warning,
+.oap__page .btn-outline-info {
+  background: var(--brand-grey-100, #f8f9fa);
+  border: 1px solid var(--brand-grey-400, #b0b0b0);
+  color: var(--brand-grey-800, #1f1f1f);
+  font-size: 0.8rem;
   font-weight: 600;
-  border-radius: 0.5rem;
 }
 
-.oap__form-submit .btn-primary {
-  background: linear-gradient(135deg, var(--brand-primary, #ffd33b) 0%, var(--brand-primary-dark, #e6be35) 100%);
-  border: none;
-  color: var(--brand-grey-900, #212529);
+.oap__page .btn-outline-warning:hover,
+.oap__page .btn-outline-info:hover {
+  background: var(--brand-secondary, #fff7d6);
+  border-color: var(--brand-primary, #f7c000);
+  color: var(--brand-grey-800, #1f1f1f);
 }
 
-.oap__form-submit .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 211, 59, 0.4);
+/* ============================================================
+ * Dispatch bar — the signature element.
+ * Sticks to the bottom of the viewport and reads back the order as it is
+ * typed, so Save is never two screens away and you can see what you are
+ * about to create without scrolling back up.
+ * ============================================================ */
+.oap__form-submit {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--brand-navy, #001f3f);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 -2px 12px rgba(0, 31, 63, 0.18);
+}
+
+.oap__slip {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.oap__slip-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.oap__slip-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.1;
+}
+
+.oap__slip-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.oap__slip-value--num {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* Nothing typed yet — the slip is waiting, not broken */
+.oap__slip-value--empty {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+
+.oap__slip-sep {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+/* The shared .ofu__submit is a full-width stacked-form button; on this bar it
+   sits beside the slip, so the width/margin it brings has to be undone. */
+.oap__form-submit .btn,
+.oap__form-submit .ofu__submit,
+.oap__form-submit .ofu__back-btn {
+  flex: 0 0 auto;
+  width: auto;
+  margin-top: 0;
+  padding: 0.375rem 1.125rem;
+  min-height: 2.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  white-space: nowrap;
+}
+
+/* Cancel: quiet, but still a real control on the navy bar */
+.oap__form-submit .ofu__back-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.oap__form-submit .ofu__back-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+/* Save: white on navy — the highest-contrast thing on the bar */
+.oap__form-submit .ofu__submit {
+  background: #fff;
+  border: 1px solid #fff;
+  color: var(--brand-navy, #001f3f);
+}
+
+.oap__form-submit .ofu__submit:hover {
+  background: var(--brand-primary, #f7c000);
+  border-color: var(--brand-primary, #f7c000);
+  color: var(--brand-navy, #001f3f);
+}
+
+@media (max-width: 767.98px) {
+  .oap__slip { display: none; }
+}
+
+/* ------------------------------------------------------------
+ * Yellow discipline (desktop intake page only — the mobile PWA
+ * surfaces keep their own treatment).
+ * The accent appeared eight times here: nine section icons, four quick-action
+ * icons, Validate, AI Parse, Add Product, the line-total chip and two totals.
+ * It now appears twice: the Auto-fill CTA and the products total.
+ * Yellow as TEXT on a light surface is 1.68:1, so the totals use yellow ink.
+ * ------------------------------------------------------------ */
+.oap__page .oap__quick-btn i {
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.oap__page .oap__quick-btn:hover i {
+  color: var(--brand-primary-text, #8f6b00);
+}
+
+/* Line total: a figure in the ledger, not a filled chip */
+.oap__page .oap__inline-line-total {
+  background: var(--brand-grey-100, #f8f9fa);
+  border: 1px solid var(--brand-grey-200, #e9ecef);
+  color: var(--brand-navy, #001f3f);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Add Product: a real secondary control, not a dashed yellow ghost */
+.oap__page .oap__inline-add-btn {
+  color: var(--brand-grey-800, #1f1f1f);
+  background: var(--brand-grey-100, #f8f9fa);
+  border: 1px solid var(--brand-grey-400, #b0b0b0);
+  border-style: solid;
+}
+
+.oap__page .oap__inline-add-btn:hover {
+  background: var(--brand-secondary, #fff7d6);
+  border-color: var(--brand-primary, #f7c000);
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+/* The one place the accent earns its keep below the fold */
+.oap__page .oap__inline-total-value {
+  color: var(--brand-primary-text, #8f6b00);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* "Optional" / item-count markers read as quiet metadata */
+.oap__page .oap__form-section-header .badge {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: var(--brand-grey-100, #f8f9fa) !important;
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  color: var(--brand-grey-600, #555) !important;
 }
 
 /* Select2 Styling Override for Order Add */
@@ -9246,7 +9695,7 @@ select.our__input:focus {
   height: 0.875rem;
 }
 
-/* Row number chip — same height as inputs (46px) so it aligns */
+/* Row number chip — same height as the inputs beside it */
 .oap__inline-row-num {
   font-size: 0.68rem;
   font-weight: 700;
@@ -9259,13 +9708,13 @@ select.our__input:focus {
   white-space: nowrap;
   display: flex;
   align-items: center;
-  height: 46px;
+  height: 2.1rem;
 }
 
 /* Remove button */
 .oap__inline-remove {
-  width: 46px;
-  height: 46px;
+  width: 2.1rem;
+  height: 2.1rem;
   padding: 0;
   display: flex;
   align-items: center;
@@ -9284,25 +9733,31 @@ select.our__input:focus {
   color: #dc2626;
 }
 
-/* Force Select2 to fill product column and match input height (46px) */
+/* Force Select2 to fill product column and match the 2.1rem input height */
 .oap__inline-col--product .select2-container {
   width: 100% !important;
 }
 .oap__inline-col--product .select2-container--default .select2-selection--single {
-  height: 46px !important;
+  height: 2.1rem !important;
+  /* The dashboard base sets a 2.25rem min-height on every Select2 box; inside
+     this row the neighbours are form-control-sm, so it has to come back down
+     or the product picker stands 2px proud of Qty and Price. */
+  min-height: 2.1rem !important;
   display: flex !important;
   align-items: center !important;
-  padding: 0 0.75rem !important;
-  border-radius: 0.375rem !important;
+  padding: 0 0.625rem !important;
+  border-radius: var(--brand-radius-sm, 0.5rem) !important;
   border: 1px solid var(--brand-grey-300, #dee2e6) !important;
 }
 .oap__inline-col--product .select2-container--default .select2-selection--single .select2-selection__rendered {
   line-height: 1 !important;
   padding: 0 !important;
   flex: 1;
+  /* Match the Qty / Price inputs beside it (form-control-sm = 0.82rem) */
+  font-size: 0.82rem !important;
 }
 .oap__inline-col--product .select2-container--default .select2-selection--single .select2-selection__arrow {
-  height: 44px !important;
+  height: 2.1rem !important;
   width: 28px !important;
 }
 .oap__inline-col--product .select2-container--default .select2-selection--single .select2-selection__placeholder {
@@ -9336,9 +9791,9 @@ select.our__input:focus {
   .oap__inline-col--total { grid-column: 1 / -1; grid-row: auto; }
 }
 
-/* Line total display — matches form-control-sm rendered height (46px) */
+/* Line total display — matches the form-control-sm rendered height */
 .oap__inline-line-total {
-  height: 46px;
+  height: 2.1rem;
   background: var(--brand-primary, #1a73e8);
   border-radius: 6px;
   padding: 0;

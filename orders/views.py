@@ -49,9 +49,11 @@ Related:
     - delivery.models: DeliveryTask (created from verified orders)
 """
 
+import csv
 import hmac
 import json
 import logging
+from decimal import Decimal, InvalidOperation
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
@@ -74,6 +76,7 @@ from core.context_processors import get_cached_business
 from orders import forms, models as orders_models
 from business import models as business_models
 from orders import forms as orders_forms
+from orders.order_code_suggest import suggest_next_order_code
 from business.decorators import (
     business_permission_required,
     business_access_required,
@@ -81,6 +84,7 @@ from business.decorators import (
     user_has_business_permission,
 )
 from business.permissions import BusinessPermissions
+from business.suspension import business_active_required
 
 # Local aliases for commonly used models
 Order = orders_models.Order
@@ -662,6 +666,7 @@ def latest_orders_list(request):
 
 @login_required(login_url='account_login')
 @business_permission_required(BusinessPermissions.ORDER_CREATE)
+@business_active_required
 def order_upload_file(request):
     if request.method == 'POST':
         form = orders_forms.OrderFileUploadForm(request.POST, request.FILES)
@@ -689,6 +694,7 @@ def order_upload_file(request):
 
 @login_required(login_url='account_login')
 @business_access_required()
+@business_active_required
 def order_upload_review_data(request):
     if 'uploaded_data' not in request.session:
         messages.error(request, 'No data to review. Please upload a file first.')
@@ -733,6 +739,7 @@ def order_upload_review_data(request):
 
 @login_required(login_url='account_login')
 @business_permission_required(BusinessPermissions.ORDER_CREATE)
+@business_active_required
 def bulk_order_entry(request):
     """
     Excel-like bulk order entry view for clients.
@@ -858,6 +865,7 @@ def mobile_product_row_partial(request):
 
 @login_required(login_url='account_login')
 @business_permission_required(BusinessPermissions.ORDER_CREATE)
+@business_active_required
 def add_order(request):
     import json
 
@@ -983,10 +991,16 @@ def add_order(request):
                         return redirect('orders:orders_all_list')
         else:
             logger.debug("Loading add_order form")
+            # Prefill the order number with "last order code + 1" so repeat
+            # sellers don't retype the sequence. Editable and clearable — it is
+            # a suggestion, and '' when we can't work one out.
             form = orders_forms.AddOrderForm(
                 business_id=business.business_id,
                 business_code=business.business_code,
-                business=business
+                business=business,
+                initial={
+                    'client_order_code': suggest_next_order_code(business.business_id),
+                },
             )
 
         # Prepare pickup locations data for JavaScript with lat/lon
@@ -1039,8 +1053,22 @@ def add_order(request):
     })
 
 
+def _parse_coord(value, limit):
+    """Return a Decimal coordinate within ±limit, or None when unusable."""
+    if value in (None, ''):
+        return None
+    try:
+        coord = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError):
+        return None
+    if coord < -limit or coord > limit:
+        return None
+    return coord
+
+
 @login_required(login_url='account_login')
 @business_permission_required(BusinessPermissions.ORDER_CREATE)
+@business_active_required
 def add_order_bulk(request):
     """
     Handle bulk order submission from Excel-like table view.
@@ -1094,10 +1122,25 @@ def add_order_bulk(request):
                 except business_models.PickupLocation.DoesNotExist:
                     pass
 
+            # Shared-location pin pasted/dropped into the row. Blank or
+            # unparseable values leave the order without coordinates.
+            lat = _parse_coord(order_data.get('latitude'), 90)
+            lng = _parse_coord(order_data.get('longitude'), 180)
+            accuracy = order_data.get('coords_accuracy') or ''
+            valid_accuracy = {c[0] for c in orders_models.Order.COORDS_ACCURACY}
+            if lat is None or lng is None:
+                lat = lng = None
+                accuracy = ''
+            elif accuracy not in valid_accuracy:
+                accuracy = 'by_customer'
+
             # Create order
             order = orders_models.Order(
                 business=business,
                 pickup_location=pickup_location,
+                latitude=lat,
+                longitude=lng,
+                coords_accuracy=accuracy or None,
                 client_order_code=order_data.get('client_order_code', ''),
                 customer_name=order_data.get('customer_name', ''),
                 customer_phone=order_data.get('customer_phone', ''),
@@ -1134,6 +1177,7 @@ def add_order_bulk(request):
 
 # add products to order
 @login_required(login_url='account_login')
+@business_active_required
 def add_order_product(request, order_id):
     try:
         # IDOR FIX: Verify order belongs to user's business
@@ -1334,6 +1378,7 @@ def product_search_api(request):
 #AddOrderWithProduct
 @login_required(login_url='account_login')
 @business_permission_required(BusinessPermissions.ORDER_CREATE)
+@business_active_required
 def add_order_with_product(request):
     # Business is injected by the decorator
     business = request.current_business
@@ -1371,6 +1416,7 @@ def add_order_with_product(request):
 
 @login_required(login_url='account_login')
 @business_access_required()
+@business_active_required
 def deliver_to_here(request, pickup_id):
     business = request.current_business
     pickup_location = business_models.PickupLocation.objects.filter(
@@ -1399,6 +1445,7 @@ def deliver_to_here(request, pickup_id):
 
 
 @login_required(login_url='account_login')
+@business_active_required
 def pick_from_here(request, pickup_id):
     """Add order with a pre-selected pickup location."""
     import json
@@ -1455,6 +1502,7 @@ def pick_from_here(request, pickup_id):
 
 @login_required(login_url='account_login')
 @business_permission_required(BusinessPermissions.ORDER_EDIT)
+@business_active_required
 def order_update(request, order_id):
     try:
         # Business is injected by the decorator, verify order belongs to it
@@ -1523,6 +1571,7 @@ def order_update(request, order_id):
 
 @login_required(login_url='account_login')
 @business_permission_required(BusinessPermissions.ORDER_DELETE)
+@business_active_required
 def delete_order(request, order_id):
     try:
         # Business is injected by the decorator, verify order belongs to it
@@ -1644,6 +1693,7 @@ def order_details(request, order_id):
 @require_POST
 @login_required(login_url='account_login')
 @business_permission_required(BusinessPermissions.ORDER_EDIT)
+@business_active_required
 def update_order_zone(request, order_id):
     """Update order delivery zone and coordinates (from AI parse result)"""
     try:
@@ -1733,6 +1783,7 @@ def update_order_zone(request, order_id):
 
 @login_required(login_url='account_login')
 @business_access_required()
+@business_active_required
 def update_order_product(request, order_id):
     """Update order product items using OrderItem model"""
     # IDOR FIX: Verify order belongs to user's business
@@ -1814,6 +1865,7 @@ def order_product_list(request, order_id):
 
 @require_POST
 @login_required(login_url='/accounts/login/')
+@business_active_required
 def set_order_scheduled_delivery(request, order_id):
     """
     AJAX: set / change / clear the scheduled delivery date on an order.
@@ -1938,6 +1990,7 @@ def set_order_scheduled_delivery(request, order_id):
 
 @require_POST
 @login_required(login_url='/accounts/login/')
+@business_active_required
 def update_order_status(request, order_id=None):
     """Update order status - supports both form POST and JSON body"""
     try:
@@ -2069,6 +2122,7 @@ def update_order_status(request, order_id=None):
 
 @require_POST
 @login_required(login_url='/accounts/login/')
+@business_active_required
 def bulk_update_order_status(request):
     """Bulk update order statuses - JSON POST with order_ids and status."""
     try:
@@ -2129,6 +2183,7 @@ def bulk_update_order_status(request):
 
 @require_POST
 @login_required(login_url='account_login')
+@business_active_required
 def add_order_comment(request, order_id):
     """Add a comment to order's comment chain via HTMX"""
     try:
@@ -2321,6 +2376,7 @@ def get_order_by_api(request):
 
 @login_required(login_url='account_login')
 @require_POST
+@business_active_required
 def import_shopify_orders(request):
     """Client-facing: import selected Shopify orders (by platform_id) into real Order records.
 
@@ -2639,6 +2695,7 @@ def orders_api_pending_list(request):
 
 @login_required(login_url='account_login')
 @require_POST
+@business_active_required
 def orders_api_pending_import(request):
     """Create Order + OrderItem records from selected rows of the pending fragment."""
     import uuid as _uuid
@@ -3420,6 +3477,102 @@ def update_location(request):
 # BULK IMPORT VIEWS (SHARED - Staff & Client Dashboard)
 # =============================================================================
 
+# Single source of truth for the bulk import wizard: drives the column-mapping
+# UI AND the downloadable CSV/XLSX templates, so a sample file can never drift
+# out of sync with the fields the importer actually accepts.
+# 'samples' holds the three demo rows shown in the downloadable templates.
+BULK_IMPORT_TARGET_FIELDS = [
+    # Order Info
+    {'name': 'client_order_code', 'label': 'Order ID', 'required': False, 'group': 'Order Info',
+     'samples': ['ORD-001', 'ORD-002', '']},
+    {'name': 'order_date', 'label': 'Order Date', 'required': False, 'group': 'Order Info',
+     'samples': ['2026-01-15', '2026-01-15', '2026-01-16']},
+
+    # Customer
+    {'name': 'customer_name', 'label': 'Customer Name', 'required': True, 'group': 'Customer',
+     'samples': ['John Doe', 'Jane Smith', 'Ahmed Ali']},
+    {'name': 'customer_phone', 'label': 'Phone 1', 'required': True, 'group': 'Customer',
+     'samples': ['+97412345678', '+97487654321', '+97455555555']},
+    {'name': 'customer_whatsapp', 'label': 'Phone 2 / WhatsApp', 'required': False, 'group': 'Customer',
+     'samples': ['+97412345678', '+97487654321', '']},
+    {'name': 'customer_email', 'label': 'Email', 'required': False, 'group': 'Customer',
+     'samples': ['john@example.com', 'jane@example.com', '']},
+
+    # Address
+    {'name': 'customer_address', 'label': 'Customer Address', 'required': True, 'group': 'Address',
+     'samples': ['Zone 45 Street 123 Building 5', 'Zone 61 Street 8 Building 12', 'Zone 33 Street 44']},
+    {'name': 'dl_landmark', 'label': 'City / Landmark', 'required': False, 'group': 'Address',
+     'samples': ['Doha, near Landmark Mall', 'Lusail, near Marina', 'Al Wakrah']},
+    {'name': 'dl_building', 'label': 'Villa / Building No', 'required': False, 'group': 'Address',
+     'samples': ['5', '12', '']},
+    {'name': 'dl_street', 'label': 'Street No', 'required': False, 'group': 'Address',
+     'samples': ['123', '8', '44']},
+    {'name': 'dl_zone', 'label': 'Zone No', 'required': False, 'group': 'Address',
+     'samples': ['45', '61', '33']},
+    {'name': 'location_link', 'label': 'Location Link', 'required': False, 'group': 'Address',
+     'samples': ['https://maps.app.goo.gl/example', '', '']},
+    {'name': 'dl_latitude', 'label': 'Latitude', 'required': False, 'group': 'Address',
+     'samples': ['25.2854', '', '']},
+    {'name': 'dl_longitude', 'label': 'Longitude', 'required': False, 'group': 'Address',
+     'samples': ['51.5310', '', '']},
+
+    # Delivery
+    {'name': 'deadline_date', 'label': 'Day & Time Preference', 'required': False, 'group': 'Delivery',
+     'samples': ['Tomorrow morning', 'Any day 4-8 PM', '']},
+    {'name': 'dl_amount', 'label': 'Delivery Charge', 'required': False, 'group': 'Delivery',
+     'samples': ['15', '20', '0']},
+
+    # Product
+    {'name': 'product_url', 'label': 'Product URL', 'required': False, 'group': 'Product',
+     'samples': ['https://example.com/product/1', '', '']},
+    {'name': 'package_desc', 'label': 'Package Desc', 'required': False, 'group': 'Product',
+     'samples': ['Perfume gift box', 'Cotton t-shirt', 'Phone case']},
+    {'name': 'package_qty', 'label': 'Package Qty', 'required': False, 'group': 'Product',
+     'samples': ['1', '2', '1']},
+    {'name': 'cod_amount', 'label': 'Price / COD Amount', 'required': False, 'group': 'Product',
+     'samples': ['150', '0', '250']},
+    {'name': 'product_1', 'label': 'Product:1', 'required': False, 'group': 'Product',
+     'samples': ['Perfume 50ml', 'T-shirt (M)', 'Phone case']},
+    {'name': 'count_1', 'label': 'Count:1', 'required': False, 'group': 'Product',
+     'samples': ['1', '2', '1']},
+    {'name': 'product_2', 'label': 'Product:2', 'required': False, 'group': 'Product',
+     'samples': ['Gift wrap', '', '']},
+    {'name': 'count_2', 'label': 'Count:2', 'required': False, 'group': 'Product',
+     'samples': ['1', '', '']},
+    {'name': 'product_3', 'label': 'Product:3', 'required': False, 'group': 'Product',
+     'samples': ['', '', '']},
+    {'name': 'count_3', 'label': 'Count:3', 'required': False, 'group': 'Product',
+     'samples': ['', '', '']},
+    {'name': 'product_4', 'label': 'Product:4', 'required': False, 'group': 'Product',
+     'samples': ['', '', '']},
+    {'name': 'count_4', 'label': 'Count:4', 'required': False, 'group': 'Product',
+     'samples': ['', '', '']},
+    {'name': 'product_5', 'label': 'Product:5', 'required': False, 'group': 'Product',
+     'samples': ['', '', '']},
+    {'name': 'count_5', 'label': 'Count:5', 'required': False, 'group': 'Product',
+     'samples': ['', '', '']},
+
+    # Notes
+    {'name': 'internal_notes', 'label': 'Notes By Ezzy', 'required': False, 'group': 'Notes',
+     'samples': ['', '', '']},
+    {'name': 'seller_notes', 'label': 'Notes By Seller', 'required': False, 'group': 'Notes',
+     'samples': ['Call before delivery', 'Fragile - handle with care', '']},
+]
+
+BULK_IMPORT_SAMPLE_ROW_COUNT = 3
+
+
+def _bulk_import_sample_rows():
+    """Return (headers, rows) for the downloadable CSV/XLSX templates."""
+    headers = [f['name'] for f in BULK_IMPORT_TARGET_FIELDS]
+    rows = [
+        [f.get('samples', [])[i] if i < len(f.get('samples', [])) else ''
+         for f in BULK_IMPORT_TARGET_FIELDS]
+        for i in range(BULK_IMPORT_SAMPLE_ROW_COUNT)
+    ]
+    return headers, rows
+
+
 @login_required
 def bulk_import_orders(request):
     """
@@ -3449,51 +3602,8 @@ def bulk_import_orders(request):
             messages.error(request, 'No business associated with your account')
             return redirect('business:business_dashboard')
 
-    # Target fields for column mapping - grouped by category
-    target_fields = [
-        # Order Info
-        {'name': 'client_order_code', 'label': 'Order ID', 'required': False, 'group': 'Order Info'},
-        {'name': 'order_date', 'label': 'Order Date', 'required': False, 'group': 'Order Info'},
-
-        # Customer
-        {'name': 'customer_name', 'label': 'Customer Name', 'required': True, 'group': 'Customer'},
-        {'name': 'customer_phone', 'label': 'Phone 1', 'required': True, 'group': 'Customer'},
-        {'name': 'customer_whatsapp', 'label': 'Phone 2 / WhatsApp', 'required': False, 'group': 'Customer'},
-        {'name': 'customer_email', 'label': 'Email', 'required': False, 'group': 'Customer'},
-
-        # Address
-        {'name': 'customer_address', 'label': 'Customer Address', 'required': True, 'group': 'Address'},
-        {'name': 'dl_landmark', 'label': 'City / Landmark', 'required': False, 'group': 'Address'},
-        {'name': 'dl_building', 'label': 'Villa / Building No', 'required': False, 'group': 'Address'},
-        {'name': 'dl_street', 'label': 'Street No', 'required': False, 'group': 'Address'},
-        {'name': 'dl_zone', 'label': 'Zone No', 'required': False, 'group': 'Address'},
-        {'name': 'location_link', 'label': 'Location Link', 'required': False, 'group': 'Address'},
-        {'name': 'dl_latitude', 'label': 'Latitude', 'required': False, 'group': 'Address'},
-        {'name': 'dl_longitude', 'label': 'Longitude', 'required': False, 'group': 'Address'},
-
-        # Delivery
-        {'name': 'deadline_date', 'label': 'Day & Time Preference', 'required': False, 'group': 'Delivery'},
-
-        # Product
-        {'name': 'product_url', 'label': 'Product URL', 'required': False, 'group': 'Product'},
-        {'name': 'package_desc', 'label': 'Package Desc', 'required': False, 'group': 'Product'},
-        {'name': 'package_qty', 'label': 'Package Qty', 'required': False, 'group': 'Product'},
-        {'name': 'cod_amount', 'label': 'Price / COD Amount', 'required': False, 'group': 'Product'},
-        {'name': 'product_1', 'label': 'Product:1', 'required': False, 'group': 'Product'},
-        {'name': 'count_1', 'label': 'Count:1', 'required': False, 'group': 'Product'},
-        {'name': 'product_2', 'label': 'Product:2', 'required': False, 'group': 'Product'},
-        {'name': 'count_2', 'label': 'Count:2', 'required': False, 'group': 'Product'},
-        {'name': 'product_3', 'label': 'Product:3', 'required': False, 'group': 'Product'},
-        {'name': 'count_3', 'label': 'Count:3', 'required': False, 'group': 'Product'},
-        {'name': 'product_4', 'label': 'Product:4', 'required': False, 'group': 'Product'},
-        {'name': 'count_4', 'label': 'Count:4', 'required': False, 'group': 'Product'},
-        {'name': 'product_5', 'label': 'Product:5', 'required': False, 'group': 'Product'},
-        {'name': 'count_5', 'label': 'Count:5', 'required': False, 'group': 'Product'},
-
-        # Notes
-        {'name': 'internal_notes', 'label': 'Notes By Ezzy', 'required': False, 'group': 'Notes'},
-        {'name': 'seller_notes', 'label': 'Notes By Seller', 'required': False, 'group': 'Notes'},
-    ]
+    # Column-mapping targets (shared with the downloadable CSV/XLSX templates)
+    target_fields = BULK_IMPORT_TARGET_FIELDS
 
     context = {
         'is_staff_user': is_staff_user,
@@ -3510,6 +3620,71 @@ def bulk_import_orders(request):
         template = 'orders/bulk_import.html'
 
     return render(request, template, context)
+
+
+@login_required
+def bulk_import_sample_xlsx(request):
+    """
+    Download a ready-to-fill .xlsx template for the bulk import wizard.
+
+    Built server-side with openpyxl so the client dashboard does not need a
+    spreadsheet JS library, and the user never has to re-save a CSV as Excel.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    headers, sample_rows = _bulk_import_sample_rows()
+    required = {f['name'] for f in BULK_IMPORT_TARGET_FIELDS if f.get('required')}
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Orders'
+    ws.append(headers)
+    for row in sample_rows:
+        ws.append(row)
+
+    # Required columns get the yellow header so they stand out from optional ones
+    header_font = Font(bold=True, color='FFFFFF')
+    required_font = Font(bold=True, color='1B2A4A')
+    header_fill = PatternFill('solid', fgColor='1B2A4A')
+    required_fill = PatternFill('solid', fgColor='FFC72C')
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx)
+        is_required = header in required
+        cell.font = required_font if is_required else header_font
+        cell.fill = required_fill if is_required else header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.column_dimensions[get_column_letter(col_idx)].width = max(len(header) + 4, 16)
+    ws.freeze_panes = 'A2'
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="bulk_import_sample.xlsx"'
+    wb.save(response)
+    return response
+
+
+@login_required
+def bulk_import_sample_csv(request):
+    """
+    Download a ready-to-fill .csv template for the bulk import wizard.
+
+    Uses the same field list as the XLSX template so both files always carry
+    every column the importer can map.
+    """
+    headers, sample_rows = _bulk_import_sample_rows()
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="bulk_import_sample.csv"'
+    # BOM so Excel opens the UTF-8 file with the right encoding
+    response.write('﻿')
+    writer = csv.writer(response)
+    writer.writerow(headers)
+    for row in sample_rows:
+        writer.writerow(row)
+    return response
 
 
 @login_required
@@ -3535,7 +3710,14 @@ def bulk_import_preview(request):
             rows = list(reader)
             columns = reader.fieldnames or []
         elif file_name.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(uploaded_file, engine='openpyxl' if file_name.endswith('.xlsx') else 'xlrd')
+            # dtype=str matches the CSV branch above: without it pandas infers
+            # types and silently mangles data — "+97412345678" loses its "+" and
+            # whole numbers come back as "5.0".
+            df = pd.read_excel(
+                uploaded_file,
+                engine='openpyxl' if file_name.endswith('.xlsx') else 'xlrd',
+                dtype=str,
+            )
             df = df.fillna('')
             columns = df.columns.tolist()
             rows = df.to_dict('records')
@@ -3634,6 +3816,7 @@ def bulk_import_preview(request):
             'dl_latitude': 'Latitude',
             'dl_longitude': 'Longitude',
             'deadline_date': 'Day & Time Preference',
+            'dl_amount': 'Delivery Charge',
             'product_url': 'Product URL',
             'package_desc': 'Package Desc',
             'package_qty': 'Package Qty',
@@ -3668,6 +3851,7 @@ def bulk_import_preview(request):
             'dl_latitude': ['latitude', 'lat', 'geo lat'],
             'dl_longitude': ['longitude', 'lng', 'long', 'geo long'],
             'deadline_date': ['day', 'time', 'day time', 'preferred', 'deadline', 'delivery date', 'day time if them have demand', 'expected', 'eta', 'delivery time', 'preferred time', 'slot'],
+            'dl_amount': ['dl amount', 'delivery charge', 'delivery fee', 'delivery amount', 'shipping', 'shipping charge', 'shipping fee', 'shipping cost', 'freight', 'dlamount'],
             'product_url': ['product url', 'url', 'product link', 'item url', 'link'],
             'package_desc': ['product name', 'product', 'item', 'item name', 'description', 'product description', 'productname', 'itemname', 'goods', 'items', 'package desc', 'package description'],
             'package_qty': ['qty', 'quantity', 'count', 'units', 'pcs', 'pieces', 'no of items', 'package qty'],
@@ -3690,6 +3874,14 @@ def bulk_import_preview(request):
         for field, label in field_labels.items():
             if field in mapping_patterns:
                 mapping_patterns[field].append(label.lower())
+
+        # Add each field's own snake_case name (e.g. "dl_zone" -> "dl zone") so a
+        # file built from our downloadable CSV/XLSX template maps 100% of its
+        # columns on upload.
+        for field in mapping_patterns:
+            own_name = field.replace('_', ' ')
+            if own_name not in mapping_patterns[field]:
+                mapping_patterns[field].append(own_name)
 
         # Columns to skip/ignore from auto-mapping (not relevant for order import)
         ignore_columns = [
@@ -3798,6 +3990,7 @@ def bulk_import_preview(request):
 
 @login_required
 @require_POST
+@business_active_required
 def bulk_import_save_mapping(request):
     """Save column mapping for bulk CSV import (persists via ImportLog)."""
     try:
@@ -3844,6 +4037,7 @@ def bulk_import_save_mapping(request):
 
 @login_required
 @require_POST
+@business_active_required
 def bulk_import_save(request):
     """
     AJAX endpoint to save a single order row from bulk import.
@@ -4152,6 +4346,7 @@ def bulk_import_save(request):
 
 @login_required
 @require_POST
+@business_active_required
 def bulk_import_finalize(request):
     """Finalize an ImportLog after all rows have been processed."""
     try:

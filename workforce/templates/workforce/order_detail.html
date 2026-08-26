@@ -501,6 +501,7 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                         <thead class="table-light">
                             <tr>
                                 <th>Product</th>
+                                <th>SKU</th>
                                 <th>Quantity</th>
                                 <th>Unit Price</th>
                                 <th>Total</th>
@@ -511,6 +512,7 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                             {% for item in order_items %}
                             <tr>
                                 <td>{{ item.product|default:item.notes|truncatechars:50 }}</td>
+                                <td><span class="wf-sku">{{ item.display_sku|default:"—" }}</span></td>
                                 <td>{{ item.quantity }}</td>
                                 <td>{{ item.unit_price|default:"0.00" }} QAR</td>
                                 <td>{{ item.total_price|default:"0.00" }} QAR</td>

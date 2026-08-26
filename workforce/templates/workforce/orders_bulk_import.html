@@ -133,31 +133,26 @@ Notes: The file is parsed in the browser; rows are sent one per request so failu
                     <div class="card-body p-4">
                         <h6 class="mb-3">Required Columns:</h6>
                         <ul class="list-unstyled">
+                            {% for field in target_fields %}{% if field.required %}
                             <li class="mb-2">
-                                <code>customer_name</code> <span class="text-danger">*</span>
+                                <code>{{ field.name }}</code> <span class="text-danger">*</span>
                             </li>
-                            <li class="mb-2">
-                                <code>customer_phone</code> <span class="text-danger">*</span>
-                            </li>
-                            <li class="mb-2">
-                                <code>customer_address</code> <span class="text-danger">*</span>
-                            </li>
+                            {% endif %}{% endfor %}
                         </ul>
 
                         <h6 class="mb-3 mt-4">Optional Columns:</h6>
                         <ul class="list-unstyled small">
-                            <li class="mb-1"><code>client_order_code</code></li>
-                            <li class="mb-1"><code>customer_whatsapp</code></li>
-                            <li class="mb-1"><code>dl_zone</code>, <code>dl_street</code>, <code>dl_building</code></li>
-                            <li class="mb-1"><code>cod_amount</code>, <code>dl_amount</code></li>
+                            {% for field in target_fields %}{% if not field.required %}
+                            <li class="mb-1"><code>{{ field.name }}</code></li>
+                            {% endif %}{% endfor %}
                         </ul>
 
                         <hr>
                         <div class="d-flex gap-2 flex-wrap">
-                            <a href="#" class="btn btn-outline-primary btn-sm" onclick="downloadSampleCSV()">
+                            <a href="{% url 'orders:bulk_import_sample_csv' %}" class="btn btn-outline-primary btn-sm">
                                 <i class="fa-solid fa-download me-1"></i>Sample CSV
                             </a>
-                            <a href="#" class="btn btn-outline-success btn-sm" onclick="downloadSampleExcel()">
+                            <a href="{% url 'orders:bulk_import_sample_xlsx' %}" class="btn btn-outline-success btn-sm">
                                 <i class="fa-solid fa-download me-1"></i>Sample Excel
                             </a>
                         </div>
@@ -1195,73 +1190,6 @@ function resetWizard() {
     document.getElementById('failedRowsSection').style.display = 'none';
     checkStep1Ready();
     goToStep(1);
-}
-
-// Sample file downloads
-function getSampleData() {
-    return [
-        {
-            client_order_code: 'ORD-001',
-            customer_name: 'John Doe',
-            customer_phone: '+97412345678',
-            customer_whatsapp: '+97412345678',
-            customer_address: 'Zone 45 Street 123 Building 5',
-            dl_zone: 45,
-            dl_street: 123,
-            dl_building: 5,
-            cod_amount: 150,
-            dl_amount: 15
-        },
-        {
-            client_order_code: 'ORD-002',
-            customer_name: 'Jane Smith',
-            customer_phone: '+97487654321',
-            customer_whatsapp: '+97487654321',
-            customer_address: 'Zone 61 Street 8 Building 12',
-            dl_zone: 61,
-            dl_street: 8,
-            dl_building: 12,
-            cod_amount: 0,
-            dl_amount: 20
-        },
-        {
-            client_order_code: '',
-            customer_name: 'Ahmed Ali',
-            customer_phone: '+97455555555',
-            customer_whatsapp: '',
-            customer_address: 'Zone 33 Street 44',
-            dl_zone: 33,
-            dl_street: 44,
-            dl_building: 0,
-            cod_amount: 250,
-            dl_amount: 0
-        }
-    ];
-}
-
-function downloadSampleCSV() {
-    var csvContent = "client_order_code,customer_name,customer_phone,customer_whatsapp,customer_address,dl_zone,dl_street,dl_building,cod_amount,dl_amount\n";
-    csvContent += "ORD-001,John Doe,+97412345678,+97412345678,Zone 45 Street 123 Building 5,45,123,5,150,15\n";
-    csvContent += "ORD-002,Jane Smith,+97487654321,+97487654321,Zone 61 Street 8 Building 12,61,8,12,0,20\n";
-    csvContent += ",Ahmed Ali,+97455555555,,Zone 33 Street 44,33,44,0,250,0\n";
-
-    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    var link = document.createElement("a");
-    var url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", "sample_orders.csv");
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-function downloadSampleExcel() {
-    var data = getSampleData();
-    var worksheet = XLSX.utils.json_to_sheet(data);
-    var workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
-    XLSX.writeFile(workbook, "sample_orders.xlsx");
 }
 
 // Error Detail Modal Functions

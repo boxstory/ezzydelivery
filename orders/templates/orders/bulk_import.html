@@ -153,31 +153,26 @@
                     <div class="card-body p-4">
                         <h6 class="bim__guide-heading">Required Columns:</h6>
                         <ul class="bim__guide-list">
+                            {% for field in target_fields %}{% if field.required %}
                             <li class="bim__guide-item">
-                                <code>customer_name</code> <span class="bim__required">*</span>
+                                <code>{{ field.name }}</code> <span class="bim__required">*</span>
                             </li>
-                            <li class="bim__guide-item">
-                                <code>customer_phone</code> <span class="bim__required">*</span>
-                            </li>
-                            <li class="bim__guide-item">
-                                <code>customer_address</code> <span class="bim__required">*</span>
-                            </li>
+                            {% endif %}{% endfor %}
                         </ul>
 
                         <h6 class="bim__guide-heading bim__guide-heading--mt">Optional Columns:</h6>
                         <ul class="bim__guide-list bim__guide-list--small">
-                            <li><code>client_order_code</code></li>
-                            <li><code>customer_whatsapp</code></li>
-                            <li><code>dl_zone</code>, <code>dl_street</code>, <code>dl_building</code></li>
-                            <li><code>cod_amount</code>, <code>dl_amount</code></li>
+                            {% for field in target_fields %}{% if not field.required %}
+                            <li><code>{{ field.name }}</code></li>
+                            {% endif %}{% endfor %}
                         </ul>
 
                         <hr>
                         <div class="d-flex gap-2 flex-wrap">
-                            <a href="#" class="ofu__sample-btn" onclick="downloadSampleCSV()">
+                            <a href="{% url 'orders:bulk_import_sample_csv' %}" class="ofu__sample-btn">
                                 <i class="fa-solid fa-download"></i> Sample CSV
                             </a>
-                            <a href="#" class="ofu__sample-btn" onclick="downloadSampleExcel()">
+                            <a href="{% url 'orders:bulk_import_sample_xlsx' %}" class="ofu__sample-btn">
                                 <i class="fa-solid fa-download"></i> Sample Excel
                             </a>
                         </div>
@@ -1082,29 +1077,5 @@ function resetWizard() {
     goToStep(1);
 }
 
-function downloadSampleCSV() {
-    const headers = ['customer_name', 'customer_phone', 'customer_address', 'dl_zone', 'dl_street', 'dl_building', 'cod_amount'];
-    const sample = [
-        ['John Doe', '55123456', 'Building 10, Street 5, Zone 45', '45', '5', '10', '150'],
-        ['Jane Smith', '66789012', 'Villa 25, Street 12, Zone 61', '61', '12', '25', '200']
-    ];
-
-    let csv = headers.join(',') + '\n';
-    sample.forEach(row => {
-        csv += row.map(cell => `"${cell}"`).join(',') + '\n';
-    });
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'bulk_import_sample.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-function downloadSampleExcel() {
-    alert('For Excel format, please download the CSV and open it in Excel, then save as .xlsx');
-}
 </script>
 {% endblock extra_js %}

@@ -460,8 +460,8 @@ function renderPanel(key) {
         const isReqEmp = REQUIRED_FIELDS.has(f.name) && !val;
         const reqBadge = f.required ? '<span class="mmap__req-badge">req</span>' : '';
 
-        // Detect formula mode: value contains {…}
-        const isFormula = val.includes('{');
+        // Detect formula mode: value contains {…} or a || fallback chain
+        const isFormula = val.includes('{') || val.includes('||');
 
         let inputHtml;
         if (isSelect && !isFormula) {
@@ -476,7 +476,7 @@ function renderPanel(key) {
                 </div>`;
         } else {
             const cls = isMapped ? 'mmap__src-input--filled' : (isReqEmp ? 'mmap__src-input--req-empty' : '');
-            const placeholder = isSelect ? '{col1} {col2}…' : 'column name or {col1} {col2}…';
+            const placeholder = isSelect ? '{col1} {col2}… or colA || colB' : 'column name, {col1} {col2}… or colA || colB';
             const formulaActive = isFormula ? 'mmap__formula-btn--active' : '';
             inputHtml = `
                 <div class="mmap__input-wrap">
@@ -888,11 +888,12 @@ function showFormulaTip(btn) {
     if (!input) return;
     btn.classList.toggle('mmap__formula-btn--active');
     if (btn.classList.contains('mmap__formula-btn--active')) {
-        showToast('Formula mode: type {Column Name} to combine fields. E.g. {Street}, {Zone No}', 'success');
-        input.placeholder = '{Col A} {Col B}  or  {Col A}, {Col B}';
+        showToast('Formula mode: {Column Name} combines fields — {Street}, {Zone No}. '
+                + 'Use || for fallbacks — customer.name || billing.name takes the first one that has a value.', 'success');
+        input.placeholder = '{Col A} {Col B}  or  Col A || Col B';
         input.focus();
     } else {
-        input.placeholder = 'column name or {col1} {col2}…';
+        input.placeholder = 'column name, {col1} {col2}… or colA || colB';
     }
 }
 
@@ -1089,7 +1090,6 @@ function renderTestResult(data) {
     const result  = document.getElementById('mmap_test_result');
     const mapping = allMappings[activePlatform] || {};
     const info    = data.order_info || {};
-    const colVals = data.col_values || {};
 
     // Same ordered field list as renderPanel
     const seen    = new Set();
@@ -1102,7 +1102,7 @@ function renderTestResult(data) {
     // Show mapped fields + any unmapped required ones
     const displayFields = ordered.filter(f => mapping[f.name] || REQUIRED_FIELDS.has(f.name));
 
-    let okCount = 0, emptyCount = 0, missingReq = 0;
+    let okCount = 0, emptyCount = 0, missingReq = 0, staleCount = 0;
     let html = `
         <div class="mmap__panel-col-header">
             <span class="mmap__col-hdr" style="text-align:right">#</span>
@@ -1127,16 +1127,20 @@ function renderTestResult(data) {
 
         const col       = mapping[f.name] || '';
         const isMapped  = !!col;
-        const value     = isMapped
-            ? (col.includes('{') ? _clientResolve(col, colVals) : (colVals[col] || ''))
-            : '';
-        const hasVal    = isMapped && value !== '';
+        // Values come from the server's resolved_mapping, which runs the very same
+        // resolver the importers run — never re-resolved here, or the preview could
+        // disagree with what an import actually writes.
+        const resolved  = (data.resolved_mapping || {})[f.name];
+        const isStale   = isMapped && (!resolved || resolved.col !== col);
+        const value     = (isMapped && !isStale && resolved) ? (resolved.value || '') : '';
+        const hasVal    = isMapped && !isStale && value !== '';
         const isReqMiss = REQUIRED_FIELDS.has(f.name) && !isMapped;
-        const isReqEmp  = REQUIRED_FIELDS.has(f.name) && isMapped && !value;
+        const isReqEmp  = REQUIRED_FIELDS.has(f.name) && isMapped && !isStale && !value;
 
-        if (hasVal)       okCount++;
+        if (hasVal)        okCount++;
+        else if (isStale)  staleCount++;
         else if (isMapped) emptyCount++;
-        if (isReqMiss)    missingReq++;
+        if (isReqMiss)     missingReq++;
 
         const reqBadge = f.required ? '<span class="mmap__req-badge">req</span>' : '';
         const rowCls   = hasVal ? 'mmap__row--mapped' : '';
@@ -1152,6 +1156,12 @@ function renderTestResult(data) {
                 <div class="mmap__field" style="opacity:0.3">
                     <span class="mmap__field-key">— not mapped —</span>
                     <span class="mmap__field-label" style="font-size:0.72rem;font-weight:400"></span>
+                </div>`;
+        } else if (isStale) {
+            valueCol = `
+                <div class="mmap__field">
+                    <span class="mmap__field-key">${escHtml(col)}</span>
+                    <span class="mmap__field-label" style="font-size:0.75rem;font-weight:400;font-style:italic;color:var(--mm-warning)">unsaved — save, then re-run test</span>
                 </div>`;
         } else if (hasVal) {
             valueCol = `
@@ -1185,6 +1195,7 @@ function renderTestResult(data) {
     const summaryParts = [];
     if (okCount > 0)    summaryParts.push(`<span style="color:var(--mm-success)">${okCount} resolved</span>`);
     if (emptyCount > 0) summaryParts.push(`<span style="color:var(--mm-warning)">${emptyCount} empty</span>`);
+    if (staleCount > 0) summaryParts.push(`<span style="color:var(--mm-warning)">${staleCount} unsaved</span>`);
     if (missingReq > 0) summaryParts.push(`<span style="color:var(--mm-danger)">${missingReq} req missing</span>`);
 
     const orderBar = `
@@ -1194,10 +1205,6 @@ function renderTestResult(data) {
         </div>`;
 
     result.innerHTML = orderBar + html;
-}
-
-function _clientResolve(formula, colVals) {
-    return formula.replace(/\{([^}]+)\}/g, (_, col) => colVals[col.trim()] || '');
 }
 
 // ── Escape helpers ───────────────────────────────────────

@@ -12,6 +12,27 @@ def get_status_point(status_point_map, entry):
     return status_point_map.get(key)
 
 
+@register.filter
+def strip_coords(display):
+    """A status label with its trailing coordinate removed — "By Staff ·
+    25.370420, 51.540240" reads as "By Staff", and the number becomes a pin.
+
+    For the timeline's legacy per-queryset mode, which renders history rows
+    straight from the queryset; the merged stream splits them in the view.
+    """
+    from workforce.views import _split_coords
+    return _split_coords(display)[0] or ''
+
+
+@register.filter
+def coords_of(display):
+    """The (lat, lng) carried inside a status label, or None — pairs with
+    :func:`strip_coords` so the template can pin what it stopped printing."""
+    from workforce.views import _split_coords
+    pair = _split_coords(display)[1]
+    return {'lat': pair[0], 'lng': pair[1]} if pair else None
+
+
 def _driver_name(driver):
     """Human name for a driver — Driver.__str__ is the login username (ezzy.dr001),
     which is not what staff identify drivers by. Mirrors _driver_chip.html."""

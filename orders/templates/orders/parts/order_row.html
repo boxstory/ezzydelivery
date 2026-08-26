@@ -54,15 +54,7 @@
         <div class="orc__statuses">
             <div class="orc__st-row">
                 <span class="orc__st-label">Order</span>
-                {% if order.order_status == 'to_review' %}<span class="st st-warn">To Review</span>
-                {% elif order.order_status == 'to_publish' %}<span class="st st-info">To Publish</span>
-                {% elif order.order_status == 'ready_to_pickup' %}<span class="st st-info">Ready</span>
-                {% elif order.order_status == 'publish' %}<span class="st st-info">Publish</span>
-                {% elif order.order_status == 'published' %}<span class="st st-ok">Published</span>
-                {% elif order.order_status == 'delivered' %}<span class="st st-ok">Delivered</span>
-                {% elif order.order_status == 'fulfilled' %}<span class="st st-ok">Fulfilled</span>
-                {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancelled</span>
-                {% else %}<span class="st">{{ order.order_status }}</span>{% endif %}
+                <span class="st {{ order.order_status|order_status_class }}">{{ order.get_order_status_display }}</span>
             </div>
             {% with task=order.delivery_task.all.0 %}
             {% if task %}
@@ -80,7 +72,7 @@
         {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
         <button type="button" class="orc__btn orc__btn--info" title="Publish" hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML"><i class="fa-solid fa-paper-plane"></i></button>
         {% endif %}
-        {% if order.order_status != 'cancelled' and order.order_status != 'published' and order.order_status != 'delivered' %}
+        {% if order.order_status != 'cancelled' and order.order_status != 'publish' and order.order_status != 'delivered' %}
         <button type="button" class="orc__btn orc__btn--err" title="Cancel" hx-post="{% url 'workforce:cancel_order' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML" hx-confirm="Cancel order?"><i class="fa-solid fa-times"></i></button>
         {% endif %}
         <a href="https://wa.me/{{ order.customer_phone|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="orc__btn orc__btn--wa" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>

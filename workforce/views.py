@@ -213,7 +213,12 @@ IMPORT_FIELD_LABELS = {
     'seller_notes':         'Seller Notes',
     'internal_notes':       'Internal Notes',
 }
-for _i in range(1, 11):
+# How many product_N/count_N column pairs an import mapping can carry. Every
+# import path must use this same ceiling — a lower cap anywhere silently drops
+# products off the end of the order.
+MAX_PRODUCT_COLUMNS = 10
+
+for _i in range(1, MAX_PRODUCT_COLUMNS + 1):
     IMPORT_FIELD_LABELS[f'product_{_i}'] = f'Product {_i}'
     IMPORT_FIELD_LABELS[f'count_{_i}']   = f'Count {_i}'
 
@@ -514,6 +519,11 @@ def apply_order_list_filters(request, orders):
     dl_code = request.GET.get('dlCode', '').strip()
     search = request.GET.get('search', '').strip()
     c_status = request.GET.get('cStatus', '').strip()
+    # Ignore a status that isn't a real choice. Filtering on it returns zero
+    # rows with no hint that the value was bogus, and the applied-filter chip
+    # echoes the raw key back as if it were a genuine filter.
+    if c_status and c_status not in dict(orders_models.ORDER_STATUS_BY_CLIENT):
+        c_status = ''
     dl_task_status = request.GET.get('dlTaskStatus', '').strip()
     business_id = request.GET.get('business', '').strip()
     date_from = _parse_date_param(request.GET.get('dateFrom', '').strip())
@@ -793,6 +803,11 @@ def _apply_all_orders_filters(request, orders):
     dl_code = request.GET.get('dlCode', '').strip()
     search = request.GET.get('search', '').strip()
     c_status = request.GET.get('cStatus', '').strip()
+    # Ignore a status that isn't a real choice. Filtering on it returns zero
+    # rows with no hint that the value was bogus, and the applied-filter chip
+    # echoes the raw key back as if it were a genuine filter.
+    if c_status and c_status not in dict(orders_models.ORDER_STATUS_BY_CLIENT):
+        c_status = ''
     dl_task_status = request.GET.get('dlTaskStatus', '').strip()
     business_id = request.GET.get('business', '').strip()
     date_from = _parse_date_param(request.GET.get('dateFrom', '').strip())
@@ -1507,6 +1522,9 @@ def orders_to_publish(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def orders_published(request):
+    # "Published" here means "has a delivery task" (task_created latch), which is
+    # a different question from orders_to_publish() above — that one keys off
+    # order_status. An order can legitimately appear on both.
     orders = orders_models.Order.objects.select_related(
         'business', 'pickup_location'
     ).prefetch_related('order_comments', 'delivery_task').filter(task_created=True)
@@ -4041,9 +4059,23 @@ def _resolve_mapping_value(template, raw_row):
       - plain key:     'Column A'           → raw_row['Column A']
       - template:      '{Col A} {Col B}'    → 'value_a value_b'
       - with sep:      '{Col A}, {Col B}'   → 'value_a, value_b'
+      - fallback:      'Col A || Col B'     → first alternative that resolves non-empty
     Extra whitespace between empty substitutions is collapsed.
+
+    The '||' chain is what lets a per-client quirk stay on the Mapping Manager page
+    instead of becoming a hardcoded precedence in the importers: which source column
+    actually carries the customer name differs store by store, so the mapping has to
+    be able to say "this one, else that one".
     """
     if not template or not isinstance(raw_row, dict):
+        return ''
+    if '||' in template:
+        # Each alternative is itself a plain key or a {…} template — recursion
+        # terminates because no part can still contain '||'.
+        for part in template.split('||'):
+            value = _resolve_mapping_value(part.strip(), raw_row)
+            if value:
+                return value
         return ''
     if '{' not in template:
         return str(raw_row.get(template, '') or '')
@@ -5273,7 +5305,8 @@ def wf_mapping_manager_test(request):
 
     # Load current platform mapping
     raw_mapping = business.import_mapping or {}
-    is_nested = any(k in raw_mapping for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive'))
+    is_nested = any(k in raw_mapping for k in (
+        'shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link'))
     platform_mapping = raw_mapping.get(platform, {}) if is_nested else {}
 
     col_values = {}
@@ -5495,16 +5528,17 @@ def wf_mapping_manager_test(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
 
-    # Build resolved_mapping: for each db_field in the platform mapping, resolve value
+    # Build resolved_mapping: for each db_field in the platform mapping, resolve value.
+    # Everything goes through _resolve_mapping_value — the same call the importers
+    # make — so this preview cannot drift from what an import would actually write.
     resolved_mapping = {}
     for db_field, src_col in platform_mapping.items():
         if not src_col:
             continue
-        if '{' in src_col:
-            value = _resolve_formula(src_col, col_values)
-        else:
-            value = col_values.get(src_col, '')
-        resolved_mapping[db_field] = {'col': src_col, 'value': value}
+        resolved_mapping[db_field] = {
+            'col': src_col,
+            'value': _resolve_mapping_value(src_col, col_values),
+        }
 
     return JsonResponse({
         'success': True,
@@ -8011,6 +8045,7 @@ def bulk_update_order_status(request):
             old_status = order.order_status
             if old_status != status:
                 order.order_status = status
+                order._status_changed_by = request.user  # names the staffer on the history row
                 order.save(update_fields=['order_status'])
                 OrderVerificationLog.objects.create(
                     order=order,
@@ -20925,6 +20960,7 @@ def order_edit(request, order_id):
             # Status
             order.order_status = request.POST.get('order_status', order.order_status)
             order.verification_status = request.POST.get('verification_status', order.verification_status)
+            order._status_changed_by = request.user  # names the staffer on the history row
 
             order.save()
 
@@ -23856,7 +23892,7 @@ def _extract_products_from_raw_row(temp_order):
                 except (ValueError, TypeError):
                     pass
 
-    # --- Extract product_1..3 / count_1..3 ---
+    # --- Extract product_1..N / count_1..N ---
     raw_list = temp_order.raw_row if isinstance(temp_order.raw_row, list) else []
     db_to_header = col_mapping if is_new_format else {}
 
@@ -23871,7 +23907,7 @@ def _extract_products_from_raw_row(temp_order):
         return ''
 
     products = []
-    for i in range(1, 4):
+    for i in range(1, MAX_PRODUCT_COLUMNS + 1):
         pname = _get_val(f'product_{i}')
         if not pname:
             continue
@@ -24024,7 +24060,7 @@ def temp_orders_transfer(request):
 
         # Build product list: prefer row_data (preview modal), fallback to raw_row product_N, then line_items
         products = []
-        for i in range(1, 11):
+        for i in range(1, MAX_PRODUCT_COLUMNS + 1):
             pname = (row_data.get(f'product_{i}', '') or raw_row.get(f'product_{i}', '')).strip()
             pcount = safe_int(row_data.get(f'count_{i}', '') or raw_row.get(f'count_{i}', '')) or 1
             if pname:
@@ -24460,7 +24496,7 @@ def temp_orders_auto_import(request):
         all_items = []  # [{product, qty, pname, unit_price}] — all products, matched or not
         if stages['match_products']:
             # 1. Direct product_N/count_N keys from dict raw_row (Shopify, WooCommerce, CSV)
-            for i in range(1, 6):
+            for i in range(1, MAX_PRODUCT_COLUMNS + 1):
                 pname = (raw_row.get(f'product_{i}', '') or '').strip()
                 pcount = safe_int(raw_row.get(f'count_{i}', '')) or 1
                 if pname:
@@ -26209,10 +26245,10 @@ def onedrive_import_trigger(request, source_id):
                     order.package_description = package_desc_val[:255]
                     order.package_qty = safe_int(get_val(row_data, 'package_qty')) or 1
                 else:
-                    # Build from product_1..10 columns
+                    # Build from the product_N columns
                     desc_parts = []
                     total_qty = 0
-                    for i in range(1, 11):
+                    for i in range(1, MAX_PRODUCT_COLUMNS + 1):
                         pn = get_val(row_data, f'product_{i}')
                         if pn:
                             pc = safe_int(get_val(row_data, f'count_{i}')) or 1
@@ -26230,7 +26266,7 @@ def onedrive_import_trigger(request, source_id):
                 product_names = []
                 if package_desc_val:
                     product_names.append((package_desc_val, safe_int(get_val(row_data, 'package_qty')) or 1))
-                for i in range(1, 11):
+                for i in range(1, MAX_PRODUCT_COLUMNS + 1):
                     pn = get_val(row_data, f'product_{i}')
                     if pn:
                         pc = safe_int(get_val(row_data, f'count_{i}')) or 1
@@ -28664,6 +28700,11 @@ def wf_export_api(request):
     date_from = request.GET.get('dateFrom', '').strip()
     date_to = request.GET.get('dateTo', '').strip()
     c_status = request.GET.get('cStatus', '').strip()
+    # Ignore a status that isn't a real choice. Filtering on it returns zero
+    # rows with no hint that the value was bogus, and the applied-filter chip
+    # echoes the raw key back as if it were a genuine filter.
+    if c_status and c_status not in dict(orders_models.ORDER_STATUS_BY_CLIENT):
+        c_status = ''
     source = request.GET.get('source', 'db')
 
     # --- Shopify Live API source ---

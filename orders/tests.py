@@ -874,3 +874,112 @@ class ShopifyBillingOnlyRowTestCase(TestCase):
 
         row = _shopify_order_to_row(self._billing_only_order())
         self.assertEqual(_api_row_to_temp_defaults(row, None, 'shopify')['cod_amount'], '')
+
+
+class OrderDeliveryAreaSignalTestCase(TransactionTestCase):
+    """The stored neighbourhood name has to survive the trip to the database.
+
+    Every assertion re-fetches the row rather than reading the in-memory
+    instance: the sibling route_distance_source bug went unnoticed for exactly
+    that reason — apply_* set it in memory and the .update() never persisted it.
+    """
+
+    def setUp(self):
+        from django.core.cache import cache
+
+        # A stale zone-area map would outlive the flushed tables otherwise.
+        cache.clear()
+
+        self.user = User.objects.create_user(
+            username='areauser', email='area@example.com', password='areapass123'
+        )
+        self.profile = Profile.objects.create(
+            user=self.user, first_name='Area', last_name='User', phone=13131313
+        )
+        self.business = Business.objects.create(
+            business_id=41, user=self.user, profile=self.profile,
+            business_name='Area Business', business_code='AREAB01',
+            business_status='active',
+        )
+        self.pickup_location = PickupLocation.objects.create(
+            business=self.business, pickup_location_title='Area Warehouse',
+            locality='Doha', pickup_zone_no=9101, pickup_street_no=300,
+            pickup_building_no=3000, pickup_status='active',
+        )
+
+        ZoneName = delivery_models.ZoneName
+        ZoneArea = delivery_models.ZoneArea
+
+        self.zone = ZoneName.objects.create(
+            zone_number=9101, zone_name='Signal Zone', is_active=True,
+            latitude='25.2500000', longitude='51.5500000',
+        )
+        ZoneArea.objects.create(zone=self.zone, area_name='North Area',
+                                latitude='25.3000000', longitude='51.5000000')
+        ZoneArea.objects.create(zone=self.zone, area_name='South Area',
+                                latitude='25.2000000', longitude='51.6000000')
+
+        self.other_zone = ZoneName.objects.create(
+            zone_number=9102, zone_name='Other Zone', is_active=True,
+            latitude='25.4000000', longitude='51.4000000',
+        )
+        ZoneArea.objects.create(zone=self.other_zone, area_name='Far Area',
+                                latitude='25.4000000', longitude='51.4000000')
+
+    def _order(self, **kwargs):
+        defaults = dict(
+            business=self.business, client_order_code='AREA001',
+            customer_name='Area Test', customer_phone='44444444',
+            customer_address='Area Address', dl_zone=9101,
+            dl_building=3000, dl_street=300,
+            latitude='25.2050000', longitude='51.5950000',
+            pickup_location=self.pickup_location,
+        )
+        defaults.update(kwargs)
+        return Order.objects.create(**defaults)
+
+    def test_creating_an_order_stores_the_area(self):
+        order = self._order()
+
+        stored = Order.objects.get(pk=order.pk)
+        self.assertEqual(stored.delivery_area_name, 'South Area')
+        self.assertEqual(stored.delivery_area_source, 'pin')
+
+    def test_coords_only_save_still_updates_the_area(self):
+        """update_fields must not be able to leave the area stale.
+
+        This is the whole reason the signal writes with a queryset update
+        instead of instance.save().
+        """
+        order = self._order()
+        self.assertEqual(Order.objects.get(pk=order.pk).delivery_area_name, 'South Area')
+
+        order.latitude, order.longitude = '25.2950000', '51.5050000'
+        order.save(update_fields=['latitude', 'longitude'])
+
+        self.assertEqual(Order.objects.get(pk=order.pk).delivery_area_name, 'North Area')
+
+    def test_changing_the_zone_reresolves_against_the_new_zone(self):
+        order = self._order()
+        order.dl_zone = 9102
+        order.latitude, order.longitude = '25.4000000', '51.4000000'
+        order.save()
+
+        stored = Order.objects.get(pk=order.pk)
+        self.assertEqual(stored.delivery_area_name, 'Far Area')
+        self.assertEqual(stored.delivery_area_source, 'pin')
+
+    def test_order_without_a_pin_in_a_multi_area_zone_is_unresolved(self):
+        order = self._order(latitude=None, longitude=None)
+
+        stored = Order.objects.get(pk=order.pk)
+        self.assertEqual(stored.delivery_area_name, '')
+        self.assertEqual(stored.delivery_area_source, 'unresolved')
+
+    def test_route_distance_source_is_persisted_too(self):
+        """Sibling regression guard: the .update() used to omit this column."""
+        order = self._order()
+
+        stored = Order.objects.get(pk=order.pk)
+        if stored.route_distance_km is not None:
+            self.assertNotEqual(stored.route_distance_source, '')

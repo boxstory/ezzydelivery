@@ -1535,7 +1535,8 @@ def _sync_public_link_source(source):
         package_desc = get_cell(row_data, 'package_desc')
         if not package_desc:
             desc_parts = []
-            for pi in range(1, 4):
+            from workforce.views import MAX_PRODUCT_COLUMNS
+            for pi in range(1, MAX_PRODUCT_COLUMNS + 1):
                 pn = get_cell(row_data, f'product_{pi}')
                 pc = get_cell(row_data, f'count_{pi}')
                 if pn:

@@ -396,6 +396,23 @@ class Order(models.Model):
         return ', '.join(parts) if parts else ''
 
     @property
+    def display_skus(self):
+        """Non-empty SKUs of this order's items, de-duplicated, in order.
+
+        Used by the summary lines that report the package as a whole (task
+        detail strip, print label) so the code appears once per order.
+        """
+        items = getattr(self, '_prefetched_objects_cache', {}).get('order_items')
+        if items is None:
+            items = self.order_items.select_related('product').all()
+        skus = []
+        for item in items:
+            sku = item.display_sku
+            if sku and sku not in skus:
+                skus.append(sku)
+        return skus
+
+    @property
     def stock_flag(self):
         """
         Check stock availability for this order's items.
@@ -585,6 +602,22 @@ class OrderItem(models.Model):
                 return parts[1].strip()
             return self.notes
         return 'Item'
+
+    @property
+    def display_sku(self):
+        """Return the item's SKU for templates ('' when there is none).
+
+        Linked items take the SKU off the product record. Imported items that
+        were never matched to a product carry it in the notes tail, e.g.
+        "13__SPECIAL OUD____BUK006" → "BUK006".
+        """
+        if self.product and self.product.item_sku:
+            return self.product.item_sku
+        if self.notes and '__' in self.notes:
+            tail = self.notes.split('__')[-1].strip()
+            if tail:
+                return tail
+        return ''
 
     @property
     def stock_info(self):

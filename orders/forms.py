@@ -107,18 +107,6 @@ class AddOrderForm(SanitizedModelForm):
     View:
         orders.views.order_add
     """
-    # Add a field to display the unique order number preview
-    order_number_preview = forms.CharField(
-        label='Unique Order Number (Auto-generated)',
-        required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'readonly': 'readonly',
-            'id': 'order_number_preview',
-            'placeholder': 'Will be generated: [Business Code]-[Your Order Number]-[System ID]'
-        })
-    )
-
     class Meta:
         model = Order
         fields = ['pickup_location', 'client_order_code', 'customer_name', 'customer_phone', 'customer_whatsapp',   'cod_status_by_client', 'cod_amount',
@@ -130,7 +118,12 @@ class AddOrderForm(SanitizedModelForm):
             'order_notes': forms.TextInput(attrs={'class': 'form-control'}),
             'order_status': forms.Select(attrs={'class': 'form-control'}, choices=ORDER_STATUS),
             'delivery_speed': forms.Select(attrs={'class': 'form-control'}),
-            'client_order_code': forms.TextInput(attrs={'class': 'form-control', 'id': 'client_order_code_input'}),
+            'client_order_code': forms.TextInput(attrs={
+                'class': 'form-control',
+                'id': 'client_order_code_input',
+                'autocomplete': 'off',
+                'placeholder': 'e.g. #33, OR-1042 or 2291',
+            }),
             'latitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
             'longitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
             'coords_accuracy': forms.HiddenInput(),
@@ -171,10 +164,6 @@ class AddOrderForm(SanitizedModelForm):
         # Keep business_id for business-scoped validation (e.g. unique order code)
         self.business_id = business_id
 
-        # Store business_code for use in JavaScript
-        if business_code:
-            self.fields['order_number_preview'].widget.attrs['data-business-code'] = business_code
-
         for field in iter(self.fields):
             self.fields[field].widget.attrs.update(
                 {'class': 'form-control'})
@@ -186,6 +175,10 @@ class AddOrderForm(SanitizedModelForm):
             self.fields['cod_status_by_client'].widget = forms.Select(
                 choices=[('', '— Select —')] + list(COD_STATUS_BY_CLIENT),
                 attrs={'class': 'form-control'})
+
+        # Most orders are prepaid online — JS flips this to "unpaid" as soon as
+        # a COD amount is typed (see order_add.html).
+        self.fields['cod_status_by_client'].initial = 'online_paid'
 
         # Access the form data to filter pickup_location choices
         # Show fulfillment stores first when fulfillment service is enabled

@@ -251,3 +251,37 @@ def to_json(value):
         return _json.dumps(value, cls=DjangoJSONEncoder)
     except (TypeError, ValueError):
         return 'null'
+
+
+@register.filter
+def order_status_class(status):
+    """CSS state class for an Order.order_status value.
+
+    Pair with ``{{ order.get_order_status_display }}`` for the label so the badge
+    can never drift out of sync with ORDER_STATUS_BY_CLIENT — several templates
+    used to hand-roll this chain and tested 'published', which is not a choice
+    (the real value is 'publish', display "Published").
+    """
+    return {
+        'to_review': 'st-warn',
+        'ready_to_pickup': 'st-info',
+        'publish': 'st-ok',
+        'delivered': 'st-ok',
+        'cancelled': 'st-err',
+    }.get(status, '')
+
+
+@register.filter
+def order_status_badge(status):
+    """odp__badge--* modifier for an Order.order_status value.
+
+    Same mapping as order_status_class, expressed in the order-detail panel's
+    badge vocabulary (success/warning/info/danger/muted).
+    """
+    return {
+        'to_review': 'warning',
+        'ready_to_pickup': 'info',
+        'publish': 'success',
+        'delivered': 'success',
+        'cancelled': 'danger',
+    }.get(status, 'muted')

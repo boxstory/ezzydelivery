@@ -37,8 +37,7 @@
     <!-- Hidden fields -->
     <input type="hidden" name="order_status" value="to_review">
     <input type="hidden" name="client_order_code" id="mobile_client_order_code" value="">
-    <input type="hidden" name="order_number_preview" value="">
-    <input type="hidden" name="cod_status_by_client" id="mobile_cod_status" value="pending">
+    <input type="hidden" name="cod_status_by_client" id="mobile_cod_status" value="online_paid">
     <input type="hidden" name="order_source_text" id="mobile_order_source_text" value="">
 
     <!-- Customer Section -->
@@ -172,11 +171,15 @@
         For gifts and dated occasions — birthdays, anniversaries, events. The order is held
         and delivered on the day you pick, not earlier.
       </p>
-      <div class="form-check oap__sched__toggle">
+      <label class="oap__sched__toggle" for="mobile_scheduled_delivery">
         <input type="checkbox" class="form-check-input" name="scheduled_delivery"
                id="mobile_scheduled_delivery" value="on">
-        <label class="form-check-label" for="mobile_scheduled_delivery">Deliver on a specific date</label>
-      </div>
+        <span class="oap__sched__toggle-title">Deliver on a specific date</span>
+        <span class="oap__sched__toggle-mode" aria-hidden="true">
+          <span class="oap__sched__toggle-mode--standard">Standard</span>
+          <span class="oap__sched__toggle-mode--held">Held</span>
+        </span>
+      </label>
       <div id="mobile_scheduled_fields" hidden>
         <div class="pwa-form-group">
           <label class="pwa-form-group__label" for="mobile_scheduled_date">Delivery Date</label>
@@ -291,10 +294,6 @@
 
     <!-- Quick Actions -->
     <div class="oap__quick-actions">
-      <a href="{% url 'delivery:all_delivery_tasks' %}" class="oap__quick-btn">
-        <i class="fas fa-truck"></i>
-        <span>Go to Tasks</span>
-      </a>
       <a href="{% url 'orders:order_upload_file' %}" class="oap__quick-btn">
         <i class="fas fa-file-upload"></i>
         <span>Upload CSV</span>
@@ -350,8 +349,12 @@
         </div>
       </div>
 
+      <!-- Intake grid — sections that fit half the width pair up; the ones that
+           need the room (pickup picker, address, products) span both columns. -->
+      <div class="oap__grid">
+
       <!-- Order Information Section -->
-      <div class="oap__form-section">
+      <div class="oap__form-section oap__form-section--wide">
         <div class="oap__form-section-header">
           <i class="fas fa-file-alt"></i>
           <h3>Order Information</h3>
@@ -359,8 +362,8 @@
         <div class="oap__form-section-body">
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label" for="id_client_order_code">
-                <i class="fas fa-hashtag me-1 text-muted"></i>Your Order ID
+              <label class="form-label" for="client_order_code_input">
+                <i class="fas fa-hashtag me-1 text-muted"></i>Your Order Number
               </label>
               {{ form.client_order_code }}
               {% if form.client_order_code.errors %}
@@ -368,14 +371,11 @@
                 {% for error in form.client_order_code.errors %}{{ error }}{% endfor %}
               </div>
               {% endif %}
-              <div class="form-text">Your internal order reference number</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="id_order_number_preview">
-                <i class="fas fa-barcode me-1 text-muted"></i>System Order Number
-              </label>
-              {{ form.order_number_preview }}
-              <div class="form-text">Auto-generated unique tracking number</div>
+              <div class="form-text">
+                {% if form.client_order_code.value %}Suggested from your last order — edit it if yours differs.
+                {% else %}Paste the number from your own system.{% endif %}
+                It goes on the waybill, your COD statement and invoices.
+              </div>
             </div>
             {{ form.order_status.as_hidden }}
             <div class="col-md-6">
@@ -525,13 +525,13 @@
         </div>
         <div class="oap__form-section-body">
           <div class="row g-3">
-            <div class="col-md-12">
+            <div class="col-12">
               <label class="form-label" for="id_customer_name">
                 <i class="fas fa-user me-1 text-muted"></i>Customer Name <span class="text-danger">*</span>
               </label>
               {{ form.customer_name }}
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-xl-6">
               <label class="form-label" for="id_customer_phone">
                 <i class="fas fa-phone me-1 text-muted"></i>Phone Number <span class="text-danger">*</span>
               </label>
@@ -540,7 +540,7 @@
                 {{ form.customer_phone }}
               </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-xl-6">
               <label class="form-label" for="id_customer_whatsapp">
                  WhatsApp
               </label>
@@ -551,8 +551,39 @@
         </div>
       </div>
 
-      <!-- Delivery Address Section -->
+      <!-- Payment Section — sits beside Customer Details: who is paying, and how much -->
       <div class="oap__form-section">
+        <div class="oap__form-section-header">
+          <i class="fas fa-money-bill-wave"></i>
+          <h3>Payment (COD)</h3>
+        </div>
+        <div class="oap__form-section-body">
+          <div class="row g-3">
+            <div class="col-12 col-xl-6">
+              <label class="form-label" for="id_cod_status_by_client">
+                <i class="fas fa-hand-holding-usd me-1 text-muted"></i>COD Status
+              </label>
+              {{ form.cod_status_by_client }}
+            </div>
+            <div class="col-12 col-xl-6">
+              <label class="form-label" for="id_cod_amount">
+                <i class="fas fa-coins me-1 text-muted"></i>COD Amount (QAR)
+              </label>
+              <div class="input-group">
+                <span class="input-group-text">QAR</span>
+                {{ form.cod_amount }}
+              </div>
+            </div>
+          </div>
+          <div id="oap_cod_mismatch_alert" class="oap__cod-mismatch" style="display:none;">
+            <i class="fas fa-triangle-exclamation"></i>
+            COD amount <strong id="oap_cod_mismatch_cod">0.00</strong> QAR doesn't match products total <strong id="oap_cod_mismatch_total">0.00</strong> QAR
+          </div>
+        </div>
+      </div>
+
+      <!-- Delivery Address Section -->
+      <div class="oap__form-section oap__form-section--wide">
         <div class="oap__form-section-header">
           <i class="fas fa-map-marker-alt"></i>
           <h3>Delivery Address</h3>
@@ -642,37 +673,6 @@
         </div>
       </div>
 
-      <!-- Payment Section -->
-      <div class="oap__form-section">
-        <div class="oap__form-section-header">
-          <i class="fas fa-money-bill-wave"></i>
-          <h3>Payment (COD)</h3>
-        </div>
-        <div class="oap__form-section-body">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label" for="id_cod_status_by_client">
-                <i class="fas fa-hand-holding-usd me-1 text-muted"></i>COD Status
-              </label>
-              {{ form.cod_status_by_client }}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="id_cod_amount">
-                <i class="fas fa-coins me-1 text-muted"></i>COD Amount (QAR)
-              </label>
-              <div class="input-group">
-                <span class="input-group-text">QAR</span>
-                {{ form.cod_amount }}
-              </div>
-            </div>
-          </div>
-          <div id="oap_cod_mismatch_alert" class="oap__cod-mismatch" style="display:none;">
-            <i class="fas fa-triangle-exclamation"></i>
-            COD amount <strong id="oap_cod_mismatch_cod">0.00</strong> QAR doesn't match products total <strong id="oap_cod_mismatch_total">0.00</strong> QAR
-          </div>
-        </div>
-      </div>
-
       <!-- Delivery Time Slot -->
       <div class="oap__form-section">
         <div class="oap__form-section-header">
@@ -692,24 +692,46 @@
         </div>
       </div>
 
+      <!-- Notes Section — pairs with the time slot; both are one field each -->
+      <div class="oap__form-section">
+        <div class="oap__form-section-header">
+          <i class="fas fa-sticky-note"></i>
+          <h3>Notes</h3>
+        </div>
+        <div class="oap__form-section-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label" for="id_order_notes">
+                <i class="fas fa-comment me-1 text-muted"></i>Order Notes
+              </label>
+              {{ form.order_notes }}
+              <div class="form-text">Any special instructions or notes for this order</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Scheduled Delivery — a date the order must land on, not before -->
-      <div class="oap__form-section oap__sched" id="oap_scheduled_section">
+      <div class="oap__form-section oap__sched oap__form-section--wide" id="oap_scheduled_section">
         <div class="oap__form-section-header">
           <i class="fas fa-calendar-day"></i>
           <h3>Scheduled Delivery <span class="badge bg-secondary ms-1 fw-normal">Optional</span></h3>
         </div>
         <div class="oap__form-section-body">
-          <p class="oap__sched__intro">
+          <!-- id matches the aria-describedby Django puts on the field's help_text -->
+          <p class="oap__sched__intro" id="id_scheduled_delivery_helptext">
             Use this for gifts and dated occasions — birthdays, anniversaries, weddings, events.
             The order is held and delivered <strong>on the day you pick</strong>, not earlier.
             It stays off the daily dispatch board until the day before delivery.
           </p>
-          <div class="form-check oap__sched__toggle">
+          <label class="oap__sched__toggle" for="id_scheduled_delivery">
             {{ form.scheduled_delivery }}
-            <label class="form-check-label" for="id_scheduled_delivery">
-              Deliver on a specific date
-            </label>
-          </div>
+            <span class="oap__sched__toggle-title">Deliver on a specific date</span>
+            <span class="oap__sched__toggle-mode" aria-hidden="true">
+              <span class="oap__sched__toggle-mode--standard">Standard</span>
+              <span class="oap__sched__toggle-mode--held">Held</span>
+            </span>
+          </label>
           <div class="row g-3 oap__sched__fields" id="oap_scheduled_fields" hidden>
             <div class="col-md-4">
               <label class="form-label" for="id_scheduled_date">
@@ -744,27 +766,8 @@
         </div>
       </div>
 
-      <!-- Notes Section -->
-      <div class="oap__form-section">
-        <div class="oap__form-section-header">
-          <i class="fas fa-sticky-note"></i>
-          <h3>Notes</h3>
-        </div>
-        <div class="oap__form-section-body">
-          <div class="row g-3">
-            <div class="col-12">
-              <label class="form-label" for="id_order_notes">
-                <i class="fas fa-comment me-1 text-muted"></i>Order Notes
-              </label>
-              {{ form.order_notes }}
-              <div class="form-text">Any special instructions or notes for this order</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Products Section -->
-      <div class="oap__form-section" id="oap_products_section">
+      <div class="oap__form-section oap__form-section--wide" id="oap_products_section">
         <div class="oap__form-section-header">
           <i class="fas fa-boxes-stacked"></i>
           <h3>Products <span class="badge bg-secondary ms-1 fw-normal" id="oap_inline_product_badge">Optional</span></h3>
@@ -816,8 +819,33 @@
         </div>
       </div>
 
-      <!-- Submit Section -->
+      </div><!-- /.oap__grid -->
+
+      <!-- Dispatch bar — sticks to the bottom and reads back the order as it is
+           typed, so Save is always reachable and you can see what you are about
+           to create without scrolling back up. Values filled by JS below. -->
       <div class="oap__form-submit">
+        <div class="oap__slip" id="oap_slip">
+          <div class="oap__slip-cell">
+            <span class="oap__slip-label">Customer</span>
+            <span class="oap__slip-value oap__slip-value--empty" id="oap_slip_customer">Not set</span>
+          </div>
+          <span class="oap__slip-sep"></span>
+          <div class="oap__slip-cell">
+            <span class="oap__slip-label">Drop</span>
+            <span class="oap__slip-value oap__slip-value--empty" id="oap_slip_drop">No address</span>
+          </div>
+          <span class="oap__slip-sep"></span>
+          <div class="oap__slip-cell">
+            <span class="oap__slip-label">COD</span>
+            <span class="oap__slip-value oap__slip-value--num" id="oap_slip_cod">0.00</span>
+          </div>
+          <span class="oap__slip-sep"></span>
+          <div class="oap__slip-cell">
+            <span class="oap__slip-label">Products</span>
+            <span class="oap__slip-value oap__slip-value--num" id="oap_slip_products">0.00</span>
+          </div>
+        </div>
         <button type="button" class="ofu__back-btn" onclick="history.back()">
           <i class="fas fa-times"></i> Cancel
         </button>
@@ -865,6 +893,7 @@
                   <th class="col-street">Street</th>
                   <th class="col-building">Building</th>
                   <th class="col-address">Address</th>
+                  <th class="col-location">Paste / Drop Shared Location</th>
                   <th class="col-cod">COD</th>
                   <th class="col-cod-amount">COD Amount</th>
                   <th class="col-pickup">Pickup Location</th>
@@ -957,27 +986,6 @@
       const phoneNumberValue = id_customer_phone.val();
       id_customer_whatsapp.val(974 + phoneNumberValue);
     });
-
-    // Auto-generate order number preview
-    const clientOrderCodeInput = $("#id_client_order_code");
-    const orderNumberPreview = $("#id_order_number_preview");
-    const businessCode = orderNumberPreview.data('business-code') || '';
-
-    // Update preview when user types order number
-    clientOrderCodeInput.on("input", function () {
-      const clientOrderCode = clientOrderCodeInput.val().trim();
-      if (clientOrderCode) {
-        // Format: BusinessCode-ClientOrderCode-[Auto ID]
-        orderNumberPreview.val(businessCode + '-' + clientOrderCode + '-[Auto]');
-      } else {
-        orderNumberPreview.val('');
-      }
-    });
-
-    // Set initial value if business order code already has a value
-    if (clientOrderCodeInput.val()) {
-      clientOrderCodeInput.trigger("input");
-    }
 
     // Pickup location data with lat/lon
     const pickupLocationData = {{ pickup_locations_json|safe }};
@@ -1231,6 +1239,13 @@
         <td><input type="text" name="orders[${rowCounter-1}][dl_street]" placeholder="Street" value="0"></td>
         <td><input type="text" name="orders[${rowCounter-1}][dl_building]" placeholder="Bldg" value="0"></td>
         <td><input type="text" name="orders[${rowCounter-1}][customer_address]" placeholder="Full address"></td>
+        <td class="oap__bulk-loc">
+          <input type="text" class="oap__bulk-loc__input" placeholder="Paste link or drop pin">
+          <input type="hidden" name="orders[${rowCounter-1}][latitude]" class="oap__bulk-loc__lat">
+          <input type="hidden" name="orders[${rowCounter-1}][longitude]" class="oap__bulk-loc__lng">
+          <input type="hidden" name="orders[${rowCounter-1}][coords_accuracy]" class="oap__bulk-loc__acc">
+          <span class="oap__bulk-loc__status"></span>
+        </td>
         <td>${createSelect('cod_status_by_client', codOptions, rowCounter-1, 'unpaid')}</td>
         <td><input type="number" name="orders[${rowCounter-1}][cod_amount]" placeholder="0.00" min="0" step="0.01"></td>
         <td>${createPickupSelect(rowCounter-1)}</td>
@@ -1307,6 +1322,81 @@
             whatsappInput.value = '974' + e.target.value;
           }
         }
+      });
+
+      // ===== Paste / Drop Shared Location (per row) =====
+      // Reuses parseLatLngFromText() from qnas-verify.js, which already handles
+      // ?q= / @lat,lng / !3d!4d / plain "lat, lng". A pin the customer shared is
+      // the most accurate source we get, so it is recorded as "by_customer".
+      function applyRowLocation(input) {
+        const cell = input.closest('td');
+        if (!cell) return;
+        const latField = cell.querySelector('.oap__bulk-loc__lat');
+        const lngField = cell.querySelector('.oap__bulk-loc__lng');
+        const accField = cell.querySelector('.oap__bulk-loc__acc');
+        const status = cell.querySelector('.oap__bulk-loc__status');
+        const text = input.value.trim();
+        const coords = (typeof parseLatLngFromText === 'function')
+          ? parseLatLngFromText(text) : null;
+
+        input.classList.remove('oap__bulk-loc__input--ok', 'oap__bulk-loc__input--bad');
+
+        if (coords) {
+          latField.value = coords[0];
+          lngField.value = coords[1];
+          accField.value = 'by_customer';
+          input.classList.add('oap__bulk-loc__input--ok');
+          status.innerHTML = '<i class="fa-solid fa-location-dot"></i> '
+            + coords[0].toFixed(5) + ', ' + coords[1].toFixed(5);
+          status.title = 'Pin set from shared location';
+          return;
+        }
+
+        latField.value = '';
+        lngField.value = '';
+        accField.value = '';
+        status.innerHTML = '';
+        status.title = '';
+        if (!text) return;
+
+        input.classList.add('oap__bulk-loc__input--bad');
+        if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(text)) {
+          status.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Open the short link, then paste the full one';
+        } else {
+          status.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> No coordinates in that link';
+        }
+        status.title = status.textContent;
+      }
+
+      tableBody.addEventListener('input', function(e) {
+        if (e.target.classList.contains('oap__bulk-loc__input')) {
+          applyRowLocation(e.target);
+        }
+      });
+
+      // Dropping a WhatsApp/Maps location onto the cell
+      tableBody.addEventListener('dragover', function(e) {
+        const cell = e.target.closest ? e.target.closest('.oap__bulk-loc') : null;
+        if (!cell) return;
+        e.preventDefault();
+        cell.classList.add('oap__bulk-loc--over');
+      });
+      tableBody.addEventListener('dragleave', function(e) {
+        const cell = e.target.closest ? e.target.closest('.oap__bulk-loc') : null;
+        if (cell) cell.classList.remove('oap__bulk-loc--over');
+      });
+      tableBody.addEventListener('drop', function(e) {
+        const cell = e.target.closest ? e.target.closest('.oap__bulk-loc') : null;
+        if (!cell) return;
+        e.preventDefault();
+        cell.classList.remove('oap__bulk-loc--over');
+        const dt = e.dataTransfer;
+        if (!dt) return;
+        const text = (dt.getData('text/uri-list') || dt.getData('text/plain') || dt.getData('text') || '').trim();
+        const input = cell.querySelector('.oap__bulk-loc__input');
+        if (!input) return;
+        input.value = text;
+        applyRowLocation(input);
       });
 
       // Keyboard navigation
@@ -1409,12 +1499,12 @@
       waInput.value = '974' + this.value;
     });
 
-    // COD amount → auto-set cod_status
+    // COD amount → auto-set cod_status ("Online Paid" until an amount is typed)
     const codAmountInput = document.getElementById('mobile_cod_amount');
     const codStatusInput = document.getElementById('mobile_cod_status');
     codAmountInput.addEventListener('input', function() {
       const val = parseFloat(this.value) || 0;
-      codStatusInput.value = val > 0 ? 'include' : 'online_paid';
+      codStatusInput.value = val > 0 ? 'unpaid' : 'online_paid';
     });
 
     // AI Extract button
@@ -1477,7 +1567,7 @@
 
           // Auto-set COD status
           const codVal = parseFloat(d.cod_amount) || 0;
-          codStatusInput.value = codVal > 0 ? 'include' : 'online_paid';
+          codStatusInput.value = codVal > 0 ? 'unpaid' : 'online_paid';
 
           extractStatus.innerHTML = '<i class="fas fa-check-circle"></i> Extracted ' + filledCount + ' fields';
           extractStatus.className = 'pwa-ai-extract__status pwa-ai-extract__status--success';
@@ -1873,13 +1963,31 @@ $(document).ready(function () {
     });
   }
 
+  // COD amount → COD status. Default is "Online Paid"; typing any amount
+  // flips it to "Unpaid". A status the user picked themselves (partial paid,
+  // pending, ...) is left alone.
+  function syncDesktopCodStatus(amount) {
+    const codStatus = document.getElementById('id_cod_status_by_client');
+    if (!codStatus) return;
+    if (amount > 0) {
+      if (codStatus.value === 'online_paid' || codStatus.value === '') {
+        codStatus.value = 'unpaid';
+      }
+    } else if (codStatus.value === 'unpaid') {
+      codStatus.value = 'online_paid';
+    }
+  }
+
   // Re-check COD mismatch whenever COD amount is edited
   const desktopCodInput = document.getElementById('id_cod_amount');
   if (desktopCodInput) {
     desktopCodInput.addEventListener('input', function() {
       const total = parseFloat(desktopTotal ? desktopTotal.textContent : '0') || 0;
       checkDesktopCodMismatch(total);
+      syncDesktopCodStatus(parseFloat(this.value) || 0);
     });
+    // Honour a pre-filled amount (browser restore / server-rendered value)
+    syncDesktopCodStatus(parseFloat(desktopCodInput.value) || 0);
   }
   const mobileCodInput = document.getElementById('mobile_cod_amount');
   if (mobileCodInput) {
@@ -1912,6 +2020,79 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   wireScheduled('id_scheduled_delivery', 'oap_scheduled_fields', 'id_scheduled_date');
   wireScheduled('mobile_scheduled_delivery', 'mobile_scheduled_fields', 'mobile_scheduled_date');
+});
+</script>
+
+<!-- Dispatch bar read-back — mirrors what the form will create -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var slip = document.getElementById('oap_slip');
+  if (!slip) return;
+
+  var out = {
+    customer: document.getElementById('oap_slip_customer'),
+    drop: document.getElementById('oap_slip_drop'),
+    cod: document.getElementById('oap_slip_cod'),
+    products: document.getElementById('oap_slip_products')
+  };
+
+  // Placeholder text doubles as the empty state — "Not set", not a blank gap
+  function put(el, text, empty) {
+    if (!el) return;
+    el.textContent = text || empty;
+    el.classList.toggle('oap__slip-value--empty', !text);
+  }
+
+  function val(id) {
+    var el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  }
+
+  function refresh() {
+    put(out.customer, val('id_customer_name'), 'Not set');
+
+    // Zone/street/building is how Qatar addresses are dispatched; the typed
+    // address is the fallback when the numbers are still at their 0 default.
+    var z = val('id_dl_zone'), s = val('id_dl_street'), b = val('id_dl_building');
+    var placed = [z, s, b].some(function(v) { return v && v !== '0'; });
+    var drop = placed ? ('Z ' + (z || '—') + ' · S ' + (s || '—') + ' · B ' + (b || '—'))
+                      : val('id_customer_address');
+    put(out.drop, drop, 'No address');
+
+    var cod = parseFloat(val('id_cod_amount')) || 0;
+    if (out.cod) out.cod.textContent = cod.toFixed(2);
+
+    var totalEl = document.getElementById('oap_inline_total_display');
+    var total = totalEl ? (parseFloat(totalEl.textContent) || 0) : 0;
+    if (out.products) out.products.textContent = total.toFixed(2);
+  }
+
+  ['id_customer_name', 'id_dl_zone', 'id_dl_street', 'id_dl_building',
+   'id_customer_address', 'id_cod_amount'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', refresh);
+      el.addEventListener('change', refresh);  // QNAS/AI fills set .value directly
+    }
+  });
+
+  // The products total is written by the inline-products script, not typed —
+  // watch the node instead of guessing when it changed.
+  var totalEl = document.getElementById('oap_inline_total_display');
+  if (totalEl && window.MutationObserver) {
+    new MutationObserver(refresh).observe(totalEl, { childList: true, characterData: true, subtree: true });
+  }
+
+  // Zone/street/building also arrive from Validate / AI Parse, which set .value
+  // directly without firing events. Nothing to hook, so re-read on a slow tick —
+  // paused while the tab is hidden.
+  var form = document.getElementById('orders_add_form_main');
+  if (form) form.addEventListener('input', refresh, true);
+  setInterval(function() {
+    if (!document.hidden) refresh();
+  }, 1500);
+
+  refresh();
 });
 </script>
 {% endblock extra_js %}

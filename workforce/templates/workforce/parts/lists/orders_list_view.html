@@ -222,7 +222,6 @@ Notes: One template, several routes — the queryset differs per view but the co
                         <button type="button" onclick="bulkPublishOrders()"><span class="st-dot st-dot--ok"></span> Publish to Delivery</button>
                         <button type="button" onclick="bulkSetOrderStatus('delivered')"><span class="st-dot st-dot--ok"></span> Delivered</button>
                         <button type="button" onclick="bulkSetOrderStatus('cancelled')"><span class="st-dot st-dot--err"></span> Cancelled</button>
-                        <button type="button" onclick="bulkSetOrderStatus('reported')"><span class="st-dot st-dot--err"></span> Reported</button>
                     </div>
                 </div>
                 {% comment %} Same modal as the filter-bar button; with rows ticked it exports just those. {% endcomment %}
@@ -352,15 +351,7 @@ Notes: One template, several routes — the queryset differs per view but the co
                             {% endif %}
                             <div class="orc__st-row">
                                 <span class="orc__st-label">OD</span>
-                                {% if order.order_status == 'to_review' %}<span class="st st-warn">To Review</span>
-                                {% elif order.order_status == 'to_publish' %}<span class="st st-info">To Publish</span>
-                                {% elif order.order_status == 'ready_to_pickup' %}<span class="st st-info">Ready</span>
-                                {% elif order.order_status == 'publish' %}<span class="st st-info">Publish</span>
-                                {% elif order.order_status == 'published' %}<span class="st st-ok">Published</span>
-                                {% elif order.order_status == 'delivered' %}<span class="st st-ok">Delivered</span>
-                                {% elif order.order_status == 'fulfilled' %}<span class="st st-ok">Fulfilled</span>
-                                {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancelled</span>
-                                {% else %}<span class="st">{{ order.order_status }}</span>{% endif %}
+                                <span class="st {{ order.order_status|order_status_class }}">{{ order.get_order_status_display }}</span>
                             </div>
                             {% with task=order.delivery_task.all.0 %}
                             {% if task %}
@@ -378,7 +369,7 @@ Notes: One template, several routes — the queryset differs per view but the co
                         {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
                         <button type="button" class="orc__btn orc__btn--info" title="Publish" hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML"><i class="fa-solid fa-paper-plane"></i></button>
                         {% endif %}
-                        {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
+                        {% if order.order_status != 'cancelled' and order.order_status != 'publish' %}
                         <button type="button" class="orc__btn orc__btn--err" title="Cancel" hx-post="{% url 'workforce:cancel_order' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML" hx-confirm="Cancel order?"><i class="fa-solid fa-times"></i></button>
                         {% endif %}
                         {% if user_profile.is_superadmin %}
@@ -766,8 +757,7 @@ Notes: One template, several routes — the queryset differs per view but the co
             'to_review': 'Hold for Review',
             'ready_to_pickup': 'Ready to Pickup',
             'delivered': 'Delivered',
-            'cancelled': 'Cancelled',
-            'reported': 'Reported'
+            'cancelled': 'Cancelled'
         };
         const label = statusLabels[status] || status;
         if (!confirm(`Set ${selectedOrders.length} order(s) to "${label}"?`)) return;
@@ -856,10 +846,10 @@ Notes: One template, several routes — the queryset differs per view but the co
     }
 
     function getStatusClass(status) {
+        // Mirrors core.templatetags.custom_filters.order_status_class — keep in sync.
         const map = {
-            'to_review': 'st-warn', 'ready_to_pickup': 'st-info', 'to_publish': 'st-info',
-            'publish': 'st-info', 'published': 'st-ok', 'delivered': 'st-ok',
-            'fulfilled': 'st-ok', 'cancelled': 'st-err', 'reported': 'st-err'
+            'to_review': 'st-warn', 'ready_to_pickup': 'st-info',
+            'publish': 'st-ok', 'delivered': 'st-ok', 'cancelled': 'st-err'
         };
         return map[status] || '';
     }

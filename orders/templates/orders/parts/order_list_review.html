@@ -25,11 +25,7 @@
             <div class="orc-amount">{{ order.cod_amount|default:"0" }} <small>QAR</small></div>
             <div class="orc-date">{{ order.order_date|date:"d/m" }}</div>
             <div class="orc-status">
-                {% if order.order_status == 'to_review' %}<span class="st st-warn">Review</span>
-                {% elif order.order_status == 'to_publish' %}<span class="st st-info">Publish</span>
-                {% elif order.order_status == 'published' %}<span class="st st-ok">Done</span>
-                {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancel</span>
-                {% else %}<span class="st">{{ order.order_status|truncatechars:8 }}</span>{% endif %}
+                <span class="st {{ order.order_status|order_status_class }}">{{ order.get_order_status_display }}</span>
                 {% if order.verification_status == 'verified' %}<span class="st st-ok-o">V</span>{% endif %}
             </div>
             <div class="orc-actions">
@@ -48,7 +44,7 @@
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
                 {% endif %}
-                {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
+                {% if order.order_status != 'cancelled' and order.order_status != 'publish' %}
                 <button type="button" class="orc-btn orc-btn-err" title="Cancel"
                         hx-post="{% url 'workforce:cancel_order' order.id %}"
                         hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Cancel order?">
