@@ -9,13 +9,13 @@
 <button type="button" class="fleet-btn-icon" title="Search tasks" onclick="headerSearchToggle()">
     <i class="fa-solid fa-magnifying-glass"></i>
 </button>
-<a href="{% url 'fleet:fleet_tasks_map' %}" class="fleet-btn-icon" title="Tasks Map" style="text-decoration:none;">
+<a href="{% url 'fleet:fleet_tasks_map' %}" class="fleet-btn-icon" title="Tasks Map">
     <i class="fa-solid fa-map-location-dot"></i>
 </a>
 <a href="{% url 'fleet:driver_tasks' %}?area=all" class="fleet-btn-icon" title="Refresh">
     <i class="fa-solid fa-rotate-right"></i>
 </a>
-<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon">
     <i class="fa-solid fa-bell"></i>
     {% if unread_notifications > 0 %}
     <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
@@ -314,7 +314,12 @@
                             {% if addr and addr.dl_unit %}<span class="ftk__plate-cell"><span class="ftk__plate-tag">Unit</span><span class="ftk__plate-num">{{ addr.dl_unit }}</span></span>{% endif %}
                         </span>
                         {% if pzone and zone_name_map and pzone in zone_name_map %}
-                        <span class="ftk__plate-zonename">{{ zone_name_map|get_item:pzone }}</span>
+                        <span class="ftk__plate-zonewrap">
+                            <span class="ftk__plate-zonename">{{ zone_name_map|get_item:pzone }}</span>
+                            {% if card.order.delivery_area_name %}
+                            <span class="ftk__plate-zonearea">{{ card.order.delivery_area_name }}</span>
+                            {% endif %}
+                        </span>
                         {% endif %}
                         {% if card.order.coords_accuracy %}
                         <span class="task-card__acc-badge task-card__acc-badge--{{ card.order.coords_accuracy }}">{% if card.order.coords_accuracy == 'by_customer' %}By Client{% elif card.order.coords_accuracy == 'by_staff' %}By Staff{% elif card.order.coords_accuracy == 'by_driver' %}By Driver{% elif card.order.coords_accuracy == 'exact' %}Exact{% elif card.order.coords_accuracy == 'street' %}Street{% elif card.order.coords_accuracy == 'landmark' %}Landmark{% elif card.order.coords_accuracy == 'zone_center' %}Zone Ctr{% elif card.order.coords_accuracy == 'ai_estimate' %}AI Est.{% else %}{{ card.order.get_coords_accuracy_display }}{% endif %}</span>
@@ -402,16 +407,18 @@
                 <i class="fa-solid fa-check"></i> Accept
             </button>
             {% elif current_tab == 'accepted' %}
-            <a href="{% url 'fleet:fleet_task_navigation' card.id %}" class="task-card__action-btn task-card__action-btn--nav"
-               onclick="event.stopPropagation();">
-                <i class="fa-solid fa-map"></i> Navigate
-            </a>
-            {% if card.dl_task_status == 'accepted' %}
-            <button class="task-card__action-btn task-card__action-btn--start"
-                    onclick="event.stopPropagation(); startRide({{ card.id }}, this)">
-                <i class="fa-solid fa-play"></i> Start
-            </button>
-            {% endif %}
+            <div class="task-card__action-group">
+                <a href="{% url 'fleet:fleet_task_navigation' card.id %}" class="task-card__action-btn task-card__action-btn--nav"
+                   onclick="event.stopPropagation();">
+                    <i class="fa-solid fa-map"></i> Navigate
+                </a>
+                {% if card.dl_task_status == 'accepted' %}
+                <button class="task-card__action-btn task-card__action-btn--start"
+                        onclick="event.stopPropagation(); startRide({{ card.id }}, this)">
+                    <i class="fa-solid fa-play"></i> Start
+                </button>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
     </div>
@@ -763,6 +770,10 @@
         form.append('task_id', taskId);
         form.append('csrfmiddlewaretoken', getCsrf());
 
+        // Accepting moves the task status, and the server pins that change to
+        // the driver's latest fix — take one now so the pin is this moment.
+        if (window.EzzyGPS && EzzyGPS.stamp) EzzyGPS.stamp();
+
         fetch('{% url "fleet:fleet_accept_task" %}', {
             method: 'POST',
             body: form,
@@ -794,6 +805,8 @@
         const form = new FormData();
         form.append('task_id', taskId);
         form.append('csrfmiddlewaretoken', getCsrf());
+
+        if (window.EzzyGPS && EzzyGPS.stamp) EzzyGPS.stamp();
 
         fetch('{% url "fleet:fleet_start_ride" %}', {
             method: 'POST',

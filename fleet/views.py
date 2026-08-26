@@ -53,6 +53,7 @@ import logging
 from django.db import connection, transaction
 from django.db.models import Q
 from django.shortcuts import redirect, render, get_object_or_404
+from django.urls import reverse
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
@@ -2233,6 +2234,199 @@ def driver_profile_mobile(request):
         return redirect('core:main_dashboard')
 
 
+# =============================================================================
+# SCAN RESOLUTION
+#
+# One label can mean three different jobs depending on where the parcel is in
+# its life: a first-mile pickup the driver is holding, a delivery task of theirs
+# waiting to be collected from the sender, or an unclaimed task in the pool. The
+# scanner therefore resolves a code first and lets the driver choose, instead of
+# guessing an action and mutating the wrong thing.
+# =============================================================================
+
+def _scan_code_matches(code, *candidates):
+    """A label carries the order number; readers and prefixes vary, so accept an
+    exact hit or either side containing the other."""
+    code_l = (code or '').strip().lower()
+    if not code_l:
+        return False
+    for value in candidates:
+        value_l = (value or '').strip().lower()
+        if value_l and (value_l == code_l or value_l in code_l or code_l in value_l):
+            return True
+    return False
+
+
+def _scan_match_pickup(driver, code):
+    """This driver's first-mile pickup for a scanned label, whatever its status."""
+    from delivery.models import PickupTask
+
+    qs = PickupTask.objects.filter(driver=driver).exclude(
+        order__order_status='cancelled'
+    ).select_related('order', 'business', 'pickup_location').order_by('-created_at')
+
+    exact = qs.filter(order__order_number__iexact=code).first()
+    if exact:
+        return exact
+    for pickup in qs[:300]:
+        if _scan_code_matches(code, pickup.order.order_number if pickup.order else ''):
+            return pickup
+        if code.isdigit() and int(code) == pickup.pk:
+            return pickup
+    return None
+
+
+def _scan_match_task(code, driver=None):
+    """A delivery task for a scanned label. Scoped to one driver when given."""
+    from django.db.models import Q
+    from delivery import models as delivery_models
+
+    qs = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'order__business', 'pickup_location'
+    ).exclude(order__order_status='cancelled')
+    if driver is not None:
+        qs = qs.filter(driver=driver)
+
+    exact = qs.filter(
+        Q(dl_task_number__iexact=code) | Q(order__order_number__iexact=code)
+    ).order_by('-id').first()
+    if exact:
+        return exact
+
+    for task in qs.order_by('-id')[:300]:
+        if _scan_code_matches(code, task.dl_task_number,
+                              task.order.order_number if task.order else ''):
+            return task
+    return None
+
+
+@login_required(login_url='account_login')
+def scan_resolve(request):
+    """
+    Look up a scanned label and report what this driver can do with it —
+    WITHOUT changing anything. The scanner shows the options in its own window
+    so the driver picks the step, rather than the scan silently committing one.
+    POST: code. Returns {found, title, subtitle, details[], actions[], warning}.
+    URL: /fleet/scan/resolve/
+    """
+    import json as _json
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    driver = _get_request_driver(request)
+    if not driver:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+
+    try:
+        data = _json.loads(request.body) if request.content_type == 'application/json' else request.POST
+    except _json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid request data'})
+
+    code = str(data.get('code') or data.get('barcode') or '').strip()
+    if not code:
+        return JsonResponse({'success': False, 'error': 'No code scanned'})
+
+    actions = []
+    warnings = []
+    details = []
+    title = code
+    subtitle = ''
+
+    pickup_open = ['accepted', 'in_progress', 'arrived']
+
+    # 1. A first-mile pickup this driver is holding
+    pickup = _scan_match_pickup(driver, code)
+    if pickup:
+        order = pickup.order
+        title = order.order_number if order else f'Pickup #{pickup.pk}'
+        subtitle = pickup.business.business_name if pickup.business else ''
+        if order and order.customer_name:
+            details.append({'icon': 'fa-user', 'text': order.customer_name})
+        if pickup.pickup_location:
+            details.append({'icon': 'fa-store', 'text': str(pickup.pickup_location)})
+        details.append({'icon': 'fa-truck-ramp-box',
+                        'text': f'Pickup · {pickup.get_status_display()}'})
+        if pickup.status in pickup_open:
+            actions.append({
+                'key': 'collect_pickup',
+                'label': 'Collect pickup',
+                'icon': 'fa-box-open',
+                'endpoint': reverse('fleet:pickup_scan_collect'),
+                'payload': {'code': code},
+            })
+        else:
+            warnings.append(f'This pickup is already {pickup.get_status_display()}.')
+
+    # 2. A delivery task already assigned to this driver — collect from sender
+    own_task = _scan_match_task(code, driver=driver)
+    if own_task:
+        order = own_task.order
+        if not pickup:
+            title = (order.order_number if order else '') or own_task.dl_task_number or code
+            subtitle = order.business.business_name if order and order.business else ''
+            if order and order.customer_name:
+                details.append({'icon': 'fa-user', 'text': order.customer_name})
+        details.append({'icon': 'fa-clipboard-check',
+                        'text': f'Task {own_task.dl_task_number or own_task.pk} · '
+                                f'{own_task.get_dl_task_status_display()}'})
+        if own_task.dl_task_status in ('assigned', 'pending', 'for_review', 'accepted'):
+            actions.append({
+                'key': 'pickup_task',
+                'label': 'Pick up from sender',
+                'icon': 'fa-truck-ramp-box',
+                'endpoint': reverse('fleet:pickup_scan_process'),
+                'payload': {'code': code},
+            })
+        elif own_task.dl_task_status in ('picked_up', 'start_ride', 'in_transit', 'out_for_delivery'):
+            warnings.append(f'Task {own_task.dl_task_number or own_task.pk} is already '
+                            f'{own_task.get_dl_task_status_display()}.')
+
+    # 3. An unclaimed task in the pool — the driver can take it
+    if not own_task:
+        pool_task = _scan_match_task(code)
+        if pool_task and pool_task.driver_id is None:
+            order = pool_task.order
+            if not pickup:
+                title = (order.order_number if order else '') or pool_task.dl_task_number or code
+                subtitle = order.business.business_name if order and order.business else ''
+                if order and order.customer_name:
+                    details.append({'icon': 'fa-user', 'text': order.customer_name})
+            if pool_task.dl_task_publish and pool_task.dl_task_status in ('pending', 'for_review'):
+                actions.append({
+                    'key': 'take_task',
+                    'label': 'Take this task',
+                    'icon': 'fa-hand',
+                    'endpoint': reverse('fleet:fleet_task_scan_take_any'),
+                    'payload': {'code': code},
+                })
+            elif not pool_task.dl_task_publish:
+                warnings.append('This task is not published to fleet yet.')
+            else:
+                warnings.append(f'Task is {pool_task.get_dl_task_status_display()} — cannot take it.')
+        elif pool_task and pool_task.driver_id:
+            warnings.append('Another driver already has this task.')
+
+    if not actions and not warnings:
+        return JsonResponse({
+            'success': True,
+            'found': False,
+            'code': code,
+            'warning': f'Nothing matches this label: {code}',
+        })
+
+    return JsonResponse({
+        'success': True,
+        'found': bool(actions),
+        'code': code,
+        'title': title,
+        'subtitle': subtitle,
+        'details': details,
+        'actions': actions,
+        'warning': ' '.join(warnings),
+    })
+
+
 @login_required(login_url='account_login')
 def pickup_scanner(request):
     """
@@ -2782,6 +2976,11 @@ def driver_tasks(request):
     paginator = Paginator(task_list, 20)
     cards = paginator.get_page(page)
 
+    # The neighbourhood shown under the zone name comes from Order.delivery_area_name,
+    # which orders.signals keeps in step with the zone and the pin. It used to be
+    # resolved here per request; storing it means the card, staff lists and exports
+    # all print the same name off one already-select_related row.
+
     # Filters the shared pagination component re-appends to every page link.
     # The old hand-rolled pager hardcoded tab/area/type/status/sort (+zone)
     # into its hrefs; `search` was silently dropped and is now kept too.
@@ -2901,10 +3100,10 @@ def fleet_task_take_scan(request):
             or order_num.lower() in code_lower
         )
 
-        # Also check OrderBarcode
+        # Also check OrderBarcode (its field is order_number, not barcode_value)
         if not code_matches:
             barcode_match = orders_models.OrderBarcode.objects.filter(
-                barcode_value=scanned_code, order=task.order
+                order_number__iexact=scanned_code, order=task.order
             ).exists()
             code_matches = barcode_match
 

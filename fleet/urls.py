@@ -80,6 +80,9 @@ urlpatterns = [
           fleet_views.pickup_scanner, name='pickup_scanner'),
      path('pickup/scan/',
           fleet_views.pickup_scan_process, name='pickup_scan_process'),
+     # Read-only: what does this label mean and what can the driver do with it
+     path('scan/resolve/',
+          fleet_views.scan_resolve, name='scan_resolve'),
 
      # First-Mile Pickups (collect from client)
      path('pickups/',

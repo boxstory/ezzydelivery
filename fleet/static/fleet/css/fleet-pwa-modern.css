@@ -68,6 +68,7 @@
   --font-size-4xl: 2.25rem;
 
   /* Border Radius — native PWA feel */
+  --radius-xs: 0.375rem;
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
@@ -153,6 +154,21 @@
 .fleet-pwa__header-actions {
   display: flex;
   gap: var(--spacing-sm);
+}
+
+/* Header icon buttons sit on a light tile with a hairline instead of a shadow,
+   so they read as one set whether they are <button> or <a>. */
+.fleet-pwa__header-actions .fleet-btn-icon {
+  background: var(--fleet-grey-100);
+  border: 1px solid var(--fleet-grey-200);
+  border-radius: var(--radius-xs);
+  box-shadow: none;
+  color: var(--fleet-grey-700);
+}
+
+.fleet-pwa__header-actions .fleet-btn-icon:active {
+  background: var(--fleet-grey-200);
+  transform: scale(0.92);
 }
 
 .fleet-pwa__content {
@@ -698,6 +714,9 @@
   box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition: all var(--transition-base);
+  /* anchors using this class must never render the link underline */
+  text-decoration: none;
+  position: relative;
 }
 
 .fleet-btn-icon:active {
@@ -1173,6 +1192,10 @@
    SCANNER OVERLAY (for Barcode Scanner)
    ============================================================================ */
 
+/* Sits ON TOP of the live camera feed, so it must stay transparent — a solid
+   backdrop here blacks the camera out and the scanner looks broken. The dimming
+   is done by .fleet-scanner__frame's spread shadow, which leaves the target
+   window clear. It also must not swallow taps meant for the controls beneath. */
 .fleet-scanner {
   position: fixed;
   top: 0;
@@ -1180,7 +1203,14 @@
   right: 0;
   bottom: 0;
   z-index: var(--z-modal);
-  background: rgba(0, 0, 0, 0.95);
+  background: transparent;
+  pointer-events: none;
+}
+
+/* Give the overlay's own buttons their taps back. */
+.fleet-scanner__close,
+.fleet-scanner__torch {
+  pointer-events: auto;
 }
 
 .fleet-scanner__viewport {
@@ -1221,15 +1251,18 @@
   }
 }
 
+/* Clears the Enter Manually button below it. The text now reads over a live
+   camera image rather than a black sheet, hence the shadow. */
 .fleet-scanner__hint {
   position: absolute;
-  bottom: var(--spacing-2xl);
+  bottom: calc(var(--spacing-2xl) + 56px + env(safe-area-inset-bottom, 0px));
   left: 0;
   right: 0;
   text-align: center;
   color: var(--fleet-white);
   font-size: var(--font-size-base);
   font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
 .fleet-scanner__close {
@@ -5692,12 +5725,109 @@
     color: var(--fleet-dark);
 }
 
+/* Above the scanner overlay, not under it — this is the fallback a driver needs
+   most when the camera will not read the label. */
 .fleet-scanner__manual {
     position: absolute;
     bottom: calc(var(--spacing-2xl) + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
-    z-index: 10;
+    z-index: calc(var(--z-modal) + 1);
+}
+
+/* --- Scan result panel ---------------------------------------------------
+   Sits in the scanner window itself rather than a modal that closes the view:
+   a scanned label can be a pickup, a task waiting at the sender or an unclaimed
+   task, so the driver reads what it is and picks the step while the camera
+   stays live behind the panel. */
+.fleet-scan-result {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: calc(var(--z-modal) + 2);
+    padding: var(--spacing-lg);
+    padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom, 0px));
+    background: var(--fleet-white);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.fleet-scan-result[hidden] { display: none; }
+
+.fleet-scan-result__head {
+    border-bottom: 1px solid var(--fleet-grey-100);
+    padding-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.fleet-scan-result__title {
+    font-size: var(--font-size-lg);
+    font-weight: 800;
+    color: var(--fleet-dark);
+    overflow-wrap: anywhere;
+}
+
+.fleet-scan-result__sub {
+    font-size: var(--font-size-sm);
+    color: var(--fleet-grey-500);
+    font-weight: 600;
+}
+
+.fleet-scan-result__row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--fleet-dark);
+    padding: 2px 0;
+}
+
+.fleet-scan-result__row i {
+    color: var(--fleet-grey-400);
+    width: 16px;
+    flex: 0 0 auto;
+}
+
+.fleet-scan-result__warning {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    background: #fef3c7;
+    color: #92400e;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+}
+
+.fleet-scan-result__warning[hidden] { display: none; }
+
+.fleet-scan-result__actions:not(:empty) {
+    margin-top: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.fleet-scan-result__next { margin-top: var(--spacing-sm); }
+
+/* Step committed — the panel reads as a receipt, not a prompt. */
+.fleet-scan-result--done .fleet-scan-result__head {
+    border-bottom-color: #16a34a;
+}
+
+.fleet-scan-result--done .fleet-scan-result__sub {
+    color: #16a34a;
+}
+
+/* Outline button over a live camera picture needs its own backdrop, same
+   treatment as the close and torch controls. */
+.fleet-scanner__manual .fleet-btn--outline {
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(8px);
+    border-color: rgba(255, 255, 255, 0.6);
+    color: var(--fleet-white);
 }
 
 .fleet-modal {
@@ -6897,11 +7027,28 @@ img.vf-photo-preview {
 }
 
 /* Zone name label beside the plate */
+.ftk .ftk__plate-zonewrap {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .ftk .ftk__plate-zonename {
   font-size: 12px;
   font-weight: 700;
   color: #001f3f;
   line-height: 1.2;
+}
+
+/* Second line under the zone name — the wider zone group / area */
+.ftk .ftk__plate-zonearea {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--fleet-grey-500);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ============================================================================
@@ -7081,3 +7228,60 @@ img.vf-photo-preview {
 /* Staff/driver-set coordinates: trusted, green like by_customer */
 .ftk .task-card__acc-badge--by_staff  { color: #15803d; }
 .ftk .task-card__acc-badge--by_driver { color: #1d4ed8; }
+
+/* ── fgeo: Location Check panel (driver Settings) ─────────────────────────────
+   Read-back of why the phone refused a fix. Deliberately plain: a driver reads
+   this while standing next to a customer, so it is a key/value list, not a
+   dashboard. */
+.fgeo__intro {
+    font-size: var(--font-size-sm);
+    color: var(--fleet-grey-600);
+    margin-bottom: var(--spacing-md);
+}
+
+.fgeo__grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--spacing-xs) var(--spacing-md);
+    align-items: baseline;
+    margin: var(--spacing-md) 0 0;
+    padding: var(--spacing-md);
+    background: var(--fleet-grey-50);
+    border: 1px solid var(--fleet-grey-100);
+    border-radius: var(--radius-sm);
+}
+
+.fgeo__key {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--fleet-grey-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.fgeo__val {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    color: var(--fleet-dark);
+    overflow-wrap: anywhere;
+}
+
+.fgeo__val--good { color: var(--fleet-success); }
+.fgeo__val--warn { color: var(--fleet-warning); }
+.fgeo__val--bad  { color: var(--fleet-danger); }
+
+/* The instruction block. Left rule rather than a filled panel — it carries the
+   fix, so it must stay readable in sunlight without shouting. */
+.fgeo__advice {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-left: 3px solid var(--fleet-primary);
+    background: var(--fleet-grey-50);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: var(--font-size-sm);
+    line-height: 1.55;
+    color: var(--fleet-dark);
+}
+
+.fgeo__advice strong { display: block; margin-bottom: 0.25rem; }

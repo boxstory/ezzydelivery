@@ -43,6 +43,26 @@
             Enter Manually
         </button>
     </div>
+
+    <!-- Scan result: stays inside the scanner window, camera still running, so
+         the driver picks the next step and carries on scanning. -->
+    <div class="fleet-scan-result" id="fleet_scan_result_panel" hidden>
+        <div class="fleet-scan-result__head">
+            <div class="fleet-scan-result__title" id="fleet_scan_result_title">—</div>
+            <div class="fleet-scan-result__sub" id="fleet_scan_result_sub"></div>
+        </div>
+
+        <div class="fleet-scan-result__details" id="fleet_scan_result_details"></div>
+
+        <div class="fleet-scan-result__warning" id="fleet_scan_result_warning" hidden></div>
+
+        <div class="fleet-scan-result__actions" id="fleet_scan_result_actions"></div>
+
+        <button type="button" class="fleet-btn fleet-btn--outline fleet-btn--block fleet-scan-result__next"
+                onclick="resetScanner()">
+            <i class="fa-solid fa-qrcode me-2"></i>Scan next
+        </button>
+    </div>
 </div>
 
 <!-- Manual Entry Modal -->
@@ -77,138 +97,185 @@
     </div>
 </div>
 
-<!-- Success Modal — shows task details for 3s then auto-resets -->
-<div class="fleet-modal" id="successModal" style="display: none;">
-    <div class="fleet-modal__overlay"></div>
-    <div class="fleet-modal__content">
-        <div class="fleet-modal__body" style="padding: var(--spacing-xl) var(--spacing-lg);">
-            <!-- Confirm icon + title -->
-            <div style="text-align:center; margin-bottom: var(--spacing-md);">
-                <div id="scanSuccessIcon" style="width:72px; height:72px; border-radius:50%; background:#dcfce7; color:#16a34a; display:flex; align-items:center; justify-content:center; margin:0 auto var(--spacing-sm); font-size:2rem; transition: all 0.3s;">
-                    <i class="fa-solid fa-circle-check"></i>
-                </div>
-                <h3 style="font-size: var(--font-size-xl); font-weight: 800; color: var(--fleet-dark); margin:0 0 4px;">Pickup Confirmed!</h3>
-                <p style="color: var(--fleet-grey-500); font-size: var(--font-size-sm); margin:0;" id="successMessage"></p>
-            </div>
-
-            <!-- Task details card -->
-            <div id="scanTaskCard" style="background:var(--fleet-grey-50,#f8f9fa); border-radius:var(--radius-sm); padding:var(--spacing-md); margin-bottom:var(--spacing-md);">
-                <div class="fleet-scan-task__row">
-                    <span class="fleet-scan-task__label"><i class="fa-solid fa-hashtag"></i></span>
-                    <span class="fleet-scan-task__val" id="scanTaskNum">—</span>
-                </div>
-                <div class="fleet-scan-task__row" id="scanBusinessRow">
-                    <span class="fleet-scan-task__label"><i class="fa-solid fa-store"></i></span>
-                    <span class="fleet-scan-task__val" id="scanBusiness">—</span>
-                </div>
-                <div class="fleet-scan-task__row" id="scanCustomerRow">
-                    <span class="fleet-scan-task__label"><i class="fa-solid fa-user"></i></span>
-                    <span class="fleet-scan-task__val" id="scanCustomer">—</span>
-                </div>
-                <div class="fleet-scan-task__row" id="scanZoneRow">
-                    <span class="fleet-scan-task__label"><i class="fa-solid fa-location-dot"></i></span>
-                    <span class="fleet-scan-task__val" id="scanZone">—</span>
-                </div>
-                <div class="fleet-scan-task__row" id="scanPickupRow">
-                    <span class="fleet-scan-task__label"><i class="fa-solid fa-circle-dot" style="color:#16a34a"></i></span>
-                    <span class="fleet-scan-task__val" id="scanPickup">—</span>
-                </div>
-            </div>
-
-            <!-- 3-second countdown bar -->
-            <div style="height:4px; background:var(--fleet-grey-100); border-radius:99px; overflow:hidden; margin-bottom:6px;">
-                <div id="scanCountdownBar" style="height:100%; background:#16a34a; border-radius:99px; width:100%;"></div>
-            </div>
-            <p style="font-size:var(--font-size-xs); color:var(--fleet-grey-400); text-align:center; margin:0 0 var(--spacing-md);">Next scan in 3 seconds…</p>
-
-            <!-- Manual buttons -->
-            <button type="button" class="fleet-btn fleet-btn--primary fleet-btn--block" onclick="resetScanner()">
-                <i class="fa-solid fa-qrcode me-2"></i>Scan Now
-            </button>
-            <button type="button" class="fleet-btn fleet-btn--outline fleet-btn--block" style="margin-top: var(--spacing-sm);" onclick="window.location.href='{% url 'fleet:fleet_dashboard' %}'">
-                Back to Dashboard
-            </button>
-        </div>
-    </div>
-</div>
 
 
 <script>
     let videoStream = null;
     let torchEnabled = false;
-    let isScanning = true;
+    let isScanning = false;
+    let _detector = null;
+    let _detectTimer = null;
+
+    /* ~8 looks a second. Fast enough to catch a label the moment it is framed,
+       and far cheaper on a driver's battery than decoding every frame. */
+    const DETECT_INTERVAL_MS = 120;
+
+    const hintEl = document.querySelector('.fleet-scanner__hint');
+
+    function setHint(text, icon) {
+        if (!hintEl) return;
+        hintEl.innerHTML = '<i class="fa-solid ' + (icon || 'fa-qrcode') + ' me-2"></i>' + text;
+    }
+
+    function cameraErrorText(err) {
+        const name = (err && err.name) || '';
+        if (name === 'NotAllowedError' || name === 'SecurityError') {
+            return 'Camera permission is blocked. Allow Camera for ezzydelivery.qa in your browser settings, then reload.';
+        }
+        if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No camera found on this device.';
+        if (name === 'NotReadableError') return 'Camera is busy — close other apps using it and try again.';
+        return name ? ('Camera error: ' + name) : 'Camera could not be started.';
+    }
+
+    /* Stay on the page when the camera cannot run — manual entry is right there
+       and is the only way left to finish the job. */
+    function scannerUnavailable(message) {
+        stopBarcodeDetection();
+        setHint(message, 'fa-triangle-exclamation');
+        showToast(message, 'danger', 6000);
+    }
 
     // Initialize camera
     async function initCamera() {
+        const video = document.getElementById('cameraVideo');
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            scannerUnavailable('This browser does not allow camera access on this page.');
+            return;
+        }
+
         try {
-            const constraints = {
-                video: {
-                    facingMode: 'environment', // Use back camera
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
-                }
-            };
-
-            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-            document.getElementById('cameraVideo').srcObject = videoStream;
-
-            // Check if torch is available
-            const track = videoStream.getVideoTracks()[0];
-            const capabilities = track.getCapabilities();
-            if (capabilities.torch) {
-                document.getElementById('torchBtn').style.display = 'block';
-            }
-
-            // Start barcode detection
-            startBarcodeDetection();
-
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+            });
         } catch (error) {
-            console.error('Camera error:', error);
-            showToast('Camera access denied', 'danger');
-            setTimeout(() => {
-                window.location.href = '{% url "fleet:fleet_dashboard" %}';
-            }, 2000);
+            try {
+                // Some devices reject the back-camera/resolution hints — take any camera
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            } catch (error2) {
+                console.error('Camera error:', error2);
+                scannerUnavailable(cameraErrorText(error2));
+                return;
+            }
+        }
+
+        video.srcObject = videoStream;
+        try { await video.play(); } catch (e) { /* autoplay attr covers it */ }
+
+        // Check if torch is available
+        const track = videoStream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities ? track.getCapabilities() : null;
+        if (capabilities && capabilities.torch) {
+            document.getElementById('torchBtn').style.display = 'block';
+        }
+
+        startBarcodeDetection();
+    }
+
+    // jsQR fallback for browsers without BarcodeDetector (iOS Safari, Firefox).
+    // QR only — it cannot read the Code128 bars on our waybills.
+    let _jsqrLoad = null;
+    function loadJsQr() {
+        if (window.jsQR) return Promise.resolve(true);
+        if (_jsqrLoad) return _jsqrLoad;
+        _jsqrLoad = new Promise(resolve => {
+            const s = document.createElement('script');
+            s.src = "{% static 'fleet/js/jsqr.min.js' %}?v=20260727a";
+            s.onload = () => resolve(!!window.jsQR);
+            s.onerror = () => resolve(false);
+            document.head.appendChild(s);
+        });
+        return _jsqrLoad;
+    }
+
+    /* Started fresh on every scan cycle. The old version hung its only start on
+       the video's 'loadeddata' event, which never fires a second time — so
+       scanning died after the first successful scan until the page reloaded. */
+    async function startBarcodeDetection() {
+        stopBarcodeDetection();
+        isScanning = true;
+        const video = document.getElementById('cameraVideo');
+
+        if ('BarcodeDetector' in window) {
+            try {
+                if (!_detector) {
+                    const wanted = ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code'];
+                    let formats = wanted;
+                    if (BarcodeDetector.getSupportedFormats) {
+                        const supported = await BarcodeDetector.getSupportedFormats();
+                        formats = wanted.filter(f => supported.includes(f));
+                    }
+                    if (formats.length) _detector = new BarcodeDetector({ formats: formats });
+                }
+            } catch (e) {
+                console.warn('BarcodeDetector unavailable:', e);
+                _detector = null;
+            }
+        }
+
+        if (_detector) {
+            setHint('Align barcode within frame');
+            detectLoopNative(video);
+            return;
+        }
+
+        const hasJsQr = await loadJsQr();
+        if (hasJsQr) {
+            setHint('QR only on this browser — tap Enter Manually for barcodes');
+            detectLoopJsQr(video);
+        } else {
+            scannerUnavailable('This browser cannot scan — tap Enter Manually.');
         }
     }
 
-    // Barcode detection using BarcodeDetector API or fallback
-    async function startBarcodeDetection() {
-        if ('BarcodeDetector' in window) {
-            const barcodeDetector = new BarcodeDetector({
-                formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code']
-            });
+    function stopBarcodeDetection() {
+        isScanning = false;
+        if (_detectTimer) { clearTimeout(_detectTimer); _detectTimer = null; }
+    }
 
-            const video = document.getElementById('cameraVideo');
-
-            const detectBarcode = async () => {
-                if (!isScanning) return;
-
+    function detectLoopNative(video) {
+        const tick = async () => {
+            if (!isScanning) return;
+            if (video.readyState >= 2 && video.videoWidth) {
                 try {
-                    const barcodes = await barcodeDetector.detect(video);
-                    if (barcodes.length > 0) {
-                        const barcode = barcodes[0].rawValue;
-                        handleBarcodeDetected(barcode);
-                    } else {
-                        requestAnimationFrame(detectBarcode);
+                    const found = await _detector.detect(video);
+                    if (found.length > 0) {
+                        handleBarcodeDetected(found[0].rawValue);
+                        return;
                     }
-                } catch (error) {
-                    console.error('Detection error:', error);
-                    requestAnimationFrame(detectBarcode);
-                }
-            };
+                } catch (e) { /* keep trying */ }
+            }
+            _detectTimer = setTimeout(tick, DETECT_INTERVAL_MS);
+        };
+        tick();
+    }
 
-            video.addEventListener('loadeddata', () => {
-                detectBarcode();
-            });
-        } else {
-            console.warn('BarcodeDetector API not available');
-            showToast('Please use manual entry', 'info');
-        }
+    function detectLoopJsQr(video) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const tick = () => {
+            if (!isScanning) return;
+            if (video.readyState >= 2 && video.videoWidth) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                try {
+                    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+                    if (code && code.data) {
+                        handleBarcodeDetected(code.data);
+                        return;
+                    }
+                } catch (e) { /* keep trying */ }
+            }
+            _detectTimer = setTimeout(tick, DETECT_INTERVAL_MS);
+        };
+        tick();
     }
 
     // Handle detected barcode
     function handleBarcodeDetected(barcode) {
-        isScanning = false;
+        stopBarcodeDetection();
         haptic([10, 100, 10]);
 
         console.log('Barcode detected:', barcode);
@@ -217,84 +284,137 @@
         submitBarcode(barcode);
     }
 
-    let _autoResetTimer = null;
+    const panel = document.getElementById('fleet_scan_result_panel');
+    const panelTitle = document.getElementById('fleet_scan_result_title');
+    const panelSub = document.getElementById('fleet_scan_result_sub');
+    const panelDetails = document.getElementById('fleet_scan_result_details');
+    const panelWarning = document.getElementById('fleet_scan_result_warning');
+    const panelActions = document.getElementById('fleet_scan_result_actions');
 
-    // Submit barcode to backend
+    /* A label can mean more than one thing — a pickup the driver holds, a task
+       of theirs waiting at the sender, or an unclaimed task in the pool. Ask the
+       server what it is, then let the driver choose. Nothing is written until
+       they tap an action. */
     async function submitBarcode(barcode) {
+        showPanel({ title: barcode, subtitle: 'Looking up…', details: [], actions: [] });
         try {
-            const response = await fetch('{% url "fleet:pickup_scan_process" %}', {
+            const response = await fetch('{% url "fleet:scan_resolve" %}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token }}'
                 },
-                body: JSON.stringify({ barcode: barcode })
+                body: JSON.stringify({ code: barcode })
             });
 
             const data = await response.json();
 
+            if (!data.success) {
+                showPanel({ title: barcode, warning: data.error || 'Could not read this label' });
+                return;
+            }
+            showPanel(data);
+            haptic(data.found ? [10, 50, 10] : [40]);
+        } catch (error) {
+            console.error('Resolve error:', error);
+            showPanel({ title: barcode, warning: 'Network error — check your signal and scan again.' });
+        }
+    }
+
+    // Render the in-window result. Camera keeps running behind it.
+    function showPanel(data) {
+        panelTitle.textContent = data.title || data.code || '—';
+        panelSub.textContent = data.subtitle || '';
+        panelSub.hidden = !data.subtitle;
+
+        panelDetails.innerHTML = '';
+        (data.details || []).forEach(d => {
+            const row = document.createElement('div');
+            row.className = 'fleet-scan-result__row';
+            const icon = document.createElement('i');
+            icon.className = 'fa-solid ' + (d.icon || 'fa-circle-info');
+            const text = document.createElement('span');
+            text.textContent = d.text || '';
+            row.appendChild(icon);
+            row.appendChild(text);
+            panelDetails.appendChild(row);
+        });
+
+        panelWarning.textContent = data.warning || '';
+        panelWarning.hidden = !data.warning;
+
+        panelActions.innerHTML = '';
+        (data.actions || []).forEach(a => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'fleet-btn fleet-btn--primary fleet-btn--block';
+            btn.innerHTML = '<i class="fa-solid ' + (a.icon || 'fa-check') + ' me-2"></i>' + a.label;
+            btn.addEventListener('click', () => runAction(a, btn));
+            panelActions.appendChild(btn);
+        });
+
+        panel.hidden = false;
+    }
+
+    // Commit the step the driver picked, then report back in the same window.
+    async function runAction(action, btn) {
+        const buttons = panelActions.querySelectorAll('button');
+        buttons.forEach(b => { b.disabled = true; });
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Working…';
+
+        try {
+            const response = await fetch(action.endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify(action.payload || {})
+            });
+            const data = await response.json();
+
             if (data.success) {
-                showSuccess(data);
+                haptic([10, 50, 10, 50, 10]);
+                panelActions.innerHTML = '';
+                panelWarning.hidden = true;
+                panelSub.textContent = data.message || 'Done';
+                panelSub.hidden = false;
+                panel.classList.add('fleet-scan-result--done');
+                if (data.next_step) {
+                    const row = document.createElement('div');
+                    row.className = 'fleet-scan-result__row';
+                    row.innerHTML = '<i class="fa-solid fa-arrow-right"></i>';
+                    const text = document.createElement('span');
+                    text.textContent = data.next_step;
+                    row.appendChild(text);
+                    panelDetails.appendChild(row);
+                }
             } else {
-                showToast(data.error || 'Invalid barcode', 'danger');
-                isScanning = true;
+                panelWarning.textContent = data.error || 'That step could not be completed';
+                panelWarning.hidden = false;
+                buttons.forEach(b => { b.disabled = false; });
+                btn.innerHTML = '<i class="fa-solid ' + (action.icon || 'fa-check') + ' me-2"></i>' + action.label;
             }
         } catch (error) {
-            console.error('Submit error:', error);
-            showToast('Network error. Please try again.', 'danger');
-            isScanning = true;
+            console.error('Action error:', error);
+            panelWarning.textContent = 'Network error — nothing was changed. Try again.';
+            panelWarning.hidden = false;
+            buttons.forEach(b => { b.disabled = false; });
+            btn.innerHTML = '<i class="fa-solid ' + (action.icon || 'fa-check') + ' me-2"></i>' + action.label;
         }
     }
 
-    // Show success modal with task details, auto-reset after 3s
-    function showSuccess(data) {
-        const message = typeof data === 'string' ? data : (data.message || 'Pickup confirmed!');
-        const taskNum = (typeof data === 'object' && data.task_number) ? data.task_number : '';
-        const business = (typeof data === 'object' && data.business) ? data.business : '';
-
-        document.getElementById('successMessage').textContent = message;
-
-        // Populate task details card
-        document.getElementById('scanTaskNum').textContent = taskNum || '—';
-
-        if (business) {
-            document.getElementById('scanBusiness').textContent = business;
-            document.getElementById('scanBusinessRow').style.display = '';
-        } else {
-            document.getElementById('scanBusinessRow').style.display = 'none';
-        }
-
-        // Hide optional rows if no data
-        document.getElementById('scanCustomerRow').style.display = 'none';
-        document.getElementById('scanZoneRow').style.display = 'none';
-        document.getElementById('scanPickupRow').style.display = 'none';
-
-        // Start 3s countdown bar animation
-        const bar = document.getElementById('scanCountdownBar');
-        bar.style.animation = 'none';
-        void bar.offsetWidth; // reflow
-        bar.style.animation = 'scan-countdown 3s linear forwards';
-
-        document.getElementById('successModal').style.display = 'flex';
-        haptic([10, 50, 10, 50, 10]);
-
-        // Auto-reset after 3 seconds
-        if (_autoResetTimer) clearTimeout(_autoResetTimer);
-        _autoResetTimer = setTimeout(() => {
-            resetScanner();
-        }, 3000);
-    }
-
-    // Reset scanner
+    // Back to scanning — panel closes, camera was never stopped.
     function resetScanner() {
-        if (_autoResetTimer) { clearTimeout(_autoResetTimer); _autoResetTimer = null; }
-        document.getElementById('successModal').style.display = 'none';
-        isScanning = true;
+        panel.hidden = true;
+        panel.classList.remove('fleet-scan-result--done');
+        panelActions.innerHTML = '';
         startBarcodeDetection();
     }
 
     // Close scanner
     function closeScanner() {
+        stopBarcodeDetection();
         if (videoStream) {
             videoStream.getTracks().forEach(track => track.stop());
         }

@@ -19,7 +19,7 @@
 
     <!-- PWA Modern CSS -->
     {% load static %}
-    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260802a">
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260818a">
     <!-- Fleet Component CSS - fth__ ffs__ fpm__ BEM blocks -->
     <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260630a">
 
@@ -64,7 +64,7 @@
                     <button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
                         <i class="fa-solid fa-rotate-right"></i>
                     </button>
-                    <a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+                    <a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon">
                         <i class="fa-solid fa-bell"></i>
                         {% if unread_notifications > 0 %}
                         <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
@@ -278,12 +278,17 @@
         var pollTimer = null;
         var running = false;
         var currentPos = null;
+        var lastSentKey = null;   // fix+position already delivered; re-sending it stores a duplicate
         var lastMovedAt = 0;
         var anchorPos = null;     // position the stationary test measures against
         var activeTaskId = null;
         var gpsState = 'grey';    // grey|green|red|yellow
         var wakeLock = null;
         var wakeLockWanted = false;
+        // Last positioning failure, kept for the Settings diagnostics panel. A
+        // driver reporting "location denied" cannot read a console, so the raw
+        // code/message is held here for the panel to show back to them.
+        var lastError = null;
 
         function profile() { return PROFILES[profileName]; }
 
@@ -334,6 +339,24 @@
         function sendLocation(useKeepalive) {
             var ping = buildPing();
             if (!ping) return Promise.resolve(false);
+
+            /* A fix already sent is never sent twice. getCurrentPosition hands
+             * back a cached position while it is younger than maximumAge, and
+             * this function is reached off-schedule too — the duty cycle
+             * restarts itself on a profile change, and the error path
+             * deliberately re-reports the last known fix. Each of those was
+             * storing another row for a position the server already had.
+             *
+             * The scheduled poll is unaffected: every profile asks for a fix
+             * fresher than its own send interval, so a normal cycle always
+             * produces a new fixed_at — including a parked driver, whose trail
+             * keeps its heartbeat. Costs no battery; saves a request. */
+            var key = ping.fixed_at + '|' + ping.latitude + '|' + ping.longitude;
+            if (key === lastSentKey) {
+                console.log('[EzzyGPS] Same fix as last send — skipped');
+                return Promise.resolve(false);
+            }
+            lastSentKey = key;
 
             return fetch('/api/driver/location/', {
                 method: 'POST',
@@ -433,6 +456,7 @@
 
         function onError(err) {
             console.warn('[EzzyGPS] Error:', err.code, err.message);
+            lastError = { code: err.code, message: err.message || '', at: Date.now() };
             if (err.code === 1) { // PERMISSION_DENIED
                 setGpsState('red', 'Permission denied');
                 stop();
@@ -544,11 +568,47 @@
                 isEnabled: function() { return wakeLockWanted; },
                 isSupported: function() { return 'wakeLock' in navigator; }
             },
+            /* Put a fix on the record BEFORE a status change is sent.
+             *
+             * The server stamps every status change with the driver's most
+             * recent stored fix, so the quality of that evidence is decided
+             * here, not there: with only the duty cycle running, the pin on
+             * "Delivered" is whatever ping happened to land last — typically
+             * seconds old, sometimes minutes, and on a phone that had been
+             * asleep, days. Taking a fix at the tap makes the pin mean what
+             * the timeline says it means.
+             *
+             * Always resolves, and never holds the action for more than
+             * WAIT_MS: a driver standing at a door must not wait on GPS. A
+             * failed or slow fix just leaves the previous behaviour in place.
+             *
+             * Battery: one extra fix per status change — a handful per job,
+             * against a duty cycle already taking one every 30s while on task.
+             * No wake lock, no watch, nothing left running afterwards. */
+            stamp: function() {
+                var WAIT_MS = 6000;
+                if (!('geolocation' in navigator)) return Promise.resolve(false);
+                return new Promise(function(resolve) {
+                    var settled = false;
+                    function finish(v) { if (!settled) { settled = true; resolve(v); } }
+                    setTimeout(function() { finish(false); }, WAIT_MS);
+                    navigator.geolocation.getCurrentPosition(function(pos) {
+                        onPosition(pos);
+                        sendLocation().then(finish).catch(function() { finish(false); });
+                    }, function(err) {
+                        console.warn('[EzzyGPS] Stamp failed:', err && err.message);
+                        // Nothing fresh — push the last known so the change is
+                        // still witnessed by something rather than nothing.
+                        sendLocation().then(finish).catch(function() { finish(false); });
+                    }, { enableHighAccuracy: true, maximumAge: 5000, timeout: WAIT_MS });
+                });
+            },
             getPosition: function() {
                 return currentPos ? Object.assign({}, currentPos) : null;
             },
             getState: function() { return gpsState; },
             getProfile: function() { return profileName; },
+            getLastError: function() { return lastError ? Object.assign({}, lastError) : null; },
             flushQueue: flushQueue
         };
 

@@ -372,6 +372,20 @@ def upload_path_handler_back(instance, filename):
 
 
 
+# document_file ships with a placeholder default, and a row may exist carrying
+# only a typed document number — so "a DriverDocument row exists" never means
+# "an image was uploaded". Anything gating on uploads must use the helpers below.
+DOC_PLACEHOLDER_MARKER = 'doc_default'
+
+
+def docs_with_image(queryset):
+    """Narrow a DriverDocument queryset to rows holding a real uploaded image."""
+    return (queryset
+            .exclude(document_file='')
+            .exclude(document_file__isnull=True)
+            .exclude(document_file__icontains=DOC_PLACEHOLDER_MARKER))
+
+
 class DriverDocument(models.Model):
     driver = models.ForeignKey(
         Driver, on_delete=models.CASCADE, related_name='driver_document')
@@ -395,6 +409,12 @@ class DriverDocument(models.Model):
         validators=image_validators(max_mb=8))
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def has_real_file(self):
+        """True only when a real image was uploaded, not the shipped placeholder."""
+        name = self.document_file.name if self.document_file else ''
+        return bool(name) and DOC_PLACEHOLDER_MARKER not in name
 
     def __str__(self):
         return str(self.document_no)

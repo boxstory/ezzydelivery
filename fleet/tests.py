@@ -2543,3 +2543,306 @@ class ChargeInvoiceTest(ClientPayoutMixin, TransactionTestCase):
             invoice, amount=Decimal('5.00'), created_by=self.user)
         with self.assertRaises(ValueError):
             billing_service.void_charge_invoice(invoice, created_by=self.user)
+
+    # -- Editing a live invoice's hand-added charges -------------------------
+
+    def _issued(self, extras=None, number='PP-1'):
+        """One 20.00 prepaid delivery, invoiced. `number` keeps the order code unique."""
+        from fleet import billing_service
+
+        prepaid = self._prepaid_task(number=number)
+        invoice, _, _ = billing_service.issue_charge_invoice(
+            business=self.business, task_ids=[prepaid.id], extras=extras,
+            created_by=self.user)
+        return invoice
+
+    def test_add_line_restates_the_total_and_books_revenue(self):
+        from fleet import billing_service
+
+        invoice = self._issued()
+        line, invoice = billing_service.add_invoice_charge_line(
+            invoice, kind='inventory_handling', label='Cargo handling',
+            amount='7.50', created_by=self.user)
+
+        self.assertEqual(invoice.total_amount, Decimal('27.50'))
+        self.assertEqual(invoice.amount_due, Decimal('27.50'))
+        self.assertEqual(invoice.status, fleet_models.BusinessChargeInvoice.STATUS_ISSUED)
+        self.assertIsNone(line.delivery_task_id)
+        self.assertTrue(fleet_models.DriverTransaction.objects.filter(
+            business=self.business, transaction_type='inventory_handling',
+            reference_number=invoice.invoice_code, amount=Decimal('7.50')).exists())
+
+    def test_add_line_on_a_part_paid_invoice_raises_the_balance_due(self):
+        from fleet import billing_service
+
+        invoice = self._issued()
+        billing_service.record_invoice_payment(
+            invoice, amount=Decimal('5.00'), created_by=self.user)
+
+        _line, invoice = billing_service.add_invoice_charge_line(
+            invoice, kind='other_charge', label='Waiting', amount='10.00',
+            created_by=self.user)
+
+        self.assertEqual(invoice.total_amount, Decimal('30.00'))
+        self.assertEqual(invoice.amount_due, Decimal('25.00'))
+        self.assertEqual(invoice.status, fleet_models.BusinessChargeInvoice.STATUS_PART_PAID)
+
+    def test_add_line_refuses_a_delivery_charge_kind(self):
+        """Hand-adding one would bill a job no DeliveryTask is marked against."""
+        from fleet import billing_service
+
+        invoice = self._issued()
+        with self.assertRaises(ValueError):
+            billing_service.add_invoice_charge_line(
+                invoice, kind='delivery_charge', label='Sneaky', amount='5.00',
+                created_by=self.user)
+
+    def test_remove_line_reverses_it_and_restates_the_total(self):
+        from fleet import billing_service
+
+        invoice = self._issued(extras=[{'kind': 'other_charge', 'label': 'Ad hoc',
+                                        'amount': Decimal('9.00')}])
+        self.assertEqual(invoice.total_amount, Decimal('29.00'))
+        line = invoice.lines.filter(delivery_task__isnull=True).first()
+
+        invoice = billing_service.remove_invoice_charge_line(
+            invoice, line_id=line.id, created_by=self.user)
+
+        self.assertEqual(invoice.total_amount, Decimal('20.00'))
+        self.assertFalse(invoice.lines.filter(pk=line.pk).exists())
+        self.assertTrue(fleet_models.DriverTransaction.objects.filter(
+            business=self.business, transaction_type='other_charge',
+            reference_number=invoice.invoice_code, amount=Decimal('-9.00')).exists())
+
+    def test_remove_line_refused_when_it_would_drop_below_what_was_paid(self):
+        from fleet import billing_service
+
+        invoice = self._issued(extras=[{'kind': 'other_charge', 'label': 'Ad hoc',
+                                        'amount': Decimal('9.00')}])
+        billing_service.record_invoice_payment(
+            invoice, amount=Decimal('25.00'), created_by=self.user)
+        line = invoice.lines.filter(delivery_task__isnull=True).first()
+
+        with self.assertRaises(ValueError):
+            billing_service.remove_invoice_charge_line(
+                invoice, line_id=line.id, created_by=self.user)
+
+    def test_remove_line_refused_for_a_billed_delivery(self):
+        from fleet import billing_service
+
+        invoice = self._issued()
+        line = invoice.lines.filter(delivery_task__isnull=False).first()
+        with self.assertRaises(ValueError):
+            billing_service.remove_invoice_charge_line(
+                invoice, line_id=line.id, created_by=self.user)
+
+    def test_adding_to_a_settled_invoice_reopens_it_as_part_paid(self):
+        """A charge missed at issue is billed on the same document, not a new one."""
+        from fleet import billing_service
+
+        paid = self._issued()
+        billing_service.record_invoice_payment(
+            paid, amount=Decimal('20.00'), created_by=self.user)
+        paid.refresh_from_db()
+        self.assertEqual(paid.status, fleet_models.BusinessChargeInvoice.STATUS_PAID)
+
+        _line, paid = billing_service.add_invoice_charge_line(
+            paid, kind='other_charge', label='Late fee', amount='5.00',
+            created_by=self.user)
+
+        self.assertEqual(paid.total_amount, Decimal('25.00'))
+        self.assertEqual(paid.amount_paid, Decimal('20.00'))
+        self.assertEqual(paid.amount_due, Decimal('5.00'))
+        self.assertEqual(paid.status, fleet_models.BusinessChargeInvoice.STATUS_PART_PAID)
+
+    def test_a_settled_invoice_can_grow_but_never_shrink(self):
+        """Money already received is the floor: removal that clawed back under it
+        would leave a payment stranded against a smaller document."""
+        from fleet import billing_service
+
+        invoice = self._issued(extras=[{'kind': 'other_charge', 'label': 'Ad hoc',
+                                        'amount': Decimal('9.00')}])
+        billing_service.record_invoice_payment(
+            invoice, amount=Decimal('29.00'), created_by=self.user)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, fleet_models.BusinessChargeInvoice.STATUS_PAID)
+
+        line = invoice.lines.filter(delivery_task__isnull=True).first()
+        with self.assertRaises(ValueError):
+            billing_service.remove_invoice_charge_line(
+                invoice, line_id=line.id, created_by=self.user)
+
+    def test_line_edits_refused_on_a_void_invoice(self):
+        from fleet import billing_service
+
+        voided = self._issued(number='PP-2')
+        billing_service.void_charge_invoice(voided, created_by=self.user)
+        with self.assertRaises(ValueError):
+            billing_service.add_invoice_charge_line(
+                voided, kind='other_charge', label='Late', amount='5.00',
+                created_by=self.user)
+
+    def test_void_after_an_added_line_reverses_each_charge_once(self):
+        from fleet import billing_service
+
+        invoice = self._issued()
+        billing_service.add_invoice_charge_line(
+            invoice, kind='fulfillment_charge', label='Fulfilment', amount='6.00',
+            created_by=self.user)
+        invoice.refresh_from_db()
+        billing_service.void_charge_invoice(invoice, created_by=self.user)
+
+        self.assertEqual(fleet_models.DriverTransaction.objects.filter(
+            reference_number=invoice.invoice_code,
+            transaction_type='delivery_charge', amount=Decimal('-20.00')).count(), 1)
+        self.assertEqual(fleet_models.DriverTransaction.objects.filter(
+            reference_number=invoice.invoice_code,
+            transaction_type='fulfillment_charge', amount=Decimal('-6.00')).count(), 1)
+
+    # -- Column resolution ---------------------------------------------------
+
+    def test_columns_fall_back_from_invoice_to_client_to_default(self):
+        from fleet import invoice_columns
+
+        invoice = self._issued()
+
+        # Untouched: exactly the columns the document carried before the picker.
+        self.assertEqual(invoice_columns.resolve_keys(invoice),
+                         invoice_columns.DEFAULT_KEYS)
+
+        self.business.invoice_columns = ['order', 'area', 'delivered', 'cod', 'charge']
+        self.business.save(update_fields=['invoice_columns'])
+        invoice.refresh_from_db()
+        self.assertEqual(invoice_columns.resolve_keys(invoice),
+                         ['order', 'area', 'delivered', 'cod', 'charge'])
+
+        invoice.column_keys = ['order', 'customer', 'charge']
+        invoice.save(update_fields=['column_keys'])
+        self.assertEqual(invoice_columns.resolve_keys(invoice),
+                         ['order', 'customer', 'charge'])
+
+    def test_clean_keys_drops_unknowns_and_always_keeps_the_money_column(self):
+        from fleet import invoice_columns
+
+        # Registry order, not the order they were passed in.
+        self.assertEqual(invoice_columns.clean_keys(['charge', 'nonsense', 'order']),
+                         ['order', 'charge'])
+        self.assertEqual(invoice_columns.clean_keys(['customer']),
+                         ['customer', 'charge'])
+        self.assertEqual(invoice_columns.clean_keys([]), ['charge'])
+
+    def test_render_table_totals_only_the_money_columns(self):
+        from fleet import invoice_columns
+
+        invoice = self._issued()
+        invoice.column_keys = ['order', 'area', 'service', 'delivered', 'cod', 'charge']
+        invoice.save(update_fields=['column_keys'])
+        lines = list(invoice.lines.select_related(
+            'delivery_task', 'delivery_task__order', 'delivery_task__dl_to_address',
+            'delivery_task__driver__profile__user').filter(delivery_task__isnull=False))
+
+        table = invoice_columns.render_table(invoice, lines)
+
+        self.assertEqual([c['key'] for c in table['columns']],
+                         ['order', 'area', 'service', 'delivered', 'cod', 'charge'])
+        self.assertEqual([(g['label'], g['count']) for g in table['header_groups']],
+                         [('Delivery', 3), ('Dates', 1), ('Amount (QAR)', 2)])
+        self.assertEqual(table['col_count'], 7)
+        # Label cell spans the index column plus everything before the first total.
+        self.assertEqual(table['totals_label_span'], 5)
+        self.assertEqual([c['value'] for c in table['totals_cells']], ['0.00', '20.00'])
+        self.assertEqual(len(table['rows']), 1)
+        self.assertEqual(len(table['rows'][0]['cells']), 6)
+
+    def test_combined_date_column_stacks_both_dates_in_one_cell(self):
+        from fleet import invoice_columns
+
+        invoice = self._issued()
+        invoice.column_keys = ['order', 'dates', 'charge']
+        invoice.save(update_fields=['column_keys'])
+        lines = list(invoice.lines.select_related(
+            'delivery_task', 'delivery_task__order', 'delivery_task__dl_to_address',
+            'delivery_task__driver__profile__user').filter(delivery_task__isnull=False))
+
+        table = invoice_columns.render_table(invoice, lines)
+
+        # One column, not two, and the Dates band spans just it.
+        self.assertEqual([c['key'] for c in table['columns']], ['order', 'dates', 'charge'])
+        self.assertEqual([(g['label'], g['count']) for g in table['header_groups']],
+                         [('Delivery', 1), ('Dates', 1), ('Amount (QAR)', 1)])
+
+        date_cell = table['rows'][0]['cells'][1]
+        task = lines[0].delivery_task
+        self.assertEqual(date_cell['value'], task.order.order_date.strftime('%d %b %y'))
+        self.assertEqual(date_cell['sub'], task.completed_at.strftime('%d %b %y'))
+
+        # A single-value column carries no second line.
+        self.assertEqual(table['rows'][0]['cells'][0]['sub'], '')
+
+
+class DriverTaskCardDeliveryAreaTest(DriverTestMixin, TestCase):
+    """The task card prints the stored area and no longer resolves it per request.
+
+    The query-count assertion is the real guard: it is what fails if anyone
+    reintroduces a per-page ZoneArea lookup in driver_tasks().
+    """
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+
+        self.zone = delivery_models.ZoneName.objects.create(
+            zone_number=70, zone_name='Card Zone', is_active=True,
+            latitude='25.2500000', longitude='51.5500000',
+        )
+        delivery_models.ZoneArea.objects.create(
+            zone=self.zone, area_name='North Area',
+            latitude='25.3000000', longitude='51.5000000',
+        )
+        delivery_models.ZoneArea.objects.create(
+            zone=self.zone, area_name='South Area',
+            latitude='25.2000000', longitude='51.6000000',
+        )
+
+        self.user, self.profile = self.create_driver_user()
+        self.driver = self.create_driver(self.user, self.profile)
+        self.business, self.pickup, self.order = self.create_business_and_order(
+            self.user, self.profile
+        )
+
+        self.order.latitude, self.order.longitude = '25.2050000', '51.5950000'
+        self.order.save()
+
+        self.task = self.create_delivery_task(
+            self.order, self.business, pickup=self.pickup, driver=self.driver,
+            status='accepted', dl_task_publish=True,
+        )
+
+        self.client = Client()
+        self.client.login(username='testdriver', password='TestDriver@123')
+
+    def test_order_stores_the_area_when_coords_are_saved(self):
+        self.assertEqual(
+            orders_models.Order.objects.get(pk=self.order.pk).delivery_area_name,
+            'South Area',
+        )
+
+    def test_card_renders_the_stored_area(self):
+        response = self.client.get('/fleet/tasks/', {'tab': 'accepted'})
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn('ftk__plate-zonearea', html)
+        self.assertIn('South Area', html)
+
+    def test_card_issues_no_zonearea_queries(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get('/fleet/tasks/', {'tab': 'accepted'})
+
+        self.assertEqual(response.status_code, 200)
+        area_queries = [q for q in ctx.captured_queries
+                        if 'zonearea' in q['sql'].lower()]
+        self.assertEqual(area_queries, [], 'driver_tasks must read the stored area')

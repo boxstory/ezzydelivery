@@ -8,7 +8,7 @@
 <button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
     <i class="fa-solid fa-rotate-right"></i>
 </button>
-<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon">
     <i class="fa-solid fa-bell"></i>
     {% if unread_notifications > 0 %}
     <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
@@ -137,6 +137,48 @@
     </div>
 </div>
 
+<!-- Location Diagnostics -->
+<div class="fleet-card fleet-slide-up fgeo" style="animation-delay:0.08s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-location-crosshairs me-2"></i>
+            Location Check
+        </h3>
+    </div>
+    <div class="fleet-card__body">
+        <p class="fgeo__intro">
+            If tasks show "Location permission denied", run this check. It reports what the
+            phone is actually refusing, so you know which setting to change.
+        </p>
+
+        <button type="button" class="fleet-btn fleet-btn--block" id="fleet_settings_btn_geotest">
+            <i class="fa-solid fa-satellite-dish me-1"></i> Test Location Now
+        </button>
+
+        <dl class="fgeo__grid" id="fleet_settings_geo_results" hidden>
+            <dt class="fgeo__key">Permission</dt>
+            <dd class="fgeo__val" id="fleet_settings_geo_permission">—</dd>
+
+            <dt class="fgeo__key">Live fix</dt>
+            <dd class="fgeo__val" id="fleet_settings_geo_fix">—</dd>
+
+            <dt class="fgeo__key">Accuracy</dt>
+            <dd class="fgeo__val" id="fleet_settings_geo_accuracy">—</dd>
+
+            <dt class="fgeo__key">Secure (HTTPS)</dt>
+            <dd class="fgeo__val" id="fleet_settings_geo_secure">—</dd>
+
+            <dt class="fgeo__key">Opened as</dt>
+            <dd class="fgeo__val" id="fleet_settings_geo_display">—</dd>
+
+            <dt class="fgeo__key">Browser</dt>
+            <dd class="fgeo__val" id="fleet_settings_geo_browser">—</dd>
+        </dl>
+
+        <div class="fgeo__advice" id="fleet_settings_geo_advice" hidden></div>
+    </div>
+</div>
+
 <!-- Account Settings -->
 <div class="fleet-card fleet-slide-up" style="animation-delay:0.1s;">
     <div class="fleet-card__header">
@@ -231,4 +273,149 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* Location Check — turns "it says permission denied" into a specific setting to fix.
+ *
+ * Three separate things can each deny a fix and they need different fixes: the
+ * browser's per-site permission, the Android app permission behind it, and the
+ * device's location service. The Permissions API reports only the first, so the
+ * panel also takes a real fix and reads the failure code, which is what
+ * separates a blocked site (code 1) from location services being off (code 2). */
+(function () {
+    var btn = document.getElementById('fleet_settings_btn_geotest');
+    if (!btn) return;
+
+    var results = document.getElementById('fleet_settings_geo_results');
+    var advice = document.getElementById('fleet_settings_geo_advice');
+
+    function set(id, text, tone) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'fgeo__val' + (tone ? ' fgeo__val--' + tone : '');
+    }
+
+    function browserName() {
+        var ua = navigator.userAgent;
+        if (/SamsungBrowser/i.test(ua)) return 'Samsung Internet';
+        if (/EdgA?\//i.test(ua)) return 'Edge';
+        if (/FBAN|FBAV|Instagram|WhatsApp|Line\//i.test(ua)) return 'In-app browser';
+        if (/CriOS/i.test(ua)) return 'Chrome (iOS)';
+        if (/Chrome\//i.test(ua)) return 'Chrome';
+        if (/Safari\//i.test(ua)) return 'Safari';
+        return 'Other';
+    }
+
+    function isStandalone() {
+        return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+            || window.navigator.standalone === true;
+    }
+
+    /* Which setting to send the driver to, given how the fix actually failed. */
+    function adviseFor(code, browser, permission) {
+        if (code === 1 || permission === 'denied') {
+            if (browser === 'In-app browser') {
+                return '<strong>Opened inside another app.</strong> Chat apps block location. '
+                     + 'Tap the menu and choose <em>Open in Chrome</em>, then install from there.';
+            }
+            if (browser === 'Samsung Internet') {
+                return '<strong>Samsung Internet is blocking this site.</strong> Menu → Settings → '
+                     + 'Sites and downloads → Site permissions → Location → allow ezzydelivery.qa. '
+                     + 'Samsung Internet keeps its own list, separate from Chrome.';
+            }
+            return '<strong>The browser is blocking this site.</strong> Open ezzydelivery.qa in Chrome, '
+                 + 'tap the sliders icon left of the address bar → Permissions → Location → Allow. '
+                 + 'Then force stop the app and reopen it.';
+        }
+        if (code === 2) {
+            return '<strong>The site is allowed, but the phone returned no position.</strong> '
+                 + 'This is the device, not the app: switch Location ON in the quick panel, and turn on '
+                 + 'Settings → Location → Location services → Google Location Accuracy. '
+                 + 'Also check Power saving mode is off.';
+        }
+        if (code === 3) {
+            return '<strong>Timed out.</strong> The permission is fine. Step outside or near a window '
+                 + 'and test again — indoors the first fix can take longer than the app waits.';
+        }
+        return '';
+    }
+
+    function showAdvice(html) {
+        if (!html) { advice.hidden = true; return; }
+        advice.innerHTML = html;
+        advice.hidden = false;
+    }
+
+    function resetBtn(label) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-satellite-dish me-1"></i> ' + label;
+    }
+
+    btn.addEventListener('click', function () {
+        results.hidden = false;
+        showAdvice('');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Checking...';
+
+        var browser = browserName();
+        set('fleet_settings_geo_browser', browser, browser === 'In-app browser' ? 'bad' : null);
+        set('fleet_settings_geo_display', isStandalone() ? 'Installed app' : 'Browser tab');
+        set('fleet_settings_geo_secure',
+            window.isSecureContext ? 'Yes' : 'No - location cannot work',
+            window.isSecureContext ? 'good' : 'bad');
+        set('fleet_settings_geo_fix', 'Testing...');
+        set('fleet_settings_geo_accuracy', '-');
+
+        if (!('geolocation' in navigator)) {
+            set('fleet_settings_geo_permission', 'Not supported', 'bad');
+            set('fleet_settings_geo_fix', 'Unavailable', 'bad');
+            showAdvice('<strong>This browser has no location support.</strong> Open the app in Chrome.');
+            resetBtn('Test Location Now');
+            return;
+        }
+
+        // Permissions API is absent on older WebViews - the live fix below is
+        // the real test, so a missing reading is reported, never treated as a
+        // failure.
+        var permProbe = (navigator.permissions && navigator.permissions.query)
+            ? navigator.permissions.query({ name: 'geolocation' })
+                .then(function (s) { return s.state; })
+                .catch(function () { return 'unknown'; })
+            : Promise.resolve('unknown');
+
+        permProbe.then(function (state) {
+            var tone = state === 'granted' ? 'good' : (state === 'denied' ? 'bad' : 'warn');
+            var label = { granted: 'Allowed', denied: 'Blocked', prompt: 'Not asked yet', unknown: 'Cannot read' }[state] || state;
+            set('fleet_settings_geo_permission', label, tone);
+
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                var acc = Math.round(pos.coords.accuracy);
+                set('fleet_settings_geo_fix', 'Got a position', 'good');
+                // Android's "approximate location" returns kilometre-scale
+                // accuracy, which passes the permission check but is useless for
+                // proving a delivery - so it is called out rather than passed.
+                if (acc > 1000) {
+                    set('fleet_settings_geo_accuracy', acc + ' m - approximate only', 'warn');
+                    showAdvice('<strong>Only approximate location is granted.</strong> Settings → Apps → '
+                             + 'Chrome → Permissions → Location → turn ON <em>Use precise location</em>. '
+                             + 'Without it deliveries are pinned kilometres away.');
+                } else {
+                    set('fleet_settings_geo_accuracy', acc + ' m', acc > 100 ? 'warn' : 'good');
+                    showAdvice('<strong>Location is working.</strong> Nothing to change on this phone.');
+                }
+                resetBtn('Test Again');
+            }, function (err) {
+                var name = { 1: 'Blocked by browser', 2: 'No position from device', 3: 'Timed out' }[err.code] || 'Failed';
+                set('fleet_settings_geo_fix', name + ' (code ' + err.code + ')', 'bad');
+                set('fleet_settings_geo_accuracy', '-');
+                showAdvice(adviseFor(err.code, browser, state));
+                resetBtn('Test Again');
+            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+        });
+    });
+})();
+</script>
 {% endblock %}
