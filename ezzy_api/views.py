@@ -535,6 +535,50 @@ _MAX_FIX_AGE_HOURS = 24
 _MAX_FIX_SKEW_MINUTES = 5
 
 
+def _fix_key(row):
+    """Identity of a fix: the moment the device took it, and where.
+
+    Coordinates are rounded to the column's own precision so a float that
+    round-trips a hair differently doesn't read as a new position.
+    """
+    return (row.fixed_at, round(float(row.latitude), 7), round(float(row.longitude), 7))
+
+
+def _dedupe_pings(driver_id, rows):
+    """Drop pings that repeat a fix already stored, and repeats inside the batch.
+
+    The PWA sends whatever ``getCurrentPosition`` hands back, and with a
+    ``maximumAge`` set that is routinely the *same cached fix*: the duty cycle
+    restarts itself on a profile change and asks again, every open PWA page
+    runs its own sender, and an error path deliberately re-reports the last
+    known position. None of those is a new position, but each was stored as
+    another row — 3,000 rows for one driver held only 821 distinct fixes, so
+    every count over this table read ~3.6x high.
+
+    A ping with no trusted ``fixed_at`` can only be deduped inside the batch;
+    there is no device timestamp to match it against an earlier row.
+    """
+    stamps = {row.fixed_at for row in rows if row.fixed_at}
+    seen = set()
+    if stamps:
+        seen = {
+            (fixed_at, round(float(lat), 7), round(float(lng), 7))
+            for lat, lng, fixed_at in fleet_models.DriverLocation.objects.filter(
+                driver_id=driver_id, fixed_at__in=stamps,
+            ).values_list('latitude', 'longitude', 'fixed_at')
+        }
+
+    kept, duplicates = [], 0
+    for row in rows:
+        key = _fix_key(row)
+        if key in seen:
+            duplicates += 1
+            continue
+        seen.add(key)
+        kept.append(row)
+    return kept, duplicates
+
+
 def _as_float(value):
     """Coerce an optional numeric ping field, discarding junk instead of 500ing."""
     if value is None or value == '':
@@ -642,6 +686,7 @@ def driver_update_location(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    rows, duplicates = _dedupe_pings(driver.pk, rows)
     created = fleet_models.DriverLocation.objects.bulk_create(rows)
 
     if is_batch:
@@ -649,6 +694,15 @@ def driver_update_location(request):
             'message': 'Locations updated successfully',
             'saved': len(created),
             'rejected': rejected,
+            'duplicates': duplicates,
+        }, status=status.HTTP_200_OK)
+
+    # A repeat is accepted, not refused: an error would send the PWA's offline
+    # queue chasing a ping the server already holds, forever.
+    if not created:
+        return Response({
+            'message': 'Location already recorded',
+            'duplicate': True,
         }, status=status.HTTP_200_OK)
 
     loc = created[0]
