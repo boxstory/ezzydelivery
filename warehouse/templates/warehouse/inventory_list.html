@@ -1,6 +1,7 @@
 {% extends 'wh_dashboard_base.html' %}
 {% load business_dropdown %}
 {% load static %}
+{% load custom_filters %}
 
 {% comment %}Sort URL helper macro{% endcomment %}
 {% block extra_css %}{% endblock %}
@@ -60,6 +61,8 @@
 
   <div class="wfnote wfnote--inset" id="warehouse_inventory_list_card_notes"
        data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_inventory_list_card_notes' %}" hidden></div>
+
+  {% include "warehouse/parts/_receipt_labels_banner.html" %}
 
   <!-- Stats -->
   <div class="wh__stats">
@@ -134,6 +137,14 @@
           <label for="low_stock"><span class="wh__badge wh__badge--warning"><i class="fas fa-exclamation-triangle"></i> Low Stock</span></label>
         </div>
       </div>
+      {% if is_staff %}
+      <div class="wh__filter-group--sm">
+        <div class="wh__filter-check">
+          <input type="checkbox" name="no_barcode" id="no_barcode" value="1" {% if no_barcode_only %}checked{% endif %}>
+          <label for="no_barcode"><span class="wh__badge wh__badge--muted"><i class="fas fa-barcode"></i> No Barcode</span></label>
+        </div>
+      </div>
+      {% endif %}
       <div class="wh__filter-group--sm">
         <button type="submit" class="wh__filter-btn">
           <i class="fas fa-filter"></i> Filter
@@ -151,15 +162,62 @@
       </div>
       <span class="wh__count-badge">{{ stock_levels.paginator.count|default:0 }} items</span>
     </div>
+
+    {% if is_staff %}
+    {% comment %}
+    Selection and the actions that consume it sit in one strip — the count is the
+    whole reason a button is enabled, so they belong together. Ticks survive
+    paging (sessionStorage keyed to the current filter); off-page ids ride along
+    as hidden inputs at submit time.
+    {% endcomment %}
+    <form id="warehouse_inventory_form_bulk" method="post" target="_blank"
+          action="{% url 'warehouse:print_product_labels' %}">
+      {% csrf_token %}
+      <div class="whsel__bar" data-whsel-filter="{{ filter_params }}" data-whsel-total="{{ total_matching }}">
+        <button type="submit" class="whsel__btn whsel__btn--primary" id="warehouse_inventory_btn_print" disabled>
+          <i class="fas fa-qrcode"></i> Print labels <span class="whsel__count" id="warehouse_inventory_text_count">0</span>
+        </button>
+        <button type="submit" class="whsel__btn" id="warehouse_inventory_btn_barcodes" disabled
+                formaction="{% url 'warehouse:assign_internal_barcodes' %}" formtarget="_self"
+                title="Give every selected product without a barcode an internal EZ code">
+          <i class="fas fa-barcode"></i> Assign internal barcodes
+        </button>
+        {% if total_matching > stock_levels|length %}
+        <button type="submit" class="whsel__btn whsel__btn--all" name="select_all" value="1"
+                title="Print a label for every product matching the current filter">
+          <i class="fas fa-layer-group"></i> All <span class="whsel__count">{{ total_matching }}</span> matching
+        </button>
+        {% endif %}
+        <span class="whsel__hint" id="warehouse_inventory_text_hint">Tick rows to print stickers — the selection is kept as you page.</span>
+        <button type="button" class="whsel__clear" id="warehouse_inventory_btn_clear" hidden>Clear</button>
+      </div>
+      {# Carries the live filter so "all matching" prints exactly this list. #}
+      <div id="warehouse_inventory_box_carry" hidden>
+        <input type="hidden" name="search" value="{{ search }}">
+        <input type="hidden" name="warehouse" value="{{ selected_warehouse|default:'' }}">
+        <input type="hidden" name="category" value="{{ selected_category|default:'' }}">
+        <input type="hidden" name="business" value="{{ selected_business|default:'' }}">
+        <input type="hidden" name="low_stock" value="{% if low_stock_only %}1{% endif %}">
+        <input type="hidden" name="no_barcode" value="{% if no_barcode_only %}1{% endif %}">
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      </div>
+    </form>
+    {% endif %}
+
     <div class="wh__table-wrap">
       <table class="wh__table">
         <thead>
           <tr>
+            {% if is_staff %}
+            <th class="wh__th whsel__col"><input type="checkbox" id="warehouse_inventory_check_all" title="Select all on this page" aria-label="Select all rows on this page"></th>
+            {% endif %}
             <th class="wh__th">Image</th>
             <th class="wh__th wh__th--sortable {% if sort_field == 'name' %}wh__th--sorted{% endif %}" data-sort="name">Product Details<i class="fas fa-sort{% if sort_field == 'name' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
             <th class="wh__th wh__th--sortable {% if sort_field == 'brand' %}wh__th--sorted{% endif %}" data-sort="brand">Brand<i class="fas fa-sort{% if sort_field == 'brand' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
             <th class="wh__th wh__th--sortable {% if sort_field == 'sku' %}wh__th--sorted{% endif %}" data-sort="sku">SKU / Barcode<i class="fas fa-sort{% if sort_field == 'sku' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
             <th class="wh__th wh__th--sortable {% if sort_field == 'category' %}wh__th--sorted{% endif %}" data-sort="category">Category<i class="fas fa-sort{% if sort_field == 'category' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            {% comment %}Sorting by variant group puts a product's siblings next to each other, which is what you want before printing a set of labels.{% endcomment %}
+            <th class="wh__th wh__th--sortable {% if sort_field == 'variant' %}wh__th--sorted{% endif %}" data-sort="variant">Variant<i class="fas fa-sort{% if sort_field == 'variant' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
             <th class="wh__th wh__th--sortable {% if sort_field == 'warehouse' %}wh__th--sorted{% endif %}" data-sort="warehouse">Warehouse<i class="fas fa-sort{% if sort_field == 'warehouse' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
             <th class="wh__th wh__th--sortable {% if sort_field == 'location' %}wh__th--sorted{% endif %}" data-sort="location">Location<i class="fas fa-sort{% if sort_field == 'location' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
             <th class="wh__th wh__th--center wh__th--sortable {% if sort_field == 'price' %}wh__th--sorted{% endif %}" data-sort="price">Price<i class="fas fa-sort{% if sort_field == 'price' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
@@ -173,6 +231,14 @@
         <tbody>
           {% for stock in stock_levels %}
           <tr class="{% if stock.quantity_on_hand <= stock.reorder_point %}wh__row--warning{% endif %}">
+            {% if is_staff %}
+            {% comment %}form= links the tick to the bulk form even though the table sits outside it.{% endcomment %}
+            <td class="wh__td whsel__col">
+              <input type="checkbox" class="whsel__chk" form="warehouse_inventory_form_bulk"
+                     name="product_ids" value="{{ stock.product.id }}"
+                     aria-label="Select {{ stock.product.item_name }}">
+            </td>
+            {% endif %}
             <td class="wh__td">
               {% if stock.product.product_image %}
               <img src="{{ stock.product.product_image.url }}" alt="{{ stock.product.item_name }}" class="wh__product-img">
@@ -187,6 +253,13 @@
                 {% if stock.product.size %} | Size: {{ stock.product.size }}{% endif %}
                 {% if stock.product.color %} | {{ stock.product.color.color_variant }}{% endif %}
               </div>
+              {% with vcount=variant_counts|get_item:stock.product.variant_group %}
+              {% if vcount > 1 %}
+              <div class="wh__meta">
+                <span class="wh__badge wh__badge--muted"><i class="fas fa-layer-group"></i> 1 of {{ vcount }} variants</span>
+              </div>
+              {% endif %}
+              {% endwith %}
               {% with aliases=stock.product.get_client_names_list %}
               {% if aliases %}
               <div class="wh__meta mt-1">
@@ -212,6 +285,9 @@
               <code class="wh__code">{{ stock.product.item_sku|default:"-" }}</code>
               {% if stock.product.barcode %}
               <div class="wh__meta"><i class="fas fa-barcode"></i> {{ stock.product.barcode }}</div>
+              {% else %}
+              {% comment %}No barcode: the label falls back to product_id, but scans elsewhere won't resolve.{% endcomment %}
+              <div class="wh__meta"><span class="wh__badge wh__badge--warning"><i class="fas fa-barcode"></i> No barcode</span></div>
               {% endif %}
             </td>
             <td class="wh__td">
@@ -220,6 +296,12 @@
               {% else %}
               <span class="wh__muted">-</span>
               {% endif %}
+            </td>
+            <td class="wh__td">
+              {% with variant=stock.product.display_variant %}
+              {% if variant %}<span class="wh__badge wh__badge--muted">{{ variant }}</span>
+              {% else %}<span class="wh__muted">—</span>{% endif %}
+              {% endwith %}
             </td>
             <td class="wh__td"><span class="wh__muted">{{ stock.warehouse.name }}</span></td>
             <td class="wh__td"><span class="wh__badge wh__badge--muted">{{ stock.location.code|default:"Default" }}</span></td>
@@ -257,11 +339,29 @@
                  hx-push-url="true">
                 <i class="fas fa-chart-line"></i> Details
               </a>
+              {% if is_staff %}
+              <a href="{% url 'warehouse:print_product_labels' %}?stock_ids={{ stock.id }}"
+                 class="wh__action-btn wh__action-btn--pill"
+                 target="_blank" rel="noopener"
+                 title="Print QR label for this variant">
+                <i class="fas fa-qrcode"></i> Label
+              </a>
+              {% with vcount=variant_counts|get_item:stock.product.variant_group %}
+              {% if vcount > 1 %}
+              <a href="{% url 'warehouse:print_product_labels' %}?variant_group={{ stock.product.variant_group|urlencode }}"
+                 class="wh__action-btn wh__action-btn--pill"
+                 target="_blank" rel="noopener"
+                 title="Print a label for all {{ vcount }} variants of this product">
+                <i class="fas fa-layer-group"></i> All {{ vcount }}
+              </a>
+              {% endif %}
+              {% endwith %}
+              {% endif %}
             </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="13" class="wh__empty">
+            <td colspan="{% if is_staff %}15{% else %}14{% endif %}" class="wh__empty">
               <i class="fas fa-boxes"></i>
               <p>No inventory items found</p>
               <p class="wh__meta">Start by receiving stock into your warehouse</p>
@@ -376,4 +476,112 @@
   });
 })();
 </script>
+
+{% if is_staff %}
+<script>
+(function () {
+  'use strict';
+  var form     = document.getElementById('warehouse_inventory_form_bulk');
+  var bar      = document.querySelector('.whsel__bar');
+  var printBtn = document.getElementById('warehouse_inventory_btn_print');
+  var codeBtn  = document.getElementById('warehouse_inventory_btn_barcodes');
+  var checkAll = document.getElementById('warehouse_inventory_check_all');
+  var countEl  = document.getElementById('warehouse_inventory_text_count');
+  var hint     = document.getElementById('warehouse_inventory_text_hint');
+  var clearBtn = document.getElementById('warehouse_inventory_btn_clear');
+  var carry    = document.getElementById('warehouse_inventory_box_carry');
+  if (!form || !printBtn) { return; }
+
+  var HINT_DEFAULT = hint.textContent;
+
+  // Selection belongs to the filter, not the page. Ticking rows, paging on and
+  // printing would otherwise silently drop everything ticked earlier — a
+  // 40-variant seller would mean four separate print runs.
+  var KEY = 'whselInv:' + (bar.dataset.whselFilter || '');
+  function load() {
+    try { return new Set(JSON.parse(sessionStorage.getItem(KEY) || '[]')); }
+    catch (e) { return new Set(); }
+  }
+  function save(set) {
+    try { sessionStorage.setItem(KEY, JSON.stringify(Array.from(set))); } catch (e) {}
+  }
+  var picked = load();
+
+  function boxes() {
+    return Array.prototype.slice.call(document.querySelectorAll('.whsel__chk'));
+  }
+
+  function refresh() {
+    var all = boxes();
+    var onPage = all.filter(function (b) { return b.checked; }).length;
+
+    countEl.textContent = picked.size;
+    printBtn.disabled = picked.size === 0;
+    codeBtn.disabled = picked.size === 0;
+    clearBtn.hidden = picked.size === 0;
+
+    if (checkAll) {
+      checkAll.checked = onPage > 0 && onPage === all.length;
+      checkAll.indeterminate = onPage > 0 && onPage < all.length;
+    }
+
+    var offPage = picked.size - onPage;
+    hint.textContent = offPage > 0
+      ? picked.size + ' selected — ' + offPage + ' on other pages, all print together.'
+      : HINT_DEFAULT;
+
+    // Ids ticked on pages you are no longer looking at still have to reach the
+    // server, so they ride along as hidden inputs.
+    var stale = carry.querySelectorAll('input[name="product_ids"]');
+    for (var i = 0; i < stale.length; i++) { stale[i].remove(); }
+    var here = {};
+    all.forEach(function (b) { here[b.value] = true; });
+    picked.forEach(function (id) {
+      if (here[id]) { return; }
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'product_ids';
+      input.value = id;
+      carry.appendChild(input);
+    });
+  }
+
+  boxes().forEach(function (box) {
+    box.checked = picked.has(box.value);
+    box.addEventListener('change', function () {
+      if (box.checked) { picked.add(box.value); } else { picked.delete(box.value); }
+      save(picked);
+      refresh();
+    });
+  });
+
+  if (checkAll) {
+    checkAll.addEventListener('change', function () {
+      boxes().forEach(function (box) {
+        box.checked = checkAll.checked;
+        if (box.checked) { picked.add(box.value); } else { picked.delete(box.value); }
+      });
+      save(picked);
+      refresh();
+    });
+  }
+
+  clearBtn.addEventListener('click', function () {
+    picked.clear();
+    save(picked);
+    boxes().forEach(function (box) { box.checked = false; });
+    refresh();
+  });
+
+  // Assigning barcodes navigates this tab and changes the rows underneath, so
+  // the old ticks would point at a list that no longer means the same thing.
+  codeBtn.addEventListener('click', function () {
+    picked.clear();
+    save(picked);
+  });
+
+  refresh();
+})();
+</script>
+{% endif %}
 {% endblock %}

@@ -1,0 +1,363 @@
+{% load static %}
+{# Purpose: Standalone printable QR labels for products and their variants, stuck on product boxes. #}
+{# Used by: warehouse.label_views.print_product_labels #}
+{# Notes: Paper preset lives on .whlb__sheet--<key>; copies are cloned client-side, not rendered per unit by the server. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Product Labels</title>
+  <link rel="stylesheet" href="{% static 'warehouse/css/product-labels.css' %}?v=20260822c">
+</head>
+<body>
+  <div class="whlb__toolbar">
+    <div class="whlb__toolbar-left">
+      <div class="whlb__toolbar-title">Product Labels</div>
+      <div class="whlb__toolbar-count">
+        {{ labels|length }} item{{ labels|length|pluralize }} ·
+        <span id="warehouse_labels_text_total">{{ labels|length }}</span> sticker<span id="warehouse_labels_text_plural">{{ labels|length|pluralize }}</span>
+      </div>
+      {% if labels %}
+      <div class="whlb__hint whlb__hint--warn" id="warehouse_labels_text_hint">
+        Preview below is actual size. Pick the label stock loaded in your printer before printing.
+      </div>
+      {% endif %}
+      {% if truncated %}
+      <div class="whlb__hint whlb__hint--warn">
+        Only the first {{ max_rows }} products are shown — the rest of your selection was not rendered.
+      </div>
+      {% endif %}
+    </div>
+
+    {% if labels %}
+    <div class="whlb__toolbar-right">
+      <span class="whlb__field">
+        <label class="whlb__field-label" for="warehouse_labels_select_preset">Label size</label>
+        <select class="whlb__field-select" id="warehouse_labels_select_preset">
+          {% for key, name in presets %}
+          <option value="{{ key }}" {% if key == preset %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </span>
+
+      <span class="whlb__field">
+        <label class="whlb__field-label" for="warehouse_labels_select_qrmode">QR contains</label>
+        <select class="whlb__field-select" id="warehouse_labels_select_qrmode">
+          {% for key, name in qr_modes %}
+          <option value="{{ key }}" {% if key == qr_mode %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </span>
+
+      {% comment %}
+        Custom stock: pre-cut sheets vary by supplier, so rather than guess a
+        preset the operator measures one label and types it in. Persisted per
+        device like the preset itself.
+      {% endcomment %}
+      <span class="whlb__field whlb__field--custom" id="warehouse_labels_field_custom" hidden>
+        <label class="whlb__field-label" for="warehouse_labels_input_w">Label</label>
+        <input class="whlb__field-input whlb__field-input--sm" id="warehouse_labels_input_w"
+               type="number" min="20" max="210" step="0.1" value="99.1" aria-label="Label width in mm">
+        <span class="whlb__field-label">×</span>
+        <input class="whlb__field-input whlb__field-input--sm" id="warehouse_labels_input_h"
+               type="number" min="10" max="297" step="0.1" value="38.1" aria-label="Label height in mm">
+        <span class="whlb__field-label">mm ·</span>
+        <input class="whlb__field-input whlb__field-input--sm" id="warehouse_labels_input_cols"
+               type="number" min="1" max="6" step="1" value="2" aria-label="Labels across the sheet">
+        <span class="whlb__field-label">across</span>
+      </span>
+
+      <button class="whlb__btn" id="warehouse_labels_btn_print" type="button">Print</button>
+      <button class="whlb__btn whlb__btn--ghost" type="button" onclick="window.close()">Close</button>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if labels %}
+  {% comment %}
+    The count strip. Per-product counts are the source of truth — the buttons on
+    the left only FILL them, so "25 of one and 20 of another" is one job rather
+    than two print runs.
+  {% endcomment %}
+  <div class="whlb__counts">
+    <div class="whlb__counts-head">
+      <span class="whlb__counts-title">Copies per product</span>
+      <span class="whlb__fill">
+        <span class="whlb__field-label">Set all to</span>
+        <input class="whlb__field-input whlb__field-input--sm" id="warehouse_labels_input_fixed"
+               type="number" min="1" max="500" step="1" value="1" aria-label="Set every product to this many copies">
+        <button class="whlb__chip" type="button" id="warehouse_labels_btn_fillfixed">Apply</button>
+        <button class="whlb__chip" type="button" id="warehouse_labels_btn_fillonhand">Use on-hand qty</button>
+        {% if has_preset_copies %}
+        <button class="whlb__chip" type="button" id="warehouse_labels_btn_fillreceipt">Use received qty</button>
+        {% endif %}
+      </span>
+      <label class="whlb__check" for="warehouse_labels_check_split">
+        <input type="checkbox" id="warehouse_labels_check_split">
+        <span>Start each product on a new sheet</span>
+      </label>
+    </div>
+    <div class="whlb__counts-list">
+      {% for l in labels %}
+      <label class="whlb__counts-row" for="warehouse_labels_qty_{{ l.product.id }}">
+        <span class="whlb__counts-name">
+          {{ l.product.item_name }}{% if l.variant %} <span class="whlb__counts-variant">{{ l.variant }}</span>{% endif %}
+        </span>
+        <span class="whlb__counts-meta">{{ l.payload|default:"no code" }} · on hand {{ l.on_hand }}</span>
+        <input class="whlb__counts-qty" id="warehouse_labels_qty_{{ l.product.id }}"
+               data-pid="{{ l.product.id }}" type="number" min="0" max="500" step="1"
+               value="{% if l.copies %}{{ l.copies }}{% else %}1{% endif %}"
+               inputmode="numeric" aria-label="Copies of {{ l.product.item_name }}">
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% comment %}
+    Re-posts the same selection when the QR content mode changes — the QR SVG is
+    built server-side, so that switch cannot be done in CSS like the paper size.
+  {% endcomment %}
+  <form method="POST" id="warehouse_labels_form_reload" class="whlb__reload-form">
+    {% csrf_token %}
+    {% for l in labels %}<input type="hidden" name="product_ids" value="{{ l.product.id }}">
+    {% if l.copies %}<input type="hidden" name="qty" value="{{ l.product.id }}:{{ l.copies }}">{% endif %}{% endfor %}
+    <input type="hidden" name="qr_mode" id="warehouse_labels_input_qrmode" value="{{ qr_mode }}">
+    <input type="hidden" name="preset" id="warehouse_labels_input_preset" value="{{ preset }}">
+  </form>
+
+  <div class="whlb__sheet whlb__sheet--{{ preset }}" id="warehouse_labels_sheet_labels">
+    {% for l in labels %}
+    <div class="whlb__label" data-pid="{{ l.product.id }}" data-onhand="{{ l.on_hand }}"{% if l.copies %} data-copies="{{ l.copies }}"{% endif %}>
+      <div class="whlb__label-inner">
+        <div class="whlb__qr">
+          {% if l.qr_svg %}{{ l.qr_svg }}{% else %}<div class="whlb__qr-missing">NO CODE</div>{% endif %}
+        </div>
+        <div class="whlb__info">
+          <div class="whlb__name">{{ l.product.item_name }}</div>
+          {% if l.variant %}<div class="whlb__variant">{{ l.variant }}</div>{% endif %}
+          <div class="whlb__sku">{{ l.product.item_sku|default:l.product.product_id }}</div>
+          <div class="whlb__code">{{ l.payload|default:"—" }}</div>
+          <div class="whlb__extra">
+            {% if l.product.brand_name %}<span class="whlb__brand">{{ l.product.brand_name }}</span>{% endif %}
+            {% if l.product.item_price %}<span class="whlb__price">QAR {{ l.product.item_price }}</span>{% endif %}
+          </div>
+          <div class="whlb__foot">
+            {% if l.product.business %}<span class="whlb__biz">{{ l.product.business.business_name }}</span>{% endif %}
+            {% if l.warehouse %}<span class="whlb__loc">{{ l.warehouse }}{% if l.location %}/{{ l.location }}{% endif %}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="whlb__empty">
+      <p>No products selected.</p>
+      <p class="whlb__hint">Pick items on the inventory page and choose “Print Labels”.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <script>
+    (function () {
+      var sheet = document.getElementById('warehouse_labels_sheet_labels');
+      if (!sheet) { return; }
+
+      var presetSelect = document.getElementById('warehouse_labels_select_preset');
+      var qrSelect = document.getElementById('warehouse_labels_select_qrmode');
+      var totalText = document.getElementById('warehouse_labels_text_total');
+      var pluralText = document.getElementById('warehouse_labels_text_plural');
+      var hint = document.getElementById('warehouse_labels_text_hint');
+      var printBtn = document.getElementById('warehouse_labels_btn_print');
+      var reloadForm = document.getElementById('warehouse_labels_form_reload');
+      var splitCheck = document.getElementById('warehouse_labels_check_split');
+      var fixedInput = document.getElementById('warehouse_labels_input_fixed');
+      var customField = document.getElementById('warehouse_labels_field_custom');
+      var wInput = document.getElementById('warehouse_labels_input_w');
+      var hInput = document.getElementById('warehouse_labels_input_h');
+      var colsInput = document.getElementById('warehouse_labels_input_cols');
+
+      var STORAGE_KEY = 'warehouse_labels_preset';
+      var CUSTOM_KEY = 'warehouse_labels_custom';
+      /* One job should not be able to spool a whole roll by accident. */
+      var MAX_STICKERS = 2000;
+
+      var originals = [].slice.call(sheet.querySelectorAll('.whlb__label'));
+      if (!originals.length) { return; }
+
+      var qtyInputs = [].slice.call(document.querySelectorAll('.whlb__counts-qty'));
+
+      /* @page cannot read custom properties, so a custom label size is the one
+         rule that has to be written at runtime. Created here, never in the
+         template. */
+      var pageStyle = document.createElement('style');
+      pageStyle.id = 'warehouse_labels_style_page';
+      document.head.appendChild(pageStyle);
+
+      function clamp(v, lo, hi, fallback) {
+        var n = parseFloat(v);
+        if (isNaN(n)) { return fallback; }
+        return Math.max(lo, Math.min(hi, n));
+      }
+
+      function qtyFor(pid) {
+        var box = document.getElementById('warehouse_labels_qty_' + pid);
+        if (!box) { return 1; }
+        var n = parseInt(box.value, 10);
+        return Math.max(0, Math.min(500, isNaN(n) ? 0 : n));
+      }
+
+      function render() {
+        var frag = document.createDocumentFragment();
+        var total = 0;
+        var capped = false;
+        var split = splitCheck && splitCheck.checked;
+
+        originals.forEach(function (label) {
+          var n = qtyFor(label.getAttribute('data-pid'));
+          for (var i = 0; i < n; i++) {
+            if (total >= MAX_STICKERS) { capped = true; break; }
+            var clone = label.cloneNode(true);
+            /* On sheet stock, peeling one product per sheet is worth the wasted
+               labels — so the first copy of each product can force a new page. */
+            if (split && i === 0 && total > 0) {
+              clone.classList.add('whlb__label--sheet-break');
+            }
+            frag.appendChild(clone);
+            total++;
+          }
+        });
+
+        sheet.textContent = '';
+        sheet.appendChild(frag);
+
+        totalText.textContent = String(total);
+        pluralText.textContent = total === 1 ? '' : 's';
+        printBtn.disabled = total === 0;
+
+        if (capped) {
+          hint.textContent = 'Capped at ' + MAX_STICKERS + ' stickers for one job — print the rest in a second batch.';
+          hint.classList.add('whlb__hint--warn');
+        }
+      }
+
+      /* Pre-cut sheets differ by supplier, so the custom size is measured off a
+         real sheet and turned into both the @page rule and the label box. */
+      function applyCustom() {
+        var w = clamp(wInput.value, 20, 210, 99.1);
+        var h = clamp(hInput.value, 10, 297, 38.1);
+        var cols = clamp(colsInput.value, 1, 6, 2);
+
+        // Centre the grid on A4 and let the rows fall where they fall.
+        var sideMargin = Math.max(0, (210 - (w * cols)) / 2);
+
+        pageStyle.textContent =
+          '@page whlb-custom { size: 210mm 297mm; margin: 8mm ' + sideMargin.toFixed(2) + 'mm; }';
+        sheet.style.setProperty('--whlb-w', w + 'mm');
+        sheet.style.setProperty('--whlb-h', h + 'mm');
+        sheet.style.setProperty('--whlb-qr', Math.max(10, h - 8) + 'mm');
+        sheet.style.setProperty('--whlb-cols-w', (w * cols) + 'mm');
+
+        try {
+          localStorage.setItem(CUSTOM_KEY, JSON.stringify({w: w, h: h, cols: cols}));
+        } catch (e) { /* private mode */ }
+      }
+
+      /* Paper size is otherwise pure CSS — the preset class swaps the @page rule. */
+      function applyPreset(value) {
+        sheet.className = sheet.className.replace(/whlb__sheet--\S+/g, '').trim();
+        sheet.classList.add('whlb__sheet--' + value);
+        document.getElementById('warehouse_labels_input_preset').value = value;
+        try { localStorage.setItem(STORAGE_KEY, value); } catch (e) { /* private mode */ }
+
+        customField.hidden = value !== 'custom';
+        if (value === 'custom') {
+          applyCustom();
+        } else {
+          sheet.style.removeProperty('--whlb-w');
+          sheet.style.removeProperty('--whlb-h');
+          sheet.style.removeProperty('--whlb-qr');
+          sheet.style.removeProperty('--whlb-cols-w');
+        }
+
+        if (hint) {
+          hint.textContent = 'Preview below is actual size. Load ' +
+            presetSelect.options[presetSelect.selectedIndex].text + ' stock before printing.';
+          hint.classList.remove('whlb__hint--warn');
+        }
+      }
+
+      try {
+        var savedCustom = JSON.parse(localStorage.getItem(CUSTOM_KEY) || 'null');
+        if (savedCustom) {
+          wInput.value = savedCustom.w;
+          hInput.value = savedCustom.h;
+          colsInput.value = savedCustom.cols;
+        }
+      } catch (e) { /* ignore */ }
+
+      var saved = null;
+      try { saved = localStorage.getItem(STORAGE_KEY); } catch (e) { saved = null; }
+      if (saved) {
+        for (var i = 0; i < presetSelect.options.length; i++) {
+          if (presetSelect.options[i].value === saved) {
+            presetSelect.value = saved;
+            applyPreset(saved);
+            break;
+          }
+        }
+      }
+
+      presetSelect.addEventListener('change', function () { applyPreset(presetSelect.value); });
+
+      qrSelect.addEventListener('change', function () {
+        document.getElementById('warehouse_labels_input_qrmode').value = qrSelect.value;
+        reloadForm.submit();
+      });
+
+      qtyInputs.forEach(function (box) { box.addEventListener('input', render); });
+      if (splitCheck) { splitCheck.addEventListener('change', render); }
+
+      function fill(getter) {
+        qtyInputs.forEach(function (box) { box.value = getter(box); });
+        render();
+      }
+
+      document.getElementById('warehouse_labels_btn_fillfixed')
+        .addEventListener('click', function () {
+          var n = Math.max(0, Math.min(500, parseInt(fixedInput.value, 10) || 0));
+          fill(function () { return n; });
+        });
+
+      document.getElementById('warehouse_labels_btn_fillonhand')
+        .addEventListener('click', function () {
+          fill(function (box) {
+            var label = sheet.querySelector('[data-pid="' + box.dataset.pid + '"]') ||
+                        originals.filter(function (l) { return l.dataset.pid === box.dataset.pid; })[0];
+            return label ? (parseInt(label.dataset.onhand, 10) || 0) : 0;
+          });
+        });
+
+      var receiptBtn = document.getElementById('warehouse_labels_btn_fillreceipt');
+      if (receiptBtn) {
+        receiptBtn.addEventListener('click', function () {
+          fill(function (box) {
+            var label = originals.filter(function (l) { return l.dataset.pid === box.dataset.pid; })[0];
+            return label ? (parseInt(label.dataset.copies, 10) || 1) : 1;
+          });
+        });
+      }
+
+      [wInput, hInput, colsInput].forEach(function (input) {
+        input.addEventListener('input', function () {
+          if (presetSelect.value === 'custom') { applyCustom(); }
+        });
+      });
+
+      printBtn.addEventListener('click', function () { window.print(); });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

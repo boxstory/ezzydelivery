@@ -128,12 +128,29 @@ class Product(models.Model):
     size = models.CharField(max_length=100, null=True, blank=True)
     unit = models.ForeignKey(
         UnitVariant, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # Variants are FLAT in this schema: every Product row is one sellable
+    # variant, and a Shopify product with 12 options imports as 12 rows. These
+    # two fields are the only thing tying those rows back together.
+    variant_group = models.CharField(
+        max_length=64, blank=True, default='', db_index=True,
+        help_text="Shared key for every variant of the same product. Platform product id for imports, {business_pk}-G{n} for manual products."
+    )
+    variant_label = models.CharField(
+        max_length=120, blank=True, default='',
+        help_text="Variant name override, e.g. '50ml / Gift Box'. Blank falls back to colour / size / unit."
+    )
     item_price = models.PositiveIntegerField(_("Price"), default=0)
     item_discription = models.CharField(max_length=100, null=True, blank=True)
     client_names = models.TextField(
         blank=True, null=True,
         help_text="Comma-separated alternate names clients use for this product (e.g. 'Oud 50ml, special oud')"
     )
+
+    # Label printing audit — reprints bump the count rather than being blocked,
+    # because printing a sticker again is a normal thing to need.
+    label_printed_at = models.DateTimeField(null=True, blank=True)
+    label_print_count = models.PositiveIntegerField(default=0)
 
     brand_logo = models.ImageField(
         upload_to='product_images/brand_logo', null=True, blank=True,
@@ -150,6 +167,22 @@ class Product(models.Model):
 
     def __str__(self):
         return self.brand_name + " " + self.item_name
+
+    def display_variant(self):
+        """
+        Variant descriptor for labels and lists.
+
+        The stored override wins — a Shopify variant title like "50ml / Gift Box"
+        has no colour/size/unit to rebuild it from.
+        """
+        from product.barcode_utils import variant_line
+        return variant_line(self)
+
+    def sibling_variants(self):
+        """Every other Product row sharing this one's variant_group."""
+        if not self.variant_group:
+            return Product.objects.none()
+        return Product.objects.filter(variant_group=self.variant_group).exclude(pk=self.pk)
 
     def get_client_names_list(self):
         """Return list of stripped client alias names."""

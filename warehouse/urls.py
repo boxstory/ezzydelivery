@@ -1,5 +1,6 @@
 from django.urls import path
 from warehouse import views as warehouse_views
+from warehouse import label_views as warehouse_label_views
 
 app_name = 'warehouse'
 
@@ -13,6 +14,11 @@ urlpatterns = [
     path('products/add/', warehouse_views.staff_product_add, name='staff_product_add'),
     path('products/<int:product_id>/edit/', warehouse_views.staff_product_edit, name='staff_product_edit'),
     path('inventory/<int:product_id>/', warehouse_views.stock_card, name='stock_card'),
+
+    # Product labels (staff only)
+    path('labels/print/', warehouse_label_views.print_product_labels, name='print_product_labels'),
+    path('labels/assign-barcodes/', warehouse_label_views.assign_internal_barcodes, name='assign_internal_barcodes'),
+
     path('transactions/', warehouse_views.transaction_list, name='transaction_list'),
 
     # Receiving

@@ -217,15 +217,33 @@ def product_single_delete(request, product_id):
 # -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_single_update(request, product_id):
-    business = get_cached_business(request)
-    if not business:
-        logger.warning(f"User {request.user.id} has no associated business")
-        messages.error(request, "No business associated with your account")
-        return redirect('business:business_dashboard')
+    """Edit one product.
+
+    Two contexts (mirrors product_single_add):
+      - Client dashboard: edits a product of the logged-in user's own business.
+      - Staff dashboard (seller section): staff pass ?business_id=<pk> to edit
+        that seller's product, and land back on the seller detail page.
+    """
+    biz_id = request.POST.get('business_id') or request.GET.get('business_id')
+    staff_mode = bool(biz_id) and is_staff_user(request)
+
+    if staff_mode:
+        business = get_object_or_404(Business, pk=biz_id)
+    else:
+        business = get_cached_business(request)
+        if not business:
+            logger.warning(f"User {request.user.id} has no associated business")
+            messages.error(request, "No business associated with your account")
+            return redirect('business:business_dashboard')
+
+    if staff_mode:
+        back_url = reverse('workforce:seller_detail', args=[business.business_id]) + '#products'
+    else:
+        back_url = reverse('product:product_all_list_table')
 
     try:
         # OPTIMIZATION: Use select_related to fetch related data in single query
-        # SECURITY FIX: Verify product belongs to user's business
+        # SECURITY FIX: Verify product belongs to the business being edited
         product = product_models.Product.objects.select_related(
             'color', 'unit', 'business', 'product_category'
         ).get(id=product_id, business=business)
@@ -234,7 +252,7 @@ def product_single_update(request, product_id):
     except product_models.Product.DoesNotExist:
         logger.warning(f"User {request.user.id} attempted to update non-existent or unauthorized product {product_id}")
         messages.error(request, "Product not found or unauthorized")
-        return redirect('product:product_all_list_table')
+        return redirect(back_url)
 
     if request.method == 'POST':
         form = product_forms.AddItemsForm(request.POST, request.FILES, instance=product)
@@ -242,7 +260,7 @@ def product_single_update(request, product_id):
             form.save()
             logger.info(f"Product {product_id} updated successfully by user {request.user.id}")
             messages.success(request, 'Your product details have been updated!')
-            return redirect('product:product_all_list_table')
+            return redirect(back_url)
         else:
             logger.warning(f"Invalid update form for product {product_id}: {form.errors}")
             messages.error(request, 'Error updating product. Please check the form.')
@@ -253,6 +271,9 @@ def product_single_update(request, product_id):
         'business': business,
         'form': form,
         'product': product,
+        'staff_mode': staff_mode,
+        'back_url': back_url,
+        'base_template': 'wf_dashboard_base.html' if staff_mode else 'business_dashboard_base.html',
     }
     return render(request, 'product/product_single_update.html', data)
 
@@ -811,6 +832,11 @@ def product_api_import(request):
 
         variant_id = (p.get('variant_id') or '').strip()
         platform_id = (p.get('platform_id') or '').strip()
+        # Shopify calls a product with no options "Default Title" — that is the
+        # absence of a variant, not the name of one.
+        variant_title = (p.get('variant_title') or '').strip()
+        if variant_title.lower() == 'default title':
+            variant_title = ''
 
         # Update mode: refresh the row this product already maps to. Matching also
         # covers the EZ-{platform id} form, so a SKU added in the store later lands
@@ -878,6 +904,10 @@ def product_api_import(request):
                 item_price=price_val,
                 size=(p.get('size') or '')[:100],
                 item_discription=(p.get('item_discription') or '')[:100],
+                # Every platform variant lands as its own Product row, so the
+                # platform's product id is what puts the siblings back together.
+                variant_group=platform_id[:64],
+                variant_label=variant_title[:120],
             )
         except Exception:
             logger.exception(

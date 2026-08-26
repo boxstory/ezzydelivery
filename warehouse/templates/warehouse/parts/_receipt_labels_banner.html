@@ -1,0 +1,17 @@
+{# Purpose: One-shot offer to print stickers for the receipt that just landed. #}
+{# Used by: warehouse/inventory_list.html, warehouse/put_away_detail.html (context: last_receipt) #}
+{# Notes: GET, so the qty pairs ride in the query string and open in a print tab. #}
+{% if last_receipt and is_staff %}
+<div class="whrcpt__banner">
+  <div class="whrcpt__text">
+    <strong>{{ last_receipt.units }} unit{{ last_receipt.units|pluralize }}</strong> received
+    across {{ last_receipt.lines }} product{{ last_receipt.lines|pluralize }}.
+    Stick a QR label on each box before it goes to the shelf.
+  </div>
+  <a class="whrcpt__btn"
+     href="{% url 'warehouse:print_product_labels' %}?{% for pid in last_receipt.ids %}product_ids={{ pid }}&amp;{% endfor %}{% for pair in last_receipt.qty %}qty={{ pair|urlencode }}{% if not forloop.last %}&amp;{% endif %}{% endfor %}"
+     target="_blank" rel="noopener">
+    <i class="fas fa-qrcode"></i> Print labels for this receipt
+  </a>
+</div>
+{% endif %}

@@ -1,21 +1,20 @@
-{% extends "business_dashboard_base.html" %}
+{% extends base_template|default:"business_dashboard_base.html" %}
 {% load static %}
 {% load business_console %}
 {% load crispy_forms_tags %}
 
-{% block extra_head %}
-<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260801a">
-Products Update
-{% endblock extra_head %}
+{% block title %}Edit Product{% endblock title %}
 
-{% block extra_css %}{% endblock extra_css %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260818a">
+{% endblock extra_css %}
 
 {% block content %}
 <div class="pu" id="product_update_container">
 
   {% bconheader eyebrow="Catalogue" live=product.product_id icon="fa-solid fa-pen-to-square" title="Edit Product" subtitle=product.item_name %}
-    <a class="bcon__btn bcon__btn--ghost" href="{% url 'product:product_all_list_table' %}" id="product_update_btn_back">
-      <i class="fa-solid fa-arrow-left"></i> Back to Products
+    <a class="bcon__btn bcon__btn--ghost" href="{{ back_url }}" id="product_update_btn_back">
+      <i class="fa-solid fa-arrow-left"></i> {% if staff_mode %}Back to seller{% else %}Back to Products{% endif %}
     </a>
   {% endbconheader %}
 
@@ -23,6 +22,7 @@ Products Update
   <div class="pu__form-card">
     <form method="POST" enctype="multipart/form-data" id="product_update_form_main" novalidate>
       {% csrf_token %}
+      {% if staff_mode %}<input type="hidden" name="business_id" value="{{ business.business_id }}">{% endif %}
 
       {% if form.non_field_errors %}
       <div class="alert alert-danger py-2 mb-3" role="alert">
@@ -47,9 +47,13 @@ Products Update
 
 {% block extra_js %}
 <script>
-  $("#id_color").select2();
-  $("#id_unit").select2();
-  $("#id_product_category").select2();
+  // select2 is optional here — the dashboard bases don't ship jQuery, so guard it
+  // or the submit-state handler below never binds.
+  if (window.jQuery && jQuery.fn.select2) {
+    $("#id_color").select2();
+    $("#id_unit").select2();
+    $("#id_product_category").select2();
+  }
 
   // Submit loading state
   var form = document.getElementById('product_update_form_main');

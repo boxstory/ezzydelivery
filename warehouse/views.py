@@ -3,7 +3,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Sum, F, Q
+from django.db.models import Sum, F, Q, Count
 from django.http import JsonResponse
 from django.urls import reverse
 from django.utils import timezone
@@ -311,6 +311,7 @@ def inventory_list(request):
     warehouse_id = request.GET.get('warehouse')
     search = request.GET.get('search', '')
     low_stock_only = request.GET.get('low_stock') == '1'
+    no_barcode_only = request.GET.get('no_barcode') == '1'
     category_id = request.GET.get('category')
     business_filter_id = request.GET.get('business') if is_staff else None
 
@@ -327,6 +328,9 @@ def inventory_list(request):
         'price': 'product__item_price',
         'on_hand': 'quantity_on_hand',
         'reserved': 'quantity_reserved',
+        # Puts sibling variants next to each other, which is what you want before
+        # printing a set of labels for one product.
+        'variant': 'product__variant_group',
     }
     orm_sort = SORT_FIELDS.get(sort_field, 'product__item_name')
     if sort_dir == 'desc':
@@ -388,6 +392,14 @@ def inventory_list(request):
             quantity_on_hand__lte=F('reorder_point') + F('quantity_reserved')
         )
 
+    # Products with nothing scannable on file. Their labels still print (the
+    # payload falls back to product_id) but scans elsewhere will not resolve, so
+    # this is the worklist for the bulk barcode assign.
+    if no_barcode_only:
+        stock_levels = stock_levels.filter(
+            Q(product__barcode__isnull=True) | Q(product__barcode='')
+        )
+
     # Get categories for filter (from products in stock)
     try:
         category_ids = stock_levels.values_list('product__product_category_id', flat=True).distinct()
@@ -425,6 +437,29 @@ def inventory_list(request):
         logger.error(f"Error calculating total inventory value: {e}")
         total_value = 0
 
+    # How many variants each product on this page has siblings among. Counted
+    # over the whole catalogue, not the page, so "print all 7" means all 7 even
+    # when six of them are on the next page.
+    variant_counts = {}
+    try:
+        page_groups = {
+            stock.product.variant_group for stock in items
+            if stock.product and stock.product.variant_group
+        }
+        if page_groups:
+            rows = product_models.Product.objects.filter(
+                variant_group__in=page_groups
+            ).values('variant_group').annotate(n=Count('id'))
+            variant_counts = {r['variant_group']: r['n'] for r in rows}
+    except Exception as e:
+        logger.error(f"Error counting variant groups: {e}")
+
+    # Everything except `page`, so paging keeps the filters and "select all
+    # matching" can hand the same filter to the label printer.
+    filter_qs = request.GET.copy()
+    filter_qs.pop('page', None)
+    filter_params = filter_qs.urlencode()
+
     context = {
         'stock_levels': items,
         'per_page': str(wh_per_page(request, 25)),
@@ -436,10 +471,16 @@ def inventory_list(request):
         'selected_category': category_id,
         'selected_business': business_filter_id,
         'low_stock_only': low_stock_only,
+        'no_barcode_only': no_barcode_only,
         'total_value': total_value,
         'is_staff': is_staff,
         'sort_field': sort_field,
         'sort_dir': sort_dir,
+        'variant_counts': variant_counts,
+        'filter_params': filter_params,
+        'total_matching': paginator.count,
+        # Flash semantics: offered once on the page you land on after receiving.
+        'last_receipt': request.session.pop('wh_last_receipt', None),
     }
     return render(request, 'warehouse/inventory_list.html', context)
 
@@ -906,6 +947,17 @@ def receive_stock(request):
                 msg += f" Put-away task {pa_task.task_number} created."
             messages.success(request, msg)
 
+            # Stickers are needed at the moment stock lands, not when someone
+            # later browses inventory — so the receipt is stashed and the next
+            # page offers to print exactly these lines, at these quantities.
+            received_lines = {pid: qty for pid, qty in fulfilled_items.items() if qty > 0}
+            request.session['wh_last_receipt'] = {
+                'ids': list(received_lines.keys()),
+                'qty': [f"{pid}:{qty}" for pid, qty in received_lines.items()],
+                'lines': len(received_lines),
+                'units': total_items,
+            }
+
             # Redirect to put-away task if one was created
             if pa_task:
                 return redirect('warehouse:put_away_detail', pk=pa_task.pk)
@@ -980,12 +1032,19 @@ ADJUSTMENT_REASON_CHOICES = [
 @user_passes_test(has_warehouse_access, login_url='account_login')
 def stock_adjust(request):
     """
-    Correct on-hand quantities to match a physical count.
+    Correct on-hand quantities, either to a physical count or by a signed delta.
 
-    The form posts the counted figure, never a delta: the delta is derived
-    inside the transaction from the row as it stands at that moment, so a
-    receive or a pick landing between page load and submit is not overwritten
-    with a stale number.
+    Two modes, both resolved against the row as it stands inside the
+    transaction — never against the figure that was on screen:
+
+      count  — the posted number is the counted total; the delta is derived.
+               A receive or a pick landing between page load and submit is
+               therefore not overwritten with a stale number.
+      deduct — the posted number is the change itself (-1 for one damaged
+               unit, +2 for two found). Written off live stock, so a
+               concurrent movement shifts the result rather than erasing it.
+               This is the mode for damage/loss: the operator knows how many
+               units went, not what the shelf now totals.
     """
     business, is_staff = get_business_filter(request)
 
@@ -1002,9 +1061,15 @@ def stock_adjust(request):
         reference = request.POST.get('reference', '').strip()
         notes = request.POST.get('notes', '').strip()
         product_ids = request.POST.getlist('products[]')
-        counted_values = request.POST.getlist('counted[]')
+        # 'counted[]' is the pre-deduct-mode name — kept as a fallback so a page
+        # left open across the deploy still posts something the view understands.
+        qty_values = request.POST.getlist('qty[]') or request.POST.getlist('counted[]')
+        mode = request.POST.get('mode') or 'count'
 
         try:
+            if mode not in ('count', 'deduct'):
+                raise ValueError("Unknown adjustment mode")
+
             reason_label = dict(ADJUSTMENT_REASON_CHOICES).get(reason)
             if not reason_label:
                 raise ValueError("Select a reason for this adjustment")
@@ -1023,7 +1088,8 @@ def stock_adjust(request):
                     pk=location_id, warehouse=warehouse
                 )
 
-            note_parts = [f"Stock adjustment. Reason: {reason_label}"]
+            mode_label = "write-off" if mode == 'deduct' else "count"
+            note_parts = [f"Stock adjustment ({mode_label}). Reason: {reason_label}"]
             if reference:
                 note_parts.append(f"Ref: {reference}")
             if notes:
@@ -1036,13 +1102,15 @@ def stock_adjust(request):
             removed = 0
 
             with db_transaction.atomic():
-                for product_id, counted_str in zip(product_ids, counted_values):
-                    if not product_id or not counted_str.strip():
+                for product_id, qty_str in zip(product_ids, qty_values):
+                    if not product_id or not qty_str.strip():
                         continue
 
-                    new_quantity = int(counted_str)
-                    if new_quantity < 0:
+                    entered = int(qty_str)
+                    if mode == 'count' and entered < 0:
                         raise ValueError("Counted quantity cannot be negative")
+                    if mode == 'deduct' and entered == 0:
+                        continue
 
                     if is_staff:
                         product = product_models.Product.objects.get(pk=product_id)
@@ -1060,7 +1128,19 @@ def stock_adjust(request):
                     stock_level = warehouse_models.StockLevel.objects.select_for_update().get(pk=stock_level.pk)
 
                     old_quantity = stock_level.quantity_on_hand
-                    delta = new_quantity - old_quantity
+                    if mode == 'deduct':
+                        # The operator counted units gone, not units left — the
+                        # delta is what was typed and the total follows from it.
+                        delta = entered
+                        new_quantity = old_quantity + delta
+                        if new_quantity < 0:
+                            raise ValueError(
+                                f"{product.item_name}: cannot deduct {-delta} — only "
+                                f"{old_quantity} on hand at this location"
+                            )
+                    else:
+                        new_quantity = entered
+                        delta = new_quantity - old_quantity
                     if delta == 0:
                         continue
 
@@ -1092,7 +1172,11 @@ def stock_adjust(request):
                         below_reserved.append(product.item_name)
 
             if not adjusted:
-                messages.info(request, "No changes applied — every counted quantity matched the current stock.")
+                messages.info(request, (
+                    "No changes applied — every quantity entered was zero."
+                    if mode == 'deduct' else
+                    "No changes applied — every counted quantity matched the current stock."
+                ))
             else:
                 summary = ", ".join(adjusted[:3])
                 if len(adjusted) > 3:
@@ -1173,7 +1257,11 @@ def api_stock_levels(request):
             ).exists():
                 return JsonResponse({'error': 'Warehouse is not linked to your business'}, status=403)
 
-        location_id = safe_int(request.GET.get('location'), default=0, minimum=1) or None
+        # minimum=0, not 1: safe_int CLAMPS UP to minimum, so minimum=1 turned an
+        # absent location into location id 1 — a real bin. The default-location
+        # sheet then read someone else's shelf and reported the true default
+        # stock as "elsewhere", with 0 on hand for everything.
+        location_id = safe_int(request.GET.get('location'), default=0, minimum=0) or None
 
         # Read the WHOLE warehouse, not just the selected location. Filtering on
         # location_id=None meant "only rows with no location", so a business
@@ -1181,16 +1269,27 @@ def api_stock_levels(request):
         levels = warehouse_models.StockLevel.objects.filter(
             product__business_id=business_id,
             warehouse_id=warehouse_id,
-        ).values('product_id', 'location_id', 'quantity_on_hand', 'quantity_reserved')
+        ).select_related('location').values(
+            'product_id', 'location_id', 'location__name', 'quantity_on_hand', 'quantity_reserved'
+        )
 
         here = {}        # the row the count will actually overwrite
         elsewhere = {}   # same warehouse, other locations — shown, never written
+        elsewhere_where = {}  # ...and which bins they are in
         for row in levels:
             pid = row['product_id']
             if row['location_id'] == location_id:
                 here[pid] = row
-            else:
+            elif row['quantity_on_hand']:
                 elsewhere[pid] = elsewhere.get(pid, 0) + row['quantity_on_hand']
+                # A bare count of units "somewhere else" is a dead end for the
+                # operator — an adjustment can only be made against the location
+                # holding the stock, so name it.
+                elsewhere_where.setdefault(pid, []).append({
+                    'location_id': row['location_id'],
+                    'name': row['location__name'] or 'Default Location',
+                    'qty': row['quantity_on_hand'],
+                })
 
         products = product_models.Product.objects.filter(
             business_id=business_id
@@ -1210,6 +1309,7 @@ def api_stock_levels(request):
                 'on_hand': row['quantity_on_hand'] if row else 0,
                 'reserved': row['quantity_reserved'] if row else 0,
                 'elsewhere': elsewhere.get(p.id, 0),
+                'elsewhere_at': elsewhere_where.get(p.id, []),
             })
         return JsonResponse(data, safe=False)
     except Exception as e:
@@ -3731,6 +3831,9 @@ def put_away_detail(request, pk):
         'total_items': total_items,
         'completed_items': completed_items,
         'storage_locations': storage_locations,
+        # Flash semantics: offered once on the page you land on after receiving.
+        'last_receipt': request.session.pop('wh_last_receipt', None),
+        'is_staff': _is_staff(request.user),
     }
     return render(request, 'warehouse/put_away_detail.html', context)
 

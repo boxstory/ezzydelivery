@@ -1,6 +1,7 @@
 {# Purpose: Correct on-hand stock to a physical count — writes adjust_in / adjust_out inventory transactions. #}
 {# Used by: warehouse.views.stock_adjust (URL warehouse:stock_adjust) #}
-{# Notes: Rows load over api_stock_levels after business + warehouse are chosen; the form posts the COUNTED figure, never a delta. #}
+{# Notes: Rows load over api_stock_levels after business + warehouse are chosen. Two modes — "count" posts the counted total, #}
+{#        "deduct" posts a signed change (-1 for a damaged unit); the hidden `mode` field tells the view which. #}
 {#        Init is swap-safe — the warehouse sidebar navigates by HTMX, so DOMContentLoaded does not fire on arrival. #}
 {% extends 'wh_dashboard_base.html' %}
 {% load business_dropdown %}
@@ -107,8 +108,27 @@
 
                         <div class="wha__divider"></div>
 
+                        <div class="wsa__mode d-flex flex-column flex-sm-row gap-2 mb-3" role="radiogroup" aria-label="How quantities are entered">
+                            <label class="wsa__mode-opt flex-fill">
+                                <input type="radio" name="mode" value="count" checked>
+                                <span class="wsa__mode-face d-flex align-items-baseline gap-2">
+                                    <i class="fas fa-clipboard-list wsa__mode-icon"></i>
+                                    <span class="wsa__mode-name">Count total</span>
+                                    <span class="wsa__mode-desc">type what is on the shelf</span>
+                                </span>
+                            </label>
+                            <label class="wsa__mode-opt flex-fill">
+                                <input type="radio" name="mode" value="deduct">
+                                <span class="wsa__mode-face d-flex align-items-baseline gap-2">
+                                    <i class="fas fa-plus-minus wsa__mode-icon"></i>
+                                    <span class="wsa__mode-name">Adjust by &plusmn;</span>
+                                    <span class="wsa__mode-desc">type the change, <code>-1</code> for one damaged unit</span>
+                                </span>
+                            </label>
+                        </div>
+
                         <div class="wrs__products-header">
-                            <div class="wha__section-label"><i class="fas fa-boxes wha__section-icon"></i> COUNTED QUANTITIES <span class="wha__required">*</span></div>
+                            <div class="wha__section-label"><i class="fas fa-boxes wha__section-icon"></i> <span id="adjust-section-label">COUNTED QUANTITIES</span> <span class="wha__required">*</span></div>
                             <div class="wsa__toolbar">
                                 <input type="search" id="product-search" class="wsa__search" placeholder="Filter products…" aria-label="Filter products" disabled>
                                 <span id="products-count" class="wsa__count"></span>
@@ -131,8 +151,8 @@
                                         <th class="wh__th wh__th--center" width="90">On Hand</th>
                                         <th class="wh__th wh__th--center" width="100">Other Locs</th>
                                         <th class="wh__th wh__th--center" width="90">Reserved</th>
-                                        <th class="wh__th wh__th--center" width="120">Counted</th>
-                                        <th class="wh__th wh__th--center" width="90">Change</th>
+                                        <th class="wh__th wh__th--center" width="120" id="adjust-qty-head">Counted</th>
+                                        <th class="wh__th wh__th--center" width="90" id="adjust-result-head">Change</th>
                                     </tr>
                                 </thead>
                                 <tbody id="adjust-tbody">
@@ -183,6 +203,15 @@ function initStockAdjust() {
     var countEl = document.getElementById('products-count');
     var summaryEl = document.getElementById('adjust-summary');
     var strayHint = document.getElementById('adjust-stray-hint');
+    var modeRadios = form.querySelectorAll('input[name="mode"]');
+    var qtyHead = document.getElementById('adjust-qty-head');
+    var resultHead = document.getElementById('adjust-result-head');
+    var sectionLabel = document.getElementById('adjust-section-label');
+
+    function isDeduct() {
+        var checked = form.querySelector('input[name="mode"]:checked');
+        return !!checked && checked.value === 'deduct';
+    }
 
     // Product text is seller-supplied and goes into innerHTML below.
     function esc(v) {
@@ -264,6 +293,7 @@ function initStockAdjust() {
 
                 var html = '';
                 var strayTotal = 0;
+                var strayLocs = {};
                 data.forEach(function(p, i) {
                     var sku = p.sku ? esc(p.sku) : '—';
                     var search = [p.name, p.sku, p.color, p.size, p.unit, p.barcode]
@@ -273,6 +303,19 @@ function initStockAdjust() {
                     // location, so this is shown but never adjusted.
                     var other = p.elsewhere || 0;
                     strayTotal += other;
+                    // "2 units somewhere else" is not actionable on its own — the
+                    // cell has to say which bin, and offer to switch to it, or the
+                    // operator just sees 0 on hand and a deduction they cannot make.
+                    var at = p.elsewhere_at || [];
+                    var otherCell = '—';
+                    if (other) {
+                        var where = at.map(function(a) { return a.name + ': ' + a.qty; }).join(' · ');
+                        at.forEach(function(a) { strayLocs[a.name] = true; });
+                        otherCell = at.length === 1
+                            ? '<button type="button" class="wsa__jump" data-loc="' + esc(at[0].location_id || '') +
+                              '" title="Switch the sheet to ' + esc(at[0].name) + '">' + other + '</button>'
+                            : '<span title="' + esc(where) + '">' + other + '</span>';
+                    }
                     html += '<tr class="wrs__product-row wsa__row" data-search="' + esc(search) + '">' +
                         '<td class="wh__td wh__td--center"><span class="wrs__row-num">' + (i + 1) + '</span></td>' +
                         '<td class="wh__td"><span class="fw-semibold">' + esc(p.name) + '</span>' +
@@ -283,9 +326,9 @@ function initStockAdjust() {
                         '<td class="wh__td wsa__variant">' + (esc(p.unit) || '—') + '</td>' +
                         '<td class="wh__td"><code class="wsa__barcode">' + (esc(p.barcode) || '—') + '</code></td>' +
                         '<td class="wh__td wh__td--center wsa__onhand" data-on-hand="' + p.on_hand + '">' + p.on_hand + '</td>' +
-                        '<td class="wh__td wh__td--center wsa__other' + (other ? ' wsa__other--has' : '') + '">' + (other || '—') + '</td>' +
+                        '<td class="wh__td wh__td--center wsa__other' + (other ? ' wsa__other--has' : '') + '">' + otherCell + '</td>' +
                         '<td class="wh__td wh__td--center wsa__reserved">' + (p.reserved || '—') + '</td>' +
-                        '<td class="wh__td wh__td--center"><input type="number" name="counted[]" class="form-control form-control-sm wsa__input" min="0" placeholder="—"></td>' +
+                        '<td class="wh__td wh__td--center"><input type="number" name="qty[]" class="form-control form-control-sm wsa__input" placeholder="—"></td>' +
                         '<td class="wh__td wh__td--center wsa__delta">—</td>' +
                         '</tr>';
                 });
@@ -294,14 +337,20 @@ function initStockAdjust() {
                 // Loud about it: 0 on hand with units sitting in bins is exactly
                 // the case that used to look like "the page failed to load stock".
                 if (strayTotal && strayHint) {
+                    var names = Object.keys(strayLocs);
                     strayHint.textContent = strayTotal + ' unit' + (strayTotal === 1 ? '' : 's') +
-                        ' of this business sit in other locations of this warehouse — switch Storage Location to count them.';
+                        ' of this business sit elsewhere in this warehouse (' +
+                        names.slice(0, 3).join(', ') + (names.length > 3 ? ', …' : '') +
+                        ') — an adjustment only touches the selected location, so switch Storage Location ' +
+                        'or click the figure in Other Locs to go there.';
                     strayHint.hidden = false;
                 } else if (strayHint) {
                     strayHint.hidden = true;
                 }
                 if (searchInput) searchInput.disabled = false;
-                updateSummary();
+                // Rows are built fresh, so the mode's min/placeholder must be
+                // stamped onto the new inputs — applyMode ends in updateSummary.
+                applyMode();
             })
             .catch(function(err) {
                 console.error('Error:', err);
@@ -310,41 +359,91 @@ function initStockAdjust() {
     }
 
     // ── Live delta per row + header summary ──
-    function updateSummary() {
-        var rows = tbody.querySelectorAll('.wsa__row');
-        var changed = 0;
-        rows.forEach(function(row) {
-            var input = row.querySelector('.wsa__input');
-            var deltaCell = row.querySelector('.wsa__delta');
-            var onHand = parseInt(row.querySelector('.wsa__onhand').getAttribute('data-on-hand'), 10);
-            row.classList.remove('wsa__row--up', 'wsa__row--down');
+    // Both modes end up describing the same movement, so each row is reduced to
+    // (delta, resulting quantity) first and the two columns are filled from that.
+    function readRow(row, deduct) {
+        var input = row.querySelector('.wsa__input');
+        var onHand = parseInt(row.querySelector('.wsa__onhand').getAttribute('data-on-hand'), 10);
+        if (!input || input.value.trim() === '') return null;
+        var entered = parseInt(input.value, 10);
+        if (isNaN(entered)) return null;
+        var delta = deduct ? entered : entered - onHand;
+        return { delta: delta, after: onHand + delta, onHand: onHand };
+    }
 
-            if (!input || input.value.trim() === '') {
-                deltaCell.textContent = '—';
-                deltaCell.className = 'wh__td wh__td--center wsa__delta';
+    function updateSummary() {
+        var deduct = isDeduct();
+        var changed = 0;
+        var short = 0;
+        tbody.querySelectorAll('.wsa__row').forEach(function(row) {
+            var cell = row.querySelector('.wsa__delta');
+            row.classList.remove('wsa__row--up', 'wsa__row--down', 'wsa__row--invalid');
+            cell.className = 'wh__td wh__td--center wsa__delta';
+
+            var r = readRow(row, deduct);
+            if (!r) { cell.textContent = '—'; return; }
+
+            // Deducting more than is on the shelf would drive stock negative —
+            // the view refuses it, so say so before the round trip.
+            if (r.after < 0) {
+                short += 1;
+                row.classList.add('wsa__row--invalid');
+                cell.classList.add('wsa__delta--down');
+                cell.textContent = 'only ' + r.onHand;
                 return;
             }
-            var counted = parseInt(input.value, 10);
-            if (isNaN(counted)) { deltaCell.textContent = '—'; return; }
-
-            var delta = counted - onHand;
-            if (delta === 0) {
-                deltaCell.textContent = 'no change';
-                deltaCell.className = 'wh__td wh__td--center wsa__delta wsa__delta--flat';
-            } else {
-                changed += 1;
-                deltaCell.textContent = (delta > 0 ? '+' : '') + delta;
-                deltaCell.className = 'wh__td wh__td--center wsa__delta ' + (delta > 0 ? 'wsa__delta--up' : 'wsa__delta--down');
-                row.classList.add(delta > 0 ? 'wsa__row--up' : 'wsa__row--down');
+            if (r.delta === 0) {
+                cell.classList.add('wsa__delta--flat');
+                cell.textContent = 'no change';
+                return;
             }
+            changed += 1;
+            cell.classList.add(r.delta > 0 ? 'wsa__delta--up' : 'wsa__delta--down');
+            cell.textContent = deduct ? String(r.after) : (r.delta > 0 ? '+' : '') + r.delta;
+            row.classList.add(r.delta > 0 ? 'wsa__row--up' : 'wsa__row--down');
         });
         if (summaryEl) {
-            summaryEl.textContent = changed ? changed + ' row' + (changed === 1 ? '' : 's') + ' changed' : '';
+            var parts = [];
+            if (changed) parts.push(changed + ' row' + (changed === 1 ? '' : 's') + ' changed');
+            if (short) parts.push(short + ' over-deducted');
+            summaryEl.textContent = parts.join(' · ');
         }
     }
 
+    // ── Count total ⇄ Adjust by ± ──
+    function applyMode() {
+        var deduct = isDeduct();
+        if (qtyHead) qtyHead.textContent = deduct ? 'Adjust By' : 'Counted';
+        if (resultHead) resultHead.textContent = deduct ? 'New Qty' : 'Change';
+        if (sectionLabel) sectionLabel.textContent = deduct ? 'QUANTITY CHANGE' : 'COUNTED QUANTITIES';
+        form.classList.toggle('wsa--deduct', deduct);
+        tbody.querySelectorAll('.wsa__input').forEach(function(input) {
+            // A negative is the whole point of deduct mode, so the min floor has
+            // to come off — otherwise the browser blocks submit on "-1".
+            if (deduct) { input.removeAttribute('min'); input.placeholder = '-1'; }
+            else { input.setAttribute('min', '0'); input.placeholder = '—'; }
+        });
+        updateSummary();
+    }
+
+    Array.prototype.forEach.call(modeRadios, function(radio) {
+        radio.addEventListener('change', applyMode);
+    });
+
     tbody.addEventListener('input', function(e) {
         if (e.target.classList.contains('wsa__input')) updateSummary();
+    });
+
+    // Jump the sheet to the bin actually holding the stock.
+    tbody.addEventListener('click', function(e) {
+        var jump = e.target.closest ? e.target.closest('.wsa__jump') : null;
+        if (!jump || !locationSelect) return;
+        e.preventDefault();
+        var want = jump.getAttribute('data-loc') || '';
+        var exists = Array.prototype.some.call(locationSelect.options, function(o) { return o.value === want; });
+        if (!exists) return;
+        locationSelect.value = want;
+        loadStock();
     });
 
     // ── Filter the sheet ──
@@ -366,18 +465,29 @@ function initStockAdjust() {
             alert('Select a reason for this adjustment.');
             return;
         }
+        var deduct = isDeduct();
         var changed = false;
+        var short = [];
         tbody.querySelectorAll('.wsa__row').forEach(function(row) {
-            var input = row.querySelector('.wsa__input');
-            if (!input || input.value.trim() === '') return;
-            var onHand = parseInt(row.querySelector('.wsa__onhand').getAttribute('data-on-hand'), 10);
-            if (parseInt(input.value, 10) !== onHand) changed = true;
+            var r = readRow(row, deduct);
+            if (!r) return;
+            if (r.after < 0) short.push(row.querySelector('.fw-semibold').textContent);
+            else if (r.delta !== 0) changed = true;
         });
+        if (short.length) {
+            e.preventDefault();
+            alert('Cannot deduct more than is on hand: ' + short.join(', '));
+            return;
+        }
         if (!changed) {
             e.preventDefault();
-            alert('Nothing to adjust — enter a counted quantity that differs from the on-hand figure.');
+            alert(deduct
+                ? 'Nothing to adjust — enter the change for at least one product, e.g. -1 for a damaged unit.'
+                : 'Nothing to adjust — enter a counted quantity that differs from the on-hand figure.');
         }
     });
+
+    applyMode();
 
     // Warehouse may be pre-selected (default warehouse) — populate locations and,
     // for a seller with an implicit business, the sheet itself.

@@ -1,0 +1,525 @@
+/*
+Purpose: Printable product/variant QR labels stuck on product boxes.
+Used by: warehouse/templates/warehouse/print_product_labels.html
+Notes: Standalone print page (no brandkit import, same as business-waybill.css). Paper preset
+       lives on .whlb__sheet--<key>; screen and print share one label size so the preview is
+       actual size. Which text blocks survive is a function of the preset, not the markup.
+*/
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #f3f4f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #111827;
+}
+
+/* ==========================================================================
+   Toolbar (screen only)
+   ========================================================================== */
+
+.whlb__toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.whlb__toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.whlb__toolbar-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.whlb__toolbar-count {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.whlb__hint {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 6px;
+  max-width: 46ch;
+}
+
+/* Shown until this device has picked a label stock, so nobody prints on the default. */
+.whlb__hint--warn {
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: inline-block;
+}
+
+.whlb__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.whlb__field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.whlb__field-select,
+.whlb__field-input {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #fff;
+  color: #111827;
+}
+
+.whlb__field-input { width: 72px; }
+.whlb__field-input:disabled { background-color: #f3f4f6; color: #9ca3af; }
+
+.whlb__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+}
+
+.whlb__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #16223c;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.whlb__btn--ghost {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.whlb__reload-form { display: none; }
+
+.whlb__empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: #6b7280;
+}
+
+/* ==========================================================================
+   Paper presets
+
+   @page cannot read custom properties, so each preset needs its own named page
+   rule and a matching set of variables on the sheet.
+   ========================================================================== */
+
+@page whlb-l38x25  { size: 38mm 25mm;   margin: 0; }
+@page whlb-l50x25  { size: 50mm 25mm;   margin: 0; }
+@page whlb-l50x30  { size: 50mm 30mm;   margin: 0; }
+@page whlb-l100x50 { size: 100mm 50mm;  margin: 0; }
+/* Avery L7159 geometry: 63.5 × 33.9mm, 3 across × 8 down. The margins are what
+   is left of A4 once the grid is centred — 3 × 70mm would have overflowed the
+   page and dropped to 2 labels a row. */
+@page whlb-a4_24up { size: 210mm 297mm; margin: 12.9mm 9.75mm; }
+
+/* Avery L7163 geometry: 99.1 × 38.1mm, 2 across × 7 down — the common 14-per-A4
+   sheet. Margins are the A4 remainder either side of the centred grid. */
+@page whlb-a4_14up { size: 210mm 297mm; margin: 15.15mm 5.9mm; }
+
+/* Written at runtime by the page script from the measured label size. */
+@page whlb-custom { size: 210mm 297mm; margin: 8mm; }
+
+/* --whlb-qr is a MAXIMUM, not a fixed size: the QR grows to the label height and
+   stops there, so a taller sticker gets a bigger, easier-to-scan code instead of
+   a band of white. The cap is what stops it eating the text column on narrow
+   stock. --whlb-clamp is how many lines of product name survive. */
+.whlb__sheet--l38x25 {
+  --whlb-w: 38mm; --whlb-h: 25mm; --whlb-pad: 1.5mm; --whlb-qr: 15mm;
+  --whlb-name: 6.5pt; --whlb-body: 5pt; --whlb-code: 5.5pt; --whlb-clamp: 2;
+}
+.whlb__sheet--l50x25 {
+  --whlb-w: 50mm; --whlb-h: 25mm; --whlb-pad: 2mm; --whlb-qr: 19mm;
+  --whlb-name: 7.5pt; --whlb-body: 5.5pt; --whlb-code: 6pt; --whlb-clamp: 2;
+}
+.whlb__sheet--l50x30 {
+  --whlb-w: 50mm; --whlb-h: 30mm; --whlb-pad: 2mm; --whlb-qr: 22mm;
+  --whlb-name: 8pt; --whlb-body: 6pt; --whlb-code: 6.5pt; --whlb-clamp: 3;
+}
+.whlb__sheet--l100x50 {
+  --whlb-w: 100mm; --whlb-h: 50mm; --whlb-pad: 4mm; --whlb-qr: 40mm;
+  --whlb-name: 12pt; --whlb-body: 8pt; --whlb-code: 9pt; --whlb-clamp: 3;
+}
+.whlb__sheet--a4_24up {
+  --whlb-w: 63.5mm; --whlb-h: 33.9mm; --whlb-pad: 2.5mm; --whlb-qr: 26mm;
+  --whlb-name: 8pt; --whlb-body: 6pt; --whlb-code: 6.5pt; --whlb-clamp: 3;
+}
+.whlb__sheet--a4_14up {
+  --whlb-w: 99.1mm; --whlb-h: 38.1mm; --whlb-pad: 3mm; --whlb-qr: 30mm;
+  --whlb-name: 10pt; --whlb-body: 7pt; --whlb-code: 8pt; --whlb-clamp: 3;
+}
+/* Overridden inline by the script once a size is measured. */
+.whlb__sheet--custom {
+  --whlb-w: 99.1mm; --whlb-h: 38.1mm; --whlb-pad: 3mm; --whlb-qr: 30mm;
+  --whlb-name: 10pt; --whlb-body: 7pt; --whlb-code: 8pt; --whlb-clamp: 3;
+}
+
+.whlb__sheet--l38x25  .whlb__label { page: whlb-l38x25; }
+.whlb__sheet--l50x25  .whlb__label { page: whlb-l50x25; }
+.whlb__sheet--l50x30  .whlb__label { page: whlb-l50x30; }
+.whlb__sheet--l100x50 .whlb__label { page: whlb-l100x50; }
+.whlb__sheet--a4_24up .whlb__label { page: whlb-a4_24up; }
+.whlb__sheet--a4_14up .whlb__label { page: whlb-a4_14up; }
+.whlb__sheet--custom  .whlb__label { page: whlb-custom; }
+
+/* Blocks that do not fit the smaller stock. A 38mm sticker that tries to carry
+   brand + price + business name is unreadable, so the preset drops them rather
+   than shrinking everything into mush. */
+.whlb__sheet--l38x25 .whlb__extra,
+.whlb__sheet--l38x25 .whlb__foot,
+.whlb__sheet--l50x25 .whlb__foot,
+.whlb__sheet--l50x25 .whlb__price,
+.whlb__sheet--l50x30 .whlb__foot,
+.whlb__sheet--custom .whlb__foot,
+.whlb__sheet--a4_24up .whlb__foot { display: none; }
+
+/* ==========================================================================
+   Sheet + label
+   ========================================================================== */
+
+.whlb__sheet {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6mm;
+  padding: 16px;
+  justify-content: flex-start;
+}
+
+/* Sheet stock: the labels butt against each other with no gutter, which is how
+   the die-cut sheet is laid out. Anything else and the grid drifts off the
+   pre-cut positions by the second row. */
+.whlb__sheet--a4_24up,
+.whlb__sheet--a4_14up,
+.whlb__sheet--custom {
+  gap: 0;
+  width: 210mm;
+  margin: 16px auto;
+  background: #fff;
+}
+
+.whlb__sheet--a4_24up { padding: 12.9mm 9.75mm; }
+.whlb__sheet--a4_14up { padding: 15.15mm 5.9mm; }
+
+/* Custom stock wraps at the measured column count rather than at the page edge. */
+.whlb__sheet--custom {
+  width: var(--whlb-cols-w, 210mm);
+  padding: 0;
+}
+
+/* A product can be given its own sheet when mixing several in one job. */
+.whlb__label--sheet-break {
+  break-before: page;
+  page-break-before: always;
+}
+
+.whlb__label {
+  width: var(--whlb-w);
+  height: var(--whlb-h);
+  padding: var(--whlb-pad);
+  background: #fff;
+  color: #000;
+  overflow: hidden;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  /* Screen only — shows the die-cut edge so the preview reads as a sticker. */
+  outline: 1px dashed #d1d5db;
+}
+
+.whlb__label-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--whlb-pad);
+  height: 100%;
+  width: 100%;
+}
+
+.whlb__qr {
+  flex: 0 0 auto;
+  height: min(100%, var(--whlb-qr));
+  aspect-ratio: 1 / 1;
+  line-height: 0;
+}
+
+.whlb__qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.whlb__qr-missing {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #000;
+  font-size: var(--whlb-body);
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.whlb__info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5mm;
+}
+
+.whlb__name {
+  font-size: var(--whlb-name);
+  font-weight: 700;
+  line-height: 1.2;
+  /* Clamped, then cut — a long product name must never push the SKU off the
+     sticker. Small stock gets 2 lines, roomier stock 3. */
+  display: -webkit-box;
+  -webkit-line-clamp: var(--whlb-clamp, 2);
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.whlb__variant {
+  font-size: var(--whlb-body);
+  font-weight: 600;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.whlb__sku,
+.whlb__code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.whlb__sku { font-size: var(--whlb-body); }
+.whlb__code { font-size: var(--whlb-code); font-weight: 700; letter-spacing: 0.02em; }
+
+.whlb__extra,
+.whlb__foot {
+  display: flex;
+  gap: 1.5mm;
+  font-size: var(--whlb-body);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.whlb__price { font-weight: 700; }
+.whlb__brand,
+.whlb__biz,
+.whlb__loc { overflow: hidden; text-overflow: ellipsis; }
+.whlb__loc { font-weight: 700; }
+
+/* ==========================================================================
+   Print
+   ========================================================================== */
+
+@media print {
+  body { background: #fff; }
+
+  .whlb__toolbar { display: none !important; }
+
+  .whlb__sheet {
+    padding: 0;
+    gap: 0;
+    margin: 0;
+    display: block;
+  }
+
+  .whlb__label {
+    outline: none;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .whlb__label:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* Sheet stock is the case where many labels share a page, so it keeps the grid
+     and drops the per-label page break. */
+  .whlb__sheet--a4_24up,
+  .whlb__sheet--a4_14up,
+  .whlb__sheet--custom {
+    display: flex;
+    flex-wrap: wrap;
+    width: auto;
+    padding: 0;
+  }
+
+  .whlb__sheet--custom { width: var(--whlb-cols-w, auto); }
+
+  .whlb__sheet--a4_24up .whlb__label,
+  .whlb__sheet--a4_14up .whlb__label,
+  .whlb__sheet--custom .whlb__label {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}
+
+/* ==========================================================================
+   Counts strip (screen only) — per-product copy counts
+   The list is the source of truth; the fill buttons only write into it.
+   ========================================================================== */
+
+.whlb__counts {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.whlb__counts-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.whlb__counts-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+
+.whlb__fill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.whlb__chip {
+  padding: 5px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.whlb__chip:hover {
+  border-color: #16223c;
+  color: #16223c;
+}
+
+.whlb__field-input--sm { width: 64px; }
+
+/* Long jobs stay scannable without pushing the actual label preview off-screen. */
+.whlb__counts-list {
+  max-height: 34vh;
+  overflow-y: auto;
+}
+
+.whlb__counts-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 15rem) 5.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 1rem;
+  border-bottom: 1px solid #f6f7f9;
+  cursor: pointer;
+}
+
+.whlb__counts-row:hover { background: #f9fafb; }
+
+.whlb__counts-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.whlb__counts-variant {
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.whlb__counts-meta {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 11px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.whlb__counts-qty {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #fff;
+  color: #111827;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* A zero is a deliberate "skip this one", so it should read as switched off. */
+.whlb__counts-qty[value="0"] { color: #9ca3af; }
+
+@media (max-width: 700px) {
+  .whlb__counts-row {
+    grid-template-columns: minmax(0, 1fr) 4.5rem;
+  }
+  .whlb__counts-meta { display: none; }
+}
+
+@media print {
+  .whlb__counts { display: none !important; }
+}

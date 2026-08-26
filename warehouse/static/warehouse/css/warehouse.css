@@ -1599,6 +1599,67 @@ input.wsa__input {
 }
 .wsa__delta--up { color: var(--wh-green); }
 .wsa__delta--down { color: var(--wh-red); }
+
+/* Entry mode — count the shelf, or write a signed change against it. Two plain
+   selectable rows rather than a pill switch: which one is armed decides whether
+   "-1" means one unit gone or a shelf total, so it has to read as a statement. */
+.wsa__mode-opt {
+    margin: 0;
+    cursor: pointer;
+}
+.wsa__mode-opt input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.wsa__mode-face {
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--wh-border);
+    border-left: 3px solid var(--wh-border);
+    border-radius: var(--wh-radius);
+    background: var(--wh-surface);
+    font-size: 0.75rem;
+    color: var(--wh-muted);
+}
+.wsa__mode-icon {
+    font-size: 0.8125rem;
+    color: var(--wh-dim);
+}
+.wsa__mode-name {
+    font-weight: 700;
+    color: var(--wh-slate);
+    white-space: nowrap;
+}
+.wsa__mode-desc code {
+    font-family: var(--wh-mono);
+    font-size: 0.6875rem;
+    color: var(--wh-slate);
+}
+.wsa__mode-opt input:checked + .wsa__mode-face {
+    border-left-color: var(--wh-accent);
+    background: var(--wh-surface-alt);
+}
+.wsa__mode-opt input:checked + .wsa__mode-face .wsa__mode-icon,
+.wsa__mode-opt input:checked + .wsa__mode-face .wsa__mode-name {
+    color: var(--wh-navy);
+}
+.wsa__mode-opt input:focus-visible + .wsa__mode-face {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--wh-accent-glow);
+}
+
+/* Deduct mode writes stock away, so the entry column is marked as the one that
+   subtracts — a "12" typed into the wrong mode is an invisible 12-unit error. */
+.wsa--deduct input.wsa__input {
+    border-color: var(--wh-dim);
+    background: var(--wh-surface-alt);
+}
+.wsa__row--invalid input.wsa__input {
+    border-color: var(--wh-red);
+    background: var(--wh-red-bg);
+}
+.wsa__row--invalid td:first-child { box-shadow: inset 3px 0 0 var(--wh-red); }
 /* A touched row is marked on its left edge — the sheet can run to hundreds of
    rows, so the changed ones have to be findable without reading every delta. */
 .wsa__row--up td:first-child { box-shadow: inset 3px 0 0 var(--wh-green); }
@@ -1628,6 +1689,23 @@ input.wsa__input {
 .wsa__other--has {
     font-weight: 700;
     color: var(--wh-amber);
+}
+/* The figure doubles as the way to get to the bin holding it. */
+.wsa__jump {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+.wsa__jump:hover { color: var(--wh-navy); }
+.wsa__jump:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--wh-accent-glow);
+    border-radius: var(--wh-radius);
 }
 .wsa__stray-hint {
     display: flex;
@@ -4083,4 +4161,160 @@ body[data-shell="warehouse"] .htmx-loader__text {
 
 @media (prefers-reduced-motion: reduce) {
     body[data-shell="warehouse"] .htmx-loader__spinner .spinner-border { animation-duration: 1.6s; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SELECTION BAR (whsel__) — bulk actions over a stock list
+   Selection state and the actions that consume it share one strip,
+   because the count is the whole reason a button is enabled.
+   ═══════════════════════════════════════════════════════════ */
+
+.whsel__bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.625rem 1.125rem;
+    background: var(--wh-surface-alt);
+    border-bottom: 1px solid var(--wh-border);
+}
+
+.whsel__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--wh-border);
+    border-radius: var(--wh-radius);
+    background: var(--wh-surface);
+    color: var(--wh-slate);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--wh-transition);
+}
+
+.whsel__btn:hover:not(:disabled) {
+    border-color: var(--wh-navy);
+    color: var(--wh-navy);
+}
+
+.whsel__btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.whsel__btn--primary {
+    background: var(--wh-navy);
+    border-color: var(--wh-navy);
+    color: #fff;
+}
+
+.whsel__btn--primary:hover:not(:disabled) {
+    background: var(--wh-navy-mid);
+    color: #fff;
+}
+
+/* The escape hatch from paging: acts on the filter, not the ticks, so it reads
+   as a different kind of action. */
+.whsel__btn--all {
+    border-style: dashed;
+}
+
+.whsel__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    font-size: 0.65rem;
+    font-weight: 700;
+}
+
+.whsel__btn:not(.whsel__btn--primary) .whsel__count {
+    background: var(--wh-border);
+    color: var(--wh-slate);
+}
+
+.whsel__hint {
+    font-size: 0.7rem;
+    color: var(--wh-muted);
+    margin-left: auto;
+}
+
+.whsel__clear {
+    padding: 0.25rem 0.5rem;
+    border: none;
+    background: none;
+    color: var(--wh-muted);
+    font-family: inherit;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.whsel__col {
+    width: 2.25rem;
+    text-align: center;
+}
+
+.whsel__chk,
+#warehouse_inventory_check_all {
+    width: 0.95rem;
+    height: 0.95rem;
+    accent-color: var(--wh-navy);
+    cursor: pointer;
+}
+
+@media (max-width: 575px) {
+    .whsel__hint {
+        margin-left: 0;
+        width: 100%;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RECEIPT LABEL BANNER (whrcpt__) — one-shot print offer after receiving
+   ═══════════════════════════════════════════════════════════ */
+
+.whrcpt__banner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    background: var(--wh-amber-bg);
+    border: 1px solid var(--wh-amber);
+    border-left-width: 3px;
+    border-radius: var(--wh-radius);
+}
+
+.whrcpt__text {
+    flex: 1 1 20rem;
+    font-size: 0.8rem;
+    color: var(--wh-slate);
+}
+
+.whrcpt__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--wh-radius);
+    background: var(--wh-navy);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: var(--wh-transition);
+}
+
+.whrcpt__btn:hover {
+    background: var(--wh-navy-mid);
+    color: #fff;
 }
