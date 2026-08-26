@@ -16,14 +16,25 @@
   {# stringformat first: `add` returns "" when concatenating a str with an int. #}
   {% with total_str=business_apis_total|default:"0"|stringformat:"s" %}{% with readout_note="of "|add:total_str %}
   {% bconheader header_id="client_api_list_hero" eyebrow="Settings" live="API access" title="Integrations &amp; API keys" subtitle="Connect your store platform to import orders, and issue keys for your own applications." readout_label="Live connections" readout_value=verified_apis_total|default:"0" readout_note=readout_note %}
+    {% if not business_suspended %}
     <a href="{% url 'business:business_settings_api_add' business.business_id %}"
        class="bcon__command-cta"
        id="client_api_list_btn_new_integration">
       <i class="fa-solid fa-plus"></i>
       Add integration
     </a>
+    {% endif %}
   {% endbconheader %}
   {% endwith %}{% endwith %}
+
+  {% if business_suspended %}
+  <div class="bapi__advice bapi__advice--suspended" id="client_api_list_notice_suspended">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <p>Your account is suspended, so integrations and API keys are locked. Your saved
+    credentials are untouched and store imports resume the moment the suspension is lifted
+    &mdash; you will not need to reconnect or regenerate anything.</p>
+  </div>
+  {% endif %}
 
   <!-- E-Commerce Integrations -->
   <section class="bapi__section" id="client_api_list_section_ecommerce">
@@ -33,10 +44,12 @@
         Store integrations
         <span class="bapi__section-badge">{{ business_apis_total|default:"0" }}</span>
       </h2>
+      {% if not business_suspended %}
       <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bapi__action">
         <i class="fa-solid fa-plus"></i>
         Add integration
       </a>
+      {% endif %}
     </div>
 
     <div class="bapi__section-body" id="client_api_list_section_integrations_list">
@@ -97,6 +110,12 @@
           </dl>
 
           <div class="bapi__card-actions">
+            {% if business_suspended %}
+            <span class="bapi__action bapi__action--locked" aria-disabled="true">
+              <i class="fa-solid fa-lock"></i>
+              Locked while suspended
+            </span>
+            {% else %}
             {% if api.platform_slug == 'shopify' and api.link_state == 'broken' %}
             <a href="{% url 'business:shopify_oauth_start' business.business_id api.id %}"
                class="bapi__action bapi__action--connect"
@@ -144,10 +163,12 @@
         <i class="fa-solid fa-plug"></i>
         <h4>No store connected</h4>
         <p>Connect Shopify, WooCommerce, or Magento to import orders automatically instead of entering them by hand.</p>
+        {% if not business_suspended %}
         <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bapi__btn-empty">
           <i class="fa-solid fa-plus"></i>
           Add integration
         </a>
+        {% endif %}
       </div>
       {% endif %}
     </div>
@@ -166,6 +187,12 @@
         API keys
         <span class="bapi__section-badge">{{ active_keys_total|default:"0" }} active</span>
       </h2>
+      {% if business_suspended %}
+      <span class="bapi__action bapi__action--locked" aria-disabled="true">
+        <i class="fa-solid fa-lock"></i>
+        Locked while suspended
+      </span>
+      {% else %}
       <button class="bapi__action"
               data-bs-toggle="modal"
               data-bs-target="#createApiKeyModal"
@@ -247,6 +274,7 @@
         <i class="fa-solid fa-key"></i>
         <h4>No API keys yet</h4>
         <p>Generate a key to let your own application create orders and read delivery status.</p>
+        {% if not business_suspended %}
         <button class="bapi__btn-empty"
                 data-bs-toggle="modal"
                 data-bs-target="#createApiKeyModal"

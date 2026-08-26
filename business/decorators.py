@@ -33,6 +33,7 @@ from django.http import JsonResponse
 
 from business.models import Business, BusinessTeamProfile
 from business.permissions import TeamRoles
+from business.suspension import is_business_suspended
 
 logger = logging.getLogger('business.permissions')
 
@@ -507,6 +508,7 @@ def business_permissions_context(request):
         - user_permissions: Set of permission codes
         - is_business_owner: Boolean
         - is_team_manager: Boolean
+        - business_suspended: Boolean (staff has suspended this account)
 
     Template Usage:
         {% if 'orders_create' in user_permissions %}
@@ -524,6 +526,7 @@ def business_permissions_context(request):
         'user_permissions': set(),
         'is_business_owner': False,
         'is_team_manager': False,
+        'business_suspended': False,
     }
 
     if hasattr(request, 'user') and request.user.is_authenticated:
@@ -540,6 +543,7 @@ def business_permissions_context(request):
             context['user_access_type'] = access_type
             context['user_team_profile'] = team_profile
             context['is_business_owner'] = (access_type == 'owner')
+            context['business_suspended'] = is_business_suspended(business)
 
             if access_type == 'owner':
                 # Owners have all permissions

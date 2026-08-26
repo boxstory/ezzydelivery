@@ -25,6 +25,7 @@ from delivery import models as delivery_models
 from delivery.state_machine import can_transition as task_can_transition
 from core import models as core_models
 from business import models as business_models
+from business.suspension import is_business_suspended, SUSPENSION_MESSAGE
 from ezzy_api import models as ezzy_api_models
 from ezzy_api import serializers as ezzy_api_serializers
 from core.context_processors import get_cached_business
@@ -1421,6 +1422,9 @@ def create_api_key(request):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
+            if is_business_suspended(business):
+                return Response({'error': SUSPENSION_MESSAGE}, status=status.HTTP_403_FORBIDDEN)
+
             api_key = ezzy_api_models.ClientApiKey.objects.create(
                 business=business,
                 key_name=key_name,
@@ -1552,6 +1556,8 @@ def import_shopify_orders(request):
         # Verify user owns this business
         if not request.user.is_staff and business.user != request.user:
             return Response({'error': 'Not authorized for this business'}, status=status.HTTP_403_FORBIDDEN)
+        if is_business_suspended(business):
+            return Response({'error': SUSPENSION_MESSAGE}, status=status.HTTP_403_FORBIDDEN)
         api_settings = business_models.BusinessApiSettings.objects.filter(
             business=business,
             api_type='shopify',
@@ -1656,6 +1662,8 @@ def import_woocommerce_orders(request):
         # Verify user owns this business
         if not request.user.is_staff and business.user != request.user:
             return Response({'error': 'Not authorized for this business'}, status=status.HTTP_403_FORBIDDEN)
+        if is_business_suspended(business):
+            return Response({'error': SUSPENSION_MESSAGE}, status=status.HTTP_403_FORBIDDEN)
         api_settings = business_models.BusinessApiSettings.objects.filter(
             business=business,
             api_type='woocommerce',
@@ -1813,6 +1821,8 @@ def import_tiktokshop_orders(request):
         # Verify user owns this business
         if not request.user.is_staff and business.user != request.user:
             return Response({'error': 'Not authorized for this business'}, status=status.HTTP_403_FORBIDDEN)
+        if is_business_suspended(business):
+            return Response({'error': SUSPENSION_MESSAGE}, status=status.HTTP_403_FORBIDDEN)
         api_settings = business_models.BusinessApiSettings.objects.filter(
             business=business,
             api_type='tiktokshop',
@@ -1937,6 +1947,8 @@ def test_tiktokshop_connection(request):
         # Verify user owns this business
         if not request.user.is_staff and business.user != request.user:
             return Response({'error': 'Not authorized for this business'}, status=status.HTTP_403_FORBIDDEN)
+        if is_business_suspended(business):
+            return Response({'error': SUSPENSION_MESSAGE}, status=status.HTTP_403_FORBIDDEN)
         api_settings = business_models.BusinessApiSettings.objects.filter(
             business=business,
             api_type='tiktokshop'
@@ -4115,6 +4127,9 @@ def webhook_inbound_order(request, webhook_key):
 
     if not wk.is_active:
         return Response({'success': False, 'error': 'Webhook key is disabled'}, status=403)
+
+    if is_business_suspended(wk.business):
+        return Response({'success': False, 'error': SUSPENSION_MESSAGE}, status=403)
 
     # --- WooCommerce HMAC-SHA256 signature verification ---
     wc_sig_header = request.META.get('HTTP_X_WC_WEBHOOK_SIGNATURE', '')

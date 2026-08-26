@@ -15,6 +15,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from ai_agent.tools.base import BaseTool, ToolError, register_tool
+from business.suspension import is_business_suspended, SUSPENSION_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,12 @@ def _resolve_business(business_id=None, business_name=None):
 
     if business_id:
         try:
-            return Business.objects.get(business_id=business_id)
+            business = Business.objects.get(business_id=business_id)
         except Business.DoesNotExist:
             raise ToolError(f'Business {business_id} not found', 'NOT_FOUND')
+        if is_business_suspended(business):
+            raise ToolError(SUSPENSION_MESSAGE, 'SUSPENDED')
+        return business
 
     if business_name:
         matches = Business.objects.filter(

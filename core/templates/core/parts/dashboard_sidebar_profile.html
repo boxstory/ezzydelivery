@@ -178,6 +178,14 @@
                 <span class="ms-1 opacity-75">· Incomplete</span>
                 {% endif %}
             </span>
+            {% comment %}Account standing is a separate fact from identity verification:
+            staff can suspend a business without un-verifying the person who owns it.
+            {% endcomment %}
+            {% if business_suspended %}
+            <span class="cps__role-badge badge mb-2 bg-danger">
+                <i class="fas fa-ban me-1"></i>Business Suspended
+            </span>
+            {% endif %}
             {% endif %}
 
             {% if profile.is_driver %}

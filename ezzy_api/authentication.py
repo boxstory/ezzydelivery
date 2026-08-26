@@ -2,6 +2,7 @@ from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
+from business.suspension import is_business_suspended, SUSPENSION_MESSAGE
 from ezzy_api.models import ClientApiKey
 
 
@@ -36,6 +37,9 @@ class ClientApiKeyAuthentication(BaseAuthentication):
 
         if not api_key.is_valid():
             raise AuthenticationFailed('API key is inactive or expired')
+
+        if is_business_suspended(api_key.business):
+            raise AuthenticationFailed(SUSPENSION_MESSAGE)
 
         user = api_key.business.user
         if user is None or not user.is_active:

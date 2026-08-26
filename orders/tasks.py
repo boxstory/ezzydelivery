@@ -6,6 +6,8 @@ Async tasks for order processing, including OneDrive / Google Sheet / API sync.
 import logging
 from celery import shared_task
 
+from business.suspension import SUSPENDED_STATUSES, SUSPENSION_MESSAGE, is_business_suspended
+
 logger = logging.getLogger(__name__)
 
 TEMP_ORDER_PER_SOURCE_LIMIT = 1000
@@ -242,6 +244,11 @@ def _sync_all_onedrive(source_id=None):
     ).select_related('business')
     if source_id:
         sources = sources.filter(id=source_id)
+    else:
+        # Bulk cron run: skip suspended sellers quietly rather than logging one
+        # error per suspended account every hour. A targeted re-sync still reaches
+        # the per-source guard, so staff get told why it refused.
+        sources = sources.exclude(business__business_status__in=SUSPENDED_STATUSES)
 
     total_c, total_u, errors = 0, 0, []
     for source in sources:
@@ -256,6 +263,9 @@ def _sync_all_onedrive(source_id=None):
 
 
 def _sync_onedrive_source(source):
+    if is_business_suspended(source.business):
+        raise RuntimeError(SUSPENSION_MESSAGE)
+
     from orders.models import TempOrder, Order
     from workforce.views import _onedrive_download_file, _safe_load_workbook
 
@@ -520,6 +530,11 @@ def _sync_all_google_sheets(api_settings_id=None):
     ).select_related('business')
     if api_settings_id:
         qs = qs.filter(id=api_settings_id)
+    else:
+        # Bulk cron run: skip suspended sellers quietly rather than logging one
+        # error per suspended account every hour. A targeted re-sync still reaches
+        # the per-source guard, so staff get told why it refused.
+        qs = qs.exclude(business__business_status__in=SUSPENDED_STATUSES)
 
     total_c, total_u, errors = 0, 0, []
     for api_settings in qs:
@@ -535,6 +550,9 @@ def _sync_all_google_sheets(api_settings_id=None):
 
 def _sync_google_sheet_source(api_settings):
     """Fetch rows from Google Sheets and upsert into TempOrder."""
+    if is_business_suspended(api_settings.business):
+        raise RuntimeError(SUSPENSION_MESSAGE)
+
     import re
     import gspread
     from google.oauth2.credentials import Credentials
@@ -834,6 +852,11 @@ def _sync_all_api(api_type, api_settings_id=None):
     ).select_related('business')
     if api_settings_id:
         qs = qs.filter(id=api_settings_id)
+    else:
+        # Bulk cron run: skip suspended sellers quietly rather than logging one
+        # error per suspended account every hour. A targeted re-sync still reaches
+        # the per-source guard, so staff get told why it refused.
+        qs = qs.exclude(business__business_status__in=SUSPENDED_STATUSES)
 
     total_c, total_u, errors = 0, 0, []
     for api_settings in qs:
@@ -899,6 +922,9 @@ def _api_row_to_temp_defaults(row, business, api_type):
 
 def _sync_api_source(api_settings):
     """Fetch orders from Shopify/WooCommerce and upsert into TempOrder."""
+    if is_business_suspended(api_settings.business):
+        raise RuntimeError(SUSPENSION_MESSAGE)
+
     from orders.models import TempOrder, Order
 
     api_type = api_settings.api_type
@@ -1240,6 +1266,11 @@ def _sync_all_public_links(source_id=None):
     sources = PublicLinkSource.objects.filter(is_active=True).select_related('business')
     if source_id:
         sources = sources.filter(id=source_id)
+    else:
+        # Bulk cron run: skip suspended sellers quietly rather than logging one
+        # error per suspended account every hour. A targeted re-sync still reaches
+        # the per-source guard, so staff get told why it refused.
+        sources = sources.exclude(business__business_status__in=SUSPENDED_STATUSES)
 
     import requests as _req
     total_c, total_u, errors = 0, 0, []
@@ -1368,6 +1399,9 @@ def _auto_map_headers(headers):
 
 
 def _sync_public_link_source(source):
+    if is_business_suspended(source.business):
+        raise RuntimeError(SUSPENSION_MESSAGE)
+
     import requests
     from django.utils import timezone
     from orders.models import TempOrder, Order
