@@ -143,6 +143,9 @@ MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
 ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
 
+# Uploaded-vs-placeholder lives on the model, next to the field that has the default
+from fleet.models import DOC_PLACEHOLDER_MARKER, docs_with_image  # noqa: E402
+
 
 # HELPER FUNCTIONS --------------------------------------------------------------------------------------------------------------
 
@@ -1042,7 +1045,7 @@ def join_team(request):
         profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
     except core_models.ProfilePicture.DoesNotExist:
         profile_picture = core_models.ProfilePicture.objects.create(
-            user_id=request.user.id, profile_id=request.user.id
+            user_id=request.user.id, profile_id=profile.id
         )
 
     completion_percentage = profile.get_profile_completion_percentage()
@@ -1223,7 +1226,35 @@ def main_dashboard(request):
         elif profile.verification_status == VERIFICATION_STATUS_VERIFIED:
             # Allow access to dashboard
             if profile.is_business:
-                return redirect('business:business_dashboard')
+                # The business dashboard is gated by @business_required, which needs a
+                # real Business row (or an active + staff-verified team membership).
+                # Redirecting on the is_business flag alone ping-pongs forever
+                # (ERR_TOO_MANY_REDIRECTS) whenever the flag and the data disagree,
+                # so resolve the actual access here and only redirect if it holds.
+                from business.decorators import get_user_business_access
+                business, access_type, team_profile = get_user_business_access(request.user, request)
+                has_access = bool(business) and (
+                    access_type == 'owner'
+                    or (
+                        access_type == 'team_member'
+                        and team_profile
+                        and team_profile.team_verifed
+                        and team_profile.team_status == 'active'
+                    )
+                )
+                if has_access:
+                    return redirect('business:business_dashboard')
+
+                logger.error(
+                    f"User {request.user.id} is a verified business profile but has no "
+                    f"business record (owner or active team member) - sending to business registration"
+                )
+                messages.error(
+                    request,
+                    "Your account is verified but no business record is linked to it. "
+                    "Please complete your business registration or contact support."
+                )
+                return redirect('core:business_register')
             elif profile.is_driver:
                 return redirect('fleet:fleet_dashboard')
             else:
