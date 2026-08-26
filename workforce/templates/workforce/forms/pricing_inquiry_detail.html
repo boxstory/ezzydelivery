@@ -13,86 +13,108 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
 {% endblock extra_css %}
 
 {% block content %}
-<link href="{% static 'workforce/css/pricing_inquiry_detail.css' %}?v=20260621d" rel="stylesheet" type="text/css" />
-<div class="pid col-12 p-3" id="pricing-inquiry-detail">
+<link href="{% static 'workforce/css/pricing_inquiry_detail.css' %}?v=20260824b" rel="stylesheet" type="text/css" />
+{% comment %}
+Each of the three is its own file rather than one appended sheet: Cloudflare ignores ?v= on
+/static/, so appended rules sit behind a stale cached copy. A new path is the only reliable bust.
+pricing_inquiry_console.css loads last and is authoritative over the two above it.
+{% endcomment %}
+<link href="{% static 'workforce/css/pricing_suggestion.css' %}?v=30260817a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/pricing_inquiry_console.css' %}?v=20260817b" rel="stylesheet" type="text/css" />
+<div class="pid col-12" id="pricing-inquiry-detail">
 
   <!-- ══════════════════════════════════════
-       BACK LINK
-  ═══════════════════════════════════════ -->
-  <a href="{% url 'workforce:pricing_inquiries_list' %}"
-     class="pid__back"
-     hx-get="{% url 'workforce:pricing_inquiries_list' %}"
-     hx-target="#main-content" hx-select="#main-content"
-     hx-swap="outerHTML" hx-push-url="true">
-    <i class="fa-solid fa-arrow-left"></i>Pricing Inquiries
-  </a>
-
-  <!-- ══════════════════════════════════════
-       HERO
+       HERO (back link sits in the action row, just before the help button)
   ═══════════════════════════════════════ -->
   <div class="pid__hero">
-    <div class="pid__hero__glow"></div>
-    <div class="pid__hero__content">
 
-      <!-- Avatar -->
+    <!-- Row 1 — who this record is. Identity owns the full width; actions sit
+         on their own rule below so the name never shares a line with them. -->
+    <div class="pid__hero__top">
+
       <div class="pid__hero__avatar">
-        <i class="fa-solid fa-store"></i>
+        <i class="fa-solid fa-store" aria-hidden="true"></i>
       </div>
 
-      <!-- Identity block -->
       <div class="pid__hero__info">
+        <div class="pid__hero__kicker">Pricing inquiry · #{{ inquiry.pk }}</div>
         <h1 class="pid__hero__name">{{ inquiry.business_name }}</h1>
         <div class="pid__hero__sub">
-          <i class="fa-solid fa-user pid__hero__sub-icon"></i>{{ inquiry.full_name }}
-          &nbsp;·&nbsp;
-          <i class="fa-solid fa-calendar pid__hero__sub-icon"></i>{{ inquiry.date_created|date:"d M Y" }}
+          <i class="fa-solid fa-user pid__hero__sub-icon" aria-hidden="true"></i>{{ inquiry.full_name }}
+          <span class="pid__hero__sep">·</span>
+          <i class="fa-solid fa-calendar pid__hero__sub-icon" aria-hidden="true"></i>{{ inquiry.date_created|date:"d M Y" }}
+          <span class="pid__hero__sep">·</span>
           {% if inquiry.assigned_to %}
-          &nbsp;·&nbsp;
-          <i class="fa-solid fa-user-tie pid__hero__sub-icon"></i><span id="assigned-to-display">{{ inquiry.assigned_to.get_full_name|default:inquiry.assigned_to.username }}</span>
+          <i class="fa-solid fa-user-tie pid__hero__sub-icon" aria-hidden="true"></i><span id="assigned-to-display">{{ inquiry.assigned_to.get_full_name|default:inquiry.assigned_to.username }}</span>
           {% else %}
-          &nbsp;·&nbsp;
           <span id="assigned-to-display" class="pid__hero__unassigned">Unassigned</span>
           {% endif %}
         </div>
-        <div class="pid__hero__badges">
-          <span class="pid__badge pid__badge--status pid__badge--{{ inquiry.crm_status }}" id="crm-status-badge">
-            <i class="fa-solid fa-circle"></i>{{ inquiry.get_crm_status_display }}
-          </span>
-          {% if not inquiry.is_complete %}
-          <span class="pid__badge pid__badge--ghost"><i class="fa-solid fa-circle-half-stroke"></i>Partial</span>
-          {% endif %}
-          {% if inquiry.is_required_COD_service %}
-          <span class="pid__badge pid__badge--cod"><i class="fa-solid fa-money-bill-wave"></i>COD</span>
-          {% endif %}
-          {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar or inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}
-          <span class="pid__badge pid__badge--fulfillment"><i class="fa-solid fa-warehouse"></i>Fulfillment</span>
-          {% endif %}
-          {% if inquiry.preferred_start_date == 'Immediately' %}
-          <span class="pid__badge pid__badge--urgent"><i class="fa-solid fa-bolt"></i>Start Immediately</span>
-          {% endif %}
-        </div>
       </div>
 
-      <!-- Action buttons -->
+      <div class="pid__hero__badges">
+        <span class="pid__badge pid__badge--status pid__badge--{{ inquiry.crm_status }}" id="crm-status-badge">
+          <i class="fa-solid fa-circle" aria-hidden="true"></i>{{ inquiry.get_crm_status_display }}
+        </span>
+        {% if not inquiry.is_complete %}
+        <span class="pid__badge pid__badge--ghost"><i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i>Partial</span>
+        {% endif %}
+        {% if inquiry.is_required_COD_service %}
+        <span class="pid__badge pid__badge--cod"><i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i>COD</span>
+        {% endif %}
+        {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar or inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}
+        <span class="pid__badge pid__badge--fulfillment"><i class="fa-solid fa-warehouse" aria-hidden="true"></i>Fulfillment</span>
+        {% endif %}
+        {% if inquiry.preferred_start_date == 'Immediately' %}
+        <span class="pid__badge pid__badge--urgent"><i class="fa-solid fa-bolt" aria-hidden="true"></i>Start Immediately</span>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- Row 2 — what you can do about it. Every control is translucent on navy
+         except Edit, which changes what the page is; the page's one yellow is
+         spent on Save Changes in Manage Inquiry. -->
+    <div class="pid__hero__bar">
       <div class="pid__hero__actions">
         <a href="tel:{{ inquiry.business_contact_number }}" class="pid__hero__btn pid__hero__btn--call">
-          <i class="fa-solid fa-phone"></i>Call
+          <i class="fa-solid fa-phone" aria-hidden="true"></i>Call
         </a>
-        <a href="https://wa.me/{{ inquiry.business_contact_number|cut:'+' }}" target="_blank" class="pid__hero__btn pid__hero__btn--wa">
-          <i class="fa-brands fa-whatsapp"></i>WhatsApp
+        <a href="https://wa.me/{{ inquiry.business_contact_number|cut:'+' }}" target="_blank" rel="noopener" class="pid__hero__btn pid__hero__btn--wa">
+          <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>WhatsApp
         </a>
         {# Business lead: sends from the CRM — Business Leads number/channel. #}
         <button type="button" class="pid__hero__btn pid__hero__btn--wa"
                 data-wasend-open
                 data-wasend-to="{{ inquiry.business_contact_number|cut:'+' }}"
                 data-wasend-name="{{ inquiry.business_name|escape }}">
-          <i class="fa-solid fa-paper-plane"></i>Send from EZZY
+          <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>Send from EZZY
         </button>
+        {# Rate sheet: the token URL the customer picks their plan on. #}
+        {% if quote_url %}
+        <button type="button" class="pid__hero__btn pid__hero__btn--link"
+                data-quote-copy data-link="{{ quote_url }}"
+                title="Copy the customer's rate sheet link">
+          <i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i>{% if inquiry.has_agreed_plan %}Rate Sheet{% else %}Send Rate Sheet{% endif %}
+        </button>
+        {% endif %}
         <button type="button" class="pid__hero__btn pid__hero__btn--manage" id="pid-edit-toggle" onclick="toggleEditMode()">
-          <i class="fa-solid fa-pen-to-square"></i>Edit
+          <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>Edit
         </button>
-        <a href="#manage-panel" class="pid__hero__btn pid__hero__btn--manage">
-          <i class="fa-solid fa-sliders"></i>Manage
+        <a href="#manage-panel" class="pid__hero__btn pid__hero__btn--jump">
+          <i class="fa-solid fa-sliders" aria-hidden="true"></i>Manage
+        </a>
+      </div>
+
+      <div class="pid__hero__util">
+        <a href="{% url 'workforce:pricing_inquiries_list' %}"
+           class="pid__back"
+           hx-get="{% url 'workforce:pricing_inquiries_list' %}"
+           hx-target="#main-content" hx-select="#main-content"
+           hx-swap="outerHTML" hx-push-url="true"
+           title="Back to Pricing Inquiries">
+          <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+          <span class="visually-hidden">Back to Pricing Inquiries</span>
         </a>
         <button type="button" class="wfnote__btn" data-wfnote-toggle
                 aria-expanded="false" aria-controls="workforce_forms_pricing_inquiry_detail_card_notes"
@@ -101,9 +123,14 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
           <span class="visually-hidden">Show notes</span>
         </button>
       </div>
-
     </div>
+
   </div>
+
+  <!-- ══════════════════════════════════════
+       BODY — everything below the hero lives in one padded section
+  ═══════════════════════════════════════ -->
+  <div class="pid__body">
 
   <div class="wfnote" id="workforce_forms_pricing_inquiry_detail_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_forms_pricing_inquiry_detail_card_notes' %}" hidden></div>
@@ -111,34 +138,24 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
   <!-- ══════════════════════════════════════
        STATS ROW
   ═══════════════════════════════════════ -->
+  {% comment %} Four answers off the form, not four KPIs — one instrument panel divided by
+     hairlines rather than four cards with icon tiles that only repeat the label. {% endcomment %}
   <div class="pid__stats">
-    <div class="pid__stats__card">
-      <div class="pid__stats__icon pid__stats__icon--blue"><i class="fa-solid fa-boxes-stacked"></i></div>
-      <div>
-        <div class="pid__stats__num">{{ inquiry.avarage_number_of_order_done_last_month|default:"—" }}</div>
-        <div class="pid__stats__lbl">Orders / Month</div>
-      </div>
+    <div class="pid__stat">
+      <div class="pid__stat__lbl">Orders / month</div>
+      <div class="pid__stat__val {% if not inquiry.avarage_number_of_order_done_last_month %}pid__stat__val--empty{% endif %}">{{ inquiry.avarage_number_of_order_done_last_month|default:"Not answered" }}</div>
     </div>
-    <div class="pid__stats__card">
-      <div class="pid__stats__icon pid__stats__icon--green"><i class="fa-solid fa-coins"></i></div>
-      <div>
-        <div class="pid__stats__num">{{ inquiry.average_order_value_qar|default:"—" }}</div>
-        <div class="pid__stats__lbl">Avg Order Value (QAR)</div>
-      </div>
+    <div class="pid__stat">
+      <div class="pid__stat__lbl">Avg order value (QAR)</div>
+      <div class="pid__stat__val {% if not inquiry.average_order_value_qar %}pid__stat__val--empty{% endif %}">{{ inquiry.average_order_value_qar|default:"Not answered" }}</div>
     </div>
-    <div class="pid__stats__card">
-      <div class="pid__stats__icon pid__stats__icon--orange"><i class="fa-solid fa-chart-line"></i></div>
-      <div>
-        <div class="pid__stats__num">{{ inquiry.orders_expected_in_next_3_months_milestone|default:"—" }}</div>
-        <div class="pid__stats__lbl">3-Month Milestone</div>
-      </div>
+    <div class="pid__stat">
+      <div class="pid__stat__lbl">3-month milestone</div>
+      <div class="pid__stat__val {% if not inquiry.orders_expected_in_next_3_months_milestone %}pid__stat__val--empty{% endif %}">{{ inquiry.orders_expected_in_next_3_months_milestone|default:"Not answered" }}</div>
     </div>
-    <div class="pid__stats__card">
-      <div class="pid__stats__icon pid__stats__icon--purple"><i class="fa-solid fa-truck-fast"></i></div>
-      <div>
-        <div class="pid__stats__num">{{ inquiry.delivery_coverage|default:"—" }}</div>
-        <div class="pid__stats__lbl">Coverage</div>
-      </div>
+    <div class="pid__stat">
+      <div class="pid__stat__lbl">Coverage</div>
+      <div class="pid__stat__val {% if not inquiry.delivery_coverage %}pid__stat__val--empty{% endif %}">{{ inquiry.delivery_coverage|default:"Not answered" }}</div>
     </div>
   </div>
 
@@ -157,7 +174,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
       <div class="pid__edit-bar d-flex align-items-center gap-2">
         <i class="fa-solid fa-pen-to-square pid__edit-bar__icon"></i>
         <span class="pid__edit-bar__label">Editing</span>
-        <span id="pid-edit-feedback" class="small ms-1" style="font-size:0.75rem;color:rgba(255,255,255,0.5)"></span>
+        <span id="pid-edit-feedback" class="pid__edit-bar__feedback ms-1"></span>
         <button type="submit" class="pid__btn-save ms-auto"><i class="fa-solid fa-floppy-disk"></i>Save changes</button>
         <button type="button" class="pid__btn-discard" onclick="toggleEditMode()">Discard</button>
       </div>
@@ -263,7 +280,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
             <p class="pid__notes-text">{{ inquiry.staff_notes }}</p>
           </div>
           {% else %}
-          <p class="pid__muted pid-view" style="font-size:0.875rem">No staff notes yet.</p>
+          <p class="pid__muted pid-view">No staff notes yet.</p>
           {% endif %}
           <textarea class="form-control pid-edit d-none" name="staff_notes" rows="4"
                     placeholder="Internal notes about this lead…">{{ inquiry.staff_notes|default:'' }}</textarea>
@@ -304,7 +321,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
               <div class="pid__service__icon"><i class="fa-solid fa-money-bill-wave"></i></div>
               <span>Do you require COD (Cash on Delivery)?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_required_COD_service %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
-              <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_required_COD_service">
+              <select class="form-select form-select-sm pid-edit pid__service__select d-none ms-auto" name="is_required_COD_service">
                 <option value="true" {% if inquiry.is_required_COD_service %}selected{% endif %}>Yes</option>
                 <option value="false" {% if not inquiry.is_required_COD_service %}selected{% endif %}>No</option>
               </select>
@@ -313,7 +330,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
               <div class="pid__service__icon"><i class="fa-solid fa-plane-departure"></i></div>
               <span>Fulfillment to operate from outside Qatar?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
-              <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_required_fulfillment_service_for_operate_from_outside_qatar">
+              <select class="form-select form-select-sm pid-edit pid__service__select d-none ms-auto" name="is_required_fulfillment_service_for_operate_from_outside_qatar">
                 <option value="true" {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}selected{% endif %}>Yes</option>
                 <option value="false" {% if not inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}selected{% endif %}>No</option>
               </select>
@@ -322,7 +339,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
               <div class="pid__service__icon"><i class="fa-solid fa-warehouse"></i></div>
               <span>Fulfillment hub in Doha?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
-              <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_required_fulfillment_service_for_make_hub_in_doha">
+              <select class="form-select form-select-sm pid-edit pid__service__select d-none ms-auto" name="is_required_fulfillment_service_for_make_hub_in_doha">
                 <option value="true" {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}selected{% endif %}>Yes</option>
                 <option value="false" {% if not inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}selected{% endif %}>No</option>
               </select>
@@ -331,7 +348,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
               <div class="pid__service__icon"><i class="fa-solid fa-bolt"></i></div>
               <span>Frequent same-day pick & delivery required?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
-              <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_frequent_same_day_pick_and_delivery_required">
+              <select class="form-select form-select-sm pid-edit pid__service__select d-none ms-auto" name="is_frequent_same_day_pick_and_delivery_required">
                 <option value="true" {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}selected{% endif %}>Yes</option>
                 <option value="false" {% if not inquiry.is_frequent_same_day_pick_and_delivery_required %}selected{% endif %}>No</option>
               </select>
@@ -340,7 +357,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
               <div class="pid__service__icon"><i class="fa-solid fa-hand-holding-box"></i></div>
               <span>Special handling required?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_special_handling_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
-              <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_special_handling_required">
+              <select class="form-select form-select-sm pid-edit pid__service__select d-none ms-auto" name="is_special_handling_required">
                 <option value="true" {% if inquiry.is_special_handling_required %}selected{% endif %}>Yes</option>
                 <option value="false" {% if not inquiry.is_special_handling_required %}selected{% endif %}>No</option>
               </select>
@@ -349,7 +366,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
               <div class="pid__service__icon"><i class="fa-solid fa-rotate-left"></i></div>
               <span>Return / reverse logistics required?</span>
               <span class="pid-view ms-auto"><i class="fa-solid {% if inquiry.is_return_logistics_required %}fa-circle-check pid__service__check--on{% else %}fa-circle-xmark pid__service__check--off{% endif %} pid__service__check"></i></span>
-              <select class="form-select form-select-sm pid-edit d-none ms-auto" style="width:auto;" name="is_return_logistics_required">
+              <select class="form-select form-select-sm pid-edit pid__service__select d-none ms-auto" name="is_return_logistics_required">
                 <option value="true" {% if inquiry.is_return_logistics_required %}selected{% endif %}>Yes</option>
                 <option value="false" {% if not inquiry.is_return_logistics_required %}selected{% endif %}>No</option>
               </select>
@@ -444,9 +461,9 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
             <span class="pid__field__lbl">Preferred Communication Channel</span>
             <span class="pid__field__val pid-view">
               {% if inquiry.preferred_communication_channel %}
-                {% if inquiry.preferred_communication_channel == 'WhatsApp' %}<i class="fa-brands fa-whatsapp" style="color:#25d366"></i>&nbsp;{% endif %}
-                {% if inquiry.preferred_communication_channel == 'Email' %}<i class="fa-solid fa-envelope" style="color:#2563eb"></i>&nbsp;{% endif %}
-                {% if inquiry.preferred_communication_channel == 'Phone Call' %}<i class="fa-solid fa-phone" style="color:#0891b2"></i>&nbsp;{% endif %}
+                {% if inquiry.preferred_communication_channel == 'WhatsApp' %}<i class="fa-brands fa-whatsapp pid__channel-icon--wa" aria-hidden="true"></i>&nbsp;{% endif %}
+                {% if inquiry.preferred_communication_channel == 'Email' %}<i class="fa-solid fa-envelope pid__channel-icon--email" aria-hidden="true"></i>&nbsp;{% endif %}
+                {% if inquiry.preferred_communication_channel == 'Phone Call' %}<i class="fa-solid fa-phone pid__channel-icon--phone" aria-hidden="true"></i>&nbsp;{% endif %}
                 {{ inquiry.preferred_communication_channel }}
               {% else %}—{% endif %}
             </span>
@@ -769,9 +786,9 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
             <span class="pid__field__lbl">Preferred Communication Channel</span>
             <span class="pid__field__val">
               {% if inquiry.preferred_communication_channel %}
-                {% if inquiry.preferred_communication_channel == 'WhatsApp' %}<i class="fa-brands fa-whatsapp" style="color:#25d366"></i>&nbsp;{% endif %}
-                {% if inquiry.preferred_communication_channel == 'Email' %}<i class="fa-solid fa-envelope" style="color:#2563eb"></i>&nbsp;{% endif %}
-                {% if inquiry.preferred_communication_channel == 'Phone Call' %}<i class="fa-solid fa-phone" style="color:#0891b2"></i>&nbsp;{% endif %}
+                {% if inquiry.preferred_communication_channel == 'WhatsApp' %}<i class="fa-brands fa-whatsapp pid__channel-icon--wa" aria-hidden="true"></i>&nbsp;{% endif %}
+                {% if inquiry.preferred_communication_channel == 'Email' %}<i class="fa-solid fa-envelope pid__channel-icon--email" aria-hidden="true"></i>&nbsp;{% endif %}
+                {% if inquiry.preferred_communication_channel == 'Phone Call' %}<i class="fa-solid fa-phone pid__channel-icon--phone" aria-hidden="true"></i>&nbsp;{% endif %}
                 {{ inquiry.preferred_communication_channel }}
               {% else %}—{% endif %}
             </span>
@@ -827,6 +844,227 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
     <!-- ─── RIGHT COLUMN ─────────────────── -->
     <div class="pid__grid__right">
 
+      <!-- SUGGESTED RATE -->
+      <div class="pid__panel pid__panel--suggest" id="suggest-panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-calculator"></i>
+          <h3>Suggested Rate</h3>
+          {% if suggestion %}
+          <span class="pid__count-chip {% if suggestion.missing %}pid__count-chip--warn{% else %}pid__count-chip--ok{% endif %}">
+            {% if suggestion.missing %}{{ suggestion.missing|length }} unanswered{% else %}Complete{% endif %}
+          </span>
+          {% endif %}
+        </div>
+        <div class="pid__panel__body">
+          {% if p2p.is_likely_p2p %}
+          {% comment %} The 3PL card prices recurring business volume; a one-off personal
+             sender belongs on P2P, where a single delivery is the product. {% endcomment %}
+          <div class="pid__p2p">
+            <div class="pid__p2p__hd">
+              <i class="fa-solid fa-person-walking-luggage"></i>
+              <strong>Looks like a P2P customer, not a 3PL client</strong>
+            </div>
+            <ul class="pid__p2p__why">
+              {% for reason in p2p.reasons %}<li>{{ reason }}</li>{% endfor %}
+            </ul>
+            <p class="pid__p2p__note">
+              The rate below prices recurring business volume, so it does not really apply.
+              Send them to peer-to-peer pricing instead.
+            </p>
+            <a href="{% url 'webpages:p2p_pricing' %}" target="_blank" rel="noopener"
+               class="pid__p2p__link">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i>Open P2P pricing
+            </a>
+          </div>
+          {% endif %}
+          {% if not suggestion %}
+          <div class="pid__quote pid__quote--empty">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>{{ suggestion_error|default:"No suggestion available." }}</span>
+          </div>
+          {% else %}
+
+          {% comment %} The three numbers that decide the call, on one line: the floor we
+             will not go under, what the rate card says, and what the customer
+             actually agreed to. The gap between the last two is the argument. {% endcomment %}
+          <div class="pid__spread">
+            <div class="pid__spread__cell">
+              <span class="pid__spread__lbl">Floor</span>
+              <span class="pid__spread__num">{{ suggestion.floor_value|floatformat:2 }}</span>
+            </div>
+            <div class="pid__spread__cell pid__spread__cell--lead">
+              <span class="pid__spread__lbl">Suggested</span>
+              <span class="pid__spread__num">{{ suggestion.suggested_price|floatformat:2 }}</span>
+            </div>
+            <div class="pid__spread__cell">
+              <span class="pid__spread__lbl">Agreed</span>
+              {% if inquiry.agreed_price_value is not None %}
+              <span class="pid__spread__num">{{ inquiry.agreed_price_value|floatformat:2 }}</span>
+              {% if agreed_gap is not None %}
+              <span class="pid__spread__gap {% if agreed_gap < 0 %}pid__spread__gap--under{% elif agreed_gap > 0 %}pid__spread__gap--over{% endif %}">
+                {% if agreed_gap > 0 %}+{% endif %}{{ agreed_gap|floatformat:2 }} vs suggested
+              </span>
+              {% endif %}
+              {% else %}
+              <span class="pid__spread__none">Not chosen yet</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="pid__spread__unit">QR per delivery</div>
+          <div class="pid__sugg__card">{{ suggestion.ruleset.name }}</div>
+
+          {% if 'outside_rate_card' in suggestion.flags %}
+          <div class="pid__sugg__warn">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Outside the rate card — price this one manually.</span>
+          </div>
+          {% endif %}
+
+          <!-- How we got here -->
+          <div class="pid__canvas-section">
+            <div class="pid__canvas-label">How we got here</div>
+            <table class="pid__sugg__table">
+              <thead>
+                <tr>
+                  <th scope="col">Step</th>
+                  <th scope="col" class="pid__sugg__col-num">Change</th>
+                  <th scope="col" class="pid__sugg__col-num">Running</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for line in suggestion.breakdown %}
+                <tr>
+                  <td class="pid__sugg__lbl">
+                    {{ line.label }}
+                    {% if line.explanation %}<span class="pid__sugg__why">{{ line.explanation }}</span>{% endif %}
+                  </td>
+                  <td class="pid__sugg__delta">
+                    {% if line.effect == 'set_base' %}{{ line.running_total|floatformat:2 }}
+                    {% else %}{% if line.delta|floatformat:2|slice:":1" != "-" %}+{% endif %}{{ line.delta|floatformat:2 }}{% endif %}
+                  </td>
+                  <td class="pid__sugg__run">{{ line.running_total|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Reality check -->
+          <div class="pid__canvas-section">
+            <div class="pid__canvas-label">Reality check</div>
+            {% if suggestion.comparables.thin %}
+            <div class="pid__sugg__note">Too few comparable deliveries to be meaningful (n={{ suggestion.comparables.count|default:0 }}).</div>
+            {% elif suggestion.comparables.count %}
+            <div class="pid__sugg__note">
+              We have actually billed
+              <strong>{{ suggestion.comparables.distinct_values|join:" or " }} QR</strong>
+              across {{ suggestion.comparables.count }} verified deliveries
+              {% if suggestion.comparables.distance_bucket %}at this distance{% endif %}.
+              <span class="pid__sugg__aside">{{ suggestion.comparables.excluded_unverified }} unverified charges excluded.</span>
+            </div>
+            {% endif %}
+            {% if suggestion.inputs.benchmark_band %}
+            <div class="pid__sugg__note">
+              They currently pay <strong>{{ suggestion.inputs.benchmark_band }}</strong>
+              {% if 'above_benchmark' in suggestion.flags %}<span class="pid__sugg__flag pid__sugg__flag--warn">we are higher</span>
+              {% elif 'below_benchmark' in suggestion.flags %}<span class="pid__sugg__flag pid__sugg__flag--ok">we are lower</span>{% endif %}
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Floor -->
+          <div class="pid__sugg__floor">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Floor {{ suggestion.floor_value|floatformat:2 }} QR —
+              <strong>configured, not a measured cost</strong>. We do not yet track what a delivery costs us,
+              so no margin is shown.</span>
+          </div>
+
+          <!-- Missing inputs -->
+          {% if suggestion.missing %}
+          <div class="pid__canvas-section">
+            <div class="pid__canvas-label">Ask on the call</div>
+            <div class="pid__sugg__missing">
+              {% for label in suggestion.missing_labels %}<span class="pid__sugg__chip">{{ label }}</span>{% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Actions -->
+          <div class="pid__sugg__actions">
+            <button type="button" class="pid__sugg__btn pid__sugg__btn--accept" id="suggest-accept"
+                    data-price="{{ suggestion.suggested_price|floatformat:2 }}">
+              <i class="fa-solid fa-check"></i>Accept as quote
+            </button>
+            <button type="button" class="pid__sugg__btn" id="suggest-override">
+              <i class="fa-solid fa-pen"></i>Override
+            </button>
+          </div>
+          {% if inquiry.quoted_price_value is not None %}
+          <div class="pid__sugg__quoted">
+            Staff quote <strong>{{ inquiry.quoted_price_value|floatformat:2 }} QR</strong>
+            by {{ inquiry.quoted_by.get_full_name|default:inquiry.quoted_by.username|default:"—" }},
+            {{ inquiry.quoted_at|date:"d M Y, H:i" }}
+            {% if inquiry.quoted_note %}<span class="pid__sugg__aside">{{ inquiry.quoted_note }}</span>{% endif %}
+          </div>
+          {% endif %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- AGREED PLAN -->
+      <div class="pid__panel pid__panel--quote" id="quote-panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+          <h3>Quoted Plan</h3>
+          {% if inquiry.has_agreed_plan %}
+          <span class="pid__count-chip pid__count-chip--ok">Selected</span>
+          {% endif %}
+        </div>
+        <div class="pid__panel__body">
+          {% if inquiry.has_agreed_plan %}
+          <div class="pid__quote">
+            <div class="pid__quote__plan">{{ inquiry.agreed_plan_name }}</div>
+            <div class="pid__quote__price">
+              {% if inquiry.selected_plan.is_custom_quote %}
+              <span class="pid__quote__custom"><i class="fa-solid fa-headset"></i>Wants to discuss with sales</span>
+              {% else %}
+              {{ inquiry.agreed_price_label }}
+              {% endif %}
+            </div>
+            <div class="pid__quote__meta">
+              Chosen by customer {{ inquiry.plan_agreed_at|date:"d M Y, H:i" }}
+            </div>
+            {% if inquiry.plan_agreement_note %}
+            <div class="pid__quote__note">
+              <span class="pid__canvas-label">Customer note</span>
+              {{ inquiry.plan_agreement_note }}
+            </div>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="pid__quote pid__quote--empty">
+            <i class="fa-solid fa-hourglass-half"></i>
+            <span>No plan selected yet — send the rate sheet link below.</span>
+          </div>
+          {% endif %}
+
+          {% if quote_url %}
+          <div class="pid__canvas-section">
+            <div class="pid__canvas-label">Rate sheet link</div>
+            <div class="pid__quote__link">
+              <input type="text" class="pid__select pid__quote__link-input" id="quote-link-input"
+                     readonly value="{{ quote_url }}">
+              <button type="button" class="pid__quote__copy" data-quote-copy
+                      data-link="{{ quote_url }}">
+                <i class="fa-solid fa-copy"></i>Copy
+              </button>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
       <!-- MANAGE PANEL -->
       <div class="pid__panel pid__panel--crm" id="manage-panel">
         <div class="pid__panel__hd">
@@ -834,6 +1072,38 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
           <h3>Manage Inquiry</h3>
         </div>
         <div class="pid__panel__body">
+
+          {% comment %} The lead board is the other half of this record. The number
+             leads the card because it is what staff quote to each other and search
+             the board by. {% endcomment %}
+          {% if crm_lead %}
+          <a class="pid__leadcard" href="{% url 'workforce:crm_lead_detail' crm_lead.pk %}">
+            <div class="pid__leadcard__top">
+              <span class="pid__leadcard__lbl"><i class="fa-solid fa-id-card-clip" aria-hidden="true"></i>CRM Lead</span>
+              <span class="pid__leadcard__stage">{{ crm_lead.stage_label }}</span>
+            </div>
+            <div class="pid__leadcard__num">#{{ crm_lead.pk }}</div>
+            <div class="pid__leadcard__meta">
+              {{ crm_lead.company_name|default:crm_lead.contact_name|default:inquiry.business_name }}
+              <span class="pid__leadcard__go">Open lead card<i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+            </div>
+          </a>
+          {% if crm_lead_parent %}
+          <div class="pid__leadcard__merged">
+            Merged into
+            <a href="{% url 'workforce:crm_lead_detail' crm_lead_parent.pk %}">Lead #{{ crm_lead_parent.pk }}</a>
+            — work that card instead.
+          </div>
+          {% endif %}
+          {% else %}
+          <div class="pid__leadcard pid__leadcard--none">
+            <div class="pid__leadcard__top">
+              <span class="pid__leadcard__lbl"><i class="fa-solid fa-id-card-clip" aria-hidden="true"></i>CRM Lead</span>
+            </div>
+            <div class="pid__leadcard__num pid__leadcard__num--none">—</div>
+            <div class="pid__leadcard__meta">No lead card for this inquiry yet</div>
+          </div>
+          {% endif %}
 
           <div class="pid__canvas-section">
             <div class="pid__canvas-label">Pipeline Status</div>
@@ -848,6 +1118,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
                       data-status="{{ value }}">{{ label }}</button>
               {% endfor %}
             </div>
+
           </div>
 
           <div class="pid__canvas-section">
@@ -868,7 +1139,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
           </div>
 
           <div class="pid__canvas-section">
-            <div class="pid__canvas-label"><i class="fa-solid fa-note-sticky me-1" style="color:var(--brand-primary)"></i>Staff Notes</div>
+            <div class="pid__canvas-label">Staff Notes</div>
             <textarea class="pid__textarea" id="staff-notes-input" rows="2"
                       placeholder="Internal notes about this lead…">{{ inquiry.staff_notes|default:'' }}</textarea>
           </div>
@@ -939,6 +1210,7 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
     </div><!-- /right -->
   </div><!-- /grid -->
 
+  </div><!-- /.pid__body -->
 
 </div><!-- /.pid -->
 
@@ -950,8 +1222,89 @@ Notes: pid__ namespace; view/edit panels are two copies of the same fields toggl
     urlEdit: "{% url 'workforce:pricing_inquiry_edit' inquiry.pk %}",
     urlAddActivity: "{% url 'workforce:pricing_inquiry_add_activity' inquiry.pk %}",
     urlDeleteBase: "/workforce/forms/pricing-inquiries/{{ inquiry.pk }}/delete-activity/",
+    urlQuotePrice: "{% url 'workforce:pricing_inquiry_quote_price' inquiry.pk %}",
     csrfToken: "{{ csrf_token }}"
   };
+
+  // Suggested rate — accept it as-is, or override with your own number.
+  (function () {
+    var accept = document.getElementById('suggest-accept');
+    var override = document.getElementById('suggest-override');
+    if (!accept && !override) { return; }
+
+    function send(price, note, btn) {
+      var original = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>Saving…'; }
+      var fd = new FormData();
+      fd.append('csrfmiddlewaretoken', PID_CONFIG.csrfToken);
+      fd.append('price', price);
+      fd.append('note', note || '');
+      fetch(PID_CONFIG.urlQuotePrice, { method: 'POST', body: fd })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+          if (btn) { btn.disabled = false; btn.innerHTML = original; }
+          if (!res.ok || res.data.error) { alert(res.data.error || 'Could not save the quote.'); return; }
+          location.reload();
+        })
+        .catch(function (err) {
+          if (btn) { btn.disabled = false; btn.innerHTML = original; }
+          alert('Error: ' + err.message);
+        });
+    }
+
+    if (accept) {
+      accept.addEventListener('click', function () {
+        send(accept.dataset.price, '', accept);
+      });
+    }
+    if (override) {
+      override.addEventListener('click', function () {
+        var price = prompt('Quote what price (QR per delivery)?',
+                           accept ? accept.dataset.price : '');
+        if (price === null || !price.trim()) { return; }
+        // The server also demands a note below the floor; asking here saves a round trip.
+        var note = prompt('Why this price? (required if below the floor)') || '';
+        send(price.trim(), note, override);
+      });
+    }
+  })();
+
+  // Rate-sheet link — sales re-sends this to a lead who never picked a plan.
+  // Two triggers (hero button and the panel field) share one handler.
+  document.querySelectorAll('[data-quote-copy]').forEach(function (btn) {
+    var original = btn.innerHTML;
+
+    function flash(ok) {
+      btn.innerHTML = ok
+        ? '<i class="fa-solid fa-check"></i>Copied'
+        : '<i class="fa-solid fa-triangle-exclamation"></i>Copy it manually';
+      setTimeout(function () { btn.innerHTML = original; }, 2000);
+    }
+
+    // execCommand needs a live selection, so it goes through the panel field.
+    // Also the landing spot when the Clipboard API rejects — it does whenever
+    // the document is not focused or the permission is refused, and without
+    // this the button would silently do nothing.
+    function legacyCopy() {
+      var input = document.getElementById('quote-link-input');
+      if (!input) { flash(false); return; }
+      input.select();
+      input.setSelectionRange(0, 99999);
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      flash(ok);
+    }
+
+    btn.addEventListener('click', function () {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(btn.dataset.link)
+          .then(function () { flash(true); })
+          .catch(legacyCopy);
+      } else {
+        legacyCopy();
+      }
+    });
+  });
 
   var _pidEditMode = false;
   function toggleEditMode() {

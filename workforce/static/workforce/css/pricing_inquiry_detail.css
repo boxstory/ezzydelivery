@@ -5,20 +5,29 @@
 
 /* ── BACK LINK ───────────────────────────────────────────────────────────── */
 
+/* Icon button in the hero action row, paired with the help button beside it —
+   same 1.75rem round shape and translucent treatment as .wfnote__btn. */
 .pid__back {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: var(--brand-grey-500);
+  justify-content: center;
+  align-self: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.85rem;
+  line-height: 1;
+  flex: 0 0 auto;
   text-decoration: none;
-  margin-bottom: 1.25rem;
   transition: var(--brand-transition);
 }
 .pid__back:hover {
-  color: var(--brand-primary);
-  gap: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.16);
+  color: #fff;
 }
 
 /* ── HERO ────────────────────────────────────────────────────────────────── */
@@ -30,25 +39,6 @@
   padding: 2rem 2.5rem;
   margin-bottom: 1.5rem;
   overflow: hidden;
-}
-
-.pid__hero__glow {
-  position: absolute;
-  top: -40%;
-  right: -10%;
-  width: 320px;
-  height: 320px;
-  background: radial-gradient(circle, rgba(247,192,0,0.25) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.pid__hero__content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: flex-start;
-  gap: 1.5rem;
-  flex-wrap: wrap;
 }
 
 /* Avatar */
@@ -175,6 +165,19 @@
   color: #bbf7d0;
 }
 
+/* Neutral utility action — the hero's yellow is already spent on --manage,
+   so the rate-sheet link uses the dark-surface translucent treatment instead. */
+.pid__hero__btn--link {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.85);
+}
+.pid__hero__btn--link:hover {
+  background: rgba(255,255,255,0.16);
+  border-color: rgba(255,255,255,0.35);
+  color: #fff;
+}
+
 .pid__hero__btn--manage {
   background: var(--brand-primary, #f7c000);
   color: var(--brand-grey-800, #1f1f1f);
@@ -188,6 +191,13 @@
   transform: translateY(-1px);
 }
 
+/* ── BODY ────────────────────────────────────────────────────────────────── */
+
+/* Single section holding everything below the hero — notes, stats and grid */
+.pid__body {
+  padding: 0.325rem;
+}
+
 /* ── STATS ROW ───────────────────────────────────────────────────────────── */
 
 .pid__stats {
@@ -195,51 +205,6 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
   margin-bottom: 1.5rem;
-}
-
-.pid__stats__card {
-  background: var(--brand-white, #fff);
-  border-radius: var(--brand-radius-md, 8px);
-  padding: 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  box-shadow: var(--brand-shadow-sm);
-  border: 1px solid var(--brand-grey-200, #e8e8e8);
-  transition: var(--brand-transition);
-}
-.pid__stats__card:hover {
-  box-shadow: var(--brand-shadow-md);
-  transform: translateY(-2px);
-}
-
-.pid__stats__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--brand-radius-sm, 6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.125rem;
-  flex-shrink: 0;
-}
-.pid__stats__icon--blue   { background: #e3f2fd; color: #1976d2; }
-.pid__stats__icon--green  { background: #e8f5e9; color: #2e7d32; }
-.pid__stats__icon--orange { background: #fff8e1; color: #f57f17; }
-.pid__stats__icon--purple { background: #f3e5f5; color: #7b1fa2; }
-
-.pid__stats__num {
-  font-size: 1.375rem;
-  font-weight: 800;
-  color: var(--brand-grey-800, #1f1f1f);
-  line-height: 1.1;
-}
-.pid__stats__lbl {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--brand-grey-500, #888);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
 }
 
 /* ── MAIN GRID ───────────────────────────────────────────────────────────── */
@@ -498,6 +463,97 @@
 .pid__crm-pill--converted   { background: #dcfce7;  color: #15803d; }
 .pid__crm-pill--lost        { background: #fee2e2;  color: #b91c1c; }
 .pid__crm-pill--on_hold     { background: #f3f4f6;  color: #6b7280; }
+
+/* CRM lead card — the lead number leads the Manage panel; navy carries it so it
+   reads as identity, not as another status chip. */
+.pid__leadcard {
+  display: block;
+  padding: 0.75rem;
+  margin-bottom: 1.125rem;
+  background: var(--brand-gradient-navy, linear-gradient(135deg, #001f3f 0%, #003366 100%));
+  border: 1px solid var(--brand-navy, #001f3f);
+  border-radius: var(--brand-radius-md, 0.75rem);
+  color: var(--brand-white, #fff);
+  text-decoration: none;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+a.pid__leadcard:hover {
+  box-shadow: var(--brand-shadow-md, 0 4px 12px rgba(0, 31, 63, 0.22));
+  transform: translateY(-1px);
+  color: var(--brand-white, #fff);
+}
+.pid__leadcard__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.pid__leadcard__lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-primary, #f7c000);
+}
+.pid__leadcard__stage {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.25em 0.75em;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 100px;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
+}
+.pid__leadcard__num {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  margin-top: 0.375rem;
+}
+.pid__leadcard__num--none { color: rgba(255, 255, 255, 0.45); }
+.pid__leadcard__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+.pid__leadcard__go {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 600;
+  color: var(--brand-primary, #f7c000);
+}
+.pid__leadcard__go i { font-size: 0.7rem; transition: transform 0.2s ease; }
+a.pid__leadcard:hover .pid__leadcard__go i { transform: translateX(3px); }
+
+/* No lead yet — same footprint, drained of the identity colour */
+.pid__leadcard--none {
+  background: var(--brand-grey-100, #fafafa);
+  border-color: var(--brand-grey-300, #dcdcdc);
+  color: var(--brand-grey-700, #333);
+}
+.pid__leadcard--none .pid__leadcard__lbl { color: var(--brand-grey-500, #6c757d); }
+.pid__leadcard--none .pid__leadcard__num { color: var(--brand-grey-400, #b0b0b0); }
+.pid__leadcard--none .pid__leadcard__meta { color: var(--brand-grey-500, #6c757d); }
+
+.pid__leadcard__merged {
+  margin: -0.75rem 0 1.125rem;
+  font-size: 0.75rem;
+  color: var(--brand-warning-text, #92400e);
+}
+.pid__leadcard__merged a { color: inherit; font-weight: 700; }
 
 /* ── NOTES BLOCK ─────────────────────────────────────────────────────────── */
 
@@ -843,7 +899,6 @@
 }
 
 @media (max-width: 768px) {
-  .pid__hero__content { flex-direction: column; }
   .pid__hero__actions { padding-top: 0; }
   .pid__stats { grid-template-columns: repeat(2, 1fr); }
   .pid__canvas { width: 100%; }
@@ -1032,9 +1087,120 @@
   font-style: italic;
 }
 
-/* ── STATS: BIGGER NUMBERS ───────────────────────────────────────────────── */
+/* ── QUOTED PLAN PANEL ───────────────────────────────────────────────────── */
+/* What the customer picked on the public rate sheet. Read-only here: it is a
+   record of their choice, corrected through the timeline, not retyped. */
 
-.pid__stats__num {
-  font-size: 1.75rem;
-  letter-spacing: -0.02em;
+.pid__panel--quote {
+  border-top: 3px solid var(--brand-navy, #001f3f);
+}
+
+.pid__count-chip--ok {
+  background: var(--brand-success-bg, #dcfce7);
+  color: var(--brand-success-dark, #065f46);
+}
+
+.pid__quote__plan {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--brand-navy, #001f3f);
+  line-height: 1.3;
+}
+
+.pid__quote__price {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--brand-grey-800, #1f1f1f);
+  margin-top: 0.375rem;
+}
+
+.pid__quote__custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: var(--brand-font-primary, "Inter", sans-serif);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--brand-warning-text, #92400e);
+}
+
+.pid__quote__meta {
+  font-size: 0.75rem;
+  color: var(--brand-grey-500, #6c757d);
+  margin-top: 0.375rem;
+}
+
+.pid__quote__note {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--brand-grey-100, #f8f9fa);
+  border-left: 3px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 6px);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--brand-grey-700, #333);
+}
+
+.pid__quote--empty {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  background: var(--brand-grey-100, #f8f9fa);
+  border: 1px dashed var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 6px);
+  font-size: 0.8125rem;
+  color: var(--brand-grey-600, #555);
+}
+
+.pid__quote--empty i {
+  color: var(--brand-grey-400, #b0b0b0);
+}
+
+.pid__quote__link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pid__quote__link-input {
+  font-size: 0.78rem;
+  padding: 0.4rem 0.625rem;
+  color: var(--brand-grey-600, #555);
+}
+
+.pid__quote__copy {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.1rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--brand-grey-100, #f8f9fa);
+  border: 1px solid var(--brand-grey-400, #b0b0b0);
+  color: var(--brand-grey-800, #1f1f1f);
+  border-radius: var(--brand-radius-sm, 6px);
+  cursor: pointer;
+  transition: var(--brand-transition);
+}
+
+.pid__quote__copy:hover {
+  background: var(--brand-secondary, #fff7d6);
+  border-color: var(--brand-primary, #f7c000);
+}
+
+/* The panel sits above Manage Inquiry — keep the same gap the grid uses */
+#quote-panel {
+  margin-bottom: 1.25rem;
+}
+
+/* The link section needs air under the "chosen by" line, and none below it —
+   it is the last thing in the panel. */
+#quote-panel .pid__canvas-section {
+  margin-top: 1.125rem;
+  margin-bottom: 0;
 }

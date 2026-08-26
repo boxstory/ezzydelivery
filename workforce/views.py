@@ -21038,14 +21038,42 @@ def pricing_inquiries_list(request):
     if status_filter:
         inquiries = inquiries.filter(crm_status=status_filter)
 
+    # Who has picked a rate on the public quote sheet and who still has to be chased.
+    quote_filter = request.GET.get('quote', '').strip()
+    if quote_filter == '1':
+        inquiries = inquiries.filter(plan_agreed_at__isnull=False)
+    elif quote_filter == '0':
+        inquiries = inquiries.filter(plan_agreed_at__isnull=True)
+
+    # Where the customer's agreed price sits against what the rate card suggested —
+    # the feedback loop that says whether the card is set right.
+    variance_filter = request.GET.get('variance', '').strip()
+    if variance_filter in ('below', 'above'):
+        inquiries = inquiries.filter(
+            suggested_price_value__isnull=False, agreed_price_value__isnull=False)
+        if variance_filter == 'below':
+            inquiries = inquiries.filter(agreed_price_value__lt=F('suggested_price_value'))
+        else:
+            inquiries = inquiries.filter(agreed_price_value__gt=F('suggested_price_value'))
+
     total_count = webpages_models.PricingEnquiry.objects.count()
     cod_count = webpages_models.PricingEnquiry.objects.filter(is_required_COD_service=True).count()
     fulfillment_count = webpages_models.PricingEnquiry.objects.filter(
         Q(is_required_fulfillment_service_for_operate_from_outside_qatar=True) |
         Q(is_required_fulfillment_service_for_make_hub_in_doha=True)
     ).count()
+    quoted_count = webpages_models.PricingEnquiry.objects.filter(plan_agreed_at__isnull=False).count()
 
     page_obj = paginate_queryset(request, inquiries, items_per_page=50)
+
+    # Tag the one-off personal senders so triage can skip them. Pure Python on
+    # the page's rows — no extra queries.
+    try:
+        from webpages.pricing.routing import p2p_signals
+        for row in page_obj:
+            row.is_likely_p2p = p2p_signals(row)['is_likely_p2p']
+    except Exception:
+        logger.exception('P2P routing check failed on the pricing inquiries list')
 
     # Filters carried across pages by the shared pagination component. The old
     # hand-rolled pager hardcoded search/cod/fulfillment/status into its hrefs,
@@ -21063,9 +21091,12 @@ def pricing_inquiries_list(request):
         'cod_filter': cod_filter,
         'fulfillment_filter': fulfillment_filter,
         'status_filter': status_filter,
+        'quote_filter': quote_filter,
+        'variance_filter': variance_filter,
         'total_count': total_count,
         'cod_count': cod_count,
         'fulfillment_count': fulfillment_count,
+        'quoted_count': quoted_count,
     }
     return render(request, 'workforce/forms/pricing_inquiries_list.html', context)
 
@@ -21075,17 +21106,67 @@ def pricing_inquiries_list(request):
 def pricing_inquiry_detail(request, inquiry_id):
     """Full detail view for a single PricingEnquiry submission."""
     inquiry = get_object_or_404(
-        webpages_models.PricingEnquiry.objects.prefetch_related('activities__created_by'),
+        webpages_models.PricingEnquiry.objects
+            .select_related('selected_plan', 'lead', 'lead__merged_into')
+            .prefetch_related('activities__created_by'),
         pk=inquiry_id
     )
     from django.contrib.auth.models import User
     staff_users = User.objects.filter(is_staff=True).order_by('first_name', 'username')
+    # Suggested rate — best-effort, exactly like the CRM sync below it. A pricing
+    # failure must never take down a CRM record staff are trying to read.
+    suggestion, suggestion_error = None, ''
+    try:
+        from webpages.pricing.engine import get_or_create_suggestion
+        suggestion, _record = get_or_create_suggestion(inquiry, user=request.user)
+        if not suggestion.available:
+            suggestion_error = suggestion.reason
+    except Exception:
+        logger.exception('Price suggestion failed for PricingEnquiry %s', inquiry.pk)
+        suggestion_error = 'Could not compute a suggestion — see the error log.'
+
+    # Personal one-off senders land on this form regularly; the 3PL rate card is
+    # the wrong product for them, so say so before sales spends a quote on it.
+    try:
+        from webpages.pricing.routing import p2p_signals
+        p2p = p2p_signals(inquiry)
+    except Exception:
+        logger.exception('P2P routing check failed for PricingEnquiry %s', inquiry.pk)
+        p2p = None
+
+    # Gap between what the customer agreed to and what the engine suggested —
+    # the one number the call turns on, and the page had it split across two
+    # panels. Best-effort like the suggestion itself: never break the record.
+    from decimal import Decimal
+    agreed_gap = None
+    try:
+        if suggestion and suggestion.available and inquiry.agreed_price_value is not None:
+            agreed_gap = Decimal(str(inquiry.agreed_price_value)) - Decimal(str(suggestion.suggested_price))
+    except (TypeError, ValueError, ArithmeticError):
+        agreed_gap = None
+
+    quote_path = inquiry.get_quote_url()
+
+    # The CRM card this form became. Staff read the pricing console and the lead
+    # board as one thing, so the state card carries the lead number and links to
+    # it; a merged lead points at the surviving parent card instead.
+    crm_lead = getattr(inquiry, 'lead', None)
+    crm_lead_parent = crm_lead.merged_into if (crm_lead and crm_lead.merged_into_id) else None
+
     context = {
+        'agreed_gap': agreed_gap,
+        'crm_lead': crm_lead,
+        'crm_lead_parent': crm_lead_parent,
         'page_title': f'Pricing Inquiry – {inquiry.business_name}',
         'inquiry': inquiry,
         'activities': inquiry.activities.select_related('created_by').order_by('-created_at'),
         'staff_users': staff_users,
         'status_choices': webpages_models.PricingEnquiry.STATUS_CHOICES,
+        # Absolute — this gets copied out of the console into a WhatsApp reply.
+        'quote_url': request.build_absolute_uri(quote_path) if quote_path else '',
+        'suggestion': suggestion if (suggestion and suggestion.available) else None,
+        'suggestion_error': suggestion_error,
+        'p2p': p2p,
         # Starter text for the "Send from EZZY" composer, editable on the AI
         # Config Messages tab. '' when that template is switched off.
         'wa_send_message': message_templates.render_template(
@@ -21144,12 +21225,15 @@ def pricing_inquiry_update_status(request, inquiry_id):
             body='; '.join(changes),
             created_by=request.user,
         )
-        # Keep the CRM lead in sync with the legacy page (one-way, no back-write)
-        try:
-            from crm.services import sync_lead_from_pricing_status
-            sync_lead_from_pricing_status(inquiry)
-        except Exception:
-            logger.exception('CRM lead sync failed for PricingEnquiry %s', inquiry.pk)
+
+    # Keep the CRM lead in sync with the legacy page (one-way, no back-write).
+    # Runs on every staff save, not just on a diff, so a row whose lead is
+    # missing (abandoned form → no lead was ever created) gets one here.
+    try:
+        from crm.services import sync_lead_from_pricing_status
+        sync_lead_from_pricing_status(inquiry)
+    except Exception:
+        logger.exception('CRM lead sync failed for PricingEnquiry %s', inquiry.pk)
 
     return JsonResponse({
         'success': True,
@@ -21254,6 +21338,109 @@ def pricing_inquiry_add_activity(request, inquiry_id):
             'created_by': activity.created_by.get_full_name() or activity.created_by.username,
             'created_at': activity.created_at.strftime('%d %b %Y, %H:%M'),
         }
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pricing_inquiry_quote_price(request, inquiry_id):
+    """AJAX: record the staff quote for an inquiry — the suggestion, or an override.
+
+    Writes the ``quoted_*`` block only. The ``agreed_*`` block belongs to the
+    customer, who stamped it with their own IP when they confirmed on the rate
+    sheet, and staff must never be able to write it on their behalf.
+    """
+    from decimal import Decimal, InvalidOperation
+    from core.validators import sanitize_text
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    inquiry = get_object_or_404(webpages_models.PricingEnquiry, pk=inquiry_id)
+
+    raw_price = (request.POST.get('price') or '').strip()
+    note = sanitize_text(request.POST.get('note') or '')[:2000]
+    try:
+        price = Decimal(raw_price).quantize(Decimal('0.01'))
+    except (InvalidOperation, ValueError, TypeError):
+        return JsonResponse({'error': 'Enter a valid price'}, status=400)
+    if price <= 0:
+        return JsonResponse({'error': 'Price must be above zero'}, status=400)
+
+    suggestion = inquiry.latest_suggestion
+    suggested = suggestion.suggested_price if suggestion else None
+    is_override = suggested is None or price != suggested
+
+    # Below the configured floor is allowed — it is a guess, not a cost — but it
+    # needs a reason on the record, and it says so loudly in the timeline.
+    below_floor = bool(suggestion and suggestion.floor_value is not None
+                       and price < suggestion.floor_value)
+    if below_floor and not note:
+        return JsonResponse(
+            {'error': 'This is below the configured floor. Add a note explaining why.'}, status=400)
+
+    inquiry.quoted_price_value = price
+    inquiry.quoted_price_unit = 'QR per delivery'
+    inquiry.quoted_by = request.user
+    inquiry.quoted_at = timezone.now()
+    inquiry.quoted_note = note or None
+
+    # A customer who already picked a plan keeps their agreement — this becomes a
+    # counter-offer on the record instead of silently replacing what they chose.
+    counter_offer = inquiry.plan_agreed_at is not None
+
+    status_moved = False
+    if inquiry.crm_status == webpages_models.PricingEnquiry.STATUS_NEW:
+        inquiry.crm_status = webpages_models.PricingEnquiry.STATUS_QUOTED
+        status_moved = True
+    inquiry.save()
+
+    if suggestion is not None:
+        suggestion.staff_action = (suggestion.ACTION_OVERRIDDEN if is_override
+                                   else suggestion.ACTION_ACCEPTED)
+        suggestion.staff_price = price
+        suggestion.staff_note = note or None
+        suggestion.acted_by = request.user
+        suggestion.acted_at = timezone.now()
+        suggestion.save(update_fields=['staff_action', 'staff_price', 'staff_note',
+                                       'acted_by', 'acted_at'])
+
+    if is_override and suggested is not None:
+        body = f'Staff quoted {price} QR (suggested {suggested} QR)'
+    elif is_override:
+        body = f'Staff quoted {price} QR'
+    else:
+        body = f'Staff accepted the suggested rate of {price} QR'
+    if suggestion is not None:
+        body += f' [{suggestion.ruleset_code}]'
+    if below_floor:
+        body += f'. BELOW the configured floor of {suggestion.floor_value} QR'
+    if counter_offer:
+        body += '. Counter-offer — the customer had already agreed a plan'
+    if note:
+        body += f'. Note: {note[:300]}'
+    if status_moved:
+        body += '. Status moved to Quoted'
+
+    webpages_models.PricingEnquiryActivity.objects.create(
+        inquiry=inquiry,
+        activity_type=webpages_models.PricingEnquiryActivity.TYPE_STATUS_CHANGE,
+        body=body,
+        created_by=request.user,
+    )
+
+    if status_moved:
+        try:
+            from crm.services import sync_lead_from_pricing_status
+            sync_lead_from_pricing_status(inquiry)
+        except Exception:
+            logger.exception('CRM lead sync failed for PricingEnquiry %s', inquiry.pk)
+
+    return JsonResponse({
+        'success': True,
+        'quoted_price': str(price),
+        'is_override': is_override,
+        'below_floor': below_floor,
+        'counter_offer': counter_offer,
     })
 
 

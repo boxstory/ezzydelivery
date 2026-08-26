@@ -353,13 +353,16 @@ urlpatterns = [
     path('forms/pricing-inquiries/<int:inquiry_id>/', workforce_views.pricing_inquiry_detail, name='pricing_inquiry_detail'),
     path('forms/pricing-inquiries/<int:inquiry_id>/update-status/', workforce_views.pricing_inquiry_update_status, name='pricing_inquiry_update_status'),
     path('forms/pricing-inquiries/<int:inquiry_id>/edit/', workforce_views.pricing_inquiry_edit, name='pricing_inquiry_edit'),
+    path('forms/pricing-inquiries/<int:inquiry_id>/quote-price/', workforce_views.pricing_inquiry_quote_price, name='pricing_inquiry_quote_price'),
     path('forms/pricing-inquiries/<int:inquiry_id>/add-activity/', workforce_views.pricing_inquiry_add_activity, name='pricing_inquiry_add_activity'),
     path('forms/pricing-inquiries/<int:inquiry_id>/delete-activity/<int:activity_id>/', workforce_views.pricing_inquiry_delete_activity, name='pricing_inquiry_delete_activity'),
 
     # CRM Leads
     path('crm/leads/board/', crm_views.crm_leads_board, name='crm_leads_board'),
-    path('crm/leads/board/drivers/', crm_views.crm_leads_board, {'board_category': 'driver'}, name='crm_driver_leads_board'),
+    path('crm/leads/board/drivers/', crm_views.crm_driver_leads_board, name='crm_driver_leads_board'),
     path('crm/leads/', crm_views.crm_leads_list, name='crm_leads_list'),
+    path('crm/leads/drivers/', crm_views.crm_driver_leads_list, name='crm_driver_leads_list'),
+    path('crm/leads/export/google-contacts/', crm_views.crm_leads_export_google, name='crm_leads_export_google'),
     path('crm/leads/new/', crm_views.crm_lead_create, name='crm_lead_create'),
     path('crm/leads/<int:lead_id>/', crm_views.crm_lead_detail, name='crm_lead_detail'),
     path('crm/leads/<int:lead_id>/update-stage/', crm_views.crm_lead_update_stage, name='crm_lead_update_stage'),

@@ -1,0 +1,880 @@
+/* Purpose: Console redesign layer for the staff pricing-inquiry record (pid__ namespace)
+   Used by: workforce/templates/workforce/forms/pricing_inquiry_detail.html
+   Notes: Loads AFTER pricing_inquiry_detail.css and pricing_suggestion.css and is authoritative
+          over both. A new file path is the only reliable Cloudflare bust on /static/ — ?v= is
+          ignored — so redesign passes land here rather than being appended to the older files. */
+
+/* =============================================================================
+   The record reads as a rate ledger: navy carries authority, every number is
+   mono, and yellow is spent exactly once (Save Changes). Labels are the
+   uppercase micro-scale; everything else is ink on hairlines.
+   ============================================================================= */
+
+/* ── HERO ────────────────────────────────────────────────────────────────────
+   Two rows. Identity owns the full width; actions sit on their own rule below.
+   The old single-row flex squeezed the name, meta and badges into 137px of
+   1037px because the action row claimed 779px on the same line.
+
+   The band itself — navy fill, the 3px yellow rule, radius, and the
+   0.7rem/1.1rem inset — belongs to staff-hero.css, which matches every
+   [class$="__hero"] under [data-dashboard="staff"] and outranks a bare
+   .pid__hero. Nothing here re-declares those; the rows carry no horizontal
+   padding of their own or the band would be inset twice. */
+
+.pid__hero__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0;
+}
+
+.pid__hero__avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 1.125rem;
+}
+
+.pid__hero__info { flex: 1 1 22rem; min-width: 0; }
+
+/* Record number — staff quote this to each other, so it leads the block. */
+.pid__hero__kicker {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 0.25rem;
+}
+
+.pid__hero__name {
+  letter-spacing: -0.015em;
+}
+
+.pid__hero__sub {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.62);
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+  gap: 0.375rem;
+}
+
+.pid__hero__sep {
+  color: rgba(255, 255, 255, 0.28);
+  padding: 0 0.125rem;
+}
+
+/* Badges move to their own column on row 1 and wrap under the name below lg. */
+.pid__hero__badges {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  gap: 0.375rem;
+  max-width: 22rem;
+}
+
+.pid__badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+/* ── HERO ACTION BAR ─────────────────────────────────────────────────────── */
+
+.pid__hero__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 0.625rem;
+}
+
+.pid__hero__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  padding-top: 0;
+  flex: 1 1 auto;
+}
+
+.pid__hero__util {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-left: auto;
+}
+
+/* Every hero control is translucent on navy. The one solid control is Edit —
+   it changes what the page IS, so it earns the weight without spending yellow. */
+.pid__hero__btn {
+  min-height: 2.1rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.88);
+  box-shadow: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.pid__hero__btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.38);
+  color: #fff;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Channel buttons keep a green tint so the two ways to reach a lead stay
+   findable in a row of otherwise identical controls. */
+.pid__hero__btn--call,
+.pid__hero__btn--wa {
+  background: rgba(37, 211, 102, 0.12);
+  border-color: rgba(37, 211, 102, 0.32);
+  color: #a7f3c0;
+}
+.pid__hero__btn--call:hover,
+.pid__hero__btn--wa:hover {
+  background: rgba(37, 211, 102, 0.22);
+  border-color: rgba(37, 211, 102, 0.45);
+  color: #d1fae5;
+}
+
+.pid__hero__btn--manage {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.92);
+  color: var(--brand-navy, #001f3f);
+  font-weight: 700;
+  box-shadow: none;
+}
+.pid__hero__btn--manage:hover {
+  background: #fff;
+  border-color: #fff;
+  color: var(--brand-navy, #001f3f);
+  transform: none;
+  box-shadow: none;
+}
+
+/* The anchor-jump to Manage Inquiry is navigation, not an action — quiet it. */
+.pid__hero__btn--jump {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pid__back { width: 2.1rem; height: 2.1rem; border-radius: var(--brand-radius-sm, 0.5rem); }
+
+/* ── BODY ────────────────────────────────────────────────────────────────── */
+
+.pid__body { padding: 0; }
+
+/* ── QUALIFICATION STRIP ─────────────────────────────────────────────────────
+   Four answers off the form, not four KPIs — so one instrument panel divided by
+   hairlines, never four floating cards with pastel icon tiles. */
+
+.pid__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin-bottom: 1.125rem;
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-grey-200, #f0f0f0);
+  border-radius: var(--brand-radius-md, 0.75rem);
+  overflow: hidden;
+}
+
+.pid__stat {
+  padding: 0.75rem 0.75rem;
+  border-left: 1px solid var(--brand-grey-200, #f0f0f0);
+  min-width: 0;
+}
+.pid__stat:first-child { border-left: 0; }
+
+.pid__stat__lbl {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+  margin-bottom: 0.25rem;
+}
+
+.pid__stat__val {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--brand-grey-800, #1f1f1f);
+  word-break: break-word;
+}
+/* An unanswered question is a fact about the lead, so it stays readable — grey-400
+   at this size is 2.6:1. It reads quieter than an answer through weight, not fog. */
+.pid__stat__val--empty {
+  color: var(--brand-grey-500, #6c757d);
+  font-weight: 400;
+  font-size: 0.9375rem;
+}
+
+/* ── GRID ────────────────────────────────────────────────────────────────── */
+
+.pid__grid { gap: 1.125rem; }
+.pid__grid__left,
+.pid__grid__right { gap: 1.125rem; }
+
+/* ── PANELS ──────────────────────────────────────────────────────────────── */
+
+.pid__panel {
+  border-color: var(--brand-grey-200, #f0f0f0);
+  border-radius: var(--brand-radius-md, 0.75rem);
+  box-shadow: none;
+}
+
+.pid__panel__hd {
+  padding: 0.75rem 1.125rem;
+  gap: 0.5rem;
+  background: var(--brand-white, #fff);
+  border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+/* Header icons were #f4c20d on near-white: 1.7:1, unreadable. They label
+   nothing the heading does not already say, so they drop to quiet ink. */
+.pid__panel__hd > i {
+  color: var(--brand-grey-400, #b0b0b0);
+  font-size: 0.8125rem;
+}
+.pid__panel__hd h3 {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-600, #555);
+}
+
+.pid__panel__body { padding: 0.75rem 1.125rem 1.125rem; }
+.pid__panel__body--flush { padding: 0; }
+
+/* Accent rules on panel tops read as ranking when they are only grouping. */
+.pid__panel--crm,
+.pid__panel--quote,
+.pid__panel--suggest { border-top: 1px solid var(--brand-grey-200, #f0f0f0); }
+
+.pid__count-chip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  background: var(--brand-grey-150, #e9ecef);
+  color: var(--brand-grey-600, #555);
+}
+
+/* ── FIELDS ──────────────────────────────────────────────────────────────── */
+
+.pid__field {
+  padding: 0.5rem 0;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.pid__field__lbl {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--brand-grey-500, #6c757d);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pid__field__val {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--brand-grey-800, #1f1f1f);
+  flex: 0 0 auto;
+}
+
+/* #f4c20d text on white is 1.68:1. Yellow ink is the darkened same hue. */
+.pid__field__val--primary { color: var(--brand-primary-text, #8f6b00); }
+
+.pid__field__val--num {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.pid__field__val--urgent { color: var(--brand-danger, #dc2626); }
+
+.pid__chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+.pid__chip--yes     { background: var(--brand-success-bg, #dcfce7); color: var(--brand-success, #15803d); }
+.pid__chip--no      { background: var(--brand-grey-150, #e9ecef); color: var(--brand-grey-600, #555); }
+.pid__chip--neutral { background: var(--brand-warning-bg, #fef3c7); color: #92400e; }
+
+.pid__divider { margin: 0.75rem 0; }
+
+/* ── CONTACT ROWS ────────────────────────────────────────────────────────────
+   A channel that exists is a target you click. One that does not is a gap in
+   the record — it still shows (staff need to know it is missing) but it stops
+   competing for the same weight. */
+
+.pid__contact { gap: 0.25rem; }
+
+.pid__contact__item {
+  gap: 0.625rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  background: none;
+  border: 1px solid transparent;
+}
+.pid__contact__item:hover {
+  background: var(--brand-grey-50, #f8f9fa);
+  border-color: var(--brand-grey-200, #f0f0f0);
+}
+
+.pid__contact__item > i { font-size: 0.875rem; width: 1.125rem; }
+
+.pid__contact__label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.pid__contact__val {
+  font-size: 0.82rem;
+  margin-top: 0.1rem;
+  word-break: break-word;
+}
+
+.pid__contact__item--empty {
+  opacity: 1;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+.pid__contact__item--empty > i { color: var(--brand-grey-300, #dcdcdc); }
+.pid__contact__item--empty .pid__contact__val {
+  color: var(--brand-grey-500, #6c757d);
+  font-style: normal;
+  font-weight: 400;
+}
+
+/* ── SERVICE CHIPS ───────────────────────────────────────────────────────── */
+
+.pid__svc-grid { gap: 0.375rem; }
+
+.pid__svc {
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: var(--brand-grey-50, #f8f9fa);
+  color: var(--brand-grey-600, #555);
+  border: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+.pid__svc--on {
+  background: var(--brand-success-bg, #dcfce7);
+  color: var(--brand-success-dark, #065f46);
+  border-color: transparent;
+  font-weight: 600;
+}
+.pid__svc--on > i:first-child { color: var(--brand-success, #15803d); }
+
+/* ── PRICE SPREAD ────────────────────────────────────────────────────────────
+   The page's thesis. Floor, suggested and what the customer actually agreed
+   were spread across two panels, so the gap between them — the only thing the
+   call turns on — was invisible. Three numbers, one line, one bracket. */
+
+.pid__spread {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--brand-grey-200, #f0f0f0);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  overflow: hidden;
+}
+
+.pid__spread__cell {
+  padding: 0.5rem 0.625rem;
+  border-left: 1px solid var(--brand-grey-200, #f0f0f0);
+  min-width: 0;
+}
+.pid__spread__cell:first-child { border-left: 0; }
+
+/* The engine's number is the one being defended below, so it carries navy. */
+.pid__spread__cell--lead {
+  background: var(--brand-navy, #001f3f);
+  border-left-color: var(--brand-navy, #001f3f);
+}
+.pid__spread__cell--lead + .pid__spread__cell { border-left-color: var(--brand-navy, #001f3f); }
+
+.pid__spread__lbl {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+  margin-bottom: 0.125rem;
+}
+.pid__spread__cell--lead .pid__spread__lbl { color: rgba(255, 255, 255, 0.6); }
+
+.pid__spread__num {
+  display: block;
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--brand-grey-800, #1f1f1f);
+}
+.pid__spread__cell--lead .pid__spread__num { color: #fff; font-size: 1.375rem; }
+
+.pid__spread__none {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--brand-grey-400, #b0b0b0);
+}
+
+/* Signed gap against the suggestion — the number staff argue about. */
+.pid__spread__gap {
+  display: block;
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
+  font-weight: 600;
+  margin-top: 0.125rem;
+}
+.pid__spread__gap--under { color: var(--brand-danger, #dc2626); }
+.pid__spread__gap--over  { color: var(--brand-success, #15803d); }
+
+.pid__spread__unit {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+  margin-top: 0.375rem;
+}
+
+.pid__sugg__card {
+  margin-top: 0.125rem;
+  margin-bottom: 0.875rem;
+  font-size: 0.72rem;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+/* ── RATE LEDGER ─────────────────────────────────────────────────────────────
+   The arithmetic that produced the number, as a ledger with a running total —
+   the artifact sales has to defend on the call. */
+
+.pid__canvas-section { margin-bottom: 1.125rem; }
+.pid__canvas-section:last-child { margin-bottom: 0; }
+
+.pid__canvas-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+  margin-bottom: 0.375rem;
+}
+
+.pid__sugg__table thead th {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+  border-bottom: 1px solid var(--brand-grey-300, #dcdcdc);
+  padding: 0 0 0.25rem;
+  text-align: left;
+}
+.pid__sugg__table thead th.pid__sugg__col-num { text-align: right; padding-left: 0.75rem; }
+
+.pid__sugg__table td { padding: 0.375rem 0; border-bottom-color: var(--brand-grey-200, #f0f0f0); }
+
+.pid__sugg__lbl { font-size: 0.78rem; }
+.pid__sugg__why { font-size: 0.68rem; margin-top: 0.1rem; line-height: 1.4; }
+
+.pid__sugg__table .pid__sugg__delta,
+.pid__sugg__table .pid__sugg__run {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.375rem 0 0.375rem 0.75rem;
+}
+
+/* The running total is the spine of the ledger — it stays the darkest column. */
+.pid__sugg__table tr:last-child .pid__sugg__run { color: var(--brand-navy, #001f3f); }
+
+.pid__sugg__note { font-size: 0.78rem; margin-bottom: 0.375rem; }
+.pid__sugg__aside { font-size: 0.68rem; margin-top: 0.125rem; }
+
+.pid__sugg__flag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.375rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.pid__sugg__floor {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.72rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.pid__sugg__chip {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.72rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.pid__sugg__actions { margin-top: 0.75rem; gap: 0.375rem; }
+
+.pid__sugg__btn { min-height: 2.1rem; font-size: 0.8rem; }
+.pid__sugg__btn:hover {
+  background: var(--brand-grey-150, #e9ecef);
+  border-color: var(--brand-grey-500, #6c757d);
+}
+.pid__sugg__btn--accept:hover { background: var(--brand-navy-light, #003366); border-color: var(--brand-navy-light, #003366); }
+
+.pid__sugg__quoted { font-size: 0.75rem; margin-top: 0.75rem; padding-top: 0.75rem; }
+
+/* ── QUOTED PLAN ─────────────────────────────────────────────────────────── */
+
+.pid__quote__plan { font-size: 0.875rem; }
+.pid__quote__price {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.125rem;
+  margin-top: 0.25rem;
+  color: var(--brand-navy, #001f3f);
+}
+.pid__quote__meta { font-size: 0.72rem; margin-top: 0.25rem; }
+.pid__quote--empty { padding: 0.5rem 0.625rem; font-size: 0.78rem; }
+.pid__quote__note { margin-top: 0.5rem; padding: 0.5rem 0.625rem; font-size: 0.78rem; }
+
+.pid__quote__link-input { font-size: 0.75rem; padding: 0.375rem 0.5rem; }
+.pid__quote__copy { min-height: 2.1rem; font-size: 0.8rem; padding: 0.375rem 0.625rem; }
+.pid__quote__copy:hover { background: var(--brand-grey-150, #e9ecef); border-color: var(--brand-grey-500, #6c757d); }
+
+/* ── PIPELINE STAGE SELECTOR ─────────────────────────────────────────────────
+   Seven outlined colour swatches read as seven equal choices shouting at once.
+   The stage is a position, so: one filled navy current stage, the rest quiet
+   with a colour swatch carrying the identity. */
+
+.pid__crm-status-display { padding: 0 0 0.5rem; text-align: left; }
+
+.pid__crm-pill {
+  gap: 0.375rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.pid__status-grid { gap: 0.25rem; }
+
+.pid__status-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.375rem 0.5rem;
+  min-height: 2.1rem;
+  text-align: left;
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  background: var(--brand-white, #fff);
+  color: var(--brand-grey-600, #555);
+  opacity: 1;
+}
+.pid__status-opt::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: currentColor;
+}
+.pid__status-opt:hover {
+  background: var(--brand-grey-50, #f8f9fa);
+  border-color: var(--brand-grey-500, #6c757d);
+  transform: none;
+  box-shadow: none;
+  opacity: 1;
+}
+.pid__status-opt.active {
+  background: var(--brand-navy, #001f3f);
+  border-color: var(--brand-navy, #001f3f);
+  color: #fff;
+  transform: none;
+  box-shadow: none;
+}
+
+/* The swatch keeps each stage's identity; the button surface stays neutral. */
+.pid__status-opt--new         { color: var(--brand-grey-600, #555); }
+.pid__status-opt--contacted   { color: #2563eb; }
+.pid__status-opt--quoted      { color: #0e7490; }
+.pid__status-opt--negotiating { color: #b45309; }
+.pid__status-opt--converted   { color: var(--brand-success, #15803d); }
+.pid__status-opt--lost        { color: var(--brand-danger, #dc2626); }
+.pid__status-opt--on_hold     { color: var(--brand-grey-500, #6c757d); }
+
+.pid__status-opt--new.active,
+.pid__status-opt--contacted.active,
+.pid__status-opt--quoted.active,
+.pid__status-opt--negotiating.active,
+.pid__status-opt--converted.active,
+.pid__status-opt--lost.active,
+.pid__status-opt--on_hold.active {
+  background: var(--brand-navy, #001f3f);
+  color: #fff;
+}
+.pid__status-opt--new.active::before         { background: #9ca3af; }
+.pid__status-opt--contacted.active::before   { background: #60a5fa; }
+.pid__status-opt--quoted.active::before      { background: #22d3ee; }
+.pid__status-opt--negotiating.active::before { background: #fbbf24; }
+.pid__status-opt--converted.active::before   { background: #4ade80; }
+.pid__status-opt--lost.active::before        { background: #f87171; }
+.pid__status-opt--on_hold.active::before     { background: #d1d5db; }
+
+/* ── FORM CONTROLS ───────────────────────────────────────────────────────── */
+
+.pid__select,
+.pid__textarea {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.82rem;
+  border-width: 1px;
+  border-color: var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+.pid__select { min-height: 2.1rem; }
+.pid__textarea { margin-bottom: 0; }
+.pid__select:focus,
+.pid__textarea:focus {
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
+}
+
+.pid__type-toggle {
+  border-width: 1px;
+  border-color: var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+.pid__type-btn span {
+  padding: 0.375rem 0.5rem;
+  min-height: 2.1rem;
+  font-size: 0.78rem;
+  border-right-color: var(--brand-grey-300, #dcdcdc);
+}
+/* Yellow belongs to Save Changes alone — the toggle takes navy. */
+.pid__type-btn input:checked + span {
+  background: var(--brand-navy, #001f3f);
+  color: #fff;
+  font-weight: 600;
+}
+.pid__type-btn input:focus-visible + span {
+  outline: 2px solid var(--brand-primary, #f7c000);
+  outline-offset: -2px;
+}
+
+/* The page's single yellow: the one control that writes the record. */
+.pid__submit-btn {
+  padding: 0.5rem 0.75rem;
+  min-height: 2.25rem;
+  font-size: 0.82rem;
+  background: var(--brand-primary, #f7c000);
+  color: var(--brand-navy, #001f3f);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  box-shadow: none;
+}
+.pid__submit-btn:hover {
+  background: var(--brand-primary-dark, #f4c20d);
+  box-shadow: none;
+  transform: none;
+}
+
+/* ── STAFF NOTES ─────────────────────────────────────────────────────────── */
+
+.pid__notes-block {
+  margin-top: 0;
+  padding: 0.5rem 0.625rem;
+  background: var(--brand-grey-50, #f8f9fa);
+  border: 1px solid var(--brand-grey-200, #f0f0f0);
+  border-left: 3px solid var(--brand-grey-400, #b0b0b0);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+.pid__notes-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+  margin-bottom: 0.25rem;
+}
+.pid__notes-text { font-size: 0.82rem; color: var(--brand-grey-800, #1f1f1f); line-height: 1.5; }
+
+/* ── TIMELINE ────────────────────────────────────────────────────────────── */
+
+#activity-timeline { padding: 0.375rem 1.125rem; }
+
+.pid__tl-item { gap: 0.625rem; padding: 0.625rem 0; }
+.pid__tl-dot { width: 0.5rem; height: 0.5rem; margin-top: 0.3rem; border-width: 0; }
+.pid__tl-item--note .pid__tl-dot          { background: var(--brand-grey-400, #b0b0b0); }
+.pid__tl-item--followup .pid__tl-dot      { background: #2563eb; }
+.pid__tl-item--status_change .pid__tl-dot { background: #d97706; }
+
+.pid__tl-type {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+.pid__tl-time {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: 0.68rem;
+  color: var(--brand-grey-450, #9ca3af);
+}
+.pid__tl-text { font-size: 0.82rem; line-height: 1.5; }
+.pid__tl-by { font-size: 0.68rem; color: var(--brand-grey-500, #6c757d); }
+
+.pid__tl-empty { padding: 1.5rem 0.75rem; color: var(--brand-grey-500, #6c757d); }
+.pid__tl-empty i { font-size: 1.5rem; color: var(--brand-grey-300, #dcdcdc); margin-bottom: 0.375rem; }
+.pid__tl-empty p { font-size: 0.82rem; }
+
+/* ── EDIT MODE ───────────────────────────────────────────────────────────── */
+
+.pid__edit-bar {
+  background: var(--brand-navy, #001f3f);
+  border-left: 3px solid var(--brand-primary, #f7c000);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1.125rem;
+  box-shadow: none;
+}
+.pid__edit-bar__label { font-size: 0.68rem; letter-spacing: 0.06em; color: rgba(255, 255, 255, 0.6); }
+.pid__edit-bar__feedback { font-size: 0.72rem; color: rgba(255, 255, 255, 0.6); }
+
+.pid__btn-save {
+  min-height: 2.1rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+.pid__btn-save:hover:not(:disabled) { box-shadow: none; transform: none; }
+
+.pid__btn-discard {
+  min-height: 2.1rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+#pid-edit-form .pid__panel { border-left: 1px solid var(--brand-grey-200, #f0f0f0); background: var(--brand-white, #fff); }
+#pid-edit-form .pid__field { padding: 0.5rem 0; gap: 0.25rem; }
+#pid-edit-form .pid__field .pid__field__lbl {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+}
+#pid-edit-form .pid__field .pid-edit { font-size: 0.82rem; min-height: 2.1rem; }
+#pid-edit-form .pid__field .pid-edit:focus { box-shadow: none; border-color: var(--brand-primary, #f7c000); }
+#pid-edit-form .pid__service .pid-edit { width: 7rem !important; min-height: 2.1rem; }
+
+.pid__service { padding: 0.5rem 0; font-size: 0.82rem; }
+.pid__service__icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  font-size: 0.68rem;
+}
+.pid__service--on .pid__service__icon {
+  background: var(--brand-success-bg, #dcfce7);
+  color: var(--brand-success-dark, #065f46);
+}
+.pid__service__check--on { color: var(--brand-success, #15803d); }
+
+/* Replaces the inline width/colour attributes the template used to carry. */
+.pid__service__select { width: auto; }
+.pid__channel-icon--wa    { color: #25d366; }
+.pid__channel-icon--email { color: #2563eb; }
+.pid__channel-icon--phone { color: #0891b2; }
+
+/* ── ACCESSIBILITY ───────────────────────────────────────────────────────── */
+
+.pid__hero__btn:focus-visible,
+.pid__back:focus-visible,
+.pid__status-opt:focus-visible,
+.pid__sugg__btn:focus-visible,
+.pid__submit-btn:focus-visible,
+.pid__quote__copy:focus-visible,
+.pid__btn-save:focus-visible,
+.pid__btn-discard:focus-visible {
+  outline: 2px solid var(--brand-primary, #f7c000);
+  outline-offset: 2px;
+}
+.pid__contact__item:focus-visible {
+  outline: 2px solid var(--brand-navy, #001f3f);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pid .pid__hero__btn,
+  .pid .pid__status-opt,
+  .pid .pid__contact__item,
+  .pid .pid__sugg__btn,
+  .pid .pid__submit-btn { transition: none; }
+}
+
+/* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 1200px) {
+  .pid__grid { grid-template-columns: 1fr 350px; }
+}
+
+@media (max-width: 1100px) {
+  .pid__hero__badges { flex-basis: 100%; justify-content: flex-start; max-width: none; margin-top: 0.375rem; }
+}
+
+@media (max-width: 992px) {
+  .pid__grid { grid-template-columns: 1fr; }
+  .pid__stats { grid-template-columns: repeat(2, 1fr); }
+  .pid__stat:nth-child(3) { border-left: 0; }
+  .pid__stat:nth-child(n+3) { border-top: 1px solid var(--brand-grey-200, #f0f0f0); }
+  .pid__hero__top { gap: 0.625rem; }
+}
+
+@media (max-width: 768px) {
+  .pid__hero__top { flex-wrap: wrap; }
+  .pid__hero__actions { width: 100%; }
+  .pid__hero__util { margin-left: 0; }
+  .pid__status-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 575px) {
+  .pid__stats { grid-template-columns: 1fr; }
+  .pid__stat { border-left: 0; border-top: 1px solid var(--brand-grey-200, #f0f0f0); }
+  .pid__stat:first-child { border-top: 0; }
+  .pid__spread { grid-template-columns: 1fr; }
+  .pid__spread__cell { border-left: 0; border-top: 1px solid var(--brand-grey-200, #f0f0f0); }
+  .pid__spread__cell:first-child { border-top: 0; }
+  .pid__hero__name { font-size: 1.125rem; }
+  .pid__field { flex-wrap: wrap; }
+}

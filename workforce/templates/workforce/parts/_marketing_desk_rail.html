@@ -1,0 +1,63 @@
+{% load workforce_tags %}
+{# Purpose: Horizontal rail of the marketing-desk pages, scoped to the desk the current page belongs to. #}
+{# Used by: the CRM consoles (business board, driver board, lists, inbox, contacts, reports, columns) and Pricing Inquiries. #}
+{# Notes: wfdesk__ furniture lives in workforce.css. A business page shows only the business pipeline, a driver page #}
+{#        only the driver pipeline — the two desks are worked by different people and the cross-links were noise. #}
+{#        Reports is now per-pipeline and sits inside its own group; only Inbox/Contacts belong to neither desk, #}
+{#        so those pages show both groups and act as the crossover point. #}
+{#        Membership must match _MKT in core/departments.py, or a link here 404s for a marketing-only user — which #}
+{#        is why the ops-owned verification queues appear in the sidebar menus but not on this rail. #}
+
+{% with un=request.resolver_match.url_name %}
+{% with is_driver_desk=un|in_csv:"crm_driver_leads_board,crm_driver_leads_list,crm_driver_stages_manage,crm_driver_reports" is_business_desk=un|in_csv:"crm_leads_board,crm_lead_detail,crm_lead_create,crm_lead_update,crm_leads_list,pricing_inquiries_list,pricing_inquiry_detail,pricing_inquiry_edit,crm_stages_manage,crm_reports" %}
+
+<nav class="wfdesk" aria-label="Marketing desk pages">
+  <span class="wfdesk__label">Marketing desk</span>
+
+  {% url 'workforce:crm_leads_board' as u_board %}
+  {% url 'workforce:crm_leads_list' as u_list %}
+  {% url 'workforce:pricing_inquiries_list' as u_pricing %}
+  {% url 'workforce:crm_stages_manage' as u_stages %}
+  {% url 'workforce:crm_driver_leads_board' as u_driver_board %}
+  {% url 'workforce:crm_driver_leads_list' as u_driver_list %}
+  {% url 'workforce:crm_driver_stages_manage' as u_driver_stages %}
+  {% url 'workforce:crm_whatsapp_inbox' as u_inbox %}
+  {% url 'workforce:crm_contacts' as u_contacts %}
+  {% url 'workforce:crm_reports' as u_reports %}
+  {% url 'workforce:crm_driver_reports' as u_driver_reports %}
+
+  {% if not is_driver_desk %}
+  <div class="wfdesk__group">
+    <span class="wfdesk__label wfdesk__label--group">Business</span>
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_board label="Board" names="crm_leads_board,crm_lead_detail,crm_lead_create,crm_lead_update" %}
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_list label="Leads" names="crm_leads_list" %}
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_pricing label="Pricing Inquiries" names="pricing_inquiries_list,pricing_inquiry_detail,pricing_inquiry_edit" %}
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_stages label="Columns" names="crm_stages_manage" %}
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_reports label="Reports" names="crm_reports" %}
+  </div>
+  {% endif %}
+
+  {% if not is_driver_desk and not is_business_desk %}
+  <span class="wfdesk__rule" aria-hidden="true"></span>
+  {% endif %}
+
+  {% if not is_business_desk %}
+  <div class="wfdesk__group">
+    <span class="wfdesk__label wfdesk__label--group">Driver</span>
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_driver_board label="Board" names="crm_driver_leads_board" %}
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_driver_list label="Leads" names="crm_driver_leads_list" %}
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_driver_stages label="Columns" names="crm_driver_stages_manage" %}
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_driver_reports label="Reports" names="crm_driver_reports" %}
+  </div>
+  {% endif %}
+
+  <span class="wfdesk__rule" aria-hidden="true"></span>
+
+  <div class="wfdesk__group">
+    <span class="wfdesk__label wfdesk__label--group">Both</span>
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_inbox label="WhatsApp Inbox" names="crm_whatsapp_inbox" %}
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_contacts label="Contacts" names="crm_contacts" %}
+  </div>
+</nav>
+
+{% endwith %}{% endwith %}

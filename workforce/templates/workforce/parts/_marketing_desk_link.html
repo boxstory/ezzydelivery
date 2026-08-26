@@ -1,0 +1,12 @@
+{% load workforce_tags %}
+{# Purpose: One link in the marketing desk rail — marks itself current from the resolved URL name. #}
+{# Used by: workforce/parts/_marketing_desk_rail.html #}
+{# Notes: `names` is a CSV of every url_name that counts as this page, so a record screen keeps its index lit. #}
+
+{% if request.resolver_match.url_name|in_csv:names %}
+<span class="wfdesk__link wfdesk__link--current" aria-current="page">{{ label }}</span>
+{% else %}
+<a class="wfdesk__link" href="{{ url }}"
+   hx-get="{{ url }}" hx-target="#main-content" hx-select="#main-content"
+   hx-swap="outerHTML" hx-push-url="true">{{ label }}</a>
+{% endif %}

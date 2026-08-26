@@ -1,0 +1,296 @@
+/* Purpose: Suggested Rate panel (pid__sugg__) on the staff pricing inquiry page.
+   Used by: workforce/templates/workforce/forms/pricing_inquiry_detail.html
+   Notes: Split out of pricing_inquiry_detail.css deliberately — Cloudflare ignores the ?v= query
+          string on /static/, so an appended rule can sit behind a stale cached copy for hours.
+          A new file path is a new cache key. Do the same for the next big block rather than
+          appending and hoping the bust works. */
+
+/* ── SUGGESTED RATE ──────────────────────────────────────────────────────── */
+/* Computed from the rate card, shown with the arithmetic that produced it.
+   Sales must be able to defend the number, so no line ever appears bare. */
+
+.pid__panel--suggest {
+  border-top: 3px solid var(--brand-navy-light, #003366);
+}
+
+.pid__count-chip--warn {
+  background: var(--brand-warning-bg, #fef3c7);
+  color: var(--brand-warning-text, #92400e);
+}
+
+.pid__sugg__headline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.pid__sugg__amount {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--brand-navy, #001f3f);
+}
+
+.pid__sugg__unit {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.pid__sugg__card {
+  margin-top: 0.375rem;
+  font-size: 0.72rem;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.pid__sugg__warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--brand-warning-bg, #fef3c7);
+  border: 1px solid #fde68a;
+  border-radius: var(--brand-radius-sm, 6px);
+  font-size: 0.8rem;
+  color: var(--brand-warning-text, #92400e);
+}
+
+/* ── Breakdown table ─────────────────────────────────────────────────────── */
+
+.pid__sugg__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pid__sugg__table td {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--brand-grey-200, #e8e8e8);
+  vertical-align: top;
+}
+
+.pid__sugg__table tr:last-child td {
+  border-bottom: 0;
+}
+
+.pid__sugg__lbl {
+  font-size: 0.8rem;
+  color: var(--brand-grey-800, #1f1f1f);
+  line-height: 1.35;
+}
+
+.pid__sugg__why {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--brand-grey-500, #6c757d);
+  margin-top: 0.15rem;
+}
+
+/* Scoped through .pid__sugg__table so these beat the `td { padding: 0.5rem 0 }`
+   above on specificity — without the table prefix the padding-left loses and the
+   delta runs straight into the running total ("+5.0030.00"). */
+.pid__sugg__table .pid__sugg__delta,
+.pid__sugg__table .pid__sugg__run {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  text-align: right;
+  white-space: nowrap;
+  padding: 0.5rem 0 0.5rem 1rem;
+  width: 1%;
+}
+
+.pid__sugg__delta {
+  color: var(--brand-grey-600, #555);
+}
+
+.pid__sugg__run {
+  font-weight: 700;
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+/* ── Reality check + floor ───────────────────────────────────────────────── */
+
+.pid__sugg__note {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--brand-grey-700, #333);
+  margin-bottom: 0.5rem;
+}
+
+.pid__sugg__aside {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.pid__sugg__flag {
+  display: inline-block;
+  margin-left: 0.375rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.pid__sugg__flag--warn {
+  background: var(--brand-warning-bg, #fef3c7);
+  color: var(--brand-warning-text, #92400e);
+}
+
+.pid__sugg__flag--ok {
+  background: var(--brand-success-bg, #dcfce7);
+  color: var(--brand-success-dark, #065f46);
+}
+
+/* The honesty line. Deliberately styled as a caveat, not as a stat. */
+.pid__sugg__floor {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--brand-grey-100, #f8f9fa);
+  border-left: 3px solid var(--brand-grey-400, #b0b0b0);
+  border-radius: var(--brand-radius-sm, 6px);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--brand-grey-600, #555);
+}
+
+.pid__sugg__floor i {
+  margin-top: 0.15rem;
+  color: var(--brand-grey-400, #b0b0b0);
+}
+
+.pid__sugg__missing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.pid__sugg__chip {
+  padding: 0.2rem 0.5rem;
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  color: var(--brand-grey-600, #555);
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+
+.pid__sugg__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.125rem;
+}
+
+.pid__sugg__btn {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--brand-grey-100, #f8f9fa);
+  border: 1px solid var(--brand-grey-400, #b0b0b0);
+  color: var(--brand-grey-800, #1f1f1f);
+  border-radius: var(--brand-radius-sm, 6px);
+  cursor: pointer;
+  transition: var(--brand-transition);
+}
+
+.pid__sugg__btn:hover {
+  background: var(--brand-secondary, #fff7d6);
+  border-color: var(--brand-primary, #f7c000);
+}
+
+.pid__sugg__btn--accept {
+  background: var(--brand-navy, #001f3f);
+  border-color: var(--brand-navy, #001f3f);
+  color: #fff;
+}
+
+.pid__sugg__btn--accept:hover {
+  background: var(--brand-navy-light, #003366);
+  border-color: var(--brand-navy-light, #003366);
+  color: #fff;
+}
+
+.pid__sugg__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pid__sugg__quoted {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--brand-grey-200, #e8e8e8);
+  font-size: 0.78rem;
+  color: var(--brand-grey-700, #333);
+}
+
+#suggest-panel {
+  margin-bottom: 1.25rem;
+}
+
+/* ── P2P ROUTING NOTICE ──────────────────────────────────────────────────── */
+/* This lead is a one-off personal sender, not a 3PL client. Sits above the
+   suggested rate because it changes whether that number means anything. */
+
+.pid__p2p {
+  margin-bottom: 1.125rem;
+  padding: 0.75rem;
+  background: var(--brand-info-bg, #eff6ff);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--brand-radius-sm, 6px);
+}
+
+.pid__p2p__hd {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--brand-info-dark, #1e40af);
+}
+
+.pid__p2p__why {
+  margin: 0.5rem 0 0.5rem 1.125rem;
+  padding: 0;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--brand-grey-700, #333);
+}
+
+.pid__p2p__note {
+  margin: 0 0 0.625rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--brand-grey-600, #555);
+}
+
+.pid__p2p__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.1rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-info, #2563eb);
+  border-radius: var(--brand-radius-sm, 6px);
+  color: var(--brand-info-dark, #1e40af);
+}
+
+.pid__p2p__link:hover {
+  background: var(--brand-info, #2563eb);
+  color: #fff;
+}

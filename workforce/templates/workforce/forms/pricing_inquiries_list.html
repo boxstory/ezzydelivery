@@ -9,11 +9,11 @@
 
 {% block extra_css %}
 {# workforce.css already loaded in wf_dashboard_base.html #}
-<link href="{% static 'workforce/css/pricing_inquiries_list.css' %}?v=20260807b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/pricing_inquiries_list.css' %}?v=20260817a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="pil col-12 p-3">
+<div class="pil col-12">
   <div class="pil__console">
 
     <!-- HEADER BAR -->
@@ -36,6 +36,10 @@
           <span class="pil__metric-label">Need Fulfillment</span>
           <span class="pil__metric-value">{{ fulfillment_count }}</span>
         </div>
+        <div class="pil__metric">
+          <span class="pil__metric-label">Plan Selected</span>
+          <span class="pil__metric-value">{{ quoted_count }}</span>
+        </div>
       </div>
       <button type="button" class="wfnote__btn wfnote__btn--ink align-self-center ms-3" data-wfnote-toggle
               aria-expanded="false" aria-controls="workforce_forms_pricing_inquiries_list_card_notes"
@@ -44,6 +48,11 @@
         <span class="visually-hidden">Show notes</span>
       </button>
     </div>
+
+    <!-- Everything below the header bar sits in one padded section -->
+    <div class="pil__body">
+
+    {% include "workforce/parts/_marketing_desk_rail.html" %}
 
     <div class="wfnote" id="workforce_forms_pricing_inquiries_list_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_forms_pricing_inquiries_list_card_notes' %}" hidden></div>
@@ -113,11 +122,33 @@
               <option value="on_hold" {% if status_filter == 'on_hold' %}selected{% endif %}>On hold</option>
             </select>
           </div>
+
+          <div class="pil__facet {% if quote_filter %}is-active{% endif %}">
+            <select name="quote" class="pil__facet-select" aria-label="Filter by plan selection"
+                    hx-get="" hx-target="#main-content" hx-select="#main-content"
+                    hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
+                    hx-include="#workforce_forms_pricing_form_filter">
+              <option value="">All quotes</option>
+              <option value="1" {% if quote_filter == '1' %}selected{% endif %}>Plan selected</option>
+              <option value="0" {% if quote_filter == '0' %}selected{% endif %}>No plan yet</option>
+            </select>
+          </div>
+
+          <div class="pil__facet {% if variance_filter %}is-active{% endif %}">
+            <select name="variance" class="pil__facet-select" aria-label="Filter by agreed vs suggested"
+                    hx-get="" hx-target="#main-content" hx-select="#main-content"
+                    hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
+                    hx-include="#workforce_forms_pricing_form_filter">
+              <option value="">Agreed vs suggested</option>
+              <option value="below" {% if variance_filter == 'below' %}selected{% endif %}>Agreed below suggestion</option>
+              <option value="above" {% if variance_filter == 'above' %}selected{% endif %}>Agreed above suggestion</option>
+            </select>
+          </div>
         </div>
 
         <button type="submit" class="pil__btn pil__btn--primary">Search</button>
 
-        {% if search or cod_filter or fulfillment_filter or status_filter %}
+        {% if search or cod_filter or fulfillment_filter or status_filter or quote_filter or variance_filter %}
         <a href="{% url 'workforce:pricing_inquiries_list' %}" class="pil__clear-all"
            hx-get="{% url 'workforce:pricing_inquiries_list' %}"
            hx-target="#main-content" hx-select="#main-content"
@@ -145,6 +176,8 @@
             <th class="pil__col-center">Orders/Mo</th>
             <th class="pil__col-center">Needs</th>
             <th>Pipeline</th>
+            <th>Suggested</th>
+            <th>Quote</th>
             <th>Received</th>
             <th></th>
           </tr>
@@ -159,7 +192,10 @@
             </td>
             <td class="pil__id">{{ inq.pk }}</td>
             <td>
-              <div class="pil__biz-name">{{ inq.business_name }}</div>
+              <div class="pil__biz-name">
+                {{ inq.business_name }}
+                {% if inq.is_likely_p2p %}<span class="pil__tag pil__tag--p2p" title="Answers read like a one-off personal delivery, not a 3PL client">P2P?</span>{% endif %}
+              </div>
               <div class="pil__biz-person">{{ inq.full_name }}</div>
               {# Online presence — website / Facebook / Instagram always occupy their #}
               {# slot so every row reads the same way. A channel with nothing openable #}
@@ -204,6 +240,29 @@
             <td>
               <span class="pil__pill pil__pill--{{ inq.crm_status }}">{{ inq.get_crm_status_display }}</span>
             </td>
+            {# What the rate card suggests for this lead, before any human touches it. #}
+            <td>
+              {% if inq.suggested_price_value is not None %}
+              <span class="pil__quote pil__quote--sugg">{{ inq.suggested_price_value|floatformat:0 }}</span>
+              {% else %}
+              <span class="pil__tag pil__tag--none">—</span>
+              {% endif %}
+            </td>
+            {# What the customer picked on the public rate sheet — a dash means #}
+            {# they never got that far and the link is worth re-sending. #}
+            <td>
+              {% if inq.plan_agreed_at %}
+                {% if inq.selected_plan.is_custom_quote %}
+                <span class="pil__quote pil__quote--talk" title="{{ inq.agreed_plan_name }}">
+                  <i class="fa-solid fa-headset"></i>Wants call
+                </span>
+                {% else %}
+                <span class="pil__quote" title="{{ inq.agreed_plan_name }}">{{ inq.agreed_price_label }}</span>
+                {% endif %}
+              {% else %}
+              <span class="pil__tag pil__tag--none">—</span>
+              {% endif %}
+            </td>
             <td class="pil__date">{{ inq.date_created|date:"d M Y" }}</td>
             <td onclick="event.stopPropagation()">
               <a href="{% url 'workforce:pricing_inquiry_detail' inq.pk %}"
@@ -220,7 +279,7 @@
 
           <!-- EXPANDED DRAWER -->
           <tr class="pil__drawer-row">
-            <td colspan="10">
+            <td colspan="12">
               <div class="pil__drawer">
 
                 <!-- Service requirements -->
@@ -340,7 +399,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="10">
+            <td colspan="12">
               <div class="pil__empty">
                 <i class="fa-solid fa-inbox"></i>
                 No pricing inquiries match your filters yet.
@@ -355,6 +414,8 @@
     <!-- PAGINATION (shared brand component) -->
     {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="pricing_inquiries" %}
 
+
+    </div><!-- /.pil__body -->
   </div>
 </div>
 
