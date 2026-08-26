@@ -11,445 +11,584 @@
    - HTML changes prohibited — CSS only
    ============================================ */
 
-/* ==================== SIDEBAR ==================== */
+/* ==================== SIDEBAR ====================
+   Desktop rail (#client_sidebar_container_main) — "the manifest rail".
+   Cool ledger paper, navy identity plate, flat rows that hang off a hairline
+   route line, monochrome ink. The yellow accent is spent ONCE: on the route
+   you are currently on. Matches the navy command band (bcon__command) that
+   heads every content page and the staff rail (workforce-sidebar.css).
+   Mobile (.bsb__mobile-toggle / .bsb__mobile-nav) keeps its own light rules
+   below — desktop rules are ID-scoped so the two never collide.
+   ================================================= */
 
-/* Sidebar container — transitions for collapse */
+/* ---------- shared base ---------- */
 .bsb__sidebar {
   position: relative;
-  transition: width 0.25s ease, min-width 0.25s ease, padding 0.25s ease;
   overflow-x: hidden;
-  overflow-y: auto;
-  white-space: nowrap;
 }
 
 /* Suppress transition on initial page load to avoid collapse flash */
-.bsb__sidebar.no-transition {
+.bsb__sidebar.no-transition,
+.bsb__sidebar.no-transition * {
   transition: none !important;
 }
 
-/* Toggle button — full-width pill below the dashboard btn */
-.bsb__toggle-btn {
-  width: 100%;
-  height: 1.6rem;
-  margin-top: 0.35rem;
-  padding: 0;
-  border-radius: var(--brand-radius-md, 8px);
-  background: rgba(247,192,0,0.15);
-  border: 1px solid var(--brand-primary-dark, #d4a800);
-  color: var(--brand-grey-700, #444);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.65rem;
+/* ---------- MOBILE: menu bar, section labels, submenu ---------- */
+.bsb__mobile-toggle .bsb__toggle-btn {
+  min-height: 2.75rem;                    /* real touch target */
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-bottom: 2px solid var(--brand-primary);
+  border-radius: var(--brand-radius-sm);
+  background: var(--brand-navy);
+  color: var(--brand-white);
+  font-size: 0.82rem;
   cursor: pointer;
-  transition: background 0.2s;
-  flex-shrink: 0;
 }
 
-.bsb__toggle-btn:hover {
-  background: var(--brand-primary, #f7c000);
+.bsb__mobile-toggle .bsb__toggle-btn:hover,
+.bsb__mobile-toggle .bsb__toggle-btn:focus {
+  background: var(--brand-navy-light);
+  color: var(--brand-white);
 }
 
-/* Icon flips to chevron-right when collapsed */
-.bsb__sidebar.collapsed .bsb__toggle-btn i {
+.bsb__mobile-toggle .bsb__toggle-btn[aria-expanded="true"] .bsb__chevron {
   transform: rotate(180deg);
 }
 
-/* No slide-right hover in collapsed state */
-.bsb__sidebar.collapsed .bsb__link--collapse:hover,
-.bsb__sidebar.collapsed .bsb__link--single:hover {
-  transform: none;
+.bsb__chevron {
+  transition: transform 0.2s ease;
 }
 
-/* Pre-collapsed state (prevents flash on page load) */
-.sidebar-pre-collapsed #client_sidebar_container_main {
-  width: 3.5rem !important;
-  min-width: 3.5rem !important;
-  padding-left: 0.5rem !important;
-  padding-right: 0.5rem !important;
-  overflow: hidden;
-}
-
-/* ── COLLAPSED STATE ── */
-.bsb__sidebar.collapsed {
-  width: 3.5rem !important;
-  min-width: 3.5rem !important;
-  padding-left: 0.5rem !important;
-  padding-right: 0.5rem !important;
-  overflow: hidden !important;
-  white-space: normal !important;
-}
-
-/* Hide all text labels when collapsed */
-.bsb__sidebar.collapsed .bsb__header,
-.bsb__sidebar.collapsed .bsb__section-label,
-.bsb__sidebar.collapsed .bsb__submenu,
-.bsb__sidebar.collapsed .bsb__divider,
-.bsb__sidebar.collapsed .bsb__link--collapse span,
-.bsb__sidebar.collapsed .bsb__link--collapse .bsb__icon--rotate,
-.bsb__sidebar.collapsed .bsb__link--single span {
-  display: none !important;
-}
-
-/* Fit links inside the 3.5rem container — suppress ::before animation + border */
-.bsb__sidebar.collapsed .bsb__link--collapse,
-.bsb__sidebar.collapsed .bsb__link--single {
-  justify-content: center !important;
-  padding: 0.4rem !important;
-  width: 2.5rem !important;
-  min-width: 2.5rem !important;
-  max-width: 2.5rem !important;
-  overflow: visible !important;
-  white-space: normal !important;
-  border: none !important;
-  border-radius: var(--brand-radius-sm, 8px) !important;
-  position: relative;
-}
-
-/* Kill the ::before slide animation in collapsed mode — it causes layout bleed */
-.bsb__sidebar.collapsed .bsb__link--collapse::before,
-.bsb__sidebar.collapsed .bsb__link--single::before {
-  display: none !important;
-}
-
-.bsb__sidebar.collapsed .bsb__link--collapse i,
-.bsb__sidebar.collapsed .bsb__link--single i {
-  margin: 0;
-  font-size: 1rem;
-}
-
-/* Header */
-.bsb__header {
-  padding: 0;
-  text-align: center;
-  margin-bottom: 0.5rem;
-}
-
-/* Two-line dashboard title */
-.bsb__header .nav-link.bsb__dashboard-title {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  border: 0.125rem solid var(--brand-primary-dark);
-  color: var(--brand-grey-800);
+/* Mobile section labels (li.bsb__section) had no styling at all */
+.bsb__section {
+  font-size: 0.62rem;
   font-weight: 700;
-  border-radius: var(--brand-radius-md);
-  width: 100%;
-  white-space: normal !important;
-  line-height: 1.3 !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  padding: 0.75rem 0.5rem !important;
-  text-decoration: none;
-  display: flex;
-  justify-content: center;
-  box-shadow: 0 0.25rem 0.75rem rgba(255, 211, 59, 0.3);
-  transition: var(--brand-transition);
-}
-
-.bsb__header .nav-link.bsb__dashboard-title:hover {
-  background: linear-gradient(135deg, var(--brand-primary-dark) 0%, var(--brand-primary) 100%);
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.375rem 1.25rem rgba(255, 211, 59, 0.4);
-}
-
-.bsb__header .nav-link.bsb__dashboard-title span {
-  display: block;
-}
-
-.bsb__header .nav-link.bsb__dashboard-title span:last-child {
-  font-size: 0.85em;
-  opacity: 0.9;
-}
-
-/* Truncate long business names inside the dashboard button */
-.bsb__dashboard-title-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-
-.bsb__mobile-header.bsb__dashboard-title {
-  white-space: normal !important;
-  line-height: 1.3 !important;
-  flex-direction: column !important;
-  padding: 0.75rem 1rem !important;
-}
-
-.bsb__mobile-header.bsb__dashboard-title span {
-  display: block;
-}
-
-.bsb__mobile-header.bsb__dashboard-title span:last-child {
-  font-size: 0.85em;
-  opacity: 0.9;
-}
-
-/* Divider */
-.bsb__divider {
-  border-top: 0.125rem solid var(--brand-grey-300);
-  opacity: 0.6;
-  margin: 0.5rem 0;
-}
-
-/* Section labels */
-.bsb__section-label {
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--brand-grey-500);
-  padding: 0.5rem 0.25rem 0.15rem;
+  padding: 0.75rem 0.75rem 0.25rem;
   list-style: none;
 }
 
-/* Main collapse toggle links */
-.bsb__link--collapse {
-  background: var(--brand-white);
-  border: 0.125rem solid var(--brand-grey-200);
-  color: var(--brand-grey-700);
-  font-weight: 600;
-  padding: 0.75rem;
-  border-radius: var(--brand-radius-md);
+.bsb__mobile-nav .bsb__submenu {
+  border-inline-start: 1px solid var(--brand-grey-250);
+  margin-inline-start: 1.1rem;
+}
+
+/* Role badge in the business switcher (both rails) */
+.bsb__switcher-role {
+  font-size: 0.68rem;
+  color: var(--brand-grey-500);
+  display: block;
+}
+
+/* ============================================================
+   DESKTOP RAIL
+   ============================================================ */
+
+#client_sidebar_container_main {
+  --bsb-paper: #fbfcfd;                    /* cool ledger paper   */
+  --bsb-line: #e7ebf0;                     /* hairline / route line */
+  --bsb-line-strong: #d6dde6;
+  --bsb-ink: var(--brand-navy, #001f3f);   /* authority ink       */
+  --bsb-yellow: var(--brand-primary, #f7c000);
+  --bsb-yellow-soft: rgba(247, 192, 0, 0.13);
+  --bsb-text: #5b6472;                     /* resting label       */
+  --bsb-text-strong: #1f2937;
+  --bsb-muted: #96a1b2;                    /* section labels, resting icons */
+
+  padding: 0 0.375rem 0.75rem;
+  background: var(--bsb-paper);
+  border-right: 1px solid var(--bsb-line);
+
+  /* The rail stays put while a long ledger scrolls beside it. */
+  align-self: flex-start;                  /* sticky needs this inside the flex row */
+  position: sticky;
+  top: 0;
+  z-index: 20;                             /* sticky makes a stacking context —
+                                              lift it so collapsed flyouts clear
+                                              the content column */
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bsb-line-strong) transparent;
+  transition: width 0.2s ease, min-width 0.2s ease, padding 0.2s ease;
+}
+
+#client_sidebar_container_main::-webkit-scrollbar { width: 6px; }
+#client_sidebar_container_main::-webkit-scrollbar-thumb {
+  background: var(--bsb-line-strong);
+  border-radius: 3px;
+}
+
+html[dir="rtl"] #client_sidebar_container_main {
+  border-right: 0;
+  border-left: 1px solid var(--bsb-line);
+}
+
+/* Width caps — a nav rail past ~14rem is wasted page width */
+@media (min-width: 768px) {
+  #client_sidebar_container_main.col-md-3 {
+    flex: 0 0 auto;
+    width: 12rem;
+    max-width: 12rem;
+  }
+}
+
+@media (min-width: 992px) {
+  #client_sidebar_container_main.col-lg-2 {
+    flex: 0 0 auto;
+    width: 13.5rem;
+    max-width: 13.5rem;
+  }
+}
+
+/* ---------- Identity plate ---------- */
+#client_sidebar_container_main .bsb__header {
+  padding: 0.5rem 0 0;
+  margin-bottom: 0.35rem;
+}
+
+#client_sidebar_container_main .bsb__header .nav-link.bsb__dashboard-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start !important;
+  gap: 0.05rem;
   width: 100%;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  transition: var(--brand-transition);
+  padding: 0.45rem 2.2rem 0.45rem 0.6rem !important;
+  background: var(--bsb-ink);
+  border: 0;
+  border-bottom: 2px solid var(--bsb-yellow);
+  border-radius: 0.4rem;
+  box-shadow: 0 1px 3px rgba(0, 31, 63, 0.18);
+  color: var(--brand-white);
   text-decoration: none;
+  white-space: nowrap !important;
+  line-height: 1.25 !important;
+  transition: background 0.2s ease;
+}
+
+#client_sidebar_container_main .bsb__header .nav-link.bsb__dashboard-title:hover {
+  background: #002a54;
+  color: var(--brand-white);
+  transform: none;
+  box-shadow: 0 2px 6px rgba(0, 31, 63, 0.22);
+}
+
+/* Business name — the identity */
+#client_sidebar_container_main .bsb__dashboard-title-name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* "Dashboard" — the kicker. Yellow reads AA on navy. */
+#client_sidebar_container_main .bsb__header .nav-link.bsb__dashboard-title span:last-child {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bsb-yellow);
+}
+
+/* ---------- Collapse toggle — quiet, banked to the content edge ---------- */
+#client_sidebar_container_main .bsb__toggle-btn {
+  position: absolute;
+  top: 0.85rem;
+  inset-inline-end: 0.6rem;
+  z-index: 2;
+  width: 1.35rem;
+  height: 1.35rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0.3rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.58rem;
   cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  word-wrap: break-word;
-  line-height: 1.3;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
-.bsb__link--collapse::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  transition: left 0.3s ease;
-  z-index: -1;
+#client_sidebar_container_main .bsb__toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: var(--brand-white);
 }
 
-.bsb__link--collapse:hover::before {
-  left: 0;
+#client_sidebar_container_main .bsb__toggle-btn i {
+  transition: transform 0.2s ease;
 }
 
-.bsb__link--collapse:hover {
-  color: var(--brand-grey-800);
-  border-color: var(--brand-primary);
-  transform: translateX(0.25rem);
-  box-shadow: var(--brand-shadow-sm);
-}
-
-.bsb__link--collapse i {
-  transition: var(--brand-transition);
-  flex-shrink: 0;
-}
-
-.bsb__link--collapse span {
-  flex: 1;
-  white-space: normal;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.bsb__link--collapse:hover i {
-  transform: scale(1.1);
-}
-
-.bsb__link--collapse.active {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  border-color: var(--brand-primary-dark);
-  color: var(--brand-grey-800);
-  font-weight: 700;
-  box-shadow: var(--brand-shadow-md);
-}
-
-/* Single (non-collapsible) links */
-.bsb__link--single {
+#client_sidebar_container_main.collapsed .bsb__toggle-btn {
+  position: static;
+  margin: 0.5rem auto 0.35rem;
   background: var(--brand-white);
-  border: 0.125rem solid var(--brand-grey-200);
-  color: var(--brand-grey-700);
-  font-weight: 600;
-  padding: 0.75rem;
-  border-radius: var(--brand-radius-md);
-  width: 100%;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  transition: var(--brand-transition);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  position: relative;
-  overflow: hidden;
-  word-wrap: break-word;
-  line-height: 1.3;
+  border-color: var(--bsb-line);
+  color: var(--bsb-muted);
 }
 
-.bsb__link--single::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  transition: left 0.3s ease;
-  z-index: -1;
+#client_sidebar_container_main.collapsed .bsb__toggle-btn:hover {
+  background: #f1f5f9;
+  border-color: var(--bsb-line-strong);
+  color: var(--bsb-ink);
 }
 
-.bsb__link--single:hover::before {
-  left: 0;
-}
-
-.bsb__link--single:hover {
-  color: var(--brand-grey-800);
-  border-color: var(--brand-primary);
-  transform: translateX(0.25rem);
-  box-shadow: var(--brand-shadow-sm);
-}
-
-.bsb__link--single i {
-  transition: var(--brand-transition);
-  flex-shrink: 0;
-}
-
-.bsb__link--single span {
-  flex: 1;
-  white-space: normal;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.bsb__link--single:hover i {
-  transform: scale(1.1);
-}
-
-.bsb__link--single.active {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  border-color: var(--brand-primary-dark);
-  color: var(--brand-grey-800);
-  font-weight: 700;
-  box-shadow: var(--brand-shadow-md);
-}
-
-/* Chevron rotation */
-.bsb__icon--rotate {
-  transition: transform 0.3s ease;
-}
-
-.bsb__link--collapse[aria-expanded="true"] .bsb__icon--rotate {
+#client_sidebar_container_main.collapsed .bsb__toggle-btn i {
   transform: rotate(180deg);
 }
 
-/* Submenu container */
-.bsb__submenu {
-  margin-top: 0.25rem;
-  margin-bottom: 0.5rem;
-  border-left: 0.1875rem solid var(--brand-primary);
-  background: var(--brand-grey-50);
-  border-radius: var(--brand-radius-sm);
-  overflow: hidden;
-  padding: 0;
+/* ---------- Dividers & section labels ---------- */
+#client_sidebar_container_main .bsb__divider {
+  border-top: 1px solid var(--bsb-line);
+  opacity: 1;
+  margin: 0.4rem 0.15rem;
 }
 
-.bsb__submenu .nav {
-  gap: 0.25rem;
-  padding: 0.25rem;
+#client_sidebar_container_main .bsb__section-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bsb-muted);
+  padding: 0.6rem 0.4rem 0.28rem 0.55rem;
+  margin-top: 0.2rem;
+  border-top: 1px solid var(--bsb-line);
+  list-style: none;
 }
 
-/* Submenu links */
-.bsb__submenu-link {
-  background: var(--brand-white);
-  border: 1px solid var(--brand-grey-200);
-  color: var(--brand-grey-600);
-  padding: 0.4rem 0.5rem 0.4rem 0.75rem;
-  font-weight: 500;
-  border-radius: var(--brand-radius-sm);
-  width: 100%;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  transition: var(--brand-transition);
-  text-decoration: none;
+#client_sidebar_nav_main > .bsb__section-label:first-child {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0.35rem;
+}
+
+/* ---------- Route rows ---------- */
+#client_sidebar_container_main .bsb__link--collapse,
+#client_sidebar_container_main .bsb__link--single {
+  position: relative;
   display: flex;
   align-items: center;
-  position: relative;
-  overflow: hidden;
-  word-wrap: break-word;
+  width: 100%;
+  min-height: 2.15rem;
+  padding: 0.42rem 0.45rem 0.42rem 0.5rem;
+  background: transparent;
+  border: 0;
+  border-inline-start: 2px solid transparent;
+  border-radius: 0.3rem;
+  color: var(--bsb-text);
+  font-size: 0.8rem;
+  font-weight: 500;
   line-height: 1.3;
+  text-align: start !important;   /* start, not left — the rail flips in Arabic */
+  justify-content: flex-start !important;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 
-.bsb__submenu-link::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 0.1875rem;
-  height: 100%;
-  background: var(--brand-primary);
-  transform: scaleY(0);
-  transition: transform 0.3s ease;
-}
-
-.bsb__submenu-link:hover::before {
-  transform: scaleY(1);
-}
-
-.bsb__submenu-link:hover {
-  background: var(--brand-grey-100);
-  border-color: var(--brand-primary);
-  color: var(--brand-grey-800);
-  transform: translateX(0.125rem);
-  box-shadow: var(--brand-shadow-sm);
-}
-
-.bsb__submenu-link i {
-  transition: var(--brand-transition);
+#client_sidebar_container_main .bsb__link--collapse i,
+#client_sidebar_container_main .bsb__link--single i {
+  width: 1.05rem;
   flex-shrink: 0;
-  margin-right: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--bsb-muted);
+  text-align: center;
+  transition: color 0.18s ease;
 }
 
-.bsb__submenu-link span {
-  flex: 1;
-  white-space: normal;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+#client_sidebar_container_main .bsb__link--collapse span,
+#client_sidebar_container_main .bsb__link--single span {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.bsb__submenu-link:hover i {
-  color: var(--brand-primary);
-  transform: scale(1.15);
+#client_sidebar_container_main .bsb__link--collapse:hover,
+#client_sidebar_container_main .bsb__link--single:hover {
+  background: rgba(0, 31, 63, 0.045);
+  border-inline-start-color: var(--bsb-line-strong);
+  color: var(--bsb-text-strong);
+  transform: none;
+  box-shadow: none;
 }
 
-.bsb__submenu-link.active {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  border-color: var(--brand-primary-dark);
-  color: var(--brand-grey-800);
-  font-weight: 700;
-  box-shadow: var(--brand-shadow-sm);
+#client_sidebar_container_main .bsb__link--collapse:hover i,
+#client_sidebar_container_main .bsb__link--single:hover i {
+  color: var(--bsb-text-strong);
+  transform: none;
 }
 
-.bsb__submenu-link.active::before {
-  transform: scaleY(1);
-  width: 0.25rem;
+/* A parent whose section you are inside: navy ink, no yellow. The yellow
+   belongs to the stop you are actually on, one level down. */
+#client_sidebar_container_main .bsb__link--collapse.active {
+  background: transparent;
+  border-inline-start-color: var(--bsb-line-strong);
+  color: var(--bsb-ink);
+  font-weight: 650;
+  box-shadow: none;
 }
 
-.bsb__submenu-link.active i {
-  color: var(--brand-grey-800);
-  transform: scale(1.1);
+/* The one yellow in the rail: where you are now. */
+#client_sidebar_container_main .bsb__link--single.active {
+  background: linear-gradient(90deg, var(--bsb-yellow-soft) 0%, rgba(247, 192, 0, 0.02) 100%);
+  border-inline-start-color: var(--bsb-yellow);
+  color: var(--bsb-ink);
+  font-weight: 650;
+  box-shadow: none;
 }
 
-/* Role badge in switcher */
-.bsb__switcher-role {
-  font-size: 0.7rem;
-  opacity: 0.75;
-  display: block;
+#client_sidebar_container_main .bsb__link--collapse.active i,
+#client_sidebar_container_main .bsb__link--single.active i {
+  color: var(--bsb-ink);
+}
+
+/* Chevron */
+#client_sidebar_container_main .bsb__icon--rotate {
+  width: auto;
+  font-size: 0.58rem;
+  color: var(--bsb-muted);
+  transition: transform 0.2s ease;
+}
+
+#client_sidebar_container_main .bsb__link--collapse[aria-expanded="true"] .bsb__icon--rotate {
+  transform: rotate(180deg);
+}
+
+/* ---------- Submenu: stops hanging off the route line ---------- */
+#client_sidebar_container_main .bsb__submenu {
+  margin: 0.15rem 0 0.35rem 1rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-inline-start: 1px solid var(--bsb-line);
+  border-radius: 0;
+  overflow: visible;
+}
+
+html[dir="rtl"] #client_sidebar_container_main .bsb__submenu {
+  margin-left: 0;
+  margin-right: 1rem;
+}
+
+#client_sidebar_container_main .bsb__submenu .nav {
+  gap: 0.05rem;
+  padding: 0.1rem 0;
+}
+
+#client_sidebar_container_main .bsb__submenu-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 1.9rem;
+  margin-inline-start: 0.4rem;
+  padding: 0.3rem 0.45rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0.3rem;
+  color: var(--bsb-text);
+  font-size: 0.745rem;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: start !important;   /* start, not left — the rail flips in Arabic */
+  justify-content: flex-start !important;
+  text-decoration: none;
+  box-shadow: none;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+/* tick onto the guide line */
+#client_sidebar_container_main .bsb__submenu-link::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -0.4rem;
+  top: 50%;
+  width: 0.4rem;
+  height: 1px;
+  margin-top: -0.5px;
+  background: var(--bsb-line);
+  transform: none;
+  transition: background 0.18s ease;
+}
+
+#client_sidebar_container_main .bsb__submenu-link i {
+  width: 0.95rem;
+  flex-shrink: 0;
+  margin-right: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--bsb-muted);
+  text-align: center;
+  transition: color 0.18s ease;
+}
+
+html[dir="rtl"] #client_sidebar_container_main .bsb__submenu-link i {
+  margin-right: 0;
+  margin-left: 0.4rem;
+}
+
+#client_sidebar_container_main .bsb__submenu-link span {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#client_sidebar_container_main .bsb__submenu-link:hover {
+  background: rgba(0, 31, 63, 0.05);
+  border-color: transparent;
+  color: var(--bsb-text-strong);
+  transform: none;
+  box-shadow: none;
+}
+
+#client_sidebar_container_main .bsb__submenu-link:hover::before {
+  background: var(--bsb-line-strong);
+}
+
+#client_sidebar_container_main .bsb__submenu-link:hover i {
+  color: var(--bsb-text-strong);
+  transform: none;
+}
+
+/* Current stop — a lit node on the line */
+#client_sidebar_container_main .bsb__submenu-link.active {
+  background: var(--bsb-yellow-soft);
+  color: var(--bsb-ink);
+  font-weight: 650;
+  box-shadow: none;
+}
+
+#client_sidebar_container_main .bsb__submenu-link.active::before {
+  inset-inline-start: -0.62rem;
+  top: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: -0.225rem;
+  border-radius: 50%;
+  background: var(--bsb-yellow);
+  box-shadow: 0 0 0 2px var(--bsb-paper);
+}
+
+#client_sidebar_container_main .bsb__submenu-link.active i {
+  color: var(--bsb-ink);
+  transform: none;
+}
+
+/* Business switcher rows carry two lines of text */
+#client_sidebar_container_main .bsb__submenu-link .flex-fill {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ---------- Language switcher ---------- */
+#client_sidebar_container_main .bsb__lang-form {
+  margin: 0;
+}
+
+/* ---------- Keyboard focus ---------- */
+#client_sidebar_container_main .nav-link:focus-visible,
+#client_sidebar_container_main .bsb__toggle-btn:focus-visible {
+  outline: 2px solid var(--bsb-yellow);
+  outline-offset: -2px;
+  border-radius: 0.3rem;
+}
+
+/* ---------- COLLAPSED RAIL ---------- */
+
+/* Pre-collapsed state (prevents flash on page load) */
+.sidebar-pre-collapsed #client_sidebar_container_main {
+  width: 3.25rem !important;
+  min-width: 3.25rem !important;
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
+  overflow: hidden;
+}
+
+#client_sidebar_container_main.collapsed {
+  width: 3.25rem !important;
+  min-width: 3.25rem !important;
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
+  overflow: visible !important;            /* lets the labels fly out */
+  white-space: normal !important;
+}
+
+#client_sidebar_container_main.collapsed .bsb__header,
+#client_sidebar_container_main.collapsed .bsb__section-label,
+#client_sidebar_container_main.collapsed .bsb__submenu,
+#client_sidebar_container_main.collapsed .bsb__divider,
+#client_sidebar_container_main.collapsed .bsb__link--collapse span,
+#client_sidebar_container_main.collapsed .bsb__link--collapse .bsb__icon--rotate,
+#client_sidebar_container_main.collapsed .bsb__link--single span {
+  display: none !important;
+}
+
+#client_sidebar_container_main.collapsed .bsb__link--collapse,
+#client_sidebar_container_main.collapsed .bsb__link--single {
+  justify-content: center !important;
+  padding: 0.45rem 0 !important;
+  width: 100% !important;
+  border-radius: 0.3rem;
+}
+
+#client_sidebar_container_main.collapsed .bsb__link--collapse i,
+#client_sidebar_container_main.collapsed .bsb__link--single i {
+  width: auto;
+  margin: 0 !important;
+  font-size: 0.95rem;
+}
+
+/* Flyout label — the collapsed rail stays readable */
+#client_sidebar_container_main.collapsed .bsb__link--collapse[data-label]::after,
+#client_sidebar_container_main.collapsed .bsb__link--single[data-label]::after {
+  content: attr(data-label);
+  position: absolute;
+  inset-inline-start: calc(100% + 0.45rem);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1080;
+  padding: 0.25rem 0.45rem;
+  background: var(--bsb-ink);
+  border-radius: 0.3rem;
+  color: var(--brand-white);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+#client_sidebar_container_main.collapsed .bsb__link--collapse[data-label]:hover::after,
+#client_sidebar_container_main.collapsed .bsb__link--single[data-label]:hover::after,
+#client_sidebar_container_main.collapsed .bsb__link--collapse[data-label]:focus-visible::after,
+#client_sidebar_container_main.collapsed .bsb__link--single[data-label]:focus-visible::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #client_sidebar_container_main,
+  #client_sidebar_container_main * {
+    transition: none !important;
+  }
 }
 
 /* ==================== API SETTINGS + TEST CONSOLE ==================== */
@@ -4800,6 +4939,8 @@
 .bsl__field__label { font-size: 0.7rem; color: var(--brand-grey-500, #6c757d); }
 .bsl__field__label i { margin-right: 0.25rem; color: var(--brand-primary, #f7c000); }
 .bsl__field__value { font-size: 0.75rem; font-weight: 500; color: var(--brand-grey-800, #1f1f1f); }
+/* A suspended account must not read as a neutral label in the switcher. */
+.bsl__field__value--suspended { color: var(--brand-danger); font-weight: 700; }
 .bsl__code { font-family: "JetBrains Mono", monospace; font-size: 0.75rem; font-weight: 700; background: var(--brand-grey-100); padding: 0.125rem 0.375rem; border-radius: 0.25rem; }
 .bsl__btn {
     display: flex; align-items: center; justify-content: center; gap: 0.375rem;

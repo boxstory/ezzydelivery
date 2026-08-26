@@ -66,7 +66,9 @@
             {% if business_info.business.business_status %}
             <div class="bsl__field">
                 <span class="bsl__field__label"><i class="fa-solid fa-circle-info"></i> Status</span>
-                <span class="bsl__field__value">{{ business_info.business.get_business_status_display }}</span>
+                <span class="bsl__field__value {% if business_info.business.business_status == 'suspended' %}bsl__field__value--suspended{% endif %}">
+                    {% if business_info.business.business_status == 'suspended' %}<i class="fa-solid fa-ban"></i> {% endif %}{{ business_info.business.get_business_status_display }}
+                </span>
             </div>
             {% endif %}
         </div>

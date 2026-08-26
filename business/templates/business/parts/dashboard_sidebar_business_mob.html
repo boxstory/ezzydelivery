@@ -129,16 +129,16 @@
 
       <!-- FINANCE -->
       <li class="bsb__section">{% trans "Finance" %}</li>
-      <li class="nav-item {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}active{% endif %}">
-        <div class="nav-link d-flex align-items-center {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}active{% endif %}"
+      <li class="nav-item {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' or current_url == 'business_delivery_charges' %}active{% endif %}">
+        <div class="nav-link d-flex align-items-center {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' or current_url == 'business_delivery_charges' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-finance-mobile"
-             aria-expanded="{% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}true{% else %}false{% endif %}">
+             aria-expanded="{% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' or current_url == 'business_delivery_charges' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-chart-line me-2"></i>
           <span class="flex-fill text-start">{% trans "Finance" %}</span>
           <i class="fa-solid fa-caret-down ms-auto"></i>
         </div>
-        <div class="bsb__submenu collapse {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' or current_url == 'business_charge_invoices' or current_url == 'business_charge_invoice' %}show{% endif %}"
+        <div class="bsb__submenu collapse {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' or current_url == 'business_delivery_charges' or current_url == 'business_charge_invoices' or current_url == 'business_charge_invoice' %}show{% endif %}"
              id="submenu-finance-mobile">
           <a class="nav-link {% if current_url == 'business_finance_dashboard' %}active{% endif %}" href="{% url 'business:business_finance_dashboard' %}">
             <i class="fa-solid fa-chart-pie me-2"></i>
@@ -150,11 +150,11 @@
           </a>
           <a class="nav-link {% if current_url == 'business_cod_statement' %}active{% endif %}" href="{% url 'business:business_cod_statement' %}">
             <i class="fa-solid fa-file-invoice-dollar me-2"></i>
-            <span>{% trans "Client COD Requests" %}</span>
+            <span>{% trans "COD Collections" %}</span>
           </a>
-          <a class="nav-link" href="{% url 'business:business_cod_statement' %}">
-            <i class="fa-solid fa-hand-holding-dollar me-2"></i>
-            <span>{% trans "Driver COD Requests" %}</span>
+          <a class="nav-link {% if current_url == 'business_delivery_charges' %}active{% endif %}" href="{% url 'business:business_delivery_charges' %}">
+            <i class="fa-solid fa-sack-dollar me-2"></i>
+            <span>{% trans "EST Delivery Charges" %}</span>
           </a>
           <a class="nav-link {% if current_url == 'business_charge_invoices' or current_url == 'business_charge_invoice' %}active{% endif %}" href="{% url 'business:business_charge_invoices' %}">
             <i class="fa-solid fa-file-invoice me-2"></i>

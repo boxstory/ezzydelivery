@@ -922,6 +922,7 @@ def business_settings(request, business_id):
 #business_settings_api---------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @business_required
+@business_active_required
 def business_settings_api_update(request, business_id, api_id):
     user_business = get_cached_business(request)
     if user_business and request.user.id == user_business.user_id:
@@ -972,6 +973,7 @@ def business_settings_api_update(request, business_id, api_id):
 
 @login_required(login_url='/accounts/login/')
 @business_required
+@business_active_required
 def business_settings_api_add(request, business_id):
     user_business = get_cached_business(request)
     if user_business and request.user.id == user_business.user_id:
@@ -1092,6 +1094,7 @@ def business_settings_api_list(request, business_id):
 
 @login_required(login_url='/accounts/login/')
 @business_required
+@business_active_required
 def business_settings_api_delete(request, business_id, api_id):
     # IDOR FIX: Verify user owns this business
     user_business = get_cached_business(request)
@@ -1110,6 +1113,7 @@ def business_settings_api_delete(request, business_id, api_id):
 
 @login_required(login_url='/accounts/login/')
 @business_required
+@business_active_required
 def business_settings_api_test(request, business_id, api_id):
     # IDOR FIX: Verify user owns this business
     user_business = get_cached_business(request)
@@ -1134,6 +1138,7 @@ def business_settings_api_test(request, business_id, api_id):
 
 @login_required(login_url='/accounts/login/')
 @business_required
+@business_active_required
 def business_settings_api_test_result(request, business_id, api_id):
     # IDOR FIX: Verify user owns this business
     user_business = get_cached_business(request)
@@ -1408,6 +1413,7 @@ def shopify_oauth_app_url():
 
 @login_required(login_url='/accounts/login/')
 @business_required
+@business_active_required
 def shopify_oauth_start(request, business_id, api_id):
     """Initiate Shopify OAuth flow - redirects user to Shopify authorization page."""
     user_business = get_cached_business(request)
@@ -1455,6 +1461,7 @@ def shopify_oauth_start(request, business_id, api_id):
 
 @login_required(login_url='/accounts/login/')
 @business_required
+@business_active_required
 def shopify_oauth_callback(request):
     """Handle Shopify OAuth callback - exchange code for access token."""
     code = request.GET.get('code')
@@ -1602,7 +1609,7 @@ from business.decorators import (
     user_has_business_permission,
 )
 from business.permissions import BusinessPermissions, TeamRoles, get_role_permissions
-from core.validators import safe_int
+from core.validators import safe_int, sanitize_text
 
 
 @login_required(login_url='/accounts/login/')
@@ -2796,14 +2803,21 @@ def business_cod_payout_invoice(request, txn_code):
 @business_required
 @business_permission_required(BusinessPermissions.REPORTS_VIEW)
 def business_charge_invoices(request):
-    """The seller's own charge invoices — what they owe EzzyDelivery.
+    """Every finance document this seller has, both directions.
 
-    The COD statement answers "what is Ezzy holding for me". A prepaid seller
-    has no COD, so nothing on their finance pages ever said what the deliveries
-    cost them. This is that ledger.
+    Two different documents settle a delivery and sellers confuse them: a COD
+    payout invoice (CODCS) is money we paid them with charges withheld, a charge
+    invoice (INVC) is money they owe us. A seller who is paid by withholding
+    never receives a charge invoice at all — asking why their payout is "not in
+    invoices" is what this page now answers by carrying both legs.
+
+    Payouts are listed all-time: the COD statement windows them by ``?days=``,
+    so a payout invoice used to fall out of the seller's only entry point about
+    a month after it was issued.
     """
     from decimal import Decimal
     from fleet.models import BusinessChargeInvoice
+    from fleet.wallet_service import WalletService
 
     business = get_cached_business(request)
     if not business:
@@ -4103,6 +4117,7 @@ def return_detail(request, return_id):
 
 @login_required(login_url='account_login')
 @business_required
+@business_active_required
 def return_create(request, order_id):
     """Create a return request from a delivered order."""
     business = get_cached_business(request)
@@ -4187,6 +4202,7 @@ def return_create(request, order_id):
 
 @login_required(login_url='account_login')
 @business_required
+@business_active_required
 def return_update_status(request, return_id):
     """Update the status of a return request (approve/reject)."""
     if request.method != 'POST':

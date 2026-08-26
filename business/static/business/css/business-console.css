@@ -22,6 +22,26 @@
   margin-bottom: 1.125rem;
 }
 
+/* The dashboard root has no BEM container of its own and lays its sections out
+   with Bootstrap `.row g-3`, whose -0.5rem side margins hung 8px outside the
+   shell once the content area stopped carrying padding. Give it a matching
+   gutter and publish it, so the rows sit inside and the band still runs flush. */
+@media (min-width: 768px) {
+  .business-dashboard #client_dashboard_container_main {
+    padding: 0.5rem;
+    --bcon-root-gutter: 0.5rem;
+  }
+
+  /* Right-hand gutter for everything below the command band. The band runs
+     full-bleed, so without this the content under it ran to the same edge.
+     Applied to the siblings rather than the root because the Bootstrap rows
+     cancel root padding with their negative side margins — this also evens up
+     the plates (were 8px) and the panels inside rows (were 16px). */
+  .business-dashboard #client_dashboard_header_main ~ * {
+    padding-right: 0.325rem;
+  }
+}
+
 /* Manifest eyebrow — mono breadcrumb / context line */
 .bcon__eyebrow {
   display: flex;
@@ -63,58 +83,58 @@
    This is THE page header for every client-dashboard page; {% bconheader %}
    renders it, so a page never writes this markup by hand.
    ============================================================================ */
+/* Geometry matches the staff console's .wfhero (workforce.css): flat navy band,
+   yellow 3px bottom rule, eyebrow + title left, tallies and actions right.
+   The two consoles are the same product, so they now carry the same masthead. */
 .bcon__command {
   position: relative;
-  background: var(--brand-gradient-navy);
-  border-radius: var(--brand-radius-md);
-  padding: 1.25rem 1.5rem;
-  /* No side margin: the band sits flush with the page gutter, so it lines up
-     with the panels underneath whatever wrapper a page happens to use. */
-  margin: 0 0 1.125rem;
+  background: var(--brand-navy, #001f3f);
+  border-radius: 0.4rem 0.4rem 0 0;
+  border-bottom: 3px solid var(--brand-primary, #f7c000);
+  padding: 0.375rem 0.75rem;
+  /* The page is two parts: this band runs full-bleed across the top, and the
+     content below keeps the page gutter. The band cancels the gutter its root
+     published in --bcon-root-gutter; a root that sets no gutter (or mobile,
+     where that rule does not apply) leaves this at 0 and nothing moves. */
+  margin: calc(var(--bcon-root-gutter, 0px) * -1)
+          calc(var(--bcon-root-gutter, 0px) * -1)
+          0.75rem;
   overflow: hidden;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 1.25rem;
+  gap: 0.75rem 1rem;
   flex-wrap: wrap;
 }
-.bcon__command::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 82% 20%, rgba(247,192,0,0.14) 0%, transparent 55%);
-  pointer-events: none;
-}
-/* faint manifest grid on the navy field */
-.bcon__command::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 100% 1.5rem;
-  pointer-events: none;
-}
 .bcon__command-main { position: relative; min-width: 0; }
-.bcon__command .bcon__eyebrow { color: rgba(255,255,255,0.55); margin-bottom: 0.5rem; }
+.bcon__command .bcon__eyebrow {
+  font-size: 0.63rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 0.2rem;
+}
 .bcon__command .bcon__eyebrow-sep { background: rgba(247,192,0,0.6); }
 .bcon__command .bcon__eyebrow-live { color: var(--brand-primary); }
 
 .bcon__command-title {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  font-size: 1.4rem;
-  font-weight: 800;
+  gap: 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 700;
   color: #fff;
   margin: 0;
-  letter-spacing: -0.01em;
-  line-height: 1.1;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
 }
-.bcon__command-title i { color: var(--brand-primary); font-size: 1.05rem; flex-shrink: 0; }
+.bcon__command-title i { color: var(--brand-primary); font-size: 1rem; flex-shrink: 0; }
 .bcon__command-sub {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   color: rgba(255,255,255,0.6);
-  margin: 0.3rem 0 0;
+  margin: 0.15rem 0 0;
+  max-width: 46rem;
 }
 /* Some eyebrows carry a back-link ("← Order #123"); keep it legible on navy. */
 .bcon__command .bcon__eyebrow a {
@@ -126,30 +146,41 @@
 .bcon__command-right {
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 1.25rem;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
   flex-wrap: wrap;
 }
-/* live readout inside the band */
-.bcon__command-readout { text-align: right; }
+/* Live readout inside the band — the staff console's .wfhero__tally:
+   yellow rule on the left of the figure, label under it, mono numerals. */
+.bcon__command-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  border-right: 3px solid var(--brand-primary, #f7c000);
+  padding-right: 0.75rem;
+}
 .bcon__command-readout-label {
-  font-size: 0.6rem;
-  font-weight: 700;
+  order: 2;
+  font-size: 0.58rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(247,192,0,0.9);
-  margin: 0 0 0.15rem;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+  margin: 0;
 }
 .bcon__command-readout-value {
+  order: 1;
   font-family: var(--bcon-mono);
-  font-size: 1.5rem;
-  font-weight: 800;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: #fff;
   margin: 0;
-  line-height: 1;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
-.bcon__command-readout-value small { font-size: 0.7rem; color: rgba(255,255,255,0.55); font-weight: 600; }
+.bcon__command-readout-value small { font-size: 0.6rem; color: rgba(255,255,255,0.55); font-weight: 600; }
 
 .bcon__command-cta {
   display: inline-flex;
@@ -157,28 +188,39 @@
   gap: 0.4rem;
   background: var(--brand-primary);
   color: var(--brand-navy);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  padding: 0.55rem 1rem;
-  border-radius: var(--brand-radius-sm);
+  letter-spacing: 0.04em;
+  padding: 0.24rem 0.7rem;
+  border-radius: 0.3rem;
   text-decoration: none;
   border: 1px solid var(--brand-primary);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   white-space: nowrap;
+  line-height: 1.4;
 }
 .bcon__command-cta:hover {
   background: var(--brand-primary-dark);
   color: var(--brand-navy);
-  transform: translateY(-1px);
-  box-shadow: 0 0.35rem 0.75rem rgba(247,192,0,0.35);
 }
 
 /* ── Actions slot on the navy field ─────────────────────────────────────────
    Pages hand the header arbitrary action markup — the same .bcon__btn set they
    used on the old paper header. Rather than rewrite 50 templates, the three
-   button variants are restated here for a dark background: primary becomes the
-   yellow CTA, secondary a translucent plate, ghost a hairline outline. */
-.bcon__command .bcon__actions { position: relative; gap: 0.5rem; }
+   button variants are restated here for a dark background. All three now carry
+   the staff console's .wfhero__ghost geometry (small, hairline, yellow on
+   hover); primary keeps the yellow fill because it is the page's real action. */
+.bcon__command .bcon__actions { position: relative; gap: 0.375rem; }
+
+.bcon__command .bcon__btn {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  border-radius: 0.3rem;
+  padding: 0.24rem 0.6rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
 
 .bcon__command .bcon__btn--primary {
   background: var(--brand-primary);
@@ -190,28 +232,19 @@
   background: var(--brand-primary-dark);
   color: var(--brand-navy);
   border-color: var(--brand-primary-dark);
-  box-shadow: 0 0.35rem 0.75rem rgba(247,192,0,0.35);
 }
 
-.bcon__command .bcon__btn--secondary {
-  background: rgba(255,255,255,0.12);
-  color: #fff;
-  border-color: rgba(255,255,255,0.22);
-}
-.bcon__command .bcon__btn--secondary:hover {
-  background: rgba(255,255,255,0.2);
-  color: #fff;
-  border-color: rgba(247,192,0,0.55);
-}
-
+.bcon__command .bcon__btn--secondary,
 .bcon__command .bcon__btn--ghost {
-  background: transparent;
-  color: rgba(255,255,255,0.8);
-  border-color: rgba(255,255,255,0.28);
+  background-color: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.25);
 }
+.bcon__command .bcon__btn--secondary:hover,
 .bcon__command .bcon__btn--ghost:hover {
-  color: var(--brand-primary);
-  border-color: rgba(247,192,0,0.6);
+  color: var(--brand-navy, #001f3f);
+  background-color: var(--brand-primary, #f7c000);
+  border-color: var(--brand-primary, #f7c000);
 }
 
 /* Segmented control (table ⇄ kanban): a .btn-group of ghost buttons where the
@@ -447,11 +480,10 @@ a.bcon__gauge:hover::before { opacity: 1; }
   .bcon__gauge--money { grid-column: 1 / -1; }
 }
 
-/* Panel left index-edge variants (for the operations queues) */
-.bcon__panel--edge { border-left: var(--bcon-edge) solid var(--brand-grey-300); }
-.bcon__panel--warn  { border-left: var(--bcon-edge) solid var(--brand-warning-alt); }
-.bcon__panel--ok    { border-left: var(--bcon-edge) solid var(--brand-success-bright); }
-.bcon__panel--alert { border-left: var(--bcon-edge) solid var(--brand-danger); }
+/* Panel left index-edge variants moved to sit AFTER the .bcon__panel base rule
+   further down this file — the base declares `border:` shorthand at the same
+   specificity, so declaring them here left every queue panel with a plain grey
+   1px edge and no semantic colour at all. */
 
 /* Queue rows — compact manifest lines inside a panel */
 .bcon__qlist { max-height: 340px; overflow-y: auto; }
@@ -550,72 +582,67 @@ a.bcon__gauge:hover::before { opacity: 1; }
 /* ============================================================================
    STAT PLATES — the dispatch board row
    ============================================================================ */
+/* Same card as the staff console's .wfstat__card: a real left rule (not a
+   pseudo-element bar), tight padding, mono figure. */
 .bcon__plates {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.75rem;
-  margin: 0 0 1.25rem;
-  padding: 0 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
 }
 
 .bcon__plate {
   position: relative;
   display: block;
   background: #fff;
-  border: 1px solid var(--brand-grey-200);
-  border-radius: var(--brand-radius-md);
-  padding: 0.875rem 1rem 0.875rem 1.125rem;
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  border: 1px solid var(--brand-grey-200, #f0f0f0);
+  border-left: var(--bcon-edge) solid var(--brand-grey-300, #dee2e6);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  transition: border-left-color 0.2s ease, box-shadow 0.2s ease;
   text-decoration: none;
   color: inherit;
 }
-.bcon__plate::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: var(--bcon-edge);
-  background: var(--brand-grey-300);
-  transition: background 0.2s ease;
-}
 a.bcon__plate:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--brand-shadow-md);
-  border-color: var(--brand-grey-300);
+  border-left-color: var(--brand-navy, #001f3f);
+  box-shadow: 0 2px 8px rgba(0, 31, 63, 0.07);
   color: inherit;
 }
-.bcon__plate--primary::before { background: var(--brand-primary); }
-.bcon__plate--success::before { background: var(--brand-success-light); }
-.bcon__plate--info::before    { background: var(--brand-info); }
-.bcon__plate--warning::before { background: var(--brand-warning-alt); }
-.bcon__plate--danger::before  { background: var(--brand-danger); }
-.bcon__plate--navy::before    { background: var(--brand-navy); }
+.bcon__plate--primary { border-left-color: var(--brand-primary); background: #fffdf4; }
+.bcon__plate--success { border-left-color: var(--brand-success-light); }
+.bcon__plate--info    { border-left-color: var(--brand-info); }
+.bcon__plate--warning { border-left-color: var(--brand-warning-alt); }
+.bcon__plate--danger  { border-left-color: var(--brand-danger); }
+.bcon__plate--navy    { border-left-color: var(--brand-navy); }
 
 .bcon__plate-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.1rem;
 }
 
 .bcon__plate-label {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--brand-grey-500);
+  letter-spacing: 0.1em;
+  color: var(--brand-grey-500, #6c757d);
   margin: 0;
 }
 
+/* The staff cards carry no icon tile — the left rule already says which figure
+   this is. Kept at a small, quiet size for the pages that still pass one. */
 .bcon__plate-icon {
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: var(--brand-radius-sm);
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 0.25rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   flex-shrink: 0;
 }
 .bcon__plate-icon--primary { background: linear-gradient(135deg, #fffbeb, #fef3c7); color: var(--brand-navy); border: 1px solid #fde68a; }
@@ -644,19 +671,20 @@ a.bcon__plate:hover {
 
 .bcon__plate-value {
   font-family: var(--bcon-mono);
-  font-size: 1.5rem;
+  font-size: 1.15rem;
   font-weight: 700;
-  color: var(--brand-grey-800);
-  line-height: 1;
-  margin: 0;
-  letter-spacing: -0.02em;
+  color: var(--brand-navy, #001f3f);
+  line-height: 1.25;
+  margin: 0.1rem 0 0;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 .bcon__plate-value small {
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   font-weight: 600;
-  color: var(--brand-grey-450);
-  letter-spacing: 0;
+  letter-spacing: 0.08em;
+  color: var(--brand-grey-500, #6c757d);
+  margin-left: 0.3rem;
 }
 
 .bcon__plate-foot {
@@ -674,37 +702,46 @@ a.bcon__plate:hover {
 /* ============================================================================
    PANELS — section cards with a manifest header strip
    ============================================================================ */
+/* Section card, matching the staff console's .wf-card: white, hairline border,
+   a plain white header strip with a yellow icon tick and sentence-case title —
+   not the grey uppercase manifest strip this used to carry. */
 .bcon__panel {
   background: #fff;
-  border: 1px solid var(--brand-grey-200);
-  border-radius: var(--brand-radius-md);
+  border: 1px solid var(--brand-grey-200, #e9ecef);
+  border-radius: 0.4rem;
   overflow: hidden;
-  transition: box-shadow 0.2s ease;
 }
-.bcon__panel:hover { box-shadow: var(--brand-shadow-sm); }
+
+/* Left index-edge variants for the operations queues. These must come after the
+   base rule above: it sets `border:` shorthand, which resets border-left. The
+   edge carries meaning — pending / delivered / failed — so it is not optional. */
+.bcon__panel--edge  { border-left: var(--bcon-edge) solid var(--brand-grey-300); }
+.bcon__panel--warn  { border-left: var(--bcon-edge) solid var(--brand-warning-alt); }
+.bcon__panel--ok    { border-left: var(--bcon-edge) solid var(--brand-success-bright); }
+.bcon__panel--alert { border-left: var(--bcon-edge) solid var(--brand-danger); }
 
 .bcon__panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.625rem 1rem;
-  background: var(--brand-grey-100);
-  border-bottom: 1px solid var(--brand-grey-200);
+  padding: 0.375rem 0.75rem;
+  background: #fff;
+  border-bottom: 1px solid var(--brand-grey-200, #e9ecef);
 }
 
 .bcon__panel-title {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--brand-grey-500);
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--brand-grey-800, #212529);
   margin: 0;
 }
-.bcon__panel-title i { color: var(--brand-primary); font-size: 0.75rem; }
+.bcon__panel-title i { color: var(--brand-primary); font-size: 0.85rem; }
 
 .bcon__panel-head--navy {
   background: var(--brand-gradient-navy);
@@ -726,7 +763,7 @@ a.bcon__plate:hover {
 }
 .bcon__panel-link:hover { color: var(--brand-primary-dark); gap: 0.5rem; }
 
-.bcon__panel-body { padding: 1rem; }
+.bcon__panel-body { padding: 0.75rem; }
 .bcon__panel-body--flush { padding: 0; }
 
 /* Panel footer link (full-width, centered) */
@@ -845,6 +882,47 @@ a.bcon__plate:hover {
 .bcon__i-success { color: var(--brand-success); }
 .bcon__i-warning { color: var(--brand-warning-alt); }
 .bcon__i-info { color: var(--brand-info); }
+
+/* Two-line reference cell — primary ref on top, secondary ref beneath */
+.bcon__ref-main {
+  display: block;
+  font-family: var(--bcon-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+.bcon__ref-sub {
+  display: block;
+  font-family: var(--bcon-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  margin-top: 0.125rem;
+}
+
+/* Two-line party cell — name on top, phone/meta beneath */
+.bcon__party-name {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  line-height: 1.25;
+}
+.bcon__party-sub {
+  display: block;
+  font-family: var(--bcon-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  margin-top: 0.125rem;
+  white-space: nowrap;
+}
 
 /* Zone / meta chip */
 .bcon__chip {
@@ -1095,6 +1173,26 @@ a.bcon__plate:hover {
   .business-dashboard .ofb__filters { flex-wrap: nowrap; }
 }
 
+/* Standalone filter body — no .ofb toolbar above it, so it carries its own
+   full border and radius instead of the flat-top edge the paired body uses. */
+.business-dashboard .ofb__body--solo {
+  border-top: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-sm);
+}
+/* Action column — buttons sit on the field baseline, sized to their content */
+.business-dashboard .ofb__filters__col--actions {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.business-dashboard .ofb__filters__col--actions .oal__filter-btn {
+  height: 1.9rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 /* Toggle — quiet, borderless */
 .business-dashboard .ofb__toggle {
   height: 1.9rem;
@@ -1269,4 +1367,80 @@ a.bcon__plate:hover {
 @media (max-width: 768px) {
   .bcon__cockpit-actions { width: 100%; }
   .bcon__cockpit-actions > * { flex: 1 1 auto; justify-content: center; }
+}
+
+/* ── Account alert bar ────────────────────────────────────────────────────
+   Full-bleed strip at the top of every client page for an account-level
+   state the seller cannot dismiss (suspension). Restrained on purpose: a
+   hairline, a tinted ground and one accent — it must read as a ledger
+   notice, not a marketing banner. Static, not sticky, so it never fights
+   the PWA header for the top of the viewport on mobile. */
+.bcon__alertbar {
+  border-bottom: 1px solid var(--brand-grey-200, #e5e7eb);
+  background: var(--brand-grey-100, #f3f4f6);
+}
+.bcon__alertbar__inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0.625rem 1rem;
+}
+.bcon__alertbar__icon {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  font-size: 0.875rem;
+  color: var(--brand-grey-500, #6c757d);
+}
+.bcon__alertbar__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--brand-grey-600, #4b5563);
+}
+.bcon__alertbar__text strong {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--brand-navy);
+}
+.bcon__alertbar__btn {
+  flex-shrink: 0;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--brand-grey-300, #d1d5db);
+  border-radius: 0.25rem;
+  background: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--brand-navy);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.bcon__alertbar__btn:hover {
+  border-color: var(--brand-navy);
+  color: var(--brand-navy);
+}
+
+/* The one accent: suspension is the state the seller must act on. */
+.bcon__alertbar--danger {
+  border-bottom-color: var(--brand-danger);
+  background: var(--brand-danger-bg);
+}
+.bcon__alertbar--danger .bcon__alertbar__icon,
+.bcon__alertbar--danger .bcon__alertbar__text strong {
+  color: var(--brand-danger);
+}
+
+@media (max-width: 575.98px) {
+  .bcon__alertbar__inner {
+    flex-wrap: wrap;
+    padding: 0.5rem 0.75rem;
+  }
+  .bcon__alertbar__btn {
+    margin-left: auto;
+  }
 }

@@ -2,6 +2,17 @@ body {
   background: #f5f5f5;
 }
 
+/* One checkbox size for the whole client dashboard — 1rem. Brandkit sizes
+   .form-check-input at 18px with !important, so the override has to match that
+   weight; page-level CSS (e.g. .oal__table-checkbox) inherits from here. */
+.business-dashboard input[type="checkbox"],
+.business-dashboard input[type="checkbox"].form-check-input,
+.business-dashboard .form-check-input[type="checkbox"] {
+  width: 1rem !important;
+  height: 1rem !important;
+  min-width: 1rem !important;
+}
+
 /* Dashboard flex container */
 .col-12.d-flex {
   display: flex;
@@ -9,10 +20,14 @@ body {
   width: 100%;
 }
 
+/* The content area itself carries no gutter — the page roots inside it
+   (.bcon__page and the legacy containers below) own the spacing, so padding
+   here just doubled it. The mobile block further down re-declares its own
+   padding, so the PWA views are unaffected. */
 .biz-dash__content {
   background: #f5f5f5;
   min-height: calc(100vh - 3.5rem);
-  padding: 0.325rem;
+  padding: 0;
   width: 100%;
   flex: 1 1 0%;
   min-width: 0;
@@ -103,6 +118,11 @@ body {
   .business-dashboard .pco__form-container,
   .business-dashboard .pal__container {
     padding: 0.375rem;
+    /* Published so the command band can cancel exactly this much and sit
+       flush at the top of the page. Roots with no gutter never set it, so the
+       band leaves itself alone there instead of hanging outside the shell.
+       Consumed by .bcon__command in business-console.css. */
+    --bcon-root-gutter: 0.375rem;
   }
 }
 
@@ -158,3 +178,222 @@ body {
   }
 }
 
+
+/* ============================================================================
+   FORM CONTROLS — selects, date/time pickers, dropdown menus
+   One shape for every field in the client dashboard. They had drifted badly:
+   selects were pill-shaped (16px radius) on the order lists and 12px elsewhere,
+   date/time inputs sat at 12px text in a box with 2.4px of vertical padding,
+   and font sizes ran 12 / 13 / 13.6 / 15px across the same screen.
+   Brand Kit: Bootstrap stays the base, radius is --brand-radius-sm, focus is a
+   yellow border with no glow, and nothing drops below the console floors
+   (0.82rem text, 2.1rem control height).
+   Desktop + mobile — the PWA views use their own .pwa-* fields, not these.
+   ============================================================================ */
+.business-dashboard .form-control,
+.business-dashboard .form-select,
+.business-dashboard input[type="date"],
+.business-dashboard input[type="time"],
+.business-dashboard input[type="datetime-local"],
+.business-dashboard select {
+  min-height: 2.25rem;
+  font-size: 0.85rem;
+  color: var(--brand-grey-800, #1f1f1f);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  /* Pills are for badges. A full-radius field reads as a consumer app, not a
+     logistics console — this is the single biggest source of the drift. */
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  padding: 0.375rem 0.75rem;
+  transition: border-color 0.15s ease;
+}
+
+/* Selects carry the arrow as a background-image, so colour must never be set
+   with the `background` shorthand here — it would wipe the arrow out. */
+.business-dashboard .form-select,
+.business-dashboard select {
+  background-color: #fff;
+  padding-right: 2rem;
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+  background-size: 0.7rem 0.7rem;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+/* One arrow for every select, drawn in brand ink rather than Bootstrap blue-grey */
+.business-dashboard .form-select,
+.business-dashboard select:not([multiple]):not([size]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236c757d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3,6 8,11 13,6'/%3E%3C/svg%3E");
+}
+
+/* Focus: a yellow edge, no coloured halo. */
+.business-dashboard .form-control:focus,
+.business-dashboard .form-select:focus,
+.business-dashboard input[type="date"]:focus,
+.business-dashboard input[type="time"]:focus,
+.business-dashboard select:focus {
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
+  outline: none;
+}
+
+.business-dashboard .form-control::placeholder {
+  color: var(--brand-grey-450, #9ca3af);
+}
+
+.business-dashboard .form-control:disabled,
+.business-dashboard .form-select:disabled,
+.business-dashboard select:disabled {
+  background-color: var(--brand-grey-100, #f8f9fa);
+  color: var(--brand-grey-500, #6c757d);
+  cursor: not-allowed;
+}
+
+/* Dates and times are figures — line them up in mono like every other number
+   in the console, and give the picker button a real hit area. */
+.business-dashboard input[type="date"],
+.business-dashboard input[type="time"],
+.business-dashboard input[type="datetime-local"] {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  background-color: #fff;
+}
+
+.business-dashboard input[type="date"]::-webkit-calendar-picker-indicator,
+.business-dashboard input[type="time"]::-webkit-calendar-picker-indicator,
+.business-dashboard input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  padding: 0.2rem;
+  margin-left: 0.25rem;
+  border-radius: 0.25rem;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.business-dashboard input[type="date"]::-webkit-calendar-picker-indicator:hover,
+.business-dashboard input[type="time"]::-webkit-calendar-picker-indicator:hover,
+.business-dashboard input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: var(--brand-secondary, #fff7d6);
+}
+
+/* Small variants still clear the 2.1rem / 0.82rem floor */
+.business-dashboard .form-control-sm,
+.business-dashboard .form-select-sm {
+  min-height: 2.1rem;
+  font-size: 0.82rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.business-dashboard .form-select-sm {
+  padding-right: 1.75rem;
+}
+
+/* Option rows: readable on every platform that lets us style them */
+.business-dashboard select option {
+  color: var(--brand-grey-800, #1f1f1f);
+  background-color: #fff;
+  padding: 0.375rem 0.5rem;
+}
+
+/* ── Dropdown menus (Bootstrap .dropdown) ────────────────────────────────── */
+.business-dashboard .dropdown-menu {
+  border: 1px solid var(--brand-grey-200, #e9ecef);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 31, 63, 0.12);
+  padding: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.business-dashboard .dropdown-item {
+  border-radius: 0.3rem;
+  padding: 0.375rem 0.625rem;
+  font-size: 0.85rem;
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+.business-dashboard .dropdown-item:hover,
+.business-dashboard .dropdown-item:focus {
+  background-color: var(--brand-grey-100, #f8f9fa);
+  color: var(--brand-navy, #001f3f);
+}
+
+/* The chosen row is marked by the navy fill, not a yellow wash */
+.business-dashboard .dropdown-item.active,
+.business-dashboard .dropdown-item:active {
+  background-color: var(--brand-navy, #001f3f);
+  color: #fff;
+}
+
+.business-dashboard .dropdown-divider {
+  margin: 0.25rem 0;
+  border-top-color: var(--brand-grey-200, #e9ecef);
+}
+
+/* Select2 pickers used by the filter bars — match the native fields above so a
+   row of controls does not step up and down. Their own stylesheet ships a 28px
+   box with a 4px radius. */
+.business-dashboard .select2-container--default .select2-selection--single {
+  min-height: 2.25rem;
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.business-dashboard .select2-container--default .select2-selection--single .select2-selection__rendered {
+  font-size: 0.85rem;
+  line-height: 2.25rem;
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+.business-dashboard .select2-container--default .select2-selection--single .select2-selection__arrow {
+  height: 2.25rem;
+}
+
+.business-dashboard .select2-container--default.select2-container--focus .select2-selection--single,
+.business-dashboard .select2-container--default.select2-container--open .select2-selection--single {
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
+}
+
+.business-dashboard .select2-dropdown {
+  border: 1px solid var(--brand-grey-200, #e9ecef);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 31, 63, 0.12);
+}
+
+.business-dashboard .select2-container--default .select2-results__option {
+  font-size: 0.85rem;
+  padding: 0.375rem 0.625rem;
+}
+
+.business-dashboard .select2-container--default .select2-results__option--highlighted[aria-selected] {
+  background-color: var(--brand-grey-100, #f8f9fa);
+  color: var(--brand-navy, #001f3f);
+}
+
+.business-dashboard .select2-container--default .select2-results__option[aria-selected="true"] {
+  background-color: var(--brand-navy, #001f3f);
+  color: #fff;
+}
+
+/* The shared pagination component ships its per-page select as a 1rem-radius
+   pill with a 2rem box. pagination.css loads AFTER this file, and its
+   `.pgn--compact .pgn__per-page select` rule matches at the same weight, so the
+   override has to out-specify it rather than rely on order. Colour is set with
+   `background-color` only — that rule paints the arrow via the `background`
+   shorthand, and re-declaring the shorthand here would erase it. */
+.business-dashboard .pgn__per-page select[id^="pagination-per-page-select"] {
+  height: 2.25rem;
+  min-height: 2.25rem;
+  font-size: 0.82rem;
+  border-width: 1px;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  background-color: #fff;
+}
+
+.business-dashboard .pgn__per-page select[id^="pagination-per-page-select"]:focus {
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
+}
