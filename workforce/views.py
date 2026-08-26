@@ -12079,57 +12079,141 @@ def client_charge_verification(request):
     from django.db.models import Sum
     from delivery import models as delivery_models
     from delivery.charges import BILLABLE_CHARGE
-    from datetime import timedelta
+    from datetime import datetime as _datetime, timedelta
 
     business_id = request.GET.get('business', '')
     status_filter = request.GET.get('status', 'pending')
-    try:
-        days = safe_int(request.GET.get('days'), default=90, minimum=1, maximum=730)
-        if days < 1 or days > 365:
-            days = 90
-    except (ValueError, TypeError):
-        days = 90
+    search_q = (request.GET.get('q') or '').strip()[:80]
+    speed_filter = (request.GET.get('speed') or '').strip()[:40]
+    category_filter = (request.GET.get('category') or '').strip()[:40]
+    zone_filter = (request.GET.get('zone') or '').strip()[:10]
+    sort_key = (request.GET.get('sort') or 'recent').strip()
+    # Mirror the page sizes paginate_queryset accepts, so the dropdown can
+    # never show a size the pager would silently ignore.
+    per_page = request.GET.get('per_page', '')
+    if per_page not in ('10', '25', '50', '100'):
+        per_page = ''
+    # Money bounds are read as Decimal so ?amount_min=abc never 500s.
+    amount_min = safe_decimal(request.GET.get('amount_min'), default=None, minimum=0)
+    amount_max = safe_decimal(request.GET.get('amount_max'), default=None, minimum=0)
 
-    start_date = timezone.now() - timedelta(days=days)
+    days = safe_int(request.GET.get('days'), default=90, minimum=1, maximum=365)
+
+    def _parse_date(raw):
+        try:
+            return _datetime.strptime((raw or '').strip(), '%Y-%m-%d').date()
+        except (TypeError, ValueError):
+            return None
+
+    date_from = _parse_date(request.GET.get('from'))
+    date_to = _parse_date(request.GET.get('to'))
+
+    # An explicit from/to window replaces the rolling period — the two would
+    # otherwise fight, and the dates staff typed are the more specific intent.
+    if date_from or date_to:
+        window_start, window_end = date_from, date_to
+    else:
+        window_start = (timezone.now() - timedelta(days=days)).date()
+        window_end = None
+
+    window = Q()
+    if window_start:
+        window &= Q(dl_task_date__gte=window_start)
+    if window_end:
+        window &= Q(dl_task_date__lte=window_end)
 
     # Every completed job is billable, COD or prepaid — same rule as the driver
     # leg, so the two consoles never disagree about which rows exist.
     tasks = delivery_models.DeliveryTask.objects.filter(
         dl_task_status__in=['delivered', 'partial_delivery'],
-        dl_task_date__gte=start_date.date(),
-    ).select_related(
+    ).filter(window).select_related(
         'order', 'order__business', 'pickup_location', 'dl_to_address',
         'charge_verified_by', 'driver', 'driver__user',
-    ).order_by('-completed_at', '-id')
+    ).annotate(billable_amount=BILLABLE_CHARGE)
 
     if business_id:
         tasks = tasks.filter(order__business_id=business_id)
 
-    if status_filter and status_filter != 'all':
-        tasks = tasks.filter(charge_verification_status=status_filter)
+    if speed_filter:
+        tasks = tasks.filter(dl_speed=speed_filter)
 
+    if category_filter:
+        tasks = tasks.filter(dl_category=category_filter)
+
+    if zone_filter:
+        zone_num = safe_int(zone_filter, default=None)
+        if zone_num is not None:
+            tasks = tasks.filter(order__dl_zone=zone_num)
+
+    # Amount bounds run against the annotated billable figure — the same
+    # resolver the payout deducts with, so a row found by amount here is the
+    # row that will bill at that amount.
+    if amount_min is not None:
+        tasks = tasks.filter(billable_amount__gte=amount_min)
+    if amount_max is not None:
+        tasks = tasks.filter(billable_amount__lte=amount_max)
+
+    if search_q:
+        text_match = (
+            Q(dl_task_number__icontains=search_q)
+            | Q(order__order_number__icontains=search_q)
+            | Q(order__client_order_code__icontains=search_q)
+            | Q(order__platform_id__icontains=search_q)
+            | Q(order__customer_name__icontains=search_q)
+            | Q(order__customer_phone__icontains=search_q)
+            | Q(order__business__business_name__icontains=search_q)
+        )
+        # A number typed in the search box is also tried as a charge, so
+        # "18.50" finds every row billing that figure without switching field.
+        amount_term = safe_decimal(search_q, default=None)
+        if amount_term is not None:
+            text_match |= Q(billable_amount=amount_term) | Q(dl_price=amount_term)
+        tasks = tasks.filter(text_match)
+
+    # Counts are taken before the status cut, so the three status cards keep
+    # showing the whole queue for the current filters instead of zeroing out
+    # every card except the one being viewed.
+    scoped = tasks
     stats = {
-        'pending_count': tasks.filter(charge_verification_status='pending').count(),
-        'verified_count': tasks.filter(charge_verification_status='verified').count(),
-        'published_count': tasks.filter(charge_verification_status='published').count(),
+        'pending_count': scoped.filter(charge_verification_status='pending').count(),
+        'verified_count': scoped.filter(charge_verification_status='verified').count(),
+        'published_count': scoped.filter(charge_verification_status='published').count(),
         # Pending money at stake: the staff figure once set, otherwise the
         # system charge that would be billed if nobody touched the row. Same
         # resolver the payout deducts with (delivery/charges.py).
-        'total_pending_charge': tasks.filter(
+        'total_pending_charge': scoped.filter(
             charge_verification_status='pending'
         ).aggregate(total=Sum(BILLABLE_CHARGE))['total'] or 0,
     }
+
+    if status_filter and status_filter != 'all':
+        tasks = tasks.filter(charge_verification_status=status_filter)
+
+    # What the current filter actually matched — the figure staff quote when
+    # they have narrowed to one business, one period or one amount band.
+    match = tasks.aggregate(total=Sum(BILLABLE_CHARGE), rows=Count('id'))
+    stats['match_count'] = match['rows'] or 0
+    stats['match_total'] = match['total'] or 0
+
+    SORT_OPTIONS = {
+        'recent': ('-completed_at', '-id'),
+        'oldest': ('completed_at', 'id'),
+        'amount_desc': ('-billable_amount', '-id'),
+        'amount_asc': ('billable_amount', '-id'),
+        'business': ('order__business__business_name', '-completed_at'),
+    }
+    if sort_key not in SORT_OPTIONS:
+        sort_key = 'recent'
+    tasks = tasks.order_by(*SORT_OPTIONS[sort_key])
 
     # Dropdown lists only businesses that actually have billable deliveries in
     # the period, so staff are not scrolling dead accounts.
     period_biz_ids = delivery_models.DeliveryTask.objects.filter(
         dl_task_status__in=['delivered', 'partial_delivery'],
-        dl_task_date__gte=start_date.date(),
-    ).values_list('order__business_id', flat=True).distinct()
+    ).filter(window).values_list('order__business_id', flat=True).distinct()
     all_businesses = business_models.Business.objects.filter(
         business_id__in=[b for b in period_biz_ids if b]
     ).order_by('business_name')
-
     tasks_paginated = paginate_queryset(request, tasks, items_per_page=50)
 
     # Activity trail for the visible page only — a charge is judged on the whole
@@ -12174,15 +12258,38 @@ def client_charge_verification(request):
         )
 
     # Keep the filters alive across pages — the shared pagination component
-    # appends this to every page link.
+    # appends this to every page link. `page` is deliberately absent so the
+    # pager sets it, and the status cards get the same string without `status`
+    # so clicking one only swaps the status.
     from urllib.parse import urlencode
-    filter_params = urlencode({
-        k: v for k, v in (
-            ('business', business_id),
-            ('status', status_filter),
-            ('days', days),
-        ) if v
-    })
+    carried = [
+        ('business', business_id),
+        ('days', '' if (date_from or date_to) else days),
+        ('from', request.GET.get('from', '') if date_from else ''),
+        ('to', request.GET.get('to', '') if date_to else ''),
+        ('q', search_q),
+        ('amount_min', '' if amount_min is None else amount_min),
+        ('amount_max', '' if amount_max is None else amount_max),
+        ('speed', speed_filter),
+        ('category', category_filter),
+        ('zone', zone_filter),
+        ('sort', '' if sort_key == 'recent' else sort_key),
+    ]
+    # The stat-card links rebuild the whole query, so they carry the page size;
+    # the pager writes its own `per_page`, so filter_params must not repeat it —
+    # a second copy would override the size its own selector just set.
+    status_params = urlencode(
+        {k: v for k, v in carried + [('per_page', per_page)] if v not in ('', None)}
+    )
+    filter_params = urlencode(
+        {k: v for k, v in carried + [('status', status_filter)] if v not in ('', None)}
+    )
+    # Any filter beyond the original three is "narrowed" — the template uses
+    # this to show the reset link only when there is something to reset.
+    has_extra_filters = any(
+        v not in ('', None) for k, v in carried
+        if k not in ('business', 'days')
+    )
 
     context = {
         'page_title': 'Client Charges',
@@ -12192,7 +12299,21 @@ def client_charge_verification(request):
         'selected_business': business_id,
         'selected_status': status_filter,
         'selected_days': days,
+        'selected_sort': sort_key,
+        'selected_speed': speed_filter,
+        'selected_category': category_filter,
+        'selected_zone': zone_filter,
+        'selected_per_page': str(per_page or 50),
+        'search_q': search_q,
+        'amount_min': request.GET.get('amount_min', '') if amount_min is not None else '',
+        'amount_max': request.GET.get('amount_max', '') if amount_max is not None else '',
+        'date_from': request.GET.get('from', '') if date_from else '',
+        'date_to': request.GET.get('to', '') if date_to else '',
+        'speed_choices': delivery_models.DeliveryTask.DL_SPEED_CHOICES,
+        'category_choices': delivery_models.DeliveryTask.DL_CATEGORY_CHOICES,
+        'has_extra_filters': has_extra_filters,
         'filter_params': filter_params,
+        'status_params': status_params,
     }
     return render(request, 'workforce/client_charge_verification.html', context)
 
@@ -13470,6 +13591,70 @@ def cod_business_settlement_reverse(request):
     })
 
 
+def _ledger_shared_filters(request):
+    """The filters Payout History and Charge Invoices have in common.
+
+    The two pages are one ledger shown as two tabs, so switching tab must not
+    silently drop the account or the date window the user is looking at.
+    ``carry`` is what the tab links append: everything except the invoice-only
+    status filter and the pager's own parameters.
+    """
+    params = request.GET.copy()
+    for key in ('page', 'per_page', 'status'):
+        params.pop(key, None)
+    return {
+        'business_id': request.GET.get('business_id', ''),
+        'date_from': request.GET.get('date_from', ''),
+        'date_to': request.GET.get('date_to', ''),
+        'carry': params.urlencode(),
+    }
+
+
+def _ledger_tab_counts(filters):
+    """(payouts, invoices) under the shared filters — the numbers on the tabs.
+
+    Counted off the same filters both lists apply, so the badge on the tab you
+    are not looking at is the number of rows you would actually find there.
+    """
+    from fleet.models import BusinessChargeInvoice
+
+    payouts = fleet_models.DriverTransaction.objects.filter(
+        transaction_type='cod_client_settle'
+    )
+    invoices = BusinessChargeInvoice.objects.all()
+
+    if filters['business_id']:
+        payouts = payouts.filter(business_id=filters['business_id'])
+        invoices = invoices.filter(business_id=filters['business_id'])
+    if filters['date_from']:
+        payouts = payouts.filter(created_at__date__gte=filters['date_from'])
+        invoices = invoices.filter(issued_at__date__gte=filters['date_from'])
+    if filters['date_to']:
+        payouts = payouts.filter(created_at__date__lte=filters['date_to'])
+        invoices = invoices.filter(issued_at__date__lte=filters['date_to'])
+
+    return payouts.count(), invoices.count()
+
+
+def _ledger_accounts():
+    """Every business that has a payout OR a charge invoice, for the dropdown.
+
+    Shared between both tabs on purpose: an account carried over from the other
+    tab has to stay selectable, otherwise the list would be filtered by a
+    business the <select> could not show and it would read as "All accounts".
+    """
+    from fleet.models import BusinessChargeInvoice
+
+    payout_ids = fleet_models.DriverTransaction.objects.filter(
+        transaction_type='cod_client_settle', business_id__isnull=False
+    ).values_list('business_id', flat=True)
+    invoice_ids = BusinessChargeInvoice.objects.values_list('business_id', flat=True)
+
+    return business_models.Business.objects.filter(
+        business_id__in=set(payout_ids) | set(invoice_ids)
+    ).order_by('business_name')
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def cod_business_payout_history(request):
@@ -13522,9 +13707,9 @@ def cod_business_payout_history(request):
             total_deductions += p.deductions_total
             total_net += p.net_paid
 
-    all_businesses = business_models.Business.objects.filter(
-        business_id__in=[p.business_id for p in payouts if p.business_id]
-    ).order_by('business_name')
+    all_businesses = _ledger_accounts()
+    ledger = _ledger_shared_filters(request)
+    payout_count, invoice_count = _ledger_tab_counts(ledger)
 
     # Paginate the display list only — the totals, live/void counts and the
     # business dropdown above are all computed off the full filtered set, so
@@ -13545,6 +13730,10 @@ def cod_business_payout_history(request):
         'total_net': total_net,
         'live_count': sum(1 for p in payouts if not p.reversal),
         'void_count': sum(1 for p in payouts if p.reversal),
+        # Tab rail: the two legs of the same client relationship.
+        'ledger_carry': ledger['carry'],
+        'payout_count': payout_count,
+        'invoice_count': invoice_count,
     }
     return render(request, 'workforce/cod_business_payout_history.html', context)
 
@@ -13829,9 +14018,9 @@ def client_charge_invoices(request):
     total_billed = sum((i.total_amount or Decimal('0') for i in live), Decimal('0'))
     total_paid = sum((i.amount_paid or Decimal('0') for i in live), Decimal('0'))
 
-    all_businesses = business_models.Business.objects.filter(
-        business_id__in=[i.business_id for i in invoices if i.business_id]
-    ).order_by('business_name')
+    all_businesses = _ledger_accounts()
+    ledger = _ledger_shared_filters(request)
+    payout_count, invoice_count = _ledger_tab_counts(ledger)
 
     invoices_page = paginate_queryset(request, invoices, 25)
 
@@ -13851,6 +14040,10 @@ def client_charge_invoices(request):
         'void_count': len(invoices) - len(live),
         'unpaid_count': sum(1 for i in live if i.amount_due > 0),
         'status_choices': BusinessChargeInvoice.STATUS_CHOICES,
+        # Tab rail: the two legs of the same client relationship.
+        'ledger_carry': ledger['carry'],
+        'payout_count': payout_count,
+        'invoice_count': invoice_count,
     }
     return render(request, 'workforce/client_charge_invoices.html', context)
 
@@ -13858,15 +14051,19 @@ def client_charge_invoices(request):
 def _charge_invoice_context(invoice):
     """Everything the invoice document renders, staff copy or seller copy."""
     from decimal import Decimal
+    from fleet import billing_service, invoice_columns
 
+    # Every column resolver reads off these relations, so they all come down in
+    # one query however many columns the client has picked.
     lines = list(invoice.lines.select_related(
-        'delivery_task', 'delivery_task__order'
+        'delivery_task', 'delivery_task__order', 'delivery_task__dl_to_address',
+        'delivery_task__driver__profile__user',
     ).order_by('delivery_task__completed_at', 'id'))
 
     delivery_lines = [l for l in lines if l.delivery_task_id]
     extra_lines = [l for l in lines if not l.delivery_task_id]
 
-    return {
+    context = {
         'invoice': invoice,
         'business': invoice.business,
         'delivery_lines': delivery_lines,
@@ -13874,7 +14071,12 @@ def _charge_invoice_context(invoice):
         'delivery_total': sum((l.amount or Decimal('0') for l in delivery_lines), Decimal('0')),
         'extra_total': sum((l.amount or Decimal('0') for l in extra_lines), Decimal('0')),
         'payments': list(invoice.payments.select_related('created_by').order_by('created_at')),
+        'extra_kind_choices': billing_service.EDITABLE_KINDS,
     }
+    # The line table is built in Python: its columns are chosen per client, and
+    # resolving them in template syntax would take a tag per column.
+    context.update(invoice_columns.render_table(invoice, delivery_lines))
+    return context
 
 
 @login_required(login_url='/accounts/login/')
@@ -13963,6 +14165,129 @@ def client_charge_invoice_void(request):
         return JsonResponse({'error': 'Could not void the invoice'}, status=500)
 
     return JsonResponse({'success': True, 'invoice_code': code})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def client_charge_invoice_line_add(request):
+    """Put another hand-added charge on an invoice that is already issued."""
+    from django.http import JsonResponse
+    from decimal import InvalidOperation
+    from fleet import billing_service
+    from fleet.models import BusinessChargeInvoice
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    code = (request.POST.get('invoice_code') or '').strip()
+    invoice = BusinessChargeInvoice.objects.filter(invoice_code=code).first()
+    if not invoice:
+        return JsonResponse({'error': 'Invoice not found'}, status=404)
+
+    try:
+        line, invoice = billing_service.add_invoice_charge_line(
+            invoice=invoice,
+            kind=(request.POST.get('kind') or 'other_charge').strip(),
+            label=(request.POST.get('label') or '').strip(),
+            amount=(request.POST.get('amount') or '0').strip(),
+            created_by=request.user,
+        )
+    except (ValueError, InvalidOperation) as e:
+        return JsonResponse({'error': str(e) or 'Invalid charge amount'}, status=400)
+    except Exception:
+        logger.exception("Charge line add failed for %s", code)
+        return JsonResponse({'error': 'Could not add the charge'}, status=500)
+
+    return JsonResponse({
+        'success': True,
+        'line_id': line.id,
+        'total_amount': float(invoice.total_amount),
+        'amount_due': float(invoice.amount_due),
+        'status': invoice.get_status_display(),
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def client_charge_invoice_line_remove(request):
+    """Take a hand-added charge back off an invoice that is already issued."""
+    from django.http import JsonResponse
+    from fleet import billing_service
+    from fleet.models import BusinessChargeInvoice
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    code = (request.POST.get('invoice_code') or '').strip()
+    invoice = BusinessChargeInvoice.objects.filter(invoice_code=code).first()
+    if not invoice:
+        return JsonResponse({'error': 'Invoice not found'}, status=404)
+
+    try:
+        line_id = int((request.POST.get('line_id') or '').strip())
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Invalid charge reference'}, status=400)
+
+    try:
+        invoice = billing_service.remove_invoice_charge_line(
+            invoice=invoice, line_id=line_id, created_by=request.user,
+        )
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception:
+        logger.exception("Charge line removal failed for %s", code)
+        return JsonResponse({'error': 'Could not remove the charge'}, status=500)
+
+    return JsonResponse({
+        'success': True,
+        'total_amount': float(invoice.total_amount),
+        'amount_due': float(invoice.amount_due),
+        'status': invoice.get_status_display(),
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def client_charge_invoice_columns(request):
+    """Choose which columns the invoice document carries.
+
+    The choice lives on the client by default, so every invoice for that account
+    reads alike; ``save_default`` off keeps it to this one invoice, and ``reset``
+    drops the override so the invoice follows the client again.
+    """
+    from django.http import JsonResponse
+    from fleet import invoice_columns as ic
+    from fleet.models import BusinessChargeInvoice
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    code = (request.POST.get('invoice_code') or '').strip()
+    invoice = BusinessChargeInvoice.objects.select_related('business').filter(
+        invoice_code=code
+    ).first()
+    if not invoice:
+        return JsonResponse({'error': 'Invoice not found'}, status=404)
+
+    if (request.POST.get('reset') or '') in ('1', 'true', 'on'):
+        invoice.column_keys = []
+        invoice.save(update_fields=['column_keys'])
+        return JsonResponse({'success': True, 'columns': ic.resolve_keys(invoice)})
+
+    raw = (request.POST.get('columns') or '').split(',')
+    keys = ic.clean_keys([k.strip() for k in raw if k.strip()])
+    if not keys:
+        return JsonResponse({'error': 'Pick at least one column'}, status=400)
+
+    invoice.column_keys = keys
+    invoice.save(update_fields=['column_keys'])
+
+    if (request.POST.get('save_default') or '') in ('1', 'true', 'on'):
+        business = invoice.business
+        business.invoice_columns = keys
+        business.save(update_fields=['invoice_columns'])
+
+    return JsonResponse({'success': True, 'columns': keys})
 
 
 @login_required(login_url='/accounts/login/')

@@ -1,0 +1,20 @@
+{# Purpose: Tab rail joining the two legs of one client ledger — COD payouts out, charge invoices in. #}
+{# Used by: workforce/cod_business_payout_history.html, workforce/client_charge_invoices.html #}
+{# Notes: Include with active="payouts" or active="invoices". The tabs are real links to the two URLs, #}
+{#        carrying ledger_carry (account + date window) so switching tab keeps what you were looking at. #}
+<nav class="bcp__tabs" aria-label="Ledger views">
+  <a href="{% url 'workforce:cod_business_payout_history' %}{% if ledger_carry %}?{{ ledger_carry }}{% endif %}"
+     class="bcp__tab{% if active == 'payouts' %} bcp__tab--active{% endif %}"
+     {% if active == 'payouts' %}aria-current="page"{% endif %}>
+    <i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i>
+    <span>Payouts</span>
+    <span class="bcp__tab-count">{{ payout_count|default:"0" }}</span>
+  </a>
+  <a href="{% url 'workforce:client_charge_invoices' %}{% if ledger_carry %}?{{ ledger_carry }}{% endif %}"
+     class="bcp__tab{% if active == 'invoices' %} bcp__tab--active{% endif %}"
+     {% if active == 'invoices' %}aria-current="page"{% endif %}>
+    <i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i>
+    <span>Charge Invoices</span>
+    <span class="bcp__tab-count">{{ invoice_count|default:"0" }}</span>
+  </a>
+</nav>

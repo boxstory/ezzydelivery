@@ -11,8 +11,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/cod_payout_invoice.css' %}?v=20260815a" type="text/css" />
-<link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260808a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_payout_invoice.css' %}?v=20260824b" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260824a" type="text/css" />
 <link rel="stylesheet" href="{% static 'workforce/css/invoice_preview.css' %}?v=20260815a" type="text/css" />
 {% endblock %}
 
@@ -29,6 +29,8 @@
       <button type="button" class="bpi__ghost" id="workforce_charge_invoice_btn_preview"
               data-bpi-preview-toggle aria-pressed="false">A4 preview</button>
       {% if not seller_view %}
+      <button type="button" class="bpi__ghost" id="workforce_charge_invoice_btn_columns"
+              data-bs-toggle="modal" data-bs-target="#cccColumnsModal">Columns</button>
       {% if not invoice.is_void %}
       <button type="button" class="bpi__ghost" id="workforce_charge_invoice_btn_whatsapp">Send on WhatsApp</button>
       {% if invoice.amount_due > 0 %}
@@ -110,42 +112,37 @@
     </p>
     {% endif %}
 
-    <!-- Deliveries billed -->
+    {% comment %}
+    Deliveries billed. Columns are chosen per client (fleet/invoice_columns.py) and
+    arrive pre-rendered as `columns` / `rows` / `totals_cells`.
+    {% endcomment %}
     <div class="bpi__table-wrap">
-      <table class="bpi__table">
+      <table class="bpi__table {{ table_size_class }}">
         <thead>
+          <tr class="bpi__hgroup">
+            <th class="bpi__col-idx" rowspan="2">#</th>
+            {% for g in header_groups %}<th colspan="{{ g.count }}">{{ g.label }}</th>{% endfor %}
+          </tr>
           <tr>
-            <th class="bpi__col-idx">#</th>
-            <th>Order</th>
-            <th>Customer</th>
-            <th>Delivered</th>
-            <th>Payment</th>
-            <th class="bpi__num">Delivery charge</th>
+            {% for c in columns %}<th class="{{ c.css }}">{{ c.label }}</th>{% endfor %}
           </tr>
         </thead>
         <tbody>
-          {% for l in delivery_lines %}
+          {% for row in rows %}
           <tr>
-            <td class="bpi__col-idx">{{ forloop.counter }}</td>
-            <td class="bpi__order">
-              {% if l.delivery_task.order %}#{{ l.delivery_task.order.order_number|default:l.delivery_task.order_id }}
-              {% else %}{{ l.label }}{% endif %}
-            </td>
-            <td>{% if l.delivery_task.order %}{{ l.delivery_task.order.customer_name|default:"—" }}{% else %}—{% endif %}</td>
-            <td class="bpi__date">{{ l.delivery_task.completed_at|date:"d M Y"|default:"—" }}</td>
-            <td>{% if l.delivery_task.cod_collected %}COD{% else %}Prepaid{% endif %}</td>
-            <td class="bpi__num bpi__num--fee">{{ l.amount|floatformat:2|intcomma }}</td>
+            <td class="bpi__col-idx">{{ row.index }}</td>
+            {% for cell in row.cells %}<td class="{{ cell.css }}">{{ cell.value }}{% if cell.sub %}<span class="bpi__cell-sub">{{ cell.sub }}</span>{% endif %}</td>{% endfor %}
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="bpi__empty">No deliveries on this invoice.</td>
+            <td colspan="{{ col_count }}" class="bpi__empty">No deliveries on this invoice.</td>
           </tr>
           {% endfor %}
         </tbody>
         <tfoot>
           <tr class="bpi__totals-row">
-            <td colspan="5">Total · {{ delivery_lines|length }} deliver{{ delivery_lines|length|pluralize:"y,ies" }}</td>
-            <td class="bpi__num bpi__num--fee">{{ delivery_total|floatformat:2|intcomma }}</td>
+            <td colspan="{{ totals_label_span }}">Total · {{ delivery_lines|length }} deliver{{ delivery_lines|length|pluralize:"y,ies" }}</td>
+            {% for cell in totals_cells %}<td class="{{ cell.css }}">{{ cell.value }}</td>{% endfor %}
           </tr>
         </tfoot>
       </table>
@@ -223,6 +220,47 @@
     <div class="bprev__pages"></div>
   </section>
 
+  {% if not seller_view and not invoice.is_void %}
+  <!-- Other charges editor: screen-only, the sheet above already itemises them -->
+  <section class="ccc__chargelog">
+    <h2 class="ccc__paylog-title">Other charges on this invoice</h2>
+
+    {% for l in extra_lines %}
+    <div class="ccc__charge-row" data-charge-line="{{ l.id }}">
+      <span class="ccc__charge-kind">{{ l.get_kind_display }}</span>
+      <span class="ccc__charge-label">{{ l.label }}</span>
+      <span class="ccc__charge-amount">{{ l.amount|floatformat:2|intcomma }}</span>
+      <button type="button" class="ccc__charge-remove" data-charge-remove="{{ l.id }}"
+              aria-label="Remove {{ l.label }}">&times;</button>
+    </div>
+    {% empty %}
+    <p class="ccc__charge-empty">No charges beyond the deliveries themselves.</p>
+    {% endfor %}
+
+    <div class="ccc__charge-add">
+      <select class="ccc__input ccc__charge-in-kind" id="ccc_charge_kind" aria-label="Charge type">
+        {% for value, label in extra_kind_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+      <input type="text" class="ccc__input ccc__charge-in-label" id="ccc_charge_label"
+             placeholder="Description (optional)" aria-label="Charge description">
+      <input type="number" class="ccc__input ccc__charge-in-amount" id="ccc_charge_amount"
+             placeholder="0.00" step="0.01" min="0" inputmode="decimal" aria-label="Charge amount">
+      <button type="button" class="ccc__primary" id="ccc_add_charge">Add charge</button>
+    </div>
+
+    <p class="ccc__charge-note">
+      {% if invoice.status == 'paid' %}
+      This invoice is settled — adding a charge reopens it as partly paid and the client will owe
+      the new amount. Nothing can be taken off, since that would drop the invoice below the
+      {{ invoice.amount_paid|floatformat:2|intcomma }} already received.
+      {% else %}
+      Adding or removing a charge restates the invoice total and books the matching ledger entry.
+      A billed delivery can only be taken off by voiding the whole invoice.
+      {% endif %}
+    </p>
+  </section>
+  {% endif %}
+
   {% if not seller_view and payments %}
   <!-- Payment ledger: screen-only, the sheet above already itemises them -->
   <section class="ccc__paylog">
@@ -250,6 +288,47 @@
 </div>
 
 {% if not seller_view %}
+<!-- Choose the columns this invoice's line table carries -->
+<div class="modal fade" id="cccColumnsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content ccc__paybox">
+      <div class="modal-header">
+        <h5 class="modal-title ccc__paybox-title">Invoice columns · {{ invoice.invoice_code }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="ccc__cols-help">
+          Pick what each delivery line shows. Beyond about nine columns the sheet stops fitting an
+          A4 page. The client sees the same columns on their own copy of this invoice.
+        </p>
+        {% for group in picker_groups %}
+        <div class="ccc__cols-group">
+          <p class="ccc__cols-group-title">{{ group.label }}</p>
+          {% for col in group.items %}
+          <label class="ccc__cols-item">
+            <input type="checkbox" class="form-check-input ccc__cols-box" value="{{ col.key }}"
+                   {% if col.checked %}checked{% endif %} {% if col.pinned %}disabled{% endif %}>
+            <span>{{ col.label }}{% if col.pinned %} <em class="ccc__cols-pin">always shown</em>{% endif %}</span>
+          </label>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="modal-footer">
+        <label class="ccc__cols-default">
+          <input type="checkbox" class="form-check-input mt-0" id="ccc_cols_default" checked>
+          Save as the default for {{ business.business_name|default:"this client" }}
+        </label>
+        {% if has_invoice_override %}
+        <button type="button" class="bpi__ghost" id="ccc_cols_reset">Reset to client default</button>
+        {% endif %}
+        <button type="button" class="bpi__ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="ccc__primary" id="ccc_cols_save">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Record a payment -->
 <div class="modal fade" id="cccPayModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -345,6 +424,65 @@
       if (data.success) { window.location.reload(); }
       else { alert(data.error || 'Could not void the invoice'); this.disabled = false; }
     } catch (e) { alert('Network error'); this.disabled = false; }
+  });
+
+  // Shared POST helper for the three line/column endpoints — same shape as the
+  // payment and void handlers above, reloading so the printed sheet restates.
+  async function post(url, body, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      const data = await resp.json();
+      if (data.success) { window.location.reload(); return; }
+      alert(data.error || 'That did not go through');
+    } catch (e) { alert('Network error'); }
+    if (btn) btn.disabled = false;
+  }
+
+  el('ccc_add_charge')?.addEventListener('click', function () {
+    const amount = (el('ccc_charge_amount').value || '').trim();
+    if (!amount || parseFloat(amount) <= 0) { alert('Enter the charge amount'); return; }
+    const body = new URLSearchParams();
+    body.append('invoice_code', code);
+    body.append('kind', el('ccc_charge_kind').value);
+    body.append('label', el('ccc_charge_label').value);
+    body.append('amount', amount);
+    post('{% url "workforce:client_charge_invoice_line_add" %}', body, this);
+  });
+
+  document.querySelectorAll('[data-charge-remove]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const row = this.closest('[data-charge-line]');
+      const name = row ? row.querySelector('.ccc__charge-label').textContent.trim() : 'this charge';
+      if (!confirm('Remove "' + name + '" from ' + code + '? The invoice total is restated and the charge reversed in the ledger.')) return;
+      const body = new URLSearchParams();
+      body.append('invoice_code', code);
+      body.append('line_id', this.getAttribute('data-charge-remove'));
+      post('{% url "workforce:client_charge_invoice_line_remove" %}', body, this);
+    });
+  });
+
+  el('ccc_cols_save')?.addEventListener('click', function () {
+    const picked = Array.from(document.querySelectorAll('.ccc__cols-box'))
+                        .filter(b => b.checked || b.disabled)
+                        .map(b => b.value);
+    if (!picked.length) { alert('Pick at least one column'); return; }
+    const body = new URLSearchParams();
+    body.append('invoice_code', code);
+    body.append('columns', picked.join(','));
+    body.append('save_default', el('ccc_cols_default').checked ? '1' : '0');
+    post('{% url "workforce:client_charge_invoice_columns" %}', body, this);
+  });
+
+  el('ccc_cols_reset')?.addEventListener('click', function () {
+    const body = new URLSearchParams();
+    body.append('invoice_code', code);
+    body.append('reset', '1');
+    post('{% url "workforce:client_charge_invoice_columns" %}', body, this);
   });
 
   el('workforce_charge_invoice_btn_whatsapp')?.addEventListener('click', async function () {

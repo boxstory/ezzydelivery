@@ -26,6 +26,12 @@ BILLABLE_STATUSES = ['delivered', 'partial_delivery']
 VALID_KINDS = {k for k, _ in BusinessChargeInvoiceLine.KIND_CHOICES}
 KIND_NAMES = dict(BusinessChargeInvoiceLine.KIND_CHOICES)
 
+# What staff may hand-add to an invoice. A delivery charge is never one of them:
+# that line has to be tied to a DeliveryTask, or the task stays billable and the
+# same job gets charged again on the next invoice.
+EDITABLE_KINDS = [(k, v) for k, v in BusinessChargeInvoiceLine.KIND_CHOICES
+                  if k != 'delivery_charge']
+
 
 def billable_tasks(business_id=None, date_from=None, date_to=None,
                    verified_only=False):
@@ -195,6 +201,133 @@ def issue_charge_invoice(business, task_ids=None, extras=None, created_by=None,
         )
 
     return invoice, len(locked), skipped
+
+
+def _resync_invoice_totals(invoice):
+    """Restate an invoice's total from its live lines and re-derive its status."""
+    total = invoice.lines.aggregate(t=Sum('amount'))['t'] or Decimal('0')
+    paid = invoice.amount_paid or Decimal('0')
+
+    invoice.total_amount = total
+    if paid <= 0:
+        invoice.status = BusinessChargeInvoice.STATUS_ISSUED
+    elif total - paid <= 0:
+        invoice.status = BusinessChargeInvoice.STATUS_PAID
+    else:
+        invoice.status = BusinessChargeInvoice.STATUS_PART_PAID
+    invoice.save(update_fields=['total_amount', 'status'])
+    return invoice
+
+
+def _assert_editable(invoice):
+    """Any invoice that is not void takes line edits.
+
+    A paid invoice included: adding to one restates it to part-paid and the
+    client owes the difference, which beats reissuing a document they already
+    have. Money already received is still protected — ``remove_invoice_charge_line``
+    refuses to drop the total below ``amount_paid``, so a paid invoice can grow
+    but never shrink.
+    """
+    if invoice.status == BusinessChargeInvoice.STATUS_VOID:
+        raise ValueError("This invoice is void — nothing can be added to it")
+
+
+@transaction.atomic
+def add_invoice_charge_line(invoice, kind, label, amount, created_by=None):
+    """Put another hand-added charge on a live invoice.
+
+    Books its own revenue row, exactly as issuing an extra line does, so the
+    ledger and the document stay in step and a later void reverses it cleanly.
+    """
+    invoice = BusinessChargeInvoice.objects.select_for_update().select_related(
+        'business'
+    ).get(pk=invoice.pk)
+    _assert_editable(invoice)
+
+    if kind not in dict(EDITABLE_KINDS):
+        raise ValueError(
+            "A delivery charge can only be billed by selecting the delivery on "
+            "the Charges to Collect desk"
+        )
+
+    cleaned = _clean_extras([{'kind': kind, 'label': label, 'amount': amount}])
+    if not cleaned:
+        raise ValueError("Enter an amount for the charge")
+    line_spec = cleaned[0]
+
+    charge_txn = WalletService.record_transaction(
+        driver=None,
+        transaction_type=line_spec['kind'],
+        amount=line_spec['amount'],
+        description=(
+            f"{line_spec['label']} billed to {invoice.business.business_name} "
+            f"on invoice {invoice.invoice_code}"
+        ),
+        created_by=created_by,
+        reference_number=invoice.invoice_code,
+        business=invoice.business,
+    )
+    line = BusinessChargeInvoiceLine.objects.create(
+        invoice=invoice,
+        delivery_task=None,
+        charge_txn=charge_txn,
+        kind=line_spec['kind'],
+        label=line_spec['label'],
+        amount=line_spec['amount'],
+    )
+
+    _resync_invoice_totals(invoice)
+    return line, invoice
+
+
+@transaction.atomic
+def remove_invoice_charge_line(invoice, line_id, created_by=None):
+    """Take a hand-added charge back off a live invoice.
+
+    The line is deleted rather than flagged, which is what keeps
+    ``void_charge_invoice`` correct — it reverses by walking the lines that are
+    still there, so a removed line can never be reversed a second time. The
+    reversal transaction booked here is the audit trail.
+    """
+    invoice = BusinessChargeInvoice.objects.select_for_update().select_related(
+        'business'
+    ).get(pk=invoice.pk)
+    _assert_editable(invoice)
+
+    line = invoice.lines.select_related('charge_txn').filter(pk=line_id).first()
+    if not line:
+        raise ValueError("That charge is not on this invoice")
+    if line.delivery_task_id:
+        raise ValueError(
+            "A billed delivery cannot be taken off on its own — void the invoice "
+            "to put its deliveries back on the desk"
+        )
+
+    paid = invoice.amount_paid or Decimal('0')
+    if (invoice.total_amount or Decimal('0')) - (line.amount or Decimal('0')) < paid:
+        raise ValueError(
+            f"Removing this line would drop the invoice below the {paid} already "
+            f"received against it"
+        )
+
+    txn = line.charge_txn
+    if txn is not None:
+        WalletService.record_transaction(
+            driver=None,
+            transaction_type=txn.transaction_type,
+            amount=-abs(txn.amount),
+            description=(
+                f"{line.label} reversed for {invoice.business.business_name} "
+                f"(removed from invoice {invoice.invoice_code})"
+            ),
+            created_by=created_by,
+            reference_number=invoice.invoice_code,
+            business=invoice.business,
+        )
+
+    line.delete()
+    _resync_invoice_totals(invoice)
+    return invoice
 
 
 @transaction.atomic

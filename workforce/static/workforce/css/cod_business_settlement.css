@@ -22,10 +22,71 @@
   color: var(--tlr-ink);
   font-family: var(--tlr-sans);
   min-height: 100vh;
-  padding: 1.5rem 1.25rem 7rem;
+  /* Hero sits flush; the body section below it carries the page padding.
+     The bottom pad stays — it reserves room for the sticky tape. */
+  padding: 0 0 7rem;
 }
 
 .bcp__wrap { max-width: 1240px; margin: 0 auto; }
+
+/* Everything below the hero — one padded section */
+.bcp__body { padding: 0.325rem; }
+
+/* ── Ledger tab rail ──────────────────────────────────────────
+   The two legs of one client relationship: COD paid out, charges
+   billed in. Real links, so each tab keeps its own URL. Brass
+   underlines the tab you are on — the page's one accent, and the
+   filter/primary controls below are ink, so nothing competes. */
+.bcp__tabs {
+  display: flex;
+  border-bottom: 2px solid var(--tlr-rule);
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bcp__tab {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.75rem 1.1rem;
+  font-family: var(--tlr-cond);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--tlr-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s;
+}
+
+.bcp__tab:hover { color: var(--tlr-ink); }
+.bcp__tab:focus-visible { outline: 2px solid var(--tlr-ink); outline-offset: -2px; }
+
+.bcp__tab--active {
+  color: var(--tlr-ink);
+  font-weight: 700;
+  border-bottom-color: var(--tlr-brass);
+}
+
+/* Count of rows behind each tab under the filters in force */
+.bcp__tab-count {
+  font-family: var(--tlr-mono);
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  color: var(--tlr-muted);
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule-strong);
+}
+
+.bcp__tab--active .bcp__tab-count {
+  color: var(--tlr-brass-deep);
+  border-color: var(--tlr-brass);
+  background: var(--tlr-brass-soft);
+}
 
 /* ── Inline separator, used in the account group headers ──── */
 .bcp__sep { color: var(--tlr-rule-strong); margin: 0 0.35rem; }
@@ -74,6 +135,11 @@
   gap: 0.85rem;
   align-items: end;
 }
+/* Five-field variant: the invoices filter carries a status select on top of the
+   account + date window the payout filter has. Collapses with the base rule at
+   the tablet breakpoint below. */
+.bcp__window--wide { grid-template-columns: 2fr 1fr 1fr 1fr auto; }
+
 .bcp__field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .bcp__field-label {
   font-family: var(--tlr-mono);

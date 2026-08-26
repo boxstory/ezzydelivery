@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260808a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260824a" type="text/css" />
 <link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260808a" type="text/css" />
 {% endblock %}
 
@@ -52,8 +52,13 @@
       </div>
     </header>
 
+    <!-- Everything below the hero sits in one padded section -->
+    <div class="bcp__body">
+
     <div class="wfnote" id="workforce_client_charge_invoices_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_client_charge_invoices_card_notes' %}" hidden></div>
+
+    {% include "workforce/parts/_finance_ledger_tabs.html" with active="invoices" %}
 
     <section class="wfstat" aria-label="Invoice totals">
       <div class="wfstat__card">
@@ -79,7 +84,7 @@
     </section>
 
     <!-- Filters -->
-    <form method="GET" class="bcp__window" id="workforce_charge_invoices_form_filter">
+    <form method="GET" class="bcp__window bcp__window--wide" id="workforce_charge_invoices_form_filter">
       <div class="bcp__field bcp__field--account">
         <label class="bcp__field-label" for="workforce_charge_invoices_select_business">Account</label>
         <select name="business_id" id="workforce_charge_invoices_select_business" class="bcp__select">
@@ -103,6 +108,10 @@
       <div class="bcp__field">
         <label class="bcp__field-label" for="workforce_charge_invoices_input_from">From</label>
         <input type="date" name="date_from" id="workforce_charge_invoices_input_from" class="bcp__input" value="{{ date_from }}">
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_charge_invoices_input_to">To</label>
+        <input type="date" name="date_to" id="workforce_charge_invoices_input_to" class="bcp__input" value="{{ date_to }}">
       </div>
       <div class="bcp__window-actions">
         <button type="submit" class="bcp__primary">Apply</button>
@@ -172,6 +181,7 @@
     </section>
     {% endif %}
 
+  </div><!-- /.bcp__body -->
   </div>
 </div>
 {% endblock %}

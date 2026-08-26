@@ -196,6 +196,13 @@ class Business(EmailNormalizedModel, models.Model):
     import_mapping = models.JSONField(default=dict, blank=True,
         help_text='Shared import column mapping for all sources: {db_field: source_column_header}')
 
+    # Which columns this client's delivery charge invoices carry, as a list of keys
+    # from fleet.invoice_columns.INVOICE_COLUMNS. Empty means "not set" — the
+    # document falls back to the default column set, which is what every invoice
+    # showed before the picker existed. A single invoice can override this.
+    invoice_columns = models.JSONField(default=list, blank=True,
+        help_text='Default charge-invoice columns for this client (keys from fleet.invoice_columns)')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

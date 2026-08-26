@@ -178,6 +178,43 @@
 .bpi__date { font-family: var(--tlr-mono); color: var(--tlr-muted); white-space: nowrap; }
 .bpi__empty { text-align: center; color: var(--tlr-muted); padding: 1.5rem 0; }
 
+/* Grouped header band — used by the charge invoice, whose columns are chosen per
+   client, so the reader can still tell delivery detail from dates from money. */
+.bpi__hgroup th {
+  text-align: center;
+  letter-spacing: 0.2em;
+  color: var(--tlr-ink);
+  border-bottom: 1px solid var(--tlr-rule);
+  padding-bottom: 0.35rem;
+}
+.bpi__hgroup .bpi__col-idx {
+  text-align: left;
+  vertical-align: bottom;
+  border-bottom: 1px solid var(--tlr-rule-strong);
+  letter-spacing: normal;
+}
+/* Second line inside a cell — a column carrying two figures (ordered above
+   delivered) rather than spending two columns of sheet width on them. */
+.bpi__cell-sub {
+  display: block;
+  font-size: 0.88em;
+  color: var(--tlr-muted);
+  margin-top: 0.1rem;
+}
+/* The nowrap on .bpi__date keeps each date on its own line; the block child
+   above is what puts the second one underneath. */
+.bpi__date--stack { white-space: nowrap; }
+
+.bpi__area { color: var(--tlr-muted); }
+.bpi__svc {
+  font-family: var(--tlr-mono);
+  font-size: 0.78em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tlr-muted);
+  white-space: nowrap;
+}
+
 .bpi__totals-row td {
   border-top: 2px solid var(--tlr-ink);
   border-bottom: none;
@@ -344,6 +381,20 @@
   .bpi__num,
   .bpi__order,
   .bpi__date { white-space: nowrap; word-break: normal; }
+
+  /* A chosen column set past six no longer fits the sheet at the base size, so
+     the type and the side padding come down in two steps. Set by the view from
+     the column count — the payout invoice, at six fixed columns, never gets it. */
+  .bpi__table--wide { font-size: 0.62rem; }
+  .bpi__table--wide thead th,
+  .bpi__table--wide tbody td { padding: 0.35rem 0.3rem; }
+  .bpi__table--wide thead th { font-size: 0.58rem; letter-spacing: 0.08em; }
+
+  .bpi__table--xwide { font-size: 0.54rem; }
+  .bpi__table--xwide thead th,
+  .bpi__table--xwide tbody td { padding: 0.25rem 0.2rem; }
+  .bpi__table--xwide thead th { font-size: 0.5rem; letter-spacing: 0.05em; }
+  .bpi__table--xwide .bpi__totals-row td { font-size: 0.6rem; }
 
   /* Running letterpad: the band groups repeat at the top and bottom of every
      printed page, so page 2 onwards keeps the letterhead and page 1 keeps the

@@ -1148,6 +1148,12 @@ class BusinessChargeInvoice(models.Model):
     due_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
 
+    # Per-invoice override of the client's default column set. Empty means "follow
+    # the client", which in turn falls back to the default columns — so an invoice
+    # nobody has touched renders exactly as it did before the picker existed.
+    column_keys = models.JSONField(default=list, blank=True,
+        help_text="Columns this invoice shows, overriding Business.invoice_columns")
+
     issued_at = models.DateTimeField(auto_now_add=True, db_index=True)
     issued_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,

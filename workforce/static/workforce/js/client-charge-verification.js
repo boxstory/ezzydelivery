@@ -171,11 +171,20 @@
     });
 
     // Filters re-query on change — no separate Apply button to forget.
+    // Selects and date pickers submit themselves; typed fields (search, amount,
+    // zone) wait for Enter or the Apply button so the page is not re-queried on
+    // every keystroke. Clearing the search box with its native ✕ re-queries too.
     const form = document.getElementById('workforce_charges_filter_form');
     if (form) {
-      form.querySelectorAll('select').forEach(function (sel) {
-        sel.addEventListener('change', function () { form.submit(); });
+      form.querySelectorAll('select, input[type=date]').forEach(function (el) {
+        el.addEventListener('change', function () { form.submit(); });
       });
+      const search = document.getElementById('workforce_charges_filter_q');
+      if (search) {
+        search.addEventListener('search', function () {
+          if (search.value === '') form.submit();
+        });
+      }
     }
   }
 

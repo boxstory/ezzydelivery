@@ -2381,10 +2381,32 @@ def business_finance_dashboard(request):
         transaction_type='bills_receivable'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
 
-    # Delivery summary
+    # Delivery summary. The charge total resolves the same way the Delivery
+    # Charges ledger does (staff-verified figure, else the raw dl_price) and
+    # counts only completed jobs -- summing dl_price alone read as 0 for every
+    # client whose charges are set at verification.
+    from delivery.charges import BILLABLE_CHARGE
+
     delivery_stats = all_deliveries.aggregate(
         total_deliveries=Count('id'),
-        total_delivery_charges=Sum('dl_price'),
+        total_delivery_charges=Sum(
+            BILLABLE_CHARGE,
+            filter=Q(dl_task_status__in=['delivered', 'partial_delivery']),
+        ),
+        charged_count=Count(
+            'id', filter=Q(dl_task_status__in=['delivered', 'partial_delivery'])
+        ),
+        # The slice of that charge total nobody has settled yet: neither withheld
+        # from a COD payout nor put on an invoice. Stated on the plate so the
+        # figure is not read as money already billed.
+        unbilled_charges=Sum(
+            BILLABLE_CHARGE,
+            filter=Q(
+                dl_task_status__in=['delivered', 'partial_delivery'],
+                settled_delivery_charge__isnull=True,
+                charge_invoice__isnull=True,
+            ),
+        ),
         delivered=Count('id', filter=Q(dl_task_status='delivered')),
         failed=Count('id', filter=Q(dl_task_status='failed')),
     )
@@ -2476,6 +2498,11 @@ def business_transactions(request):
     return render(request, 'business/parts/business_transactions.html', context)
 
 
+# How many COD payouts the statement shows before sending the seller to the full
+# ledger on the Invoices & Payouts page.
+PAYOUT_ROW_CAP = 20
+
+
 @login_required(login_url='account_login')
 @business_required
 @business_permission_required(BusinessPermissions.REPORTS_VIEW)
@@ -2499,19 +2526,95 @@ def business_cod_statement(request):
         days = 30
     start_date = timezone.now() - timedelta(days=days)
 
-    # COD deliveries for this business
-    cod_deliveries = delivery_models.DeliveryTask.objects.filter(
+    # COD deliveries for this business — the period window only. The summary
+    # plates are period totals, so they aggregate THIS queryset; the search /
+    # status / date filters below narrow the ledger list alone, otherwise
+    # defaulting the list to unsettled would silently shrink the headline totals.
+    period_deliveries = delivery_models.DeliveryTask.objects.filter(
         business=business.business_id,
         cod_collected_amount__gt=0,
         dl_task_date__gte=start_date.date()
-    ).select_related('driver__user', 'order').order_by('-dl_task_date')
+    ).select_related('order').order_by('-dl_task_date')
 
     # Summary stats
-    stats = cod_deliveries.aggregate(
+    stats = period_deliveries.aggregate(
         total_cod=Sum('cod_collected_amount'),
         collected=Count('id', filter=Q(cod_collected=True)),
         settled_driver=Count('id', filter=Q(cod_settled=True)),
         total=Count('id'),
+    )
+
+    # ---- Ledger filters (search / date / status) -----------------------------
+    # Default status is 'unpaid': COD this business has not been paid out yet.
+    # That is the only bucket a seller has to chase, so it is what they land on.
+    COD_STATUS_FILTERS = [
+        ('unpaid', 'Not paid to you'),
+        ('paid', 'Paid to you'),
+        ('with_driver', 'With driver'),
+        ('uncollected', 'Not collected'),
+        ('all', 'All'),
+    ]
+    valid_statuses = [key for key, _ in COD_STATUS_FILTERS]
+    cod_status = request.GET.get('status') or 'unpaid'
+    if cod_status not in valid_statuses:
+        cod_status = 'unpaid'
+
+    search_q = sanitize_text(request.GET.get('q') or '', collapse_whitespace=True)[:100]
+
+    def _parse_filter_date(raw):
+        try:
+            return datetime.strptime((raw or '').strip(), '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            return None
+
+    date_from = _parse_filter_date(request.GET.get('date_from'))
+    date_to = _parse_filter_date(request.GET.get('date_to'))
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+
+    cod_deliveries = period_deliveries
+    if date_from:
+        cod_deliveries = cod_deliveries.filter(dl_task_date__gte=date_from)
+    if date_to:
+        cod_deliveries = cod_deliveries.filter(dl_task_date__lte=date_to)
+
+    if search_q:
+        cod_deliveries = cod_deliveries.filter(
+            Q(dl_task_number__icontains=search_q)
+            | Q(order__order_number__icontains=search_q)
+            | Q(order__customer_name__icontains=search_q)
+            | Q(order__customer_phone__icontains=search_q)
+        )
+
+    # How many rows each status option would return under the current period,
+    # date and search filters. Stated on the option itself because a period
+    # holding no paid COD reads as a broken filter otherwise: "All" and "Not
+    # paid to you" return an identical list with nothing to explain why.
+    bucket_counts = cod_deliveries.aggregate(
+        all=Count('id'),
+        unpaid=Count('id', filter=Q(cod_client_settled=False)),
+        paid=Count('id', filter=Q(cod_client_settled=True)),
+        with_driver=Count('id', filter=Q(cod_collected=True, cod_settled=False)),
+        uncollected=Count('id', filter=Q(cod_collected=False)),
+    )
+    cod_status_filters = [
+        (key, label, bucket_counts.get(key) or 0) for key, label in COD_STATUS_FILTERS
+    ]
+
+    if cod_status == 'unpaid':
+        cod_deliveries = cod_deliveries.filter(cod_client_settled=False)
+    elif cod_status == 'paid':
+        cod_deliveries = cod_deliveries.filter(cod_client_settled=True)
+    elif cod_status == 'with_driver':
+        cod_deliveries = cod_deliveries.filter(cod_collected=True, cod_settled=False)
+    elif cod_status == 'uncollected':
+        cod_deliveries = cod_deliveries.filter(cod_collected=False)
+
+    # What the filtered list itself is worth — the seller filters to 'Not paid to
+    # you' to learn how much is outstanding, so the answer belongs on the page.
+    filtered_totals = cod_deliveries.aggregate(
+        amount=Sum('cod_collected_amount'),
+        count=Count('id'),
     )
 
     # Outstanding COD — deliberately NOT date-windowed. Money collected 90 days ago
@@ -2534,14 +2637,17 @@ def business_cod_statement(request):
     cod_with_driver = outstanding['with_driver'] or Decimal('0')
     cod_ready = outstanding['ready'] or Decimal('0')
 
-    # COD settlements to this business (includes payout reversals in the list)
-    settlements = fleet_models.DriverTransaction.objects.filter(
+    # COD settlements to this business (includes payout reversals in the list).
+    # Deliberately NOT bound by ?days=: a payout invoice is a permanent document
+    # and this is where sellers open it, so a 30-day window used to hide every
+    # payout older than a month. Capped instead, with the full list one click away
+    # on the Invoices & Payouts page.
+    settlements = list(fleet_models.DriverTransaction.objects.filter(
         business=business,
         transaction_type__in=['cod_client_settle', 'cod_client_settle_reversal'],
-        created_at__gte=start_date.date()
     ).select_related('created_by').prefetch_related(
         'payout_deductions'
-    ).order_by('-created_at')
+    ).order_by('-created_at')[:PAYOUT_ROW_CAP])
 
     # A payout row holds the NET transferred. Stamp the gross COD released and the
     # charges withheld on each one, so the seller can reconcile a transfer against
@@ -2557,9 +2663,11 @@ def business_cod_statement(request):
     settled_net = sum((s.net_paid for s in payout_rows), Decimal('0'))
 
     # Net total = payouts minus reversals
-    settled_reversed = abs(settlements.filter(
-        transaction_type='cod_client_settle_reversal').aggregate(
-        total=Sum('amount'))['total'] or Decimal('0'))
+    # settlements is a capped list, so the footer sums exactly the rows on screen.
+    settled_reversed = abs(sum(
+        (s.amount or Decimal('0') for s in settlements
+         if s.transaction_type == 'cod_client_settle_reversal'),
+        Decimal('0')))
     total_settled = settled_net - settled_reversed
 
     # Paginate the delivery list — at ?days=365 a high-volume seller would otherwise
@@ -2573,9 +2681,21 @@ def business_cod_statement(request):
     except (ValueError, TypeError):
         per_page = 50
 
-    cod_deliveries_total = cod_deliveries.count()
+    cod_deliveries_total = filtered_totals['count'] or 0
     paginator = Paginator(cod_deliveries, per_page)
     deliveries_page = paginator.get_page(request.GET.get('page'))
+
+    # Keep every active filter on the pagination links, or page 2 silently
+    # reverts to the default 'Not paid to you' view.
+    from urllib.parse import quote
+
+    filter_params = [f'days={days}', f'status={cod_status}']
+    if search_q:
+        filter_params.append(f'q={quote(search_q)}')
+    if date_from:
+        filter_params.append(f'date_from={date_from:%Y-%m-%d}')
+    if date_to:
+        filter_params.append(f'date_to={date_to:%Y-%m-%d}')
 
     context = {
         'business': business,
@@ -2584,7 +2704,14 @@ def business_cod_statement(request):
         'cod_deliveries_page': deliveries_page,
         'cod_deliveries_total': cod_deliveries_total,
         'per_page': str(per_page),
-        'pagination_filter_params': f'days={days}',
+        'pagination_filter_params': '&'.join(filter_params),
+        'cod_status': cod_status,
+        'cod_status_filters': cod_status_filters,
+        'search_q': search_q,
+        'date_from': date_from.isoformat() if date_from else '',
+        'date_to': date_to.isoformat() if date_to else '',
+        'filtered_amount': filtered_totals['amount'] or Decimal('0'),
+        'filters_active': bool(search_q or date_from or date_to or cod_status != 'unpaid'),
         'stats': stats,
         'settlements': settlements,
         'total_settled': total_settled,
@@ -2691,6 +2818,41 @@ def business_charge_invoices(request):
     total_billed = sum((i.total_amount or Decimal('0') for i in live), Decimal('0'))
     total_paid = sum((i.amount_paid or Decimal('0') for i in live), Decimal('0'))
 
+    # ── The payout leg ───────────────────────────────────────────────────────
+    payout_qs = fleet_models.DriverTransaction.objects.filter(
+        business=business,
+        transaction_type__in=['cod_client_settle', 'cod_client_settle_reversal'],
+    ).select_related('created_by').prefetch_related('payout_deductions').order_by('-created_at')
+
+    days = safe_int(request.GET.get('days'), default=0, minimum=0, maximum=730)
+    if days:
+        from datetime import timedelta
+        payout_qs = payout_qs.filter(created_at__gte=timezone.now() - timedelta(days=days))
+
+    payouts = list(payout_qs)
+
+    # A reversal carries the payout's code in reference_number — the same match
+    # the staff history, the payout invoice and the COD statement all use.
+    reversed_codes = {
+        p.reference_number for p in payouts
+        if p.transaction_type == 'cod_client_settle_reversal' and p.reference_number
+    }
+
+    total_paid_to_you = Decimal('0')
+    total_cod_released = Decimal('0')
+    total_withheld = Decimal('0')
+    for p in payouts:
+        if p.transaction_type != 'cod_client_settle':
+            continue
+        # The txn stores only the NET, so gross must add the withheld charges back.
+        p.gross_cod, p.deductions_total, p.net_paid = WalletService.payout_figures(p)
+        p.is_reversed = p.transaction_code in reversed_codes
+        if p.is_reversed:
+            continue
+        total_cod_released += p.gross_cod
+        total_withheld += p.deductions_total
+        total_paid_to_you += p.net_paid
+
     context = {
         'business': business,
         'invoices': invoices,
@@ -2698,6 +2860,12 @@ def business_charge_invoices(request):
         'total_paid': total_paid,
         'total_outstanding': total_billed - total_paid,
         'unpaid_count': sum(1 for i in live if i.amount_due > 0),
+        'payouts': payouts,
+        'payout_count': sum(1 for p in payouts if p.transaction_type == 'cod_client_settle'),
+        'total_cod_released': total_cod_released,
+        'total_withheld': total_withheld,
+        'total_paid_to_you': total_paid_to_you,
+        'days': days,
     }
     return render(request, 'business/parts/business_charge_invoices.html', context)
 
@@ -2730,6 +2898,105 @@ def business_charge_invoice(request, invoice_code):
     # Hides the staff-only controls on the shared invoice template.
     context['seller_view'] = True
     return render(request, 'workforce/client_charge_invoice.html', context)
+
+
+@login_required(login_url='account_login')
+@business_required
+@business_permission_required(BusinessPermissions.REPORTS_VIEW)
+def business_delivery_charges(request):
+    """Estimated delivery charges — what each completed delivery costs the seller.
+
+    The invoice page only shows charges once staff have issued a document, and a
+    COD seller only sees them as a deduction after a payout runs. This is the
+    running ledger in between: every delivered job with the charge it will bill
+    at, flagged as an estimate until staff verify it, plus where each charge
+    ended up (withheld from a COD payout, billed on an invoice, or still to bill).
+    """
+    from django.db.models import Sum, Count
+    from django.core.paginator import Paginator
+    from decimal import Decimal
+    from datetime import timedelta
+    from django.utils import timezone
+    from delivery.charges import BILLABLE_CHARGE
+
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    days = safe_int(request.GET.get('days'), default=30, minimum=1, maximum=365)
+    start_date = (timezone.now() - timedelta(days=days)).date()
+
+    # Same row rule as the staff Client Charges console — every completed job is
+    # billable, COD or prepaid — so the two screens never disagree on what exists.
+    tasks = delivery_models.DeliveryTask.objects.filter(
+        business=business.business_id,
+        dl_task_status__in=['delivered', 'partial_delivery'],
+        dl_task_date__gte=start_date,
+    ).select_related('order', 'charge_invoice').annotate(
+        est_charge=BILLABLE_CHARGE,
+    ).order_by('-dl_task_date', '-id')
+
+    period = tasks.aggregate(
+        total=Sum('est_charge'),
+        count=Count('id'),
+        confirmed=Sum('est_charge', filter=Q(verified_delivery_charge__isnull=False)),
+        confirmed_count=Count('id', filter=Q(verified_delivery_charge__isnull=False)),
+        estimated=Sum('est_charge', filter=Q(verified_delivery_charge__isnull=True)),
+        estimated_count=Count('id', filter=Q(verified_delivery_charge__isnull=True)),
+    )
+
+    # Unbilled is deliberately all-time, not windowed: a charge accrued 90 days
+    # ago and never settled is still owed today, and scoping it to the selected
+    # period would hide it. A task carries at most one of the two settlement
+    # routes, so "neither" is exactly what is still to bill.
+    unbilled = delivery_models.DeliveryTask.objects.filter(
+        business=business.business_id,
+        dl_task_status__in=['delivered', 'partial_delivery'],
+        settled_delivery_charge__isnull=True,
+        charge_invoice__isnull=True,
+    ).annotate(est_charge=BILLABLE_CHARGE).aggregate(
+        total=Sum('est_charge'),
+        count=Count('id'),
+    )
+
+    per_page = safe_int(request.GET.get('per_page'), default=50, minimum=1, maximum=100)
+    if per_page not in (10, 25, 50, 100):
+        per_page = 50
+
+    tasks_total = tasks.count()
+    paginator = Paginator(tasks, per_page)
+    tasks_page = paginator.get_page(request.GET.get('page'))
+
+    avg_charge = Decimal('0.00')
+    if period['count']:
+        avg_charge = (period['total'] or Decimal('0')) / period['count']
+
+    page_total = sum(
+        (Decimal(str(t.est_charge or 0)) for t in tasks_page.object_list),
+        Decimal('0'),
+    )
+
+    context = {
+        'business': business,
+        'selected_days': days,
+        'tasks': tasks_page,
+        'tasks_page': tasks_page,
+        'tasks_total': tasks_total,
+        'per_page': str(per_page),
+        'pagination_filter_params': f'days={days}',
+        'total_charges': period['total'] or Decimal('0'),
+        'total_count': period['count'] or 0,
+        'confirmed_charges': period['confirmed'] or Decimal('0'),
+        'confirmed_count': period['confirmed_count'] or 0,
+        'estimated_charges': period['estimated'] or Decimal('0'),
+        'estimated_count': period['estimated_count'] or 0,
+        'unbilled_charges': unbilled['total'] or Decimal('0'),
+        'unbilled_count': unbilled['count'] or 0,
+        'avg_charge': avg_charge,
+        'page_total': page_total,
+    }
+    return render(request, 'business/parts/business_delivery_charges.html', context)
 
 
 # =============================================================================

@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/client_charge_verification.css' %}?v=20260813b" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_charge_verification.css' %}?v=20260824d" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -48,13 +48,16 @@
       </div>
     </header>
 
+    <!-- Everything below the hero sits in one padded section -->
+    <div class="ccv__body">
+
     <div class="wfnote" id="workforce_client_charge_verification_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_client_charge_verification_card_notes' %}" hidden></div>
 
     {% comment %}
     The three status cards are also the status filter — clicking one is the same
     as picking it in the Status dropdown, so the figure and the way into it are
-    the same control. Business and period are carried through untouched.
+    the same control. Every other filter is carried through untouched.
     {% endcomment %}
     <section class="wfstat" aria-label="Charge verification totals">
       <div class="wfstat__card wfstat__card--here">
@@ -62,19 +65,19 @@
         <span class="wfstat__value">{{ stats.total_pending_charge|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
         <span class="wfstat__sub">what is at stake in the queue</span>
       </div>
-      <a href="?business={{ selected_business }}&amp;days={{ selected_days }}&amp;status=pending"
+      <a href="?{{ status_params }}{% if status_params %}&amp;{% endif %}status=pending"
          class="wfstat__card {% if selected_status == 'pending' %}wfstat__card--on{% endif %}">
         <span class="wfstat__label">Pending</span>
         <span class="wfstat__value">{{ stats.pending_count|intcomma }}</span>
         <span class="wfstat__sub">deliver{{ stats.pending_count|pluralize:"y,ies" }} awaiting a figure</span>
       </a>
-      <a href="?business={{ selected_business }}&amp;days={{ selected_days }}&amp;status=verified"
+      <a href="?{{ status_params }}{% if status_params %}&amp;{% endif %}status=verified"
          class="wfstat__card {% if selected_status == 'verified' %}wfstat__card--on{% endif %}">
         <span class="wfstat__label">Verified</span>
         <span class="wfstat__value">{{ stats.verified_count|intcomma }}</span>
         <span class="wfstat__sub">agreed, still editable</span>
       </a>
-      <a href="?business={{ selected_business }}&amp;days={{ selected_days }}&amp;status=published"
+      <a href="?{{ status_params }}{% if status_params %}&amp;{% endif %}status=published"
          class="wfstat__card wfstat__card--done {% if selected_status == 'published' %}wfstat__card--on{% endif %}">
         <span class="wfstat__label">Published</span>
         <span class="wfstat__value">{{ stats.published_count|intcomma }}</span>
@@ -91,39 +94,139 @@
     <section class="ccv__panel">
       <div class="ccv__panel-head">
         <h2 class="ccv__panel-title">Charge ledger</h2>
-        <form method="get" class="ccv__filters" id="workforce_charges_filter_form">
-          <div class="ccv__filter">
-            <label for="workforce_charges_filter_business" class="ccv__field-label">Business</label>
-            <select name="business" id="workforce_charges_filter_business" class="form-select form-select-sm">
-              <option value="">All businesses</option>
-              {% for biz in all_businesses %}
-              <option value="{{ biz.business_id }}" {% if selected_business == biz.business_id|stringformat:"s" %}selected{% endif %}>
-                {{ biz.business_name }}
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="ccv__filter">
-            <label for="workforce_charges_filter_status" class="ccv__field-label">Status</label>
-            <select name="status" id="workforce_charges_filter_status" class="form-select form-select-sm">
-              <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All</option>
-              <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
-              <option value="verified" {% if selected_status == 'verified' %}selected{% endif %}>Verified</option>
-              <option value="published" {% if selected_status == 'published' %}selected{% endif %}>Published</option>
-              <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>Rejected</option>
-            </select>
-          </div>
-          <div class="ccv__filter">
-            <label for="workforce_charges_filter_days" class="ccv__field-label">Period</label>
-            <select name="days" id="workforce_charges_filter_days" class="form-select form-select-sm">
-              <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 days</option>
-              <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 days</option>
-              <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 days</option>
-              <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last year</option>
-            </select>
-          </div>
-        </form>
+        {% comment %} What the current filter actually matched — the figure staff
+           quote once they have narrowed to a business, a period or an amount band.
+           It is the sum of the billable charge over every matching row, not just
+           the page on screen. {% endcomment %}
+        <div class="ccv__match">
+          <span class="ccv__match-count">{{ stats.match_count|intcomma }} row{{ stats.match_count|pluralize }} matched</span>
+          <span class="ccv__match-total">QAR {{ stats.match_total|floatformat:2|intcomma }}</span>
+        </div>
       </div>
+
+      {% comment %}
+      Filters sit on their own full-width strip rather than beside the title —
+      there are too many now to share the line, and the amount pair has to sit
+      next to the search box to read as one "find the charge" group.
+      Selects re-query on change; typed fields re-query on Enter or Apply.
+      {% endcomment %}
+      <form method="get" class="ccv__filters" id="workforce_charges_filter_form">
+        <div class="ccv__filter ccv__filter--wide">
+          <label for="workforce_charges_filter_business" class="ccv__field-label">Business</label>
+          <select name="business" id="workforce_charges_filter_business" class="form-select form-select-sm">
+            <option value="">All businesses</option>
+            {% for biz in all_businesses %}
+            <option value="{{ biz.business_id }}" {% if selected_business == biz.business_id|stringformat:"s" %}selected{% endif %}>
+              {{ biz.business_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="ccv__filter">
+          <label for="workforce_charges_filter_status" class="ccv__field-label">Status</label>
+          <select name="status" id="workforce_charges_filter_status" class="form-select form-select-sm">
+            <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All</option>
+            <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="verified" {% if selected_status == 'verified' %}selected{% endif %}>Verified</option>
+            <option value="published" {% if selected_status == 'published' %}selected{% endif %}>Published</option>
+            <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>Rejected</option>
+          </select>
+        </div>
+        <div class="ccv__filter">
+          <label for="workforce_charges_filter_days" class="ccv__field-label">Period</label>
+          <select name="days" id="workforce_charges_filter_days" class="form-select form-select-sm">
+            <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 days</option>
+            <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 days</option>
+            <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 days</option>
+            <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last year</option>
+          </select>
+        </div>
+        {% comment %} A typed date window overrides the rolling period — the view
+           drops `days` the moment either box is filled. {% endcomment %}
+        <div class="ccv__filter ccv__filter--date">
+          <label for="workforce_charges_filter_from" class="ccv__field-label">From</label>
+          <input type="date" name="from" id="workforce_charges_filter_from"
+                 class="form-control form-control-sm" value="{{ date_from }}">
+        </div>
+        <div class="ccv__filter ccv__filter--date">
+          <label for="workforce_charges_filter_to" class="ccv__field-label">To</label>
+          <input type="date" name="to" id="workforce_charges_filter_to"
+                 class="form-control form-control-sm" value="{{ date_to }}">
+        </div>
+
+        <div class="ccv__filter-break" aria-hidden="true"></div>
+
+        <div class="ccv__filter ccv__filter--search">
+          <label for="workforce_charges_filter_q" class="ccv__field-label">Search</label>
+          <input type="search" name="q" id="workforce_charges_filter_q"
+                 class="form-control form-control-sm" value="{{ search_q }}"
+                 placeholder="Task, order, client ref, customer, phone, or amount">
+        </div>
+        {% comment %} Amount bounds run against the billable figure — the verified
+           charge when one is set, the calculated one otherwise. {% endcomment %}
+        <div class="ccv__filter ccv__filter--amt">
+          <label for="workforce_charges_filter_amount_min" class="ccv__field-label">Amount ≥</label>
+          <input type="number" name="amount_min" id="workforce_charges_filter_amount_min"
+                 class="form-control form-control-sm" value="{{ amount_min }}"
+                 step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+        </div>
+        <div class="ccv__filter ccv__filter--amt">
+          <label for="workforce_charges_filter_amount_max" class="ccv__field-label">Amount ≤</label>
+          <input type="number" name="amount_max" id="workforce_charges_filter_amount_max"
+                 class="form-control form-control-sm" value="{{ amount_max }}"
+                 step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+        </div>
+        <div class="ccv__filter">
+          <label for="workforce_charges_filter_speed" class="ccv__field-label">Service</label>
+          <select name="speed" id="workforce_charges_filter_speed" class="form-select form-select-sm">
+            <option value="">Any service</option>
+            {% for value, label in speed_choices %}
+            <option value="{{ value }}" {% if selected_speed == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="ccv__filter">
+          <label for="workforce_charges_filter_category" class="ccv__field-label">Category</label>
+          <select name="category" id="workforce_charges_filter_category" class="form-select form-select-sm">
+            <option value="">Any category</option>
+            {% for value, label in category_choices %}
+            <option value="{{ value }}" {% if selected_category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="ccv__filter ccv__filter--zone">
+          <label for="workforce_charges_filter_zone" class="ccv__field-label">Drop zone</label>
+          <input type="number" name="zone" id="workforce_charges_filter_zone"
+                 class="form-control form-control-sm" value="{{ selected_zone }}"
+                 min="1" step="1" inputmode="numeric" placeholder="e.g. 24">
+        </div>
+        <div class="ccv__filter">
+          <label for="workforce_charges_filter_sort" class="ccv__field-label">Sort</label>
+          <select name="sort" id="workforce_charges_filter_sort" class="form-select form-select-sm">
+            <option value="recent" {% if selected_sort == 'recent' %}selected{% endif %}>Newest first</option>
+            <option value="oldest" {% if selected_sort == 'oldest' %}selected{% endif %}>Oldest first</option>
+            <option value="amount_desc" {% if selected_sort == 'amount_desc' %}selected{% endif %}>Amount high → low</option>
+            <option value="amount_asc" {% if selected_sort == 'amount_asc' %}selected{% endif %}>Amount low → high</option>
+            <option value="business" {% if selected_sort == 'business' %}selected{% endif %}>Business A → Z</option>
+          </select>
+        </div>
+        {% comment %} Rows sits with Apply rather than in the field run — it is a
+           view control, not a filter, and it keeps the trailing line occupied. {% endcomment %}
+        <div class="ccv__filter-actions">
+          <div class="ccv__filter ccv__filter--per">
+            <label for="workforce_charges_filter_per_page" class="ccv__field-label">Rows</label>
+            <select name="per_page" id="workforce_charges_filter_per_page" class="form-select form-select-sm">
+              <option value="25" {% if selected_per_page == '25' %}selected{% endif %}>25</option>
+              <option value="50" {% if selected_per_page == '50' %}selected{% endif %}>50</option>
+              <option value="100" {% if selected_per_page == '100' %}selected{% endif %}>100</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-sm ccv__filter-apply">Apply</button>
+          {% if has_extra_filters %}
+          <a href="{% url 'workforce:client_charge_verification' %}" class="ccv__filter-reset">Clear</a>
+          {% endif %}
+        </div>
+      </form>
 
       {% if tasks %}
       <div class="ccv__bar">
@@ -280,16 +383,17 @@
 
       {% if tasks.has_other_pages %}
       <div class="ccv__pager">
-        {% include "includes/components/_pagination.html" with page_obj=tasks filter_params=filter_params %}
+        {% include "includes/components/_pagination.html" with page_obj=tasks filter_params=filter_params per_page=selected_per_page %}
       </div>
       {% endif %}
 
       {% else %}
-      <p class="ccv__empty">No deliveries match this filter. Widen the period or clear the business filter.</p>
+      <p class="ccv__empty">No deliveries match these filters. Widen the period, loosen the amount range, or clear the search.</p>
       {% endif %}
     </section>
 
     <span class="d-none">{% csrf_token %}</span>
+  </div><!-- /.ccv__body -->
   </div>
 
   <!-- Sticky tape -->
@@ -311,5 +415,5 @@
 <script>
   const workforceChargeActionUrl = "{% url 'workforce:client_charge_verification_action' %}";
 </script>
-<script src="{% static 'workforce/js/client-charge-verification.js' %}?v=20260728c"></script>
+<script src="{% static 'workforce/js/client-charge-verification.js' %}?v=20260824a"></script>
 {% endblock %}

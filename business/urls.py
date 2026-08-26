@@ -110,6 +110,7 @@ urlpatterns = [
     path('finance/transactions/', business_views.business_transactions, name='business_transactions'),
     path('finance/cod-statement/', business_views.business_cod_statement, name='business_cod_statement'),
     path('finance/cod-payout/<str:txn_code>/', business_views.business_cod_payout_invoice, name='business_cod_payout_invoice'),
+    path('finance/delivery-charges/', business_views.business_delivery_charges, name='business_delivery_charges'),
     path('finance/invoices/', business_views.business_charge_invoices, name='business_charge_invoices'),
     path('finance/invoices/<str:invoice_code>/', business_views.business_charge_invoice, name='business_charge_invoice'),
 

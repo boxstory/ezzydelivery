@@ -1,0 +1,207 @@
+{# Purpose: The seller's running ledger of estimated delivery charges — what each completed delivery will bill at. #}
+{# Used by: business.views.business_delivery_charges (URL business:business_delivery_charges) #}
+{# Notes: Mobile PWA list + desktop bcon__ console, same split as the COD statement. A charge is an ESTIMATE until #}
+{#        staff verify it; the "Unbilled" plate is all-time, not windowed, because old unsettled charges are still owed. #}
+{% extends "business_dashboard_base.html" %}
+{% load static business_console %}
+
+{% block title %}Delivery Charges{% endblock %}
+
+{% block content %}
+<!-- ==========================================
+     Mobile PWA View (visible < 768px only)
+     ========================================== -->
+<div class="d-md-none" id="delivery_charges_mobile_pwa_view">
+  <div class="pwa-section-header">
+    <h2 class="pwa-section-header__title">Delivery Charges</h2>
+    <a href="{% url 'business:business_finance_dashboard' %}" class="pwa-section-header__link">
+      <i class="fas fa-arrow-left"></i> Finance
+    </a>
+  </div>
+
+  <div class="pwa-period-select">
+    <form method="GET" class="w-100">
+      <select name="days" onchange="this.form.submit()">
+        <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+        <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+        <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+        <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+      </select>
+    </form>
+  </div>
+
+  <div class="pwa-stats-grid">
+    <div class="pwa-finance-stat">
+      <p class="pwa-finance-stat__value">{{ total_charges|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Charges (QR)</p>
+    </div>
+    <div class="pwa-finance-stat">
+      <p class="pwa-finance-stat__value">{{ total_count }}</p>
+      <p class="pwa-finance-stat__label">Deliveries</p>
+    </div>
+    <div class="pwa-finance-stat">
+      <p class="pwa-finance-stat__value">{{ estimated_charges|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Estimated (QR)</p>
+    </div>
+    <div class="pwa-finance-stat">
+      <p class="pwa-finance-stat__value">{{ unbilled_charges|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Still to bill (QR)</p>
+    </div>
+  </div>
+  <p class="pwa-stats-note">Estimated charges are not yet confirmed by EzzyDelivery. "Still to bill" is all-time.</p>
+
+  <div class="pwa-txn-list">
+    {% for task in tasks %}
+    <div class="pwa-txn-item">
+      <div class="pwa-txn-item__icon pwa-txn-item__icon--charge">
+        <i class="fas fa-truck"></i>
+      </div>
+      <div class="pwa-txn-item__info">
+        <p class="pwa-txn-item__type">#{{ task.dl_task_number }}</p>
+        <p class="pwa-txn-item__desc">
+          {{ task.dl_task_date|date:"d M" }}
+          {% if task.order %}&middot; Order #{{ task.order.order_number|default:"-" }}{% endif %}
+          &middot; {% if task.verified_delivery_charge is not None %}Confirmed{% else %}Estimated{% endif %}
+        </p>
+      </div>
+      <div class="pwa-txn-item__right">
+        <p class="pwa-txn-item__amount pwa-txn-item__amount--negative">{{ task.est_charge|floatformat:2 }} QR</p>
+        <p class="pwa-txn-item__date">
+          {% if task.settled_delivery_charge is not None %}Withheld
+          {% elif task.charge_invoice %}Invoiced
+          {% else %}To bill{% endif %}
+        </p>
+      </div>
+    </div>
+    {% empty %}
+    <div class="pwa-empty-state">
+      <i class="fas fa-file-invoice-dollar"></i>
+      <p>No delivery charges for this period</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% include "includes/components/_pagination.html" with page_obj=tasks_page filter_params=pagination_filter_params per_page=per_page pagination_id="delivery_charges_mob" variant="compact" show_goto="false" %}
+</div>
+
+<!-- ==========================================
+     Desktop console (visible ≥ 768px)
+     ========================================== -->
+<div class="d-none d-md-block" id="delivery_charges_desktop_view">
+<div class="bcon__page">
+  {% comment %}
+  The period is part of the page's identity, so it rides in the eyebrow — built
+  here because tag arguments resolve variables, they do not interpolate.
+  {% endcomment %}
+  {% with days_str=selected_days|stringformat:"s" %}{% with period="Last "|add:days_str|add:" days" %}
+  {% bconheader eyebrow="Finance" live=period icon="fa-solid fa-sack-dollar" title="EST Delivery Charges" subtitle=business.business_name %}
+    <form method="GET">
+      <select name="days" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+        <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+        <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+        <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+      </select>
+    </form>
+  {% endbconheader %}
+  {% endwith %}{% endwith %}
+</div>
+
+<div class="bcon__plates">
+  <div class="bcon__plate bcon__plate--navy bcon__rise bcon__rise--1">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Charges This Period</p>
+      <span class="bcon__plate-icon bcon__plate-icon--info"><i class="fa-solid fa-sack-dollar"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ total_charges|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">{{ total_count }} deliver{{ total_count|pluralize:"y,ies" }} &middot; avg {{ avg_charge|floatformat:2 }} QAR</p>
+  </div>
+  <div class="bcon__plate bcon__plate--success bcon__rise bcon__rise--2">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Confirmed</p>
+      <span class="bcon__plate-icon bcon__plate-icon--success"><i class="fa-solid fa-circle-check"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ confirmed_charges|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">{{ confirmed_count }} priced by EzzyDelivery</p>
+  </div>
+  <div class="bcon__plate bcon__plate--warning bcon__rise bcon__rise--3">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Estimated</p>
+      <span class="bcon__plate-icon bcon__plate-icon--warning"><i class="fa-solid fa-scale-balanced"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ estimated_charges|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">{{ estimated_count }} awaiting confirmation</p>
+  </div>
+  {% comment %} Unbilled is all-time, not filtered by the period selector — a charge
+     accrued months ago and never settled is still owed today. {% endcomment %}
+  <div class="bcon__plate bcon__plate--info bcon__rise bcon__rise--4">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Still To Bill</p>
+      <span class="bcon__plate-icon bcon__plate-icon--info"><i class="fa-solid fa-hourglass-half"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ unbilled_charges|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">{{ unbilled_count }} deliveries &middot; all-time</p>
+  </div>
+</div>
+
+<div class="px-2 bcon__rise bcon__rise--5">
+  <div class="bcon__panel">
+    <div class="bcon__panel-head">
+      <h5 class="bcon__panel-title"><i class="fa-solid fa-list-ul"></i> Charge Ledger</h5>
+      <span class="bcon__badge bcon__badge--primary">{{ tasks_total }} items</span>
+    </div>
+    <div class="bcon__panel-body--flush bcon__ledger-wrap">
+      <table class="bcon__ledger" id="business_charges_table_ledger">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Task #</th>
+            <th>Order #</th>
+            <th>Delivery</th>
+            <th class="bcon__td--right">Charge</th>
+            <th>Pricing</th>
+            <th>Billing</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for task in tasks %}
+          <tr>
+            <td data-label="Date" class="bcon__num">{{ task.dl_task_date|date:"d M" }}</td>
+            <td data-label="Task"><span class="bcon__chip">#{{ task.dl_task_number }}</span></td>
+            <td data-label="Order" class="bcon__num">{% if task.order %}#{{ task.order.order_number|default:"-" }}{% else %}-{% endif %}</td>
+            <td data-label="Delivery">{{ task.get_dl_task_status_display }}</td>
+            <td data-label="Charge" class="bcon__amount">{{ task.est_charge|floatformat:2 }} <small>QAR</small></td>
+            <td data-label="Pricing">
+              {% if task.verified_delivery_charge is not None %}
+                <span class="bcon__badge bcon__badge--success"><i class="fas fa-check"></i> Confirmed</span>
+              {% else %}
+                <span class="bcon__badge bcon__badge--warning"><i class="fas fa-clock"></i> Estimated</span>
+              {% endif %}
+            </td>
+            <td data-label="Billing">
+              {% if task.settled_delivery_charge is not None %}
+                <span class="bcon__badge bcon__badge--muted">Withheld at payout</span>
+              {% elif task.charge_invoice %}
+                <a href="{% url 'business:business_charge_invoice' task.charge_invoice.invoice_code %}" class="bcon__chip">{{ task.charge_invoice.invoice_code }}</a>
+              {% else %}
+                <span class="bcon__badge bcon__badge--warning">To bill</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7"><div class="bcon__empty"><i class="fa-solid fa-sack-dollar"></i><p class="bcon__empty-title">No delivery charges</p><p class="bcon__empty-text">No completed deliveries in this period.</p></div></td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4">Total on this page</td>
+            <td class="bcon__amount">{{ page_total|floatformat:2 }} <small>QAR</small></td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% include "includes/components/_pagination.html" with page_obj=tasks_page filter_params=pagination_filter_params per_page=per_page pagination_id="delivery_charges" %}
+  </div>
+</div>
+</div><!-- end desktop view -->
+{% endblock %}

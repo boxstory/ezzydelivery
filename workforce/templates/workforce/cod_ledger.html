@@ -11,11 +11,11 @@ Notes: Read-only and append-only; the summary tiles reflect the active filter, n
 {% block title %}COD Ledger{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260712m" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260816a" type="text/css" />
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-3">
+<div class="container-fluid codl">
 
   <!-- Hero Header -->
   <div class="wfd__hero">
@@ -41,6 +41,9 @@ Notes: Read-only and append-only; the summary tiles reflect the active filter, n
       </button>
     </div>
   </div>
+
+  <!-- Everything below the hero sits in one padded section -->
+  <div class="codl__body">
 
   <div class="wfnote" id="workforce_cod_ledger_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_cod_ledger_card_notes' %}" hidden></div>
@@ -244,5 +247,6 @@ Notes: Read-only and append-only; the summary tiles reflect the active filter, n
 
   {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page %}
 
+</div><!-- /.codl__body -->
 </div>
 {% endblock %}

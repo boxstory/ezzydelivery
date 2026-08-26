@@ -16,14 +16,20 @@
     </a>
   </div>
 
-  <!-- Period selector -->
+  {% comment %} Period + status share one form so the mobile list obeys the same
+     default ("Not paid to you") the desktop ledger opens on. {% endcomment %}
   <div class="pwa-period-select">
-    <form method="GET" style="width: 100%;">
+    <form method="GET" class="d-flex gap-2 w-100" id="cod_statement_mob_form_filters">
       <select name="days" onchange="this.form.submit()">
         <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
         <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
         <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
         <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+      </select>
+      <select name="status" onchange="this.form.submit()" id="cod_statement_mob_select_status">
+        {% for key, label, count in cod_status_filters %}
+        <option value="{{ key }}" {% if cod_status == key %}selected{% endif %}>{{ label }} ({{ count }})</option>
+        {% endfor %}
       </select>
     </form>
   </div>
@@ -72,7 +78,7 @@
   {% if settlements %}
   <div class="pwa-section-header">
     <h3 class="pwa-section-header__title">Settlements</h3>
-    <span class="pwa-section-header__badge pwa-section-header__badge--success">{{ settlements|length }}</span>
+    <a href="{% url 'business:business_charge_invoices' %}" class="pwa-section-header__link">All payouts</a>
   </div>
   <div class="pwa-txn-list">
     {% comment %} Mobile previously showed only the net amount with no invoice link, so the
@@ -126,10 +132,7 @@
       </div>
       <div class="pwa-txn-item__info">
         <p class="pwa-txn-item__type">#{{ task.dl_task_number }}</p>
-        <p class="pwa-txn-item__desc">
-          {% if task.driver %}{{ task.driver.user.first_name|default:"-" }}{% else %}-{% endif %}
-          &middot; {{ task.dl_task_date|date:"d M" }}
-        </p>
+        <p class="pwa-txn-item__desc">{{ task.dl_task_date|date:"d M" }}</p>
       </div>
       <div class="pwa-txn-item__right">
         <p class="pwa-txn-item__amount pwa-txn-item__amount--negative">{{ task.cod_collected_amount|default:0|floatformat:0 }} QR</p>
@@ -154,8 +157,10 @@
      ========================================== -->
 <div class="d-none d-md-block" id="cod_desktop_view">
 <div class="bcon__page">
-  {# The period is part of the page's identity, so it rides in the eyebrow — built
-     here because tag arguments resolve variables, they do not interpolate. #}
+  {% comment %}
+  The period is part of the page's identity, so it rides in the eyebrow — built
+  here because tag arguments resolve variables, they do not interpolate.
+  {% endcomment %}
   {% with days_str=selected_days|stringformat:"s" %}{% with period="Last "|add:days_str|add:" days" %}
   {% bconheader eyebrow="Finance" live=period icon="fa-solid fa-file-invoice-dollar" title="COD Statement" subtitle=business.business_name %}
     <form method="GET">
@@ -226,7 +231,12 @@
   <div class="bcon__panel">
     <div class="bcon__panel-head">
       <h5 class="bcon__panel-title"><i class="fa-solid fa-handshake"></i> COD Settlements</h5>
-      <span class="bcon__badge bcon__badge--success">{{ settlements|length }} items</span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="bcon__badge bcon__badge--success">{{ settlements|length }} item{{ settlements|length|pluralize }}</span>
+        {% comment %} This list is capped at the newest payouts; every payout invoice
+           ever issued lives on the Invoices & Payouts page. {% endcomment %}
+        <a href="{% url 'business:business_charge_invoices' %}" class="bcon__chip">All payouts</a>
+      </div>
     </div>
     <div class="bcon__panel-body--flush bcon__ledger-wrap">
       <table class="bcon__ledger">
@@ -280,44 +290,101 @@
 {% endif %}
 
 <!-- COD Deliveries List -->
+<!-- COD Deliveries filter bar — search / date / status. Defaults to
+     "Not paid to you" so a seller lands on the money still owed to them. -->
+<div class="px-2 mb-1 bcon__rise bcon__rise--5">
+  <form method="GET" class="ofb__section" id="cod_statement_form_filters">
+    <input type="hidden" name="days" value="{{ selected_days }}">
+    <input type="hidden" name="per_page" value="{{ per_page }}">
+    <div class="ofb__body ofb__body--solo">
+      <div class="ofb__filters">
+        <div class="ofb__filters__col ofb__filters__col--wide">
+          <label for="cod_statement_input_search" class="form-label mb-0">Search</label>
+          <input type="text" class="form-control form-control-sm" name="q"
+                 id="cod_statement_input_search" value="{{ search_q }}"
+                 placeholder="Order #, task #, customer or mobile">
+        </div>
+        <div class="ofb__filters__col">
+          <label for="cod_statement_input_date_from" class="form-label mb-0">From</label>
+          <input type="date" class="form-control form-control-sm" name="date_from"
+                 id="cod_statement_input_date_from" value="{{ date_from }}">
+        </div>
+        <div class="ofb__filters__col">
+          <label for="cod_statement_input_date_to" class="form-label mb-0">To</label>
+          <input type="date" class="form-control form-control-sm" name="date_to"
+                 id="cod_statement_input_date_to" value="{{ date_to }}">
+        </div>
+        <div class="ofb__filters__col">
+          <label for="cod_statement_select_status" class="form-label mb-0">Status</label>
+          <select class="form-select form-select-sm" name="status" id="cod_statement_select_status">
+            {% for key, label, count in cod_status_filters %}
+            <option value="{{ key }}" {% if cod_status == key %}selected{% endif %}>{{ label }} ({{ count }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="ofb__filters__col ofb__filters__col--actions">
+          <button type="submit" class="oal__filter-btn oal__filter-btn--search" id="cod_statement_btn_search">
+            <i class="fa-solid fa-search"></i> Search
+          </button>
+          <a href="?days={{ selected_days }}" class="oal__filter-btn oal__filter-btn--clear" id="cod_statement_btn_clear">
+            <i class="fa-solid fa-times"></i> Clear
+          </a>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
 <div class="px-2 bcon__rise bcon__rise--5">
   <div class="bcon__panel">
     <div class="bcon__panel-head">
       <h5 class="bcon__panel-title"><i class="fa-solid fa-money-bill"></i> COD Deliveries</h5>
-      <span class="bcon__badge bcon__badge--warning">{{ cod_deliveries_total }} items</span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="bcon__badge bcon__badge--warning">{{ cod_deliveries_total }} items</span>
+        <span class="bcon__badge bcon__badge--muted">{{ filtered_amount|floatformat:0 }} QAR</span>
+      </div>
     </div>
     <div class="bcon__panel-body--flush bcon__ledger-wrap">
       <table class="bcon__ledger">
         <thead>
           <tr>
             <th>Date</th>
-            <th>Task #</th>
-            <th>Order #</th>
-            <th>Driver</th>
+            <th>Order / Task #</th>
+            <th>Customer</th>
             <th class="bcon__td--right">COD</th>
             <th>Collected</th>
-            <th>Settled</th>
+            <th>Handed Over</th>
+            <th>Paid to You</th>
           </tr>
         </thead>
         <tbody>
           {% for task in cod_deliveries %}
           <tr>
             <td data-label="Date" class="bcon__num">{{ task.dl_task_date|date:"d M" }}</td>
-            <td data-label="Task"><span class="bcon__chip">#{{ task.dl_task_number }}</span></td>
-            <td data-label="Order" class="bcon__num">{% if task.order %}#{{ task.order.order_number|default:"-" }}{% else %}-{% endif %}</td>
-            <td data-label="Driver">{% if task.driver %}{{ task.driver.user.first_name|default:"-" }}{% else %}-{% endif %}</td>
+            <td data-label="Order / Task">
+              <span class="bcon__ref-main">{% if task.order %}#{{ task.order.order_number|default:"-" }}{% else %}-{% endif %}</span>
+              <span class="bcon__ref-sub">Task #{{ task.dl_task_number }}</span>
+            </td>
+            <td data-label="Customer">
+              <span class="bcon__party-name">{{ task.order.customer_name|default:"-" }}</span>
+              <span class="bcon__party-sub">{{ task.order.customer_phone|default:"-" }}</span>
+            </td>
             <td data-label="COD" class="bcon__amount bcon__amount--warning">{{ task.cod_collected_amount|default:0|floatformat:0 }} <small>QAR</small></td>
             <td data-label="Collected">
               {% if task.cod_collected %}<span class="bcon__badge bcon__badge--success"><i class="fas fa-check"></i> Yes</span>
               {% else %}<span class="bcon__badge bcon__badge--warning"><i class="fas fa-clock"></i> No</span>{% endif %}
             </td>
-            <td data-label="Settled">
+            <td data-label="Handed Over">
               {% if task.cod_settled %}<span class="bcon__badge bcon__badge--success"><i class="fas fa-check"></i> Yes</span>
               {% else %}<span class="bcon__badge bcon__badge--muted"><i class="fas fa-clock"></i> No</span>{% endif %}
             </td>
+            <td data-label="Paid to You">
+              {% if task.cod_client_settled %}<span class="bcon__badge bcon__badge--success"><i class="fas fa-check"></i> Yes</span>
+              {% else %}<span class="bcon__badge bcon__badge--warning"><i class="fas fa-clock"></i> No</span>{% endif %}
+            </td>
           </tr>
           {% empty %}
-          <tr><td colspan="7"><div class="bcon__empty"><i class="fa-solid fa-money-bill"></i><p class="bcon__empty-title">No COD deliveries</p><p class="bcon__empty-text">Nothing found for this period.</p></div></td></tr>
+          <tr><td colspan="7"><div class="bcon__empty"><i class="fa-solid fa-money-bill"></i><p class="bcon__empty-title">No COD deliveries</p><p class="bcon__empty-text">{% if filters_active %}No deliveries match these filters. <a href="?days={{ selected_days }}">Reset</a>{% else %}Nothing found for this period.{% endif %}</p></div></td></tr>
           {% endfor %}
         </tbody>
       </table>

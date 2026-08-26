@@ -263,6 +263,10 @@ urlpatterns = [
     path('client-charges/invoices/payment/', workforce_views.client_charge_invoice_payment, name='client_charge_invoice_payment'),
     path('client-charges/invoices/void/', workforce_views.client_charge_invoice_void, name='client_charge_invoice_void'),
     path('client-charges/invoices/whatsapp/', workforce_views.client_charge_invoice_whatsapp, name='client_charge_invoice_whatsapp'),
+    # These three must stay above the <invoice_code> catch-all below, or it swallows them.
+    path('client-charges/invoices/line/add/', workforce_views.client_charge_invoice_line_add, name='client_charge_invoice_line_add'),
+    path('client-charges/invoices/line/remove/', workforce_views.client_charge_invoice_line_remove, name='client_charge_invoice_line_remove'),
+    path('client-charges/invoices/columns/', workforce_views.client_charge_invoice_columns, name='client_charge_invoice_columns'),
     path('client-charges/invoices/<str:invoice_code>/', workforce_views.client_charge_invoice_detail, name='client_charge_invoice_detail'),
 
     # COD Submissions Management (Staff)

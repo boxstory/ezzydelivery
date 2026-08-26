@@ -1,11 +1,12 @@
-{# Purpose: The seller's own charge invoices — what EzzyDelivery has billed them for delivery and what is still due. #}
+{# Purpose: Every finance document the seller has — COD payouts we paid them, and charge invoices they owe us. #}
 {# Used by: business.views.business_charge_invoices (URL business:business_charge_invoices) #}
 {# Notes: Mobile PWA list + desktop bcon__ console, same split as the COD statement. Read-only: payments are #}
-{#        recorded by staff, and each row links to the seller's copy of the invoice document. #}
+{#        recorded by staff, and each row links to the seller's copy of the document. Payouts are listed #}
+{#        all-time here because the COD statement windows them by ?days=. #}
 {% extends "business_dashboard_base.html" %}
 {% load static business_console humanize %}
 
-{% block title %}Invoices{% endblock %}
+{% block title %}Invoices &amp; Payouts{% endblock %}
 
 {% block content %}
 <!-- ==========================================
@@ -13,7 +14,7 @@
      ========================================== -->
 <div class="d-md-none" id="invoices_mobile_pwa_view">
   <div class="pwa-section-header">
-    <h2 class="pwa-section-header__title">Invoices</h2>
+    <h2 class="pwa-section-header__title">Invoices &amp; Payouts</h2>
     <a href="{% url 'business:business_finance_dashboard' %}" class="pwa-section-header__link">
       <i class="fas fa-arrow-left"></i> Finance
     </a>
@@ -21,12 +22,12 @@
 
   <div class="pwa-stats-grid">
     <div class="pwa-finance-stat">
-      <p class="pwa-finance-stat__value">{{ total_billed|floatformat:0 }}</p>
-      <p class="pwa-finance-stat__label">Billed (QR)</p>
+      <p class="pwa-finance-stat__value">{{ total_paid_to_you|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Paid to You (QR)</p>
     </div>
     <div class="pwa-finance-stat">
-      <p class="pwa-finance-stat__value">{{ total_paid|floatformat:0 }}</p>
-      <p class="pwa-finance-stat__label">Paid (QR)</p>
+      <p class="pwa-finance-stat__value">{{ total_billed|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Billed (QR)</p>
     </div>
     <div class="pwa-finance-stat">
       <p class="pwa-finance-stat__value">{{ total_outstanding|floatformat:0 }}</p>
@@ -38,6 +39,42 @@
     </div>
   </div>
 
+  {% comment %} Payouts first — the money that reached the seller's bank is what they
+     open this page to reconcile. Each row is the payout invoice document. {% endcomment %}
+  <div class="pwa-section-header mt-3">
+    <h3 class="pwa-section-header__title">COD payouts to you</h3>
+  </div>
+  <div class="pwa-txn-list">
+    {% for s in payouts %}
+    {% if s.transaction_type == 'cod_client_settle' %}
+    <a href="{% url 'business:business_cod_payout_invoice' s.transaction_code %}" class="pwa-txn-item pwa-txn-item--link">
+      <div class="pwa-txn-item__icon pwa-txn-item__icon--settle">
+        <i class="fas fa-handshake"></i>
+      </div>
+      <div class="pwa-txn-item__info">
+        <p class="pwa-txn-item__type">{{ s.transaction_code|default:"COD Payout" }}</p>
+        <p class="pwa-txn-item__desc">
+          {% if s.is_reversed %}Reversed &middot; {% endif %}{{ s.gross_cod|floatformat:0 }} COD{% if s.deductions_total %} &minus; {{ s.deductions_total|floatformat:0 }} charges{% endif %}
+        </p>
+      </div>
+      <div class="pwa-txn-item__right">
+        <p class="pwa-txn-item__amount {% if s.is_reversed %}pwa-txn-item__amount--negative{% else %}pwa-txn-item__amount--positive{% endif %}">{{ s.net_paid|floatformat:0 }} QR</p>
+        <p class="pwa-txn-item__date">{{ s.created_at|date:"d M" }} <i class="fas fa-chevron-right ms-1"></i></p>
+      </div>
+    </a>
+    {% endif %}
+    {% endfor %}
+    {% if not payout_count %}
+    <div class="pwa-empty-state">
+      <i class="fas fa-handshake"></i>
+      <p>No payouts yet</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="pwa-section-header mt-3">
+    <h3 class="pwa-section-header__title">Delivery charge invoices</h3>
+  </div>
   <div class="pwa-txn-list">
     {% for inv in invoices %}
     <a href="{% url 'business:business_charge_invoice' inv.invoice_code %}" class="pwa-txn-item pwa-txn-item--link">
@@ -72,26 +109,34 @@
      ========================================== -->
 <div class="d-none d-md-block" id="invoices_desktop_view">
 <div class="bcon__page">
-  {% bconheader eyebrow="Finance" icon="fa-solid fa-file-invoice" title="Delivery Charge Invoices" subtitle=business.business_name %}
+  {% bconheader eyebrow="Finance" icon="fa-solid fa-file-invoice" title="Invoices &amp; Payouts" subtitle=business.business_name %}
   {% endbconheader %}
 </div>
 
 <div class="bcon__plates">
-  <div class="bcon__plate bcon__plate--primary bcon__rise bcon__rise--1">
+  <div class="bcon__plate bcon__plate--success bcon__rise bcon__rise--1">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Paid to You</p>
+      <span class="bcon__plate-icon bcon__plate-icon--success"><i class="fa-solid fa-handshake"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ total_paid_to_you|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">{{ payout_count }} COD payout{{ payout_count|pluralize }}</p>
+  </div>
+  <div class="bcon__plate bcon__plate--primary bcon__rise bcon__rise--2">
     <div class="bcon__plate-top">
       <p class="bcon__plate-label">Total Billed</p>
       <span class="bcon__plate-icon bcon__plate-icon--primary"><i class="fa-solid fa-file-invoice"></i></span>
     </div>
     <p class="bcon__plate-value">{{ total_billed|floatformat:0 }} <small>QAR</small></p>
   </div>
-  <div class="bcon__plate bcon__plate--success bcon__rise bcon__rise--2">
+  <div class="bcon__plate bcon__rise bcon__rise--3">
     <div class="bcon__plate-top">
       <p class="bcon__plate-label">Paid</p>
       <span class="bcon__plate-icon bcon__plate-icon--success"><i class="fa-solid fa-circle-check"></i></span>
     </div>
     <p class="bcon__plate-value">{{ total_paid|floatformat:0 }} <small>QAR</small></p>
   </div>
-  <div class="bcon__plate bcon__plate--warning bcon__rise bcon__rise--3">
+  <div class="bcon__plate bcon__plate--warning bcon__rise bcon__rise--4">
     <div class="bcon__plate-top">
       <p class="bcon__plate-label">Outstanding</p>
       <span class="bcon__plate-icon bcon__plate-icon--warning"><i class="fa-solid fa-hourglass-half"></i></span>
@@ -101,11 +146,72 @@
   </div>
 </div>
 
+{% comment %} Payouts read first: a seller opens this page to reconcile the transfer that
+   hit their bank against the COD their deliveries collected. {% endcomment %}
 <div class="px-2 bcon__rise bcon__rise--4">
+  <div class="bcon__panel bcon__panel--ok">
+    <div class="bcon__panel-head">
+      <h5 class="bcon__panel-title"><i class="fa-solid fa-handshake"></i> COD payouts to you</h5>
+      <span class="bcon__badge bcon__badge--success">{{ payout_count }} payout{{ payout_count|pluralize }}</span>
+    </div>
+    <div class="bcon__panel-body--flush bcon__ledger-wrap">
+      <table class="bcon__ledger">
+        <thead>
+          <tr>
+            <th>Paid</th>
+            <th>Payout</th>
+            <th class="bcon__td--right">COD Released</th>
+            <th class="bcon__td--right">Charges Withheld</th>
+            <th class="bcon__td--right">Net Paid</th>
+            <th>Method / Ref</th>
+            <th>Document</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in payouts %}
+          {% if s.transaction_type == 'cod_client_settle' %}
+          <tr>
+            <td data-label="Paid" class="bcon__num">{{ s.created_at|date:"d M Y" }}</td>
+            <td data-label="Payout"><span class="bcon__chip">{{ s.transaction_code }}</span></td>
+            <td data-label="COD Released" class="bcon__num bcon__td--right">{{ s.gross_cod|floatformat:2 }}</td>
+            <td data-label="Charges Withheld" class="bcon__num bcon__td--right">{% if s.deductions_total %}&minus;{{ s.deductions_total|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td data-label="Net Paid" class="bcon__amount {% if s.is_reversed %}bcon__amount--danger{% else %}bcon__amount--success{% endif %}">
+              {{ s.net_paid|floatformat:2 }} <small>QAR</small>
+            </td>
+            <td data-label="Method / Ref">
+              {{ s.get_payment_method_display }}{% if s.reference_number %} <small class="text-muted">{{ s.reference_number }}</small>{% endif %}
+            </td>
+            <td data-label="Document">
+              {% if s.is_reversed %}<span class="bcon__chip">Reversed</span>{% endif %}
+              <a href="{% url 'business:business_cod_payout_invoice' s.transaction_code %}" class="bcon__chip">View</a>
+            </td>
+          </tr>
+          {% endif %}
+          {% empty %}
+          <tr><td colspan="7">No COD payouts yet. A payout appears here the day we transfer collected COD to you.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if payout_count %}
+        <tfoot>
+          <tr>
+            <td colspan="2">Total (excludes reversed)</td>
+            <td class="bcon__num bcon__td--right">{{ total_cod_released|floatformat:2 }}</td>
+            <td class="bcon__num bcon__td--right">{% if total_withheld %}&minus;{{ total_withheld|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td class="bcon__amount bcon__amount--success">{{ total_paid_to_you|floatformat:2 }} <small>QAR</small></td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="px-2 bcon__rise bcon__rise--5">
   <div class="bcon__panel">
     <div class="bcon__panel-head">
-      <h5 class="bcon__panel-title"><i class="fa-solid fa-receipt"></i> Invoices</h5>
-      <span class="bcon__badge bcon__badge--primary">{{ invoices|length }} items</span>
+      <h5 class="bcon__panel-title"><i class="fa-solid fa-receipt"></i> Delivery charge invoices</h5>
+      <span class="bcon__badge bcon__badge--primary">{{ invoices|length }} item{{ invoices|length|pluralize }}</span>
     </div>
     <div class="bcon__panel-body--flush bcon__ledger-wrap">
       <table class="bcon__ledger">
@@ -138,7 +244,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="8">No invoices yet.</td></tr>
+          <tr><td colspan="8">No charge invoices. Delivery charges withheld from a COD payout are already settled and are never invoiced again — they appear as "Charges Withheld" above.</td></tr>
           {% endfor %}
         </tbody>
         <tfoot>

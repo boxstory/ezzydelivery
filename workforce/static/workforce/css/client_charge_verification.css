@@ -22,10 +22,15 @@
   color: var(--tlr-ink);
   font-family: var(--tlr-sans);
   min-height: 100vh;
-  padding: 1.5rem 1.25rem 7rem;
+  /* Hero sits flush; the body section below it carries the page padding.
+     The bottom pad stays — it reserves room for the sticky tape. */
+  padding: 0 0 7rem;
 }
 
 .ccv__wrap { max-width: 1320px; margin: 0 auto; }
+
+/* Everything below the hero — one padded section */
+.ccv__body { padding: 0.325rem; }
 
 /* ── Standing note under the stat cards ───────────────────── */
 .ccv__note {
@@ -60,9 +65,85 @@
   text-transform: uppercase;
   margin: 0;
 }
-.ccv__filters { display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; }
-.ccv__filter { display: flex; flex-direction: column; gap: 0.2rem; }
+/* Matched tally beside the ledger title — what the current filter adds up to. */
+.ccv__match {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.72rem;
+  color: var(--tlr-muted);
+}
+.ccv__match-total {
+  font-weight: 600;
+  color: var(--tlr-ink);
+  border-left: 1px solid var(--tlr-rule);
+  padding-left: 0.6rem;
+}
+
+/* ── Filter strip ─────────────────────────────────────────── */
+/* Full-width row under the ledger head. Two visual lines: the scope fields
+   (business / status / period / dates), then the find fields (search, amount
+   pair, service, category, zone, sort, rows) after the flex break. */
+.ccv__filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--tlr-rule);
+  background: var(--tlr-paper);
+}
+/* flex:0 0 auto — the strip wraps to a new line rather than squeezing a field
+   narrower than its content; without it the wide business select overflows the
+   column it sits in once the row is full. */
+.ccv__filter { display: flex; flex-direction: column; gap: 0.2rem; flex: 0 0 auto; }
 .ccv__filter .form-select { width: auto; min-width: 9rem; }
+/* Width is set on the wrapper, not the field: a select's own min-width does not
+   feed the flex column's intrinsic size, so sizing the field alone leaves it
+   overflowing a 7rem parent. Fields fill the wrapper instead. */
+.ccv__filter--wide { width: 22rem; }
+.ccv__filter--search { width: 22rem; }
+.ccv__filter--amt { width: 7rem; }
+.ccv__filter--zone { width: 7rem; }
+.ccv__filter--date { width: 10rem; }
+.ccv__filter--per { width: 5.5rem; }
+.ccv__filter--wide .form-select,
+.ccv__filter--search .form-control,
+.ccv__filter--amt .form-control,
+.ccv__filter--zone .form-control,
+.ccv__filter--date .form-control,
+.ccv__filter--per .form-select { width: 100%; min-width: 0; }
+/* Forces the find fields onto their own line without a wrapper element. */
+.ccv__filter-break { flex-basis: 100%; height: 0; margin: 0; }
+
+.ccv__filter-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+.ccv__filter-apply {
+  font-family: var(--tlr-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: var(--tlr-ink);
+  border: 1px solid var(--tlr-ink);
+  color: var(--tlr-paper);
+  padding: 0.35rem 1.1rem;
+}
+.ccv__filter-apply:hover { background: var(--tlr-brass-deep); border-color: var(--tlr-brass-deep); color: #fff; }
+.ccv__filter-reset {
+  font-family: var(--tlr-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--tlr-rule-strong);
+}
+.ccv__filter-reset:hover { color: var(--tlr-void); border-bottom-color: var(--tlr-void); }
 
 .ccv__bar {
   display: flex;
@@ -314,9 +395,18 @@
 }
 @media (max-width: 575.98px) {
   .ccv { padding: 1rem 0.75rem 8.5rem; }
-  .ccv__filters { width: 100%; }
+  .ccv__filters { width: 100%; padding: 0.6rem 0.75rem; }
   .ccv__filter { flex: 1 1 8rem; }
-  .ccv__filter .form-select { width: 100%; min-width: 0; }
+  .ccv__filter .form-select,
+  .ccv__filter .form-control { width: 100%; min-width: 0; }
+  .ccv__filter--wide,
+  .ccv__filter--search { flex: 1 1 100%; width: 100%; }
+  .ccv__filter--amt,
+  .ccv__filter--zone,
+  .ccv__filter--date,
+  .ccv__filter--per { width: auto; }
+  .ccv__filter-actions { margin-left: 0; width: 100%; }
+  .ccv__filter-apply { flex: 1 1 auto; }
   .ccv__tape-inner { flex-wrap: wrap; gap: 0.6rem; padding: 0.6rem 0.75rem; }
   .ccv__tape-total { margin-left: 0; }
   .ccv__tape-actions { width: 100%; }

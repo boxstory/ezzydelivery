@@ -157,7 +157,15 @@
       <span class="bcon__plate-icon bcon__plate-icon--info"><i class="fa-solid fa-file-invoice"></i></span>
     </div>
     <p class="bcon__plate-value">{{ delivery_stats.total_delivery_charges|default:0|floatformat:0 }} <small>QAR</small></p>
-    <p class="bcon__plate-foot">Total billed</p>
+    {% comment %} The charge total is what accrued, not what was collected. The foot names
+       the part still to settle so the plate is never read as money already billed. {% endcomment %}
+    <p class="bcon__plate-foot">
+      {% if delivery_stats.charged_count %}
+        {{ delivery_stats.charged_count }} deliver{{ delivery_stats.charged_count|pluralize:"y,ies" }}
+        {% if delivery_stats.unbilled_charges %} &middot; {{ delivery_stats.unbilled_charges|floatformat:0 }} still to bill
+        {% else %} &middot; all settled{% endif %}
+      {% else %}No completed deliveries{% endif %}
+    </p>
   </div>
   <div class="bcon__plate bcon__plate--warning bcon__rise bcon__rise--3">
     <div class="bcon__plate-top">
