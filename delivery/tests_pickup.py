@@ -1,8 +1,11 @@
 # Purpose: Tests for first-mile pickup — creation gating, pool scoping, atomic accept, dispositions
 # Used by: python manage.py test delivery.tests_pickup
 
+from datetime import timedelta
+
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from delivery import models as delivery_models
 from delivery.selectors import pickup_pool_for
@@ -107,6 +110,307 @@ class PickupCreationTestCase(PickupBaseTestCase):
         self.assertEqual(PickupTask.objects.get(order=order).status, 'cancelled')
 
 
+class PickupLateLocationTestCase(PickupBaseTestCase):
+    """Imports save the order with no pickup location, so the create-time gate
+    bails on 'no_pickup_location'. Attaching one later must open the leg."""
+
+    def make_locationless_order(self, code):
+        with self.captureOnCommitCallbacks(execute=True):
+            order = Order.objects.create(
+                business=self.business, client_order_code=code,
+                customer_name='Cust', customer_phone='55555555',
+                customer_address='Somewhere', dl_zone=55,
+                pickup_location=None,
+            )
+        return order
+
+    def test_no_pickup_without_a_location(self):
+        order = self.make_locationless_order('PKL01')
+        self.assertFalse(PickupTask.objects.filter(order=order).exists())
+
+    def test_pickup_created_when_location_arrives_later(self):
+        order = self.make_locationless_order('PKL02')
+        with self.captureOnCommitCallbacks(execute=True):
+            order.pickup_location = self.pickup_location
+            order.save(update_fields=['pickup_location'])
+        pickup = PickupTask.objects.filter(order=order).first()
+        self.assertIsNotNone(pickup)
+        self.assertEqual(pickup.status, 'pending')
+        self.assertEqual(pickup.pickup_location_id, self.pickup_location.pk)
+
+    def test_late_fulfilment_centre_still_refused(self):
+        order = self.make_locationless_order('PKL03')
+        fc = PickupLocation.objects.create(
+            business=self.business, pickup_location_title='WH: Hub',
+            locality='Doha', pickup_status='active', is_fulfilment_center=True)
+        with self.captureOnCommitCallbacks(execute=True):
+            order.pickup_location = fc
+            order.save(update_fields=['pickup_location'])
+        self.assertFalse(PickupTask.objects.filter(order=order).exists())
+
+    def test_terminal_order_gets_no_late_pickup(self):
+        order = self.make_locationless_order('PKL04')
+        Order.objects.filter(pk=order.pk).update(order_status='delivered')
+        order.refresh_from_db()
+        with self.captureOnCommitCallbacks(execute=True):
+            order.pickup_location = self.pickup_location
+            order.save(update_fields=['pickup_location'])
+        self.assertFalse(PickupTask.objects.filter(order=order).exists())
+
+    def test_relocating_an_existing_pickup_makes_no_second_leg(self):
+        order = self.make_order('PKL05')
+        other = PickupLocation.objects.create(
+            business=self.business, pickup_location_title='PK Store 2',
+            locality='Doha', pickup_status='active')
+        with self.captureOnCommitCallbacks(execute=True):
+            order.pickup_location = other
+            order.save(update_fields=['pickup_location'])
+        self.assertEqual(PickupTask.objects.filter(order=order).count(), 1)
+
+
+class PickupReadyToPickupTestCase(PickupBaseTestCase):
+    """Staff marking an order 'ready_to_pickup' is the third chance to open a
+    leg. The order was created against a location the gate refused (a stale
+    fulfilment-centre flag, an inactive address), so neither the create hook nor
+    the location hook ever fired; once the config is repaired, the status move
+    is what asserts the goods are packed and collectable."""
+
+    def make_refused_order(self, code):
+        self.pickup_location.is_fulfilment_center = True
+        self.pickup_location.save(update_fields=['is_fulfilment_center'])
+        order = self.make_order(code)
+        self.assertFalse(PickupTask.objects.filter(order=order).exists())
+        return order
+
+    def repair_location(self):
+        self.pickup_location.is_fulfilment_center = False
+        self.pickup_location.pickup_status = 'active'
+        self.pickup_location.save(
+            update_fields=['is_fulfilment_center', 'pickup_status'])
+
+    def set_status(self, order, status):
+        with self.captureOnCommitCallbacks(execute=True):
+            order.order_status = status
+            order.save(update_fields=['order_status'])
+
+    def test_leg_opens_when_staff_mark_ready(self):
+        order = self.make_refused_order('PKR01')
+        self.repair_location()
+        self.set_status(order, 'ready_to_pickup')
+        pickup = PickupTask.objects.filter(order=order).first()
+        self.assertIsNotNone(pickup)
+        self.assertEqual(pickup.status, 'pending')
+        self.assertEqual(pickup.pickup_location_id, self.pickup_location.pk)
+
+    def test_still_refused_while_the_location_is_unrepaired(self):
+        order = self.make_refused_order('PKR02')
+        self.set_status(order, 'ready_to_pickup')
+        self.assertFalse(PickupTask.objects.filter(order=order).exists())
+
+    def test_no_second_leg_when_one_already_exists(self):
+        order = self.make_order('PKR03')
+        self.assertEqual(PickupTask.objects.filter(order=order).count(), 1)
+        self.set_status(order, 'ready_to_pickup')
+        self.assertEqual(PickupTask.objects.filter(order=order).count(), 1)
+
+    def test_only_the_transition_fires_not_every_later_save(self):
+        order = self.make_refused_order('PKR04')
+        self.set_status(order, 'ready_to_pickup')   # gate still refuses
+        self.repair_location()
+        with self.captureOnCommitCallbacks(execute=True):
+            order.customer_name = 'Renamed'
+            order.save(update_fields=['customer_name'])
+        self.assertFalse(PickupTask.objects.filter(order=order).exists())
+
+
+class WorkforcePickupCreateTestCase(PickupBaseTestCase):
+    """Staff repair hatch: /workforce/pickups/create/ opens a leg for an order
+    that never got one, after asking which shop address holds the goods."""
+
+    def setUp(self):
+        super().setUp()
+        self.staff = User.objects.create_user(
+            username='pkstaff3', password='x', is_staff=True)
+        core_models.Profile.objects.create(
+            user=self.staff, is_staff=True, dept_operations=True)
+        self.client.force_login(self.staff)
+
+    def make_locationless_order(self, code):
+        with self.captureOnCommitCallbacks(execute=True):
+            order = Order.objects.create(
+                business=self.business, client_order_code=code,
+                customer_name='Cust', customer_phone='55555555',
+                customer_address='Somewhere', dl_zone=55, pickup_location=None,
+            )
+        return order
+
+    def test_lookup_offers_only_non_fulfilment_locations(self):
+        order = self.make_locationless_order('PKC01')
+        PickupLocation.objects.create(
+            business=self.business, pickup_location_title='WH: Hub',
+            locality='Doha', pickup_status='active', is_fulfilment_center=True)
+        resp = self.client.post('/workforce/pickups/create/',
+                                {'order_number': order.order_number})
+        data = resp.json()
+        self.assertTrue(data['success'])
+        self.assertTrue(data['needs_location'])
+        titles = [loc['title'] for loc in data['locations']]
+        self.assertEqual(titles, ['PK Store'])
+
+    def test_creates_the_leg_and_stamps_the_order(self):
+        order = self.make_locationless_order('PKC02')
+        with self.captureOnCommitCallbacks(execute=True):
+            resp = self.client.post('/workforce/pickups/create/', {
+                'order_number': order.order_number,
+                'pickup_location_id': self.pickup_location.pk,
+            })
+        self.assertTrue(resp.json()['success'])
+        order.refresh_from_db()
+        self.assertEqual(order.pickup_location_id, self.pickup_location.pk)
+        self.assertEqual(PickupTask.objects.filter(order=order).count(), 1)
+
+    def test_unknown_order_is_reported(self):
+        resp = self.client.post('/workforce/pickups/create/',
+                                {'order_number': 'NOPE-1'})
+        self.assertFalse(resp.json()['success'])
+
+    def test_existing_pickup_is_refused(self):
+        order = self.make_order('PKC03')
+        resp = self.client.post('/workforce/pickups/create/',
+                                {'order_number': order.order_number})
+        data = resp.json()
+        self.assertFalse(data['success'])
+        self.assertIn('already has a pickup', data['error'])
+
+    def test_location_from_another_client_is_refused(self):
+        order = self.make_locationless_order('PKC04')
+        other_user = User.objects.create_user(username='pkbiz2', password='x')
+        other_profile = Profile.objects.create(
+            user=other_user, first_name='Other', last_name='Biz', phone=77777777)
+        other_business = Business.objects.create(
+            business_id=901, user=other_user, profile=other_profile,
+            business_name='Other Biz', business_code='OTB001',
+            business_status='active', pickup_task_enabled=True)
+        foreign = PickupLocation.objects.create(
+            business=other_business, pickup_location_title='Foreign Store',
+            locality='Doha', pickup_status='active')
+        resp = self.client.post('/workforce/pickups/create/', {
+            'order_number': order.order_number,
+            'pickup_location_id': foreign.pk,
+        })
+        self.assertFalse(resp.json()['success'])
+        self.assertFalse(PickupTask.objects.filter(order=order).exists())
+
+    def test_client_with_pickup_disabled_is_refused_in_words(self):
+        order = self.make_locationless_order('PKC05')
+        self.business.pickup_task_enabled = False
+        self.business.save(update_fields=['pickup_task_enabled'])
+        resp = self.client.post('/workforce/pickups/create/', {
+            'order_number': order.order_number,
+            'pickup_location_id': self.pickup_location.pk,
+        })
+        data = resp.json()
+        self.assertFalse(data['success'])
+        self.assertIn('switched off', data['error'])
+
+
+class PickupRelocateTestCase(PickupBaseTestCase):
+    """Staff move an open pickup to another of the client's addresses."""
+
+    def setUp(self):
+        super().setUp()
+        self.staff = User.objects.create_user(
+            username='pkstaff4', password='x', is_staff=True)
+        core_models.Profile.objects.create(
+            user=self.staff, is_staff=True, dept_operations=True)
+        self.client.force_login(self.staff)
+        self.other_location = PickupLocation.objects.create(
+            business=self.business, pickup_location_title='PK Store 2',
+            locality='Wakrah', pickup_zone_no=90, pickup_status='active')
+
+    def relocate(self, pickup, location):
+        return self.client.post('/workforce/pickups/relocate/', {
+            'pickup_id': pickup.pk, 'pickup_location_id': location.pk,
+        }).json()
+
+    def test_moves_pickup_and_order_together(self):
+        order = self.make_order('PKR01')
+        pickup = PickupTask.objects.get(order=order)
+        self.assertTrue(self.relocate(pickup, self.other_location)['success'])
+        pickup.refresh_from_db()
+        order.refresh_from_db()
+        self.assertEqual(pickup.pickup_location_id, self.other_location.pk)
+        self.assertEqual(order.pickup_location_id, self.other_location.pk)
+
+    def test_assigned_driver_is_notified(self):
+        order = self.make_order('PKR02')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.driver = self.driver
+        pickup.status = 'accepted'
+        pickup.save()
+        self.assertTrue(self.relocate(pickup, self.other_location)['success'])
+        self.assertTrue(fleet_models.DriverNotification.objects.filter(
+            driver=self.driver, title='Pickup address changed').exists())
+
+    def test_collected_pickup_is_refused(self):
+        order = self.make_order('PKR03')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.status = 'collected'
+        pickup.save(update_fields=['status'])
+        res = self.relocate(pickup, self.other_location)
+        self.assertFalse(res['success'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.pickup_location_id, self.pickup_location.pk)
+
+    def test_fulfilment_centre_is_refused(self):
+        order = self.make_order('PKR04')
+        pickup = PickupTask.objects.get(order=order)
+        fc = PickupLocation.objects.create(
+            business=self.business, pickup_location_title='WH: Hub',
+            locality='Doha', pickup_status='active', is_fulfilment_center=True)
+        res = self.relocate(pickup, fc)
+        self.assertFalse(res['success'])
+        self.assertIn('fulfilment centre', res['error'])
+
+    def test_another_clients_location_is_refused(self):
+        order = self.make_order('PKR05')
+        pickup = PickupTask.objects.get(order=order)
+        other_user = User.objects.create_user(username='pkbiz3', password='x')
+        other_profile = Profile.objects.create(
+            user=other_user, first_name='Other', last_name='Biz', phone=76767676)
+        other_business = Business.objects.create(
+            business_id=902, user=other_user, profile=other_profile,
+            business_name='Other Biz', business_code='OTB002',
+            business_status='active', pickup_task_enabled=True)
+        foreign = PickupLocation.objects.create(
+            business=other_business, pickup_location_title='Foreign Store',
+            locality='Doha', pickup_status='active')
+        self.assertFalse(self.relocate(pickup, foreign)['success'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.pickup_location_id, self.pickup_location.pk)
+
+    def test_editing_the_order_carries_the_open_leg_across(self):
+        order = self.make_order('PKR06')
+        pickup = PickupTask.objects.get(order=order)
+        with self.captureOnCommitCallbacks(execute=True):
+            order.pickup_location = self.other_location
+            order.save(update_fields=['pickup_location'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.pickup_location_id, self.other_location.pk)
+        self.assertEqual(PickupTask.objects.filter(order=order).count(), 1)
+
+    def test_editing_the_order_leaves_a_collected_leg_alone(self):
+        order = self.make_order('PKR07')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.status = 'collected'
+        pickup.save(update_fields=['status'])
+        with self.captureOnCommitCallbacks(execute=True):
+            order.pickup_location = self.other_location
+            order.save(update_fields=['pickup_location'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.pickup_location_id, self.pickup_location.pk)
+
+
 class PickupPoolScopingTestCase(PickupBaseTestCase):
     def test_public_pool_visible_to_all_approved(self):
         order = self.make_order('PK010')
@@ -207,8 +511,9 @@ class PickupPoolStaleTestCase(PickupBaseTestCase):
         pickup.refresh_from_db()
         self.assertEqual(pickup.status, 'dropped')
 
-    def test_collected_pickup_cancelled_and_driver_notified(self):
-        # Driver is holding the goods — pickup is pulled and they are told
+    def test_collected_pickup_survives_cancelled_delivery(self):
+        # Driver is holding the goods — the collection happened, so the pickup is
+        # never relabelled 'cancelled'. It stays open so they can route or return it.
         order = self.make_order('PKS09')
         pickup = PickupTask.objects.get(order=order)
         pickup.driver = self.driver
@@ -218,9 +523,61 @@ class PickupPoolStaleTestCase(PickupBaseTestCase):
         task.dl_task_status = 'cancelled'
         task.save(update_fields=['dl_task_status'])
         pickup.refresh_from_db()
-        self.assertEqual(pickup.status, 'cancelled')
+        self.assertEqual(pickup.status, 'collected')
         self.assertTrue(fleet_models.DriverNotification.objects.filter(
+            driver=self.driver, title='Pickup needs routing').exists())
+
+    def test_collected_pickup_closes_as_handed_off_when_delivered(self):
+        # The delivery leg finished — the first-mile work is done, not cancelled
+        order = self.make_order('PKS10')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.driver = self.driver
+        pickup.status = 'collected'
+        pickup.save()
+        task = self.make_task(order, 'pending')
+        task.dl_task_status = 'delivered'
+        task.save(update_fields=['dl_task_status'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'handed_off')
+        self.assertFalse(fleet_models.DriverNotification.objects.filter(
             driver=self.driver, title='Pickup cancelled').exists())
+
+    def test_pending_transfer_auto_confirms_when_target_delivers(self):
+        # Nobody tapped "confirm hand-off", but the target driver delivered the
+        # order — that is proof the hand-off happened.
+        target = make_driver(7)
+        order = self.make_order('PKS11')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.driver = self.driver
+        pickup.status = 'collected'
+        pickup.disposition = 'transfer'
+        pickup.transfer_to_driver = target
+        pickup.save()
+        task = self.make_task(order, 'pending')
+        task.driver = target
+        task.dl_task_status = 'delivered'
+        task.save(update_fields=['driver', 'dl_task_status'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'handed_off')
+        self.assertIsNotNone(pickup.transfer_confirmed_at)
+
+    def test_pending_transfer_not_confirmed_when_someone_else_delivers(self):
+        target = make_driver(8)
+        other = make_driver(9)
+        order = self.make_order('PKS12')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.driver = self.driver
+        pickup.status = 'collected'
+        pickup.disposition = 'transfer'
+        pickup.transfer_to_driver = target
+        pickup.save()
+        task = self.make_task(order, 'pending')
+        task.driver = other
+        task.dl_task_status = 'delivered'
+        task.save(update_fields=['driver', 'dl_task_status'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'handed_off')
+        self.assertIsNone(pickup.transfer_confirmed_at)
 
 
 class PickupAcceptTestCase(PickupBaseTestCase):
@@ -444,6 +801,62 @@ class WorkforcePickupAssignTestCase(PickupBaseTestCase):
         resp = self.client.get('/workforce/pickups/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'PKA04')
+
+    def test_pool_status_hides_handed_off_by_default(self):
+        order = self.make_order('PKA05')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.status = 'handed_off'
+        pickup.save(update_fields=['status'])
+
+        resp = self.client.get('/workforce/pickups/')
+        self.assertNotContains(resp, order.order_number)
+        # …but it is still one filter away
+        resp_all = self.client.get('/workforce/pickups/', {'status': 'all'})
+        self.assertContains(resp_all, order.order_number)
+
+    def test_pool_status_defaults_to_last_7_days(self):
+        old = self.make_order('PKA06')
+        recent = self.make_order('PKA07')
+        # created_at is auto_now_add, so backdate through the queryset
+        PickupTask.objects.filter(order=old).update(
+            created_at=timezone.now() - timedelta(days=10))
+
+        resp = self.client.get('/workforce/pickups/')
+        self.assertNotContains(resp, old.order_number)
+        self.assertContains(resp, recent.order_number)
+
+        resp_all = self.client.get('/workforce/pickups/', {'days': 'all'})
+        self.assertContains(resp_all, old.order_number)
+
+    def test_pool_status_custom_date_range_overrides_preset(self):
+        order = self.make_order('PKA08')
+        PickupTask.objects.filter(order=order).update(
+            created_at=timezone.now() - timedelta(days=45))
+        day = (timezone.now() - timedelta(days=45)).strftime('%Y-%m-%d')
+
+        # The To box is inclusive of its whole day, so a single-day range finds it
+        resp = self.client.get('/workforce/pickups/', {'date_from': day, 'date_to': day})
+        self.assertContains(resp, order.order_number)
+        # A reversed pair is normalised rather than returning nothing
+        resp_rev = self.client.get('/workforce/pickups/', {'date_from': day, 'date_to': day})
+        self.assertContains(resp_rev, order.order_number)
+        # Junk falls back to the 7-day default instead of erroring
+        resp_junk = self.client.get('/workforce/pickups/', {'date_from': 'not-a-date'})
+        self.assertEqual(resp_junk.status_code, 200)
+        self.assertNotContains(resp_junk, order.order_number)
+
+    def test_pool_status_flags_active_pickups_hidden_by_the_window(self):
+        order = self.make_order('PKA09')
+        PickupTask.objects.filter(order=order).update(
+            created_at=timezone.now() - timedelta(days=40))  # still pending
+
+        resp = self.client.get('/workforce/pickups/', {'days': '7'})
+        self.assertNotContains(resp, order.order_number)
+        self.assertContains(resp, 'ppl__windownote')
+        self.assertEqual(resp.context['hidden_active'], 1)
+
+        resp_all = self.client.get('/workforce/pickups/', {'days': 'all'})
+        self.assertEqual(resp_all.context['hidden_active'], 0)
 
 
 class WorkforcePickupCancelDeleteTestCase(PickupBaseTestCase):

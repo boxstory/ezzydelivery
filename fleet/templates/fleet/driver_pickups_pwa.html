@@ -309,12 +309,19 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
         return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     }
 
+    /* Every pickup action here moves the leg's status, and the server stamps
+     * that change with the driver's latest fix — so a fix is taken first and
+     * the action waits for it (capped in EzzyGPS.stamp, never more than a few
+     * seconds). Without it the pin on "Collected" is whichever ping happened
+     * to land last, which is what left first-mile stages with no position at
+     * all on the staff timeline. */
     function post(url, data, btn, done) {
         if (btn) { btn.disabled = true; }
         const form = new FormData();
         Object.entries(data).forEach(([k, v]) => form.append(k, v));
         form.append('csrfmiddlewaretoken', csrf());
-        fetch(url, { method: 'POST', body: form })
+        const stamped = (window.EzzyGPS && EzzyGPS.stamp) ? EzzyGPS.stamp() : Promise.resolve(false);
+        stamped.then(() => fetch(url, { method: 'POST', body: form })
             .then(r => r.json())
             .then(res => {
                 if (res.success) {
@@ -326,15 +333,19 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
                     if (btn) btn.disabled = false;
                 }
             })
-            .catch(() => { if (btn) btn.disabled = false; });
+            .catch(() => { if (btn) btn.disabled = false; }));
     }
 
     window.pickupAccept = function (id, btn) {
         post('{% url "fleet:accept_pickup" %}', { pickup_id: id }, btn, () => location.href = '?tab=mine');
     };
     window.pickupStatus = function (id, status, btn) {
+        // After collecting, stay on Mine while the driver still has packages to
+        // collect — only jump to In progress once this tab is empty.
         post('{% url "fleet:update_pickup_status" %}', { pickup_id: id, status: status }, btn,
-            status === 'collected' ? () => location.href = '?tab=in_progress' : null);
+            status === 'collected'
+                ? (res) => { location.href = res.remaining > 0 ? '?tab=mine' : '?tab=in_progress'; }
+                : null);
     };
     window.pickupRoute = function (id, btn, disposition) {
         post('{% url "fleet:route_pickup" %}', { pickup_id: id, disposition: disposition || '' }, btn);
@@ -376,6 +387,7 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
     let scanStream = null;
     let scanning = false;
     let scanCollected = 0;
+    let scanRemaining = 0;
 
     function el(id) { return document.getElementById(id); }
 
@@ -515,11 +527,15 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
         const form = new FormData();
         form.append('code', code);
         form.append('csrfmiddlewaretoken', csrf());
+        // Scanning a barcode collects the package — same status change as the
+        // Collected button, so it is witnessed the same way.
+        if (window.EzzyGPS && EzzyGPS.stamp) EzzyGPS.stamp();
         fetch('{% url "fleet:pickup_scan_collect" %}', { method: 'POST', body: form })
             .then(r => r.json())
             .then(res => {
                 if (res.success) {
                     scanCollected += 1;
+                    scanRemaining = res.remaining || 0;
                     if (typeof haptic === 'function') haptic([10, 50, 10]);
                     el('fps_scan_order').textContent = res.order_number || '—';
                     el('fps_scan_business').textContent = res.business || '—';
@@ -560,7 +576,10 @@ Notes: Separate from delivery tasks; cards act per preset disposition, transfer 
     window.pickupCloseScanner = function () {
         stopScanCamera();
         el('fps_scan_modal').style.display = 'none';
-        if (scanCollected > 0) { location.href = '?tab=in_progress'; }
+        // Same rule as the Collected button: only leave Mine once it is empty
+        if (scanCollected > 0) {
+            location.href = scanRemaining > 0 ? '?tab=mine' : '?tab=in_progress';
+        }
     };
 })();
 </script>

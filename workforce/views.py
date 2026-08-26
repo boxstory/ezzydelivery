@@ -8403,6 +8403,42 @@ def _pickup_event_gps(pickup, when):
     }
 
 
+#: Trailing "25.365290, 51.546683" on a status label. The pin receiver and the
+#: QNAS verifier both append the coordinate to the display value, which put a
+#: 20-character number on the timeline where a pin belongs.
+_COORD_IN_LABEL_RE = re.compile(r'\s*[·,]?\s*(-?\d{1,3}\.\d{4,})\s*,\s*(-?\d{1,3}\.\d{4,})\s*$')
+
+
+def _split_coords(display):
+    """Split a status label into (label without the coordinate, (lat, lng) or None).
+
+    The number is what the map is for — the words are what the timeline row is
+    for, so they are separated rather than printed side by side.
+    """
+    if not display:
+        return display or None, None
+    match = _COORD_IN_LABEL_RE.search(display)
+    if not match:
+        return display, None
+    label = _COORD_IN_LABEL_RE.sub('', display).strip(' ·,') or None
+    return label, (match.group(1), match.group(2))
+
+
+def _map_pin(lat, lng, label, ref=None, ref_label=None, colour=None):
+    """One timeline map pin, optionally paired with a second point to compare.
+
+    Returns None when there is no coordinate, so callers can pass a possibly
+    empty pair straight through. ``ref`` is a (lat, lng) pair.
+    """
+    if lat is None or lng is None or lat == '' or lng == '':
+        return None
+    pin = {'lat': lat, 'lng': lng, 'label': label, 'colour': colour}
+    if ref and ref[0] is not None and ref[1] is not None:
+        pin['ref_lat'], pin['ref_lng'] = ref[0], ref[1]
+        pin['ref_label'] = ref_label
+    return pin
+
+
 def _build_task_timeline(task, status_history, verification_logs, status_points, cod):
     """
     Merge every recorded fact about a delivery task into one chronological list.
@@ -19194,6 +19230,65 @@ def wf_pickup_location_delete(request, business_id, location_id):
 # DRIVER MANAGEMENT VIEWS
 # =============================================================================
 
+# The driver roster reads the CRM driver board as a second status axis: which
+# pipeline column each applicant sits in. Columns are staff-managed rows
+# (crm.LeadStage), so everything here resolves them at runtime — never a hardcoded
+# list. `none` is the synthetic column for an applicant the board has not filed yet.
+CRM_STAGE_NONE = 'none'
+
+
+def _crm_driver_stages():
+    """Live driver-board columns, left→right. Empty list if the board is unseeded."""
+    from crm.services import board_stages
+    from crm.models import Lead as CRMLead
+
+    return list(board_stages(CRMLead.CATEGORY_DRIVER))
+
+
+def _crm_driver_stage_keys():
+    return {s.key for s in _crm_driver_stages()}
+
+
+def _crm_driver_stage_choices():
+    """(key, label) pairs for the CRM Stage filter, with "No CRM card" last."""
+    return [(s.key, s.label) for s in _crm_driver_stages()] + [(CRM_STAGE_NONE, 'No CRM card')]
+
+
+def _crm_driver_stage_tallies(drivers=None):
+    """Per-column driver counts for the pipeline strip.
+
+    Counts DRIVERS, not cards, so it reconciles with the roster's own totals: a
+    driver holding two cards is one row here. `drivers` narrows the tally to a
+    queryset (unused today — the strip counts the whole pool so the segments stay
+    stable while you click through them).
+    """
+    from django.db.models import Count
+    from crm.models import Lead as CRMLead
+
+    cards = CRMLead.objects.filter(
+        category=CRMLead.CATEGORY_DRIVER, merged_into__isnull=True, driver__isnull=False,
+    )
+    if drivers is not None:
+        cards = cards.filter(driver__in=drivers)
+    per_stage = {
+        row['stage']: row['n']
+        for row in cards.values('stage').annotate(n=Count('driver', distinct=True))
+    }
+
+    total_drivers = fleet_models.Driver.objects.count()
+    carded = cards.values('driver').distinct().count()
+
+    tallies = [
+        {'key': s.key, 'label': s.label, 'swatch': s.dot_swatch, 'count': per_stage.get(s.key, 0)}
+        for s in _crm_driver_stages()
+    ]
+    tallies.append({
+        'key': CRM_STAGE_NONE, 'label': 'No CRM card', 'swatch': 'grey',
+        'count': max(total_drivers - carded, 0),
+    })
+    return tallies
+
+
 def _apply_driver_filters(request, drivers, params=None, default_approved=True):
     """Narrow a Driver queryset by the shared driver filter bar.
 
@@ -29965,9 +30060,34 @@ def pickup_pool_status(request):
     from django.db.models import Count
     from core.decorators import is_superadmin
 
-    status_filter = request.GET.get('status', 'all')
+    # Default hides handed-off pickups: the hand-off is the end of the first-mile
+    # leg, so those rows are finished work that only buries the live pool.
+    status_filter = request.GET.get('status', 'open')
     mode_filter = request.GET.get('mode', 'all')
     search = request.GET.get('search', '').strip()
+
+    # …and only the last 7 days, so the page opens on current work. 'all' lifts it.
+    # An explicit From/To pair wins over the quick preset when either is given.
+    days_filter = request.GET.get('days', '7')
+    if days_filter not in ('7', '30', '90', 'all'):
+        days_filter = '7'
+    date_from = (request.GET.get('date_from') or '').strip()
+    date_to = (request.GET.get('date_to') or '').strip()
+    since = until = None
+    if date_from or date_to:
+        days_filter = 'custom'
+        since = _parse_filter_date(date_from)
+        until = _parse_filter_date(date_to, end_of_day=True)
+        if since and until and since > until:
+            since, until = until, since
+        # Echo back what was actually applied, so the boxes never show junk
+        date_from = since.strftime('%Y-%m-%d') if since else ''
+        date_to = until.strftime('%Y-%m-%d') if until else ''
+        if not (since or until):
+            days_filter = '7'
+            since = timezone.now() - timedelta(days=7)
+    elif days_filter != 'all':
+        since = timezone.now() - timedelta(days=int(days_filter))
 
     qs = PickupTask.objects.select_related(
         'order', 'business', 'pickup_location', 'driver',
@@ -29980,8 +30100,14 @@ def pickup_pool_status(request):
 
     if status_filter == 'active':
         qs = qs.filter(status__in=active_statuses)
+    elif status_filter == 'open':
+        qs = qs.exclude(status='handed_off')
     elif status_filter != 'all':
         qs = qs.filter(status=status_filter)
+    if since:
+        qs = qs.filter(created_at__gte=since)
+    if until:
+        qs = qs.filter(created_at__lte=until)
     if mode_filter != 'all':
         qs = qs.filter(pickup_mode=mode_filter)
     if search:
@@ -30011,11 +30137,66 @@ def pickup_pool_status(request):
     for pickup in rows:
         pickup.task_id = task_by_order.get(pickup.order_id)
 
+    # Every open row offers the client's other addresses as a dropdown, so one
+    # query for the whole page rather than one per row. Fulfilment centres are
+    # left out: the goods are already at our warehouse, so moving a collection
+    # there is never the answer.
+    locations_by_business = {}
+    for loc in business_models.PickupLocation.objects.filter(
+        business_id__in={p.business_id for p in rows},
+        pickup_status='active', is_fulfilment_center=False,
+    ).order_by('-is_default', 'pickup_location_title'):
+        locations_by_business.setdefault(loc.business_id, []).append(loc)
+    # Movable up to the moment the driver has the goods — 'collected' onwards
+    # the address is history. Mirrors UNMOVEABLE_PICKUP_STATUSES in the service.
+    movable = ('pending', 'accepted', 'in_progress', 'arrived')
+    for pickup in rows:
+        options = locations_by_business.get(pickup.business_id, [])
+        pickup.can_relocate = pickup.status in movable and bool(options)
+        pickup.location_options = [{
+            'id': loc.id,
+            'label': (f'{loc.pickup_location_title} · Z{loc.pickup_zone_no}'
+                      if loc.pickup_zone_no else loc.pickup_location_title),
+            'selected': loc.id == pickup.pickup_location_id,
+            'disabled': False,
+        } for loc in options]
+        # A leg parked on a fulfilment centre or a retired address is exactly the
+        # one staff need to move, but that location is not in the offered list —
+        # so show it as a dead selected option rather than letting the dropdown
+        # claim the pickup is somewhere it is not.
+        if pickup.pickup_location and not any(o['selected'] for o in pickup.location_options):
+            pickup.location_options.insert(0, {
+                'id': pickup.pickup_location_id,
+                'label': f'{pickup.pickup_location.pickup_location_title} (current)',
+                'selected': True,
+                'disabled': True,
+            })
+        elif not pickup.pickup_location:
+            pickup.location_options.insert(0, {
+                'id': '', 'label': '— no location —', 'selected': True, 'disabled': True,
+            })
+
+    # A date window must never bury live work — an unclaimed pickup from three
+    # weeks ago is exactly the one staff need. Count what the window hid and say so.
+    hidden_active = 0
+    if since or until:
+        outside = Q()
+        if since:
+            outside |= Q(created_at__lt=since)
+        if until:
+            outside |= Q(created_at__gt=until)
+        hidden_active = PickupTask.objects.filter(
+            outside, status__in=active_statuses).count()
+
     context = {
         'page_obj': page_obj,
         'pickups': rows,
         'status_filter': status_filter,
         'mode_filter': mode_filter,
+        'days_filter': days_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+        'hidden_active': hidden_active,
         'search': search,
         'per_page': per_page,
         'status_counts': status_counts,
@@ -30026,6 +30207,35 @@ def pickup_pool_status(request):
         'can_delete_pickups': is_superadmin(request.user),
     }
     return render(request, 'workforce/pickup_pool_status.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pickup_timeline_card(request, pickup_id):
+    """Render the shared first-mile pickup strip for one pickup task.
+
+    The pool list only carries a status word per row; the stage rail with its
+    timestamps lived on the task detail page, so staff had to open a second tab
+    to see how far a leg had got. Same partial, fetched on demand rather than
+    rendered into every row — the cancel lookup and the GPS count are a query
+    each, which would be an N+1 across a 100-row page.
+    """
+    from delivery.models import PickupTask
+
+    pickup = get_object_or_404(
+        PickupTask.objects.select_related(
+            'order', 'business', 'driver', 'transfer_to_driver',
+            'drop_warehouse__warehouse',
+        ),
+        id=pickup_id,
+    )
+    from django.template.loader import render_to_string
+    html = render_to_string(
+        'workforce/parts/_pickup_leg_card.html',
+        {'pickup': pickup, 'pickup_gps': _pickup_gps_coverage(pickup)},
+        request=request,
+    )
+    return HttpResponse(html)
 
 
 def _pickup_ids_from_request(request):
@@ -30374,6 +30584,152 @@ def pickup_staff_delete(request):
         else:
             done.append(pid)
     return _pickup_bulk_response(done, failed)
+
+
+# Why the pickup gate refused, in words a coordinator can act on.
+PICKUP_REFUSAL_REASONS = {
+    'no_business': 'That order has no business attached.',
+    'pickup_disabled': 'First-mile pickup is switched off for this client — '
+                       'turn it on at Pickups → Pickup Automation first.',
+    'business_not_active': 'This client account is not active.',
+    'hub_delivery_order': 'Hub-delivery order — collection runs through a hub pickup batch, '
+                          'not the pickup pool.',
+    'no_pickup_location': 'The order has no pickup location.',
+    'fulfilment_center': 'That location is a fulfilment centre — the goods are already at our '
+                         'warehouse, so there is nothing to collect. Pick the client\'s own '
+                         'shop location instead.',
+    'pickup_location_inactive': 'That pickup location is not active.',
+    'already_exists': 'This order already has a pickup.',
+    'error': 'Pickup creation failed — check the delivery log.',
+}
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def pickup_staff_create(request):
+    """Staff opens a first-mile leg for an order that never got one.
+
+    Imports save the order without a pickup location, so the create-time gate
+    bails and — for anything created before that retry existed — no leg is ever
+    opened. This is the repair hatch.
+
+    Two phases over one endpoint:
+      POST order_number            -> {needs_location: true, locations: [...]}
+      POST order_number + pickup_location_id -> sets it on the order, creates the leg
+
+    Refusals are reported with the service's own reason so staff fix the config
+    instead of guessing; there is deliberately no override flag.
+    """
+    from delivery.models import PickupTask
+    from delivery.services.pickup import create_pickup_task_if_needed
+
+    order_number = (request.POST.get('order_number') or '').strip()
+    if not order_number:
+        return JsonResponse({'success': False, 'error': 'Enter an order number'})
+
+    order = orders_models.Order.objects.select_related(
+        'business', 'pickup_location').filter(order_number__iexact=order_number).first()
+    if not order:
+        return JsonResponse({'success': False, 'error': f'No order found for {order_number}'})
+    if not order.business:
+        return JsonResponse({'success': False, 'error': PICKUP_REFUSAL_REASONS['no_business']})
+    if PickupTask.objects.filter(order=order).exists():
+        return JsonResponse({'success': False,
+                             'error': PICKUP_REFUSAL_REASONS['already_exists']})
+    if order.order_status in ('delivered', 'cancelled'):
+        return JsonResponse({
+            'success': False,
+            'error': f'Order {order.order_number} is already '
+                     f'{order.get_order_status_display().lower()}.'})
+
+    # Only the client's own collectable addresses — a fulfilment centre holds the
+    # goods already, so offering it would only produce a refusal on submit.
+    locations = list(business_models.PickupLocation.objects.filter(
+        business=order.business, pickup_status='active', is_fulfilment_center=False
+    ).order_by('-is_default', 'pickup_location_title'))
+
+    location_id = (request.POST.get('pickup_location_id') or '').strip()
+    if not location_id:
+        if not locations:
+            return JsonResponse({
+                'success': False,
+                'error': f'{order.business.business_name} has no active shop pickup location. '
+                         f'Add one on the client page first.'})
+        return JsonResponse({
+            'success': True,
+            'needs_location': True,
+            'order_number': order.order_number,
+            'business': order.business.business_name,
+            'current_location': (order.pickup_location.pickup_location_title
+                                 if order.pickup_location else ''),
+            'locations': [{
+                'id': loc.id,
+                'title': loc.pickup_location_title,
+                'locality': loc.locality or '',
+                'is_default': loc.is_default,
+            } for loc in locations],
+        })
+
+    chosen = next((loc for loc in locations if str(loc.id) == location_id), None)
+    if not chosen:
+        return JsonResponse({'success': False,
+                             'error': 'That pickup location does not belong to this client'})
+
+    if order.pickup_location_id != chosen.id:
+        order.pickup_location = chosen
+        order.save(update_fields=['pickup_location'])
+
+    pickup, reason = create_pickup_task_if_needed(order, source='staff_manual')
+    if not pickup and reason == 'already_exists':
+        # Attaching the location above may have fired the post-save retry hook,
+        # which already opened the leg. That is the result we wanted, not a failure.
+        pickup = PickupTask.objects.filter(order=order).first()
+    if not pickup:
+        return JsonResponse({
+            'success': False,
+            'error': PICKUP_REFUSAL_REASONS.get(reason, f'Pickup not created ({reason})')})
+
+    logger.info("Staff %s created pickup %s for order %s",
+                request.user.id, pickup.pk, order.order_number)
+    return JsonResponse({
+        'success': True,
+        'message': f'Pickup created for {order.order_number} '
+                   f'from {chosen.pickup_location_title}',
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def pickup_staff_relocate(request):
+    """Staff moves an open pickup to another of that client's addresses.
+
+    The pool row shows the client's locations as a dropdown; this writes the
+    choice onto both the pickup and its order so the label, the waybill and the
+    driver's screen all name the same place. POST: pickup_id, pickup_location_id.
+    """
+    from delivery.models import PickupTask
+    from delivery.services.pickup import relocate_pickup
+
+    pickup = PickupTask.objects.select_related(
+        'order', 'business', 'driver', 'pickup_location').filter(
+            pk=request.POST.get('pickup_id')).first()
+    if not pickup:
+        return JsonResponse({'success': False, 'error': 'Pickup not found'})
+
+    location = business_models.PickupLocation.objects.filter(
+        pk=request.POST.get('pickup_location_id'), business=pickup.business).first()
+    if not location:
+        return JsonResponse({'success': False,
+                             'error': 'That pickup location does not belong to this client'})
+
+    ok, message = relocate_pickup(pickup, location, actor=request.user)
+    if not ok:
+        return JsonResponse({'success': False, 'error': message})
+    logger.info("Staff %s relocated pickup %s to location %s",
+                request.user.id, pickup.pk, location.pk)
+    return JsonResponse({'success': True, 'message': message})
 
 
 # ==========================================================================

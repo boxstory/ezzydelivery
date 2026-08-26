@@ -5,88 +5,24 @@ Business Signals
 Handles automatic actions when business data changes.
 """
 import logging
-from django.db import models
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import pre_save
 from django.dispatch import receiver
-from django.utils import timezone
 from business.models import Business, PickupLocation
-from warehouse.models import Warehouse
 
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender=Business, dispatch_uid='business.create_fulfillment_store_on_service_enable')
-def create_fulfillment_store_on_service_enable(sender, instance, created, **kwargs):
-    """
-    Automatically create a "Fulfillment Store" pickup location when
-    fulfillment service is enabled for a business.
-
-    This signal triggers when:
-    - A business is created with fulfillment_service_enabled=True
-    - An existing business enables fulfillment service
-
-    Args:
-        sender: The Business model class
-        instance: The Business instance being saved
-        created: Boolean indicating if this is a new instance
-        **kwargs: Additional keyword arguments
-    """
-    # Check if fulfillment service is enabled
-    if not instance.fulfillment_service_enabled:
-        return
-
-    # Check if fulfillment store already exists (by title OR by is_fulfilment_center flag)
-    fulfillment_store_exists = PickupLocation.objects.filter(
-        business=instance,
-    ).filter(
-        models.Q(pickup_location_title__icontains="fulfillment") |
-        models.Q(pickup_location_title__icontains="fulfilment") |
-        models.Q(is_fulfilment_center=True)
-    ).exists()
-
-    if fulfillment_store_exists:
-        logger.debug(f"Fulfillment store already exists for business {instance.business_id}")
-        return
-
-    # Create the fulfillment pickup location carrying the real warehouse identity.
-    # Warehouse resolution: the business's own active warehouse link, else the
-    # default warehouse, else the first one. Generic title only if none exists.
-    try:
-        from warehouse.models import SellerWarehouseLink
-        link = SellerWarehouseLink.objects.filter(
-            business=instance, is_active=True).order_by('-is_default', 'priority').first()
-        warehouse = link.warehouse if link else Warehouse.objects.order_by('-is_default', 'name').first()
-
-        if warehouse:
-            title = f"WH: {warehouse.name}"
-            locality = warehouse.address or warehouse.city or 'EzzyDelivery Fulfillment Center'
-            lat, lon = warehouse.latitude, warehouse.longitude
-        else:
-            title, locality, lat, lon = (
-                "Fulfillment Store", "EzzyDelivery Fulfillment Center", None, None)
-
-        PickupLocation.objects.create(
-            business=instance,
-            pickup_location_title=title,
-            locality=locality,
-            pickup_lat=lat,
-            pickup_lon=lon,
-            pickup_status='active',
-            is_fulfilment_center=True,
-            warehouse=warehouse,
-        )
-        logger.info(
-            f"Created fulfilment pickup location '{title}' for business {instance.business_id}")
-
-        # Update the fulfillment_activated_at timestamp if not already set
-        if not instance.fulfillment_activated_at:
-            Business.objects.filter(pk=instance.pk).update(
-                fulfillment_activated_at=timezone.now()
-            )
-            logger.info(f"Set fulfillment_activated_at for business {instance.business_id}")
-
-    except Exception as e:
-        logger.error(f"Failed to create Fulfillment Store for business {instance.business_id}: {e}")
+# NOTE: the old `create_fulfillment_store_on_service_enable` post_save receiver used to
+# live here. Because `Business.fulfillment_service_enabled` defaults to True, it fired on
+# every business's first save and stamped in an `is_fulfilment_center=True` PickupLocation
+# pointing at the default warehouse — for clients who had no SellerWarehouseLink and were
+# never onboarded to fulfilment. A stale FC flag makes first-mile pickup silently refuse
+# (delivery/services/pickup.py -> 'fulfilment_center'), so those clients got no pickup jobs.
+#
+# Fulfilment pickup locations are now created in exactly one place: staff link the business
+# to a warehouse in the warehouse dashboard, and `warehouse.signals
+# .seller_warehouse_link_post_save` creates/updates the "WH: <name>" row (and the matching
+# post_delete deactivates it on unlink). Do not reintroduce a Business-level auto-create.
 
 
 @receiver(pre_save, sender=PickupLocation, dispatch_uid='business.autofill_pickup_coords_from_qnas')
@@ -148,7 +84,9 @@ def track_fulfillment_service_change(sender, instance, **kwargs):
             # Check if fulfillment service is being enabled
             if not old_instance.fulfillment_service_enabled and instance.fulfillment_service_enabled:
                 logger.info(f"Fulfillment service being enabled for business {instance.business_id}")
-                # The post_save signal will handle creating the pickup location
+                # Audit trail only — this no longer creates a pickup location. The
+                # fulfilment pickup row is created when staff link the business to a
+                # warehouse (warehouse.signals.seller_warehouse_link_post_save).
 
         except Business.DoesNotExist:
             pass

@@ -2,7 +2,8 @@
 Purpose: First-mile pickup strip — stage rail, driver, mode and disposition for an order's PickupTask.
 Used by: workforce/order_detail.html, workforce/parts/delivery_task_detail.html (pass pickup=<PickupTask or None>).
 Notes: Renders nothing when pickup is empty; cancelled shows a flat row instead of the rail.
-       Optional pickup_gps_pings (int or None) adds a location-coverage badge.
+       Optional pickup_gps ({count, padded, span} from _pickup_gps_coverage, or None)
+       adds a location-coverage badge; padded means the leg was too short to expect a ping.
 {% endcomment %}
 {% load workforce_tags %}
 {% if pickup %}
@@ -66,10 +67,20 @@ Notes: Renders nothing when pickup is empty; cancelled shows a flat row instead 
         {% if pickup.collected_at and pickup.accepted_at %}
         <span class="pkl__ev"><i class="fa-regular fa-hourglass-half"></i> {{ pickup.accepted_at|timesince:pickup.collected_at }} accept &rarr; collect</span>
         {% endif %}
-        {% if pickup_gps_pings is not None %}
-        <span class="pkl__ev {% if pickup_gps_pings == 0 %}pkl__ev--none{% endif %}">
+        {% comment %}A leg closed seconds after it was accepted is narrower than the
+        ~30s ping interval, so it can never contain a fix — those are counted over a
+        padded window and say "around", never "no GPS", which would blame the driver
+        for a window too short to measure.{% endcomment %}
+        {% if pickup_gps %}
+        <span class="pkl__ev {% if not pickup_gps.count %}pkl__ev--none{% endif %}"
+              {% if pickup_gps.padded %}title="The leg was open for {{ pickup_gps.span }}s — shorter than the gap between GPS pings — so this counts fixes within a minute either side."{% endif %}>
             <i class="fa-solid fa-location-crosshairs"></i>
-            {% if pickup_gps_pings %}{{ pickup_gps_pings }} GPS ping{{ pickup_gps_pings|pluralize }} during leg{% else %}No GPS recorded during this leg{% endif %}
+            {% if pickup_gps.count %}
+            {{ pickup_gps.count }} GPS fix{{ pickup_gps.count|pluralize:"es" }}
+            {% if pickup_gps.padded %}around the leg &middot; closed in {{ pickup_gps.span }}s{% else %}during leg{% endif %}
+            {% else %}
+            No GPS recorded {% if pickup_gps.padded %}around this leg{% else %}during this leg{% endif %}
+            {% endif %}
         </span>
         {% endif %}
     </div>

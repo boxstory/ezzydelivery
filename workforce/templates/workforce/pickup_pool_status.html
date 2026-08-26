@@ -3,11 +3,29 @@
 {% comment %}
 Purpose: Staff pickup pool — every first-mile pickup task, filters, assign/reassign, return-to-pool, cancel, delete, bulk actions
 Used by: workforce_views.pickup_pool_status at /workforce/pickups/
-Notes: Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (accepted→pending) only before
+Notes: The status filter defaults to "open", which hides handed_off rows (finished first-mile legs);
+       "All statuses" brings them back. The date window defaults to the last 7 days (?days=7); a From/To pair
+       (?date_from/?date_to) overrides the preset and shows as "Custom range"; the two boxes are hidden
+       under every other preset and revealed by picking it. When the window hides a pickup
+       that is still active, ppl__windownote says how many and links to all-time — the window must never bury live work.
+       "Create pickup" (hero, right) is the repair hatch for an order that never got a first-mile
+       leg — imports save the order with no pickup location, so the create-time gate bails. It looks
+       the order up, offers the client's active non-fulfilment-centre locations, writes the chosen one
+       onto the order and runs the same create_pickup_task_if_needed service. Refusals are shown in
+       the service's own words (fulfilment centre / pickup disabled / inactive) — there is no override.
+       The client cell carries a pickup-location dropdown on any leg still in
+       pending/accepted/in_progress/arrived — changing it posts pickup_staff_relocate, which moves
+       the pickup AND its order to that address and notifies an assigned driver. From 'collected'
+       onwards the driver holds the goods, so the cell falls back to plain text. Only the client's
+       active non-fulfilment-centre locations are offered.
+       Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (accepted→pending) only before
        collection. Cancel closes the first-mile leg only (order + delivery task untouched) and is refused on
        already-closed legs. Delete removes the row and is superadmin-only (can_delete_pickups) and refused
        once collected. Row checkboxes (shift-click ranges) drive the bulk bar, which posts pickup_ids[] to the
        same assign/unassign/cancel/delete endpoints. Driver picker reuses fleet search.
+       The Timeline button expands a third row per pickup and pulls workforce:pickup_timeline_card —
+       the same _pickup_leg_card.html strip the task detail page renders — once per row, on demand
+       (the cancel lookup and the GPS count are a query each, so it is never rendered inline).
        Hero filters carry data-no-select2 and are enhanced locally instead: the global
        staff-dashboard enhancer forces width:100% + light chrome, which stacked the fields and
        collapsed the navy hero. The local init uses width:'auto' and the ppl__pick skin.
@@ -22,24 +40,40 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (a
 <div class="col-12">
 
     <div class="ppl__hero">
-        <div>
-            <span class="ppl__hero-eyebrow">First-mile &middot; Live pool</span>
-            <h1 class="ppl__hero-title">Pickup Pool</h1>
-        </div>
-        <div class="d-flex align-items-end flex-wrap gap-3">
-            <div class="ppl__tallies">
-                <div class="ppl__tally ppl__tally--alert">
-                    <span class="ppl__tally-num">{{ pending_count }}</span>
-                    <span class="ppl__tally-lbl">Unclaimed</span>
+        <div class="ppl__hero-top">
+            <div class="ppl__hero-id">
+                <span class="ppl__hero-eyebrow">First-mile &middot; Live pool</span>
+                <h1 class="ppl__hero-title">Pickup Pool</h1>
+            </div>
+            <div class="ppl__hero-aside">
+                <div class="ppl__tallies">
+                    <div class="ppl__tally ppl__tally--alert">
+                        <span class="ppl__tally-num">{{ pending_count }}</span>
+                        <span class="ppl__tally-lbl">Unclaimed</span>
+                    </div>
+                    <div class="ppl__tally">
+                        <span class="ppl__tally-num">{{ active_count }}</span>
+                        <span class="ppl__tally-lbl">Active</span>
+                    </div>
                 </div>
-                <div class="ppl__tally">
-                    <span class="ppl__tally-num">{{ active_count }}</span>
-                    <span class="ppl__tally-lbl">Active</span>
+                <div class="ppl__hero-acts">
+                    <button type="button" class="btn btn-sm ppl__fbtn ppl__fbtn--ghost" id="pp_mk_open">
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i> Create pickup
+                    </button>
+                    <button type="button" class="wfnote__btn" data-wfnote-toggle
+                            aria-expanded="false" aria-controls="workforce_pickup_pool_status_card_notes"
+                            title="About this page">
+                        <i class="fa-solid fa-question" aria-hidden="true"></i>
+                        <span class="visually-hidden">Show notes</span>
+                    </button>
                 </div>
             </div>
-            <form method="GET" class="d-flex flex-wrap gap-2">
+        </div>
+        <div class="ppl__hero-rail">
+            <form method="GET" class="ppl__filters">
                 <select name="status" class="form-select form-select-sm w-auto ppl__ffield" data-no-select2
                         onchange="this.form.submit()">
+                    <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open (hide handed off)</option>
                     <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All statuses</option>
                     <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active only</option>
                     {% for value, label in status_choices %}
@@ -52,21 +86,71 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (a
                     <option value="assigned" {% if mode_filter == 'assigned' %}selected{% endif %}>Assigned fleet</option>
                     <option value="public_pool" {% if mode_filter == 'public_pool' %}selected{% endif %}>Public pool</option>
                 </select>
+                <div class="ppl__fdates" id="workforce_pickup_pool_group_dates">
+                    <select name="days" class="form-select form-select-sm w-auto ppl__ffield" data-no-select2
+                            id="pp_filter_days" onchange="ppPresetRange(this)">
+                        <option value="7" {% if days_filter == '7' %}selected{% endif %}>Last 7 days</option>
+                        <option value="30" {% if days_filter == '30' %}selected{% endif %}>Last 30 days</option>
+                        <option value="90" {% if days_filter == '90' %}selected{% endif %}>Last 90 days</option>
+                        <option value="all" {% if days_filter == 'all' %}selected{% endif %}>All time</option>
+                        <option value="custom" {% if days_filter == 'custom' %}selected{% endif %}>Custom range…</option>
+                    </select>
+                    {% comment %}
+                    From/To belong to the "Custom range…" preset and are hidden under
+                    every other one — four extra controls that cannot change the
+                    result are just noise in the rail. They stay direct children of
+                    .ppl__fdates so the mobile `>` rules still reach them, and they
+                    submit empty when hidden, so the server's "custom wins" branch
+                    never fires off a stale value.
+                    {% endcomment %}
+                    <label class="ppl__fdate-lbl" for="pp_filter_from" data-pp-range
+                           {% if days_filter != 'custom' %}hidden{% endif %}>From</label>
+                    <input type="date" name="date_from" id="pp_filter_from" value="{{ date_from }}"
+                           class="form-control form-control-sm w-auto ppl__ffield ppl__fdate" data-pp-range
+                           {% if days_filter != 'custom' %}hidden{% endif %}>
+                    <label class="ppl__fdate-lbl" for="pp_filter_to" data-pp-range
+                           {% if days_filter != 'custom' %}hidden{% endif %}>To</label>
+                    <input type="date" name="date_to" id="pp_filter_to" value="{{ date_to }}"
+                           class="form-control form-control-sm w-auto ppl__ffield ppl__fdate" data-pp-range
+                           {% if days_filter != 'custom' %}hidden{% endif %}>
+                </div>
                 <input type="search" name="search" value="{{ search }}" class="form-control form-control-sm w-auto ppl__ffield"
                        placeholder="Order / business / driver…">
-                <button class="btn btn-sm ppl__fbtn" type="submit">Filter</button>
+                <button class="btn btn-sm ppl__fbtn ppl__fbtn--go" type="submit">
+                    <i class="fa-solid fa-filter" aria-hidden="true"></i> Filter
+                </button>
             </form>
-            <button type="button" class="wfnote__btn" data-wfnote-toggle
-                    aria-expanded="false" aria-controls="workforce_pickup_pool_status_card_notes"
-                    title="About this page">
-                <i class="fa-solid fa-question" aria-hidden="true"></i>
-                <span class="visually-hidden">Show notes</span>
-            </button>
         </div>
+    </div>
+
+    <div class="ppl__mkcard" id="workforce_pickup_pool_panel_create" hidden>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <label class="ppl__mklbl" for="pp_mk_order">Order number</label>
+            <input type="search" class="form-control form-control-sm w-auto ppl__ffield" id="pp_mk_order"
+                   placeholder="e.g. GLM562-J1005-AB587" autocomplete="off">
+            <button type="button" class="btn btn-sm ppl__btn ppl__btn--primary" id="pp_mk_find">Find order</button>
+            <button type="button" class="btn btn-sm ppl__btn ppl__btn--quiet" id="pp_mk_close">Close</button>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-2" id="pp_mk_step2" hidden>
+            <span class="ppl__mkmeta" id="pp_mk_meta"></span>
+            <label class="ppl__mklbl" for="pp_mk_loc">Collect from</label>
+            <select class="form-select form-select-sm ppl__ffield ppl__mkloc" id="pp_mk_loc" data-no-select2></select>
+            <button type="button" class="btn btn-sm ppl__btn ppl__btn--primary" id="pp_mk_go">Create pickup</button>
+        </div>
+        <p class="ppl__mkerr mt-2 mb-0" id="pp_mk_err" hidden></p>
     </div>
 
     <div class="wfnote" id="workforce_pickup_pool_status_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_pickup_pool_status_card_notes' %}" hidden></div>
+
+    {% if hidden_active %}
+    <div class="ppl__windownote" id="workforce_pickup_pool_note_hidden">
+        <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+        <span><strong>{{ hidden_active }}</strong> still-active pickup{{ hidden_active|pluralize }}
+            outside this date range {{ hidden_active|pluralize:"is,are" }} not shown.</span>
+        <a href="?status={{ status_filter }}&amp;mode={{ mode_filter }}&amp;days=all&amp;search={{ search|urlencode }}">Show all time</a>
+    </div>
+    {% endif %}
 
     <div class="ppl__bulk" id="workforce_pickup_pool_bar_bulk" hidden>
         <span class="ppl__bulk-count"><strong class="pp-bulk-n">0</strong> selected</span>
@@ -126,7 +210,20 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (a
                     </td>
                     <td class="ppl__td">
                         <span class="ppl__biz">{{ p.business.business_name|default:p.business.business_code }}</span>
-                        {% if p.pickup_location %}
+                        {% if p.can_relocate %}
+                        {% comment %}
+                        Staff pick a different seller address; saves on change, both
+                        the pickup and its order move together.
+                        {% endcomment %}
+                        <select class="form-select form-select-sm ppl__locpick pp-relocate"
+                                data-no-select2 aria-label="Pickup location for {{ p.order.order_number }}"
+                                data-order="{{ p.order.order_number }}"
+                                data-current="{{ p.pickup_location_id|default:'' }}">
+                            {% for loc in p.location_options %}
+                            <option value="{{ loc.id }}"{% if loc.selected %} selected{% endif %}{% if loc.disabled %} disabled{% endif %}>{{ loc.label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% elif p.pickup_location %}
                         <span class="ppl__sub">{{ p.pickup_location.pickup_location_title }}
                             {% if p.pickup_location.pickup_zone_no %}· Z{{ p.pickup_location.pickup_zone_no }}{% endif %}</span>
                         {% endif %}
@@ -153,6 +250,12 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (a
                     </td>
                     <td class="ppl__td"><span class="ppl__age">{{ p.created_at|timesince }}</span></td>
                     <td class="ppl__td text-end">
+                        {# Same stage rail the task detail page shows — loaded on demand. #}
+                        <button type="button" class="btn btn-sm ppl__btn ppl__btn--quiet pp-timeline"
+                                aria-expanded="false"
+                                title="Show the first-mile pickup timeline for {{ p.order.order_number }}">
+                            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Timeline
+                        </button>
                         {% if p.status == 'pending' %}
                         <button type="button" class="btn btn-sm ppl__btn ppl__btn--primary pp-assign-open">Assign</button>
                         {% elif p.status == 'accepted' or p.status == 'in_progress' or p.status == 'arrived' %}
@@ -184,6 +287,12 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (a
                         </div>
                     </td>
                 </tr>
+                <tr class="pp-timeline-row" hidden>
+                    <td colspan="9" class="ppl__td p-0">
+                        <div class="ppl__panel ppl__panel--timeline"
+                             data-timeline-url="{% url 'workforce:pickup_timeline_card' p.id %}"></div>
+                    </td>
+                </tr>
                 {% empty %}
                 <tr><td colspan="9" class="ppl__td text-center text-muted py-4">No pickup tasks match this filter.</td></tr>
                 {% endfor %}
@@ -191,7 +300,7 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (a
         </table>
     </div>
 
-    {% include "includes/components/_pagination.html" with page_obj=page_obj per_page=per_page filter_params="status="|add:status_filter|add:"&mode="|add:mode_filter|add:"&search="|add:search pagination_id="pickups" %}
+    {% include "includes/components/_pagination.html" with page_obj=page_obj per_page=per_page filter_params="status="|add:status_filter|add:"&mode="|add:mode_filter|add:"&days="|add:days_filter|add:"&date_from="|add:date_from|add:"&date_to="|add:date_to|add:"&search="|add:search pagination_id="pickups" %}
 </div>
 
 <script>
@@ -226,11 +335,71 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (a
         });
     });
 
+    // Quick range presets and the From/To boxes are one control: picking a preset
+    // clears any custom dates (otherwise the server's "custom wins" rule would
+    // silently ignore the pick) and hides the boxes, while "Custom range…" reveals
+    // them and waits for a date. Server-rendered `hidden` sets the opening state,
+    // so this only has to keep up with what staff pick after that.
+    function ppShowRange(on) {
+        document.querySelectorAll('.ppl__fdates [data-pp-range]')
+            .forEach(el => { el.hidden = !on; });
+    }
+    window.ppPresetRange = function (sel) {
+        const from = document.getElementById('pp_filter_from');
+        const to = document.getElementById('pp_filter_to');
+        if (sel.value === 'custom') {
+            // Reveal before focusing — a hidden input cannot take focus.
+            ppShowRange(true);
+            from.focus();
+            if (typeof from.showPicker === 'function') { try { from.showPicker(); } catch (e) { /* not user-gestured */ } }
+            return;
+        }
+        from.value = '';
+        to.value = '';
+        ppShowRange(false);
+        sel.form.submit();
+    };
+    ['pp_filter_from', 'pp_filter_to'].forEach(id => {
+        const box = document.getElementById(id);
+        if (box) box.addEventListener('change', () => {
+            document.getElementById('pp_filter_days').value = 'custom';
+            box.form.submit();
+        });
+    });
+
     document.querySelectorAll('#workforce_pickup_pool_table_view .pp-assign-open').forEach(btn => {
         btn.addEventListener('click', () => {
             const panel = btn.closest('tr').nextElementSibling;
             panel.hidden = !panel.hidden;
             if (!panel.hidden) panel.querySelector('.pp-assign-search').focus();
+        });
+    });
+
+    // Timeline strip: the same partial the task detail page renders, pulled in the
+    // first time the row is opened and then kept, so re-opening costs nothing.
+    document.querySelectorAll('#workforce_pickup_pool_table_view .pp-timeline').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Every data row is followed by its assign row, then its timeline row.
+            const panelRow = btn.closest('tr').nextElementSibling.nextElementSibling;
+            const box = panelRow.querySelector('.ppl__panel--timeline');
+            panelRow.hidden = !panelRow.hidden;
+            btn.setAttribute('aria-expanded', panelRow.hidden ? 'false' : 'true');
+            if (panelRow.hidden || box.dataset.loaded) return;
+            box.dataset.loaded = '1';
+            box.innerHTML = '<span class="ppl__panel-title">Loading timeline…</span>';
+            fetch(box.dataset.timelineUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+                .then(html => {
+                    // A pickup with nothing to draw would render an empty card —
+                    // say so rather than opening a blank strip.
+                    box.innerHTML = html.trim()
+                        ? html
+                        : '<span class="ppl__panel-title">No pickup timeline for this row</span>';
+                })
+                .catch(() => {
+                    box.dataset.loaded = '';
+                    box.innerHTML = '<span class="ppl__panel-title">Could not load the timeline — try again</span>';
+                });
         });
     });
 
@@ -297,6 +466,107 @@ Notes: Assign allowed in pending/accepted/in_progress/arrived; "Back to pool" (a
             rowPost("{% url 'workforce:pickup_staff_delete' %}", btn, null);
         });
     });
+
+    // ---- Relocate: move an open pickup to another of the client's addresses ---
+    // Saves on change. A refusal (collected, wrong client, inactive) snaps the
+    // dropdown back to what the server still holds, so the row never lies.
+    document.querySelectorAll('#workforce_pickup_pool_table_view .pp-relocate').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const chosen = sel.value;
+            const label = sel.options[sel.selectedIndex].textContent.trim();
+            if (!chosen) { sel.value = sel.dataset.current; return; }
+            if (!confirm(`Move the pickup for ${sel.dataset.order} to ${label}?\n\n`
+                + 'The order and its label move with it, and an assigned driver is notified.')) {
+                sel.value = sel.dataset.current;
+                return;
+            }
+            const form = new FormData();
+            form.append('csrfmiddlewaretoken', csrf);
+            form.append('pickup_id', sel.closest('tr').dataset.pickupId);
+            form.append('pickup_location_id', chosen);
+            sel.disabled = true;
+            fetch("{% url 'workforce:pickup_staff_relocate' %}", { method: 'POST', body: form })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) { location.reload(); return; }
+                    alert(res.error || 'Failed');
+                    sel.value = sel.dataset.current;
+                    sel.disabled = false;
+                })
+                .catch(() => {
+                    alert('Network error');
+                    sel.value = sel.dataset.current;
+                    sel.disabled = false;
+                });
+        });
+    });
+
+    // ---- Create pickup: the repair hatch for an order that never got a leg ----
+    // Imports save an order with no pickup location, so the create-time gate
+    // bails; this asks which of the client's shop addresses the goods sit at,
+    // writes it onto the order, and runs the same service the signal uses.
+    (function () {
+        const panel = document.getElementById('workforce_pickup_pool_panel_create');
+        if (!panel) return;
+        const orderBox = document.getElementById('pp_mk_order');
+        const step2 = document.getElementById('pp_mk_step2');
+        const locSel = document.getElementById('pp_mk_loc');
+        const meta = document.getElementById('pp_mk_meta');
+        const err = document.getElementById('pp_mk_err');
+        const url = "{% url 'workforce:pickup_staff_create' %}";
+
+        function say(msg) { err.textContent = msg || ''; err.hidden = !msg; }
+        function reset() { step2.hidden = true; locSel.innerHTML = ''; meta.textContent = ''; say(''); }
+
+        function post(extra, btn) {
+            const form = new FormData();
+            form.append('csrfmiddlewaretoken', csrf);
+            form.append('order_number', orderBox.value.trim());
+            Object.entries(extra || {}).forEach(([k, v]) => form.append(k, v));
+            btn.disabled = true;
+            return fetch(url, { method: 'POST', body: form })
+                .then(r => r.json())
+                .finally(() => { btn.disabled = false; });
+        }
+
+        document.getElementById('pp_mk_open').addEventListener('click', () => {
+            panel.hidden = !panel.hidden;
+            if (!panel.hidden) orderBox.focus();
+        });
+        document.getElementById('pp_mk_close').addEventListener('click', () => {
+            panel.hidden = true;
+            reset();
+        });
+        orderBox.addEventListener('input', reset);
+
+        const findBtn = document.getElementById('pp_mk_find');
+        findBtn.addEventListener('click', () => {
+            if (!orderBox.value.trim()) { say('Enter an order number'); return; }
+            reset();
+            post(null, findBtn).then(res => {
+                if (!res.success) { say(res.error || 'Failed'); return; }
+                meta.textContent = res.business
+                    + (res.current_location ? ' · currently on ' + res.current_location : '');
+                // textContent, not innerHTML — location titles are staff-entered text.
+                res.locations.forEach(loc => {
+                    const opt = document.createElement('option');
+                    opt.value = loc.id;
+                    opt.textContent = loc.title + (loc.locality ? ' — ' + loc.locality : '');
+                    if (loc.is_default) opt.selected = true;
+                    locSel.appendChild(opt);
+                });
+                step2.hidden = false;
+            }).catch(() => say('Network error'));
+        });
+
+        const goBtn = document.getElementById('pp_mk_go');
+        goBtn.addEventListener('click', () => {
+            post({ pickup_location_id: locSel.value }, goBtn).then(res => {
+                if (res.success) location.reload();
+                else say(res.error || 'Failed');
+            }).catch(() => say('Network error'));
+        });
+    })();
 
     // ---- Multi-select: tick rows, act on the whole selection in one call -------
     const checks = Array.from(document.querySelectorAll('.pp-check'));

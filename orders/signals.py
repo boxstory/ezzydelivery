@@ -23,6 +23,10 @@ logger = logging.getLogger('orders')
 # Old verification status is stored on the instance as instance._old_verification_status
 # to avoid thread-safety issues with a global dict.
 
+# Orders that have finished one way or the other. A pickup location attached to
+# one of these is a bookkeeping edit, never a reason to open a first-mile leg.
+TERMINAL_ORDER_STATUSES = ('delivered', 'cancelled')
+
 
 def generate_sequence_code(number):
     """
@@ -78,12 +82,37 @@ def generate_order_number(business, client_order_code):
 
     return order_number
 
-def _create_pickup_task_on_commit(order_id):
-    """Runs after the creating transaction commits — order row is guaranteed visible."""
+def _create_pickup_task_on_commit(order_id, source='order_create'):
+    """Runs after the transaction commits — order row is guaranteed visible.
+
+    Called on order create, and again if a pickup location only arrives later
+    (imports and API orders are saved without one, so the create-time gate
+    bails on `no_pickup_location` and would otherwise never retry).
+    """
     from delivery.services.pickup import create_pickup_task_if_needed
     order = Order.objects.filter(pk=order_id).select_related('business', 'pickup_location').first()
     if order:
-        create_pickup_task_if_needed(order, source='order_create')
+        create_pickup_task_if_needed(order, source=source)
+
+
+def _sync_pickup_location_on_commit(order_id):
+    """The order moved to another pickup address — carry its open leg across."""
+    from delivery.models import PickupTask
+    from delivery.services.pickup import UNMOVEABLE_PICKUP_STATUSES
+
+    order = Order.objects.filter(pk=order_id).select_related('pickup_location').first()
+    if not order or not order.pickup_location:
+        return
+    location = order.pickup_location
+    if location.is_fulfilment_center or location.pickup_status != 'active':
+        return
+    pickup = PickupTask.objects.filter(order_id=order_id).exclude(
+        status__in=UNMOVEABLE_PICKUP_STATUSES).exclude(
+            pickup_location_id=location.id).first()
+    if not pickup:
+        return
+    from delivery.services.pickup import relocate_pickup
+    relocate_pickup(pickup, location)
 
 
 @receiver(pre_save, sender=Order, dispatch_uid='orders.order_pre_save')
@@ -103,6 +132,7 @@ def order_pre_save_receiver(sender, instance, *args, **kwargs):
             instance._old_order_status = old_instance.order_status
             instance._old_task_status = old_instance.task_status
             instance._old_cod_status_by_staff = old_instance.cod_status_by_staff
+            instance._old_pickup_location_id = old_instance.pickup_location_id
         except Order.DoesNotExist:
             pass
 
@@ -222,6 +252,44 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
             lambda order_id=instance.pk: _create_pickup_task_on_commit(order_id)
         )
 
+    # First-mile pickup, second chance: the order was saved without a pickup
+    # location (Shopify/CSV/API imports all are), so the create-time gate bailed
+    # on 'no_pickup_location'. The moment a location is attached — by the
+    # delivery-task fallback or by staff editing the order — run the gate again.
+    # The service is idempotent, so a re-save can never produce a second leg.
+    if not created and instance.pickup_location_id and not getattr(
+            instance, '_old_pickup_location_id', None):
+        if instance.order_status not in TERMINAL_ORDER_STATUSES:
+            transaction.on_commit(
+                lambda order_id=instance.pk: _create_pickup_task_on_commit(
+                    order_id, source='location_assigned')
+            )
+
+    # First-mile pickup, third chance: staff mark the goods 'ready_to_pickup'.
+    # The two hooks above only fire on order create and on a location arriving,
+    # so an order whose location was refused at the time (a stale FC flag, an
+    # inactive address) never gets a leg even after the config is repaired.
+    # Staff moving it to 'ready_to_pickup' is the moment they assert the goods
+    # are packed and collectable, so re-run the gate on that transition.
+    # The service is idempotent ('already_exists'), so this cannot double-open.
+    if not created and instance.order_status == 'ready_to_pickup' and getattr(
+            instance, '_old_order_status', None) not in (None, 'ready_to_pickup'):
+        transaction.on_commit(
+            lambda order_id=instance.pk: _create_pickup_task_on_commit(
+                order_id, source='ready_to_pickup')
+        )
+
+    # The order and its first-mile leg must name the same address — staff edit the
+    # order in one place and the pickup in another, so whichever moves drags the
+    # other along. Only for legs the driver has not collected yet, and only to a
+    # real collectable address (an FC means the goods are already at the hub, which
+    # is a cancel decision, not a move).
+    if not created and instance.pickup_location_id and getattr(
+            instance, '_old_pickup_location_id', None) not in (None, instance.pickup_location_id):
+        transaction.on_commit(
+            lambda order_id=instance.pk: _sync_pickup_location_on_commit(order_id)
+        )
+
     # Handle verification status changes
     if not created:
         old_status = getattr(instance, '_old_verification_status', '')
@@ -320,7 +388,8 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
                 logger.warning(f"Auto flow failed for wa_order_cancelled {instance.pk}: {e}")
 
         # Clean up stored old status from instance
-        for attr in ('_old_verification_status', '_old_order_status', '_old_task_status', '_old_cod_status_by_staff'):
+        for attr in ('_old_verification_status', '_old_order_status', '_old_task_status',
+                     '_old_cod_status_by_staff', '_old_pickup_location_id'):
             if hasattr(instance, attr):
                 delattr(instance, attr)
 

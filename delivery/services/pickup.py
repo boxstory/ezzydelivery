@@ -101,20 +101,105 @@ def create_pickup_task_if_needed(order, source=''):
         return None, 'error'
 
 
-def cancel_pickup_for_order(order, reason='Order was cancelled'):
+# Pickups already closed out — nothing left to cancel or clean up.
+CLOSED_PICKUP_STATUSES = ['dropped', 'handed_off', 'cancelled']
+
+# Once the driver holds the goods the address is history, so a move is refused
+# from 'collected' onwards too.
+UNMOVEABLE_PICKUP_STATUSES = CLOSED_PICKUP_STATUSES + ['collected']
+
+
+def relocate_pickup(pickup, location, actor=None):
+    """Move an open pickup to another of the client's addresses.
+
+    Returns (ok, message). The order carries the same FK and is what every
+    downstream label/waybill reads, so both are written together — a pickup
+    pointing at one address while the order says another is the bug this
+    prevents. Never raises: staff get the refusal in words.
+    """
+    from orders.models import OrderStatusHistory
+    from fleet.models import DriverNotification
+
+    try:
+        if location.business_id != pickup.business_id:
+            return False, 'That pickup location belongs to a different client'
+        if pickup.status in UNMOVEABLE_PICKUP_STATUSES:
+            return False, (f'This pickup is already {pickup.get_status_display().lower()} — '
+                           f'the address can no longer be changed')
+        if location.pickup_status != 'active':
+            return False, f"'{location.pickup_location_title}' is not an active pickup location"
+        if location.is_fulfilment_center:
+            return False, (f"'{location.pickup_location_title}' is a fulfilment centre — the goods "
+                           f"are already at our warehouse, so there is nothing to collect there")
+        if pickup.pickup_location_id == location.id:
+            return False, 'That is already the pickup location'
+
+        old = pickup.pickup_location
+        old_title = old.pickup_location_title if old else '—'
+        pickup.pickup_location = location
+        pickup.save(update_fields=['pickup_location', 'updated_at'])
+
+        order = pickup.order
+        if order.pickup_location_id != location.id:
+            order.pickup_location = location
+            order.save(update_fields=['pickup_location'])
+
+        try:
+            OrderStatusHistory.objects.create(
+                order=order,
+                field_name='pickup_location',
+                old_value=str(old.id) if old else '',
+                new_value=str(location.id),
+                old_display=old_title,
+                new_display=location.pickup_location_title,
+                changed_by=actor if getattr(actor, 'is_authenticated', False) else None,
+                notes=f'Pickup address moved to {location.pickup_location_title}'[:255],
+            )
+        except Exception as e:
+            logger.warning(f"Pickup relocate history failed for order {order.pk}: {e}")
+
+        # The driver was sent to the old address — they have to be told.
+        if pickup.driver:
+            DriverNotification.objects.create(
+                driver=pickup.driver,
+                title='Pickup address changed',
+                message=(f"Order {order.order_number} is now collected from "
+                         f"{location.pickup_location_title}, not {old_title}."),
+                notification_type='alert',
+            )
+
+        logger.info(
+            f"PickupTask {pickup.pk} relocated for order {order.order_number}: "
+            f"{old_title} -> {location.pickup_location_title}")
+        return True, f'Pickup moved to {location.pickup_location_title}'
+    except Exception as e:
+        logger.error(f"PickupTask relocate failed for pickup {pickup.pk}: {e}", exc_info=True)
+        return False, 'Could not move the pickup — check the delivery log'
+
+
+
+def cancel_pickup_for_order(order, reason='Order was cancelled', delivery_task=None):
     """
     The order (or its delivery leg) ended — cancel the first-mile pickup unless it
     was already executed. `reason` is the human line written to the order timeline
     and the driver notification, so a task-driven cancel doesn't claim the client
     cancelled the order. Idempotent: an already-cancelled pickup is left alone.
+
+    A 'collected' pickup is never cancelled: the driver physically holds the goods,
+    so that work happened. Pass `delivery_task` (the leg that just ended) so a
+    finished delivery closes it as handed off instead. See _close_collected_pickup.
     """
     from delivery.models import PickupTask
     from fleet.models import DriverNotification
 
     try:
         pickup = PickupTask.objects.filter(order=order).exclude(
-            status__in=['dropped', 'handed_off', 'cancelled']).first()
+            status__in=CLOSED_PICKUP_STATUSES).select_related(
+                'order', 'driver', 'transfer_to_driver').first()
         if not pickup:
+            return
+        if pickup.status == 'collected':
+            _close_collected_pickup(pickup, reason, delivery_task)
             return
         old_status = pickup.status
         pickup.status = 'cancelled'
@@ -130,6 +215,63 @@ def cancel_pickup_for_order(order, reason='Order was cancelled'):
         logger.info(f"PickupTask cancelled for order {order.order_number} ({reason})")
     except Exception as e:
         logger.error(f"PickupTask cancel failed for order {order.pk}: {e}", exc_info=True)
+
+
+def _close_collected_pickup(pickup, reason, delivery_task=None):
+    """
+    The first-mile work is already done — the driver collected the goods — so this
+    pickup must not end up labelled 'Cancelled'.
+
+    - Delivery finished (delivered / partial): close as handed off. When the driver
+      who delivered is the one a pending transfer was addressed to, the hand-off
+      demonstrably happened, so confirm it rather than leaving it dangling.
+    - Anything else (order or delivery cancelled): leave the pickup at 'collected'.
+      The package still physically exists and has to be routed or returned — the
+      driver keeps it on their In progress tab and gets told what happened.
+    """
+    from fleet.models import DriverNotification
+
+    order = pickup.order
+    delivered = bool(delivery_task and delivery_task.dl_task_status in ('delivered', 'partial_delivery'))
+
+    if not delivered:
+        log_pickup_history(
+            pickup, 'collected', 'collected',
+            notes=f"{reason} — package still held by {pickup.driver or 'the pickup driver'}, "
+                  f"pickup left open for return/routing"[:255])
+        if pickup.driver:
+            DriverNotification.objects.create(
+                driver=pickup.driver,
+                title='Pickup needs routing',
+                message=(
+                    f"Order {order.order_number} ended ({reason.lower()}) but you still have "
+                    f"the package. Return it to the client or drop it at the hub."
+                ),
+                notification_type='alert',
+            )
+        logger.info(
+            f"PickupTask {pickup.pk} left collected for order {order.order_number} ({reason})")
+        return
+
+    update_fields = ['status', 'updated_at']
+    auto_confirmed = False
+    delivery_driver_id = getattr(delivery_task, 'driver_id', None)
+    if (pickup.transfer_to_driver_id and not pickup.transfer_confirmed_at
+            and delivery_driver_id == pickup.transfer_to_driver_id):
+        pickup.transfer_confirmed_at = timezone.now()
+        update_fields.append('transfer_confirmed_at')
+        auto_confirmed = True
+
+    pickup.status = 'handed_off'
+    pickup.save(update_fields=update_fields)
+
+    notes = f"Closed as handed off — {reason.lower()}"
+    if auto_confirmed:
+        notes += f"; transfer to {pickup.transfer_to_driver} auto-confirmed (they delivered it)"
+    log_pickup_history(pickup, 'collected', 'handed_off', notes=notes[:255])
+    logger.info(
+        f"PickupTask {pickup.pk} closed as handed_off for order {order.order_number} "
+        f"({reason}, auto_confirmed={auto_confirmed})")
 
 
 def _notify_assigned_fleet(pickup):

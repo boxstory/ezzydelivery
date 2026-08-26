@@ -2308,10 +2308,13 @@ def pickup_scan_process(request):
                 order__order_number__icontains=scanned_code
             ).first()
 
-        # If not found, search by barcode
+        # If not found, search the order's own barcode record. The field is
+        # order_number — filtering on barcode_value (which does not exist)
+        # raised a FieldError that surfaced to the driver as the error toast,
+        # so no unmatched scan ever got as far as its "no matching task" reply.
         if not task:
             barcode = orders_models.OrderBarcode.objects.filter(
-                barcode_value=scanned_code
+                order_number__iexact=scanned_code
             ).select_related('order').first()
 
             if barcode:
@@ -4433,8 +4436,18 @@ def update_pickup_status(request):
     if siblings_updated:
         label = 'On the way' if new_status == 'in_progress' else 'Arrived'
         msg = f"{label} — {siblings_updated + 1} pickups at this location updated"
+
+    # Pickups still open on the Mine tab — the UI stays there while any remain
+    remaining = PickupTask.objects.filter(
+        driver=driver, status__in=['accepted', 'in_progress', 'arrived'],
+    ).exclude(order__order_status='cancelled').count()
+    if new_status == 'collected' and not msg:
+        msg = (f"Collected — {remaining} more to collect" if remaining
+               else 'Collected — all pickups done')
+
     return JsonResponse({'success': True, 'status': new_status, 'message': msg,
-                         'siblings_updated': siblings_updated})
+                         'siblings_updated': siblings_updated,
+                         'remaining': remaining})
 
 
 @login_required(login_url='/accounts/login/')

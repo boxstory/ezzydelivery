@@ -339,6 +339,12 @@ def _log_driver_change(task, old_driver_id):
     )
 
 
+#: How old the driver's last fix may be and still count as their position at a
+#: status change. Generous next to the 30s duty cycle and the fix the app takes
+#: at the tap itself — it only rules out fixes that witness nothing.
+_STATUS_FIX_MAX_AGE_MINUTES = 15
+
+
 def _create_task_status_point(task, old_status, new_status):
     """Create a TaskStatusPoint with driver GPS and distance from delivery location."""
     from fleet import models as fleet_models
@@ -350,8 +356,16 @@ def _create_task_status_point(task, old_status, new_status):
     # Latest driver GPS location. A coarse fix is only stamped when the driver
     # has no precise one at all — the position on a status change is evidence,
     # so it must not silently degrade to a 500m cell tower reading.
+    #
+    # Bounded in time for the same reason. Unbounded, this took whatever the
+    # driver's last stored fix was and stamped it as "where they were when the
+    # status changed" — observed as far back as 2.9 days, which is not evidence
+    # of anything. The driver app now takes a fix at the moment of the change
+    # (EzzyGPS.stamp), so anything older than this window means the app never
+    # got one, and no position is truer than a stale one.
     if task.driver_id:
-        latest_loc = fleet_models.DriverLocation.latest_for_driver(task.driver_id)
+        latest_loc = fleet_models.DriverLocation.latest_for_driver(
+            task.driver_id, within_minutes=_STATUS_FIX_MAX_AGE_MINUTES)
         if latest_loc:
             driver_lat = latest_loc.latitude
             driver_lng = latest_loc.longitude
@@ -527,12 +541,14 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
 
             # The delivery leg ended — pull any first-mile pickup still sitting in the
             # driver pool. 'failed'/'rejected' are left alone: those can be retried.
+            # An already-collected pickup is closed as handed off, never cancelled.
             if new_status in ('cancelled', 'delivered', 'partial_delivery'):
                 try:
                     from delivery.services.pickup import cancel_pickup_for_order
                     label = 'cancelled' if new_status == 'cancelled' else 'delivered'
                     cancel_pickup_for_order(
-                        instance.order, reason=f"Delivery task was {label}")
+                        instance.order, reason=f"Delivery task was {label}",
+                        delivery_task=instance)
                 except Exception as e:
                     logger.warning(f"Pickup cleanup failed for task {instance.pk}: {e}")
 
