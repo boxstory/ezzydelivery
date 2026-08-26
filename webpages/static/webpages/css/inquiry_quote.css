@@ -1,0 +1,753 @@
+/* Purpose: Quotation rate sheet (wpq__) — plan selection after the 3PL inquiry is submitted.
+   Used by: webpages/templates/webpages/inquiry_quote.html (rides on wppi__ hero/progress/card from delivery_pricing_inquiry.css)
+   Notes: yellow budget is spent on the submit CTA inherited from .wppi__btn-submit — selection state is navy ink, never yellow */
+
+/* ============================================================================
+   SHEET BODY
+   ============================================================================ */
+.wpq__intro {
+  padding: 1.5rem 2rem 0.75rem;
+}
+
+.wpq__intro-label {
+  display: block;
+  font-family: var(--wppi-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.wpq__intro-text {
+  margin: 0.375rem 0 0;
+  font-size: 0.875rem;
+  color: var(--brand-grey-600, #555);
+  max-width: 42rem;
+}
+
+.wpq__grid {
+  padding: 0 2rem;
+}
+
+/* ============================================================================
+   PLAN CARD — a radio the whole card toggles
+   ============================================================================ */
+.wpq__plan {
+  display: block;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Kept in the a11y tree and focusable — visually replaced by the card itself */
+.wpq__plan-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wpq__plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1.125rem;
+  background: #ffffff;
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  transition: border-color 200ms, box-shadow 200ms, background 200ms;
+}
+
+.wpq__plan:hover .wpq__plan-card {
+  border-color: var(--brand-navy-light, #003366);
+  box-shadow: var(--brand-shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.08));
+}
+
+.wpq__plan-input:checked + .wpq__plan-card {
+  border-color: var(--brand-navy, #001f3f);
+  box-shadow: inset 0 0 0 1px var(--brand-navy, #001f3f);
+  background: var(--brand-grey-50, #f8f9fa);
+}
+
+.wpq__plan-input:focus-visible + .wpq__plan-card {
+  outline: 2px solid var(--brand-primary, #f7c000);
+  outline-offset: 2px;
+}
+
+/* Ribbon — navy, because the page's one yellow is already the submit button */
+.wpq__plan-badge {
+  position: absolute;
+  top: -0.5rem;
+  right: 1rem;
+  background: var(--brand-navy, #001f3f);
+  color: #ffffff;
+  font-family: var(--wppi-mono, ui-monospace, monospace);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.wpq__plan-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+/* Selection mark — empty ring until checked */
+.wpq__plan-tick {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin-top: 0.125rem;
+  border: 1px solid var(--brand-grey-400, #b0b0b0);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  transition: background 200ms, border-color 200ms;
+}
+
+.wpq__plan-tick i {
+  font-size: 0.625rem;
+  color: transparent;
+  transition: color 200ms;
+}
+
+.wpq__plan-input:checked + .wpq__plan-card .wpq__plan-tick {
+  background: var(--brand-navy, #001f3f);
+  border-color: var(--brand-navy, #001f3f);
+}
+
+.wpq__plan-input:checked + .wpq__plan-card .wpq__plan-tick i {
+  color: #ffffff;
+}
+
+.wpq__plan-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.wpq__plan-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brand-navy, #001f3f);
+  line-height: 1.25;
+}
+
+.wpq__plan-sub {
+  font-size: 0.75rem;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+/* ── Price block ─────────────────────────────────────────────────────────── */
+.wpq__plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+  border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+
+.wpq__plan-amount {
+  font-family: var(--wppi-mono, ui-monospace, monospace);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--brand-grey-800, #1f1f1f);
+  line-height: 1;
+}
+
+.wpq__plan-price--custom .wpq__plan-amount {
+  font-size: 1.25rem;
+  color: var(--brand-navy, #001f3f);
+}
+
+.wpq__plan-unit {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.wpq__plan-desc {
+  display: block;
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--brand-grey-600, #555);
+}
+
+.wpq__plan-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+}
+
+.wpq__plan-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--brand-grey-700, #333);
+}
+
+.wpq__plan-feature i {
+  margin-top: 0.2rem;
+  font-size: 0.625rem;
+  color: var(--brand-primary-text, #8f6b00);
+}
+
+/* ============================================================================
+   NOTE / CONFIRM / ACTIONS
+   ============================================================================ */
+.wpq__note {
+  padding: 1.5rem 2rem 0;
+}
+
+.wpq__note-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-grey-700, #333);
+  margin-bottom: 0.375rem;
+}
+
+.wpq__note-label span {
+  font-weight: 400;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.wpq__note-input:focus {
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
+}
+
+.wpq__confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin: 1.125rem 2rem 0;
+  padding: 0.75rem;
+  background: var(--brand-grey-50, #f8f9fa);
+  border: 1px solid var(--brand-grey-200, #f0f0f0);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.wpq__confirm-box {
+  flex: 0 0 auto;
+  margin-top: 0.125rem;
+}
+
+.wpq__confirm-box:checked {
+  background-color: var(--brand-navy, #001f3f);
+  border-color: var(--brand-navy, #001f3f);
+}
+
+.wpq__confirm-label {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--brand-grey-700, #333);
+  cursor: pointer;
+}
+
+.wpq__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem 2rem 0;
+}
+
+.wpq__wa-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--brand-grey-600, #555);
+  text-decoration: none;
+}
+
+.wpq__wa-link:hover {
+  color: var(--brand-navy, #001f3f);
+}
+
+.wpq__legal {
+  margin: 1.125rem 0 0;
+  padding: 1rem 2rem 1.5rem;
+  border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+  font-size: 0.7rem;
+  line-height: 1.6;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+/* ============================================================================
+   STAMP (already selected) + ERROR + EMPTY
+   ============================================================================ */
+.wpq__stamp {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 1.5rem 2rem 0;
+  padding: 0.75rem 1rem;
+  background: var(--brand-success-bg, #dcfce7);
+  border: 1px solid var(--brand-success, #15803d);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.wpq__stamp-icon {
+  margin-top: 0.15rem;
+  color: var(--brand-success, #15803d);
+}
+
+.wpq__stamp-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-success-dark, #065f46);
+}
+
+.wpq__stamp-text {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--brand-grey-700, #333);
+}
+
+.wpq__alert {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.5rem 2rem 0;
+  padding: 0.75rem 1rem;
+  background: var(--brand-danger-bg, #fef2f2);
+  border: 1px solid var(--brand-danger, #dc2626);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  font-size: 0.8125rem;
+  color: var(--brand-danger-dark, #991b1b);
+}
+
+.wpq__empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.wpq__empty i {
+  font-size: 2rem;
+  color: var(--brand-grey-300, #dcdcdc);
+}
+
+.wpq__empty p {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+}
+
+/* ============================================================================
+   RECEIPT — the selection echoed back on the success page
+   ============================================================================ */
+.wpq__receipt {
+  max-width: 40rem;
+  margin: 0 auto 2rem;
+  background: #ffffff;
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.wpq__receipt-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: var(--brand-navy, #001f3f);
+  border-radius: calc(var(--brand-radius-sm, 0.5rem) - 1px) calc(var(--brand-radius-sm, 0.5rem) - 1px) 0 0;
+  padding: 0.625rem 1.125rem;
+  font-family: ui-monospace, "SF Mono", "Roboto Mono", Menlo, monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.wpq__receipt-body {
+  padding: 0.375rem 1.125rem;
+}
+
+.wpq__receipt-plan {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+
+.wpq__receipt-plan:last-child {
+  border-bottom: 0;
+}
+
+.wpq__receipt-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.wpq__receipt-name {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--brand-navy, #001f3f);
+  text-align: right;
+}
+
+.wpq__receipt-price {
+  font-family: ui-monospace, "SF Mono", "Roboto Mono", Menlo, monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brand-grey-800, #1f1f1f);
+  text-align: right;
+}
+
+.wpq__receipt-meta {
+  font-size: 0.8125rem;
+  color: var(--brand-grey-600, #555);
+  text-align: right;
+}
+
+.wpq__receipt-foot {
+  padding: 0.75rem 1.125rem;
+  border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+  background: var(--brand-grey-50, #f8f9fa);
+  border-radius: 0 0 calc(var(--brand-radius-sm, 0.5rem) - 1px) calc(var(--brand-radius-sm, 0.5rem) - 1px);
+}
+
+/* ============================================================================
+   CELEBRATION MODAL — shown once after a fixed rate is confirmed
+   ============================================================================ */
+.wpq__modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.125rem;
+}
+
+.wpq__modal[hidden] {
+  display: none;
+}
+
+body.wpq-modal-open {
+  overflow: hidden;
+}
+
+.wpq__modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 31, 63, 0.72);
+  animation: wpq-fade 200ms ease-out both;
+}
+
+.wpq__modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 30rem;
+  max-height: calc(100vh - 2.25rem);
+  overflow-y: auto;
+  text-align: center;
+  background: #ffffff;
+  border-radius: var(--brand-radius-lg, 1.125rem);
+  padding: 2rem 1.75rem 1.75rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  animation: wpq-pop 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes wpq-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes wpq-pop {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.wpq__modal-x {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--brand-grey-500, #6c757d);
+  cursor: pointer;
+  transition: background 200ms, color 200ms;
+}
+
+.wpq__modal-x:hover {
+  background: var(--brand-grey-100, #f0f0f0);
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+/* The one yellow on this page — the moment it marks is the whole point */
+.wpq__modal-icon {
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--brand-primary, #f7c000);
+  color: var(--brand-navy, #001f3f);
+  font-size: 1.5rem;
+  box-shadow: 0 0 0 6px var(--brand-accent, #fef9e6);
+}
+
+.wpq__modal-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--brand-navy, #001f3f);
+  margin: 0 0 0.75rem;
+}
+
+.wpq__modal-text {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--brand-grey-600, #555);
+  margin: 0 0 1.125rem;
+}
+
+.wpq__modal-text strong {
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+.wpq__modal-eta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--brand-grey-50, #f8f9fa);
+  border: 1px solid var(--brand-grey-200, #f0f0f0);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  font-size: 0.8125rem;
+  color: var(--brand-grey-700, #333);
+}
+
+.wpq__modal-eta i {
+  color: var(--brand-primary-text, #8f6b00);
+}
+
+.wpq__modal-ask {
+  margin: 1.125rem 0 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--brand-navy, #001f3f);
+}
+
+.wpq__modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wpq__modal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.625rem 1.125rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 200ms, box-shadow 200ms, transform 200ms;
+}
+
+/* The go button takes focus on open, so its ring is deliberate, not a default */
+.wpq__modal-btn:focus-visible {
+  outline: 2px solid var(--brand-primary, #f7c000);
+  outline-offset: 2px;
+}
+
+.wpq__modal-btn--go {
+  background: var(--brand-navy, #001f3f);
+  border: 1px solid var(--brand-navy, #001f3f);
+  color: #ffffff;
+}
+
+.wpq__modal-btn--go:hover {
+  background: var(--brand-navy-light, #003366);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: var(--brand-shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.08));
+}
+
+.wpq__modal-btn--later {
+  background: var(--brand-grey-100, #fafafa);
+  border: 1px solid var(--brand-grey-400, #b0b0b0);
+  color: var(--brand-grey-800, #1f1f1f);
+  font-weight: 600;
+}
+
+.wpq__modal-btn--later:hover {
+  background: var(--brand-secondary, #fff7d6);
+  border-color: var(--brand-primary, #f7c000);
+}
+
+/* Permanent twin of the modal CTA, so the path survives a dismissal */
+.wpq__receipt-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.875rem;
+  margin-right: 1rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-decoration: none;
+  background: var(--brand-navy, #001f3f);
+  border: 1px solid var(--brand-navy, #001f3f);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  color: #ffffff;
+  transition: background 200ms;
+}
+
+.wpq__receipt-cta:hover {
+  background: var(--brand-navy-light, #003366);
+  color: #ffffff;
+}
+
+.wpq__receipt-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ============================================================================
+   RESPONSIVE
+   ============================================================================ */
+@media (max-width: 767.98px) {
+  .wpq__intro,
+  .wpq__grid,
+  .wpq__note,
+  .wpq__actions {
+    padding-left: 1.125rem;
+    padding-right: 1.125rem;
+  }
+
+  .wpq__stamp,
+  .wpq__alert,
+  .wpq__confirm {
+    margin-left: 1.125rem;
+    margin-right: 1.125rem;
+  }
+
+  .wpq__legal {
+    padding-left: 1.125rem;
+    padding-right: 1.125rem;
+  }
+
+  .wpq__actions .wppi__btn-submit {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .wpq__wa-link {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wpq__plan-card,
+  .wpq__plan-tick,
+  .wpq__plan-tick i,
+  .wpq__modal-btn {
+    transition: none;
+  }
+
+  .wpq__modal-card,
+  .wpq__modal-backdrop {
+    animation: none;
+  }
+}
+
+/* ============================================================================
+   P2P NUDGE — offered when the answers read like a one-off personal delivery
+   ============================================================================ */
+.wpq__p2p {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 1.5rem 2rem 0;
+  padding: 1rem;
+  background: var(--brand-grey-50, #f8f9fa);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-left: 3px solid var(--brand-navy, #001f3f);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.wpq__p2p-icon {
+  margin-top: 0.2rem;
+  font-size: 1rem;
+  color: var(--brand-navy, #001f3f);
+}
+
+.wpq__p2p-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--brand-navy, #001f3f);
+}
+
+.wpq__p2p-text {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--brand-grey-600, #555);
+}
+
+.wpq__p2p-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--brand-navy, #001f3f);
+  border-bottom: 1px solid var(--brand-primary, #f7c000);
+}
+
+.wpq__p2p-link:hover {
+  color: var(--brand-navy-light, #003366);
+}
+
+@media (max-width: 767.98px) {
+  .wpq__p2p {
+    margin-left: 1.125rem;
+    margin-right: 1.125rem;
+  }
+}

@@ -327,6 +327,66 @@
                 </div>
               </div>
             </div>
+
+            <div class="col-md-12">
+              <label class="form-label">Do you need fulfillment service to operate from outside Qatar? <span class="wppi__req">*</span></label>
+              <div class="wppi__radio-group" id="wppi_radio_fulfillment_outside">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
+                         id="fulfillment_outside_yes" value="True"
+                         {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'True' %}checked{% endif %}>
+                  <label class="form-check-label" for="fulfillment_outside_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
+                         id="fulfillment_outside_no" value="False"
+                         {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'False' or not saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar %}checked{% endif %}>
+                  <label class="form-check-label" for="fulfillment_outside_no">No</label>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Do you need fulfillment service to make a hub in Doha? <span class="wppi__req">*</span></label>
+              {% comment %}
+              Most sellers read "hub" as a warehouse contract. Naming the two cases they
+              actually have — a long trip into Doha, or slow same-day dispatch — is what
+              tells them whether to answer Yes.
+              {% endcomment %}
+              <div class="wppi__field-hint mb-2" id="wppi_hint_fulfillment_hub">
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>Useful if you are based far from Doha, or if you want your fast-moving items stored closer to customers so orders go out faster.
+              </div>
+              <div class="wppi__radio-group" id="wppi_radio_fulfillment_hub">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
+                         id="fulfillment_hub_yes" value="True"
+                         {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'True' %}checked{% endif %}>
+                  <label class="form-check-label" for="fulfillment_hub_yes">Yes</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
+                         id="fulfillment_hub_no" value="False"
+                         {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'False' or not saved_data.is_required_fulfillment_service_for_make_hub_in_doha %}checked{% endif %}>
+                  <label class="form-check-label" for="fulfillment_hub_no">No</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Shown when Doha hub = Yes -->
+            <div class="col-md-12" id="fulfillment_storage_field"
+                 style="{% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha != 'True' %}display:none{% endif %}">
+              <label class="form-label">Roughly how much storage would you need?</label>
+              <input type="hidden" name="fulfillment_storage_volume" id="fulfillment_storage_volume"
+                     value="{{ saved_data.fulfillment_storage_volume }}">
+              <div class="wppi__bubbles wppi__bubbles--single" data-target="fulfillment_storage_volume" id="wppi_bubbles_storage">
+                {% with v=saved_data.fulfillment_storage_volume %}
+                <button type="button" class="wppi__bubble{% if v == 'A few shelves' %} wppi__bubble--active{% endif %}" data-value="A few shelves">A few shelves</button>
+                <button type="button" class="wppi__bubble{% if v == '1-5 pallets' %} wppi__bubble--active{% endif %}" data-value="1-5 pallets">1–5 pallets</button>
+                <button type="button" class="wppi__bubble{% if v == '5-20 pallets' %} wppi__bubble--active{% endif %}" data-value="5-20 pallets">5–20 pallets</button>
+                <button type="button" class="wppi__bubble{% if v == '20+ pallets' %} wppi__bubble--active{% endif %}" data-value="20+ pallets">20+ pallets</button>
+                <button type="button" class="wppi__bubble{% if v == 'Not sure' %} wppi__bubble--active{% endif %}" data-value="Not sure">Not sure</button>
+                {% endwith %}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -351,6 +411,12 @@
             <p class="wppi__section-sub">Step 2 of 3 — Help us understand your order volumes and logistics needs</p>
           </div>
         </div>
+
+        {% if inquiry_error %}
+        <div class="alert alert-danger" role="alert" id="wppi_step2_error">
+          <i class="fa-solid fa-circle-exclamation"></i> {{ inquiry_error }}
+        </div>
+        {% endif %}
 
         <!-- Volume Group -->
         <div class="wppi__field-group" id="wppi_step2_volume_group">
@@ -464,7 +530,7 @@
             <!-- Shown when COD = Yes -->
             <div class="col-md-12" id="cod_share_field"
                  style="{% if saved_data.is_required_COD_service != 'True' %}display:none{% endif %}">
-              <label class="form-label">Roughly what share of your orders are COD?</label>
+              <label class="form-label">Roughly what share of your orders are COD? <span class="wppi__req">*</span></label>
               <input type="hidden" name="cod_orders_share" id="cod_orders_share"
                      value="{{ saved_data.cod_orders_share }}">
               <div class="wppi__bubbles wppi__bubbles--single" data-target="cod_orders_share" id="wppi_bubbles_codshare">
@@ -478,57 +544,6 @@
               </div>
             </div>
 
-            <div class="col-md-12">
-              <label class="form-label">Do you need fulfillment service to operate from outside Qatar? <span class="wppi__req">*</span></label>
-              <div class="wppi__radio-group" id="wppi_radio_fulfillment_outside">
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
-                         id="fulfillment_outside_yes" value="True"
-                         {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'True' %}checked{% endif %}>
-                  <label class="form-check-label" for="fulfillment_outside_yes">Yes</label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
-                         id="fulfillment_outside_no" value="False"
-                         {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'False' or not saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar %}checked{% endif %}>
-                  <label class="form-check-label" for="fulfillment_outside_no">No</label>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-12">
-              <label class="form-label">Do you need fulfillment service to make a hub in Doha? <span class="wppi__req">*</span></label>
-              <div class="wppi__radio-group" id="wppi_radio_fulfillment_hub">
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
-                         id="fulfillment_hub_yes" value="True"
-                         {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'True' %}checked{% endif %}>
-                  <label class="form-check-label" for="fulfillment_hub_yes">Yes</label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
-                         id="fulfillment_hub_no" value="False"
-                         {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'False' or not saved_data.is_required_fulfillment_service_for_make_hub_in_doha %}checked{% endif %}>
-                  <label class="form-check-label" for="fulfillment_hub_no">No</label>
-                </div>
-              </div>
-            </div>
-
-            <!-- Shown when Doha hub = Yes -->
-            <div class="col-md-12" id="fulfillment_storage_field"
-                 style="{% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha != 'True' %}display:none{% endif %}">
-              <label class="form-label">Roughly how much storage would you need?</label>
-              <input type="hidden" name="fulfillment_storage_volume" id="fulfillment_storage_volume"
-                     value="{{ saved_data.fulfillment_storage_volume }}">
-              <div class="wppi__bubbles wppi__bubbles--single" data-target="fulfillment_storage_volume" id="wppi_bubbles_storage">
-                {% with v=saved_data.fulfillment_storage_volume %}
-                <button type="button" class="wppi__bubble{% if v == 'A few shelves' %} wppi__bubble--active{% endif %}" data-value="A few shelves">A few shelves</button>
-                <button type="button" class="wppi__bubble{% if v == '1-5 pallets' %} wppi__bubble--active{% endif %}" data-value="1-5 pallets">1–5 pallets</button>
-                <button type="button" class="wppi__bubble{% if v == '5-20 pallets' %} wppi__bubble--active{% endif %}" data-value="5-20 pallets">5–20 pallets</button>
-                <button type="button" class="wppi__bubble{% if v == '20+ pallets' %} wppi__bubble--active{% endif %}" data-value="20+ pallets">20+ pallets</button>
-                <button type="button" class="wppi__bubble{% if v == 'Not sure' %} wppi__bubble--active{% endif %}" data-value="Not sure">Not sure</button>
-                {% endwith %}
-              </div>
-            </div>
 
             <div class="col-md-12">
               <label class="form-label">Do you require return / reverse logistics? <span class="wppi__req">*</span></label>
@@ -566,7 +581,16 @@
                   <i class="fa-solid fa-chevron-down wppi__select-chevron"></i>
                 </div>
                 <div class="wppi__select-options">
+                  {% comment %}
+                  Ordered from no third party, through the informal arrangements most
+                  small Qatar sellers actually use, to the named couriers. Values are
+                  stored verbatim on a free-text field — no model choices to keep in
+                  step — so a new option only needs a line here.
+                  {% endcomment %}
                   <div class="wppi__select-option {% if saved_data.current_courier_provider == 'None' %}selected{% endif %}" data-value="None">None (No current provider)</div>
+                  <div class="wppi__select-option {% if saved_data.current_courier_provider == 'Own drivers' %}selected{% endif %}" data-value="Own drivers">Own drivers (in-house)</div>
+                  <div class="wppi__select-option {% if saved_data.current_courier_provider == 'Freelance drivers' %}selected{% endif %}" data-value="Freelance drivers">Freelance drivers</div>
+                  <div class="wppi__select-option {% if saved_data.current_courier_provider == 'Limousine / taxi' %}selected{% endif %}" data-value="Limousine / taxi">Limousine / taxi service</div>
                   <div class="wppi__select-option {% if saved_data.current_courier_provider == 'DHL' %}selected{% endif %}" data-value="DHL">DHL</div>
                   <div class="wppi__select-option {% if saved_data.current_courier_provider == 'Aramex' %}selected{% endif %}" data-value="Aramex">Aramex</div>
                   <div class="wppi__select-option {% if saved_data.current_courier_provider == 'QPOST' %}selected{% endif %}" data-value="QPOST">Qatar Post (QPOST)</div>
@@ -587,6 +611,26 @@
                   <div class="wppi__select-option {% if saved_data.delivery_coverage == 'Doha Only' %}selected{% endif %}" data-value="Doha Only">Doha Only</div>
                   <div class="wppi__select-option {% if saved_data.delivery_coverage == 'All Qatar' %}selected{% endif %}" data-value="All Qatar">All Qatar</div>
                   <div class="wppi__select-option {% if saved_data.delivery_coverage == 'Both' %}selected{% endif %}" data-value="Both">Both (Doha + Qatar)</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              {# Drives the rate matrix, which is priced per distance band. #}
+              <label class="form-label">Typical Delivery Distance <span class="wppi__req">*</span></label>
+              <input type="hidden" name="typical_delivery_distance" id="typical_delivery_distance"
+                     value="{{ saved_data.typical_delivery_distance }}">
+              <div class="wppi__select" data-target="typical_delivery_distance" id="wppi_select_distance">
+                <div class="wppi__select-trigger {% if not saved_data.typical_delivery_distance %}placeholder{% endif %}">
+                  <span>{{ saved_data.typical_delivery_distance|default:"Select distance" }}</span>
+                  <i class="fa-solid fa-chevron-down wppi__select-chevron"></i>
+                </div>
+                <div class="wppi__select-options">
+                  <div class="wppi__select-option {% if saved_data.typical_delivery_distance == 'Under 10 km' %}selected{% endif %}" data-value="Under 10 km">Under 10 km (within Doha)</div>
+                  <div class="wppi__select-option {% if saved_data.typical_delivery_distance == '10-15 km' %}selected{% endif %}" data-value="10-15 km">10 – 15 km</div>
+                  <div class="wppi__select-option {% if saved_data.typical_delivery_distance == '15-25 km' %}selected{% endif %}" data-value="15-25 km">15 – 25 km</div>
+                  <div class="wppi__select-option {% if saved_data.typical_delivery_distance == '25-30 km' %}selected{% endif %}" data-value="25-30 km">25 – 30 km</div>
+                  <div class="wppi__select-option {% if saved_data.typical_delivery_distance == 'Over 30 km' %}selected{% endif %}" data-value="Over 30 km">Over 30 km</div>
+                  <div class="wppi__select-option {% if saved_data.typical_delivery_distance == 'Not sure' %}selected{% endif %}" data-value="Not sure">Not sure</div>
                 </div>
               </div>
             </div>
@@ -654,6 +698,12 @@
           </div>
         </div>
 
+        {% if inquiry_error %}
+        <div class="alert alert-danger" role="alert" id="wppi_step3_error">
+          <i class="fa-solid fa-circle-exclamation"></i> {{ inquiry_error }}
+        </div>
+        {% endif %}
+
         <!-- Delivery Preferences Group -->
         <div class="wppi__field-group" id="wppi_step3_delivery_group">
           <div class="wppi__field-group-label">
@@ -661,7 +711,7 @@
           </div>
           <div class="row g-3">
             <div class="col-md-12">
-              <label class="form-label">Delivery Speed Offered to Customers</label>
+              <label class="form-label">Delivery Speed Offered to Customers <span class="wppi__req">*</span></label>
               <input type="hidden" name="speed_delivery_offer_to_customers" id="speed_delivery_offer_to_customers"
                      value="{{ saved_data.speed_delivery_offer_to_customers }}">
               <div class="wppi__bubbles" data-target="speed_delivery_offer_to_customers" id="wppi_bubbles_speed">
@@ -704,7 +754,7 @@
               </div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Typical Package Size</label>
+              <label class="form-label">Typical Package Size <span class="wppi__req">*</span></label>
               <input type="hidden" name="typical_package_size" id="typical_package_size"
                      value="{{ saved_data.typical_package_size }}">
               <div class="wppi__bubbles" data-target="typical_package_size" id="wppi_bubbles_packagesize">
@@ -717,7 +767,7 @@
               </div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Average Package Weight</label>
+              <label class="form-label">Average Package Weight <span class="wppi__req">*</span></label>
               <input type="hidden" name="average_package_weight" id="average_package_weight"
                      value="{{ saved_data.average_package_weight }}">
               <div class="wppi__bubbles wppi__bubbles--single" data-target="average_package_weight" id="wppi_bubbles_weight">
@@ -751,7 +801,7 @@
             <!-- Shown when special handling = Yes -->
             <div class="col-md-12" id="special_handling_detail_field"
                  style="{% if saved_data.is_special_handling_required != 'True' %}display:none{% endif %}">
-              <label class="form-label">What kind of handling? <span class="text-muted fw-normal">(Select all that apply)</span></label>
+              <label class="form-label">What kind of handling? <span class="wppi__req">*</span> <span class="text-muted fw-normal">(Select all that apply)</span></label>
               <input type="hidden" name="special_handling_detail" id="special_handling_detail"
                      value="{{ saved_data.special_handling_detail }}">
               <div class="wppi__bubbles" data-target="special_handling_detail" id="wppi_bubbles_handling">
@@ -1115,6 +1165,13 @@ function showBubbleError(fieldId, message) {
 function clearBubbleErrors() {
   document.querySelectorAll('.wppi__field-error').forEach(function (el) { el.remove(); });
 }
+// Conditional fields (COD share, handling detail) are hidden by an inline
+// display:none on their wrapper, so a hidden one must never block the step.
+function isFieldVisible(wrapperId) {
+  var el = document.getElementById(wrapperId);
+  return !!el && el.offsetParent !== null;
+}
+
 function validateStep(step) {
   clearBubbleErrors();
   var errors = [];
@@ -1171,7 +1228,35 @@ function validateStep(step) {
       showBubbleError('preferred_start_date', 'Please select when you want to start.');
       errors.push('preferred_start_date');
     }
+    // Distance drives the rate matrix — without it every quote falls back to a
+    // default, so it is required rather than optional.
+    if (!document.getElementById('typical_delivery_distance').value) {
+      showBubbleError('typical_delivery_distance', 'Please select your typical delivery distance.');
+      errors.push('typical_delivery_distance');
+    }
+    // Only when the COD question above was answered Yes and the field is showing.
+    if (isFieldVisible('cod_share_field') && !document.getElementById('cod_orders_share').value) {
+      showBubbleError('cod_orders_share', 'Please select roughly what share of orders are COD.');
+      errors.push('cod_orders_share');
+    }
   } else if (step === 3) {
+    if (!document.getElementById('speed_delivery_offer_to_customers').value) {
+      showBubbleError('speed_delivery_offer_to_customers', 'Please select the delivery speed you offer.');
+      errors.push('speed_delivery_offer_to_customers');
+    }
+    if (!document.getElementById('typical_package_size').value) {
+      showBubbleError('typical_package_size', 'Please select your typical package size.');
+      errors.push('typical_package_size');
+    }
+    if (!document.getElementById('average_package_weight').value) {
+      showBubbleError('average_package_weight', 'Please select your average package weight.');
+      errors.push('average_package_weight');
+    }
+    if (isFieldVisible('special_handling_detail_field')
+        && !document.getElementById('special_handling_detail').value) {
+      showBubbleError('special_handling_detail', 'Please select what kind of handling is needed.');
+      errors.push('special_handling_detail');
+    }
     if (!document.getElementById('type_of_pickup_location').value) {
       showBubbleError('type_of_pickup_location', 'Please select type of pickup location.');
       errors.push('type_of_pickup_location');

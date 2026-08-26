@@ -17,6 +17,7 @@ Related:
 """
 
 import re as _re
+import uuid
 
 from django.conf import settings
 from django.db import models
@@ -102,6 +103,294 @@ class Careers(EmailNormalizedModel, models.Model):
 
     class Meta:
         verbose_name_plural = "Careers"
+
+
+# =============================================================================
+# PRICING PLAN CATALOGUE
+# =============================================================================
+
+
+class PricingPlanOption(models.Model):
+    """
+    A quotable plan shown on the post-submission price table.
+
+    The catalogue lives in the DB rather than in the template so the sales desk
+    can change a rate, retire a plan or add a seasonal one from the admin
+    without a deploy. What a customer agreed to is never read back from here —
+    `PricingEnquiry` snapshots the name and price at agreement time, so editing
+    a row later cannot rewrite an agreement that already happened.
+
+    A row with `is_custom_quote` carries no number: it is the "discuss with the
+    sales team" choice, and picking it records intent to talk, not a price.
+    """
+    key = models.SlugField(max_length=50, unique=True,
+                           help_text="Stable identifier posted by the form. Do not rename in use.")
+    name = models.CharField(max_length=100)
+    subtitle = models.CharField(max_length=150, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+
+    # Display string is authoritative for what the customer sees ("25", "Let's talk").
+    # price_value is the same number for reporting and is left empty for custom quotes.
+    price_display = models.CharField(max_length=30, blank=True, null=True)
+    price_unit = models.CharField(max_length=60, blank=True, null=True,
+                                  help_text="e.g. 'QR per delivery'")
+    price_value = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+
+    features = models.TextField(
+        blank=True, null=True,
+        help_text="One feature per line — rendered as the ticked list on the card.")
+    is_custom_quote = models.BooleanField(
+        default=False,
+        help_text="No fixed price — selecting it means 'contact me to agree a rate'.")
+
+    badge = models.CharField(max_length=30, blank=True, null=True,
+                             help_text="Ribbon text, e.g. 'Most Popular'. Leave empty for none.")
+    is_featured = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+        verbose_name = "Pricing Plan Option"
+        verbose_name_plural = "Pricing Plan Options"
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def feature_list(self):
+        """Non-empty feature lines — templates cannot split on newlines."""
+        return [line.strip() for line in (self.features or '').splitlines() if line.strip()]
+
+    @property
+    def price_label(self):
+        """'25 QR per delivery' / 'Let's talk — custom quote' for one-line summaries."""
+        bits = [b for b in ((self.price_display or '').strip(), (self.price_unit or '').strip()) if b]
+        return ' '.join(bits) or 'Custom quote'
+
+
+# =============================================================================
+# RATE CARD — the rules behind a suggested price
+# =============================================================================
+
+
+class PricingRuleSet(models.Model):
+    """
+    A versioned rate card. Exactly one is active; suggestions snapshot which.
+
+    Kept as data rather than code for the same reason as `PricingPlanOption`:
+    the sales desk changes rates without a deploy. Versioning matters more here
+    though — a suggestion made last month must stay explainable after the card
+    is edited, so `PricingSuggestion` records the code it was computed under.
+    """
+    FLOOR_CONFIG = 'config'
+    FLOOR_MEASURED = 'measured'
+    FLOOR_BASIS_CHOICES = [
+        (FLOOR_CONFIG, 'Configured constant (not a measured cost)'),
+        (FLOOR_MEASURED, 'Measured cost to serve'),
+    ]
+
+    ROUND_NEAREST = 'nearest'
+    ROUND_UP = 'up'
+    ROUNDING_CHOICES = [(ROUND_NEAREST, 'Nearest'), (ROUND_UP, 'Always up')]
+
+    code = models.SlugField(max_length=50, unique=True)
+    name = models.CharField(max_length=120)
+    notes = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(
+        default=False, help_text="Only one rate card can be active. Activating this deactivates the rest.")
+
+    base_price_default = models.DecimalField(
+        max_digits=10, decimal_places=2, default=25,
+        help_text="Used when volume or distance is unknown. Quote high and discount — "
+                  "the opposite error is unrecoverable.")
+    min_price_floor = models.DecimalField(
+        max_digits=10, decimal_places=2, default=15,
+        help_text="Lowest price the engine will suggest. This is a CONFIGURED CONSTANT, "
+                  "not a measured cost to serve — see floor basis.")
+    floor_basis = models.CharField(max_length=10, choices=FLOOR_BASIS_CHOICES, default=FLOOR_CONFIG)
+
+    rounding_step = models.DecimalField(max_digits=6, decimal_places=2, default=1)
+    rounding_mode = models.CharField(max_length=10, choices=ROUNDING_CHOICES, default=ROUND_NEAREST)
+    max_total_discount_pct = models.DecimalField(max_digits=5, decimal_places=2, default=40)
+    max_total_uplift_pct = models.DecimalField(max_digits=5, decimal_places=2, default=60)
+
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+
+    class Meta:
+        ordering = ['-is_active', 'code']
+        verbose_name = "Rate Card"
+        verbose_name_plural = "Rate Cards"
+
+    def __str__(self):
+        return f"{self.name}{'' if self.is_active else ' (inactive)'}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Single-active invariant. Done after save so the row being activated is
+        # never the one switched off.
+        if self.is_active:
+            PricingRuleSet.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+
+    @property
+    def can_report_margin(self):
+        """The one gate that stops any screen implying we know our margin.
+
+        False while the floor is a configured guess — which it is until driver
+        earnings are actually measured per task.
+        """
+        return self.floor_basis == self.FLOOR_MEASURED
+
+
+class PricingRule(models.Model):
+    """
+    One line of a rate card: a base price, or an adjustment to it.
+
+    A single table for every dimension so the sales desk edits one changelist
+    and the engine stays one loop. Within a dimension, rules are tried in
+    `priority` order and the first match wins unless `stop_on_match` is off.
+    """
+    DIM_BASE = 'volume_distance_base'
+    DIMENSION_CHOICES = [
+        (DIM_BASE, 'Base — volume x distance'),
+        ('weight', 'Weight'),
+        ('size', 'Package size'),
+        ('speed', 'Delivery speed'),
+        ('cod', 'Cash on delivery'),
+        ('special_handling', 'Special handling'),
+        ('returns', 'Return logistics'),
+        ('pickup_locations', 'Pickup locations'),
+        ('pickups_per_day', 'Pickups per day'),
+    ]
+
+    KIND_NUMERIC = 'numeric_range'
+    KIND_BAND = 'band_exact'
+    KIND_BOOL = 'boolean_true'
+    KIND_CONTAINS = 'contains'
+    KIND_ALWAYS = 'always'
+    MATCH_KIND_CHOICES = [
+        (KIND_NUMERIC, 'Numeric range'),
+        (KIND_BAND, 'Exact band'),
+        (KIND_BOOL, 'Boolean is true'),
+        (KIND_CONTAINS, 'List contains'),
+        (KIND_ALWAYS, 'Always'),
+    ]
+
+    EFFECT_SET_BASE = 'set_base'
+    EFFECT_ADD = 'add'
+    EFFECT_PCT = 'pct'
+    EFFECT_CHOICES = [
+        (EFFECT_SET_BASE, 'Set base price'),
+        (EFFECT_ADD, 'Add QR'),
+        (EFFECT_PCT, '% of base'),
+    ]
+
+    ruleset = models.ForeignKey(PricingRuleSet, on_delete=models.CASCADE, related_name='rules')
+    dimension = models.CharField(max_length=30, choices=DIMENSION_CHOICES)
+
+    match_field = models.CharField(
+        max_length=50, help_text="Normalised input key, e.g. monthly_orders, weight_mid_kg.")
+    match_kind = models.CharField(max_length=20, choices=MATCH_KIND_CHOICES, default=KIND_NUMERIC)
+    match_value = models.CharField(max_length=120, blank=True, null=True)
+    match_min = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    match_max = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True,
+                                    help_text="Exclusive upper bound. Leave empty for open-ended.")
+    # Second axis for the base matrix — a base rule matches on volume AND distance.
+    match2_field = models.CharField(max_length=50, blank=True, null=True)
+    match2_min = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    match2_max = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+
+    effect = models.CharField(max_length=10, choices=EFFECT_CHOICES, default=EFFECT_ADD)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    label = models.CharField(max_length=120, help_text="The line sales reads on the breakdown.")
+    explanation = models.TextField(blank=True, null=True, help_text="Where this rate came from.")
+
+    priority = models.PositiveIntegerField(default=100)
+    stop_on_match = models.BooleanField(
+        default=True, help_text="Off means later rules in the same dimension can also apply (they stack).")
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+
+    class Meta:
+        ordering = ['ruleset', 'dimension', 'priority', 'id']
+        indexes = [models.Index(fields=['ruleset', 'dimension', 'priority'])]
+        verbose_name = "Rate Card Rule"
+        verbose_name_plural = "Rate Card Rules"
+
+    def __str__(self):
+        return f"{self.get_dimension_display()} — {self.label}"
+
+
+class PricingSuggestion(models.Model):
+    """
+    One computed suggestion, stored rather than recomputed on demand.
+
+    Rates change, so a suggestion has to keep the number, the inputs and the
+    rule version AS THEY WERE — otherwise suggested-vs-agreed accuracy can
+    never be measured, which is the whole point of keeping the history.
+    """
+    ACTION_NONE = 'none'
+    ACTION_ACCEPTED = 'accepted'
+    ACTION_OVERRIDDEN = 'overridden'
+    ACTION_REJECTED = 'rejected'
+    ACTION_CHOICES = [
+        (ACTION_NONE, 'No action yet'),
+        (ACTION_ACCEPTED, 'Accepted as quoted'),
+        (ACTION_OVERRIDDEN, 'Overridden by staff'),
+        (ACTION_REJECTED, 'Rejected'),
+    ]
+
+    inquiry = models.ForeignKey('PricingEnquiry', on_delete=models.CASCADE, related_name='suggestions')
+    ruleset = models.ForeignKey(PricingRuleSet, on_delete=models.PROTECT, related_name='suggestions')
+    ruleset_code = models.CharField(max_length=50)
+
+    inputs_snapshot = models.JSONField(default=dict)
+    inputs_hash = models.CharField(max_length=64, db_index=True)
+    breakdown = models.JSONField(default=list, help_text="Ordered line items with running total.")
+
+    base_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    suggested_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    clamped_reason = models.CharField(max_length=120, blank=True, null=True)
+    floor_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    floor_basis = models.CharField(max_length=10, blank=True, null=True)
+
+    comparable_median = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    comparable_p25 = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    comparable_p75 = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    comparable_sample = models.PositiveIntegerField(default=0)
+    benchmark_midpoint = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    flags = models.JSONField(default=list)
+    rationale_text = models.TextField(blank=True, null=True)
+    rationale_source = models.CharField(max_length=20, default='template')
+
+    generated_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Feedback loop — how sales actually responded to this number.
+    staff_action = models.CharField(max_length=20, choices=ACTION_CHOICES, default=ACTION_NONE)
+    staff_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    staff_note = models.TextField(blank=True, null=True)
+    acted_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+                                 related_name='+')
+    acted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Pricing Suggestion"
+        verbose_name_plural = "Pricing Suggestions"
+
+    def __str__(self):
+        price = self.suggested_price if self.suggested_price is not None else 'no price'
+        return f"#{self.inquiry_id} — {price} ({self.ruleset_code})"
 
 
 # =============================================================================
@@ -222,6 +511,9 @@ class PricingEnquiry(EmailNormalizedModel, models.Model):
 
     # Pricing-relevant detail fields
     cod_orders_share = models.CharField(max_length=50, blank=True, null=True)             # shown when COD = Yes; e.g. "Below 25%"
+    # The rate matrix is priced per distance band, so this is the single most
+    # load-bearing answer on the form for a suggested price.
+    typical_delivery_distance = models.CharField(max_length=50, blank=True, null=True)    # e.g. "10-15 km", "Not sure"
     fulfillment_storage_volume = models.CharField(max_length=100, blank=True, null=True)  # shown when Doha hub = Yes; e.g. "1-5 pallets"
     current_delivery_cost = models.CharField(max_length=50, blank=True, null=True)        # optional benchmark; e.g. "10-15 QAR"
     special_handling_detail = models.CharField(max_length=200, blank=True, null=True)     # shown when special handling = Yes; multi e.g. "Fragile, Chilled / Frozen"
@@ -232,6 +524,48 @@ class PricingEnquiry(EmailNormalizedModel, models.Model):
 
     # Completion status — False for partial (in-progress), True for fully submitted
     is_complete = models.BooleanField(default=False)
+    # Set when the "you left the form half-finished" WhatsApp nudge goes out, so
+    # a lead is never messaged about the same abandoned form twice.
+    resume_nudge_sent_at = models.DateTimeField(blank=True, null=True)
+
+    # ── Quote selection ───────────────────────────────────────────────────────
+    # After submitting, the sender lands on a price table and picks a plan. The
+    # page is reachable by this token alone, never by pk: it is handed to an
+    # anonymous visitor and a sequential id would let anyone walk the table.
+    quote_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, null=True)
+    selected_plan = models.ForeignKey(
+        PricingPlanOption, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='agreements'
+    )
+    # Snapshot of the plan as it read the moment they agreed. Kept separately
+    # from the FK so a later price edit in the catalogue cannot silently change
+    # what this customer is on record as having accepted.
+    agreed_plan_name = models.CharField(max_length=100, blank=True, null=True)
+    agreed_price_display = models.CharField(max_length=30, blank=True, null=True)
+    agreed_price_unit = models.CharField(max_length=60, blank=True, null=True)
+    agreed_price_value = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    plan_agreed_at = models.DateTimeField(blank=True, null=True)
+    plan_agreement_ip = models.GenericIPAddressField(blank=True, null=True)
+    plan_agreement_user_agent = models.CharField(max_length=255, blank=True, null=True)
+    plan_agreement_note = models.TextField(blank=True, null=True)
+
+    # ── Staff quote ───────────────────────────────────────────────────────────
+    # Deliberately separate from the agreed_* block above. That block is the
+    # CUSTOMER's record, stamped with their IP and user agent when they clicked
+    # confirm; staff accepting a suggested rate must never be able to forge it.
+    quoted_price_value = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    quoted_price_unit = models.CharField(max_length=60, blank=True, null=True)
+    quoted_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+                                  related_name='+')
+    quoted_at = models.DateTimeField(blank=True, null=True)
+    quoted_note = models.TextField(blank=True, null=True)
+
+    # Latest computed suggestion, plus a denormalised copy so the list page can
+    # sort and filter on it without joining.
+    latest_suggestion = models.ForeignKey('PricingSuggestion', null=True, blank=True,
+                                          on_delete=models.SET_NULL, related_name='+')
+    suggested_price_value = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    suggested_price_at = models.DateTimeField(blank=True, null=True)
 
     # CRM status — managed by staff
     STATUS_NEW = 'new'
@@ -263,6 +597,28 @@ class PricingEnquiry(EmailNormalizedModel, models.Model):
 
     def __str__(self):
         return self.business_name
+
+    # ── Quote selection ───────────────────────────────────────────────────────
+
+    @property
+    def has_agreed_plan(self):
+        return self.plan_agreed_at is not None
+
+    @property
+    def agreed_price_label(self):
+        """'25 QR per delivery' — the snapshot, not the live catalogue row."""
+        if not self.has_agreed_plan:
+            return ''
+        bits = [b for b in ((self.agreed_price_display or '').strip(),
+                            (self.agreed_price_unit or '').strip()) if b]
+        return ' '.join(bits) or 'Custom quote'
+
+    def get_quote_url(self):
+        """Token URL of the price table — safe to send to the customer."""
+        from django.urls import reverse
+        if not self.quote_token:
+            return ''
+        return reverse('webpages:inquiry_quote', kwargs={'token': self.quote_token})
 
     # ── Online presence ───────────────────────────────────────────────────────
     # These four columns are free text from a public form that asks for "username

@@ -52,9 +52,11 @@ Related:
 
 import logging
 import random
+import uuid
 from urllib.parse import quote
 from django.forms.fields import DateTimeField
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.http import require_http_methods
@@ -210,6 +212,9 @@ def _save_step1_to_db(inquiry, data):
     inquiry.is_registered_company_in_qatar = data.get('is_registered_company_in_qatar', 'False') == 'True'
     inquiry.business_location_country = data.get('business_location_country', '')
     inquiry.is_team_available_in_qatar = data.get('is_team_available_in_qatar', 'False') == 'True'
+    inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar = data.get('is_required_fulfillment_service_for_operate_from_outside_qatar', 'False') == 'True'
+    inquiry.is_required_fulfillment_service_for_make_hub_in_doha = data.get('is_required_fulfillment_service_for_make_hub_in_doha', 'False') == 'True'
+    inquiry.fulfillment_storage_volume = data.get('fulfillment_storage_volume', '')
     inquiry.average_order_value_qar = data.get('average_order_value_qar', '')
     inquiry.business_operating_age = data.get('business_operating_age', '')
     inquiry.save()
@@ -222,14 +227,12 @@ def _save_step2_to_db(inquiry, data):
     inquiry.avarage_number_of_order_expect_next_month = data.get('avarage_number_of_order_expect_next_month', '')
     inquiry.orders_expected_in_next_3_months_milestone = data.get('orders_expected_in_next_3_months_milestone', '')
     inquiry.is_required_COD_service = data.get('is_required_COD_service', 'False') == 'True'
-    inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar = data.get('is_required_fulfillment_service_for_operate_from_outside_qatar', 'False') == 'True'
-    inquiry.is_required_fulfillment_service_for_make_hub_in_doha = data.get('is_required_fulfillment_service_for_make_hub_in_doha', 'False') == 'True'
     inquiry.current_courier_provider = data.get('current_courier_provider', '')
     inquiry.delivery_coverage = data.get('delivery_coverage', '')
     inquiry.is_return_logistics_required = data.get('is_return_logistics_required', 'False') == 'True'
     inquiry.preferred_start_date = data.get('preferred_start_date', '')
+    inquiry.typical_delivery_distance = data.get('typical_delivery_distance', '')
     inquiry.cod_orders_share = data.get('cod_orders_share', '')
-    inquiry.fulfillment_storage_volume = data.get('fulfillment_storage_volume', '')
     inquiry.current_delivery_cost = data.get('current_delivery_cost', '')
     inquiry.save()
 
@@ -257,6 +260,141 @@ def _save_step3_to_db(inquiry, data):
     inquiry.additional_notes = data.get('additional_notes', '')
     inquiry.contact_consent = data.get('contact_consent') == 'on'
     inquiry.save()
+
+
+# Answers the rate card needs to price a lead properly. Enforced here as well as
+# in the form's JavaScript, which a determined submitter can simply skip — a lead
+# that arrives without these gets a defaulted price and a "priced manually" flag.
+# Field -> the message shown when it is blank.
+PRICING_REQUIRED_FIELDS = {
+    2: [
+        ('typical_delivery_distance', 'Please select your typical delivery distance.'),
+        ('delivery_coverage', 'Please select delivery coverage.'),
+    ],
+    3: [
+        ('speed_delivery_offer_to_customers', 'Please select the delivery speed you offer.'),
+        ('typical_package_size', 'Please select your typical package size.'),
+        ('average_package_weight', 'Please select your average package weight.'),
+    ],
+}
+
+
+def _inquiry_to_session_data(inquiry):
+    """Rebuild the form's session dict from a saved record.
+
+    The inverse of the three _save_stepN_to_db functions, and it has to stay in
+    step with them: the form reads everything back out of session as POST-shaped
+    strings, so booleans go back as 'True'/'False', never as bools.
+    """
+    def b(value):
+        return 'True' if value else 'False'
+
+    return {
+        # step 1
+        'full_name': inquiry.full_name or '',
+        'business_name': inquiry.business_name or '',
+        'business_contact_number': inquiry.business_contact_number or '',
+        'operation_team_contact_number': inquiry.operation_team_contact_number or '',
+        'email': inquiry.email or '',
+        'website_url': inquiry.website_url or '',
+        'instagram_profile': inquiry.instagram_profile or '',
+        'facebook_profile': inquiry.facebook_profile or '',
+        'social_profile': inquiry.social_profile or '',
+        'product_category': inquiry.product_category or '',
+        'is_personalized_product': b(inquiry.is_personalized_product),
+        'is_located_in_qatar': b(inquiry.is_located_in_qatar),
+        'is_registered_company_in_qatar': b(inquiry.is_registered_company_in_qatar),
+        'business_location_country': inquiry.business_location_country or '',
+        'is_team_available_in_qatar': b(inquiry.is_team_available_in_qatar),
+        'is_required_fulfillment_service_for_operate_from_outside_qatar':
+            b(inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar),
+        'is_required_fulfillment_service_for_make_hub_in_doha':
+            b(inquiry.is_required_fulfillment_service_for_make_hub_in_doha),
+        'fulfillment_storage_volume': inquiry.fulfillment_storage_volume or '',
+        'average_order_value_qar': inquiry.average_order_value_qar or '',
+        'business_operating_age': inquiry.business_operating_age or '',
+        # step 2
+        'avarage_number_of_order_last_week': inquiry.avarage_number_of_order_last_week or '',
+        'avarage_number_of_order_done_last_month': inquiry.avarage_number_of_order_done_last_month or '',
+        'avarage_number_of_order_expect_next_month': inquiry.avarage_number_of_order_expect_next_month or '',
+        'orders_expected_in_next_3_months_milestone': inquiry.orders_expected_in_next_3_months_milestone or '',
+        'is_required_COD_service': b(inquiry.is_required_COD_service),
+        'current_courier_provider': inquiry.current_courier_provider or '',
+        'delivery_coverage': inquiry.delivery_coverage or '',
+        'is_return_logistics_required': b(inquiry.is_return_logistics_required),
+        'preferred_start_date': inquiry.preferred_start_date or '',
+        'typical_delivery_distance': inquiry.typical_delivery_distance or '',
+        'cod_orders_share': inquiry.cod_orders_share or '',
+        'current_delivery_cost': inquiry.current_delivery_cost or '',
+        # step 3
+        'speed_delivery_offer_to_customers': inquiry.speed_delivery_offer_to_customers or '',
+        'is_frequent_same_day_pick_and_delivery_required':
+            b(inquiry.is_frequent_same_day_pick_and_delivery_required),
+        'preferred_delivery_time_window': inquiry.preferred_delivery_time_window or '',
+        'typical_package_size': inquiry.typical_package_size or '',
+        'is_special_handling_required': b(inquiry.is_special_handling_required),
+        'special_handling_detail': inquiry.special_handling_detail or '',
+        'average_package_weight': inquiry.average_package_weight or '',
+        'type_of_pickup_location': inquiry.type_of_pickup_location or '',
+        'pickup_Location_area_name': inquiry.pickup_Location_area_name or '',
+        'pickup_location_time_slab': inquiry.pickup_location_time_slab or '',
+        'preferred_pickup_time': inquiry.preferred_pickup_time or '',
+        'number_of_pickup_times_in_day': inquiry.number_of_pickup_times_in_day or '1',
+        'number_of_pickup_locations': inquiry.number_of_pickup_locations or '',
+        'order_management_system': inquiry.order_management_system or '',
+        'preferred_communication_channel': inquiry.preferred_communication_channel or '',
+        'is_delivery_free_to_customers': inquiry.is_delivery_free_to_customers or '',
+        'preferred_payment_method': inquiry.preferred_payment_method or '',
+        'additional_notes': inquiry.additional_notes or '',
+    }
+
+
+def inquiry_resume_step(inquiry):
+    """The step to drop a returning lead on — the first one still missing an answer.
+
+    Judged on the same required fields the Next button enforces, so the lead
+    lands where they were actually stopped rather than back at the top.
+    """
+    data = _inquiry_to_session_data(inquiry)
+    for step in (2, 3):
+        if _missing_pricing_answer(step, data):
+            return step
+    return 3
+
+
+def _missing_pricing_answer(step, data):
+    """First unanswered required field for this step, or ''.
+
+    Conditional questions only count when the answer that reveals them was Yes —
+    otherwise a lead with no COD would be blocked by a field they never saw.
+    """
+    for field, message in PRICING_REQUIRED_FIELDS.get(step, []):
+        if not (data.get(field) or '').strip():
+            return message
+    if step == 2 and data.get('is_required_COD_service') == 'True':
+        if not (data.get('cod_orders_share') or '').strip():
+            return 'Please select roughly what share of your orders are COD.'
+    if step == 3 and data.get('is_special_handling_required') == 'True':
+        if not (data.get('special_handling_detail') or '').strip():
+            return 'Please select what kind of special handling is needed.'
+    return ''
+
+
+def _render_inquiry_step(request, step, all_data, error):
+    """Re-render a step with an error banner, keeping everything already typed."""
+    return render(request, 'webpages/delivery_pricing_inquiry.html', {
+        'seo': SEOMetadata.get_page_meta(
+            title="Get Delivery Quote Qatar | 3PL Pricing Inquiry",
+            description=(
+                "Request a customized delivery quote for your Qatar business. Fill out our 3PL pricing "
+                "inquiry form. Fast response, competitive rates, no obligation."
+            ),
+        ),
+        'current_step': step,
+        'saved_data': _derive_business_status(all_data),
+        'total_steps': 3,
+        'inquiry_error': error,
+    })
 
 
 def delivery_inquiry(request):
@@ -324,8 +462,18 @@ def delivery_inquiry(request):
             if additional_info:
                 wa_message += f". Additional info: {additional_info}"
 
-            # WhatsApp business number (replace with actual number)
-            wa_number = "97466451589"  # Example Qatar number
+            # The number this chat opens with is the CRM — Business Leads sender
+            # route (Auto Triggers page), not a literal: the prospect must land
+            # in the same thread the quote thank-you and every sales reply come
+            # from, or the conversation splits across two of our numbers.
+            from core.whatsapp_utils import section_number
+            wa_number = section_number('crm_leads')
+            if not wa_number:
+                logger.error('No WhatsApp number configured for the public quick inquiry link')
+                return JsonResponse(
+                    {'success': False,
+                     'error': 'WhatsApp is unavailable right now — we have saved your details '
+                              'and will contact you.'})
             wa_link = f"https://wa.me/{wa_number}?text={quote(wa_message)}"
 
             return JsonResponse({'success': True, 'redirect_url': wa_link})
@@ -361,20 +509,9 @@ def delivery_inquiry(request):
                     for field in ('website_url', 'instagram_profile', 'facebook_profile')
                 )
                 if not has_online_presence:
-                    data = {
-                        'seo': SEOMetadata.get_page_meta(
-                            title="Get Delivery Quote Qatar | 3PL Pricing Inquiry",
-                            description=(
-                                "Request a customized delivery quote for your Qatar business. Fill out our 3PL pricing "
-                                "inquiry form. Fast response, competitive rates, no obligation."
-                            ),
-                        ),
-                        'current_step': 1,
-                        'saved_data': _derive_business_status(all_data),
-                        'total_steps': 3,
-                        'inquiry_error': 'Please provide at least one: Website URL, Instagram, or Facebook.',
-                    }
-                    return render(request, 'webpages/delivery_pricing_inquiry.html', data)
+                    return _render_inquiry_step(
+                        request, 1, all_data,
+                        'Please provide at least one: Website URL, Instagram, or Facebook.')
                 if inquiry is None:
                     # Create new partial record
                     inquiry = PricingEnquiry(is_complete=False)
@@ -382,6 +519,9 @@ def delivery_inquiry(request):
                 request.session['inquiry_id'] = inquiry.id
                 request.session.modified = True
             elif current_step == 2:
+                error = _missing_pricing_answer(2, all_data)
+                if error:
+                    return _render_inquiry_step(request, 2, all_data, error)
                 if inquiry:
                     _save_step2_to_db(inquiry, all_data)
 
@@ -400,6 +540,9 @@ def delivery_inquiry(request):
             return redirect(f'/3pl/inquiry/?step={prev_step}')
 
         elif 'submit_final' in request.POST:
+            error = _missing_pricing_answer(3, all_data)
+            if error:
+                return _render_inquiry_step(request, 3, all_data, error)
             if inquiry is None:
                 # Fallback: create from all session data (shouldn't normally happen)
                 inquiry = PricingEnquiry(is_complete=False)
@@ -408,6 +551,10 @@ def delivery_inquiry(request):
 
             _save_step3_to_db(inquiry, all_data)
             inquiry.is_complete = True
+            # A row that predates the token column would otherwise 500 on the
+            # redirect below, at the very last step of the form.
+            if not inquiry.quote_token:
+                inquiry.quote_token = uuid.uuid4()
             inquiry.save()
 
             # A submitted quote request is proof of intent — attribute any later signup to it
@@ -437,7 +584,10 @@ def delivery_inquiry(request):
             request.session.pop('inquiry_step', None)
             request.session.pop('inquiry_id', None)
 
-            return redirect('webpages:inquiry_success')
+            # Straight to the price table. The token carries identity from here,
+            # not the session, so the link survives the clear above and can be
+            # re-sent by sales if the sender closes the tab.
+            return redirect('webpages:inquiry_quote', token=inquiry.quote_token)
 
     # Get saved data from session
     saved_data = request.session.get('inquiry_data', {})
@@ -460,13 +610,184 @@ def delivery_inquiry(request):
     return render(request, 'webpages/delivery_pricing_inquiry.html', data)
 
 
+def _quote_inquiry_or_404(token):
+    """The token is the only accepted key — a pk would be walkable by anyone."""
+    return get_object_or_404(
+        PricingEnquiry.objects.select_related('selected_plan'),
+        quote_token=token, is_complete=True,
+    )
+
+
+def inquiry_resume(request, token):
+    """Pick a half-finished inquiry back up from the WhatsApp nudge link.
+
+    The form keeps its progress in the session, so a lead returning on their
+    phone — a different browser from the one they started in — would otherwise
+    face an empty form. This loads the saved record back into the session and
+    drops them on the first step still missing an answer.
+
+    Token-keyed, never by id, for the same reason as the quote page: the link
+    travels over WhatsApp and must not be walkable to anyone else's record. A
+    lead who has since finished goes to their rate sheet instead of a form.
+    """
+    inquiry = get_object_or_404(PricingEnquiry, quote_token=token)
+    if inquiry.is_complete:
+        return redirect('webpages:inquiry_quote', token=inquiry.quote_token)
+
+    request.session['inquiry_data'] = _inquiry_to_session_data(inquiry)
+    request.session['inquiry_id'] = inquiry.id
+    step = inquiry_resume_step(inquiry)
+    request.session['inquiry_step'] = step
+    request.session.modified = True
+    return redirect(f'/3pl/inquiry/?step={step}')
+
+
+def inquiry_quote(request, token):
+    """Price table shown right after the inquiry is submitted.
+
+    Reached by token, never by id: the sender is anonymous at this point, and
+    the page carries their own submission back to them. Choosing a plan is an
+    indication of intent — the rate is still confirmed by the sales desk — so
+    it moves the CRM status to Quoted rather than closing anything.
+    """
+    inquiry = _quote_inquiry_or_404(token)
+    plans = list(webpages_models.PricingPlanOption.objects.filter(is_active=True))
+    error = ''
+
+    if request.method == 'POST':
+        plan_key = (request.POST.get('plan') or '').strip()
+        plan = next((p for p in plans if p.key == plan_key), None)
+        if plan is None:
+            error = 'Please choose one of the options above.'
+        elif request.POST.get('confirm_agree') != 'on':
+            error = 'Please tick the confirmation box to continue.'
+        # Counted only once the submission is valid, and on its own group: a
+        # customer who forgets the tick box twice must not burn their quota,
+        # and the multi-step form legitimately POSTs once per step elsewhere.
+        elif is_ratelimited(request, group='quote_agree', key='ip',
+                            rate=PUBLIC_FORM_RATE, method='POST', increment=True):
+            error = RATE_LIMIT_MESSAGE
+        else:
+            note = sanitize_text(request.POST.get('plan_agreement_note') or '')[:2000]
+            inquiry.selected_plan = plan
+            # Snapshot, so editing the catalogue later cannot rewrite this.
+            inquiry.agreed_plan_name = plan.name[:100]
+            inquiry.agreed_price_display = (plan.price_display or '')[:30]
+            inquiry.agreed_price_unit = (plan.price_unit or '')[:60]
+            inquiry.agreed_price_value = None if plan.is_custom_quote else plan.price_value
+            inquiry.plan_agreed_at = timezone.now()
+            inquiry.plan_agreement_ip = request.META.get('REMOTE_ADDR') or None
+            inquiry.plan_agreement_user_agent = (request.META.get('HTTP_USER_AGENT') or '')[:255]
+            inquiry.plan_agreement_note = note or None
+
+            status_moved = False
+            if inquiry.crm_status == PricingEnquiry.STATUS_NEW:
+                # Only ever lifts a brand-new lead. A lead already Converted
+                # or Lost must not be dragged back to Quoted by a re-visit.
+                inquiry.crm_status = PricingEnquiry.STATUS_QUOTED
+                status_moved = True
+            inquiry.save()
+
+            if plan.is_custom_quote:
+                body = f'Customer asked to discuss pricing with the sales team ({plan.name})'
+            else:
+                body = f'Customer agreed to {plan.name} — {plan.price_label}'
+            if note:
+                body += f'. Note: {note[:300]}'
+            if status_moved:
+                body += '. Status moved to Quoted'
+            webpages_models.PricingEnquiryActivity.objects.create(
+                inquiry=inquiry,
+                activity_type=webpages_models.PricingEnquiryActivity.TYPE_STATUS_CHANGE,
+                body=body,
+            )
+
+            # One-shot flag for the congratulations popup on the success page.
+            # A fixed rate is a deal to celebrate and onboard; a custom quote is
+            # still waiting on a sales call, so it gets no dashboard promise.
+            if not plan.is_custom_quote:
+                request.session['quote_celebrate'] = str(inquiry.quote_token)
+                request.session.modified = True
+
+            # CRM and WhatsApp are best-effort — neither may break the
+            # customer's confirmation.
+            if status_moved:
+                try:
+                    from crm.services import sync_lead_from_pricing_status
+                    sync_lead_from_pricing_status(inquiry)
+                except Exception:
+                    logger.exception('CRM lead sync failed for PricingEnquiry %s', inquiry.pk)
+            try:
+                from core.whatsapp_utils import send_quote_agreement_notification
+                send_quote_agreement_notification(inquiry)
+            except Exception:
+                logger.exception('Quote agreement WhatsApp failed for PricingEnquiry %s', inquiry.pk)
+
+            return redirect(
+                reverse('webpages:inquiry_success') + f'?t={inquiry.quote_token}'
+            )
+
+    # A one-off personal sender is on the wrong form — offer them the P2P page
+    # rather than a business rate card. Never blocks: the plans still render.
+    try:
+        from webpages.pricing.routing import p2p_signals
+        p2p = p2p_signals(inquiry)
+    except Exception:
+        logger.exception('P2P routing check failed for PricingEnquiry %s', inquiry.pk)
+        p2p = None
+
+    meta = SEOMetadata.get_page_meta(
+        title="Choose Your Delivery Plan | EzzyDelivery Qatar",
+        description="Select the delivery plan that fits your business and confirm it with our team.",
+    )
+    return render(request, 'webpages/inquiry_quote.html', {
+        'p2p': p2p,
+        'seo': meta,
+        'inquiry': inquiry,
+        'plans': plans,
+        'quote_error': error,
+        # Pre-select what they picked last time when they come back to change it.
+        'selected_key': (request.POST.get('plan')
+                         or (inquiry.selected_plan.key if inquiry.selected_plan else '')),
+    })
+
+
 def inquiry_success(request):
-    """Success page shown after completing the 3PL pricing inquiry."""
+    """Success page shown after completing the 3PL pricing inquiry.
+
+    Renders the chosen plan when the quote token is on the URL; without it the
+    page is the plain thank-you it has always been.
+    """
     meta = SEOMetadata.get_page_meta(
         title="Inquiry Submitted | EzzyDelivery Qatar",
         description="Your 3PL pricing inquiry has been submitted successfully. Our team will reach out within 24 hours.",
     )
-    return render(request, 'webpages/inquiry_success.html', {'seo': meta})
+    inquiry = None
+    token = (request.GET.get('t') or '').strip()
+    if token:
+        try:
+            inquiry = PricingEnquiry.objects.select_related('selected_plan').get(
+                quote_token=uuid.UUID(token), is_complete=True,
+            )
+        except (PricingEnquiry.DoesNotExist, ValueError, TypeError):
+            inquiry = None
+
+    # Congratulations popup: fires once, on the hop straight from confirming a
+    # fixed rate. Popping the flag means a reload or a bookmark does not replay
+    # it — the receipt below carries the same signup CTA permanently.
+    celebrate = bool(inquiry) and request.session.pop('quote_celebrate', None) == token
+    if celebrate:
+        request.session.modified = True
+        # They accepted a rate: whatever brought them here, the signup that
+        # follows belongs to this pricing inquiry.
+        from core import signup_origin
+        signup_origin.mark_intent(request, signup_origin.SOURCE_PRICING)
+
+    return render(request, 'webpages/inquiry_success.html', {
+        'seo': meta,
+        'inquiry': inquiry,
+        'celebrate': celebrate,
+    })
 
 
 @login_required

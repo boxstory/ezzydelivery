@@ -9,7 +9,8 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260223b" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260816a" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/inquiry_quote.css' %}?v=20260817a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -21,12 +22,125 @@
         <i class="fa fa-check"></i>
       </div>
       <h1 class="display-4 fw-bold mb-3">Thank You!</h1>
+      {% if inquiry.has_agreed_plan %}
+      <p class="lead mb-0">
+        {% if inquiry.selected_plan.is_custom_quote %}
+        Your request is with our sales team.<br>We'll call you to agree your rate.
+        {% else %}
+        Your plan selection is recorded.<br>Our team will confirm it with you within 24 hours.
+        {% endif %}
+      </p>
+      {% else %}
       <p class="lead mb-0">Your inquiry has been submitted successfully.<br>Our team will reach out within 24 hours.</p>
+      {% endif %}
     </div>
   </div>
 </div>
 
 <div class="container mb-5">
+
+  {% if inquiry.has_agreed_plan %}
+  <!-- Selected plan receipt -->
+  <div class="wpq__receipt" id="wpq_receipt">
+    <div class="wpq__receipt-head">
+      <span>Your Selection</span>
+      <span>Quotation QTN-{{ inquiry.pk }}</span>
+    </div>
+    <div class="wpq__receipt-body">
+      <div class="wpq__receipt-plan">
+        <span class="wpq__receipt-label">Plan</span>
+        <span class="wpq__receipt-name">{{ inquiry.agreed_plan_name }}</span>
+      </div>
+      <div class="wpq__receipt-plan">
+        <span class="wpq__receipt-label">
+          {% if inquiry.selected_plan.is_custom_quote %}Status{% else %}Rate{% endif %}
+        </span>
+        <span class="wpq__receipt-price">
+          {% if inquiry.selected_plan.is_custom_quote %}Sales team will call you{% else %}{{ inquiry.agreed_price_label }}{% endif %}
+        </span>
+      </div>
+      <div class="wpq__receipt-plan">
+        <span class="wpq__receipt-label">Confirmed</span>
+        <span class="wpq__receipt-meta">{{ inquiry.plan_agreed_at|date:"d M Y, H:i" }}</span>
+      </div>
+    </div>
+    <div class="wpq__receipt-foot">
+      {% if not inquiry.selected_plan.is_custom_quote %}
+      <a href="{% url 'account_signup' %}" class="wpq__receipt-cta">
+        <i class="fa-solid fa-arrow-right-to-bracket"></i>Create my dashboard account
+      </a>
+      {% endif %}
+      <a href="{% url 'webpages:inquiry_quote' token=inquiry.quote_token %}" class="wpq__wa-link">
+        <i class="fa-solid fa-rotate-left"></i>Change my selection
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if celebrate %}
+  <!-- Congratulations — fires once, straight after a fixed rate is confirmed -->
+  <div class="wpq__modal" id="wpq_celebrate" role="dialog" aria-modal="true"
+       aria-labelledby="wpq_celebrate_title" hidden>
+    <div class="wpq__modal-backdrop" data-wpq-close></div>
+    <div class="wpq__modal-card">
+      <button type="button" class="wpq__modal-x" data-wpq-close aria-label="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="wpq__modal-icon"><i class="fa-solid fa-champagne-glasses"></i></div>
+
+      <h2 class="wpq__modal-title" id="wpq_celebrate_title">Congratulations, {{ inquiry.business_name }}!</h2>
+
+      <p class="wpq__modal-text">
+        Your <strong>{{ inquiry.agreed_plan_name }}</strong> at
+        <strong>{{ inquiry.agreed_price_label }}</strong> is confirmed.
+      </p>
+
+      <div class="wpq__modal-eta">
+        <i class="fa-solid fa-clock"></i>
+        <span>Your dashboard will be ready in about <strong>10 minutes</strong>.</span>
+      </div>
+
+      <p class="wpq__modal-ask">Are you ready to set up your account?</p>
+
+      <div class="wpq__modal-actions">
+        <a href="{% url 'account_signup' %}" class="wpq__modal-btn wpq__modal-btn--go">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i>Yes, I'm ready
+        </a>
+        <button type="button" class="wpq__modal-btn wpq__modal-btn--later" data-wpq-close>
+          I'll do it later
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Opened from markup rather than a timer so it is on screen the moment the
+    // page paints; Esc, the backdrop and both dismiss controls all close it.
+    (function () {
+      var modal = document.getElementById('wpq_celebrate');
+      if (!modal) { return; }
+      modal.hidden = false;
+      document.body.classList.add('wpq-modal-open');
+
+      function close() {
+        modal.hidden = true;
+        document.body.classList.remove('wpq-modal-open');
+      }
+
+      modal.querySelectorAll('[data-wpq-close]').forEach(function (el) {
+        el.addEventListener('click', close);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !modal.hidden) { close(); }
+      });
+
+      var go = modal.querySelector('.wpq__modal-btn--go');
+      if (go) { go.focus(); }
+    })();
+  </script>
+  {% endif %}
+
   <!-- Client Help Portal CTA -->
   <div class="success-portal-card text-center mb-5">
     <h2 class="fw-bold mb-2" style="color: #001f3f;">While You Wait</h2>

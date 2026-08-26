@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Post-submission rate sheet — the sender picks a plan and confirms it, on a token URL.
+Used by: webpages.views.inquiry_quote (context: inquiry, plans, selected_key, quote_error).
+Notes: Continues the consignment-note voice of delivery_pricing_inquiry.html as step 4; a plan with
+       is_custom_quote carries no price and confirms a call-back, not a rate.
+{% endcomment %}
+{% block title %}Choose Your Delivery Plan | EzzyDelivery Qatar{% endblock title %}
+
+{% block seo %}
+<meta name="description" content="Select the delivery plan that fits your business and confirm it with the EzzyDelivery team.">
+<meta name="robots" content="noindex, nofollow">
+{% endblock seo %}
+
+{% block extra_css %}
+<link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260816a" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/inquiry_quote.css' %}?v=20260817a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     HERO — quotation header
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="wppi__hero" id="wpq_hero">
+  <div class="wppi__hero-barcode d-none d-lg-block"></div>
+  <div class="container position-relative">
+    <div class="wppi__hero-inner">
+
+      <div class="wppi__hero-kicker" id="wpq_hero_kicker">Quotation &middot; Ref QTN-{{ inquiry.pk }}</div>
+
+      <h1 class="wppi__hero-title" id="wpq_hero_title">
+        Choose your<br>delivery rate.
+      </h1>
+      <p class="wppi__hero-sub" id="wpq_hero_sub">
+        Thanks {{ inquiry.full_name|default:inquiry.business_name }} — your details are with our team.
+        Pick the plan that fits {{ inquiry.business_name }} and we'll confirm it with you.
+      </p>
+
+    </div>
+  </div>
+</div>
+
+<div class="container mb-5" id="wpq_wrap">
+
+  <!-- Progress — steps 1-3 done, rate selection current -->
+  <div class="wppi__progress" id="wpq_progress">
+    <div class="wppi__steps">
+      <div class="wppi__step completed">
+        <div class="wppi__step-circle"><i class="fa-solid fa-check"></i></div>
+        <div class="wppi__step-label">Company &amp; Product</div>
+      </div>
+      <div class="wppi__step-connector"></div>
+      <div class="wppi__step completed">
+        <div class="wppi__step-circle"><i class="fa-solid fa-check"></i></div>
+        <div class="wppi__step-label">Operations &amp; Orders</div>
+      </div>
+      <div class="wppi__step-connector"></div>
+      <div class="wppi__step completed">
+        <div class="wppi__step-circle"><i class="fa-solid fa-check"></i></div>
+        <div class="wppi__step-label">Delivery &amp; Pickup</div>
+      </div>
+      <div class="wppi__step-connector"></div>
+      <div class="wppi__step active">
+        <div class="wppi__step-circle"><span>4</span></div>
+        <div class="wppi__step-label">Your Rate</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rate sheet -->
+  <div class="wppi__form-card" id="wpq_sheet">
+    <div class="wppi__doc-header">
+      <span>Ezzy Delivery &middot; Doha, Qatar</span>
+      <span>Quotation QTN-{{ inquiry.pk }}</span>
+    </div>
+
+    {% if inquiry.has_agreed_plan %}
+    <div class="wpq__stamp" id="wpq_stamp">
+      <i class="fa-solid fa-circle-check wpq__stamp-icon"></i>
+      <div class="wpq__stamp-body">
+        <div class="wpq__stamp-title">
+          {% if inquiry.selected_plan.is_custom_quote %}Call-back requested{% else %}Rate confirmed{% endif %}
+        </div>
+        <div class="wpq__stamp-text">
+          You selected <strong>{{ inquiry.agreed_plan_name }}</strong>
+          {% if not inquiry.selected_plan.is_custom_quote %} — {{ inquiry.agreed_price_label }}{% endif %}
+          on {{ inquiry.plan_agreed_at|date:"d M Y, H:i" }}.
+          You can change it below until our team confirms with you.
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if quote_error %}
+    <div class="wpq__alert" id="wpq_error" role="alert">
+      <i class="fa-solid fa-triangle-exclamation"></i><span>{{ quote_error }}</span>
+    </div>
+    {% endif %}
+
+    <form method="POST" id="wpq_form" novalidate>
+      {% csrf_token %}
+
+      {% if p2p.is_likely_p2p %}
+      {% comment %}
+      Their answers read like a one-off personal delivery. The plans below are
+      priced for recurring business volume, so point at P2P — as an offer,
+      never a block, because the guess can be wrong.
+      {% endcomment %}
+      <div class="wpq__p2p" id="wpq_p2p_nudge">
+        <i class="fa-solid fa-box wpq__p2p-icon"></i>
+        <div class="wpq__p2p-body">
+          <div class="wpq__p2p-title">Sending a one-off or personal parcel?</div>
+          <p class="wpq__p2p-text">
+            The plans below are priced for stores shipping regularly. For a single
+            delivery, our peer-to-peer service is usually cheaper and quicker to book.
+          </p>
+          <a href="{% url 'webpages:p2p_pricing' %}" class="wpq__p2p-link">
+            See P2P pricing <i class="fa-solid fa-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="wpq__intro">
+        <span class="wpq__intro-label">Available plans</span>
+        <p class="wpq__intro-text">
+          Select one option. Prices are quoted in Qatari Riyal and confirmed by our
+          team before your first pickup.
+        </p>
+      </div>
+
+      <div class="wpq__grid" id="wpq_plans">
+        <div class="row g-3">
+        {% for plan in plans %}
+        <div class="col-12 col-md-6">
+          <label class="wpq__plan {% if plan.is_featured %}wpq__plan--featured{% endif %}"
+                 for="wpq_plan_{{ plan.key }}">
+            <input class="wpq__plan-input" type="radio" name="plan" value="{{ plan.key }}"
+                   id="wpq_plan_{{ plan.key }}"
+                   {% if selected_key == plan.key %}checked{% endif %}>
+            <span class="wpq__plan-card">
+              {% if plan.badge %}<span class="wpq__plan-badge">{{ plan.badge }}</span>{% endif %}
+
+              <span class="wpq__plan-head">
+                <span class="wpq__plan-tick"><i class="fa-solid fa-check"></i></span>
+                <span class="wpq__plan-titles">
+                  <span class="wpq__plan-name">{{ plan.name }}</span>
+                  {% if plan.subtitle %}<span class="wpq__plan-sub">{{ plan.subtitle }}</span>{% endif %}
+                </span>
+              </span>
+
+              <span class="wpq__plan-price {% if plan.is_custom_quote %}wpq__plan-price--custom{% endif %}">
+                <span class="wpq__plan-amount">{{ plan.price_display|default:"—" }}</span>
+                {% if plan.price_unit %}<span class="wpq__plan-unit">{{ plan.price_unit }}</span>{% endif %}
+              </span>
+
+              {% if plan.description %}
+              <span class="wpq__plan-desc">{{ plan.description }}</span>
+              {% endif %}
+
+              {% if plan.feature_list %}
+              <span class="wpq__plan-features">
+                {% for feature in plan.feature_list %}
+                <span class="wpq__plan-feature"><i class="fa-solid fa-check"></i>{{ feature }}</span>
+                {% endfor %}
+              </span>
+              {% endif %}
+            </span>
+          </label>
+        </div>
+        {% empty %}
+        <div class="col-12">
+          <div class="wpq__empty">
+            <i class="fa-solid fa-file-invoice-dollar"></i>
+            <p>Our rate card is being updated. Our team will send your quote directly.</p>
+          </div>
+        </div>
+        {% endfor %}
+        </div>
+      </div>
+
+      {% if plans %}
+      <div class="wpq__note">
+        <label class="wpq__note-label" for="wpq_note">Anything we should know? <span>(optional)</span></label>
+        <textarea class="form-control wpq__note-input" id="wpq_note" name="plan_agreement_note" rows="2"
+                  maxlength="2000"
+                  placeholder="e.g. we ship 60 orders a week and need Friday pickups">{{ inquiry.plan_agreement_note|default:'' }}</textarea>
+      </div>
+
+      <div class="wpq__confirm">
+        <input class="form-check-input wpq__confirm-box" type="checkbox" name="confirm_agree"
+               id="wpq_confirm" value="on">
+        <label class="wpq__confirm-label" for="wpq_confirm" id="wpq_confirm_label">
+          I confirm my selection and agree for the EzzyDelivery team to contact me about it.
+        </label>
+      </div>
+
+      <div class="wpq__actions">
+        <button type="submit" class="btn wppi__btn-submit btn-lg" id="wpq_submit">
+          <i class="fa-solid fa-file-signature me-2"></i>Confirm my plan
+        </button>
+        <a href="https://wa.me/97466451589?text=Hi%2C%20I%20have%20a%20question%20about%20my%20delivery%20quote"
+           class="wpq__wa-link" target="_blank" rel="noopener">
+          <i class="fa-brands fa-whatsapp"></i>Ask a question first
+        </a>
+      </div>
+
+      <p class="wpq__legal">
+        Rates shown are for standard parcels within our covered areas and are confirmed
+        by our team before your first pickup. Selecting a plan does not create a binding
+        contract.
+      </p>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<script>
+  // The confirmation sentence changes meaning for a custom quote — it is a
+  // call-back request there, not acceptance of a price.
+  (function () {
+    var label = document.getElementById('wpq_confirm_label');
+    var submit = document.getElementById('wpq_submit');
+    if (!label || !submit) { return; }
+    var CUSTOM_KEYS = [{% for plan in plans %}{% if plan.is_custom_quote %}"{{ plan.key|escapejs }}",{% endif %}{% endfor %}];
+
+    function sync() {
+      var picked = document.querySelector('input[name="plan"]:checked');
+      var isCustom = picked && CUSTOM_KEYS.indexOf(picked.value) !== -1;
+      label.textContent = isCustom
+        ? 'I would like the EzzyDelivery sales team to contact me to agree a custom rate.'
+        : 'I confirm my selection and agree for the EzzyDelivery team to contact me about it.';
+      submit.innerHTML = isCustom
+        ? '<i class="fa-solid fa-headset me-2"></i>Request a call from sales'
+        : '<i class="fa-solid fa-file-signature me-2"></i>Confirm my plan';
+    }
+
+    document.querySelectorAll('input[name="plan"]').forEach(function (el) {
+      el.addEventListener('change', sync);
+    });
+    sync();
+  })();
+</script>
+
+{% endblock content %}
