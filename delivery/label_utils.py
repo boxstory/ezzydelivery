@@ -34,6 +34,54 @@ def generate_barcode_image(barcode_data):
         return None
 
 
+def generate_barcode_svg(barcode_data, quiet_zone=10, bar_height=100):
+    """
+    Build a Code128 barcode as inline SVG markup that stretches to its container.
+
+    A rasterised barcode (generate_barcode_image) gets resampled by the browser
+    when it is scaled to the label width, which greys out the bar edges — on a
+    203dpi thermal head that is the difference between a scan and a no-read.
+    This emits one <rect> per bar in a unitless viewBox with
+    preserveAspectRatio="none" + shape-rendering="crispEdges", so the printer
+    rasterises the bars itself at its own resolution with hard edges.
+
+    quiet_zone is in modules (Code128 needs >= 10 of blank on each side).
+    Returns an SVG string, or '' if the data cannot be encoded.
+    """
+    from html import escape
+
+    from barcode.codex import Code128
+
+    try:
+        modules = Code128(str(barcode_data)).build()[0]
+    except Exception as e:
+        logger.error(f"Error generating barcode SVG: {str(e)}")
+        return ''
+
+    total = len(modules) + (quiet_zone * 2)
+    rects = []
+    x = quiet_zone
+    run_start = None
+    for i, module in enumerate(modules):
+        if module == '1':
+            if run_start is None:
+                run_start = x + i
+        elif run_start is not None:
+            rects.append(f'<rect x="{run_start}" y="0" width="{x + i - run_start}" height="{bar_height}"/>')
+            run_start = None
+    if run_start is not None:
+        rects.append(f'<rect x="{run_start}" y="0" width="{x + len(modules) - run_start}" height="{bar_height}"/>')
+
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {total} {bar_height}" '
+        f'preserveAspectRatio="none" shape-rendering="crispEdges" '
+        f'role="img" aria-label="{escape(str(barcode_data), quote=True)}">'
+        f'<rect x="0" y="0" width="{total}" height="{bar_height}" fill="#fff"/>'
+        f'<g fill="#000">{"".join(rects)}</g>'
+        f'</svg>'
+    )
+
+
 def generate_label_image(shipping_label):
     """
     Generate a shipping label image with all delivery information.

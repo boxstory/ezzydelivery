@@ -11,7 +11,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
 
 {% block extra_css %}
 {# Leaflet CSS preloaded in wf_dashboard_base.html for HTMX compatibility #}
-<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=20260802d">
+<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=20260820a">
 {% endblock extra_css %}
 
 {% block content %}
@@ -302,6 +302,14 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                             <span class="dtd__pkg-item__val dtd__pkg-item__val--text">{{ task.order.package_description }}</span>
                         </div>
                         {% endif %}
+                        {% with pkg_skus=task.order.display_skus %}
+                        {% if pkg_skus %}
+                        <div class="dtd__pkg-item dtd__pkg-item--sku">
+                            <span class="dtd__pkg-item__label"><i class="fa-solid fa-barcode"></i> SKU</span>
+                            <span class="dtd__pkg-item__val dtd__pkg-item__val--sku">{{ pkg_skus|join:" · " }}</span>
+                        </div>
+                        {% endif %}
+                        {% endwith %}
                         <div class="dtd__pkg-item">
                             <span class="dtd__pkg-item__label"><i class="fa-solid fa-cubes"></i> Qty</span>
                             <span class="dtd__pkg-item__val">{% if task.order.package_qty %}{{ task.order.package_qty }}{% else %}{{ task.order.order_items.count }}{% endif %}</span>
@@ -398,7 +406,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
 
             <!-- First-Mile Pickup leg (only for orders with a pickup task) — sits
                  above the delivery leg because collection happens first. -->
-            {% include "workforce/parts/_pickup_leg_card.html" with pickup=pickup_task pickup_gps_pings=pickup_gps_pings %}
+            {% include "workforce/parts/_pickup_leg_card.html" with pickup=pickup_task pickup_gps=pickup_gps %}
 
             <!-- Driver App Updates -->
             <div class="dtd__card">
@@ -647,6 +655,46 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                     </div>
                 </div>
             </div>
+
+            <!-- Failure / Cancellation Reason (driver app or staff update) -->
+            {% if task.failure_reason or task.failure_notes or task.rejection_reason %}
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        Reason on Record
+                    </div>
+                    <span class="dtd__state dtd__state--danger">{{ task.get_dl_task_status_display }}</span>
+                </div>
+                <div class="dtd__card__body">
+                    <div class="dtd__fields">
+                        {% if task.failure_reason %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-circle-exclamation"></i> Reason</span>
+                            <span class="dtd__field__value">{{ task.get_failure_reason_display }}</span>
+                        </div>
+                        {% endif %}
+                        {% if task.failed_attempt_count %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-rotate-right"></i> Failed Attempts</span>
+                            <span class="dtd__field__value">{{ task.failed_attempt_count }}</span>
+                        </div>
+                        {% endif %}
+                        {% if task.reschedule_date %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-regular fa-calendar"></i> Rescheduled To</span>
+                            <span class="dtd__field__value">{{ task.reschedule_date|date:"M d, Y" }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if task.failure_notes %}
+                    <div class="dtd__note">{{ task.failure_notes|linebreaksbr }}</div>
+                    {% elif task.rejection_reason %}
+                    <div class="dtd__note">{{ task.rejection_reason|linebreaksbr }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Driver GPS at Completion (Delivered / Failed / Cancelled) -->
             {% if task.dl_task_status == 'delivered' or task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' %}
@@ -1012,6 +1060,24 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                         <option value="cancelled">Cancelled</option>
                     </select>
                 </div>
+
+                {% comment %} Reason block — mirrors the driver app's Failed sheet so a staff
+                   status change lands on the same failure_reason / failure_notes fields. {% endcomment %}
+                <div class="mb-2 d-none" id="statusReasonBlock">
+                    <label class="form-label fw-semibold" style="font-size:0.8125rem;">
+                        Reason <span class="dtd__req" id="statusReasonRequired">*</span>
+                    </label>
+                    <div class="dtd__reason-grid" id="statusReasonGrid">
+                        {% for key, label in failure_reason_choices %}
+                        <button type="button" class="dtd__reason-btn{% if task.failure_reason == key %} dtd__reason-btn--selected{% endif %}"
+                                data-reason-key="{{ key }}">{{ label }}</button>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" id="statusReasonKey" value="{{ task.failure_reason|default:'' }}">
+                    <textarea class="form-control mt-2" id="statusReasonNotes" rows="2"
+                              placeholder="Add extra notes (optional)..."
+                              style="font-size:0.8125rem;">{{ task.failure_notes|default:'' }}</textarea>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="dtd__btn dtd__btn--secondary" data-bs-dismiss="modal" style="width:auto;">Cancel</button>
@@ -1326,10 +1392,47 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
         document.getElementById('statusSuccess').classList.add('d-none');
     }
 
+    // Statuses that must carry a reason, and the ones where it is optional —
+    // same split the driver app uses (Failed sheet is mandatory, the rest free).
+    const STATUS_REASON_REQUIRED = ['failed', 'rejected', 'cancelled', 'dropsownlost'];
+    const STATUS_REASON_OPTIONAL = ['non_reachable'];
+
+    (function initStatusReason() {
+        const select = document.getElementById('statusSelect');
+        const block = document.getElementById('statusReasonBlock');
+        const grid = document.getElementById('statusReasonGrid');
+        if (!select || !block || !grid) return;
+
+        grid.addEventListener('click', function(e) {
+            const btn = e.target.closest('.dtd__reason-btn');
+            if (!btn) return;
+            grid.querySelectorAll('.dtd__reason-btn').forEach(b => b.classList.remove('dtd__reason-btn--selected'));
+            btn.classList.add('dtd__reason-btn--selected');
+            document.getElementById('statusReasonKey').value = btn.getAttribute('data-reason-key') || '';
+        });
+
+        select.addEventListener('change', function() {
+            const status = select.value;
+            const required = STATUS_REASON_REQUIRED.includes(status);
+            const show = required || STATUS_REASON_OPTIONAL.includes(status);
+            block.classList.toggle('d-none', !show);
+            document.getElementById('statusReasonRequired').classList.toggle('d-none', !required);
+        });
+    })();
+
     function confirmUpdateStatus(taskId) {
         hideStatusAlerts();
         const status = document.getElementById('statusSelect').value;
         if (!status) { showStatusError('Please select a status'); return; }
+
+        const reasonKey = (document.getElementById('statusReasonKey').value || '').trim();
+        const reasonNotes = (document.getElementById('statusReasonNotes').value || '').trim();
+        if (STATUS_REASON_REQUIRED.includes(status) && !reasonKey) {
+            showStatusError('Please select a reason for this status.');
+            return;
+        }
+        const selectedReasonBtn = document.querySelector('#statusReasonGrid .dtd__reason-btn--selected');
+        const reasonLabel = selectedReasonBtn ? selectedReasonBtn.textContent.trim() : reasonKey;
 
         // Warn if COD is still marked collected but the task is being moved off "delivered".
         // Changing status does NOT clear the COD, so it keeps showing in COD Collection and
@@ -1357,7 +1460,11 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
             body: JSON.stringify({
                 status: status,
                 delivered_date: document.getElementById('statusDeliveredDate').value,
-                cod_amount: document.getElementById('statusCodAmount').value
+                cod_amount: document.getElementById('statusCodAmount').value,
+                failure_reason: reasonKey,
+                failure_notes: reasonNotes,
+                // Timeline label, same shape the driver app posts
+                notes: reasonKey ? (reasonNotes ? (reasonLabel + ' — ' + reasonNotes) : reasonLabel) : ''
             })
         })
         .then(response => {

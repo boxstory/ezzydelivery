@@ -1,7 +1,8 @@
 /*
 Purpose: Printable shipping waybill rendered from an Order (stick on package).
 Used by: business/templates/business/print_waybill.html
-Notes: Standalone print page. One .bwb__label per order, A6-sized, page-break each.
+Notes: Standalone print page. Paper preset lives on .bwb__sheet--<size>; screen and
+       print share the same label width so the preview is what the printer prints.
 */
 
 * { box-sizing: border-box; }
@@ -55,6 +56,89 @@ body {
   color: #374151;
 }
 
+.bwb__paper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+}
+
+.bwb__paper-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+}
+
+.bwb__paper-select {
+  padding: 7px 28px 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236b7280'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px 14px;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+  appearance: none;
+  cursor: pointer;
+}
+
+.bwb__paper-input {
+  width: 74px;
+  padding: 7px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Roll length only applies to continuous paper. */
+.bwb__paper--len { display: none; }
+.bwb__paper--len.bwb__paper--on { display: inline-flex; }
+
+.bwb__paper-hint {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+/* Shown until this device has picked a paper, so nobody prints on the default. */
+.bwb__paper-hint--warn {
+  color: #92400e;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------
+   Paper presets. Clients print on different hardware (80mm thermal
+   rolls, 4x6 label printers, plain A4), so the size is a per-device
+   choice held on .bwb__sheet. Screen and print read the SAME custom
+   properties, which is what makes the preview truthful.
+   --------------------------------------------------------------- */
+
+@page bwb-roll80   { size: 80mm 160mm;       margin: 0; }
+@page bwb-roll58   { size: 58mm 160mm;       margin: 0; }
+@page bwb-label4x6 { size: 101.6mm 152.4mm;  margin: 0; }
+@page bwb-a6       { size: 105mm 148mm;      margin: 0; }
+@page bwb-a4       { size: 210mm 297mm;      margin: 8mm; }
+
+.bwb__sheet--roll80   { --bwb-w: 80mm;    --bwb-h: 160mm;   --bwb-pad: 4mm; }
+.bwb__sheet--roll58   { --bwb-w: 58mm;    --bwb-h: 160mm;   --bwb-pad: 3mm; }
+.bwb__sheet--label4x6 { --bwb-w: 101.6mm; --bwb-h: 152.4mm; --bwb-pad: 5mm; }
+.bwb__sheet--a6       { --bwb-w: 105mm;   --bwb-h: 148mm;   --bwb-pad: 6mm; }
+.bwb__sheet--a4       { --bwb-w: 93mm;    --bwb-h: 136mm;   --bwb-pad: 5mm; }
+
+.bwb__sheet--roll80   .bwb__label { page: bwb-roll80; }
+.bwb__sheet--roll58   .bwb__label { page: bwb-roll58; }
+.bwb__sheet--label4x6 .bwb__label { page: bwb-label4x6; }
+.bwb__sheet--a6       .bwb__label { page: bwb-a6; }
+.bwb__sheet--a4       .bwb__label { page: bwb-a4; }
+
 .bwb__sheet {
   padding: 16px;
   display: flex;
@@ -63,16 +147,47 @@ body {
   gap: 16px;
 }
 
+/* A4 tiles four labels per sheet instead of one label per page.
+   2 x 93mm + 3mm gap = 189mm, inside A4's 194mm printable width. */
+.bwb__sheet--a4 {
+  flex-flow: row wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 3mm;
+}
+
 .bwb__label {
-  width: 105mm;
-  min-height: 148mm;
+  width: var(--bwb-w, 105mm);
+  height: var(--bwb-h, 148mm);
+  overflow: hidden;
   background: #fff;
   border: 1px solid #111827;
-  padding: 6mm;
-  display: flex;
-  flex-direction: column;
+  padding: var(--bwb-pad, 6mm);
   /* Lets the From/To row react to the real label width (narrow thermal paper) */
   container-type: inline-size;
+}
+
+/* Everything lives in the inner box so JS can shrink it to fit the paper
+   (zoom reflows, so text still fills the label width instead of scaling
+   down with blank space beside it). See fitLabels() in print_waybill.html. */
+.bwb__label-inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  zoom: var(--bwb-zoom, 1);
+}
+
+/* Height released while JS measures natural content height. */
+.bwb__sheet--measuring .bwb__label {
+  height: auto;
+  overflow: visible;
+}
+
+/* Content that cannot be shrunk far enough is allowed to run onto a second
+   page — never silently clipped, this is a shipping document. */
+.bwb__label--overflow {
+  height: auto;
+  overflow: visible;
 }
 
 .bwb__head {
@@ -80,7 +195,7 @@ body {
   align-items: center;
   justify-content: space-between;
   border-bottom: 2px solid #111827;
-  padding-bottom: 6px;
+  padding-bottom: 4px;
 }
 
 .bwb__brand {
@@ -122,7 +237,7 @@ body {
 }
 
 .bwb__logo {
-  height: 56px;
+  height: 40px;
   width: auto;
   object-fit: contain;
   flex: 0 0 auto;
@@ -161,12 +276,12 @@ body {
   flex: 1;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  padding: 6px 8px;
-  margin-top: 8px;
+  padding: 5px 7px;
+  margin-top: 6px;
 }
 
 /* From / To shown side by side, capped to ~6 lines of height */
-.bwb__row { margin-top: 8px; }
+.bwb__row { margin-top: 6px; }
 .bwb__row .bwb__box { margin-top: 0; }
 
 .bwb__box--party {
@@ -182,16 +297,68 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* Narrow paper (thermal / small labels): stack From over To full-width
-   instead of squeezing them side by side. Normal A6 (105mm) stays side by side. */
-@container (max-width: 92mm) {
+/* Narrow paper (thermal rolls): stack From over To full-width instead of
+   squeezing them side by side, and tighten every vertical gap so a whole
+   waybill still lands on ONE page instead of spilling onto a second.
+   Threshold is on the label's CONTENT box, so it must sit between the 80mm
+   roll (72mm inner) and the A4 tile (83mm inner) — 4x6 and A6 stay wide. */
+@container (max-width: 78mm) {
   .bwb__row {
     flex-direction: column;
+    gap: 5px;
+    margin-top: 5px;
   }
   .bwb__box--party {
     width: 100%;
     max-height: none;
   }
+  .bwb__box,
+  .bwb__writebox,
+  .bwb__cod,
+  .bwb__items,
+  .bwb__notes,
+  .bwb__pod { margin-top: 5px; }
+
+  .bwb__logo { height: 30px; }
+  .bwb__speed { font-size: 10px; padding: 1px 6px; }
+  .bwb__box { padding: 4px 6px; }
+  .bwb__box-label { font-size: 8px; margin-bottom: 1px; }
+  .bwb__name { font-size: 13px; }
+  .bwb__text,
+  .bwb__addr { font-size: 11px; line-height: 1.3; }
+  .bwb__chip { font-size: 10px; padding: 1px 4px; }
+  .bwb__zsb { gap: 3px 4px; margin-top: 3px; }
+  .bwb__writespace { height: 22px; }
+  .bwb__cod { padding: 4px 8px; }
+  .bwb__cod-label { font-size: 11px; }
+  .bwb__cod-amt { font-size: 16px; }
+  .bwb__items-table { font-size: 10px; }
+  .bwb__items-table th,
+  .bwb__items-table td { padding: 2px 4px; }
+  .bwb__pod { padding: 4px 6px; }
+  .bwb__pod-check { font-size: 10px; margin: 1px 0 4px; }
+  .bwb__pod-row { margin-top: 6px; }
+  .bwb__pod-line { height: 12px; }
+  .bwb__pod-cap { font-size: 8px; }
+
+  /* Ref / Date / Pieces / COD used to be dropped here to free the label width
+     for the barcode. The barcode now owns its own row at every paper size, so
+     they stay — they just wrap onto a second line on a narrow roll. */
+  .bwb__footer {
+    gap: 3px;
+    padding-top: 5px;
+  }
+  /* Taller bars on rolls: a longer scan line tolerates a light/patchy thermal
+     burn, and roll pages grow to the content so the height is free. */
+  .bwb__barcode-svg svg { height: 60px; }
+  .bwb__barcode-num { font-size: 13px; letter-spacing: 1px; }
+}
+
+/* Very narrow rolls (58mm): trim the largest type further. */
+@container (max-width: 62mm) {
+  .bwb__name { font-size: 13px; }
+  .bwb__cod-amt { font-size: 15px; }
+  .bwb__barcode-num { font-size: 12px; letter-spacing: 0.5px; }
 }
 
 .bwb__box-label {
@@ -221,7 +388,8 @@ body {
 
 .bwb__zsb {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px 6px;
   margin-top: 4px;
 }
 
@@ -234,20 +402,20 @@ body {
 }
 
 .bwb__writebox {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 .bwb__writespace {
-  height: 46px;
+  height: 34px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   margin-top: 2px;
 }
 
 .bwb__cod {
-  margin-top: 8px;
+  margin-top: 6px;
   border: 2px solid #111827;
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 6px 9px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -257,10 +425,11 @@ body {
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .bwb__cod-amt {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
 }
 
@@ -269,7 +438,7 @@ body {
 }
 
 .bwb__items {
-  margin-top: 8px;
+  margin-top: 6px;
   flex: 1;
 }
 
@@ -282,7 +451,7 @@ body {
 .bwb__items-table th,
 .bwb__items-table td {
   border: 1px solid #d1d5db;
-  padding: 3px 6px;
+  padding: 2px 5px;
   text-align: left;
 }
 
@@ -290,6 +459,20 @@ body {
   background: #f3f4f6;
   font-size: 10px;
   text-transform: uppercase;
+}
+
+/* SKU is its own column — the word "SKU" is said once, in the header */
+.bwb__items-table th.bwb__sku-col,
+.bwb__items-table td.bwb__sku-col {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.bwb__sku {
+  font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  color: #6b7280;
 }
 
 .bwb__items-table td.bwb__qty {
@@ -300,7 +483,7 @@ body {
 .bwb__text--muted { color: #9ca3af; }
 
 .bwb__notes {
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 11px;
   border: 1px dashed #d1d5db;
   border-radius: 6px;
@@ -309,10 +492,10 @@ body {
 
 /* Proof of delivery */
 .bwb__pod {
-  margin-top: 8px;
+  margin-top: 6px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 5px 7px;
 }
 
 .bwb__pod-check {
@@ -321,7 +504,7 @@ body {
   gap: 6px;
   font-size: 11px;
   font-weight: 600;
-  margin: 2px 0 8px;
+  margin: 2px 0 6px;
 }
 
 .bwb__pod-box {
@@ -335,7 +518,7 @@ body {
 .bwb__pod-row {
   display: flex;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 7px;
 }
 
 .bwb__pod-field {
@@ -345,7 +528,7 @@ body {
 
 .bwb__pod-line {
   border-bottom: 1px solid #111827;
-  height: 16px;
+  height: 13px;
 }
 
 .bwb__pod-cap {
@@ -356,43 +539,48 @@ body {
   margin-top: 2px;
 }
 
+/* The barcode owns a full-width row of its own: a wider bar module survives a
+   low-resolution thermal head far better than a scaled-down one. Ref/Date/
+   Pieces/COD sit above it as a single meta line. */
 .bwb__footer {
   margin-top: auto;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 4px;
   border-top: 2px solid #111827;
-  padding-top: 6px;
+  padding-top: 5px;
 }
 
-.bwb__footer-left {
-  flex: 2 1 0;
+.bwb__footer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 14px;
   min-width: 0;
+}
+
+.bwb__footer-code {
+  width: 100%;
   text-align: center;
 }
 
-.bwb__footer-right {
-  flex: 1 1 0;
-  min-width: 0;
-  border-left: 1px solid #d1d5db;
-  padding-left: 10px;
-}
-
-.bwb__barcode-img {
+/* Inline vector barcode. preserveAspectRatio="none" on the SVG lets it fill the
+   label edge to edge while the printer rasterises the bars at its own DPI, so
+   the edges stay hard instead of being resampled like a PNG would be. */
+.bwb__barcode-svg svg {
+  display: block;
   width: 100%;
-  height: 62px;
-  object-fit: contain;
+  height: 52px;
 }
 
 .bwb__barcode-num {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 1px;
 }
 
 .bwb__detail {
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
@@ -411,19 +599,39 @@ body {
   color: #6b7280;
 }
 
-@page {
-  size: A6;
-  margin: 0;
-}
-
 @media print {
   body { background: #fff; }
   .bwb__toolbar { display: none; }
+
+  /* Thermal drivers dither anything that is not pure black; force the bars
+     through as solid ink and keep their edges unsmoothed. */
+  .bwb__barcode-svg svg {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    shape-rendering: crispEdges;
+  }
+
   .bwb__sheet { padding: 0; gap: 0; }
+
+  /* Keep the on-screen width — never stretch to 100% of an unknown page box,
+     and never force 100vh, which is what pushed the last line onto a 2nd sheet. */
   .bwb__label {
     border: none;
-    width: 100%;
-    min-height: 100vh;
+    break-after: page;
     page-break-after: always;
+  }
+  .bwb__label:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* A4 keeps its 4-up tiling and cut guides, one page per four labels. */
+  .bwb__sheet--a4 { gap: 3mm; }
+  .bwb__sheet--a4 .bwb__label {
+    border: 1px dashed #9ca3af;
+    break-after: auto;
+    page-break-after: auto;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

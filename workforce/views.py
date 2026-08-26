@@ -1166,9 +1166,9 @@ def wf_print_waybill(request):
     scoped to a single business, so staff can print labels for orders across
     any seller. Accepts one or many order ids via GET/POST.
     """
-    import base64
     from django.db.models import F
-    from delivery.label_utils import generate_barcode_image
+    from django.utils.safestring import mark_safe
+    from delivery.label_utils import generate_barcode_svg
 
     src = request.POST if request.method == 'POST' else request.GET
 
@@ -1190,11 +1190,10 @@ def wf_print_waybill(request):
     waybills = []
     printed_ids = []
     for order in orders:
-        barcode_b64 = ''
-        buf = generate_barcode_image(order.order_number)
-        if buf:
-            barcode_b64 = base64.b64encode(buf.getvalue()).decode('ascii')
-        waybills.append({'order': order, 'barcode_b64': barcode_b64})
+        waybills.append({
+            'order': order,
+            'barcode_svg': mark_safe(generate_barcode_svg(order.order_number)),
+        })
         printed_ids.append(order.id)
 
     # Stamp what was actually rendered. Reprints bump the count rather than
@@ -6301,6 +6300,18 @@ def dl_sheet_export_columns(zone_names=None):
         at = getattr(t, 'assigned_at', None)
         return timezone.localtime(at).strftime('%Y-%m-%d %H:%M') if at else ''
 
+    def delivered(t):
+        # completed_at stamps ANY terminal state — failed tasks carry one too — so
+        # it is only a delivery date while the task actually sits on a delivered
+        # status. Order.delivered_at covers the handful of rows whose completed_at
+        # never got written, but it is read behind the same gate: a staff retry
+        # clears completed_at without clearing the order, and an ungated fallback
+        # would print the old date on a task that is back out for delivery.
+        if t.dl_task_status not in ('delivered', 'partial_delivery'):
+            return ''
+        at = t.completed_at or (t.order.delivered_at if t.order else None)
+        return timezone.localtime(at).strftime('%Y-%m-%d %H:%M') if at else ''
+
     return [
         ('seller_code',    'Seller Code',      lambda t: (t.order.business.business_code or '') if t.order and t.order.business else ''),
         ('dl_no',          'DL No',            lambda t: t.dl_task_number or ''),
@@ -6319,6 +6330,7 @@ def dl_sheet_export_columns(zone_names=None):
         ('cod_collected',  'COD Collected',    lambda t: 'Yes' if t.cod_collected else 'No'),
         ('fleet_code',     'FleetCode',        lambda t: (t.driver.driver_code or '') if t.driver else ''),
         ('assigned_date',  'Assigned Date',    assigned),
+        ('delivered_date', 'Delivered Date',   delivered),
         # Fill-in columns for the fleet — always blank on purpose.
         ('fleet_charge',   'Delivery Charge',  lambda t: ''),
         ('fleet_status',   'Delivery Status',  lambda t: ''),
@@ -8980,7 +8992,7 @@ def delivery_task_detail(request, task_id):
 
     # First-mile pickup leg context
     pickup_task = getattr(task.order, 'pickup_task', None) if task.order else None
-    pickup_gps_pings = _pickup_gps_coverage(pickup_task)
+    pickup_gps = _pickup_gps_coverage(pickup_task)
 
     # Pick list for this order
     from warehouse.models import PickList, PickListItem
@@ -9050,10 +9062,13 @@ def delivery_task_detail(request, task_id):
         'timeline_evidence': timeline_evidence,
         'timeline_now_at': timeline_now_at,
         'pickup_task': pickup_task,
-        'pickup_gps_pings': pickup_gps_pings,
+        'pickup_gps': pickup_gps,
         'pick_list': pick_list,
         'pick_list_items': pick_list_items,
         'payment_split_calc': payment_split_calc,  # Calculated from actual transactions
+        # Same reason list the driver app shows on its Failed sheet, so a staff
+        # status change is recorded against the same keys as a driver one.
+        'failure_reason_choices': delivery_models.DeliveryTask.FAILURE_REASON_CHOICES,
         'wa_instances': wa_data['instances'],
         'wa_default_instance': wa_data['default'],
         'wa_instances_error': wa_data['error'],
@@ -20524,14 +20539,10 @@ def bulk_print_waybills(request):
 
     waybills = []
     for order in orders:
-        barcode_b64 = ''
-        buf = generate_barcode_image(order.order_number)
-        if buf:
-            barcode_b64 = base64.b64encode(buf.getvalue()).decode('ascii')
         pickup_zone = order.pickup_location.pickup_zone_no if order.pickup_location else None
         waybills.append({
             'order': order,
-            'barcode_b64': barcode_b64,
+            'barcode_svg': mark_safe(generate_barcode_svg(order.order_number)),
             'from_zone_name': _zone_name(pickup_zone),
             'to_zone_name': _zone_name(order.dl_zone),
         })

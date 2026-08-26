@@ -432,6 +432,17 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
 
 <script>
 (function() {
+    /* Status-changing POST: take a fix and get it stored before the server sees
+     * the change. Every status change is pinned server-side to the driver's
+     * latest stored fix, so this is what decides whether "Delivered" carries
+     * the position of the doorstep or of wherever the last ping happened to
+     * land. Capped inside EzzyGPS.stamp — the action is never held more than a
+     * few seconds, and falls straight through when GPS is unavailable. */
+    function _tdFetch(url, opts) {
+        const stamped = (window.EzzyGPS && EzzyGPS.stamp) ? EzzyGPS.stamp() : Promise.resolve(false);
+        return stamped.then(() => fetch(url, opts));
+    }
+
     const STATUS_LABELS = {
         pending: 'Pending', for_review: 'For Review', assigned: 'Assigned',
         accepted: 'Accepted', picked_up: 'Picked Up', start_ride: 'In Transit',
@@ -871,7 +882,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        fetch('/api/driver/tasks/' + taskId + '/status/', {
+        _tdFetch('/api/driver/tasks/' + taskId + '/status/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
             body: JSON.stringify({ status: newStatus })
@@ -1041,7 +1052,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         if (payMethod) fd.append('payment_method', payMethod.value);
         const codRef = (document.getElementById('tdCodReference').value || '').trim();
         if (codRef) fd.append('cod_reference', codRef);
-        fetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
+        _tdFetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
             method: 'POST',
             headers: { 'X-CSRFToken': csrf },
             body: fd
@@ -1090,7 +1101,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const selectedBtn = document.querySelector('.td-reason-btn.selected');
         const reasonLabel = selectedBtn ? selectedBtn.textContent.trim() : reasonKey;
         fd.append('notes', notes ? (reasonLabel + ' — ' + notes) : reasonLabel);
-        fetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
+        _tdFetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
             method: 'POST',
             headers: { 'X-CSRFToken': csrf },
             body: fd
@@ -1134,7 +1145,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const timeNote = document.getElementById('tdPostponeTimeNote').value.trim();
         if (timeSlot) fd.append('preferred_time', timeSlot);
         if (timeNote) fd.append('time_note', timeNote);
-        fetch('/fleet/tasks/postpone/', { method: 'POST', body: fd })
+        _tdFetch('/fleet/tasks/postpone/', { method: 'POST', body: fd })
         .then(r => {
             if (!r.ok) return r.text().then(t => { throw new Error('HTTP ' + r.status + ': ' + t.substring(0, 200)); });
             return r.json();
@@ -1214,7 +1225,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             }
             // Step 2: Update task status to non_reachable
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Updating status…';
-            return fetch('/api/driver/tasks/' + _tdCurrentTaskId + '/status/', {
+            return _tdFetch('/api/driver/tasks/' + _tdCurrentTaskId + '/status/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
                 body: JSON.stringify({ status: 'non_reachable' })
@@ -1324,7 +1335,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Submitting...';
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
-        fetch('/fleet/tasks/' + _tdCurrentTaskId + '/partial-delivery/', {
+        _tdFetch('/fleet/tasks/' + _tdCurrentTaskId + '/partial-delivery/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
             body: JSON.stringify({ items: returnedItems, actual_cod: actualCod, payment_method: partialPayMethod })

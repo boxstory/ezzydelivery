@@ -3923,10 +3923,10 @@ def print_waybill(request):
     dependency — so a label can be printed and stuck on the package at any
     stage of the order lifecycle. Accepts one or many ids via GET/POST.
     """
-    import base64
+    from django.utils.safestring import mark_safe
     from orders.models import Order
     from delivery.models import ZoneName
-    from delivery.label_utils import generate_barcode_image
+    from delivery.label_utils import generate_barcode_svg
 
     raw_ids = request.GET.getlist('order_ids') or request.POST.getlist('order_ids')
     order_ids = [int(v) for v in raw_ids if str(v).isdigit()]
@@ -3956,14 +3956,13 @@ def print_waybill(request):
 
     waybills = []
     for order in orders:
-        barcode_b64 = ''
-        buf = generate_barcode_image(order.order_number)
-        if buf:
-            barcode_b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+        # Vector, not PNG: the label stretches the barcode to the full label
+        # width and a resampled bitmap loses its bar edges on a thermal head.
+        barcode_svg = mark_safe(generate_barcode_svg(order.order_number))
         pickup_zone = order.pickup_location.pickup_zone_no if order.pickup_location else None
         waybills.append({
             'order': order,
-            'barcode_b64': barcode_b64,
+            'barcode_svg': barcode_svg,
             'from_zone_name': _zone_name(pickup_zone),
             'to_zone_name': _zone_name(order.dl_zone),
         })
