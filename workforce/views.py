@@ -1404,8 +1404,22 @@ DRIVER_EXPORT_COLUMNS = [
     ('rating',         'Rating',         lambda d: d.driver_rating),
     ('wallet_balance', 'Wallet Balance', lambda d: d.wallet_balance),
     ('cod_in_hand',    'COD In Hand',    lambda d: getattr(d, 'cod_in_hand', 0)),
+    ('crm_stage',      'CRM Stage',      lambda d: _crm_stage_cell(d)),
     ('date_joined',    'Date Joined',    lambda d: d.user.date_joined.strftime('%Y-%m-%d') if d.user.date_joined else ''),
 ]
+
+
+def _crm_stage_cell(driver):
+    """CRM pipeline column for one exported row. Reads the prefetched `crm_leads`
+    in Python so a 2000-row export stays at one query for the whole set."""
+    live = [
+        l for l in driver.crm_leads.all()
+        if l.category == 'driver' and l.merged_into_id is None
+    ]
+    if not live:
+        return ''
+    live.sort(key=lambda l: l.updated_at, reverse=True)
+    return live[0].stage_label
 
 
 @login_required(login_url='/accounts/login/')
@@ -1418,7 +1432,7 @@ def export_drivers_csv(request):
 
     drivers = fleet_models.Driver.objects.select_related(
         'user', 'profile'
-    ).prefetch_related('driver_vehicle')
+    ).prefetch_related('driver_vehicle', 'crm_leads')
 
     # Same filter bar as the roster page, so the file matches what is on screen
     drivers, _picked = _apply_driver_filters(request, drivers)
@@ -9569,17 +9583,51 @@ def business_verification_list(request):
         for lead in Lead.objects.filter(converted_business_id__in=page_ids)
     }
     crm_open_leads = []
+    lead_rows = []
+    # Any business lead not yet attached to a business is linkable — including one
+    # staff already marked Won by hand, which is exactly the lead you come here to
+    # attach. `converted_business__isnull` is the real "not linked yet" test; the
+    # stage only decides how the row is labelled.
+    closed_stages = set(crm_services.closed_stage_keys(Lead.CATEGORY_BUSINESS))
     for lead in (
-        Lead.objects.filter(category=Lead.CATEGORY_BUSINESS, converted_business__isnull=True)
-        .exclude(stage__in=crm_services.closed_stage_keys(Lead.CATEGORY_BUSINESS))
-        .order_by('company_name', 'contact_name')
+        Lead.objects.filter(
+            category=Lead.CATEGORY_BUSINESS,
+            converted_business__isnull=True,
+            merged_into__isnull=True,
+        ).order_by('company_name', 'contact_name')
     ):
         normalized = crm_services.normalize_phone(lead.phone)
+        variants = crm_services._phone_variants(normalized) if normalized else []
+        company = (lead.company_name or '').strip()
+        contact = (lead.contact_name or '').strip()
+        label = company or contact or lead.phone or f'Lead #{lead.pk}'
+        source_label = lead.get_source_display()
+        stage_label = lead.stage_label
+        # Second line of a suggestion row: whichever of contact/phone isn't the label
+        sub = ' · '.join([p for p in (contact if contact != label else '', lead.phone, source_label) if p])
+        display = f'#{lead.pk} — {label}'
+        if lead.phone:
+            display += f' ({lead.phone})'
+        if lead.stage in closed_stages:
+            display += f' · {stage_label}'
+            sub = f'{sub} · {stage_label}' if sub else stage_label
         crm_open_leads.append({
             'pk': lead.pk,
-            'label': lead.company_name or lead.contact_name or lead.phone or f'Lead #{lead.pk}',
+            'label': label,
+            'display': display,
             'phone': lead.phone,
-            'phones': ' '.join(crm_services._phone_variants(normalized)) if normalized else '',
+            'phones': ' '.join(variants),
+            # Everything the modal's type-ahead should match on — company, contact
+            # person, source and stage, not just the display label.
+            'search': ' '.join([p for p in (company, contact, lead.phone, source_label, stage_label) if p]),
+        })
+        lead_rows.append({
+            'pk': lead.pk,
+            'label': label,
+            'sub': sub,
+            'variants': set(variants),
+            'norm_company': _crm_norm_name(company),
+            'norm_contact': _crm_norm_name(contact),
         })
     for b in page_obj:
         b.crm_lead = linked_leads.get(b.pk)
@@ -9589,6 +9637,10 @@ def business_verification_list(request):
             if normalized:
                 variants.update(crm_services._phone_variants(normalized))
         b.crm_phones = ' '.join(sorted(variants))
+        # Pre-ranked "did you mean this lead?" list shown above the search box
+        b.crm_suggestions = '' if b.crm_lead else json.dumps(
+            _crm_suggest_leads(_crm_norm_name(b.business_name), variants, lead_rows)
+        )
 
     filter_parts = []
     if verification_filter and verification_filter != 'all':
@@ -9645,9 +9697,11 @@ def _driver_application_sections(d, zone_groups_exist=None):
     zones = list(d.preferred_zone_groups.all())
     zone_ids = [zg.id for zg in zones]
     work_ok = bool(d.job_type and (zone_ids or not zone_groups_exist))
+    # has_real_file, not just "a row exists": a row may carry only a typed
+    # document number, and its document_file is then the shipped placeholder.
     docs = [
         doc for doc in d.driver_document.all()
-        if doc.document_type in apply_doc_types and doc.document_file and doc.document_file.name
+        if doc.document_type in apply_doc_types and doc.has_real_file
     ]
     has_selfie = any(doc.document_type == 'Selfie' for doc in docs)
     id_count = len({doc.document_type for doc in docs if doc.document_type != 'Selfie'})
@@ -10355,7 +10409,11 @@ def apply_verification_status(profile, new_status, user, data=None):
             try:
                 from business import models as business_models
                 business = business_models.Business.objects.get(user=profile.user)
-                business.business_status = 'active'
+                # Verifying the owner's identity says nothing about account standing.
+                # A suspension is a deliberate staff decision and must be lifted
+                # deliberately, not as a side effect of approving a document.
+                if business.business_status != 'suspended':
+                    business.business_status = 'active'
                 new_code = data.get('business_code', '').strip().upper()
                 if new_code:
                     business.business_code = new_code
@@ -16880,12 +16938,29 @@ def driver_documents_list(request):
 
     # Paginate results
     page_obj = paginate_queryset(request, documents, items_per_page=50)
+    _stamp_document_state(page_obj)
+
+    # Headline counts for the page — computed over the whole filtered set, not
+    # just the current page, so the tallies mean something on page 3 of 18.
+    today = timezone.localdate()
+    soon_cutoff = today + timedelta(days=DOC_EXPIRY_SOON_DAYS)
+    doc_totals = {
+        'total': documents.count(),
+        'expired': documents.filter(document_expiry_date__lt=today).count(),
+        'soon': documents.filter(
+            document_expiry_date__gte=today,
+            document_expiry_date__lte=soon_cutoff,
+        ).count(),
+        'no_expiry': documents.filter(document_expiry_date__isnull=True).count(),
+    }
 
     context = {
         'page_title': 'Driver ID Documents',
         'documents': page_obj,
         'search_query': search_query,
         'view_type': view_type,
+        'doc_totals': doc_totals,
+        'expiry_soon_days': DOC_EXPIRY_SOON_DAYS,
     }
 
     return render(request, 'workforce/driver_documents_list.html', context)
@@ -16908,26 +16983,27 @@ def driver_document_detail(request, document_id):
             if expiry_date:
                 document.document_expiry_date = expiry_date
 
-            # Handle file upload with validation
-            if 'document_file' in request.FILES:
-                uploaded_file = request.FILES['document_file']
-                # Validate file extension
-                allowed_extensions = ['.jpg', '.jpeg', '.png', '.pdf', '.gif']
-                import os
+            # Handle file uploads with validation — front and back share the
+            # same rules, so validate them in one pass.
+            import os
+            allowed_extensions = ['.jpg', '.jpeg', '.png', '.pdf', '.gif']
+            max_size = 10 * 1024 * 1024
+            for field in ('document_file', 'document_file_back'):
+                if field not in request.FILES:
+                    continue
+                uploaded_file = request.FILES[field]
                 ext = os.path.splitext(uploaded_file.name)[1].lower()
                 if ext not in allowed_extensions:
                     return JsonResponse({
                         'success': False,
                         'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'
                     }, status=400)
-                # Validate file size (max 10MB)
-                max_size = 10 * 1024 * 1024
                 if uploaded_file.size > max_size:
                     return JsonResponse({
                         'success': False,
                         'error': 'File too large. Maximum size is 10MB'
                     }, status=400)
-                document.document_file = uploaded_file
+                setattr(document, field, uploaded_file)
 
             document.save()
 
@@ -16942,9 +17018,13 @@ def driver_document_detail(request, document_id):
                 'error': 'An error occurred while updating document'
             }, status=400)
 
+    _stamp_document_state([document])
+
     context = {
         'page_title': 'Driver Document Detail',
         'document': document,
+        'document_type_choices': fleet_models.DriverDocument.document_choices,
+        'expiry_soon_days': DOC_EXPIRY_SOON_DAYS,
     }
 
     return render(request, 'workforce/driver_document_detail.html', context)
@@ -19439,7 +19519,7 @@ def _apply_driver_filters(request, drivers, params=None, default_approved=True):
         'search': 'search', 'driver_status': 'status', 'job_type': 'job_type',
         'slab': 'slab', 'vehicle': 'vehicle', 'zone': 'zone',
         'availability': 'availability', 'language': 'language',
-        'verification': 'verification',
+        'verification': 'verification', 'crm_stage': 'crm_stage',
     }
     if params:
         keys.update(params)
@@ -19509,6 +19589,31 @@ def _apply_driver_filters(request, drivers, params=None, default_approved=True):
     if verification_filters:
         drivers = drivers.filter(profile__verification_status__in=verification_filters)
 
+    # CRM pipeline column. Valid keys are the live driver-board columns, so a column
+    # staff added at /workforce/crm/stages/ is filterable without a code change.
+    # `none` is offered too — an applicant the board has not filed yet.
+    crm_stage_filters = choose('crm_stage', _crm_driver_stage_keys() | {CRM_STAGE_NONE})
+    if crm_stage_filters:
+        from django.db.models import Exists, OuterRef
+        from crm.models import Lead as CRMLead
+
+        # EXISTS rather than a join: a driver with two cards must not double up,
+        # and "no card" has to be a real absence test, not a negated join.
+        cards = CRMLead.objects.filter(
+            category=CRMLead.CATEGORY_DRIVER,
+            merged_into__isnull=True,
+            driver_id=OuterRef('pk'),
+        )
+        wanted = [k for k in crm_stage_filters if k != CRM_STAGE_NONE]
+        crm_q = Q()
+        if wanted:
+            drivers = drivers.annotate(_crm_in_stage=Exists(cards.filter(stage__in=wanted)))
+            crm_q |= Q(_crm_in_stage=True)
+        if CRM_STAGE_NONE in crm_stage_filters:
+            drivers = drivers.annotate(_crm_has_card=Exists(cards))
+            crm_q |= Q(_crm_has_card=False)
+        drivers = drivers.filter(crm_q)
+
     # Vehicle and zone are reverse relations — a driver with two vehicles would
     # otherwise appear twice.
     picked = {
@@ -19516,9 +19621,60 @@ def _apply_driver_filters(request, drivers, params=None, default_approved=True):
         'job_type': job_type_filters, 'slab': slab_filters,
         'vehicle': vehicle_filters, 'zone': zone_ids,
         'availability': availability_filters, 'language': language_filters,
-        'verification': verification_filters,
+        'verification': verification_filters, 'crm_stage': crm_stage_filters,
     }
     return drivers.distinct(), picked
+
+
+def _crm_lead_map(driver_ids):
+    """driver_id -> its live CRM card. Merged-away cards are skipped so the surviving
+    card is the one that shows, and a driver holding more than one resolves to the
+    most recently touched. One query."""
+    from crm.models import Lead as CRMLead
+
+    lead_by_driver = {}
+    for lead in CRMLead.objects.filter(
+        driver_id__in=driver_ids,
+        category=CRMLead.CATEGORY_DRIVER,
+        merged_into__isnull=True,
+    ).order_by('driver_id', '-updated_at'):
+        lead_by_driver.setdefault(lead.driver_id, lead)
+    return lead_by_driver
+
+
+def _attach_crm_leads(page_obj):
+    """Hang each driver's CRM card on `driver.crm_lead` so the roster pages can show
+    the pipeline stage next to the fleet standing.
+
+    Cards are only created when the driver board is rendered, so an applicant who
+    signed up since then has none — the roster would show a blank where the board
+    shows a stage. When a row is missing its card we run the same reconcile the board
+    runs, then re-read. It is throttled through the shared (cross-worker) cache so a
+    burst of filter clicks costs one pass, not one per request, and so drivers that
+    can never get a card (no usable phone number) do not trigger it every time.
+    """
+    from django.core.cache import caches
+    from crm.services import reconcile_driver_leads
+
+    page_driver_ids = [d.driver_id for d in page_obj]
+    if not page_driver_ids:
+        return page_obj
+
+    lead_by_driver = _crm_lead_map(page_driver_ids)
+
+    if len(lead_by_driver) < len(page_driver_ids):
+        try:
+            lock = caches['ratelimit']
+            if lock.add('crm_driver_reconcile_roster', 1, 120):
+                reconcile_driver_leads()
+                lead_by_driver = _crm_lead_map(page_driver_ids)
+        except Exception:
+            # A missing stage line is cosmetic — never let it break the roster.
+            logger.exception('CRM driver lead reconcile failed on the driver roster')
+
+    for d in page_obj:
+        d.crm_lead = lead_by_driver.get(d.driver_id)
+    return page_obj
 
 
 @login_required(login_url='/accounts/login/')
@@ -19546,6 +19702,7 @@ def drivers_list(request):
     availability_filters = picked['availability']
     language_filters = picked['language']
     verification_filters = picked['verification']
+    crm_stage_filters = picked['crm_stage']
 
     # Sorting
     from django.db.models import F
@@ -19562,6 +19719,8 @@ def drivers_list(request):
 
     # Pagination
     page_obj = paginate_queryset(request, drivers, items_per_page=50)
+
+    _attach_crm_leads(page_obj)
 
     # Get counts for stats
     total_count = fleet_models.Driver.objects.count()
@@ -19591,6 +19750,9 @@ def drivers_list(request):
         'availability_choices': fleet_models.DRIVER_AVAILABILITY_CHOICES,
         'language_choices': fleet_models.Driver.driver_languages_choices,
         'verification_choices': core_models.Profile.VERIFICATION_STATUS_CHOICES,
+        'crm_stage_choices': _crm_driver_stage_choices(),
+        'crm_stage_tallies': _crm_driver_stage_tallies(),
+        'selected_crm_stages': crm_stage_filters,
         'zone_group_choices': list(
             ZoneGroup.objects.filter(is_active=True)
             .order_by('display_order', 'name')
@@ -19640,6 +19802,7 @@ def drivers_pending(request):
 
     # Pagination
     page_obj = paginate_queryset(request, drivers, items_per_page=50)
+    _attach_crm_leads(page_obj)
 
     context = {
         'page_title': 'Pending Drivers',
@@ -19678,6 +19841,7 @@ def drivers_active(request):
 
     # Pagination
     page_obj = paginate_queryset(request, drivers, items_per_page=50)
+    _attach_crm_leads(page_obj)
 
     context = {
         'page_title': 'Active Drivers',
@@ -19716,6 +19880,7 @@ def drivers_inactive(request):
 
     # Pagination
     page_obj = paginate_queryset(request, drivers, items_per_page=50)
+    _attach_crm_leads(page_obj)
 
     context = {
         'page_title': 'Inactive Drivers',
@@ -19765,7 +19930,9 @@ def driver_detail(request, driver_id):
             'document_file': None,
             'document_file_back': None,
         }
-        if doc.document_file and doc.document_file.name:
+        # A number-only row carries the placeholder image — showing it would tell
+        # staff a document was uploaded when none was.
+        if doc.has_real_file:
             try:
                 if doc.document_file.storage.exists(doc.document_file.name):
                     doc_dict['document_file'] = doc.document_file

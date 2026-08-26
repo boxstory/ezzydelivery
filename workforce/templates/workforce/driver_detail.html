@@ -3,7 +3,10 @@
 {% comment %}
 Purpose: Full staff record for one driver — status, stats, deliveries, details, vehicles, documents, zones, settings
 Used by: workforce_views.driver_detail at /workforce/drivers/<driver_id>/
-Notes: Status changes are superadmin-gated in Settings; the hero dropdown writes immediately.
+Notes: Status changes are superadmin-gated in Settings; the state-strip dropdown writes immediately.
+       Hero + sections follow the Batch-2 order/delivery design language (chip breadcrumb
+       trail in the navy band, ledger cards, mono figures) — see the wdd__ block at the
+       end of workforce.css.
        The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
        help button toggles it via the delegated handler in workforce.js.
 {% endcomment %}
@@ -11,149 +14,187 @@ Notes: Status changes are superadmin-gated in Settings; the hero dropdown writes
 {% block title %}{{ driver.user.first_name }} {{ driver.user.last_name }} - Driver Detail{% endblock title %}
 
 {% block content %}
-<div class="col-12 p-3">
-<div class="wdd__page">
+<div class="wfpage">
 
-<!-- Breadcrumb -->
-<nav class="wdd__breadcrumb">
-    <a href="{% url 'workforce:drivers_list' %}" class="wdd__breadcrumb__link">
-        <i class="fa-solid fa-users"></i> Drivers
-    </a>
-    <i class="fa-solid fa-chevron-right wdd__breadcrumb__sep"></i>
-    <span class="wdd__breadcrumb__current">{{ driver.user.first_name }} {{ driver.user.last_name }}</span>
-</nav>
-
-<!-- Hero Card -->
+<!-- Hero Header -->
 <div class="wdd__hero">
-    <div class="wdd__hero__left">
-        <div class="wdd__hero__avatar">
-            <i class="fa-solid fa-motorcycle"></i>
-        </div>
-        <div class="wdd__hero__info">
-            <h1 class="wdd__hero__name">{{ driver.user.first_name }} {{ driver.user.last_name }}</h1>
-            <div class="wdd__hero__meta">
-                <span class="wdd__hero__code"><i class="fa-solid fa-hashtag"></i>{{ driver.driver_code|default:"N/A" }}</span>
-                <span class="wdd__hero__id">ID {{ driver.driver_id }}</span>
-                {% if driver.driver_code_dms %}
-                <span class="wdd__hero__dms">DMS: {{ driver.driver_code_dms }}</span>
-                {% endif %}
-            </div>
-            <div class="wdd__hero__contacts">
-                {% if driver.driver_phone %}
-                <a href="tel:{{ driver.driver_phone }}" class="wdd__hero__contact-chip">
-                    <i class="fa-solid fa-phone"></i> {{ driver.driver_phone }}
-                </a>
-                {% endif %}
-                {% if driver.driver_whatsapp %}
-                <a href="https://wa.me/974{{ driver.driver_whatsapp }}" target="_blank" class="wdd__hero__contact-chip wdd__hero__contact-chip--wa">
-                    <i class="fa-brands fa-whatsapp"></i> {{ driver.driver_whatsapp }}
-                </a>
-                {% endif %}
-                {% if driver.user.email %}
-                <a href="mailto:{{ driver.user.email }}" class="wdd__hero__contact-chip">
-                    <i class="fa-solid fa-envelope"></i> {{ driver.user.email }}
-                </a>
-                {% endif %}
-            </div>
-        </div>
+    <div class="wfhero__content">
+        <nav aria-label="breadcrumb" class="wfhero__crumbs-nav">
+            <ol class="wfhero__crumbs">
+                <li class="wfhero__crumb">
+                    <a href="{% url 'workforce:wf_dashboard' %}" class="wfhero__crumb-link">
+                        <i class="fa-solid fa-gauge-high"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="wfhero__crumb">
+                    <a href="{% url 'workforce:drivers_list' %}" class="wfhero__crumb-link">
+                        <i class="fa-solid fa-users"></i>
+                        <span>Drivers</span>
+                    </a>
+                </li>
+                <li class="wfhero__crumb wfhero__crumb--active">
+                    <i class="fa-solid fa-hashtag"></i>
+                    <span>{{ driver.driver_code|default:driver.driver_id }}</span>
+                </li>
+            </ol>
+        </nav>
+        <!-- Left column: who this is -->
+        <h1 class="wfhero__heading">
+            <i class="fa-solid fa-motorcycle me-2"></i>{{ driver.user.first_name }} {{ driver.user.last_name }}
+        </h1>
+        <p class="wfhero__record">
+            <span class="wfhero__tag">{{ driver.driver_code|default:"NO CODE" }}</span>
+            <span class="wfhero__dot">&middot;</span> ID {{ driver.driver_id }}
+            {% if driver.driver_code_dms %}
+            <span class="wfhero__dot">&middot;</span> DMS {{ driver.driver_code_dms }}
+            {% endif %}
+            <span class="wfhero__dot">&middot;</span> Joined {{ driver.user.date_joined|date:"d M Y" }}
+            {% if driver.driver_rating > 0 %}
+            <span class="wfhero__dot">&middot;</span> <span class="wfhero__star"><i class="fa-solid fa-star"></i> {{ driver.driver_rating }}/5 <small>({{ driver.driver_rating_count }})</small></span>
+            {% endif %}
+        </p>
     </div>
-    <div class="wdd__hero__right">
 
-        <!-- Account Status -->
-        <div class="wdd__status-row">
-            <span class="wdd__status-row__label">Account</span>
-            <div class="dropdown">
-                <span id="wdd_status_badge" role="button" data-bs-toggle="dropdown"
-                      class="wdd__hero__status wdd__hero__status--{% if driver.driver_status == 'approved' %}approved{% elif driver.driver_status == 'pending' or driver.driver_status == 'processing' %}pending{% else %}rejected{% endif %} wdd__hero__status--clickable">
-                    <i class="fa-solid fa-circle"></i>
-                    <span id="wdd_status_text">{% if driver.driver_status == 'approved' %}Active{% elif driver.driver_status == 'blocked' %}Deactivated{% else %}{{ driver.driver_status|title }}{% endif %}</span>
-                    <i class="fa-solid fa-chevron-down ms-1" style="font-size:0.6rem"></i>
-                </span>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><h6 class="dropdown-header">Change Account Status</h6></li>
-                    <li><a class="dropdown-item wdd__status-opt" data-status="approved" data-label="Active" data-cls="approved" href="#"><i class="fa-solid fa-circle-check text-success me-2"></i>Active</a></li>
-                    <li><a class="dropdown-item wdd__status-opt" data-status="blocked" data-label="Deactivated" data-cls="rejected" href="#"><i class="fa-solid fa-circle-minus text-secondary me-2"></i>Deactivated</a></li>
-                    <li><a class="dropdown-item wdd__status-opt" data-status="suspended" data-label="Suspended" data-cls="rejected" href="#"><i class="fa-solid fa-circle-pause text-warning me-2"></i>Suspended</a></li>
-                    <li><a class="dropdown-item wdd__status-opt" data-status="rejected" data-label="Rejected" data-cls="rejected" href="#"><i class="fa-solid fa-circle-xmark text-danger me-2"></i>Rejected</a></li>
-                </ul>
-            </div>
+    <!-- Right column: actions, then how to reach them -->
+    <div class="wfhero__bank">
+        <div class="d-flex flex-wrap justify-content-end gap-2">
+            <a href="{% url 'workforce:dl_list_all' %}?driver={{ driver.driver_id }}" class="wfhero__btn">
+                <i class="fa-solid fa-truck me-1"></i> Deliveries
+            </a>
+            <a href="{% url 'workforce:driver_document_detail' driver.driver_id %}" class="wfhero__btn">
+                <i class="fa-solid fa-id-card me-1"></i> Documents
+            </a>
+            <button type="button" class="wfhero__btn" data-wdd-goto-tab="settings">
+                <i class="fa-solid fa-pen me-1"></i> Edit
+            </button>
+            <a href="{% url 'workforce:drivers_list' %}" class="wfhero__btn">
+                <i class="fa-solid fa-arrow-left me-1"></i> All Drivers
+            </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_driver_detail_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
 
-        <!-- Working Status (online/offline) -->
-        <div class="wdd__status-row">
-            <span class="wdd__status-row__label">Working</span>
-            <span id="wdd_avail_badge" class="dra__avail-badge dra__avail-badge--{{ driver.driver_availability }}">
-                {% if driver.driver_availability == 'available' %}<i class="fa-solid fa-circle-check"></i> Online
-                {% elif driver.driver_availability == 'on_delivery' %}<i class="fa-solid fa-truck"></i> On Delivery
-                {% elif driver.driver_availability == 'on_break' %}<i class="fa-solid fa-mug-hot"></i> On Break
-                {% elif driver.driver_availability == 'returning' %}<i class="fa-solid fa-rotate-left"></i> Returning
-                {% else %}<i class="fa-solid fa-circle-xmark"></i> Offline{% endif %}
-            </span>
-            {% if driver.driver_status == 'approved' %}
-            <button id="wdd_toggle_btn" class="btn btn-sm wdd__hero__toggle {% if driver.driver_availability == 'available' %}wdd__hero__toggle--deactivate{% else %}wdd__hero__toggle--activate{% endif %}"
-                data-url="{% url 'workforce:driver_toggle_status' driver.driver_id %}"
-                data-csrf="{{ csrf_token }}">
-                <i class="fa-solid {% if driver.driver_availability == 'available' %}fa-toggle-on{% else %}fa-toggle-off{% endif %}"></i>
-                <span id="wdd_toggle_label">{% if driver.driver_availability == 'available' %}Go Offline{% else %}Go Online{% endif %}</span>
-            </button>
+        <div class="wfhero__contacts">
+            <span class="wfhero__contacts-label">Contact</span>
+            {% if driver.driver_phone %}
+            <a href="tel:{{ driver.driver_phone }}" class="wfhero__contact"
+               title="Call {{ driver.driver_phone }}">
+                <i class="fa-solid fa-phone" aria-hidden="true"></i>
+                <span class="wfhero__contact-val">&middot;&middot;&middot;{{ driver.driver_phone|slice:"-4:" }}</span>
+                <span class="visually-hidden">Call {{ driver.driver_phone }}</span>
+            </a>
+            {% endif %}
+            {% if driver.driver_whatsapp %}
+            <a href="https://wa.me/974{{ driver.driver_whatsapp }}" target="_blank" rel="noopener"
+               class="wfhero__contact wfhero__contact--wa"
+               title="WhatsApp {{ driver.driver_whatsapp }}">
+                <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+                <span class="wfhero__contact-val">&middot;&middot;&middot;{{ driver.driver_whatsapp|slice:"-4:" }}</span>
+                <span class="visually-hidden">WhatsApp {{ driver.driver_whatsapp }}</span>
+            </a>
+            {% endif %}
+            {% if driver.user.email %}
+            <a href="mailto:{{ driver.user.email }}" class="wfhero__contact"
+               title="Email {{ driver.user.email }}">
+                <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                <span class="wfhero__contact-val wfhero__contact-val--email">{{ driver.user.email }}</span>
+            </a>
             {% endif %}
         </div>
-
-        <div class="wdd__status-row">
-            <span class="wdd__status-row__label">Work preference</span>
-            <span class="wdd__status-row__value">
-                {% if driver.job_type %}{{ driver.get_job_type_display }}{% if driver.work_time_slabs %} &middot; {{ driver.work_time_slabs_display }}{% endif %}{% else %}Not set{% endif %}
-            </span>
-            <button class="btn btn-sm wdd__hero__toggle" type="button"
-                    data-bs-toggle="collapse" data-bs-target="#wdd_workpref_form" aria-expanded="false">
-                <i class="fa-solid fa-pen"></i> Edit
-            </button>
-        </div>
-        <div class="collapse" id="wdd_workpref_form">
-            <form method="post" action="{% url 'workforce:driver_set_work_pref' driver.driver_id %}"
-                  class="d-flex flex-wrap align-items-end gap-2 mt-2">
-                {% csrf_token %}
-                <div>
-                    <label class="wdd__status-row__label d-block" for="wdd_workpref_jobtype">Job type</label>
-                    <select class="form-select form-select-sm" name="job_type" id="wdd_workpref_jobtype">
-                        <option value="">Not set</option>
-                        {% for value, label in job_type_choices %}
-                        <option value="{{ value }}" {% if driver.job_type == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    {% for value, label in work_time_slab_choices %}
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="work_time_slabs"
-                               value="{{ value }}" id="wdd_workpref_slab_{{ value }}"
-                               {% if value in driver_time_slabs %}checked{% endif %}>
-                        <label class="form-check-label wdd__status-row__value" for="wdd_workpref_slab_{{ value }}">{{ label }}</label>
-                    </div>
-                    {% endfor %}
-                </div>
-                <button type="submit" class="btn btn-sm wdd__hero__toggle wdd__hero__toggle--activate">Save</button>
-            </form>
-        </div>
-
-        {% if driver.driver_rating > 0 %}
-        <span class="wdd__hero__rating">
-            <i class="fa-solid fa-star"></i> {{ driver.driver_rating }}/5
-            <small>({{ driver.driver_rating_count }})</small>
-        </span>
-        {% endif %}
-
-        <button type="button" class="wfnote__btn" data-wfnote-toggle
-                aria-expanded="false" aria-controls="workforce_driver_detail_card_notes"
-                title="About this page">
-            <i class="fa-solid fa-question" aria-hidden="true"></i>
-            <span class="visually-hidden">Show notes</span>
-        </button>
     </div>
 </div>
 
+<div class="wfpage__body">
+
 <div class="wfnote" id="workforce_driver_detail_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_driver_detail_card_notes' %}" hidden></div>
+
+<!-- Live state strip: account standing, shift availability, work preference -->
+<div class="wdd__ctrl">
+    <!-- Account Status -->
+    <div class="wdd__ctrl__cell">
+        <span class="wdd__status-row__label">Account</span>
+        <div class="dropdown">
+            <span id="wdd_status_badge" role="button" data-bs-toggle="dropdown"
+                  class="wdd__hero__status wdd__hero__status--{% if driver.driver_status == 'approved' %}approved{% elif driver.driver_status == 'pending' or driver.driver_status == 'processing' %}pending{% else %}rejected{% endif %} wdd__hero__status--clickable">
+                <i class="fa-solid fa-circle"></i>
+                <span id="wdd_status_text">{% if driver.driver_status == 'approved' %}Active{% elif driver.driver_status == 'blocked' %}Deactivated{% else %}{{ driver.driver_status|title }}{% endif %}</span>
+                <i class="fa-solid fa-chevron-down ms-1"></i>
+            </span>
+            <ul class="dropdown-menu">
+                <li><h6 class="dropdown-header">Change Account Status</h6></li>
+                <li><a class="dropdown-item wdd__status-opt" data-status="approved" data-label="Active" data-cls="approved" href="#"><i class="fa-solid fa-circle-check text-success me-2"></i>Active</a></li>
+                <li><a class="dropdown-item wdd__status-opt" data-status="blocked" data-label="Deactivated" data-cls="rejected" href="#"><i class="fa-solid fa-circle-minus text-secondary me-2"></i>Deactivated</a></li>
+                <li><a class="dropdown-item wdd__status-opt" data-status="suspended" data-label="Suspended" data-cls="rejected" href="#"><i class="fa-solid fa-circle-pause text-warning me-2"></i>Suspended</a></li>
+                <li><a class="dropdown-item wdd__status-opt" data-status="rejected" data-label="Rejected" data-cls="rejected" href="#"><i class="fa-solid fa-circle-xmark text-danger me-2"></i>Rejected</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Working Status (online/offline) -->
+    <div class="wdd__ctrl__cell">
+        <span class="wdd__status-row__label">Working</span>
+        <span id="wdd_avail_badge" class="dra__avail-badge dra__avail-badge--{{ driver.driver_availability }}">
+            {% if driver.driver_availability == 'available' %}<i class="fa-solid fa-circle-check"></i> Online
+            {% elif driver.driver_availability == 'on_delivery' %}<i class="fa-solid fa-truck"></i> On Delivery
+            {% elif driver.driver_availability == 'on_break' %}<i class="fa-solid fa-mug-hot"></i> On Break
+            {% elif driver.driver_availability == 'returning' %}<i class="fa-solid fa-rotate-left"></i> Returning
+            {% else %}<i class="fa-solid fa-circle-xmark"></i> Offline{% endif %}
+        </span>
+        {% if driver.driver_status == 'approved' %}
+        <button id="wdd_toggle_btn" class="btn btn-sm wdd__hero__toggle {% if driver.driver_availability == 'available' %}wdd__hero__toggle--deactivate{% else %}wdd__hero__toggle--activate{% endif %}"
+            data-url="{% url 'workforce:driver_toggle_status' driver.driver_id %}"
+            data-csrf="{{ csrf_token }}">
+            <i class="fa-solid {% if driver.driver_availability == 'available' %}fa-toggle-on{% else %}fa-toggle-off{% endif %}"></i>
+            <span id="wdd_toggle_label">{% if driver.driver_availability == 'available' %}Go Offline{% else %}Go Online{% endif %}</span>
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- Work preference -->
+    <div class="wdd__ctrl__cell wdd__ctrl__cell--grow">
+        <span class="wdd__status-row__label">Work preference</span>
+        <span class="wdd__status-row__value">
+            {% if driver.job_type %}{{ driver.get_job_type_display }}{% if driver.work_time_slabs %} &middot; {{ driver.work_time_slabs_display }}{% endif %}{% else %}Not set{% endif %}
+        </span>
+        <button class="btn btn-sm wdd__hero__toggle" type="button"
+                data-bs-toggle="collapse" data-bs-target="#wdd_workpref_form" aria-expanded="false">
+            <i class="fa-solid fa-pen"></i> Edit
+        </button>
+    </div>
+
+    <div class="collapse wdd__ctrl__drawer" id="wdd_workpref_form">
+        <form method="post" action="{% url 'workforce:driver_set_work_pref' driver.driver_id %}"
+              class="d-flex flex-wrap align-items-end gap-2">
+            {% csrf_token %}
+            <div>
+                <label class="wdd__status-row__label d-block" for="wdd_workpref_jobtype">Job type</label>
+                <select class="form-select form-select-sm" name="job_type" id="wdd_workpref_jobtype">
+                    <option value="">Not set</option>
+                    {% for value, label in job_type_choices %}
+                    <option value="{{ value }}" {% if driver.job_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                {% for value, label in work_time_slab_choices %}
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="work_time_slabs"
+                           value="{{ value }}" id="wdd_workpref_slab_{{ value }}"
+                           {% if value in driver_time_slabs %}checked{% endif %}>
+                    <label class="form-check-label wdd__status-row__value" for="wdd_workpref_slab_{{ value }}">{{ label }}</label>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-sm wdd__hero__toggle wdd__hero__toggle--activate">Save</button>
+        </form>
+    </div>
+</div>
 
 <!-- Stats Strip -->
 <div class="wdd__stats">
@@ -872,7 +913,7 @@ Notes: Status changes are superadmin-gated in Settings; the hero dropdown writes
 
 <!-- Tab: Zones & Notify -->
 <div id="panel-zones" class="wdd__panel" role="tabpanel">
-    <div class="wdd__card" style="max-width:900px;">
+    <div class="wdd__card">
         <div class="wdd__card__header">
             <i class="fa-solid fa-map-location-dot"></i> Preferred Zone Groups &amp; Notifications
         </div>
@@ -953,7 +994,7 @@ Notes: Status changes are superadmin-gated in Settings; the hero dropdown writes
 
 <!-- Tab: Settings -->
 <div id="panel-settings" class="wdd__panel" role="tabpanel">
-    <div class="wdd__card" style="max-width:700px;">
+    <div class="wdd__card wfcard--form">
         <div class="wdd__card__header">
             <i class="fa-solid fa-gear"></i> Update Driver Information
         </div>
@@ -1014,8 +1055,8 @@ Notes: Status changes are superadmin-gated in Settings; the hero dropdown writes
     </div>
 </div>
 
-</div>
-</div>
+</div><!-- /.wfpage__body -->
+</div><!-- /.wfpage -->
 
 {% if not user_is_superadmin %}
 <!-- Request Status Change Modal -->
@@ -1127,6 +1168,17 @@ Notes: Status changes are superadmin-gated in Settings; the hero dropdown writes
         });
     });
 })();
+
+// Hero shortcuts that jump straight to a tab (e.g. "Edit" → Settings)
+document.querySelectorAll('[data-wdd-goto-tab]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var target = document.querySelector('.wdd__tabs__btn[data-tab="' + this.dataset.wddGotoTab + '"]');
+        if (target) {
+            target.click();
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+});
 
 // Tab switching
 document.querySelectorAll('.wdd__tabs__btn').forEach(function(btn) {

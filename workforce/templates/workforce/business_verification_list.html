@@ -331,7 +331,8 @@ Notes: Approving posts to update_verification_status, which also activates the b
             <button type="button" class="uvl__btn uvl__btn--detail" data-action="link-lead"
                 data-biz-pk="{{ business.pk }}"
                 data-biz-name="{{ business.business_name }}"
-                data-biz-phones="{{ business.crm_phones }}">
+                data-biz-phones="{{ business.crm_phones }}"
+                data-suggestions="{{ business.crm_suggestions }}">
                 <i class="fa-solid fa-link"></i> Link CRM Lead
             </button>
             {% endif %}
@@ -459,20 +460,29 @@ Notes: Approving posts to update_verification_status, which also activates the b
         <div class="uvl__modal__body">
             <div class="uvl__modal__info">
                 <i class="fa-solid fa-circle-info"></i>
-                <span>Attaches an open CRM lead to this business and marks the lead Won.</span>
+                <span>Attaches an unlinked CRM lead to this business and marks the lead Won.</span>
+            </div>
+            <div class="uvl__lead-suggest" id="uvlLinkLeadSuggest" hidden>
+                <div class="uvl__lead-suggest__title">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Likely matches
+                </div>
+                <div class="uvl__lead-suggest__list" id="uvlLinkLeadSuggestList"></div>
             </div>
             <div class="uvl__modal__field mt-3">
                 <label class="uvl__modal__field-label" for="uvlLinkLeadSearch">
-                    <i class="fa-solid fa-address-book"></i> Open lead
+                    <i class="fa-solid fa-address-book"></i> CRM lead
                 </label>
                 <div class="uvl__lead-picker" id="uvlLinkLeadPicker">
                     <input type="text" id="uvlLinkLeadSearch" class="form-control" placeholder="Search leads by name or phone…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="uvlLinkLeadResults">
                     <div class="uvl__lead-picker__list" id="uvlLinkLeadResults" role="listbox" hidden></div>
                 </div>
-                <select id="uvlLinkLeadSelect" class="d-none" tabindex="-1" aria-hidden="true">
+                {% comment %}data-no-select2: the staff shell auto-enhances every <select> with Select2,
+which would replace this hidden mirror with a visible container and drop its dropdown
+on <body> outside the overlay. The combobox above is the real control.{% endcomment %}
+                <select id="uvlLinkLeadSelect" class="d-none" tabindex="-1" aria-hidden="true" data-no-select2>
                     <option value="">Select a lead…</option>
                     {% for l in crm_open_leads %}
-                    <option value="{{ l.pk }}" data-phones="{{ l.phones }}">#{{ l.pk }} — {{ l.label }}{% if l.phone %} ({{ l.phone }}){% endif %}</option>
+                    <option value="{{ l.pk }}" data-phones="{{ l.phones }}" data-search="{{ l.search }}">{{ l.display }}</option>
                     {% endfor %}
                 </select>
                 <div id="uvlLinkLeadStatus" class="small mt-1 uvl__lead-picker__status"></div>
@@ -764,6 +774,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var linkStatus  = document.getElementById('uvlLinkLeadStatus');
     var linkSearch  = document.getElementById('uvlLinkLeadSearch');
     var linkResults = document.getElementById('uvlLinkLeadResults');
+    var suggestBox  = document.getElementById('uvlLinkLeadSuggest');
+    var suggestList = document.getElementById('uvlLinkLeadSuggestList');
     var currentLinkBizPk = null;
 
     if (linkOverlay) {
@@ -773,7 +785,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return {
                     value: opt.value,
                     label: opt.textContent.trim(),
-                    haystack: (opt.textContent + ' ' + (opt.dataset.phones || '')).toLowerCase()
+                    haystack: (opt.textContent + ' ' + (opt.dataset.search || '') + ' ' + (opt.dataset.phones || '')).toLowerCase()
                 };
             });
         var leadActiveIdx = -1;
@@ -803,7 +815,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!matches.length) {
                 var empty = document.createElement('div');
                 empty.className = 'uvl__lead-picker__empty';
-                empty.textContent = q ? 'No leads match "' + linkSearch.value.trim() + '"' : 'No open leads';
+                empty.textContent = q ? 'No leads match "' + linkSearch.value.trim() + '"' : 'No unlinked leads';
                 linkResults.appendChild(empty);
             } else {
                 matches.forEach(function(item) {
@@ -832,7 +844,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         linkSearch.addEventListener('input', function() {
             // Typing invalidates any previous pick until a row is chosen again
-            if (linkSelect.value) { linkSelect.value = ''; linkConfirm.disabled = true; }
+            if (linkSelect.value) { linkSelect.value = ''; linkConfirm.disabled = true; markSuggestionSelected(''); }
             linkStatus.textContent = '';
             renderLeadList();
         });
@@ -857,6 +869,52 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('uvlLinkLeadCancelBtn').addEventListener('click', function() { closeModal(linkOverlay); });
         document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(linkOverlay); });
 
+        function labelForLead(value) {
+            var hit = leadItems.filter(function(i) { return i.value === String(value); })[0];
+            return hit ? hit.label : '';
+        }
+
+        // "Likely matches" — leads ranked server-side by phone hit and name similarity
+        function renderSuggestions(raw) {
+            var list = [];
+            try { list = JSON.parse(raw || '[]'); } catch (e) { list = []; }
+            suggestList.innerHTML = '';
+            if (!list.length) { suggestBox.hidden = true; return; }
+            list.forEach(function(item) {
+                var row = document.createElement('button');
+                row.type = 'button';
+                row.className = 'uvl__lead-suggest__item';
+                row.dataset.value = item.pk;
+                var main = document.createElement('span');
+                main.className = 'uvl__lead-suggest__name';
+                main.textContent = '#' + item.pk + ' — ' + item.label;
+                var sub = document.createElement('span');
+                sub.className = 'uvl__lead-suggest__sub';
+                sub.textContent = item.sub || '';
+                var why = document.createElement('span');
+                why.className = 'uvl__lead-suggest__why';
+                why.textContent = item.why || '';
+                row.appendChild(main);
+                if (item.sub) row.appendChild(sub);
+                row.appendChild(why);
+                row.addEventListener('click', function() {
+                    var label = labelForLead(item.pk);
+                    if (!label) return;
+                    selectLead(String(item.pk), label);
+                    markSuggestionSelected(String(item.pk));
+                    linkStatus.textContent = item.why + ' — confirm it’s the right lead.';
+                });
+                suggestList.appendChild(row);
+            });
+            suggestBox.hidden = false;
+        }
+
+        function markSuggestionSelected(value) {
+            suggestList.querySelectorAll('.uvl__lead-suggest__item').forEach(function(r) {
+                r.classList.toggle('uvl__lead-suggest__item--selected', r.dataset.value === value);
+            });
+        }
+
         document.querySelectorAll('[data-action="link-lead"]').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 currentLinkBizPk = this.dataset.bizPk;
@@ -865,21 +923,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 linkSearch.value = '';
                 linkStatus.textContent = '';
                 hideLeadList();
-                // Preselect the lead whose phone matches this business's numbers
-                var bizPhones = (this.dataset.bizPhones || '').split(' ').filter(Boolean);
-                if (bizPhones.length) {
-                    Array.prototype.some.call(linkSelect.options, function(opt) {
-                        var leadPhones = (opt.dataset.phones || '').split(' ').filter(Boolean);
-                        var hit = leadPhones.some(function(p) { return bizPhones.indexOf(p) !== -1; });
-                        if (hit) {
-                            linkSelect.value = opt.value;
-                            linkSearch.value = opt.textContent.trim();
-                            linkStatus.textContent = 'Matched by phone number — confirm it’s the right lead.';
-                        }
-                        return hit;
-                    });
-                }
-                linkConfirm.disabled = !linkSelect.value;
+                renderSuggestions(this.dataset.suggestions);
+                linkConfirm.disabled = true;
                 openModal(linkOverlay);
             });
         });

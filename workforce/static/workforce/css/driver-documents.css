@@ -1,0 +1,692 @@
+/* Purpose: The driver ID document desk — list (ddc__) and single-document examiner (ddd__)
+   Used by: workforce/templates/workforce/driver_documents_list.html + driver_document_detail.html
+   Notes: Hero band, page shell and card chrome come from webpages/css/staff-hero.css
+          (.wfpage / .wfhero__ / .wfcard__) — nothing here re-declares them. The one
+          deliberate signature is the light-box: a scan is a photographic artifact, so it
+          sits on a dark inspection surface with corner registration marks instead of
+          floating on white like a data card. Expiry state is a swatch + words, never
+          colour alone. */
+
+/* ==========================================================================
+   SHARED — expiry state marks. Four states, one vocabulary on both pages.
+   ========================================================================== */
+.ddc__state,
+.ddd__verdict {
+    --state-ink: #6b7280;
+    --state-mark: #b0b6bf;
+    --state-wash: #f6f7f9;
+}
+.ddc__state--expired, .ddd__verdict--expired { --state-ink: #b42318; --state-mark: #d92d20; --state-wash: #fef3f2; }
+.ddc__state--soon,    .ddd__verdict--soon    { --state-ink: #92400e; --state-mark: #d97706; --state-wash: #fffbeb; }
+.ddc__state--valid,   .ddd__verdict--valid   { --state-ink: #15803d; --state-mark: #22a355; --state-wash: #f2fbf5; }
+
+.ddc__state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--state-ink);
+    white-space: nowrap;
+}
+.ddc__state__mark,
+.ddd__verdict__mark {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 1px;
+    background: var(--state-mark);
+    flex-shrink: 0;
+}
+
+/* ==========================================================================
+   LIST (ddc__)
+   ========================================================================== */
+
+/* --- Hero tallies: the three counts that decide where to look first ------- */
+.ddc__tallies {
+    display: flex;
+    align-items: stretch;
+    gap: 0.9rem;
+    padding-left: 1.1rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+.ddc__tally { display: flex; flex-direction: column; align-items: flex-start; }
+.ddc__tally__num {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.85);
+    font-variant-numeric: tabular-nums;
+}
+.ddc__tally__lbl {
+    margin-top: 0.2rem;
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.4);
+}
+.ddc__tally--expired .ddc__tally__num { color: #ff9d94; }
+.ddc__tally--soon .ddc__tally__num { color: var(--brand-primary, #f7c000); }
+
+/* --- Filter bar ----------------------------------------------------------- */
+.ddc__filter {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 0.6rem 1rem;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.8rem;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.ddc__filter__search { flex: 1 1 22rem; min-width: 0; }
+.ddc__filter__label {
+    display: block;
+    margin-bottom: 0.2rem;
+    font-size: 0.63rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+}
+.ddc__filter__field { position: relative; }
+.ddc__filter__field i {
+    position: absolute;
+    top: 50%;
+    left: 0.65rem;
+    transform: translateY(-50%);
+    font-size: 0.72rem;
+    color: #9ca3af;
+    pointer-events: none;
+}
+.ddc__filter__input {
+    width: 100%;
+    height: 2.15rem;
+    padding: 0.35rem 0.7rem 0.35rem 2rem;
+    font-size: 0.82rem;
+    color: var(--brand-navy, #001f3f);
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.4rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ddc__filter__input::placeholder { color: #9ca3af; }
+.ddc__filter__input:focus {
+    outline: none;
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.22);
+}
+
+.ddc__toggle { display: flex; gap: 0; }
+.ddc__toggle__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 2.15rem;
+    padding: 0 0.8rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #6b7280;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.ddc__toggle__btn:first-child { border-radius: 0.4rem 0 0 0.4rem; }
+.ddc__toggle__btn:last-child { border-radius: 0 0.4rem 0.4rem 0; border-left: 0; }
+.ddc__toggle__btn:hover { background: #f8f9fa; color: var(--brand-navy, #001f3f); }
+.ddc__toggle__btn--on {
+    background: var(--brand-navy, #001f3f);
+    border-color: var(--brand-navy, #001f3f);
+    color: #fff;
+}
+.ddc__toggle__btn--on:hover { background: #003366; color: #fff; }
+.ddc__toggle__btn i { font-size: 0.68rem; }
+
+/* --- Document cards: the scan leads, the record captions it --------------- */
+.ddc__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 0.8rem;
+}
+.ddc__doc {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    text-decoration: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ddc__doc:hover {
+    border-color: var(--brand-navy, #001f3f);
+    box-shadow: 0 2px 8px rgba(0, 31, 63, 0.12);
+}
+.ddc__doc:focus-visible {
+    outline: 2px solid var(--brand-primary, #f7c000);
+    outline-offset: 2px;
+}
+
+/* Thumbnail sits on the same dark surface as the detail light-box, so a scan
+   reads as a scan in both places. */
+.ddc__doc__thumb {
+    position: relative;
+    display: block;
+    height: 8.5rem;
+    background: #0b1b2f;
+    overflow: hidden;
+}
+.ddc__doc__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    opacity: 0.94;
+    transition: opacity 0.15s;
+}
+.ddc__doc:hover .ddc__doc__thumb img { opacity: 1; }
+.ddc__doc__thumb--none {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    height: 100%;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+}
+.ddc__doc__thumb--none i { font-size: 1.1rem; }
+.ddc__doc__sides {
+    position: absolute;
+    right: 0.35rem;
+    bottom: 0.35rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.2rem;
+    background: rgba(0, 0, 0, 0.55);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.ddc__doc__body {
+    display: block;
+    padding: 0.5rem 0.65rem 0.4rem;
+    flex: 1 1 auto;
+}
+.ddc__doc__type {
+    display: block;
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #6b7280;
+}
+.ddc__doc__no {
+    display: block;
+    margin-top: 0.05rem;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--brand-navy, #001f3f);
+    word-break: break-all;
+}
+.ddc__doc__driver {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    color: #495057;
+}
+.ddc__doc__code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.66rem;
+    color: #9ca3af;
+    margin-left: 0.3rem;
+}
+
+.ddc__doc__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.35rem 0.65rem;
+    border-top: 1px solid #eef1f5;
+    background: var(--state-wash, #f8f9fa);
+}
+.ddc__doc--expired { --state-wash: #fef3f2; }
+.ddc__doc--soon { --state-wash: #fffbeb; }
+.ddc__doc__added {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.64rem;
+    color: #9ca3af;
+}
+
+/* --- Table view ----------------------------------------------------------- */
+.ddc__table {
+    width: 100%;
+    margin: 0;
+    border-collapse: collapse;
+}
+.ddc__table thead th {
+    padding: 0.5rem 0.65rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    text-align: left;
+    white-space: nowrap;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+.ddc__table tbody td {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.78rem;
+    color: #495057;
+    border-bottom: 1px solid #eef1f5;
+    vertical-align: middle;
+}
+.ddc__table tbody tr:last-child td { border-bottom: 0; }
+.ddc__table tbody tr:hover td { background: #fffbe8; }
+
+.ddc__cell-thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 2rem;
+    border-radius: 0.25rem;
+    background: #0b1b2f;
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.28);
+    font-size: 0.7rem;
+}
+.ddc__cell-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.ddc__row-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--brand-navy, #001f3f);
+    background: #f1f3f5;
+    border: 1px solid #dee2e6;
+    border-radius: 0.35rem;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ddc__row-btn:hover {
+    background: var(--brand-navy, #001f3f);
+    border-color: var(--brand-navy, #001f3f);
+    color: #fff;
+}
+
+/* --- Empty state ---------------------------------------------------------- */
+.ddc__empty {
+    grid-column: 1 / -1;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    background: #fff;
+    border: 1px dashed #dee2e6;
+    border-radius: 0.5rem;
+}
+.ddc__empty i { font-size: 1.6rem; color: #d1d5db; }
+.ddc__empty h3 {
+    margin: 0.5rem 0 0.2rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--brand-navy, #001f3f);
+}
+.ddc__empty p { margin: 0; font-size: 0.78rem; color: #6b7280; }
+
+/* ==========================================================================
+   DETAIL (ddd__)
+   ========================================================================== */
+
+.ddd__tag-missing {
+    padding: 0.06rem 0.4rem;
+    border-radius: 0.25rem;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px dashed rgba(255, 255, 255, 0.35);
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+/* --- Verdict strip: the review decision, above everything else ------------ */
+.ddd__verdict {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.8rem;
+    padding: 0.5rem 0.8rem;
+    margin-bottom: 0.8rem;
+    background: var(--state-wash);
+    border: 1px solid #dee2e6;
+    border-left: 3px solid var(--state-mark);
+    border-radius: 0.5rem;
+}
+.ddd__verdict__text {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--state-ink);
+}
+.ddd__verdict__count {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.72rem;
+    color: var(--state-ink);
+    opacity: 0.75;
+}
+.ddd__verdict__flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-left: auto;
+}
+.ddd__flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.3rem;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #6b7280;
+}
+.ddd__flag i { font-size: 0.62rem; }
+.ddd__flag--warn { border-color: #fcd9a4; color: #92400e; background: #fffbeb; }
+
+/* --- Layout: scan left, record right -------------------------------------- */
+.ddd__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(20rem, 32%, 28rem);
+    gap: 0.8rem;
+    align-items: start;
+}
+.ddd__side { min-width: 0; }
+.ddd__viewer-card { margin-bottom: 0; }
+
+/* --- SIGNATURE: the examiner's light-box ---------------------------------- */
+.ddd__lightbox {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22rem;
+    padding: 1.4rem;
+    background:
+        radial-gradient(ellipse at 50% 40%, #14304f 0%, #0b1b2f 72%);
+}
+/* Registration marks — a scanner bed, not a photo frame. */
+.ddd__lightbox::before,
+.ddd__lightbox::after {
+    content: "";
+    position: absolute;
+    width: 1.1rem;
+    height: 1.1rem;
+    border: 1px solid rgba(247, 192, 0, 0.45);
+    pointer-events: none;
+}
+.ddd__lightbox::before { top: 0.6rem; left: 0.6rem; border-right: 0; border-bottom: 0; }
+.ddd__lightbox::after { bottom: 0.6rem; right: 0.6rem; border-left: 0; border-top: 0; }
+
+.ddd__plate { position: relative; margin: 0; max-width: 100%; }
+.ddd__scan {
+    display: block;
+    max-width: 100%;
+    max-height: 60vh;
+    border-radius: 0.15rem;
+    cursor: zoom-in;
+    box-shadow: 0 0.6rem 1.6rem rgba(0, 0, 0, 0.45);
+}
+.ddd__plate__cap {
+    margin-top: 0.5rem;
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.38);
+}
+
+.ddd__lightbox--empty {
+    flex-direction: column;
+    gap: 0.35rem;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 0.78rem;
+}
+.ddd__lightbox--empty i { font-size: 1.8rem; color: rgba(255, 255, 255, 0.18); }
+.ddd__lightbox--empty small { font-size: 0.68rem; color: rgba(255, 255, 255, 0.25); }
+
+.ddd__viewer-hint {
+    margin: 0;
+    padding: 0.35rem 0.8rem;
+    border-top: 1px solid #eef1f5;
+    font-size: 0.68rem;
+    color: #9ca3af;
+}
+.ddd__viewer-hint i { margin-right: 0.3rem; }
+
+/* Front / back switch, sitting in the card header */
+.ddd__sides { display: flex; margin-left: auto; gap: 0; }
+.ddd__side-btn {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6b7280;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+}
+.ddd__side-btn:first-child { border-radius: 0.3rem 0 0 0.3rem; }
+.ddd__side-btn:last-child { border-radius: 0 0.3rem 0.3rem 0; border-left: 0; }
+.ddd__side-btn--on {
+    background: var(--brand-navy, #001f3f);
+    border-color: var(--brand-navy, #001f3f);
+    color: #fff;
+}
+
+/* --- Record ledger -------------------------------------------------------- */
+.ddd__record { margin: 0; }
+.ddd__record__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.4rem 0.8rem;
+    border-bottom: 1px solid #eef1f5;
+}
+.ddd__record__row:last-child { border-bottom: 0; }
+.ddd__record__row dt {
+    font-size: 0.63rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    flex-shrink: 0;
+}
+.ddd__record__row dd {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--brand-navy, #001f3f);
+    text-align: right;
+    word-break: break-word;
+}
+.ddd__record__link { color: var(--brand-navy, #001f3f); text-decoration: underline; }
+.ddd__record__link:hover { color: var(--brand-primary-text, #8f6b00); }
+.ddd__record__empty { color: #9ca3af; font-weight: 500; font-style: italic; }
+
+/* --- Update form ---------------------------------------------------------- */
+.ddd__form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+}
+.ddd__field { min-width: 0; }
+.ddd__field:nth-last-child(-n+2) { grid-column: 1 / -1; }
+.ddd__label {
+    display: block;
+    margin-bottom: 0.2rem;
+    font-size: 0.63rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+}
+.ddd__input {
+    width: 100%;
+    height: 2.15rem;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.82rem;
+    color: var(--brand-navy, #001f3f);
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.4rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ddd__input:focus {
+    outline: none;
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.22);
+}
+.ddd__input--mono {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    letter-spacing: 0.01em;
+}
+.ddd__input--file { padding: 0.3rem 0.5rem; font-size: 0.74rem; }
+select.ddd__input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236b7280' stroke-width='1.6'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-size: 0.9rem;
+    background-position: right 0.55rem center;
+    padding-right: 1.9rem;
+}
+
+.ddd__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid #eef1f5;
+}
+.ddd__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    height: 2.15rem;
+    padding: 0 0.9rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 0.4rem;
+    border: 1px solid transparent;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ddd__btn--primary {
+    background: var(--brand-navy, #001f3f);
+    border-bottom: 2px solid var(--brand-primary, #f7c000);
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+}
+.ddd__btn--primary:hover { background: #003366; color: #fff; }
+.ddd__btn--primary:disabled { opacity: 0.65; cursor: not-allowed; }
+.ddd__btn--quiet {
+    background: var(--brand-grey-100, #f1f3f5);
+    border-color: #dee2e6;
+    color: #495057;
+}
+.ddd__btn--quiet:hover { background: #e9ecef; color: var(--brand-navy, #001f3f); }
+
+.ddd__message {
+    display: none;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.ddd__message--ok { display: flex; background: #f2fbf5; color: #15803d; border: 1px solid #bbf7d0; }
+.ddd__message--error { display: flex; background: #fef3f2; color: #b42318; border: 1px solid #fecaca; }
+
+/* --- Full-size viewer ----------------------------------------------------- */
+.ddd__modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1080;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: rgba(4, 12, 22, 0.92);
+}
+.ddd__modal[hidden] { display: none; }
+.ddd__modal__img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0.2rem;
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.6);
+}
+.ddd__modal__close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 0.4rem;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.ddd__modal__close:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+@media (max-width: 1199.98px) {
+    .ddd__layout { grid-template-columns: 1fr; }
+    .ddd__scan { max-height: 44vh; }
+}
+@media (max-width: 991.98px) {
+    .ddc__tallies { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 767.98px) {
+    .ddc__grid { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+    .ddc__doc__thumb { height: 6.5rem; }
+    .ddd__form { grid-template-columns: 1fr; }
+    .ddd__field:nth-last-child(-n+2) { grid-column: auto; }
+    .ddd__verdict__flags { margin-left: 0; width: 100%; }
+    .ddd__lightbox { min-height: 14rem; padding: 0.9rem; }
+}

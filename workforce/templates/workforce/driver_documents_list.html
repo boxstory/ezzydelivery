@@ -1,189 +1,249 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 {% comment %}
-Purpose: Staff list of every driver ID document on file, with search and card/table views
-Used by: workforce.views.driver_documents_list at /workforce/driver-documents/
-Notes: Search and view toggle both reload the page with query params (no client-side filtering).
-       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
-       help button toggles it via the delegated handler in workforce.js.
+Purpose: Staff list of every driver ID document on file — thumbnail, expiry state, search, card/table views
+Used by: workforce.views.driver_documents_list at /workforce/documents/driver-ids/
+Notes: Search and the view toggle both reload with query params (no client-side filtering).
+       Expiry state and has_back are stamped in the view by _stamp_document_state — never
+       compute dates in the template. `has_real_file` excludes the shipped placeholder image.
 {% endcomment %}
 
 {% block title %}Driver ID Documents - Ezzy Delivery{% endblock title %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/driver-documents.css' %}?v=20260817a" type="text/css" />
+{% endblock extra_css %}
+
 {% block content %}
-<div class="col-12 p-3">
-  <!-- Hero Header -->
+<div class="wfpage ddc">
+
+  <!-- Hero -->
   <div class="ddc__hero">
-    <div class="ddc__hero-content">
-      <h1 class="ddc__hero-title">
-        <i class="fa-solid fa-id-card ddc__hero-icon"></i>Driver ID Documents
+    <div class="wfhero__content">
+      <nav aria-label="breadcrumb">
+        <ol class="wfhero__crumbs">
+          <li class="wfhero__crumb">
+            <a href="{% url 'workforce:wf_dashboard' %}" class="wfhero__crumb-link">
+              <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
+            </a>
+          </li>
+          <li class="wfhero__crumb wfhero__crumb--active">
+            <i class="fa-solid fa-id-card"></i><span>Driver IDs</span>
+          </li>
+        </ol>
+      </nav>
+      <h1 class="wfhero__heading">
+        <i class="fa-solid fa-id-card me-2"></i>Driver ID Documents
       </h1>
-      <p class="ddc__hero-subtitle">Manage driver identification documents and records</p>
+      <p class="wfhero__record">
+        {{ doc_totals.total }} on file
+        <span class="wfhero__dot">&middot;</span> checked against today's date
+      </p>
     </div>
-    <button type="button" class="wfnote__btn" data-wfnote-toggle
-            aria-expanded="false" aria-controls="workforce_driver_documents_list_card_notes"
-            title="About this page">
-      <i class="fa-solid fa-question" aria-hidden="true"></i>
-      <span class="visually-hidden">Show notes</span>
-    </button>
+
+    <div class="wfhero__bank">
+      <div class="d-flex flex-wrap justify-content-end gap-2">
+        <a href="{% url 'workforce:driver_verification_list' %}" class="wfhero__btn">
+          <i class="fa-solid fa-user-check me-1"></i> Driver verification
+        </a>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_driver_documents_list_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
+      </div>
+
+      <div class="ddc__tallies">
+        <span class="ddc__tally ddc__tally--expired">
+          <span class="ddc__tally__num">{{ doc_totals.expired }}</span>
+          <span class="ddc__tally__lbl">Expired</span>
+        </span>
+        <span class="ddc__tally ddc__tally--soon">
+          <span class="ddc__tally__num">{{ doc_totals.soon }}</span>
+          <span class="ddc__tally__lbl">Due {{ expiry_soon_days }}d</span>
+        </span>
+        <span class="ddc__tally">
+          <span class="ddc__tally__num">{{ doc_totals.no_expiry }}</span>
+          <span class="ddc__tally__lbl">No expiry</span>
+        </span>
+      </div>
+    </div>
   </div>
 
-  <div class="wfnote" id="workforce_driver_documents_list_card_notes"
+  <div class="wfpage__body">
+
+    <div class="wfnote" id="workforce_driver_documents_list_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_driver_documents_list_card_notes' %}" hidden></div>
 
-  <!-- Filter Bar -->
-  <div class="ddc__filter-bar">
-    <div class="ddc__filter-search">
-      <label for="searchInput" class="ddc__filter-label">
-        <i class="fa-solid fa-search"></i> Search Documents
-      </label>
-      <input type="text" id="searchInput" class="form-control ddc__filter-input" placeholder="Search by document number, driver name, type..." value="{{ search_query }}">
-    </div>
-    <div class="ddc__view-toggle">
-      <button type="button" data-view="card" id="cardViewBtn" class="ddc__toggle-btn {% if view_type == 'card' %}ddc__toggle-btn--active{% endif %}" aria-pressed="{% if view_type == 'card' %}true{% else %}false{% endif %}">
-        <i class="fa-solid fa-grip"></i> Card
-      </button>
-      <button type="button" data-view="table" id="tableViewBtn" class="ddc__toggle-btn {% if view_type == 'table' %}ddc__toggle-btn--active{% endif %}" aria-pressed="{% if view_type == 'table' %}true{% else %}false{% endif %}">
-        <i class="fa-solid fa-list"></i> Table
-      </button>
-    </div>
-  </div>
-
-  <!-- Card View -->
-  <div id="cardView" class="ddc__card-grid {% if view_type != 'card' %}d-none{% endif %}">
-    {% if documents %}
-      {% for doc in documents %}
-      <div class="ddc__card" data-search-text="{{ doc.document_no|lower }} {{ doc.document_type|lower }} {{ doc.driver.user.first_name|default:''|lower }} {{ doc.driver.user.last_name|default:''|lower }} {{ doc.driver.driver_code|default:''|lower }}">
-        <div class="ddc__card-top">
-          <div class="ddc__card-avatar">
-            <i class="fa-solid fa-id-card"></i>
-          </div>
-          <div class="ddc__card-info">
-            <h3 class="ddc__card-name">{{ doc.driver.user.first_name|default:"Unknown" }} {{ doc.driver.user.last_name|default:"Driver" }}</h3>
-            <p class="ddc__card-type">{{ doc.document_type|default:"N/A" }}</p>
-          </div>
-        </div>
-        <div class="ddc__card-details">
-          <div class="ddc__detail-row">
-            <i class="fa-solid fa-hashtag"></i>
-            <span>{{ doc.document_no|default:"N/A" }}</span>
-          </div>
-          <div class="ddc__detail-row">
-            <i class="fa-solid fa-user"></i>
-            <span>Driver: {{ doc.driver.driver_code|default:"N/A" }}</span>
-          </div>
-          {% if doc.document_issued_from %}
-          <div class="ddc__detail-row">
-            <i class="fa-solid fa-building"></i>
-            <span>{{ doc.document_issued_from }}</span>
-          </div>
-          {% endif %}
-          {% if doc.document_expiry_date %}
-          <div class="ddc__detail-row">
-            <i class="fa-solid fa-calendar"></i>
-            <span>Exp: {{ doc.document_expiry_date|date:"d M Y" }}</span>
-          </div>
-          {% endif %}
-          <div class="ddc__detail-row">
-            <i class="fa-solid fa-clock"></i>
-            <span>{{ doc.created_at|date:"d M Y" }}</span>
-          </div>
-        </div>
-        <div class="ddc__card-footer">
-          <a href="{% url 'workforce:driver_document_detail' doc.id %}" class="ddc__view-btn">
-            <i class="fa-solid fa-eye"></i> View Details
-          </a>
+    <!-- Filter bar -->
+    <div class="ddc__filter">
+      <div class="ddc__filter__search">
+        <label for="searchInput" class="ddc__filter__label">Search documents</label>
+        <div class="ddc__filter__field">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input type="text" id="searchInput" class="ddc__filter__input"
+                 placeholder="Document number, driver name, code or type…" value="{{ search_query }}">
         </div>
       </div>
-      {% endfor %}
-    {% else %}
+      <div class="ddc__toggle" role="group" aria-label="View mode">
+        <button type="button" data-view="card" id="cardViewBtn"
+                class="ddc__toggle__btn {% if view_type == 'card' %}ddc__toggle__btn--on{% endif %}"
+                aria-pressed="{% if view_type == 'card' %}true{% else %}false{% endif %}">
+          <i class="fa-solid fa-grip"></i> Card
+        </button>
+        <button type="button" data-view="table" id="tableViewBtn"
+                class="ddc__toggle__btn {% if view_type == 'table' %}ddc__toggle__btn--on{% endif %}"
+                aria-pressed="{% if view_type == 'table' %}true{% else %}false{% endif %}">
+          <i class="fa-solid fa-list"></i> Table
+        </button>
+      </div>
+    </div>
+
+    <!-- Card view -->
+    <div id="cardView" class="ddc__grid {% if view_type != 'card' %}d-none{% endif %}">
+      {% if documents %}
+        {% for doc in documents %}
+        <a class="ddc__doc ddc__doc--{{ doc.expiry_state }}" href="{% url 'workforce:driver_document_detail' doc.id %}">
+          <span class="ddc__doc__thumb">
+            {% if doc.has_real_file %}
+            <img src="{{ doc.document_file.url }}" loading="lazy"
+                 alt="{{ doc.document_type|default:'Document' }} for {{ doc.driver.user.first_name|default:'driver' }}">
+            {% else %}
+            <span class="ddc__doc__thumb--none">
+              <i class="fa-solid fa-image" aria-hidden="true"></i>
+              <span>No scan</span>
+            </span>
+            {% endif %}
+            {% if doc.has_back %}<span class="ddc__doc__sides">2 sides</span>{% endif %}
+          </span>
+
+          <span class="ddc__doc__body">
+            <span class="ddc__doc__type">{{ doc.document_type|default:"Untyped" }}</span>
+            <span class="ddc__doc__no">{{ doc.document_no|default:"no number" }}</span>
+            <span class="ddc__doc__driver">
+              {{ doc.driver.user.first_name|default:"Unknown" }} {{ doc.driver.user.last_name|default:"" }}
+              <span class="ddc__doc__code">{{ doc.driver.driver_code|default:"—" }}</span>
+            </span>
+          </span>
+
+          <span class="ddc__doc__foot">
+            <span class="ddc__state ddc__state--{{ doc.expiry_state }}">
+              <span class="ddc__state__mark" aria-hidden="true"></span>
+              {% if doc.expiry_state == 'expired' %}Expired {{ doc.document_expiry_date|date:"M Y" }}
+              {% elif doc.expiry_state == 'soon' %}Due {{ doc.document_expiry_date|date:"d M" }}
+              {% elif doc.expiry_state == 'valid' %}To {{ doc.document_expiry_date|date:"M Y" }}
+              {% else %}No expiry{% endif %}
+            </span>
+            <span class="ddc__doc__added">{{ doc.created_at|date:"d M y" }}</span>
+          </span>
+        </a>
+        {% endfor %}
+      {% else %}
+        <div class="ddc__empty">
+          <i class="fa-solid fa-id-card" aria-hidden="true"></i>
+          <h3>No documents found</h3>
+          <p>{% if search_query %}Nothing matches “{{ search_query }}”. Try a driver code or document number.{% else %}No driver documents have been uploaded yet.{% endif %}</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Table view -->
+    <div id="tableView" class="{% if view_type != 'table' %}d-none{% endif %}">
+      {% if documents %}
+      <div class="wfcard">
+        <div class="table-responsive">
+          <table class="ddc__table">
+            <thead>
+              <tr>
+                <th scope="col">Scan</th>
+                <th scope="col">Driver</th>
+                <th scope="col">Code</th>
+                <th scope="col">Type</th>
+                <th scope="col">Number</th>
+                <th scope="col">Issued from</th>
+                <th scope="col">Expiry</th>
+                <th scope="col">Added</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for doc in documents %}
+              <tr>
+                <td>
+                  <span class="ddc__cell-thumb">
+                    {% if doc.has_real_file %}
+                    <img src="{{ doc.document_file.url }}" loading="lazy" alt="">
+                    {% else %}
+                    <i class="fa-solid fa-image" aria-hidden="true" title="No scan uploaded"></i>
+                    {% endif %}
+                  </span>
+                </td>
+                <td>{{ doc.driver.user.first_name|default:"Unknown" }} {{ doc.driver.user.last_name|default:"" }}</td>
+                <td class="wfmono">{{ doc.driver.driver_code|default:"—" }}</td>
+                <td>{{ doc.document_type|default:"—" }}</td>
+                <td class="wfmono">{{ doc.document_no|default:"—" }}</td>
+                <td>{{ doc.document_issued_from|default:"—" }}</td>
+                <td>
+                  <span class="ddc__state ddc__state--{{ doc.expiry_state }}">
+                    <span class="ddc__state__mark" aria-hidden="true"></span>
+                    {% if doc.document_expiry_date %}{{ doc.document_expiry_date|date:"d M Y" }}{% else %}No expiry{% endif %}
+                  </span>
+                </td>
+                <td class="wfmono">{{ doc.created_at|date:"d M Y" }}</td>
+                <td>
+                  <a href="{% url 'workforce:driver_document_detail' doc.id %}" class="ddc__row-btn">
+                    <i class="fa-solid fa-eye"></i> View
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
       <div class="ddc__empty">
-        <i class="fa-solid fa-id-card"></i>
-        <h3>No Documents Found</h3>
-        <p>{% if search_query %}No documents match your search criteria.{% else %}There are no driver documents available.{% endif %}</p>
+        <i class="fa-solid fa-id-card" aria-hidden="true"></i>
+        <h3>No documents found</h3>
+        <p>{% if search_query %}Nothing matches “{{ search_query }}”. Try a driver code or document number.{% else %}No driver documents have been uploaded yet.{% endif %}</p>
       </div>
-    {% endif %}
-  </div>
-
-  <!-- Table View -->
-  <div id="tableView" class="{% if view_type != 'table' %}d-none{% endif %}">
-    {% if documents %}
-    <div class="ddc__table-card">
-      <table class="ddc__table">
-        <thead>
-          <tr>
-            <th>Driver Name</th>
-            <th>Driver Code</th>
-            <th>Document Type</th>
-            <th>Document No</th>
-            <th>Issued From</th>
-            <th>Expiry Date</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for doc in documents %}
-          <tr data-search-text="{{ doc.document_no|lower }} {{ doc.document_type|lower }} {{ doc.driver.user.first_name|default:''|lower }} {{ doc.driver.user.last_name|default:''|lower }} {{ doc.driver.driver_code|default:''|lower }}">
-            <td><strong>{{ doc.driver.user.first_name|default:"Unknown" }} {{ doc.driver.user.last_name|default:"Driver" }}</strong></td>
-            <td><code>{{ doc.driver.driver_code|default:"N/A" }}</code></td>
-            <td>{{ doc.document_type|default:"N/A" }}</td>
-            <td>{{ doc.document_no|default:"N/A" }}</td>
-            <td>{{ doc.document_issued_from|default:"N/A" }}</td>
-            <td>{{ doc.document_expiry_date|date:"d M Y"|default:"N/A" }}</td>
-            <td>{{ doc.created_at|date:"d M Y" }}</td>
-            <td>
-              <a href="{% url 'workforce:driver_document_detail' doc.id %}" class="ddc__action-btn">
-                <i class="fa-solid fa-eye"></i> View
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {% endif %}
     </div>
-    {% else %}
-    <div class="ddc__empty">
-      <i class="fa-solid fa-id-card"></i>
-      <h3>No Documents Found</h3>
-      <p>{% if search_query %}No documents match your search criteria.{% else %}There are no driver documents available.{% endif %}</p>
-    </div>
-    {% endif %}
-  </div>
 
-  <!-- Pagination -->
-  {% include "includes/components/_pagination.html" with page_obj=documents filter_params=filter_params %}
+    {% include "includes/components/_pagination.html" with page_obj=documents filter_params=filter_params %}
+  </div>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var searchTimeout;
-        var searchInput = document.getElementById('searchInput');
+document.addEventListener('DOMContentLoaded', function () {
+    var searchTimeout;
+    var searchInput = document.getElementById('searchInput');
 
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                clearTimeout(searchTimeout);
-                var searchTerm = this.value;
-                searchTimeout = setTimeout(function() {
-                    var url = new URL(window.location);
-                    if (searchTerm) { url.searchParams.set('search', searchTerm); }
-                    else { url.searchParams.delete('search'); }
-                    url.searchParams.set('page', '1');
-                    window.location.href = url.toString();
-                }, 500);
-            });
-        }
-
-        document.querySelectorAll('.ddc__toggle-btn[data-view]').forEach(function(btn) {
-            btn.addEventListener('click', function() {
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            clearTimeout(searchTimeout);
+            var term = this.value;
+            searchTimeout = setTimeout(function () {
                 var url = new URL(window.location);
-                url.searchParams.set('view', this.dataset.view);
+                if (term) { url.searchParams.set('search', term); }
+                else { url.searchParams.delete('search'); }
                 url.searchParams.set('page', '1');
                 window.location.href = url.toString();
-            });
+            }, 500);
+        });
+    }
+
+    document.querySelectorAll('.ddc__toggle__btn[data-view]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var url = new URL(window.location);
+            url.searchParams.set('view', this.dataset.view);
+            url.searchParams.set('page', '1');
+            window.location.href = url.toString();
         });
     });
+});
 </script>
 {% endblock extra_js %}

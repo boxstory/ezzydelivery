@@ -1,199 +1,389 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 {% comment %}
-Purpose: View and update one driver identity document — type, number, issuing country, expiry and the file
-Used by: workforce_views.driver_document_detail at /workforce/driver-documents/<document_id>/
-Notes: The header is a light band, so the notes button uses the wfnote__btn--ink variant.
-       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
-       help button toggles it via the delegated handler in workforce.js.
+Purpose: Examine and correct one driver identity document — the scan, its record, its expiry verdict
+Used by: workforce_views.driver_document_detail at /workforce/documents/driver-ids/<document_id>/
+Notes: The scan is the page's subject, so it sits on a dark light-box with registration marks
+       rather than running full-bleed down the page. Front and back share one viewer.
+       Hero, page shell and card chrome come from the shared staff shell (webpages/css/staff-hero.css).
 {% endcomment %}
 
-{% block title %}Driver Document Detail - Ezzy Delivery{% endblock title %}
+{% block title %}{{ document.document_type|default:"Document" }} {{ document.document_no }} - Driver ID{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/driver-documents.css' %}?v=20260817a" type="text/css" />
+{% endblock extra_css %}
 
 {% block content %}
-<div class="col-12 p-3">
-  <!-- Hero Header -->
+<div class="wfpage ddd">
+
+  <!-- Hero -->
   <div class="ddd__hero">
-    <div class="ddd__hero-content">
-      <h1 class="ddd__hero-title">
-        <i class="fa-solid fa-id-card ddd__hero-icon"></i>Driver Document Detail
+    <div class="wfhero__content">
+      <nav aria-label="breadcrumb">
+        <ol class="wfhero__crumbs">
+          <li class="wfhero__crumb">
+            <a href="{% url 'workforce:wf_dashboard' %}" class="wfhero__crumb-link">
+              <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
+            </a>
+          </li>
+          <li class="wfhero__crumb">
+            <a href="{% url 'workforce:driver_documents_list' %}" class="wfhero__crumb-link">
+              <i class="fa-solid fa-id-card"></i><span>Driver IDs</span>
+            </a>
+          </li>
+          <li class="wfhero__crumb wfhero__crumb--active">
+            <i class="fa-solid fa-hashtag"></i><span>{{ document.id }}</span>
+          </li>
+        </ol>
+      </nav>
+      <h1 class="wfhero__heading">
+        <i class="fa-solid fa-id-card me-2"></i>{{ document.document_type|default:"Untyped document" }}
       </h1>
-      <p class="ddd__hero-subtitle">View and manage driver identification documents</p>
+      <p class="wfhero__record">
+        {% if document.document_no %}
+        <span class="wfhero__tag">{{ document.document_no }}</span>
+        {% else %}
+        <span class="ddd__tag-missing">NO NUMBER</span>
+        {% endif %}
+        <span class="wfhero__dot">&middot;</span>
+        {{ document.driver.user.first_name|default:"Unknown" }} {{ document.driver.user.last_name|default:"" }}
+        {% if document.driver.driver_code %}
+        <span class="wfhero__dot">&middot;</span> {{ document.driver.driver_code }}
+        {% endif %}
+        <span class="wfhero__dot">&middot;</span> Added {{ document.created_at|date:"d M Y" }}
+      </p>
     </div>
-    <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
-            aria-expanded="false" aria-controls="workforce_driver_document_detail_card_notes"
-            title="About this page">
-      <i class="fa-solid fa-question" aria-hidden="true"></i>
-      <span class="visually-hidden">Show notes</span>
-    </button>
+
+    <div class="wfhero__bank">
+      <div class="d-flex flex-wrap justify-content-end gap-2">
+        {% if document.driver %}
+        <a href="{% url 'workforce:driver_detail' document.driver.driver_id %}" class="wfhero__btn">
+          <i class="fa-solid fa-motorcycle me-1"></i> Driver record
+        </a>
+        {% endif %}
+        {% if document.has_real_file %}
+        <a href="{{ document.document_file.url }}" target="_blank" rel="noopener" class="wfhero__btn">
+          <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Open file
+        </a>
+        {% endif %}
+        <a href="{% url 'workforce:driver_documents_list' %}" class="wfhero__btn">
+          <i class="fa-solid fa-arrow-left me-1"></i> All documents
+        </a>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_driver_document_detail_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
+      </div>
+    </div>
   </div>
 
-  <div class="wfnote" id="workforce_driver_document_detail_card_notes"
+  <div class="wfpage__body">
+
+    <div class="wfnote" id="workforce_driver_document_detail_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_driver_document_detail_card_notes' %}" hidden></div>
 
-  <!-- Back Button -->
-  <div class="ddd__back-section">
-    <a href="{% url 'workforce:driver_documents_list' %}" class="ddd__back-link">
-      <i class="fa-solid fa-arrow-left"></i> Back to Documents
-    </a>
+    <!-- Verdict strip: the one thing a reviewer needs to decide at a glance -->
+    <div class="ddd__verdict ddd__verdict--{{ document.expiry_state }}">
+      <span class="ddd__verdict__mark" aria-hidden="true"></span>
+      <span class="ddd__verdict__text">
+        {% if document.expiry_state == 'expired' %}
+          Expired {{ document.document_expiry_date|date:"d M Y" }}
+        {% elif document.expiry_state == 'soon' %}
+          Expires {{ document.document_expiry_date|date:"d M Y" }}
+        {% elif document.expiry_state == 'valid' %}
+          Valid to {{ document.document_expiry_date|date:"d M Y" }}
+        {% else %}
+          No expiry recorded
+        {% endif %}
+      </span>
+      {% if document.days_left is not None %}
+      <span class="ddd__verdict__count">
+        {% if document.days_left < 0 %}{{ document.days_left|stringformat:"d"|cut:"-" }} days ago
+        {% elif document.days_left == 0 %}today
+        {% else %}in {{ document.days_left }} day{{ document.days_left|pluralize }}{% endif %}
+      </span>
+      {% endif %}
+
+      <span class="ddd__verdict__flags">
+        {% if not document.has_real_file %}
+        <span class="ddd__flag ddd__flag--warn"><i class="fa-solid fa-image-slash"></i> No scan uploaded</span>
+        {% endif %}
+        {% if not document.document_no %}
+        <span class="ddd__flag ddd__flag--warn"><i class="fa-solid fa-hashtag"></i> Number missing</span>
+        {% endif %}
+        {% if not document.document_issued_from %}
+        <span class="ddd__flag"><i class="fa-solid fa-location-dot"></i> Issuer missing</span>
+        {% endif %}
+      </span>
+    </div>
+
+    <div class="ddd__layout">
+
+      <!-- The scan — this page's subject, on an examiner's light-box -->
+      <div class="wfcard ddd__viewer-card">
+        <div class="wfcard__header">
+          <i class="fa-solid fa-camera"></i>
+          <span>Scan on file</span>
+          {% if document.has_back %}
+          <span class="ddd__sides" role="tablist" aria-label="Document side">
+            <button type="button" class="ddd__side-btn ddd__side-btn--on" data-ddd-side="front" role="tab" aria-selected="true">Front</button>
+            <button type="button" class="ddd__side-btn" data-ddd-side="back" role="tab" aria-selected="false">Back</button>
+          </span>
+          {% endif %}
+        </div>
+        <div class="wfcard__body wfcard__body--flush">
+          {% if document.has_real_file or document.has_back %}
+          <div class="ddd__lightbox">
+            {% if document.has_real_file %}
+            <figure class="ddd__plate" data-ddd-pane="front">
+              <img src="{{ document.document_file.url }}" class="ddd__scan"
+                   alt="{{ document.document_type|default:'Document' }} {{ document.document_no }} — front"
+                   data-ddd-zoom>
+              <figcaption class="ddd__plate__cap">Front</figcaption>
+            </figure>
+            {% endif %}
+            {% if document.has_back %}
+            <figure class="ddd__plate {% if document.has_real_file %}d-none{% endif %}" data-ddd-pane="back">
+              <img src="{{ document.document_file_back.url }}" class="ddd__scan"
+                   alt="{{ document.document_type|default:'Document' }} {{ document.document_no }} — back"
+                   data-ddd-zoom>
+              <figcaption class="ddd__plate__cap">Back</figcaption>
+            </figure>
+            {% endif %}
+          </div>
+          <p class="ddd__viewer-hint">
+            <i class="fa-solid fa-magnifying-glass-plus"></i>
+            Click the scan to view it full size.
+          </p>
+          {% else %}
+          <div class="ddd__lightbox ddd__lightbox--empty">
+            <i class="fa-solid fa-image" aria-hidden="true"></i>
+            <span>No scan uploaded for this document</span>
+            <small>Attach one in Update document below.</small>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- The record -->
+      <div class="ddd__side">
+        <div class="wfcard">
+          <div class="wfcard__header">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>Record</span>
+          </div>
+          <div class="wfcard__body wfcard__body--flush">
+            <dl class="ddd__record">
+              <div class="ddd__record__row">
+                <dt>Driver</dt>
+                <dd>
+                  {% if document.driver %}
+                  <a href="{% url 'workforce:driver_detail' document.driver.driver_id %}" class="ddd__record__link">
+                    {{ document.driver.user.first_name|default:"Unknown" }} {{ document.driver.user.last_name|default:"" }}
+                  </a>
+                  {% else %}<span class="ddd__record__empty">Unlinked</span>{% endif %}
+                </dd>
+              </div>
+              <div class="ddd__record__row">
+                <dt>Driver code</dt>
+                <dd class="wfmono">{{ document.driver.driver_code|default:"—" }}</dd>
+              </div>
+              <div class="ddd__record__row">
+                <dt>Type</dt>
+                <dd>{{ document.document_type|default:"—" }}</dd>
+              </div>
+              <div class="ddd__record__row">
+                <dt>Number</dt>
+                <dd class="wfmono">{{ document.document_no|default:"—" }}</dd>
+              </div>
+              <div class="ddd__record__row">
+                <dt>Issued from</dt>
+                <dd>{{ document.document_issued_from|default:"—" }}</dd>
+              </div>
+              <div class="ddd__record__row">
+                <dt>Expiry</dt>
+                <dd class="wfmono">{{ document.document_expiry_date|date:"d M Y"|default:"—" }}</dd>
+              </div>
+              <div class="ddd__record__row">
+                <dt>Added</dt>
+                <dd class="wfmono">{{ document.created_at|date:"d M Y, H:i" }}</dd>
+              </div>
+              <div class="ddd__record__row">
+                <dt>Last updated</dt>
+                <dd class="wfmono">{{ document.updated_at|date:"d M Y, H:i" }}</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+
+        <!-- Correct the record -->
+        <div class="wfcard">
+          <div class="wfcard__header">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>Update document</span>
+          </div>
+          <div class="wfcard__body">
+            <form id="updateForm" enctype="multipart/form-data">
+              {% csrf_token %}
+              <div class="ddd__form">
+                <div class="ddd__field">
+                  <label class="ddd__label" for="ddd_type">Document type</label>
+                  <select name="document_type" id="ddd_type" class="ddd__input">
+                    {% for value, label in document_type_choices %}
+                    <option value="{{ value }}" {% if document.document_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <div class="ddd__field">
+                  <label class="ddd__label" for="ddd_no">Document number</label>
+                  <input type="text" name="document_no" id="ddd_no" value="{{ document.document_no }}"
+                         class="ddd__input ddd__input--mono" required>
+                </div>
+
+                <div class="ddd__field">
+                  <label class="ddd__label" for="ddd_issued">Issued from</label>
+                  <input type="text" name="document_issued_from" id="ddd_issued"
+                         value="{{ document.document_issued_from|default:'' }}" class="ddd__input"
+                         placeholder="e.g. Qatar">
+                </div>
+
+                <div class="ddd__field">
+                  <label class="ddd__label" for="ddd_expiry">Expiry date</label>
+                  <input type="date" name="document_expiry_date" id="ddd_expiry"
+                         value="{{ document.document_expiry_date|date:'Y-m-d' }}" class="ddd__input ddd__input--mono">
+                </div>
+
+                <div class="ddd__field">
+                  <label class="ddd__label" for="ddd_file">Replace front scan</label>
+                  <input type="file" name="document_file" id="ddd_file" accept="image/*" class="ddd__input ddd__input--file">
+                </div>
+
+                <div class="ddd__field">
+                  <label class="ddd__label" for="ddd_file_back">
+                    {% if document.has_back %}Replace back scan{% else %}Add back scan{% endif %}
+                  </label>
+                  <input type="file" name="document_file_back" id="ddd_file_back" accept="image/*" class="ddd__input ddd__input--file">
+                </div>
+              </div>
+
+              <div class="ddd__actions">
+                <button type="submit" class="ddd__btn ddd__btn--primary">
+                  <i class="fa-solid fa-check"></i> Save changes
+                </button>
+                <a href="{% url 'workforce:driver_documents_list' %}" class="ddd__btn ddd__btn--quiet">Cancel</a>
+              </div>
+            </form>
+
+            <div id="updateMessage" class="ddd__message" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+</div>
 
-  <!-- Document Details Card -->
-  <div class="ddd__card">
-    <div class="ddd__card-header">
-      <i class="fa-solid fa-circle-info ddd__section-icon"></i>
-      <h5 class="ddd__card-title">DOCUMENT INFORMATION</h5>
-    </div>
-
-    {% if document.document_file %}
-    <div class="ddd__image-preview">
-      <img src="{{ document.document_file.url }}" alt="{{ document.document_type|default:'Driver' }} document image" class="ddd__image">
-    </div>
-    {% endif %}
-
-    <div class="ddd__info-grid">
-      <div class="ddd__info-row">
-        <span class="ddd__info-label">Driver Name</span>
-        <span class="ddd__info-value">{{ document.driver.user.first_name|default:"Unknown" }} {{ document.driver.user.last_name|default:"" }}</span>
-      </div>
-      <div class="ddd__info-row">
-        <span class="ddd__info-label">Driver Code</span>
-        <span class="ddd__info-value">{{ document.driver.driver_code|default:"N/A" }}</span>
-      </div>
-      <div class="ddd__info-row">
-        <span class="ddd__info-label">Document Type</span>
-        <span class="ddd__info-value">{{ document.document_type|default:"N/A" }}</span>
-      </div>
-      <div class="ddd__info-row">
-        <span class="ddd__info-label">Document Number</span>
-        <span class="ddd__info-value">{{ document.document_no|default:"N/A" }}</span>
-      </div>
-      <div class="ddd__info-row">
-        <span class="ddd__info-label">Issued From</span>
-        <span class="ddd__info-value">{{ document.document_issued_from|default:"N/A" }}</span>
-      </div>
-      <div class="ddd__info-row">
-        <span class="ddd__info-label">Expiry Date</span>
-        <span class="ddd__info-value">{{ document.document_expiry_date|date:"d M Y"|default:"N/A" }}</span>
-      </div>
-      <div class="ddd__info-row">
-        <span class="ddd__info-label">Created At</span>
-        <span class="ddd__info-value">{{ document.created_at|date:"d M Y, h:i A" }}</span>
-      </div>
-      <div class="ddd__info-row">
-        <span class="ddd__info-label">Last Updated</span>
-        <span class="ddd__info-value">{{ document.updated_at|date:"d M Y, h:i A" }}</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Edit Form -->
-  <div class="ddd__card">
-    <div class="ddd__card-header">
-      <i class="fa-solid fa-edit ddd__section-icon"></i>
-      <h5 class="ddd__card-title">UPDATE DOCUMENT</h5>
-    </div>
-
-    <form id="updateForm" enctype="multipart/form-data">
-      {% csrf_token %}
-      <div class="ddd__form-grid">
-        <div class="ddd__form-group">
-          <label class="ddd__form-label">Document Type</label>
-          <select name="document_type" class="form-select">
-            <option value="QID" {% if document.document_type == 'QID' %}selected{% endif %}>QID</option>
-            <option value="Driving License" {% if document.document_type == 'Driving License' %}selected{% endif %}>Driving License</option>
-            <option value="Passport" {% if document.document_type == 'Passport' %}selected{% endif %}>Passport</option>
-            <option value="National Identification" {% if document.document_type == 'National Identification' %}selected{% endif %}>National Identification</option>
-          </select>
-        </div>
-
-        <div class="ddd__form-group">
-          <label class="ddd__form-label">Document Number</label>
-          <input type="text" name="document_no" value="{{ document.document_no }}" class="form-control" required>
-        </div>
-
-        <div class="ddd__form-group">
-          <label class="ddd__form-label">Issued From</label>
-          <input type="text" name="document_issued_from" value="{{ document.document_issued_from|default:'' }}" class="form-control">
-        </div>
-
-        <div class="ddd__form-group">
-          <label class="ddd__form-label">Expiry Date</label>
-          <input type="date" name="document_expiry_date" value="{{ document.document_expiry_date|date:'Y-m-d' }}" class="form-control">
-        </div>
-
-        <div class="ddd__form-group">
-          <label class="ddd__form-label">Document File (Image)</label>
-          <input type="file" name="document_file" accept="image/*" class="form-control">
-        </div>
-
-        <div class="ddd__form-actions">
-          <button type="submit" class="ddd__btn ddd__btn--primary">
-            <i class="fa-solid fa-save"></i> Save Changes
-          </button>
-          <a href="{% url 'workforce:driver_documents_list' %}" class="ddd__btn ddd__btn--cancel">
-            Cancel
-          </a>
-        </div>
-      </div>
-    </form>
-
-    <div id="updateMessage" class="ddd__message"></div>
-  </div>
+<!-- Full-size scan viewer -->
+<div class="ddd__modal" id="ddd_modal" hidden>
+  <button type="button" class="ddd__modal__close" id="ddd_modal_close" aria-label="Close viewer">
+    <i class="fa-solid fa-xmark"></i>
+  </button>
+  <img src="" alt="" class="ddd__modal__img" id="ddd_modal_img">
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-    // Safe message display helper (XSS-safe)
-    function showMessage(messageDiv, isSuccess, text) {
-        messageDiv.style.display = 'block';
-        messageDiv.className = 'ddd__message ' + (isSuccess ? 'ddd__message--success' : 'ddd__message--error');
-        messageDiv.textContent = '';
-        var icon = document.createElement('i');
-        icon.className = isSuccess ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-triangle';
-        icon.setAttribute('aria-hidden', 'true');
-        messageDiv.appendChild(icon);
-        messageDiv.appendChild(document.createTextNode(' ' + text));
-    }
-
-    document.getElementById('updateForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        var formData = new FormData(this);
-        var messageDiv = document.getElementById('updateMessage');
-        var submitBtn = this.querySelector('button[type="submit"]');
-
-        submitBtn.disabled = true;
-        var originalText = submitBtn.textContent;
-        submitBtn.textContent = 'Saving...';
-
-        fetch('{% url 'workforce:driver_document_detail' document.id %}', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        })
-        .then(function(response) {
-            if (!response.ok) { throw new Error('Network response was not ok'); }
-            return response.json();
-        })
-        .then(function(data) {
-            if (data.success) {
-                showMessage(messageDiv, true, data.message || 'Document updated successfully');
-                setTimeout(function() { window.location.reload(); }, 1500);
-            } else {
-                showMessage(messageDiv, false, data.error || 'Failed to update document');
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
-            }
-        })
-        .catch(function(error) {
-            showMessage(messageDiv, false, 'Error updating document. Please try again.');
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
+(function () {
+    // ── Front / back switch ──────────────────────────────────────────────
+    document.querySelectorAll('[data-ddd-side]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var side = this.dataset.dddSide;
+            document.querySelectorAll('[data-ddd-side]').forEach(function (b) {
+                var on = b.dataset.dddSide === side;
+                b.classList.toggle('ddd__side-btn--on', on);
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            document.querySelectorAll('[data-ddd-pane]').forEach(function (pane) {
+                pane.classList.toggle('d-none', pane.dataset.dddPane !== side);
+            });
         });
     });
+
+    // ── Full-size viewer ─────────────────────────────────────────────────
+    var modal = document.getElementById('ddd_modal');
+    var modalImg = document.getElementById('ddd_modal_img');
+
+    function closeViewer() {
+        modal.hidden = true;
+        document.body.style.overflow = '';
+        modalImg.src = '';
+    }
+
+    document.querySelectorAll('[data-ddd-zoom]').forEach(function (img) {
+        img.addEventListener('click', function () {
+            modalImg.src = this.src;
+            modalImg.alt = this.alt;
+            modal.hidden = false;
+            document.body.style.overflow = 'hidden';
+        });
+    });
+
+    document.getElementById('ddd_modal_close').addEventListener('click', closeViewer);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeViewer(); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !modal.hidden) closeViewer();
+    });
+
+    // ── Save ─────────────────────────────────────────────────────────────
+    function showMessage(box, ok, text) {
+        box.className = 'ddd__message ddd__message--' + (ok ? 'ok' : 'error');
+        box.textContent = '';
+        var icon = document.createElement('i');
+        icon.className = ok ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation';
+        icon.setAttribute('aria-hidden', 'true');
+        box.appendChild(icon);
+        box.appendChild(document.createTextNode(' ' + text));
+    }
+
+    document.getElementById('updateForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        var box = document.getElementById('updateMessage');
+        var btn = this.querySelector('button[type="submit"]');
+        var original = btn.innerHTML;
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+
+        fetch('{% url "workforce:driver_document_detail" document.id %}', {
+            method: 'POST',
+            body: new FormData(this),
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content
+                    || document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(function (r) { return r.json().then(function (d) { return d; }); })
+        .then(function (data) {
+            if (data.success) {
+                showMessage(box, true, data.message || 'Document updated');
+                setTimeout(function () { window.location.reload(); }, 1200);
+            } else {
+                showMessage(box, false, data.error || 'Could not update the document');
+                btn.disabled = false;
+                btn.innerHTML = original;
+            }
+        })
+        .catch(function () {
+            showMessage(box, false, 'Could not reach the server. Try again.');
+            btn.disabled = false;
+            btn.innerHTML = original;
+        });
+    });
+})();
 </script>
 {% endblock extra_js %}

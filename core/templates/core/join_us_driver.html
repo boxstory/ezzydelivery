@@ -10,7 +10,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
 {% block title %}Join as Driver - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/driver-apply.css' %}?v=20260801a" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260817a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -323,24 +323,28 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                         <h2 class="h6 mb-0">Documents</h2>
                         {% if progress.sec4_complete %}<span class="cja__doc-status ms-auto">Complete &#10003;</span>{% endif %}
                     </div>
-                    <p class="text-muted small mb-1">Minimum 3 uploads: a selfie photo plus any 2 ID documents. Max 5MB each (JPG/PNG).</p>
+                    <p class="text-muted small mb-1">
+                        Minimum 3 uploads: a selfie photo plus any 2 ID documents (JPG/PNG).
+                        Large photos are shrunk on your phone before uploading, so this stays quick on mobile data.
+                    </p>
                     <div class="small fw-bold text-muted mb-3" id="core_join_driver_text_docmeter" aria-live="polite"></div>
                     <div class="row g-3">
                         {% for item in doc_list %}
                         <div class="col-12 col-md-6">
-                            <div class="cja__doc-tile {% if item.doc %}cja__doc-tile--done{% endif %} p-3 h-100">
+                            <div class="cja__doc-tile {% if item.has_file %}cja__doc-tile--done{% endif %} p-3 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <label class="form-label mb-0 fw-bold" for="core_join_driver_file_{{ item.key }}">
                                         <i class="fas {{ item.icon }} cja__pick-ico me-1" aria-hidden="true"></i>{{ item.type }}{% if item.type == 'Selfie' %} *{% endif %}
                                     </label>
-                                    {% if item.doc %}<span class="cja__doc-status">Uploaded &#10003;</span>{% endif %}
+                                    {% if item.has_file %}<span class="cja__doc-status">Uploaded &#10003;</span>{% endif %}
                                 </div>
                                 <input type="file" class="form-control form-control-sm mb-2 cja__doc-input"
                                        id="core_join_driver_file_{{ item.key }}"
                                        name="doc_{{ item.key }}" accept="image/*"
                                        {% if item.type == 'Selfie' %}capture="user"{% endif %}
                                        data-doc-type="{{ item.type }}"
-                                       data-existing="{% if item.doc %}1{% else %}0{% endif %}">
+                                       data-existing="{% if item.has_file %}1{% else %}0{% endif %}">
+                                <div class="cja__doc-note small mb-2 d-none" data-doc-note="{{ item.key }}" aria-live="polite"></div>
                                 {% if item.type != 'Selfie' %}
                                 <input type="text" class="form-control form-control-sm" name="doc_no_{{ item.key }}"
                                        placeholder="{{ item.type }} number (optional)"
@@ -350,6 +354,25 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                         </div>
                         {% endfor %}
                     </div>
+                </div>
+
+                <!-- Live upload state: a phone on weak mobile data needs to see that
+                     bytes are still moving, and needs a way back if they are not. -->
+                <div class="cja__upload-panel p-3 mb-4 d-none" id="core_join_driver_box_upload" aria-live="polite">
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                        <span class="small fw-bold" id="core_join_driver_text_uploadstage">Preparing your photos…</span>
+                        <span class="small text-muted" id="core_join_driver_text_uploadpct"></span>
+                    </div>
+                    <div class="progress cja__upload-bar" role="progressbar" aria-label="Upload progress"
+                         aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div class="progress-bar" id="core_join_driver_bar_upload"></div>
+                    </div>
+                    <p class="small text-muted mb-0 mt-2" id="core_join_driver_text_uploadhint">
+                        Keep this page open — closing it cancels the upload.
+                    </p>
+                    <button type="button" class="btn btn-sm btn-outline-dark mt-2 d-none" id="core_join_driver_btn_retry">
+                        Try again
+                    </button>
                 </div>
 
                 <div class="d-flex flex-column flex-md-row align-items-center justify-content-between gap-2 mb-5">
@@ -523,9 +546,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!validateStep(current)) { return; }
                 actionField.value = 'save';
                 stepField.value = String(current + 1);
-                nextBtn.disabled = true;
-                nextBtn.textContent = 'Saving…';
-                form.submit();
+                sendForm(nextBtn, 'Saving…', 'Save &amp; Continue');
             });
         }
         if (backBtn) {
@@ -558,8 +579,126 @@ document.addEventListener('DOMContentLoaded', function() {
         docMeter.classList.toggle('text-success', done);
         docMeter.classList.toggle('text-muted', !done);
     }
+    // ---------------------------------------------------------------------
+    // Photo pipeline. An unmodified phone photo is 2–6 MB; five of them on
+    // mobile data is minutes of silent waiting, and anything over the server's
+    // 5 MB cap is rejected only after the whole upload finishes. So every photo
+    // is downscaled and re-encoded here, before a single byte goes out.
+    // ---------------------------------------------------------------------
+    var MAX_DIM = 1600;                        // long edge, plenty for reading an ID
+    var TARGET_BYTES = 900 * 1024;
+    var HARD_MAX_BYTES = 5 * 1024 * 1024;      // core.views.MAX_UPLOAD_SIZE
+    var prepared = {};                         // input name -> {blob, filename}
+    var prepQueue = Promise.resolve();         // resolves when no photo is still shrinking
+
+    function humanSize(bytes) {
+        if (bytes >= 1024 * 1024) { return (bytes / 1048576).toFixed(1) + ' MB'; }
+        return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+    }
+
+    function canShrink() {
+        var c = document.createElement('canvas');
+        return !!(window.Promise && window.URL && window.FormData && c.getContext && c.toBlob);
+    }
+    var shrinkSupported = canShrink();
+
+    // Resolves to a JPEG Blob, or null when this browser/file can't be re-encoded
+    // (caller then falls back to sending the original).
+    function shrinkImage(file) {
+        return new Promise(function(resolve) {
+            var url = URL.createObjectURL(file);
+            var img = new Image();
+            img.onload = function() {
+                URL.revokeObjectURL(url);
+                var w = img.naturalWidth, h = img.naturalHeight;
+                if (!w || !h) { resolve(null); return; }
+                var scale = Math.min(1, MAX_DIM / Math.max(w, h));
+                var canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(w * scale));
+                canvas.height = Math.max(1, Math.round(h * scale));
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                // Step the quality down until it fits, but stop early rather than
+                // grinding a low-end phone for the last few kilobytes.
+                var qualities = [0.82, 0.7, 0.6, 0.45];
+                var i = 0;
+                (function attempt() {
+                    canvas.toBlob(function(blob) {
+                        if (!blob) { resolve(null); return; }
+                        if (blob.size <= TARGET_BYTES || i >= qualities.length - 1) { resolve(blob); return; }
+                        i++;
+                        attempt();
+                    }, 'image/jpeg', qualities[i]);
+                })();
+            };
+            img.onerror = function() { URL.revokeObjectURL(url); resolve(null); };
+            img.src = url;
+        });
+    }
+
+    function docNote(inp) {
+        var tile = inp.closest('.cja__doc-tile');
+        return tile ? tile.querySelector('[data-doc-note]') : null;
+    }
+
+    function setNote(inp, text, kind) {
+        var el = docNote(inp);
+        if (!el) { return; }
+        el.textContent = text || '';
+        el.classList.toggle('d-none', !text);
+        el.classList.toggle('cja__doc-note--error', kind === 'error');
+        el.classList.toggle('cja__doc-note--ok', kind === 'ok');
+    }
+
+    function handlePick(inp) {
+        var name = inp.name;
+        delete prepared[name];
+        var file = inp.files && inp.files[0];
+        if (!file) { setNote(inp, ''); updateDocMeter(); return; }
+
+        if (file.type && file.type.indexOf('image/') !== 0) {
+            inp.value = '';
+            setNote(inp, 'That is not an image — please pick a JPG or PNG photo.', 'error');
+            updateDocMeter();
+            return;
+        }
+
+        if (!shrinkSupported) {
+            // Nothing we can do but enforce the server's limit up front, so the
+            // applicant is not told "too large" after a long upload.
+            if (file.size > HARD_MAX_BYTES) {
+                inp.value = '';
+                setNote(inp, 'This photo is ' + humanSize(file.size) +
+                    ' — too large. Please retake it at a lower resolution.', 'error');
+            } else {
+                setNote(inp, humanSize(file.size) + ' ready to upload.', 'ok');
+            }
+            updateDocMeter();
+            return;
+        }
+
+        setNote(inp, 'Optimising photo…');
+        updateDocMeter();
+        prepQueue = prepQueue.then(function() {
+            return shrinkImage(file).then(function(blob) {
+                if (inp.files && inp.files[0] !== file) { return; }   // superseded by a newer pick
+                if (blob && blob.size < file.size) {
+                    var base = (file.name || 'photo').replace(/\.[^.]+$/, '');
+                    prepared[name] = { blob: blob, filename: base + '.jpg' };
+                    setNote(inp, humanSize(file.size) + ' → ' + humanSize(blob.size) + ' ready.', 'ok');
+                } else if (file.size > HARD_MAX_BYTES) {
+                    inp.value = '';
+                    setNote(inp, 'This photo is ' + humanSize(file.size) +
+                        ' and could not be compressed. Please retake it at a lower resolution.', 'error');
+                } else {
+                    setNote(inp, humanSize(file.size) + ' ready to upload.', 'ok');
+                }
+                updateDocMeter();
+            });
+        }).catch(function() { /* a failed shrink just sends the original */ });
+    }
+
     form.querySelectorAll('.cja__doc-input').forEach(function(inp) {
-        inp.addEventListener('change', updateDocMeter);
+        inp.addEventListener('change', function() { handlePick(inp); });
     });
     updateDocMeter();
 
@@ -568,30 +707,186 @@ document.addEventListener('DOMContentLoaded', function() {
     // Ask the browser for a position, then let the form through either way —
     // a refused or slow fix must never block the application.
     function captureThen(done) {
-        if (!navigator.geolocation) { done(); return; }
+        var settled = false;
+        function once() { if (!settled) { settled = true; done(); } }
+        if (!navigator.geolocation) { once(); return; }
+        // Our own wall clock, on top of the API's `timeout`. An unanswered
+        // permission prompt fires neither callback, and the API timeout does not
+        // start counting until permission is decided — that is how this form
+        // used to sit on "Submitting…" forever without ever sending a request.
+        var guard = window.setTimeout(once, 9000);
         navigator.geolocation.getCurrentPosition(function(pos) {
             document.getElementById('core_join_driver_input_geolat').value = pos.coords.latitude;
             document.getElementById('core_join_driver_input_geolng').value = pos.coords.longitude;
             document.getElementById('core_join_driver_input_geoacc').value = Math.round(pos.coords.accuracy);
-            done();
-        }, function() { done(); }, { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true });
+            window.clearTimeout(guard);
+            once();
+        }, function() {
+            window.clearTimeout(guard);
+            once();
+        }, { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true });
+    }
+
+    // ---------------------------------------------------------------------
+    // Upload with real progress. The old path was a plain form POST, which gives
+    // the browser no progress events at all — hence a dead "Submitting…" label
+    // that looked identical whether bytes were moving or the connection had died.
+    // ---------------------------------------------------------------------
+    var uploadBox = document.getElementById('core_join_driver_box_upload');
+    var uploadBar = document.getElementById('core_join_driver_bar_upload');
+    var uploadPct = document.getElementById('core_join_driver_text_uploadpct');
+    var uploadStage = document.getElementById('core_join_driver_text_uploadstage');
+    var uploadHint = document.getElementById('core_join_driver_text_uploadhint');
+    var retryBtn = document.getElementById('core_join_driver_btn_retry');
+    var STALL_MS = 45000;
+    var activeXhr = null;
+    var stallTimer = null;
+
+    function setStage(text, hint) {
+        if (uploadStage) { uploadStage.textContent = text; }
+        if (hint !== undefined && uploadHint) { uploadHint.textContent = hint; }
+    }
+
+    function setProgress(pct, label) {
+        if (uploadBar) { uploadBar.style.width = pct + '%'; }
+        if (uploadBox) {
+            var bar = uploadBox.querySelector('.progress');
+            if (bar) { bar.setAttribute('aria-valuenow', String(Math.round(pct))); }
+        }
+        if (uploadPct) { uploadPct.textContent = label || ''; }
+    }
+
+    function showPanel() {
+        if (uploadBox) { uploadBox.classList.remove('d-none'); }
+        if (retryBtn) { retryBtn.classList.add('d-none'); }
+        setProgress(0, '');
+    }
+
+    function armStall() {
+        window.clearTimeout(stallTimer);
+        stallTimer = window.setTimeout(function() {
+            setStage('Upload has stalled',
+                'No data has moved for a while — your connection may have dropped. ' +
+                'You can wait, or tap "Try again".');
+            if (retryBtn) { retryBtn.classList.remove('d-none'); }
+        }, STALL_MS);
+    }
+
+    function failPanel(message) {
+        window.clearTimeout(stallTimer);
+        setStage('Upload did not go through', message);
+        setProgress(0, '');
+        if (retryBtn) { retryBtn.classList.remove('d-none'); }
+    }
+
+    // btn is put back the way it was found, so a failed attempt is retryable
+    // instead of leaving the applicant with a permanently dead button.
+    function sendForm(btn, busyLabel, idleLabel) {
+        if (activeXhr) { return; }
+        if (btn) { btn.disabled = true; btn.innerHTML = busyLabel; }
+        if (saveBtn) { saveBtn.disabled = true; }
+        if (submitBtn) { submitBtn.disabled = true; }
+        if (nextBtn) { nextBtn.disabled = true; }
+
+        function restore() {
+            activeXhr = null;
+            if (btn) { btn.disabled = false; btn.innerHTML = idleLabel; }
+            if (saveBtn) { saveBtn.disabled = false; }
+            if (submitBtn) { submitBtn.disabled = false; }
+            if (nextBtn) { nextBtn.disabled = false; }
+        }
+
+        showPanel();
+        setStage(needsLocation ? 'Getting your location…' : 'Preparing your photos…',
+                 'Keep this page open — closing it cancels the upload.');
+
+        captureThen(function() {
+            setStage('Preparing your photos…');
+            prepQueue.then(function() { post(); }, function() { post(); });
+        });
+
+        function post() {
+            if (!window.FormData || !window.XMLHttpRequest) {
+                // Ancient browser: fall back to the plain POST. No progress bar,
+                // but the application still goes through.
+                form.dataset.nativeSubmit = '1';
+                form.submit();
+                return;
+            }
+            var fd = new FormData(form);
+            Object.keys(prepared).forEach(function(name) {
+                var p = prepared[name];
+                if (p && p.blob) { fd.set(name, p.blob, p.filename); }
+            });
+
+            var xhr = new XMLHttpRequest();
+            activeXhr = xhr;
+            // getAttribute, not form.action: this form has an <input name="action">,
+            // and named controls shadow the form's own properties.
+            xhr.open('POST', form.getAttribute('action') || window.location.href, true);
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+            xhr.upload.onprogress = function(ev) {
+                armStall();
+                if (!ev.lengthComputable) { setStage('Uploading…'); return; }
+                var pct = Math.min(99, (ev.loaded / ev.total) * 100);
+                setStage('Uploading your application…',
+                         'Keep this page open — closing it cancels the upload.');
+                setProgress(pct, Math.round(pct) + '% · ' +
+                    humanSize(ev.loaded) + ' of ' + humanSize(ev.total));
+            };
+            xhr.upload.onload = function() {
+                window.clearTimeout(stallTimer);
+                setProgress(100, 'Uploaded');
+                setStage('Saving your application…', 'Almost done — do not close this page.');
+            };
+            xhr.onload = function() {
+                window.clearTimeout(stallTimer);
+                activeXhr = null;
+                if (xhr.status >= 200 && xhr.status < 400 && xhr.responseText) {
+                    // The server answers with the re-rendered page (after following
+                    // its own redirect on success), so swap the document in place —
+                    // that keeps the success/error messages the view just queued.
+                    var url = xhr.responseURL || window.location.href;
+                    try { window.history.replaceState(null, '', url); } catch (err) { /* not fatal */ }
+                    document.open();
+                    document.write(xhr.responseText);
+                    document.close();
+                    return;
+                }
+                restore();
+                failPanel('The server rejected the upload (error ' + xhr.status +
+                          '). Nothing was lost — tap "Try again".');
+            };
+            xhr.onerror = function() {
+                restore();
+                failPanel('The connection dropped before your photos finished uploading. ' +
+                          'Your typed details are still here — tap "Try again".');
+            };
+            xhr.ontimeout = xhr.onerror;
+            xhr.onabort = function() { restore(); };
+
+            armStall();
+            setStage('Uploading your application…');
+            xhr.send(fd);
+        }
+
+        if (retryBtn) {
+            retryBtn.onclick = function() {
+                if (activeXhr) { activeXhr.abort(); }
+                retryBtn.classList.add('d-none');
+                sendForm(btn, busyLabel, idleLabel);
+            };
+        }
     }
 
     form.addEventListener('submit', function(e) {
-        if (form.dataset.geoDone === '1') return;
+        if (form.dataset.nativeSubmit === '1') { return; }
+        e.preventDefault();
 
-        // Save Progress: no minimum-doc check. Location is still worth asking for
-        // on a save when the application has none yet — many applicants save
-        // several times before they ever reach the submit button.
+        // Save Progress: no minimum-doc check — a draft is allowed to be incomplete.
         if (actionField.value === 'save') {
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving…';
-            if (!needsLocation) return;
-            e.preventDefault();
-            captureThen(function() {
-                form.dataset.geoDone = '1';
-                form.submit();
-            });
+            sendForm(saveBtn, 'Saving…', 'Save Progress');
             return;
         }
 
@@ -604,22 +899,11 @@ document.addEventListener('DOMContentLoaded', function() {
             errs.push('Select at least one delivery zone you want to work in.');
         }
         if (errs.length) {
-            e.preventDefault();
             alert(errs.join('\n'));
             return;
         }
 
-        // Capture location, then submit
-        e.preventDefault();
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting…';
-
-        function go() {
-            form.dataset.geoDone = '1';
-            form.submit();
-        }
-        if (!needsLocation) { go(); return; }
-        captureThen(go);
+        sendForm(submitBtn, 'Submitting…', 'Submit Application');
     });
 });
 </script>

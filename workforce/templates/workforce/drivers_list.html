@@ -16,16 +16,18 @@ Notes: Filters and tally segments swap #main-content over HTMX and push the URL;
             <h1 class="wfd__hero-title"><i class="fa-solid fa-motorcycle"></i>Drivers</h1>
             <p class="wfd__hero-subtitle">Fleet roster — duty, vehicles and standing</p>
         </div>
-        <div class="wfd__hero-count">
-            <span class="wfd__hero-count__num">{{ total_count|default:"0" }}</span>
-            <span class="wfd__hero-count__label">Total Drivers</span>
+        <div class="wfd__hero-bank">
+            <div class="wfd__hero-count">
+                <span class="wfd__hero-count__num">{{ total_count|default:"0" }}</span>
+                <span class="wfd__hero-count__label">Total Drivers</span>
+            </div>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_drivers_list_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
-        <button type="button" class="wfnote__btn" data-wfnote-toggle
-                aria-expanded="false" aria-controls="workforce_drivers_list_card_notes"
-                title="About this page">
-            <i class="fa-solid fa-question" aria-hidden="true"></i>
-            <span class="visually-hidden">Show notes</span>
-        </button>
     </div>
 
     <div class="wfnote" id="workforce_drivers_list_card_notes"
@@ -92,6 +94,31 @@ Notes: Filters and tally segments swap #main-content over HTMX and push the URL;
                 </div>
             </button>
         </div>
+
+        {# CRM pipeline: second status axis, counted over the whole pool so segments hold still #}
+        {% if crm_stage_tallies %}
+        <div class="drl__pipe" role="group" aria-label="CRM pipeline stages">
+            <span class="drl__pipe-title">
+                <i class="fa-solid fa-diagram-project" aria-hidden="true"></i> CRM Pipeline
+            </span>
+            <div class="drl__pipe-track">
+                {% for tally in crm_stage_tallies %}
+                <button type="button"
+                        class="drl__pipe-seg {% if tally.key in selected_crm_stages %}drl__pipe-seg--active{% endif %}"
+                        hx-get="{% url 'workforce:drivers_list' %}?all=1&amp;crm_stage={{ tally.key }}"
+                        hx-target="#main-content"
+                        hx-select="#main-content"
+                        hx-swap="outerHTML"
+                        hx-push-url="true"
+                        title="Show drivers in the {{ tally.label }} column">
+                    <span class="drl__pipe-dot drl__pipe-dot--sw-{{ tally.swatch }}" aria-hidden="true"></span>
+                    <span class="drl__pipe-label">{{ tally.label }}</span>
+                    <span class="drl__pipe-count">{{ tally.count }}</span>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Filter -->
         <div class="drl__filter">
@@ -166,6 +193,13 @@ Notes: Filters and tally segments swap #main-content over HTMX and push the URL;
                         <i class="fa-solid fa-user-check"></i> Verification
                     </label>
                     {% include "workforce/parts/components/_multiselect_filter.html" with field_name="verification" label="Verification" icon="user-check" choices=verification_choices selected=selected_verifications all_text="Any Verification" %}
+                </div>
+                {# Second status axis: which column of the CRM driver board the applicant sits in #}
+                <div class="drl__filter-group">
+                    <label class="drl__filter-label">
+                        <i class="fa-solid fa-diagram-project"></i> CRM Stage
+                    </label>
+                    {% include "workforce/parts/components/_multiselect_filter.html" with field_name="crm_stage" label="CRM Stage" icon="diagram-project" choices=crm_stage_choices selected=selected_crm_stages all_text="All CRM Stages" %}
                 </div>
                 <div class="drl__filter-group">
                     <label for="sortSelect" class="drl__filter-label">
@@ -261,6 +295,7 @@ Notes: Filters and tally segments swap #main-content over HTMX and push the URL;
                             <span class="drl__badge {% if driver.driver_status == 'approved' %}drl__badge--success{% elif driver.driver_status == 'pending' or driver.driver_status == 'processing' %}drl__badge--warning{% else %}drl__badge--danger{% endif %}">
                                 {{ driver.driver_status }}
                             </span>
+                            {% include "workforce/parts/components/_driver_crm_stage.html" %}
                         </td>
                         <td>
                             <span class="dra__avail-badge dra__avail-badge--{{ driver.driver_availability }}">
@@ -318,6 +353,7 @@ Notes: Filters and tally segments swap #main-content over HTMX and push the URL;
                                class="drl__btn drl__btn--view">
                                 <i class="fa-solid fa-eye"></i> View
                             </a>
+                            {% include "workforce/parts/components/_driver_lead_btn.html" %}
                         </td>
                     </tr>
                     {% endfor %}

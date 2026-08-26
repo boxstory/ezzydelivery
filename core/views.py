@@ -507,6 +507,7 @@ def join_driver(request):
         )
 
     upload_errors = []
+    upload_warnings = []
 
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -531,17 +532,26 @@ def join_driver(request):
         existing_types = set()
         if driver:
             existing_types = set(
-                driver.driver_document.filter(document_type__in=APPLY_DOC_TYPES)
-                .exclude(document_file='').exclude(document_file__isnull=True)
-                .values_list('document_type', flat=True)
+                docs_with_image(
+                    driver.driver_document.filter(document_type__in=APPLY_DOC_TYPES)
+                ).values_list('document_type', flat=True)
             )
         uploaded = {}
+        typed_doc_nos = {}
         for doc_type in APPLY_DOC_TYPES:
-            f = request.FILES.get(f'doc_{doc_type.replace(" ", "_")}')
+            key = doc_type.replace(' ', '_')
+            doc_no = (request.POST.get(f'doc_no_{key}') or '').strip()
+            if doc_no:
+                typed_doc_nos[doc_type] = doc_no
+            f = request.FILES.get(f'doc_{key}')
             if f:
                 ok, err = validate_image_upload(f)
                 if ok:
                     uploaded[doc_type] = f
+                elif is_partial_save:
+                    # One unusable photo must never throw away the typed sections
+                    # on a draft save — keep the save, flag the file to re-pick.
+                    upload_warnings.append(f"{doc_type}: {err} — that photo was not saved.")
                 else:
                     upload_errors.append(f"{doc_type}: {err}")
 
@@ -600,6 +610,7 @@ def join_driver(request):
                 need_driver_row = (
                     driver is not None or not is_partial_save or uploaded
                     or vehicle_selected
+                    or bool(typed_doc_nos)
                     or bool((request.POST.get('driver_license_number') or '').strip())
                     or request.POST.get('has_driver_license') == 'on'
                     or bool(job_type_val)
@@ -676,30 +687,40 @@ def join_driver(request):
 
                     for doc_type in APPLY_DOC_TYPES:
                         f = uploaded.get(doc_type)
-                        doc_no = (request.POST.get(f'doc_no_{doc_type.replace(" ", "_")}') or '').strip()
+                        doc_no = typed_doc_nos.get(doc_type, '')
                         doc = fleet_models.DriverDocument.objects.filter(
                             driver=driver, document_type=doc_type).first()
-                        if not f and not (doc_no and doc):
+                        # A typed number is kept on its own — applicants often fill
+                        # the numbers on one visit and upload the photos on the next,
+                        # and a discarded number reads as "the form lost my data".
+                        # Such a row keeps the placeholder image, so docs_with_image()
+                        # still refuses to count it as an uploaded document.
+                        if not f and not doc_no:
                             continue
                         if doc is None:
                             doc = fleet_models.DriverDocument(
                                 driver=driver, document_type=doc_type, document_no='')
                         if f:
                             # Replace: drop the old image so protected media doesn't accumulate orphans
-                            if doc.pk and doc.document_file and 'doc_default' not in doc.document_file.name:
+                            if (doc.pk and doc.document_file
+                                    and DOC_PLACEHOLDER_MARKER not in doc.document_file.name):
                                 doc.document_file.delete(save=False)
                             doc.document_file = f
                         if doc_no:
                             doc.document_no = doc_no
                         doc.save()
 
+            for warn in upload_warnings:
+                messages.warning(request, warn)
+
             if is_partial_save:
                 logger.info(f"Driver application progress saved for user {request.user.id}")
                 # Wizard "Save & Continue": jump straight to the next section, no toast
                 step_next = request.POST.get('step', '')
-                if step_next in ('2', '3', '4'):
+                if step_next in ('2', '3', '4') and not upload_warnings:
                     return redirect(f"{reverse('core:join_driver')}?step={step_next}")
-                messages.success(request, "Progress saved! You can continue your application anytime.")
+                if not upload_warnings:
+                    messages.success(request, "Progress saved! You can continue your application anytime.")
             else:
                 logger.info(f"Driver application submitted for user {request.user.id} (new={is_new_driver})")
                 _notify_driver_application_received(driver, profile)
@@ -735,16 +756,24 @@ def join_driver(request):
     if profile and profile.is_driver and driver:
         application_status = profile.verification_status
 
-    existing_docs = {}
+    # Two separate facts per document: the row (which may carry only a typed
+    # number, so the number re-renders) and whether a real image is on it.
+    # Only the second one counts towards "uploaded" anywhere on this page.
+    all_docs = {}
+    docs_uploaded = set()
     if driver:
-        for doc in driver.driver_document.filter(document_type__in=APPLY_DOC_TYPES).exclude(document_file=''):
-            existing_docs[doc.document_type] = doc
+        rows = driver.driver_document.filter(document_type__in=APPLY_DOC_TYPES)
+        for doc in rows:
+            all_docs[doc.document_type] = doc
+        docs_uploaded = set(docs_with_image(rows).values_list('document_type', flat=True))
+    existing_docs = {t: d for t, d in all_docs.items() if t in docs_uploaded}
     DOC_ICONS = {
         'Selfie': 'fa-camera', 'QID': 'fa-id-card', 'Passport': 'fa-passport',
         'Driving License': 'fa-id-badge', 'Istimara': 'fa-car',
     }
     doc_list = [
-        {'type': dt, 'key': dt.replace(' ', '_'), 'doc': existing_docs.get(dt),
+        {'type': dt, 'key': dt.replace(' ', '_'), 'doc': all_docs.get(dt),
+         'has_file': dt in docs_uploaded,
          'icon': DOC_ICONS.get(dt, 'fa-file')}
         for dt in APPLY_DOC_TYPES
     ]
@@ -1063,7 +1092,7 @@ def join_us(request):
             except core_models.ProfilePicture.DoesNotExist:
                 profile_picture = core_models.ProfilePicture.objects.create(
                     user_id=request.user.id,
-                    profile_id=request.user.id
+                    profile_id=profile.id
                 )
 
             # Calculate completion percentage
@@ -1100,7 +1129,7 @@ def join_us_team(request):
         profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
     except core_models.ProfilePicture.DoesNotExist:
         profile_picture = core_models.ProfilePicture.objects.create(
-            user_id=request.user.id, profile_id=request.user.id
+            user_id=request.user.id, profile_id=profile.id
         )
 
     completion_percentage = profile.get_profile_completion_percentage()
