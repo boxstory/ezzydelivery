@@ -151,6 +151,7 @@ def _refresh_route_distance(instance):
             Order.objects.filter(pk=instance.pk).update(
                 route_distance_km=instance.route_distance_km,
                 route_distance_exact=instance.route_distance_exact,
+                route_distance_source=instance.route_distance_source,
             )
     except Exception:
         # A distance is never worth failing an order save over.
@@ -158,10 +159,37 @@ def _refresh_route_distance(instance):
                        exc_info=True)
 
 
+def _refresh_delivery_area(instance):
+    """Keep the stored neighbourhood name in step with the zone and the pin.
+
+    Queryset update rather than instance.save() for the same two reasons as the
+    distance above: it lands even when the caller saved with update_fields (a
+    coords-only save would otherwise leave the area stale), and it cannot recurse
+    back into this receiver.
+
+    The geocoder in _create_delivery_task_from_order writes coords and dl_zone
+    from inside this same receiver via real save() calls, which re-enter it on the
+    same instance — so the nested pass recomputes after those writes land.
+    """
+    from delivery.geo import apply_delivery_area
+
+    try:
+        if apply_delivery_area(instance):
+            Order.objects.filter(pk=instance.pk).update(
+                delivery_area_name=instance.delivery_area_name,
+                delivery_area_source=instance.delivery_area_source,
+            )
+    except Exception:
+        # An area label is never worth failing an order save over.
+        logger.warning('Could not refresh delivery area for order %s', instance.pk,
+                       exc_info=True)
+
+
 @receiver(post_save, sender=Order, dispatch_uid='orders.order_post_save')
 def order_post_save_receiver(sender, instance, created, *args, **kwargs):
     logger.debug('order_post_save_receiver')
     _refresh_route_distance(instance)
+    _refresh_delivery_area(instance)
     if created:
         logger.debug(f'New order created: {instance}')
         if not instance.order_number or instance.order_number == "":

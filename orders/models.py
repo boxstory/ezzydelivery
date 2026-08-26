@@ -277,6 +277,26 @@ class Order(models.Model):
                   "a measurement, the other two are approximations"
     )
 
+    # Delivery area — the neighbourhood inside the drop zone. A zone holds up to
+    # 63 ZoneArea rows, so the zone number alone cannot name it; the delivery pin
+    # picks the nearest area centre. Stored rather than resolved per screen so the
+    # driver card, staff lists and exports all print the same name. Kept current
+    # by orders.signals on every save.
+    delivery_area_name = models.CharField(
+        max_length=150, blank=True, default='',
+        help_text="Neighbourhood within the delivery zone, resolved from the pin"
+    )
+    DELIVERY_AREA_SOURCE = [
+        ('pin', 'Nearest area to the delivery pin'),
+        ('only_area', 'Only area in the zone'),
+        ('same_as_zone', 'Suppressed — area name repeats the zone name'),
+        ('unresolved', 'Could not be resolved'),
+    ]
+    delivery_area_source = models.CharField(
+        max_length=20, choices=DELIVERY_AREA_SOURCE, blank=True, default='',
+        help_text="How delivery_area_name was produced — empty means never computed"
+    )
+
     # Delivery completion tracking
     delivered_at = models.DateTimeField(blank=True, null=True, help_text="When the order was delivered")
     fulfilled_at = models.DateTimeField(blank=True, null=True, help_text="When the order was marked as fulfilled")

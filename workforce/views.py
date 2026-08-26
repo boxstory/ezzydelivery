@@ -8480,9 +8480,9 @@ def _build_task_timeline(task, status_history, verification_logs, status_points,
             note='No first-mile pickup leg on this order — the goods start here.',
             pills=[p for p in [loc.locality,
                                f"Z{loc.pickup_zone_no}" if loc.pickup_zone_no else None] if p],
-            map=({'lat': loc.pickup_lat, 'lng': loc.pickup_lon,
-                  'label': 'Pickup / dispatch point'}
-                 if loc.pickup_lat and loc.pickup_lon else None))
+            map=_map_pin(loc.pickup_lat, loc.pickup_lon, 'Pickup / dispatch point',
+                         ref=(order.latitude, order.longitude) if order else None,
+                         ref_label="Customer's saved location", colour='#8a6d00'))
 
     # GPS verdict per driver status change ----------------------------------
     gps_by_key = {}
@@ -8518,17 +8518,62 @@ def _build_task_timeline(task, status_history, verification_logs, status_points,
         if entry.field_name == 'dl_task_status':
             gps = gps_by_key.get(f"{entry.old_value}__{entry.new_value}")
         elif (entry.field_name == 'pickup_status'
-              and entry.new_value in ('accepted', 'collected', 'dropped', 'handed_off')):
+              and entry.new_value in ('accepted', 'in_progress', 'arrived',
+                                      'collected', 'dropped', 'handed_off')):
+            # Setting off and arriving at the store are the two stages staff
+            # most often dispute, and the driver app now takes a fix at each
+            # of them — so they get a pin like the rest of the leg.
             gps = _pickup_event_gps(pickup_task, entry.created_at)
         icon, ikind = icons.get(entry.field_name, ('fa-solid fa-circle-info', 'default'))
         is_location = entry.field_name in ('location_update', 'latitude/longitude')
+
+        # Both ends of a pin move carry their coordinate inside the label text.
+        # The words stay on the row and the numbers become the pin, which also
+        # makes the move itself visible: where it was against where it went.
+        from_label, to_label = entry.old_display, entry.new_display
+        pin = None
+        if is_location:
+            from_label, old_xy = _split_coords(from_label)
+            to_label, new_xy = _split_coords(to_label)
+            pin = _map_pin(*(new_xy or (None, None)), 'Pin after this change',
+                           ref=old_xy, ref_label='Pin before this change',
+                           colour='#2f6f4f')
+            if not pin and old_xy:
+                pin = _map_pin(*old_xy, 'Pin before this change', colour='#b4532a')
+
+        # The place a fixed leg happened: the client's collection point, or the
+        # hub that took custody. The driver's own fix is separate evidence and
+        # rides alongside in gps — one is where they should have been, the
+        # other where they were.
+        elif entry.field_name == 'pickup_status' and pickup_task:
+            if entry.new_value == 'collected' and pickup_task.pickup_location_id:
+                loc = pickup_task.pickup_location
+                pin = _map_pin(loc.pickup_lat, loc.pickup_lon,
+                               'Collection point', colour='#8a6d00')
+            elif entry.new_value == 'dropped' and pickup_task.drop_warehouse_id:
+                hub = pickup_task.drop_warehouse
+                pin = _map_pin(hub.latitude, hub.longitude,
+                               f'Hub: {hub.name}', colour='#8a6d00')
+
+        # Where the driver's device said they were when the job completed. It
+        # sat in a card further down the page and never on the timeline; skipped
+        # when the status change already stamped its own fix, which says it
+        # better (it carries accuracy and distance too).
+        elif (entry.field_name == 'dl_task_status' and not gps
+              and entry.new_value in ('delivered', 'partial_delivery')):
+            pin = _map_pin(task.completion_latitude, task.completion_longitude,
+                           'Driver completed here',
+                           ref=(order.latitude, order.longitude) if order else None,
+                           ref_label="Customer's saved location", colour='#2f6f4f')
+
         add(entry.created_at, kind='location' if is_location else 'status',
             icon=icon, ikind=ikind,
             tone=tone,
             title='Location Updated' if is_location else entry.get_field_name_display(),
-            from_label=entry.old_display, to_label=entry.new_display,
+            from_label=from_label, to_label=to_label,
             note=entry.notes,
             actor=(entry.changed_by.get_full_name() or entry.changed_by.username) if entry.changed_by else None,
+            map=pin,
             gps=gps)
 
     # Address confirmations that predate location_update history rows -------
@@ -8540,8 +8585,6 @@ def _build_task_timeline(task, status_history, verification_logs, status_points,
                    for e in events)
 
     if order:
-        pin_pill = (f"{order.latitude}, {order.longitude}"
-                    if order.latitude and order.longitude else None)
         for av in orders_models.AddressVerification.objects.filter(
             order=order, customer_verified_at__isnull=False
         ).order_by('customer_verified_at'):
@@ -8549,8 +8592,11 @@ def _build_task_timeline(task, status_history, verification_logs, status_points,
                 add(av.customer_verified_at, kind='location', icon='fa-solid fa-location-crosshairs',
                     ikind='location', tone='success', title='Location Confirmed by Client',
                     to_label=av.verified_address or None,
-                    pills=[p for p in [f"{av.latitude}, {av.longitude}"
-                                       if av.latitude and av.longitude else None] if p],
+                    # What the customer dropped, against what the order ended up
+                    # holding — the pair is the point, not either number.
+                    map=_map_pin(av.latitude, av.longitude, 'Point the customer confirmed',
+                                 ref=(order.latitude, order.longitude),
+                                 ref_label="Order's saved location", colour='#2f6f4f'),
                     note=av.notes or None, actor='Customer (verification link)')
 
         if order.address_verified_at and not _already_logged(order.address_verified_at):
@@ -8558,7 +8604,7 @@ def _build_task_timeline(task, status_history, verification_logs, status_points,
             add(order.address_verified_at, kind='location', icon='fa-solid fa-location-dot',
                 ikind='location', tone='success', title='Address Verified',
                 to_label=order.get_coords_accuracy_display() if order.coords_accuracy else None,
-                pills=[p for p in [pin_pill] if p],
+                map=_map_pin(order.latitude, order.longitude, 'Verified customer pin'),
                 note=order.verification_notes or None,
                 actor=((who.get_full_name() or who.username) if who
                        else ('Customer (verification link)'
@@ -8759,22 +8805,55 @@ def _delivery_leg(task, status_history, proof_count):
     }
 
 
-def _pickup_gps_coverage(pickup):
-    """Count driver GPS pings recorded across the first-mile pickup leg.
+#: A pickup leg is routinely accepted and closed in the same interaction — the
+#: median leg on this database is 7 seconds wide and 86% are under a minute —
+#: while the PWA pings roughly every 30s. A window that short cannot contain a
+#: ping, so counting inside it reported "no GPS" for drivers whose phone was
+#: reporting the whole time. Legs below this floor are measured over a window
+#: padded by _PICKUP_GPS_PAD each side and labelled "around" instead of "during".
+_PICKUP_GPS_MIN_WINDOW = timedelta(minutes=2)
+_PICKUP_GPS_PAD = timedelta(minutes=1)
 
-    Zero pings means the pickup has no location corroboration at all — the
-    pickup card previously gave no hint either way.
+
+def _pickup_gps_coverage(pickup):
+    """GPS corroboration for the first-mile leg: how many fixes the driver's
+    device reported across it.
+
+    Matched on when the device took the fix (``fixed_at``, falling back to
+    ``created_at``) rather than when the server received it. Receipt runs about
+    4s behind a live ping and hours behind an offline replay, which on a leg
+    this short misplaces every fix out of the window.
+
+    Returns None when there is nothing to measure — no driver, or never
+    accepted — else {'count', 'padded', 'span'}: padded says the count covers a
+    widened window because the leg itself was too short to expect a ping.
     """
     if not pickup or not pickup.driver_id or not pickup.accepted_at:
         return None
     end = pickup.dropped_at or pickup.collected_at or pickup.updated_at
     if not end:
         return None
-    return fleet_models.DriverLocation.objects.filter(
+
+    from django.db.models.functions import Coalesce
+
+    start, span = pickup.accepted_at, end - pickup.accepted_at
+    padded = span < _PICKUP_GPS_MIN_WINDOW
+    if padded:
+        start, end = start - _PICKUP_GPS_PAD, end + _PICKUP_GPS_PAD
+
+    # Distinct positions, not stored rows: until the ingest started rejecting
+    # them, the PWA re-sent the same cached fix several times, so a row count
+    # read about 3.6x high. Rows already written stay duplicated, so the count
+    # has to collapse them here rather than trust one row per fix.
+    count = fleet_models.DriverLocation.objects.annotate(
+        fix_at=Coalesce('fixed_at', 'created_at'),
+    ).filter(
         driver_id=pickup.driver_id,
-        created_at__gte=pickup.accepted_at,
-        created_at__lte=end,
-    ).count()
+        fix_at__gte=start,
+        fix_at__lte=end,
+    ).values('fix_at', 'latitude', 'longitude').distinct().count()
+    return {'count': count, 'padded': padded,
+            'span': max(int(span.total_seconds()), 0)}
 
 
 @login_required(login_url='/accounts/login/')

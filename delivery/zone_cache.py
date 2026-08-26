@@ -30,5 +30,12 @@ def get_active_areas():
 
 
 def invalidate_zone_cache():
-    """Drop the cached active-area list. Called from ZoneName/ZoneArea save/delete signals."""
-    cache.delete(_AREAS_CACHE_KEY)
+    """Drop every cached zone/area lookup. Called from ZoneName/ZoneArea save/delete signals.
+
+    The two delivery.geo maps are cleared here too. Until now only the active-area
+    list was dropped, so moving a zone pin left the zone-centre map — and therefore
+    every zone-estimate route distance — stale for up to an hour.
+    """
+    from delivery.geo import ZONE_AREA_CACHE_KEY, ZONE_COORD_CACHE_KEY
+
+    cache.delete_many([_AREAS_CACHE_KEY, ZONE_AREA_CACHE_KEY, ZONE_COORD_CACHE_KEY])

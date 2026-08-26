@@ -75,13 +75,14 @@ Usage:
                         <div class="odp__tl-meta"><i class="fa-regular fa-user"></i> {{ ev.actor }}</div>
                         {% endif %}
 
-                        {% comment %} A fixed place rather than a driver fix — the pickup / dispatch
-                           point, so the job's other end has a pin and a time too. {% endcomment %}
+                        {% comment %} A place rather than a driver fix — a collection point, a hub,
+                           a customer pin, or where a pin moved to. The coordinate itself is never
+                           printed: the pin opens the map, which is what the number was for. {% endcomment %}
                         {% if ev.map %}
                         <div class="odp__tl-gps">
                             <span class="odp__tl-gps__pin" title="{{ ev.map.label }}">
-                                <i class="fa-solid fa-location-dot"></i>
-                                {% include "includes/components/_map_point.html" with uid=ev.map.lat|stringformat:"s"|add:"-org" lat=ev.map.lat lon=ev.map.lng lat2=order.latitude lon2=order.longitude label=ev.map.label label2="Customer's saved location" colour="#8a6d00" colour2="#b4532a" text=ev.map.lat|stringformat:"s"|add:", "|add:ev.map.lng|stringformat:"s" size="sm" %}
+                                <i class="fa-solid fa-location-dot"></i> {{ ev.map.label }}
+                                {% include "includes/components/_map_point.html" with uid=ev.ts|date:"U"|add:"-org" lat=ev.map.lat lon=ev.map.lng lat2=ev.map.ref_lat lon2=ev.map.ref_lng label=ev.map.label label2=ev.map.ref_label colour=ev.map.colour|default:"#8a6d00" colour2="#b4532a" size="sm" %}
                             </span>
                         </div>
                         {% endif %}
@@ -95,7 +96,8 @@ Usage:
                                 <i class="fa-solid fa-location-dot"></i>
                                 {% comment %} Driver's stamped position against the customer pin — the pair
                                    is the evidence, so both go on one map. {% endcomment %}
-                                {% include "includes/components/_map_point.html" with uid=ev.gps.lat|stringformat:"s"|add:"-tl" lat=ev.gps.lat lon=ev.gps.lng lat2=ev.gps.ref_lat|default:order.latitude lon2=ev.gps.ref_lng|default:order.longitude label="Driver at this status change" label2=ev.gps.ref_label|default:"Customer's saved location" colour="#2f6f4f" colour2="#b4532a" text=ev.gps.lat|stringformat:"s"|add:", "|add:ev.gps.lng|stringformat:"s" size="sm" %}
+                                Driver here
+                                {% include "includes/components/_map_point.html" with uid=ev.gps.lat|stringformat:"s"|add:"-tl" lat=ev.gps.lat lon=ev.gps.lng lat2=ev.gps.ref_lat|default:order.latitude lon2=ev.gps.ref_lng|default:order.longitude label="Driver at this status change" label2=ev.gps.ref_label|default:"Customer's saved location" colour="#2f6f4f" colour2="#b4532a" size="sm" %}
                             </span>
                             {% if ev.gps.accuracy %}
                             <span class="odp__tl-gps__acc" title="GPS accuracy"><i class="fa-solid fa-crosshairs"></i> &plusmn;{{ ev.gps.accuracy|floatformat:0 }}m</span>
@@ -120,7 +122,7 @@ Usage:
                         <div class="odp__tl-gps__fresh {% if ev.gps.verdict == 'corroborated' %}odp__tl-gps__fresh--ok{% endif %}">
                             <i class="fa-solid fa-satellite-dish"></i>
                             Next live fix {{ ev.gps.fresh.delay_seconds|duration_short }} later:
-                            {% include "includes/components/_map_point.html" with uid=ev.gps.fresh.lat|stringformat:"s"|add:"-fresh" lat=ev.gps.fresh.lat lon=ev.gps.fresh.lng lat2=order.latitude lon2=order.longitude label="Next live fix" label2="Customer's saved location" colour="#2f6f4f" colour2="#b4532a" text=ev.gps.fresh.lat|stringformat:"s"|add:", "|add:ev.gps.fresh.lng|stringformat:"s" size="sm" %}
+                            {% include "includes/components/_map_point.html" with uid=ev.gps.fresh.lat|stringformat:"s"|add:"-fresh" lat=ev.gps.fresh.lat lon=ev.gps.fresh.lng lat2=order.latitude lon2=order.longitude label="Next live fix" label2="Customer's saved location" colour="#2f6f4f" colour2="#b4532a" size="sm" %}
                             {% if ev.gps.fresh.distance is not None %}<strong>{{ ev.gps.fresh.distance|floatformat:2 }} km</strong> from drop{% endif %}
                         </div>
                         {% endif %}
@@ -216,13 +218,25 @@ Usage:
                             <span class="odp__tl-title">{{ entry.get_field_name_display }}</span>
                             <span class="odp__tl-timestamp"><i class="fa-regular fa-clock me-1"></i>{{ entry.created_at|date:"d M Y, H:i" }}</span>
                         </div>
+                        {% comment %}The pin receiver appends the coordinate to both labels; it is
+                        stripped here and offered as a map below, same as the merged stream.{% endcomment %}
                         <div class="odp__tl-transition">
                             {% if entry.old_display %}
-                            <span class="odp__tl-pill odp__tl-pill--from">{{ entry.old_display }}</span>
+                            <span class="odp__tl-pill odp__tl-pill--from">{{ entry.old_display|strip_coords }}</span>
                             <span class="odp__tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
                             {% endif %}
-                            <span class="odp__tl-pill {% if entry.new_value == 'delivered' or entry.new_value == 'fulfilled' or entry.new_value == 'verified' or entry.new_value == 'True' %}odp__tl-pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == 'rejected' or entry.new_value == 'failed' %}odp__tl-pill--danger{% else %}odp__tl-pill--to{% endif %}">{{ entry.new_display }}</span>
+                            <span class="odp__tl-pill {% if entry.new_value == 'delivered' or entry.new_value == 'fulfilled' or entry.new_value == 'verified' or entry.new_value == 'True' %}odp__tl-pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == 'rejected' or entry.new_value == 'failed' %}odp__tl-pill--danger{% else %}odp__tl-pill--to{% endif %}">{{ entry.new_display|strip_coords }}</span>
                         </div>
+                        {% with newpin=entry.new_display|coords_of oldpin=entry.old_display|coords_of %}
+                        {% if newpin %}
+                        <div class="odp__tl-gps">
+                            <span class="odp__tl-gps__pin" title="Pin after this change">
+                                <i class="fa-solid fa-location-dot"></i> Pin after this change
+                                {% include "includes/components/_map_point.html" with uid=entry.id|stringformat:"s"|add:"-pin" lat=newpin.lat lon=newpin.lng lat2=oldpin.lat lon2=oldpin.lng label="Pin after this change" label2="Pin before this change" colour="#2f6f4f" colour2="#b4532a" size="sm" %}
+                            </span>
+                        </div>
+                        {% endif %}
+                        {% endwith %}
                         {% if entry.notes %}
                         <div class="odp__tl-note"><i class="fa-regular fa-message"></i> {{ entry.notes }}</div>
                         {% endif %}
@@ -235,8 +249,8 @@ Usage:
                         <div class="odp__tl-gps">
                             {% if sp.latitude and sp.longitude %}
                             <span class="odp__tl-gps__pin" title="Driver GPS at status change">
-                                <i class="fa-solid fa-location-dot"></i>
-                                {% include "includes/components/_map_point.html" with uid=sp.id|stringformat:"s"|add:"-sp" lat=sp.latitude lon=sp.longitude lat2=sp.delivery_latitude lon2=sp.delivery_longitude label="Driver at this status change" label2="Delivery location" colour="#2f6f4f" colour2="#b4532a" text=sp.latitude|stringformat:"s"|add:", "|add:sp.longitude|stringformat:"s" size="sm" %}
+                                <i class="fa-solid fa-location-dot"></i> Driver here
+                                {% include "includes/components/_map_point.html" with uid=sp.id|stringformat:"s"|add:"-sp" lat=sp.latitude lon=sp.longitude lat2=sp.delivery_latitude lon2=sp.delivery_longitude label="Driver at this status change" label2="Delivery location" colour="#2f6f4f" colour2="#b4532a" size="sm" %}
                             </span>
                             {% if sp.accuracy %}
                             <span class="odp__tl-gps__acc" title="GPS accuracy">

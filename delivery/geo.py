@@ -1,7 +1,12 @@
-# Purpose: Straight-line pickup→drop distance for an order, with a zone-centre fallback.
-# Used by: the Seller Transactions ledger (Distance column + CSV/XLSX export).
-# Notes: Great-circle distance, NOT road distance — always shorter than the trip driven.
-#        Reuses TaskStatusPoint.haversine_km rather than adding another copy of the formula.
+# Purpose: Geography derived from an order — pickup→drop distance, and the delivery
+#          area (neighbourhood) name within the drop zone.
+# Used by: orders.signals (keeps both current), the Seller Transactions ledger,
+#          the driver task cards, and the two backfill commands.
+# Notes: Distances are great-circle, NOT road distance — always shorter than the trip
+#        driven. Reuses TaskStatusPoint.haversine_km rather than adding another copy
+#        of the formula. Both cached maps live in LocMemCache, which is per-process:
+#        invalidation reaches one gunicorn worker, so siblings can serve a stale map
+#        until the TTL. That is cosmetic here and deliberately not worked around.
 
 from decimal import Decimal
 
@@ -160,3 +165,100 @@ def annotate_route_distance(orders):
         (order.route_km, order.route_km_exact,
          order.route_km_source) = stored_route_distance(order, zone_coords)
     return orders
+
+
+# ============================================================================
+# DELIVERY AREA — the neighbourhood inside the drop zone
+# ============================================================================
+
+ZONE_AREA_CACHE_KEY = 'delivery_zone_area_map_v1'
+ZONE_AREA_CACHE_TTL = 3600
+
+SOURCE_AREA_PIN = 'pin'
+SOURCE_AREA_ONLY = 'only_area'
+SOURCE_AREA_SAME_AS_ZONE = 'same_as_zone'
+SOURCE_AREA_UNRESOLVED = 'unresolved'
+
+
+def zone_area_map():
+    """``{zone_number: [(area_name, lat, lon), ...]}`` for every active, pinned area.
+
+    760 rows across 90 zones, changed only when staff edit an area. Cached because
+    this is read on every order save, not once per page.
+
+    An area whose name merely repeats its zone name is stored with an empty name:
+    the card already prints the zone name above it, so repeating it wastes the
+    line. Doing that here means the comparison runs once per hour over 90 rows
+    instead of once per order.
+    """
+    cached = cache.get(ZONE_AREA_CACHE_KEY)
+    if cached is not None:
+        return cached
+
+    from delivery.models import ZoneArea
+
+    areas = {}
+    rows = ZoneArea.objects.filter(
+        is_active=True, latitude__isnull=False, longitude__isnull=False,
+    ).values_list(
+        'zone__zone_number', 'zone__zone_name', 'area_name', 'latitude', 'longitude',
+    )
+    for zone_number, zone_name, area_name, lat, lon in rows:
+        name = (area_name or '').strip()
+        if name.casefold() == (zone_name or '').strip().casefold():
+            name = ''
+        # float here so the per-order hot path never touches Decimal
+        areas.setdefault(zone_number, []).append((name, float(lat), float(lon)))
+
+    cache.set(ZONE_AREA_CACHE_KEY, areas, ZONE_AREA_CACHE_TTL)
+    return areas
+
+
+def resolve_delivery_area(order, area_map=None):
+    """``(area_name, source)`` — the neighbourhood this order is being delivered to.
+
+    A zone carries up to 63 areas, so the zone number alone cannot name one; the
+    delivery pin picks the nearest area centre within the zone. ``source`` records
+    how the answer was reached so a screen never has to treat a pin match and a
+    fallback as equally trustworthy.
+
+    Pass ``area_map`` to resolve a batch without a query per order.
+    """
+    if area_map is None:
+        area_map = zone_area_map()
+
+    areas = area_map.get(order.dl_zone)
+    if not areas:
+        return '', SOURCE_AREA_UNRESOLVED
+
+    pin = _point(getattr(order, 'latitude', None), getattr(order, 'longitude', None))
+    if pin is None:
+        # No usable pin: a single-area zone names itself, anything else is a guess.
+        if len(areas) == 1:
+            name = areas[0][0]
+            return name, SOURCE_AREA_ONLY if name else SOURCE_AREA_SAME_AS_ZONE
+        return '', SOURCE_AREA_UNRESOLVED
+
+    from delivery.models import TaskStatusPoint
+
+    lat, lon = pin
+    name = min(
+        areas,
+        key=lambda area: TaskStatusPoint.haversine_km(lat, lon, area[1], area[2]),
+    )[0]
+    return name, SOURCE_AREA_PIN if name else SOURCE_AREA_SAME_AS_ZONE
+
+
+def apply_delivery_area(order, area_map=None):
+    """Set the two ``delivery_area_*`` fields on an order in memory.
+
+    Returns True when anything changed, so callers can skip a pointless write.
+    """
+    name, source = resolve_delivery_area(order, area_map)
+    changed = (
+        order.delivery_area_name != name
+        or order.delivery_area_source != source
+    )
+    order.delivery_area_name = name
+    order.delivery_area_source = source
+    return changed

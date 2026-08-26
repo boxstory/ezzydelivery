@@ -962,13 +962,18 @@ class DriverLocation(models.Model):
         With ``prefer_precise`` a coarse fix is only returned when the driver has
         no precise one in the window — so admitting low-accuracy pings never
         degrades a reading that used to come from a good one.
+
+        ``within_minutes`` bounds how old the *fix* may be, not when it arrived:
+        a replayed offline ping reaches the server now but may have been taken
+        hours ago, and a caller asking for a recent position means recent.
         """
         if not driver_id:
             return None
-        qs = cls.objects.filter(driver_id=driver_id)
+        qs = cls.objects.annotate(at_time=Coalesce('fixed_at', 'created_at')).filter(
+            driver_id=driver_id)
         if within_minutes:
-            qs = qs.filter(created_at__gte=dj_timezone.now() - timedelta(minutes=within_minutes))
-        qs = qs.order_by(Coalesce('fixed_at', 'created_at').desc())
+            qs = qs.filter(at_time__gte=dj_timezone.now() - timedelta(minutes=within_minutes))
+        qs = qs.order_by('-at_time')
         if prefer_precise:
             precise = qs.filter(
                 Q(accuracy__isnull=True) | Q(accuracy__lte=cls.MAX_TRUSTED_ACCURACY)
