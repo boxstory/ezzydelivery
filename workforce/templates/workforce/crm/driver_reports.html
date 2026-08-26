@@ -1,9 +1,9 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{# Purpose: CRM Business scorecard — funnel and conversion stats for the client sales pipeline only. #}
-{# Used by: workforce.crm_views.crm_reports #}
-{# Notes: crmr__ namespace; tiles/charts/tables come from crm/parts/_reports_body.html and the ApexCharts wiring from crm/parts/_reports_charts.html, both shared with the driver scorecard. Driver recruitment has its own page (crm/driver_reports.html) — nothing here counts an applicant. #}
+{# Purpose: CRM Driver scorecard — funnel and approval stats for the driver recruitment pipeline only. #}
+{# Used by: workforce.crm_views.crm_driver_reports #}
+{# Notes: crmr__ namespace; tiles/charts/tables come from crm/parts/_reports_body.html and the ApexCharts wiring from crm/parts/_reports_charts.html, both shared with the business scorecard. The outcome words on this page read Approved/Rejected because they are taken from this board's own terminal columns. #}
 
 {% block extra_css %}
 <link href="{% static 'workforce/css/crm.css' %}?v=20260825c" rel="stylesheet" type="text/css" />
@@ -15,26 +15,26 @@
 
     <div class="crm__head">
       <div class="crm__head-title">
-        <div class="crm__eyebrow">Sales Pipeline</div>
-        <h1 class="crm__title">Business Reports</h1>
-        <p class="crm__subtitle">Funnel health and conversion performance for client leads</p>
+        <div class="crm__eyebrow">Recruitment Pipeline</div>
+        <h1 class="crm__title">Driver Reports</h1>
+        <p class="crm__subtitle">Funnel health and approval performance for driver applicants</p>
       </div>
       <div class="crm__head-actions">
-        <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"
-           hx-get="{% url 'workforce:crm_leads_board' %}" hx-target="#main-content"
+        <a href="{% url 'workforce:crm_driver_leads_board' %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_driver_leads_board' %}" hx-target="#main-content"
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-table-columns"></i> Board
         </a>
         {# Cross-link to the other scorecard. Separate pages, separate numbers — this #}
         {# is a shortcut, not a tab. #}
-        <a href="{% url 'workforce:crm_driver_reports' %}" class="crm__btn"
-           title="Switch to the driver recruitment scorecard"
-           hx-get="{% url 'workforce:crm_driver_reports' %}" hx-target="#main-content"
+        <a href="{% url 'workforce:crm_reports' %}" class="crm__btn"
+           title="Switch to the business sales scorecard"
+           hx-get="{% url 'workforce:crm_reports' %}" hx-target="#main-content"
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-          <i class="fa-solid fa-motorcycle"></i> Driver Reports
+          <i class="fa-solid fa-briefcase"></i> Business Reports
         </a>
         <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
-                aria-expanded="false" aria-controls="workforce_crm_crm_reports_card_notes"
+                aria-expanded="false" aria-controls="workforce_crm_driver_reports_card_notes"
                 title="About this page">
           <i class="fa-solid fa-question" aria-hidden="true"></i>
           <span class="visually-hidden">Show notes</span>
@@ -47,8 +47,8 @@
 
     {% include "workforce/parts/_marketing_desk_rail.html" %}
 
-    <div class="wfnote" id="workforce_crm_crm_reports_card_notes"
-         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_crm_reports_card_notes' %}" hidden></div>
+    <div class="wfnote" id="workforce_crm_driver_reports_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_driver_reports_card_notes' %}" hidden></div>
 
     {% include "workforce/crm/parts/_reports_body.html" %}
 

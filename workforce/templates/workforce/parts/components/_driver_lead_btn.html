@@ -1,0 +1,12 @@
+{% comment %}
+Purpose: Second-line row action opening this driver's CRM lead card.
+Used by: drivers_list / drivers_pending / drivers_active / drivers_inactive Actions cells.
+Notes: Needs `driver.crm_lead`, set by workforce.views._attach_crm_leads; renders nothing without it.
+       Carries its own styling (no `*__btn` base class), so it works under any roster prefix.
+{% endcomment %}
+{% if driver.crm_lead %}
+<a href="{% url 'workforce:crm_lead_detail' driver.crm_lead.id %}"
+   class="drl__btn--lead" title="Open CRM lead">
+    <i class="fa-solid fa-address-card"></i> Lead
+</a>
+{% endif %}

@@ -1,45 +1,25 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{# Purpose: CRM leads list — unified pipeline table across all lead sources. #}
-{# Used by: workforce.crm_views.crm_leads_list #}
+{# Purpose: CRM leads table — one pipeline per page (business clients or driver applicants). #}
+{# Used by: workforce.crm_views.crm_leads_list (business) and crm_driver_leads_list (driver) #}
 {# Notes: crml__ namespace; shares tokens from crm.css; HTMX filters like pricing_inquiries_list. #}
 {#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260825c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="crm crml col-12 p-3">
+<div class="crm crml col-12">
   <div class="crm__console">
 
     <!-- HEADER BAR -->
     <div class="crm__head">
       <div class="crm__head-title">
-        <div class="crm__eyebrow">{% if category_filter == 'driver' %}Recruitment Pipeline{% elif category_filter == 'business' %}Sales Pipeline{% else %}All Pipelines{% endif %}</div>
-        <h1 class="crm__title">{% if category_filter == 'driver' %}Driver Leads{% elif category_filter == 'business' %}Business Leads{% else %}Leads{% endif %}</h1>
-        <p class="crm__subtitle">All inbound leads — pricing form, WhatsApp and manual</p>
-        <div class="crm__board-tabs" role="tablist" aria-label="Lead categories">
-          <a href="{% url 'workforce:crm_leads_list' %}"
-             class="crm__board-tab {% if not category_filter %}crm__board-tab--active{% endif %}"
-             hx-get="{% url 'workforce:crm_leads_list' %}" hx-target="#main-content"
-             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-            <i class="fa-solid fa-layer-group"></i> All
-          </a>
-          <a href="{% url 'workforce:crm_leads_list' %}?category=business"
-             class="crm__board-tab {% if category_filter == 'business' %}crm__board-tab--active{% endif %}"
-             hx-get="{% url 'workforce:crm_leads_list' %}?category=business" hx-target="#main-content"
-             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-            <i class="fa-solid fa-briefcase"></i> Business
-          </a>
-          <a href="{% url 'workforce:crm_leads_list' %}?category=driver"
-             class="crm__board-tab {% if category_filter == 'driver' %}crm__board-tab--active{% endif %}"
-             hx-get="{% url 'workforce:crm_leads_list' %}?category=driver" hx-target="#main-content"
-             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-            <i class="fa-solid fa-motorcycle"></i> Drivers
-          </a>
-        </div>
+        <div class="crm__eyebrow">{% if is_driver_list %}Recruitment Pipeline{% else %}Sales Pipeline{% endif %}</div>
+        <h1 class="crm__title">{% if is_driver_list %}Driver Leads{% else %}Business Leads{% endif %}</h1>
+        <p class="crm__subtitle">{% if is_driver_list %}Every driver applicant — application form, WhatsApp and manual{% else %}Inbound client leads — pricing form, WhatsApp and manual{% endif %}</p>
       </div>
       <div class="crm__metrics">
         <div class="crm__metric">
@@ -60,13 +40,30 @@
         </div>
       </div>
       <div class="crm__head-actions">
-        {% if category_filter == 'driver' %}{% url 'workforce:crm_driver_leads_board' as list_board_url %}{% else %}{% url 'workforce:crm_leads_board' as list_board_url %}{% endif %}
+        {% if is_driver_list %}{% url 'workforce:crm_driver_leads_board' as list_board_url %}{% else %}{% url 'workforce:crm_leads_board' as list_board_url %}{% endif %}
+        {% if is_driver_list %}{% url 'workforce:crm_leads_list' as other_list_url %}{% else %}{% url 'workforce:crm_driver_leads_list' as other_list_url %}{% endif %}
         <a href="{{ list_board_url }}" class="crm__btn"
            hx-get="{{ list_board_url }}" hx-target="#main-content"
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-table-columns"></i> Board
         </a>
-        <a href="{% url 'workforce:crm_lead_create' %}{% if category_filter == 'driver' %}?category=driver{% endif %}" class="crm__btn crm__btn--primary">
+        {# Plain link, no hx-get — htmx would swap the CSV body into the page. The #}
+        {# category rides last on purpose: the page's pipeline is fixed by the URL, #}
+        {# not by a query param, and a QueryDict read takes the last value — so the #}
+        {# export can never spill the other pipeline's contacts into this file. #}
+        <a href="{% url 'workforce:crm_leads_export_google' %}?{{ request.GET.urlencode }}&amp;category={{ list_category }}"
+           class="crm__btn" title="CSV for contacts.google.com → Import — exports the rows matching the current filter">
+          <i class="fa-solid fa-address-book"></i> Google Contacts
+        </a>
+        {# Cross-link to the other pipeline's table — the two are separate pages with #}
+        {# separate sidebar menus, so this is a shortcut rather than a tab. #}
+        <a href="{{ other_list_url }}" class="crm__btn"
+           title="{% if is_driver_list %}Switch to the business leads table{% else %}Switch to the driver leads table{% endif %}"
+           hx-get="{{ other_list_url }}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          {% if is_driver_list %}<i class="fa-solid fa-briefcase"></i> Business Leads{% else %}<i class="fa-solid fa-motorcycle"></i> Driver Leads{% endif %}
+        </a>
+        <a href="{% url 'workforce:crm_lead_create' %}{% if is_driver_list %}?category=driver{% endif %}" class="crm__btn crm__btn--primary">
           <i class="fa-solid fa-plus"></i> New Lead
         </a>
         <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
@@ -77,6 +74,11 @@
         </button>
       </div>
     </div>
+
+    <!-- Everything below the header bar sits in one padded section -->
+    <div class="crm__body">
+
+    {% include "workforce/parts/_marketing_desk_rail.html" %}
 
     <div class="wfnote" id="workforce_crm_leads_list_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_leads_list_card_notes' %}" hidden></div>
@@ -150,9 +152,12 @@
           <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Search
         </button>
 
-        {% if search or stage_filter or source_filter or category_filter or assigned_filter or overdue_filter %}
-        <a href="{% url 'workforce:crm_leads_list' %}" class="crm__clear-all"
-           hx-get="{% url 'workforce:crm_leads_list' %}"
+        {# The category is fixed by the URL now, so it is not one of the filters a #}
+        {# Reset can clear — Reset returns to this same page, unfiltered. #}
+        {% if is_driver_list %}{% url 'workforce:crm_driver_leads_list' as list_reset_url %}{% else %}{% url 'workforce:crm_leads_list' as list_reset_url %}{% endif %}
+        {% if search or stage_filter or source_filter or assigned_filter or overdue_filter %}
+        <a href="{{ list_reset_url }}" class="crm__clear-all"
+           hx-get="{{ list_reset_url }}"
            hx-target="#main-content" hx-select="#main-content"
            hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-xmark" aria-hidden="true"></i> Reset
@@ -234,6 +239,8 @@
       {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="crm_leads" %}
     </div>
 
+
+    </div><!-- /.crm__body -->
   </div>
 </div>
 {% endblock %}

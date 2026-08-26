@@ -161,7 +161,13 @@ class DigestTests(TestCase):
         from datetime import timedelta
         from django.utils import timezone
 
-        from core.models import Profile
+        from core.models import Profile, WhatsAppInstance
+
+        # The unassigned block goes to a configured desk number, not a literal
+        # in the source — with nothing configured there is no admin recipient.
+        WhatsAppInstance.objects.create(
+            instance_name='digest-test', phone_number='97466451589',
+            is_active=True, is_default=True)
 
         user = User.objects.create_user('staff2', is_staff=True)
         Profile.objects.get_or_create(user=user, defaults={'whatsapp': '97477770000'})
@@ -181,6 +187,27 @@ class DigestTests(TestCase):
         result = services.send_followup_digests(dry_run=True)
         self.assertEqual(result['sent'], 0)
         self.assertEqual(len(result['recipients']), 2)
+        # The digest trigger's "Sends to" number wins over the default sender
+        from core.models import AutoTriggerConfig
+        AutoTriggerConfig.objects.update_or_create(
+            trigger_key='wa_lead_followup_digest',
+            defaults={'label': 'Daily Lead Follow-up Digest', 'category': 'whatsapp',
+                      'department': 'mkt', 'notify_number': '97455512345'},
+        )
+        routed = services.send_followup_digests(dry_run=True)
+        self.assertTrue(any('97455512345' in r for r in routed['recipients']))
+
+    def test_unassigned_block_is_skipped_with_no_recipient_configured(self):
+        """No WhatsApp number anywhere = nothing to send to; never guess one."""
+        from datetime import timedelta
+        from django.utils import timezone
+
+        Lead.objects.create(source=Lead.SOURCE_MANUAL, company_name='Orphan',
+                            next_followup_at=timezone.localdate() - timedelta(days=1))
+
+        result = services.send_followup_digests(dry_run=True)
+        self.assertEqual(result['recipients'], [])
+        self.assertEqual(result['skipped'], 1)
 
 
 class LeadStageSeedTests(TestCase):
@@ -193,9 +220,9 @@ class LeadStageSeedTests(TestCase):
         columns = LeadStage.board_columns(Lead.CATEGORY_DRIVER)
         self.assertEqual(
             [(s.key, s.label) for s in columns],
-            [('new', 'New Application'), ('contacted', 'Applied'), ('on_hold', 'Incomplete'),
-             ('quoted', 'Uploads Completed'), ('negotiating', 'Under Review'),
-             ('won', 'Approved'), ('lost', 'Rejected')],
+            [('new_app', 'New Application'), ('applied', 'Applied'), ('incomplete', 'Incomplete'),
+             ('uploads_done', 'Uploads Completed'), ('under_review', 'Under Review'),
+             ('approved', 'Approved'), ('rejected', 'Rejected')],
         )
 
     def test_business_board_columns_unchanged(self):
@@ -203,21 +230,23 @@ class LeadStageSeedTests(TestCase):
         self.assertEqual([(s.key, s.label) for s in columns], Lead.STAGE_CHOICES)
 
     def test_terminal_flags_and_window(self):
-        self.assertEqual(LeadStage.closed_keys(Lead.CATEGORY_DRIVER), {'won', 'lost'})
+        self.assertEqual(LeadStage.closed_keys(Lead.CATEGORY_DRIVER), {'approved', 'rejected'})
         self.assertEqual(LeadStage.closed_keys(Lead.CATEGORY_BUSINESS), {'won', 'lost'})
-        approved = LeadStage.objects.get(category=Lead.CATEGORY_DRIVER, key='won')
+        approved = LeadStage.objects.get(category=Lead.CATEGORY_DRIVER,
+                                         key=Lead.DRIVER_STAGE_APPROVED)
         self.assertEqual(approved.hide_after_days, 30)
         self.assertEqual(approved.write_back, 'verified')
 
     def test_exactly_one_driver_fallback(self):
         fallbacks = LeadStage.objects.filter(category=Lead.CATEGORY_DRIVER, is_fallback=True)
-        self.assertEqual([s.key for s in fallbacks], ['on_hold'])
+        self.assertEqual([s.key for s in fallbacks], [Lead.DRIVER_STAGE_INCOMPLETE])
 
     def test_seeded_columns_are_undeletable_system_rows(self):
         self.assertEqual(LeadStage.objects.filter(is_system=True).count(), 14)
 
     def test_stage_label_is_board_specific(self):
-        driver = Lead.objects.create(category=Lead.CATEGORY_DRIVER, stage=Lead.STAGE_WON)
+        driver = Lead.objects.create(category=Lead.CATEGORY_DRIVER,
+                                     stage=Lead.DRIVER_STAGE_APPROVED)
         business = Lead.objects.create(category=Lead.CATEGORY_BUSINESS, stage=Lead.STAGE_WON)
         self.assertEqual(driver.stage_label, 'Approved')
         self.assertEqual(business.stage_label, 'Won')
@@ -254,18 +283,18 @@ class StageRuleTests(TestCase):
     def test_legacy_mapping_reproduced(self):
         cases = [
             # (verification_status, driver_status, sections_done) -> stage key
-            (('rejected', 'pending', False), 'lost'),
-            (('verified', 'rejected', False), 'lost'),     # negative terminal wins
-            (('verified', 'blocked', False), 'lost'),
-            (('verified', 'suspended', False), 'lost'),
-            (('verified', 'approved', False), 'won'),
-            (('pending', 'approved', False), 'won'),       # driver_status alone
-            (('under_review', 'pending', False), 'negotiating'),
-            (('pending', 'pending', True), 'quoted'),      # uploads complete
-            (('pending', 'pending', False), 'contacted'),
-            (('incomplete', 'pending', False), 'on_hold'),
-            (('', 'pending', False), 'on_hold'),           # no profile status -> fallback
-            (('bogus', 'pending', False), 'on_hold'),      # unknown -> fallback
+            (('rejected', 'pending', False), 'rejected'),
+            (('verified', 'rejected', False), 'rejected'),  # negative terminal wins
+            (('verified', 'blocked', False), 'rejected'),
+            (('verified', 'suspended', False), 'rejected'),
+            (('verified', 'approved', False), 'approved'),
+            (('pending', 'approved', False), 'approved'),   # driver_status alone
+            (('under_review', 'pending', False), 'under_review'),
+            (('pending', 'pending', True), 'uploads_done'),  # uploads complete
+            (('pending', 'pending', False), 'applied'),
+            (('incomplete', 'pending', False), 'incomplete'),
+            (('', 'pending', False), 'incomplete'),         # no profile status -> fallback
+            (('bogus', 'pending', False), 'incomplete'),    # unknown -> fallback
         ]
         for (verif, dstatus, done), expected in cases:
             with self.subTest(verif=verif, dstatus=dstatus, sections_done=done):
@@ -273,12 +302,14 @@ class StageRuleTests(TestCase):
                 self.assertEqual(self.target(driver, done), expected)
 
     def test_no_driver_lands_in_new_application(self):
-        self.assertEqual(stage_rules.target_stage_key(None, self.stages), 'new')
+        self.assertEqual(stage_rules.target_stage_key(None, self.stages),
+                         Lead.DRIVER_STAGE_NEW)
 
     def test_uploads_done_requires_a_submitted_application(self):
         # Every section complete but the form never submitted must NOT jump ahead.
         driver = StubDriver('incomplete', 'pending')
-        self.assertEqual(self.target(driver, sections_done=True), 'on_hold')
+        self.assertEqual(self.target(driver, sections_done=True),
+                         Lead.DRIVER_STAGE_INCOMPLETE)
 
     def test_manual_column_never_auto_filled(self):
         LeadStage.objects.create(category=Lead.CATEGORY_DRIVER, key='parked',
@@ -390,7 +421,7 @@ class StageManageViewTests(TestCase):
         self.assertEqual(stage.auto_rules, ['dstatus:processing'])
 
     def test_system_column_cannot_be_deleted(self):
-        stage = LeadStage.objects.get(category='driver', key='won')
+        stage = LeadStage.objects.get(category='driver', key=Lead.DRIVER_STAGE_APPROVED)
         self.post('/workforce/crm/stages/delete/', {'stage_id': stage.pk})
         self.assertTrue(LeadStage.objects.filter(pk=stage.pk).exists())
 
@@ -403,9 +434,11 @@ class StageManageViewTests(TestCase):
         self.assertTrue(LeadStage.objects.filter(pk=stage.pk).exists())
 
         self.post('/workforce/crm/stages/delete/',
-                  {'stage_id': stage.pk, 'move_to': 'contacted'})
+                  {'stage_id': stage.pk, 'move_to': Lead.DRIVER_STAGE_APPLIED})
         self.assertFalse(LeadStage.objects.filter(pk=stage.pk).exists())
-        self.assertEqual(Lead.objects.get(contact_name='D').stage, 'contacted')
+        # contact_name now carries the category tag — match on the base name.
+        self.assertEqual(Lead.objects.get(contact_name__startswith='D').stage,
+                         Lead.DRIVER_STAGE_APPLIED)
 
     def test_fallback_is_unique_per_board(self):
         stage = LeadStage.objects.create(category='driver', key='parked',
@@ -417,14 +450,15 @@ class StageManageViewTests(TestCase):
         self.assertEqual([s.key for s in fallbacks], ['parked'])
 
     def test_hiding_a_column_works(self):
-        stage = LeadStage.objects.get(category='driver', key='on_hold')
+        stage = LeadStage.objects.get(category='driver', key=Lead.DRIVER_STAGE_INCOMPLETE)
         self.post('/workforce/crm/stages/save/', {
             'stage_id': stage.pk, 'label': 'Incomplete', 'position': '3',
             # 'is_active' omitted = unticked checkbox
         })
         stage.refresh_from_db()
         self.assertFalse(stage.is_active)
-        self.assertNotIn('on_hold', [s.key for s in LeadStage.board_columns('driver')])
+        self.assertNotIn(Lead.DRIVER_STAGE_INCOMPLETE,
+                         [s.key for s in LeadStage.board_columns('driver')])
 
     def test_reorder(self):
         ids = [str(s.pk) for s in LeadStage.objects.filter(category='driver').order_by('position')]
@@ -474,7 +508,7 @@ class DriverStagePinTests(TestCase):
         self.lead = Lead.objects.create(
             category=Lead.CATEGORY_DRIVER, source=Lead.SOURCE_MANUAL,
             phone='97455667788', contact_name='Applicant One',
-            stage=Lead.STAGE_NEGOTIATING,
+            stage=Lead.DRIVER_STAGE_UNDER_REVIEW,
         )
 
     def move(self, stage):
@@ -484,9 +518,9 @@ class DriverStagePinTests(TestCase):
         )
 
     def test_conflicting_move_pins_and_survives_reconcile(self):
-        # 'new' is filed only when no driver matches — this driver exists, so the
-        # move disagrees with reality and must be pinned rather than reverted.
-        response = self.move(Lead.STAGE_NEW)
+        # New Application is filed only when no driver matches — this driver exists,
+        # so the move disagrees with reality and must be pinned, not reverted.
+        response = self.move(Lead.DRIVER_STAGE_NEW)
         body = response.json()
         self.assertTrue(body['success'])
         self.assertTrue(body['pinned'])
@@ -498,10 +532,10 @@ class DriverStagePinTests(TestCase):
 
         services.reconcile_driver_leads()
         self.lead.refresh_from_db()
-        self.assertEqual(self.lead.stage, Lead.STAGE_NEW)   # not snapped back
+        self.assertEqual(self.lead.stage, Lead.DRIVER_STAGE_NEW)   # not snapped back
 
     def test_unpin_hands_the_card_back_to_autofiling(self):
-        self.move(Lead.STAGE_NEW)
+        self.move(Lead.DRIVER_STAGE_NEW)
         response = self.client.post(
             f'/workforce/crm/leads/{self.lead.pk}/unpin-stage/', {},
             HTTP_HOST='ezzydelivery.qa', secure=True,
@@ -513,19 +547,20 @@ class DriverStagePinTests(TestCase):
         services.reconcile_driver_leads()
         self.lead.refresh_from_db()
         # under_review -> the Under Review column reclaims it
-        self.assertEqual(self.lead.stage, Lead.STAGE_NEGOTIATING)
+        self.assertEqual(self.lead.stage, Lead.DRIVER_STAGE_UNDER_REVIEW)
 
     def test_write_back_move_sticks_without_pinning(self):
         """A column that rewrites the driver's status makes reality agree, so the
         card needs no pin and keeps tracking the application afterwards."""
-        stage = LeadStage.objects.get(category=Lead.CATEGORY_DRIVER, key=Lead.STAGE_QUOTED)
+        stage = LeadStage.objects.get(category=Lead.CATEGORY_DRIVER,
+                                      key=Lead.DRIVER_STAGE_UPLOADS_DONE)
         stage.write_back = 'pending'
         stage.confirm_text = 'send this driver back to the review queue'
         stage.save()
 
         with patch('workforce.views._driver_application_sections',
                    return_value=[{'done': True}]):
-            body = self.move(Lead.STAGE_QUOTED).json()
+            body = self.move(Lead.DRIVER_STAGE_UPLOADS_DONE).json()
             self.assertTrue(body['success'])
             self.assertFalse(body['pinned'])
             self.assertEqual(body['warning'], '')
@@ -535,11 +570,11 @@ class DriverStagePinTests(TestCase):
 
             services.reconcile_driver_leads()
             self.lead.refresh_from_db()
-            self.assertEqual(self.lead.stage, Lead.STAGE_QUOTED)
+            self.assertEqual(self.lead.stage, Lead.DRIVER_STAGE_UPLOADS_DONE)
             self.assertFalse(self.lead.stage_pinned)
 
     def test_pinning_is_logged_on_the_timeline(self):
-        self.move(Lead.STAGE_NEW)
+        self.move(Lead.DRIVER_STAGE_NEW)
         bodies = list(self.lead.activities.values_list('body', flat=True))
         self.assertTrue(any('Pinned' in b for b in bodies), bodies)
 
@@ -589,7 +624,7 @@ class DriverWriteBackAuthorizationTests(TestCase):
         )
         self.lead = Lead.objects.create(
             category=Lead.CATEGORY_DRIVER, phone='97455990011',
-            contact_name='WB Applicant', stage=Lead.STAGE_CONTACTED,
+            contact_name='WB Applicant', stage=Lead.DRIVER_STAGE_APPLIED,
         )
 
     def _staff(self, username, **depts):
@@ -605,7 +640,8 @@ class DriverWriteBackAuthorizationTests(TestCase):
         client = self.client
         client.force_login(user)
         return client.post(
-            f'/workforce/crm/leads/{self.lead.pk}/update-stage/', {'stage': Lead.STAGE_WON},
+            f'/workforce/crm/leads/{self.lead.pk}/update-stage/',
+            {'stage': Lead.DRIVER_STAGE_APPROVED},
             HTTP_HOST='ezzydelivery.qa', secure=True,
         )
 
@@ -617,7 +653,7 @@ class DriverWriteBackAuthorizationTests(TestCase):
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.verification_status, 'pending')   # untouched
         self.lead.refresh_from_db()
-        self.assertEqual(self.lead.stage, Lead.STAGE_CONTACTED)         # not moved
+        self.assertEqual(self.lead.stage, Lead.DRIVER_STAGE_APPLIED)    # not moved
 
     def test_operations_staff_can_approve(self):
         ops = self._staff('opsonly', dept_operations=True)
@@ -631,7 +667,8 @@ class DriverWriteBackAuthorizationTests(TestCase):
         marketer = self._staff('mktonly2', dept_marketing=True)
         self.client.force_login(marketer)
         response = self.client.post(
-            f'/workforce/crm/leads/{self.lead.pk}/update-stage/', {'stage': Lead.STAGE_NEW},
+            f'/workforce/crm/leads/{self.lead.pk}/update-stage/',
+            {'stage': Lead.DRIVER_STAGE_NEW},
             HTTP_HOST='ezzydelivery.qa', secure=True,
         )
         self.assertEqual(response.status_code, 200)
@@ -641,12 +678,13 @@ class DriverWriteBackAuthorizationTests(TestCase):
         """A lead with no driver behind it must not report a silent success."""
         orphan = Lead.objects.create(
             category=Lead.CATEGORY_DRIVER, phone='97400000000',
-            contact_name='No Driver', stage=Lead.STAGE_CONTACTED,
+            contact_name='No Driver', stage=Lead.DRIVER_STAGE_APPLIED,
         )
         ops = self._staff('opsonly2', dept_operations=True)
         self.client.force_login(ops)
         response = self.client.post(
-            f'/workforce/crm/leads/{orphan.pk}/update-stage/', {'stage': Lead.STAGE_WON},
+            f'/workforce/crm/leads/{orphan.pk}/update-stage/',
+            {'stage': Lead.DRIVER_STAGE_APPROVED},
             HTTP_HOST='ezzydelivery.qa', secure=True,
         )
         body = response.json()
@@ -912,7 +950,7 @@ class StageConfigGuardTests(TestCase):
     def test_new_column_lands_before_the_outcome_columns(self):
         """Rules match right-to-left, so a column created at the far end would
         silently outrank Approved/Rejected."""
-        approved = LeadStage.objects.get(category='driver', key='won')
+        approved = LeadStage.objects.get(category='driver', key=Lead.DRIVER_STAGE_APPROVED)
         self.post('/workforce/crm/stages/save/', {
             'label': 'Processing', 'position': '99',
             'auto_rules': ['dstatus:processing'],
@@ -937,23 +975,56 @@ class ReportsFunnelTests(TestCase):
                                               is_staff=True, is_superuser=True)
         self.client.force_login(self.staff)
 
-    def test_funnel_is_split_per_board(self):
+    def _funnel(self, path):
+        response = self.client.get(path, HTTP_HOST='ezzydelivery.qa', secure=True)
+        self.assertEqual(response.status_code, 200)
+        funnel = response.context['funnel']
+        return response, {r['label']: r['count'] for r in funnel['rows']}
+
+    def test_each_scorecard_charts_only_its_own_board(self):
         """Regression: both boards were merged into one column set, so 'Quoted' and
-        'Uploads Completed' were added together under whichever label came first."""
+        'Uploads Completed' were added together under whichever label came first.
+        The two pipelines are separate pages now — neither may show the other's
+        columns."""
         Lead.objects.create(category=Lead.CATEGORY_BUSINESS, stage=Lead.STAGE_QUOTED)
-        Lead.objects.create(category=Lead.CATEGORY_DRIVER, stage=Lead.STAGE_QUOTED)
+        Lead.objects.create(category=Lead.CATEGORY_DRIVER,
+                            stage=Lead.DRIVER_STAGE_UPLOADS_DONE)
 
-        response = self.client.get('/workforce/crm/reports/',
-                                   HTTP_HOST='ezzydelivery.qa', secure=True)
-        funnels = {f['category']: f for f in response.context['funnels']}
-        self.assertEqual(set(funnels), {'business', 'driver'})
+        _, business = self._funnel('/workforce/crm/reports/')
+        _, driver = self._funnel('/workforce/crm/driver/reports/')
 
-        business = {r['label']: r['count'] for r in funnels['business']['rows']}
-        driver = {r['label']: r['count'] for r in funnels['driver']['rows']}
         self.assertEqual(business['Quoted'], 1)
         self.assertEqual(driver['Uploads Completed'], 1)
         self.assertNotIn('Uploads Completed', business)
         self.assertNotIn('Quoted', driver)
+
+    def test_headline_figures_never_count_the_other_pipeline(self):
+        """Every tile is per-board: an approved driver must not land in the business
+        page's Won, which is what happened while one page counted both."""
+        Lead.objects.create(category=Lead.CATEGORY_BUSINESS, stage=Lead.STAGE_WON)
+        Lead.objects.create(category=Lead.CATEGORY_DRIVER,
+                            stage=Lead.DRIVER_STAGE_APPROVED)
+        Lead.objects.create(category=Lead.CATEGORY_DRIVER,
+                            stage=Lead.DRIVER_STAGE_APPLIED)
+
+        business = self.client.get('/workforce/crm/reports/',
+                                   HTTP_HOST='ezzydelivery.qa', secure=True).context
+        driver = self.client.get('/workforce/crm/driver/reports/',
+                                 HTTP_HOST='ezzydelivery.qa', secure=True).context
+
+        self.assertEqual((business['total_count'], business['won_count']), (1, 1))
+        self.assertEqual((driver['total_count'], driver['won_count']), (2, 1))
+
+    def test_outcome_words_follow_the_board(self):
+        """The driver board names its terminal columns Approved/Rejected, so its
+        scorecard must not say Won/Lost."""
+        business = self.client.get('/workforce/crm/reports/',
+                                   HTTP_HOST='ezzydelivery.qa', secure=True).context
+        driver = self.client.get('/workforce/crm/driver/reports/',
+                                 HTTP_HOST='ezzydelivery.qa', secure=True).context
+
+        self.assertEqual((business['won_label'], business['lost_label']), ('Won', 'Lost'))
+        self.assertEqual((driver['won_label'], driver['lost_label']), ('Approved', 'Rejected'))
 
 
 class LeadMergeTests(TestCase):
@@ -992,7 +1063,7 @@ class LeadMergeTests(TestCase):
                          [Lead.SOURCE_WA_INBOUND, Lead.SOURCE_PRICING])
         # Blanks filled from the absorbed card, own values untouched
         self.assertEqual(self.wa.company_name, 'Same Person Co')
-        self.assertEqual(self.wa.contact_name, 'Same Person')
+        self.assertEqual(self.wa.contact_name, 'Same Person ZyBuz')
 
     def test_merged_child_disappears_from_the_board_but_parent_stays(self):
         pricing = Lead.objects.create(category=Lead.CATEGORY_BUSINESS,
@@ -1184,3 +1255,149 @@ class WhatsAppIngestRedactionTests(TestCase):
         obj.refresh_from_db()
         self.assertEqual(obj.body, body)
         self.assertIn('4521', str(obj.raw_payload))
+
+
+class ContactTagTests(TestCase):
+    """The ZyDrv / ZyBuz suffix that makes leads findable in a phone address book."""
+
+    def test_tag_is_appended_by_category_and_is_idempotent(self):
+        driver = Lead.objects.create(category=Lead.CATEGORY_DRIVER, contact_name='Sajee Kp')
+        business = Lead.objects.create(category=Lead.CATEGORY_BUSINESS, contact_name='Noora B')
+        self.assertEqual(driver.contact_name, 'Sajee Kp ZyDrv')
+        self.assertEqual(business.contact_name, 'Noora B ZyBuz')
+
+        driver.save()
+        driver.refresh_from_db()
+        self.assertEqual(driver.contact_name, 'Sajee Kp ZyDrv')   # not "… ZyDrv ZyDrv"
+
+    def test_switching_category_replaces_the_tag(self):
+        lead = Lead.objects.create(category=Lead.CATEGORY_BUSINESS, contact_name='Ali')
+        lead.category = Lead.CATEGORY_DRIVER
+        lead.save()
+        lead.refresh_from_db()
+        self.assertEqual(lead.contact_name, 'Ali ZyDrv')
+
+    def test_blank_name_stays_blank(self):
+        lead = Lead.objects.create(category=Lead.CATEGORY_DRIVER, phone='55000111')
+        self.assertEqual(lead.contact_name, '')
+
+    def test_tag_never_overflows_the_column(self):
+        lead = Lead.objects.create(category=Lead.CATEGORY_DRIVER, contact_name='x' * 100)
+        self.assertLessEqual(len(lead.contact_name), 100)
+        self.assertTrue(lead.contact_name.endswith('ZyDrv'))
+
+    def test_customer_facing_name_has_the_tag_stripped(self):
+        from crm.contact_tags import strip_tags
+        self.assertEqual(strip_tags('Sajee Kp ZyDrv'), 'Sajee Kp')
+        self.assertEqual(strip_tags('Noora B ZyBuz'), 'Noora B')
+        self.assertEqual(strip_tags('Zydrus Ltd'), 'Zydrus Ltd')   # not a tag, left alone
+
+
+class SeparateBoardStageTests(TestCase):
+    """The two boards own their columns outright — separate keys, separate pages.
+
+    Before crm.0012 the driver board borrowed the business keys (its "Approved"
+    column was literally keyed 'won'), so anything reading a stage key without
+    also reading the category could not tell the pipelines apart.
+    """
+
+    def setUp(self):
+        cache.delete(STAGE_CACHE_KEY)
+        self.staff = User.objects.create_user('boardstaff', password='x',
+                                              is_staff=True, is_superuser=True)
+        self.client.force_login(self.staff)
+
+    def get(self, url):
+        return self.client.get(url, HTTP_HOST='ezzydelivery.qa', secure=True)
+
+    def test_the_two_boards_share_no_stage_keys(self):
+        business = {s.key for s in LeadStage.objects.filter(category=Lead.CATEGORY_BUSINESS)}
+        driver = {s.key for s in LeadStage.objects.filter(category=Lead.CATEGORY_DRIVER)}
+        self.assertEqual(business & driver, set())
+
+    def test_outcome_is_read_per_board_not_from_the_key(self):
+        self.assertEqual(LeadStage.outcome_keys('won', Lead.CATEGORY_DRIVER), {'approved'})
+        self.assertEqual(LeadStage.outcome_keys('won', Lead.CATEGORY_BUSINESS), {'won'})
+        self.assertEqual(LeadStage.outcome_keys('lost', Lead.CATEGORY_DRIVER), {'rejected'})
+        self.assertEqual(LeadStage.outcome_keys('won'), {'won', 'approved'})
+
+    def test_an_in_progress_column_cannot_claim_an_outcome(self):
+        """A win rate counted from an open column would be nonsense, so the save
+        drops the outcome unless the column is terminal."""
+        self.client.post('/workforce/crm/stages/save/', {
+            'board': 'driver', 'label': 'Trial Shift', 'position': '8',
+            'is_active': '1', 'outcome': 'won',
+        }, HTTP_HOST='ezzydelivery.qa', secure=True)
+        stage = LeadStage.objects.get(category='driver', key='trial_shift')
+        self.assertEqual(stage.outcome, '')
+
+    def test_a_new_driver_lead_starts_on_the_driver_board(self):
+        """Lead.stage's model default is the business key 'new'. A driver card that
+        took it would land in the Unsorted lane, so creation resolves the board's
+        own first column instead."""
+        self.client.post('/workforce/crm/leads/new/', {
+            'category': Lead.CATEGORY_DRIVER,
+            'contact_name': 'Fresh Applicant',
+            'phone': '97455000999',
+        }, HTTP_HOST='ezzydelivery.qa', secure=True)
+        lead = Lead.objects.get(phone='97455000999')
+        self.assertEqual(lead.category, Lead.CATEGORY_DRIVER)
+        self.assertEqual(lead.stage, Lead.DRIVER_STAGE_INCOMPLETE)  # the board's catch-all
+        known = {s.key for s in LeadStage.board_columns(Lead.CATEGORY_DRIVER)}
+        self.assertIn(lead.stage, known)
+
+    def test_each_board_configures_its_columns_on_its_own_page(self):
+        business = self.get('/workforce/crm/stages/')
+        driver = self.get('/workforce/crm/driver/stages/')
+        self.assertEqual(business.status_code, 200)
+        self.assertEqual(driver.status_code, 200)
+
+        business_body = business.content.decode()
+        driver_body = driver.content.decode()
+
+        # Recruitment-only controls never render on the sales console.
+        self.assertNotIn('name="auto_rules"', business_body)
+        self.assertNotIn('name="write_back"', business_body)
+        self.assertIn('name="auto_rules"', driver_body)
+        self.assertIn('name="write_back"', driver_body)
+
+        # Each page lists only its own board's columns.
+        self.assertIn('Uploads Completed', driver_body)
+        self.assertNotIn('Uploads Completed', business_body)
+        self.assertIn('Negotiating', business_body)
+        self.assertNotIn('Negotiating', driver_body)
+
+    def rail(self, url):
+        """Just the in-page marketing-desk rail. The sidebar is global navigation
+        and deliberately keeps both menus — otherwise the other desk is
+        unreachable — so the scoping claim is about the rail only."""
+        import re
+        body = self.get(url).content.decode()
+        match = re.search(r'<nav class="wfdesk".*?</nav>', body, re.S)
+        self.assertIsNotNone(match, f'no desk rail on {url}')
+        return match.group(0)
+
+    def test_a_business_page_carries_no_driver_links(self):
+        """The rail used to list both pipelines everywhere. Two different people
+        work these boards, so each page's rail shows only its own."""
+        business_rail = self.rail('/workforce/crm/stages/')
+        driver_rail = self.rail('/workforce/crm/driver/stages/')
+
+        self.assertNotIn('/workforce/crm/driver/stages/', business_rail)
+        self.assertNotIn('/workforce/crm/leads/board/drivers/', business_rail)
+        self.assertNotIn('/workforce/crm/leads/drivers/', business_rail)
+
+        self.assertNotIn('/workforce/crm/leads/board/"', driver_rail)
+        self.assertNotIn('Pricing Inquiries', driver_rail)
+
+        # Tools that belong to neither desk stay reachable from both.
+        for rail in (business_rail, driver_rail):
+            self.assertIn('/workforce/crm/whatsapp-inbox/', rail)
+            self.assertIn('/workforce/crm/contacts/', rail)
+
+    def test_a_shared_tool_page_reaches_both_desks(self):
+        """Inbox / Contacts / Reports belong to neither pipeline, so they are the
+        crossover point and keep both groups."""
+        rail = self.rail('/workforce/crm/contacts/')
+        self.assertIn('/workforce/crm/leads/board/', rail)
+        self.assertIn('/workforce/crm/leads/board/drivers/', rail)

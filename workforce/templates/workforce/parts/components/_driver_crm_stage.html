@@ -1,0 +1,13 @@
+{% comment %}
+Purpose: Second line under a driver's standing — the CRM driver-board stage, linked to the lead card.
+Used by: drivers_list / drivers_pending / drivers_active / drivers_inactive Status cells.
+Notes: Needs `driver.crm_lead`, set by workforce.views._attach_crm_leads; renders nothing without it.
+       Styles are unscoped `drl__crm-stage` in workforce.css so all four roster pages share them.
+{% endcomment %}
+{% if driver.crm_lead %}
+<a class="drl__crm-stage drl__crm-stage--sw-{{ driver.crm_lead.stage_swatch }}"
+   href="{% url 'workforce:crm_lead_detail' driver.crm_lead.id %}"
+   title="CRM stage — {{ driver.crm_lead.stage_label }}{% if driver.crm_lead.stage_pinned %} (pinned by staff){% endif %}">
+    <i class="fa-solid fa-circle" aria-hidden="true"></i>{{ driver.crm_lead.stage_label }}{% if driver.crm_lead.stage_pinned %} <i class="fa-solid fa-thumbtack" aria-hidden="true"></i>{% endif %}
+</a>
+{% endif %}

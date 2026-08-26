@@ -7,22 +7,25 @@
 {#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260825c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="crm crmf col-12 p-3">
+<div class="crm crmf col-12">
   <div class="crm__console crmf__console">
 
     <div class="crm__head">
+      {# Back goes to the pipeline this lead is being filed into — the boards are #}
+      {# separate pages, so a driver lead must not send staff to the business one. #}
+      {% if initial_category == 'driver' %}{% url 'workforce:crm_driver_leads_board' as form_board_url %}{% else %}{% url 'workforce:crm_leads_board' as form_board_url %}{% endif %}
       <div class="crm__head-title">
-        <div class="crm__eyebrow">Sales Pipeline</div>
+        <div class="crm__eyebrow">{% if initial_category == 'driver' %}Recruitment Pipeline{% else %}Sales Pipeline{% endif %}</div>
         <h1 class="crm__title">New Lead</h1>
         <p class="crm__subtitle">Register a lead received by phone, referral or walk-in</p>
       </div>
       <div class="crm__head-actions">
-        <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"
-           hx-get="{% url 'workforce:crm_leads_board' %}" hx-target="#main-content"
+        <a href="{{ form_board_url }}" class="crm__btn"
+           hx-get="{{ form_board_url }}" hx-target="#main-content"
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-arrow-left"></i> Back to Board
         </a>
@@ -34,6 +37,9 @@
         </button>
       </div>
     </div>
+
+    <!-- Everything below the header bar sits in one padded section -->
+    <div class="crm__body">
 
     <div class="wfnote" id="workforce_crm_lead_form_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_lead_form_card_notes' %}" hidden></div>
@@ -101,6 +107,8 @@
       </form>
     </div>
 
+
+    </div><!-- /.crm__body -->
   </div>
 </div>
 {% endblock %}

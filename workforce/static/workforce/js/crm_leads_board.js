@@ -20,17 +20,48 @@
 
   // Height is measured, not guessed: whatever chrome sits above the strip on this
   // page (header, tabs, toolbar, notes card) decides how much viewport is left.
+  // Measuring from the live rect top is what keeps the strip's bottom edge pinned to
+  // the bottom of the screen — the box always ends exactly where the viewport does,
+  // so its horizontal scrollbar stays reachable no matter what opens above it.
+  var lastH = -1;
   function sizeLanes() {
     var el = lanes();
     if (!el) return;
     if (window.matchMedia('(max-width: 575px)').matches) {
       el.style.removeProperty('--crmb-lanes-h');
+      lastH = -1;
       return;
     }
-    var avail = window.innerHeight - el.getBoundingClientRect().top - 16;  // 16px breathing room
+    var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    var avail = vh - el.getBoundingClientRect().top - 16;  // 16px breathing room
     if (avail < 320) avail = 320;
-    el.style.setProperty('--crmb-lanes-h', Math.round(avail) + 'px');
+    avail = Math.round(avail);
+    // Only write when it actually moved: the ResizeObserver below watches a box that
+    // contains the strip, so an unconditional write would loop back on itself.
+    if (Math.abs(avail - lastH) < 2) return;
+    lastH = avail;
+    el.style.setProperty('--crmb-lanes-h', avail + 'px');
     syncPan();
+  }
+
+  // Anything that shifts the strip's top offset — notes card toggling, filter chips
+  // wrapping to a second row, the marketing rail loading — has to re-measure, so the
+  // measurement is queued off a frame rather than bound to a fixed list of events.
+  var sizeQueued = false;
+  function queueSize() {
+    if (sizeQueued) return;
+    sizeQueued = true;
+    requestAnimationFrame(function () { sizeQueued = false; sizeLanes(); });
+  }
+
+  function watchChrome() {
+    var el = lanes();
+    if (!el || !window.ResizeObserver) return;
+    var host = el.closest('.crm__console') || document.body;
+    if (host.__crmbRO) return;
+    var ro = new ResizeObserver(queueSize);
+    ro.observe(host);
+    host.__crmbRO = ro;
   }
 
   function step() {
@@ -85,9 +116,16 @@
     if (e.target && e.target.id === 'workforce_crm_board_div_lanes') syncPan();
   }, true);
 
-  window.addEventListener('resize', sizeLanes);
-  document.addEventListener('DOMContentLoaded', sizeLanes);
-  document.addEventListener('htmx:afterSwap', sizeLanes);   // filters re-render the strip
+  window.addEventListener('resize', queueSize);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', queueSize);
+    window.visualViewport.addEventListener('scroll', queueSize);
+  }
+  // Capture phase: a scroll on any ancestor scroller moves the strip's top offset.
+  document.addEventListener('scroll', queueSize, true);
+  document.addEventListener('DOMContentLoaded', function () { watchChrome(); queueSize(); });
+  document.addEventListener('htmx:afterSwap', function () { watchChrome(); queueSize(); });   // filters re-render the strip
+  watchChrome();
   sizeLanes();
 
   document.addEventListener('dragstart', function (e) {

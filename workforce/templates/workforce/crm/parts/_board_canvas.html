@@ -1,0 +1,181 @@
+{# Purpose: CRM kanban canvas — filter toolbar, pan rail and the stage columns/cards. #}
+{# Used by: workforce/crm/leads_board.html (business) and workforce/crm/driver_leads_board.html (driver). #}
+{# Notes: Board-agnostic — everything specific to one pipeline (title, tabs, help notes) lives in the page template that includes this. Expects `columns`, `board_url` and the filter context from workforce.crm_views._render_leads_board. #}
+
+    {# TOOLBAR — controls on the left, scope readout on the right. A kanban gives no #}
+    {# row count, so a filter's only visible effect is cards quietly disappearing; the #}
+    {# scope line states how much of the board is on screen and what is narrowing it. #}
+    <div class="crm__toolbar crmb__filterbar {% if filters_on %}crmb__filterbar--on{% endif %}">
+      <form method="get"
+            hx-get="" hx-target="#main-content" hx-select="#main-content"
+            hx-swap="outerHTML" hx-push-url="true"
+            id="workforce_crm_board_form_filter" class="crm__filters crmb__filters">
+
+        <div class="crm__search {% if search %}is-filled{% endif %}">
+          <i class="fa-solid fa-magnifying-glass crm__search-icon"></i>
+          <input type="text" name="search" value="{{ search }}" id="workforce_crm_board_input_search"
+                 class="crm__search-input" autocomplete="off"
+                 placeholder="Search company, contact, phone…"
+                 hx-get="" hx-target="#main-content" hx-select="#main-content"
+                 hx-swap="outerHTML" hx-push-url="true"
+                 hx-trigger="keyup changed delay:350ms, search"
+                 hx-include="#workforce_crm_board_form_filter">
+        </div>
+
+        <div class="crm__facets">
+          <select name="source" class="crm__facet-select {% if source_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by source"
+                  hx-get="" hx-target="#main-content" hx-select="#main-content"
+                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
+                  hx-include="#workforce_crm_board_form_filter">
+            <option value="">All sources</option>
+            {% for value, label in source_choices %}
+            <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="assigned" class="crm__facet-select {% if assigned_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by assignee"
+                  hx-get="" hx-target="#main-content" hx-select="#main-content"
+                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
+                  hx-include="#workforce_crm_board_form_filter">
+            <option value="">All assignees</option>
+            <option value="me" {% if assigned_filter == 'me' %}selected{% endif %}>Assigned to me</option>
+            <option value="none" {% if assigned_filter == 'none' %}selected{% endif %}>Unassigned</option>
+            {% for user in staff_users %}
+            <option value="{{ user.pk }}" {% if assigned_filter == user.pk|stringformat:"s" %}selected{% endif %}>
+              {{ user.get_full_name|default:user.username }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+
+      <div class="crmb__scope" role="status" aria-live="polite">
+        <p class="crmb__scope-count">
+          {% if filters_on %}
+          <span class="crmb__scope-num">{{ board_total }}</span>
+          <span class="crmb__scope-of">of {{ board_grand_total }}</span>
+          {% else %}
+          <span class="crmb__scope-num">{{ board_total }}</span>
+          {% endif %}
+          {# The unit belongs to the total, not the filtered figure — "1 of 129 card" is wrong. #}
+          <span class="crmb__scope-unit">card{{ board_grand_total|pluralize }}</span>
+          <span class="crmb__scope-dot" aria-hidden="true">·</span>
+          <span class="crmb__scope-cols">{{ column_total }} column{{ column_total|pluralize }}</span>
+        </p>
+
+        {% if active_filters %}
+        <div class="crmb__chips">
+          {% for chip in active_filters %}
+          <a class="crmb__chip" href="{{ chip.remove_url }}"
+             title="Remove the {{ chip.label|lower }} filter"
+             hx-get="{{ chip.remove_url }}" hx-target="#main-content"
+             hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+            <span class="crmb__chip-key">{{ chip.label }}</span>
+            <span class="crmb__chip-val">{{ chip.value }}</span>
+            <i class="fa-solid fa-xmark crmb__chip-x" aria-hidden="true"></i>
+          </a>
+          {% endfor %}
+          <a href="{{ board_url }}" class="crmb__chip crmb__chip--reset"
+             hx-get="{{ board_url }}"
+             hx-target="#main-content" hx-select="#main-content"
+             hx-swap="outerHTML" hx-push-url="true">Reset</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- BOARD -->
+    {# The lane strip is wider than the console, and the browser's own horizontal #}
+    {# scrollbar sits at the very bottom of a viewport-tall box — effectively out of #}
+    {# reach. The rail adds pan buttons, wheel panning and drag auto-pan (crm_leads_board.js). #}
+    <div class="crmb__rail">
+      <button type="button" class="crmb__pan crmb__pan--prev" data-crmb-pan="-1"
+              aria-label="Scroll columns left" title="Scroll columns left" hidden>
+        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="crmb__pan crmb__pan--next" data-crmb-pan="1"
+              aria-label="Scroll columns right" title="Scroll columns right" hidden>
+        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+      </button>
+    <div class="crmb__lanes" id="workforce_crm_board_div_lanes" tabindex="0"
+         role="group" aria-label="Pipeline columns — scrollable">
+      {% for column in columns %}
+      <div class="crmb__column{% if column.is_first %} crmb__column--first{% endif %}{% if column.in_bays %} crmb__column--bay{% endif %}{% if column.bay_start %} crmb__column--bay-start{% endif %}"
+           data-stage="{{ column.key }}">
+        <div class="crmb__col-head">
+          <span class="crmb__col-dot crmb__col-dot--{{ column.swatch }}"></span>
+          <span class="crmb__col-title">{{ column.label }}</span>
+          {# Only meaningful on the driver board — every business column is manual, so #}
+          {# the marker there was noise on all seven headers. #}
+          {% if column.is_manual and is_driver_board %}<span class="crmb__col-manual" title="Manual column — cards stay where staff put them"><i class="fa-solid fa-hand"></i></span>{% endif %}
+          {% if column.overdue %}<span class="crmb__col-late">{{ column.overdue }} late</span>{% endif %}
+          <span class="crmb__col-count">{{ column.count }}</span>
+        </div>
+        <div class="crmb__col-body"
+             {% if column.droppable %}data-stage-body="{{ column.key }}"{% endif %}
+             {% if column.confirm_text %}data-confirm="{{ column.confirm_text }}"{% endif %}
+             {% if column.needs_reason %}data-needs-reason="1"{% endif %}>
+          {% for lead in column.leads %}
+          <div class="crmb__card {% if lead.is_overdue %}crmb__card--overdue{% endif %}"
+               role="button" tabindex="0"
+               draggable="true" data-lead-id="{{ lead.pk }}"
+               data-detail-url="{% url 'workforce:crm_lead_detail' lead.pk %}"
+               data-stage-url="{% url 'workforce:crm_lead_update_stage' lead.pk %}">
+            <div class="crmb__card-top">
+              <span class="crmb__card-name">{{ lead.company_name|default:lead.contact_name|default:lead.phone|default:"Lead" }}</span>
+              {% if lead.stage_pinned %}
+              <span class="crmb__card-pin" title="Pinned here by staff — this card does not follow the driver's application status">
+                <i class="fa-solid fa-thumbtack"></i>
+              </span>
+              {% endif %}
+              <span class="crmb__card-id">#{{ lead.pk }}</span>
+            </div>
+            {% if lead.contact_name and lead.company_name %}
+            <div class="crmb__card-person">{{ lead.contact_name }}</div>
+            {% endif %}
+            {% if lead.phone %}<div class="crmb__card-phone">{{ lead.phone }}</div>{% endif %}
+            <div class="crmb__card-meta">
+              {% if lead.has_wa_chat %}
+              <a class="crmb__card-wa" title="Open WhatsApp conversation"
+                 href="{% url 'workforce:crm_lead_detail' lead.pk %}#workforce_crm_detail_div_chat">
+                <i class="fa-brands fa-whatsapp"></i> Chat
+              </a>
+              {% endif %}
+              {% for badge in lead.source_badges %}
+              <span class="crm__source crm__source--{{ badge.key }}">{{ badge.label }}</span>
+              {% endfor %}
+              {% if lead.category == 'driver' %}
+              <span class="crm__cat crm__cat--driver"><i class="fa-solid fa-motorcycle"></i> Driver</span>
+              {% endif %}
+              {% if lead.next_followup_at %}
+              <span class="crmb__card-due {% if lead.is_overdue %}crm__overdue-text{% endif %}">
+                <i class="fa-regular fa-calendar"></i>{{ lead.next_followup_at|date:"d M" }}
+              </span>
+              {% endif %}
+              {% if lead.assigned_to %}
+              <span class="crmb__card-avatar" title="{{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }}">
+                {{ lead.assigned_to.get_full_name|default:lead.assigned_to.username|slice:":1"|upper }}
+              </span>
+              {% endif %}
+            </div>
+            {# Merged duplicates ride inside the card they were absorbed into, so one #}
+            {# prospect is one card without losing which doors they came through. #}
+            {% for child in lead.merged_children.all %}
+            {# The parent's badge row already names both origins, so the sub-card #}
+            {# carries the absorbed card's own identity instead of repeating it. #}
+            <div class="crmb__submerge">
+              <span class="crmb__submerge-mark"><i class="fa-solid fa-layer-group"></i></span>
+              <span class="crmb__submerge-name">{{ child.company_name|default:child.contact_name|default:child.phone|default:"Lead" }}</span>
+              <span class="crmb__submerge-id">#{{ child.pk }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          {% empty %}
+          <div class="crmb__col-empty">{% if column.droppable %}Drop leads here{% else %}Empty{% endif %}</div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    </div><!-- /.crmb__rail -->
+

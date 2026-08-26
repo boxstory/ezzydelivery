@@ -1,13 +1,15 @@
-{# Purpose: The editable fields of one board column — shared by the per-row edit form and the add-column form. #}
+{# Purpose: The editable fields of one SALES board column — shared by the per-row edit form and the add-column form. #}
 {# Used by: workforce/crm/stages_manage.html (included twice; `stage` is None for the add form) #}
 {# Notes: `key` is only offered on create — it is what Lead.stage stores, so an existing column's key can never change. #}
+{#        Deliberately has no auto-file rules, catch-all or driver write-back: those are recruitment-only and live in #}
+{#        _stage_fields_driver.html. #}
 
 <div class="row g-2">
   <div class="col-12 col-md-4">
     <label class="crms__label" for="workforce_crm_stages_input_label_{{ stage.pk|default:'new' }}">Column name</label>
     <input type="text" class="form-control crms__input" name="label" maxlength="60" required
            id="workforce_crm_stages_input_label_{{ stage.pk|default:'new' }}"
-           value="{{ stage.label|default:'' }}" placeholder="e.g. Processing">
+           value="{{ stage.label|default:'' }}" placeholder="e.g. Proposal Sent">
   </div>
 
   <div class="col-12 col-md-4">
@@ -19,7 +21,7 @@
       Key <span class="crms__label-note">(optional — built from the name)</span>
     </label>
     <input type="text" class="form-control crms__input" name="key" maxlength="20"
-           id="workforce_crm_stages_input_key_new" placeholder="processing">
+           id="workforce_crm_stages_input_key_new" placeholder="proposal_sent">
     {% endif %}
   </div>
 
@@ -54,74 +56,25 @@
       <input type="checkbox" name="is_active" value="1" {% if stage.is_active or not stage %}checked{% endif %}>
       Show on board
     </label>
-    {% if is_driver_board %}
-    <label class="crms__check">
-      <input type="checkbox" name="is_fallback" value="1" {% if stage.is_fallback %}checked{% endif %}>
-      Catch-all <span class="crms__hint">— holds drivers no other column claims (one per board)</span>
-    </label>
-    {% endif %}
   </div>
-  {% if not is_driver_board %}
+  {# The sales board has no auto-filing, so it has no catch-all to elect — preserve whatever is stored. #}
   <input type="hidden" name="is_fallback" value="{% if stage.is_fallback %}1{% else %}0{% endif %}">
-  {% endif %}
-</div>
-
-{% if is_driver_board %}
-<div class="crms__fieldset">
-  <div class="crms__legend">Files cards here when the driver is…</div>
-  <p class="crms__hint crms__hint--block">
-    Tick nothing to make this a manual lane. Conditions are OR'd, and columns are checked from the
-    right, so the furthest-right match wins.
-  </p>
-  <div class="row g-2">
-    {% for group_label, rules in rule_groups %}
-    <div class="col-12 col-md-4">
-      <div class="crms__group">{{ group_label }}</div>
-      {% for value, text in rules %}
-      <label class="crms__check crms__check--stack">
-        <input type="checkbox" name="auto_rules" value="{{ value }}"
-               {% if value in stage.auto_rules %}checked{% endif %}>
-        {{ text }}
-      </label>
+  <div class="row g-2 mt-1">
+  <div class="col-12 col-md-4">
+    <label class="crms__label" for="workforce_crm_stages_select_outcome_{{ stage.pk|default:'new' }}">
+      Counts as <span class="crms__label-note">(outcome columns only)</span>
+    </label>
+    <select class="form-select crms__input" name="outcome"
+            id="workforce_crm_stages_select_outcome_{{ stage.pk|default:'new' }}">
+      {% for value, text in outcome_choices %}
+      <option value="{{ value }}" {% if stage.outcome == value %}selected{% endif %}>{{ text }}</option>
       {% endfor %}
-    </div>
-    {% endfor %}
+    </select>
+    <div class="crms__hint">Drives the win rate in Reports and the lead_won / lead_lost auto-flows. Ignored unless <em>Outcome column</em> is ticked.</div>
+  </div>
   </div>
 </div>
 
-<div class="crms__fieldset">
-  <div class="crms__legend">When staff drag a card here</div>
-  <div class="row g-2">
-    <div class="col-12 col-md-4">
-      <label class="crms__label" for="workforce_crm_stages_select_wb_{{ stage.pk|default:'new' }}">
-        Also set the driver's real status to
-      </label>
-      <select class="form-select crms__input" name="write_back"
-              id="workforce_crm_stages_select_wb_{{ stage.pk|default:'new' }}">
-        {% for value, text in write_back_choices %}
-        <option value="{{ value }}" {% if stage.write_back == value %}selected{% endif %}>{{ text }}</option>
-        {% endfor %}
-      </select>
-      <div class="crms__hint">Sends the same WhatsApp notification as the verification page.</div>
-    </div>
-    <div class="col-12 col-md-5">
-      <label class="crms__label" for="workforce_crm_stages_input_confirm_{{ stage.pk|default:'new' }}">
-        Ask staff to confirm first
-      </label>
-      <input type="text" class="form-control crms__input" name="confirm_text" maxlength="120"
-             id="workforce_crm_stages_input_confirm_{{ stage.pk|default:'new' }}"
-             value="{{ stage.confirm_text|default:'' }}" placeholder="e.g. approve this driver">
-      <div class="crms__hint">Leave blank to move cards without a prompt.</div>
-    </div>
-    <div class="col-12 col-md-3 d-flex align-items-center">
-      <label class="crms__check">
-        <input type="checkbox" name="needs_reason" value="1" {% if stage.needs_reason %}checked{% endif %}>
-        Ask for a reason
-      </label>
-    </div>
-  </div>
-</div>
-{% else %}
 <div class="crms__fieldset">
   <div class="crms__legend">Legacy pricing-form mirror</div>
   <div class="row g-2">
@@ -136,4 +89,3 @@
     </div>
   </div>
 </div>
-{% endif %}

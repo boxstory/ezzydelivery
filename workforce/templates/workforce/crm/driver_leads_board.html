@@ -1,0 +1,203 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{# Purpose: CRM Driver kanban board — drag driver applicants between recruitment stages. #}
+{# Used by: workforce.crm_views.crm_driver_leads_board #}
+{# Notes: crmb__ namespace; the columns/cards/toolbar come from crm/parts/_board_canvas.html, shared with the business board. This board rebuilds itself from the real applicant pool on every load (crm.services.reconcile_driver_leads) and some columns write back to the driver's verification status. #}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260825c" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+{% url 'workforce:crm_driver_leads_board' as board_url %}
+<div class="crm crmb col-12">
+  <div class="crm__console">
+
+    <!-- HEADER BAR -->
+    <div class="crm__head">
+      <div class="crm__head-title">
+        <div class="crm__eyebrow">Recruitment Pipeline</div>
+        <h1 class="crm__title">Driver Leads Board</h1>
+        <p class="crm__subtitle">Drag a card to change its stage{% if closed_window_days %} · closed cards show for {{ closed_window_days }} days{% endif %}</p>
+      </div>
+      <div class="crm__metrics d-none d-md-flex">
+        <div class="crm__metric">
+          <span class="crm__metric-label">Open</span>
+          <span class="crm__metric-value">{{ open_total }}</span>
+        </div>
+        <div class="crm__metric">
+          <span class="crm__metric-label">Overdue</span>
+          <span class="crm__metric-value {% if overdue_total %}crm__metric-value--alert{% endif %}">{{ overdue_total }}</span>
+        </div>
+        <div class="crm__metric">
+          <span class="crm__metric-label">{{ outcome_label }}{% if closed_window_days %} · {{ closed_window_days }}d{% endif %}</span>
+          <span class="crm__metric-value">{{ outcome_total }}</span>
+        </div>
+      </div>
+      <div class="crm__head-actions">
+        <a href="{% url 'workforce:crm_driver_leads_list' %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_driver_leads_list' %}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-table-list"></i> List
+        </a>
+        <a href="{% url 'workforce:crm_driver_stages_manage' %}" class="crm__btn"
+           hx-get="{% url 'workforce:crm_driver_stages_manage' %}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-table-columns"></i> Columns
+        </a>
+        <a href="{% url 'workforce:driver_verification_list' %}" class="crm__btn"
+           title="Document review queue for driver applications">
+          <i class="fa-solid fa-id-card"></i> Verification
+        </a>
+        {# Cross-link to the other pipeline. The two boards are separate pages with #}
+        {# separate sidebar menus; this is a shortcut, not a tab. #}
+        <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"
+           title="Switch to the business sales pipeline"
+           hx-get="{% url 'workforce:crm_leads_board' %}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <i class="fa-solid fa-briefcase"></i> Business Board
+        </a>
+        <a href="{% url 'workforce:crm_lead_create' %}?category=driver" class="crm__btn crm__btn--primary">
+          <i class="fa-solid fa-plus"></i> New Lead
+        </a>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_crm_driver_board_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Everything below the header bar sits in one padded section -->
+    <div class="crm__body">
+
+    {% include "workforce/parts/_marketing_desk_rail.html" %}
+
+    <div class="wfnote" id="workforce_crm_driver_board_card_notes" hidden>
+      <p class="wfnote__lede">
+        The kanban view of the <strong>driver recruitment</strong> funnel — one column per stage, one
+        card per applicant. Business (client) prospects live on their own board under
+        <strong>CRM Business</strong> in the sidebar; nothing on this page shows them. This board
+        rebuilds itself from the real applicant pool every time it loads: a card exists for every
+        driver application, and each card is snapped to the column whose conditions that applicant
+        matches — unless you have pinned it.
+      </p>
+
+      <div class="wfnote__cols">
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">What you can do here</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Drag a card</dt>
+              <dd class="wfnote__def">Drops it into the new stage and saves immediately. If the save
+                fails the card slides back to where it came from and you get an error.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Open a card</dt>
+              <dd class="wfnote__def">Click it (or press Enter on it) to open the lead detail page
+                with the timeline, notes and WhatsApp conversation.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Pin marker</dt>
+              <dd class="wfnote__def">A thumbtack means staff moved this card somewhere the
+                applicant's real status does not justify, so auto-filing has stopped for it. Press
+                <em>Resume auto-filing</em> on the lead page to hand it back.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Hand marker</dt>
+              <dd class="wfnote__def">A manual column — it has no conditions, so cards stay exactly
+                where staff put them and are never auto-filed.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Chat chip</dt>
+              <dd class="wfnote__def">Shown only on cards whose number has WhatsApp history on
+                record; it jumps straight to that conversation on the detail page.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Search &amp; filters</dt>
+              <dd class="wfnote__def">Filter by name, phone, source and assignee. Whatever is engaged
+                is named in a chip on the right of the bar — press its <em>✕</em> to drop that one
+                filter, or <em>Reset</em> to clear the lot.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">List / Verification</dt>
+              <dd class="wfnote__def">The filterable table of the same applicants, or the document
+                review queue where the verification decision is actually made.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Business Board</dt>
+              <dd class="wfnote__def">Shortcut to the sales pipeline. It is a separate page with its
+                own columns and its own totals.</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">The columns</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">New / Applied</dt>
+              <dd class="wfnote__def"><em>New Application</em> is a driver we know of but who has not
+                submitted; <em>Applied</em> means the form is in.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Incomplete</dt>
+              <dd class="wfnote__def">Registered but the application was never submitted.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Uploads done</dt>
+              <dd class="wfnote__def">Every section and document is in — ready for a staff decision.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Under Review</dt>
+              <dd class="wfnote__def">A staff member has picked it up and is checking the documents.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Approved / Rejected</dt>
+              <dd class="wfnote__def">The decision columns. They write back to the driver's real
+                verification status.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">More columns</dt>
+              <dd class="wfnote__def">These seven are just the starting set — <strong>Columns</strong>
+                in the header lets you add your own, name it, colour it, place it anywhere in the row
+                and choose which applicants it collects.</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+
+      <section class="wfnote__sec wfnote__sec--note">
+        <h2 class="wfnote__h">Worth knowing</h2>
+        <ul class="wfnote__notes">
+          <li>Each outcome column decides how long a closed card lingers — the built-in ones show
+            {{ closed_window_days|default:"30" }} days' worth. Older closed applicants are still on
+            the Driver Leads table; they have simply aged out of the board.</li>
+          <li><strong>Your moves always stick.</strong> If you move a card somewhere its application
+            status does not justify, the card is <em>pinned</em> and auto-filing stops for it until
+            you press <em>Resume auto-filing</em> on the lead page. If the column you drop it in sets
+            the driver's real status, no pin is needed — reality now agrees, so the card keeps
+            tracking the application.</li>
+          <li>Dragging a card into a column that sets the driver's real status — the built-in
+            <strong>Approved</strong>, <strong>Rejected</strong> and <strong>Under Review</strong>, plus
+            any you configure that way — changes the applicant's verification status and sends them a
+            WhatsApp message. You are asked to confirm first, and a rejection can carry a reason — but
+            once sent, the message cannot be taken back.</li>
+        </ul>
+      </section>
+    </div>
+
+    {% include "workforce/crm/parts/_board_canvas.html" %}
+
+    </div><!-- /.crm__body -->
+  </div>
+</div>
+
+<!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
+<script>
+  window.CRMB_CONFIG = { csrfToken: "{{ csrf_token }}", driverBoard: true };
+</script>
+<script src="{% static 'workforce/js/crm_leads_board.js' %}?v=20260825b"></script>
+{% endblock content %}

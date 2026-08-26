@@ -7,20 +7,13 @@
 {#        Carries the shared wfnote__ page-notes card under the hero, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260825c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="crm crmd col-12 p-3" id="workforce_crm_detail_div_root">
+<div class="crm crmd col-12" id="workforce_crm_detail_div_root">
 
-  <a href="{% url 'workforce:crm_leads_board' %}" class="crmd__back"
-     hx-get="{% url 'workforce:crm_leads_board' %}"
-     hx-target="#main-content" hx-select="#main-content"
-     hx-swap="outerHTML" hx-push-url="true">
-    <i class="fa-solid fa-arrow-left"></i>Leads Board
-  </a>
-
-  <!-- HERO -->
+  <!-- HERO (back link sits in the action row, just before the help button) -->
   <div class="crmd__hero">
     <div class="crmd__hero-info">
       <h1 class="crmd__hero-name">{{ lead.company_name|default:lead.contact_name|default:lead.phone|default:"Lead" }}</h1>
@@ -61,10 +54,21 @@
       <button type="button" class="crm__btn"
               data-wasend-open
               data-wasend-to="{{ lead.phone }}"
-              data-wasend-name="{{ lead.contact_name|default:lead.company_name|escape }}">
+              data-wasend-name="{{ lead_wa_name|escape }}">
         <i class="fa-solid fa-paper-plane"></i> Send from EZZY
       </button>
       {% endif %}
+      {# Back goes to the board this lead actually lives on — the two pipelines are #}
+      {# separate pages, so a driver card must not land on the business board. #}
+      {% if lead.category == 'driver' %}{% url 'workforce:crm_driver_leads_board' as detail_board_url %}{% else %}{% url 'workforce:crm_leads_board' as detail_board_url %}{% endif %}
+      <a href="{{ detail_board_url }}" class="crmd__back"
+         hx-get="{{ detail_board_url }}"
+         hx-target="#main-content" hx-select="#main-content"
+         hx-swap="outerHTML" hx-push-url="true"
+         title="Back to {% if lead.category == 'driver' %}Driver{% else %}Business{% endif %} Leads Board">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+        <span class="visually-hidden">Back to {% if lead.category == 'driver' %}Driver{% else %}Business{% endif %} Leads Board</span>
+      </a>
       <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
               aria-expanded="false" aria-controls="workforce_crm_lead_detail_card_notes"
               title="About this page">
@@ -74,6 +78,9 @@
     </div>
   </div>
 
+  <!-- Everything below the hero sits in one padded section -->
+  <div class="crmd__body">
+
   <div class="wfnote" id="workforce_crm_lead_detail_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_lead_detail_card_notes' %}" hidden></div>
 
@@ -82,69 +89,73 @@
     <!-- LEFT: source + notes + chat -->
     <div class="crmd__left">
 
-      <!-- SOURCE SUMMARY -->
-      <div class="crm__panel">
-        <div class="crm__panel-hd"><i class="fa-solid fa-right-to-bracket"></i><h3>Source</h3></div>
-        <div class="crm__panel-body">
-          {% if lead.pricing_enquiry %}
-          <div class="crmd__field"><span class="crmd__field-lbl">Origin</span>
-            <span class="crmd__field-val">3PL pricing inquiry #{{ lead.pricing_enquiry_id }}</span></div>
-          <div class="crmd__field"><span class="crmd__field-lbl">Category</span>
-            <span class="crmd__field-val">{{ lead.pricing_enquiry.product_category|default:"—" }}</span></div>
-          <div class="crmd__field"><span class="crmd__field-lbl">Orders / month</span>
-            <span class="crmd__field-val">{{ lead.pricing_enquiry.avarage_number_of_order_done_last_month|default:"—" }}</span></div>
-          <div class="crmd__field"><span class="crmd__field-lbl">Wants to start</span>
-            <span class="crmd__field-val">{{ lead.pricing_enquiry.preferred_start_date|default:"—" }}</span></div>
-          <a class="crm__view mt-2 d-inline-block" href="{% url 'workforce:pricing_inquiry_detail' lead.pricing_enquiry_id %}"
-             hx-get="{% url 'workforce:pricing_inquiry_detail' lead.pricing_enquiry_id %}"
-             hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-            <i class="fa-solid fa-arrow-right"></i> Full inquiry detail
-          </a>
-          {% elif lead.whatsapp_inquiry %}
-          <div class="crmd__field"><span class="crmd__field-lbl">Origin</span>
-            <span class="crmd__field-val">WhatsApp quick inquiry #{{ lead.whatsapp_inquiry_id }}</span></div>
-          <div class="crmd__field"><span class="crmd__field-lbl">Product</span>
-            <span class="crmd__field-val">{{ lead.whatsapp_inquiry.product_name|default:"—" }}</span></div>
-          <div class="crmd__field"><span class="crmd__field-lbl">Info</span>
-            <span class="crmd__field-val">{{ lead.whatsapp_inquiry.additional_info|default:"—" }}</span></div>
-          {% elif lead.source == 'whatsapp_inbound' %}
-          <div class="crmd__field"><span class="crmd__field-lbl">Origin</span>
-            <span class="crmd__field-val">Inbound WhatsApp message</span></div>
-          {% else %}
-          <div class="crmd__field"><span class="crmd__field-lbl">Origin</span>
-            <span class="crmd__field-val">Created manually by staff</span></div>
-          {% endif %}
+      {% comment %} Source and Contact answer the same question from two sides —
+         where this lead came from, and who to call — so they share one row. {% endcomment %}
+      <div class="crmd__split">
+        <!-- SOURCE SUMMARY -->
+        <div class="crm__panel">
+          <div class="crm__panel-hd"><i class="fa-solid fa-right-to-bracket"></i><h3>Source</h3></div>
+          <div class="crm__panel-body">
+            {% if lead.pricing_enquiry %}
+            <div class="crmd__field"><span class="crmd__field-lbl">Origin</span>
+              <span class="crmd__field-val">3PL pricing inquiry #{{ lead.pricing_enquiry_id }}</span></div>
+            <div class="crmd__field"><span class="crmd__field-lbl">Category</span>
+              <span class="crmd__field-val">{{ lead.pricing_enquiry.product_category|default:"—" }}</span></div>
+            <div class="crmd__field"><span class="crmd__field-lbl">Orders / month</span>
+              <span class="crmd__field-val">{{ lead.pricing_enquiry.avarage_number_of_order_done_last_month|default:"—" }}</span></div>
+            <div class="crmd__field"><span class="crmd__field-lbl">Wants to start</span>
+              <span class="crmd__field-val">{{ lead.pricing_enquiry.preferred_start_date|default:"—" }}</span></div>
+            <a class="crm__view mt-2 d-inline-block" href="{% url 'workforce:pricing_inquiry_detail' lead.pricing_enquiry_id %}"
+               hx-get="{% url 'workforce:pricing_inquiry_detail' lead.pricing_enquiry_id %}"
+               hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+              <i class="fa-solid fa-arrow-right"></i> Full inquiry detail
+            </a>
+            {% elif lead.whatsapp_inquiry %}
+            <div class="crmd__field"><span class="crmd__field-lbl">Origin</span>
+              <span class="crmd__field-val">WhatsApp quick inquiry #{{ lead.whatsapp_inquiry_id }}</span></div>
+            <div class="crmd__field"><span class="crmd__field-lbl">Product</span>
+              <span class="crmd__field-val">{{ lead.whatsapp_inquiry.product_name|default:"—" }}</span></div>
+            <div class="crmd__field"><span class="crmd__field-lbl">Info</span>
+              <span class="crmd__field-val">{{ lead.whatsapp_inquiry.additional_info|default:"—" }}</span></div>
+            {% elif lead.source == 'whatsapp_inbound' %}
+            <div class="crmd__field"><span class="crmd__field-lbl">Origin</span>
+              <span class="crmd__field-val">Inbound WhatsApp message</span></div>
+            {% else %}
+            <div class="crmd__field"><span class="crmd__field-lbl">Origin</span>
+              <span class="crmd__field-val">Created manually by staff</span></div>
+            {% endif %}
+          </div>
         </div>
-      </div>
 
-      <!-- CONTACT (editable) -->
-      <div class="crm__panel">
-        <div class="crm__panel-hd"><i class="fa-solid fa-address-card"></i><h3>Contact</h3></div>
-        <div class="crm__panel-body">
-          <form id="workforce_crm_detail_form_contact">
-            <div class="crmd__editrow">
-              <label class="crmd__field-lbl" for="workforce_crm_detail_input_company">Company</label>
-              <input class="form-control form-control-sm" id="workforce_crm_detail_input_company"
-                     name="company_name" value="{{ lead.company_name }}">
-            </div>
-            <div class="crmd__editrow">
-              <label class="crmd__field-lbl" for="workforce_crm_detail_input_contact">Contact person</label>
-              <input class="form-control form-control-sm" id="workforce_crm_detail_input_contact"
-                     name="contact_name" value="{{ lead.contact_name }}">
-            </div>
-            <div class="crmd__editrow">
-              <label class="crmd__field-lbl" for="workforce_crm_detail_input_phone">Phone</label>
-              <input class="form-control form-control-sm" id="workforce_crm_detail_input_phone"
-                     name="phone" value="{{ lead.phone }}">
-            </div>
-            <div class="crmd__editrow">
-              <label class="crmd__field-lbl" for="workforce_crm_detail_input_category">Category</label>
-              <input class="form-control form-control-sm" id="workforce_crm_detail_input_category"
-                     name="product_category" value="{{ lead.product_category }}">
-            </div>
-            <button type="submit" class="crm__btn mt-2"><i class="fa-solid fa-floppy-disk"></i> Save contact</button>
-            <span class="crmd__feedback" id="workforce_crm_detail_span_contact_feedback"></span>
-          </form>
+        <!-- CONTACT (editable) -->
+        <div class="crm__panel">
+          <div class="crm__panel-hd"><i class="fa-solid fa-address-card"></i><h3>Contact</h3></div>
+          <div class="crm__panel-body">
+            <form id="workforce_crm_detail_form_contact">
+              <div class="crmd__editrow">
+                <label class="crmd__field-lbl" for="workforce_crm_detail_input_company">Company</label>
+                <input class="form-control form-control-sm" id="workforce_crm_detail_input_company"
+                       name="company_name" value="{{ lead.company_name }}">
+              </div>
+              <div class="crmd__editrow">
+                <label class="crmd__field-lbl" for="workforce_crm_detail_input_contact">Contact person</label>
+                <input class="form-control form-control-sm" id="workforce_crm_detail_input_contact"
+                       name="contact_name" value="{{ lead.contact_name }}">
+              </div>
+              <div class="crmd__editrow">
+                <label class="crmd__field-lbl" for="workforce_crm_detail_input_phone">Phone</label>
+                <input class="form-control form-control-sm" id="workforce_crm_detail_input_phone"
+                       name="phone" value="{{ lead.phone }}">
+              </div>
+              <div class="crmd__editrow">
+                <label class="crmd__field-lbl" for="workforce_crm_detail_input_category">Category</label>
+                <input class="form-control form-control-sm" id="workforce_crm_detail_input_category"
+                       name="product_category" value="{{ lead.product_category }}">
+              </div>
+              <button type="submit" class="crm__btn mt-2"><i class="fa-solid fa-floppy-disk"></i> Save contact</button>
+              <span class="crmd__feedback" id="workforce_crm_detail_span_contact_feedback"></span>
+            </form>
+          </div>
         </div>
       </div>
 
@@ -168,30 +179,17 @@
       </div>
       {% endif %}
 
-      <!-- LINK WHATSAPP CHAT (manual override) -->
-      <div class="crm__panel" id="workforce_crm_detail_div_chat_link">
-        <div class="crm__panel-hd"><i class="fa-brands fa-whatsapp"></i><h3>Link WhatsApp Chat</h3></div>
-        <div class="crm__panel-body">
-          {% if lead.wa_chat_override %}
-          <div class="crmd__field-lbl mb-2">Manually linked to <strong>{{ lead.wa_chat_override }}</strong>{% if not wa_messages %} — no messages found there yet{% endif %}.</div>
-          {% elif not wa_messages %}
-          <div class="crmd__field-lbl mb-2">No WhatsApp chat auto-matched for this lead's phone. Search below to connect one.</div>
-          {% endif %}
-          <div class="crmd__link-search-wrap">
-            <input type="text" class="form-control form-control-sm" id="workforce_crm_detail_input_wa_search"
-                   placeholder="Search WhatsApp contacts by phone or name…" autocomplete="off">
-            <div class="crmd__link-results" id="workforce_crm_detail_div_wa_results"></div>
-          </div>
-          <span class="crmd__feedback" id="workforce_crm_detail_span_link_feedback"></span>
-        </div>
-      </div>
-
-      <!-- FULL WHATSAPP CONVERSATION -->
-      {% if lead.phone or lead.wa_chat_override %}
+      <!-- FULL WHATSAPP CONVERSATION (carries the manual chat linker) -->
       <div class="crm__panel">
         <div class="crm__panel-hd">
           <i class="fa-brands fa-whatsapp"></i><h3>WhatsApp Conversation</h3>
           <span class="crmd__count">{{ wa_messages|length }}</span>
+          <button type="button" class="crm__btn crmd__linker-btn" data-chatlink-toggle
+                  aria-controls="workforce_crm_detail_div_chat_link"
+                  aria-expanded="{% if wa_messages %}false{% else %}true{% endif %}">
+            <i class="fa-solid fa-link" aria-hidden="true"></i>
+            {% if lead.wa_chat_override or wa_messages %}Link a different chat{% else %}Link chat{% endif %}
+          </button>
         </div>
         {# Which of our numbers this thread runs on. Also decides which line the #}
         {# "Send from EZZY" composer replies from — see wa_session on the include. #}
@@ -219,6 +217,21 @@
           {% else %}Nothing has been exchanged on any of our numbers yet.{% endif %}
         </div>
         {% endif %}
+        <div class="crm__panel-body crmd__linker{% if wa_messages %} d-none{% endif %}"
+             id="workforce_crm_detail_div_chat_link">
+          {% if lead.wa_chat_override %}
+          <div class="crmd__field-lbl mb-2">Manually linked to <strong>{{ lead.wa_chat_override }}</strong>{% if not wa_messages %} — no messages found there yet{% endif %}. Search to re-point it.</div>
+          {% else %}
+          <div class="crmd__field-lbl mb-2">Auto-matching uses the lead's phone. If the chat lives under a different number or a LID, connect it by hand.</div>
+          {% endif %}
+          <div class="crmd__link-search-wrap">
+            <input type="text" class="form-control form-control-sm" id="workforce_crm_detail_input_wa_search"
+                   placeholder="Search WhatsApp contacts by phone or name…" autocomplete="off">
+            <div class="crmd__link-results" id="workforce_crm_detail_div_wa_results"></div>
+          </div>
+          <span class="crmd__feedback" id="workforce_crm_detail_span_link_feedback"></span>
+        </div>
+
         <div class="crm__panel-body crmd__chat crmd__chat--full{% if not wa_messages %} d-none{% endif %}" id="workforce_crm_detail_div_chat">
           {% for msg in wa_messages %}
           <div class="crmd__msg crmd__msg--{{ msg.direction }}">
@@ -245,7 +258,6 @@
           {% endfor %}
         </div>
       </div>
-      {% endif %}
 
       <!-- SHARED MEDIA -->
       {% if wa_media %}
@@ -451,6 +463,8 @@
     </div>
   </div>
 
+  </div><!-- /.crmd__body -->
+
 </div>
 
 {# wa_send_session pins the composer to the number a staff member actually PICKED #}
@@ -479,5 +493,5 @@
     csrfToken: "{{ csrf_token }}"
   };
 </script>
-<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260807g"></script>
+<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260824a"></script>
 {% endblock %}

@@ -21,6 +21,8 @@ from django.utils import timezone
 
 from core.decorators import staff_required
 from crm import services as crm_services
+from crm import contact_tags as crm_contact_tags
+from crm.contact_tags import CONTACT_TAGS, strip_tags
 from crm import stage_rules as crm_stage_rules
 from crm.models import STAGE_CACHE_KEY, InboxDismissal, Lead, LeadActivity, LeadStage
 from core.validators import safe_int
@@ -154,11 +156,10 @@ def _annotate_wa_chats(leads):
         logger.exception('crm: WA chat annotation failed')
 
 
-@login_required(login_url='/accounts/login/')
-@staff_required
-def crm_leads_board(request, board_category=Lead.CATEGORY_BUSINESS):
-    """Kanban pipeline board grouped by stage — one board per lead category
-    (business sales pipeline vs driver recruitment pipeline)."""
+def _render_leads_board(request, board_category, template):
+    """Shared kanban builder behind the two board pages. The business sales pipeline
+    and the driver recruitment pipeline are separate pages with their own URL, their
+    own columns and their own help notes — this only assembles what they share."""
     leads, search, source_filter, assigned_filter, category_filter = _filtered_leads(request)
     leads = leads.filter(category=board_category)
 
@@ -205,6 +206,7 @@ def crm_leads_board(request, board_category=Lead.CATEGORY_BUSINESS):
             'overdue': sum(1 for lead in bucket if lead.is_overdue),
             'swatch': stage.dot_swatch,
             'is_closed': stage.is_closed,
+            'outcome': stage.outcome,
             'is_manual': stage.is_manual,
             'confirm_text': stage.confirm_text,
             'needs_reason': stage.needs_reason,
@@ -222,7 +224,7 @@ def crm_leads_board(request, board_category=Lead.CATEGORY_BUSINESS):
         columns.append({
             'key': '', 'label': 'Unsorted', 'leads': orphans, 'count': len(orphans),
             'overdue': sum(1 for lead in orphans if lead.is_overdue),
-            'swatch': 'grey', 'is_closed': False, 'is_manual': True,
+            'swatch': 'grey', 'is_closed': False, 'outcome': '', 'is_manual': True,
             'confirm_text': '', 'needs_reason': False, 'droppable': False,
             'is_first': not columns, 'in_bays': True, 'bay_start': False,
         })
@@ -230,8 +232,49 @@ def crm_leads_board(request, board_category=Lead.CATEGORY_BUSINESS):
     closed_keys = crm_services.closed_stage_keys(board_category)
     open_total = sum(c['count'] for c in columns if c['key'] not in closed_keys)
     overdue_total = sum(c['overdue'] for c in columns)
-    # Headline outcome metric = the leftmost terminal column (Won / Approved).
-    outcome = next((c for c in columns if c['is_closed']), None)
+
+    # A kanban hides the effect of a filter — cards just quietly stop appearing.
+    # The scope line under the controls says out loud how much of the board is on
+    # screen, and each engaged filter gets a chip that carries its own removal URL.
+    staff_users = _staff_users()
+    board_total = sum(c['count'] for c in columns)
+    filters_on = bool(search or source_filter or assigned_filter)
+    board_grand_total = board_total
+    if filters_on:
+        board_grand_total = (Lead.objects
+                             .filter(merged_into__isnull=True, category=board_category)
+                             .filter(keep).count())
+
+    def _chip(param, label, value):
+        params = request.GET.copy()
+        params.pop(param, None)
+        query = params.urlencode()
+        return {
+            'label': label,
+            'value': value,
+            'remove_url': f'{request.path}?{query}' if query else request.path,
+        }
+
+    active_filters = []
+    if search:
+        active_filters.append(_chip('search', 'Search', search))
+    if source_filter:
+        active_filters.append(_chip(
+            'source', 'Source', dict(Lead.SOURCE_CHOICES).get(source_filter, source_filter)))
+    if assigned_filter:
+        if assigned_filter == 'me':
+            assigned_label = 'Assigned to me'
+        elif assigned_filter == 'none':
+            assigned_label = 'Unassigned'
+        else:
+            match = next((u for u in staff_users if str(u.pk) == assigned_filter), None)
+            assigned_label = (match.get_full_name() or match.username) if match else 'Assignee'
+        active_filters.append(_chip('assigned', 'Assignee', assigned_label))
+
+    # Headline outcome metric = the column this board calls a win (Won / Approved),
+    # falling back to its leftmost terminal column if none declares an outcome.
+    outcome = (next((c for c in columns if c.get('outcome') == 'won'), None)
+               or next((c for c in columns if c['is_closed']), None))
     window_days = max(hide_map.values()) if hide_map else None
 
     context = {
@@ -247,22 +290,44 @@ def crm_leads_board(request, board_category=Lead.CATEGORY_BUSINESS):
         'source_filter': source_filter,
         'assigned_filter': assigned_filter,
         'category_filter': category_filter,
-        'staff_users': _staff_users(),
+        'staff_users': staff_users,
         'source_choices': Lead.SOURCE_CHOICES,
         'category_choices': Lead.CATEGORY_CHOICES,
         'closed_window_days': window_days,
         'today': timezone.localdate(),
+        'board_total': board_total,
+        'board_grand_total': board_grand_total,
+        'column_total': len(columns),
+        'filters_on': filters_on,
+        'active_filters': active_filters,
     }
-    return render(request, 'workforce/crm/leads_board.html', context)
+    return render(request, template, context)
 
 
 @login_required(login_url='/accounts/login/')
 @staff_required
-def crm_leads_list(request):
-    """Filterable table of all leads."""
+def crm_leads_board(request):
+    """Business sales pipeline board."""
+    return _render_leads_board(
+        request, Lead.CATEGORY_BUSINESS, 'workforce/crm/leads_board.html')
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_driver_leads_board(request):
+    """Driver recruitment pipeline board — its own page, not a tab of the business one."""
+    return _render_leads_board(
+        request, Lead.CATEGORY_DRIVER, 'workforce/crm/driver_leads_board.html')
+
+
+def _render_leads_list(request, list_category):
+    """Shared table builder behind the two list pages. The category is fixed by the
+    URL, not by a tab — a business page never shows driver applicants and vice versa."""
     from workforce.views import paginate_queryset
 
-    leads, search, source_filter, assigned_filter, category_filter = _filtered_leads(request)
+    leads, search, source_filter, assigned_filter, _category_filter = _filtered_leads(request)
+    category_filter = list_category
+    leads = leads.filter(category=list_category)
 
     stage_filter = request.GET.get('stage', '').strip()
     if stage_filter:
@@ -279,31 +344,20 @@ def crm_leads_list(request):
     # Metrics scoped to the active category tab (All / Business / Drivers). The closed
     # keys are scoped to the same board: a terminal column that exists on only one
     # board would otherwise reclassify the other board's leads with the same key.
-    scoped = Lead.objects.all()
-    scoped_category = None
-    if category_filter in {c for c, _ in Lead.CATEGORY_CHOICES}:
-        scoped_category = category_filter
-        scoped = scoped.filter(category=category_filter)
-    scoped_closed = crm_services.closed_stage_keys(scoped_category)
+    scoped = Lead.objects.filter(category=list_category)
+    scoped_closed = crm_services.closed_stage_keys(list_category)
     total_count = scoped.count()
     open_count = scoped.exclude(stage__in=scoped_closed).count()
     overdue_count = (
         scoped.filter(next_followup_at__lt=timezone.localdate())
         .exclude(stage__in=scoped_closed).count()
     )
-    won_count = scoped.filter(stage=Lead.STAGE_WON).count()
+    won_count = scoped.filter(
+        stage__in=crm_services.outcome_stage_keys('won', list_category)
+    ).count()
 
-    # Stage filter options follow the board being looked at; with no category
-    # filter, show each distinct key once (the boards share most of them).
-    if category_filter in {c for c, _ in Lead.CATEGORY_CHOICES}:
-        stage_choices = [(s.key, s.label) for s in crm_services.board_stages(category_filter)]
-    else:
-        seen, stage_choices = set(), []
-        for stage in LeadStage.objects.filter(is_active=True).order_by('category', 'position'):
-            if stage.key in seen:
-                continue
-            seen.add(stage.key)
-            stage_choices.append((stage.key, stage.label))
+    # Stage filter options are this page's own board columns.
+    stage_choices = [(s.key, s.label) for s in crm_services.board_stages(list_category)]
     stage_choices = stage_choices or Lead.STAGE_CHOICES
 
     page_obj = paginate_queryset(request, leads, items_per_page=50)
@@ -318,8 +372,11 @@ def crm_leads_list(request):
         'category': category_filter,
     }.items() if v})
 
+    is_driver_list = list_category == Lead.CATEGORY_DRIVER
     context = {
-        'page_title': 'Leads',
+        'page_title': 'Driver Leads' if is_driver_list else 'Business Leads',
+        'list_category': list_category,
+        'is_driver_list': is_driver_list,
         'page_obj': page_obj,
         'per_page': request.GET.get('per_page', '50'),
         'filter_params': filter_params,
@@ -340,6 +397,112 @@ def crm_leads_list(request):
         'today': timezone.localdate(),
     }
     return render(request, 'workforce/crm/leads_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_leads_list(request):
+    """Business leads table."""
+    return _render_leads_list(request, Lead.CATEGORY_BUSINESS)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_driver_leads_list(request):
+    """Driver leads table."""
+    return _render_leads_list(request, Lead.CATEGORY_DRIVER)
+
+
+# Google CSV import wants these exact header names — anything else is ignored on
+# import. Order does not matter to Google, only the spelling.
+GOOGLE_CONTACTS_HEADERS = [
+    'First Name', 'Last Name', 'Organization Name',
+    'Phone 1 - Label', 'Phone 1 - Value', 'Notes', 'Labels',
+]
+
+
+def _google_phone(raw):
+    """E.164 so the number matches an incoming call. Bare 8-digit numbers are Qatar
+    local; anything already carrying a country code just gets the plus."""
+    digits = re.sub(r'\D', '', raw or '')
+    if not digits:
+        return ''
+    if len(digits) == 8:
+        return f'+974{digits}'
+    return f'+{digits}'
+
+
+# A lead whose "name" is just its own phone number (WhatsApp inbound cards start
+# that way) makes a useless address-book entry — and a leading '+' trips the CSV
+# formula guard. Treat those as nameless and fall through to the next label.
+_NAME_IS_PHONE_RE = re.compile(r'^[\d\s+()\-]+$')
+
+
+def _split_name(name):
+    """First token is the given name, the rest — tag included — is the family name,
+    which is what puts ZyDrv / ZyBuz at the end of the last name in the phonebook."""
+    parts = (name or '').strip().split()
+    if not parts:
+        return '', ''
+    if len(parts) == 1:
+        return parts[0], ''
+    return parts[0], ' '.join(parts[1:])
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_leads_export_google(request):
+    """Google Contacts CSV for the current filter — import at contacts.google.com.
+
+    Re-importing the same file updates the matching contacts rather than duplicating
+    them, so this doubles as the sync until a People API push exists.
+    """
+    import csv
+
+    from core.exports import safe_csv_writer, set_export_filename
+    from django.http import HttpResponse
+
+    leads, _search, _source, _assigned, _category = _filtered_leads(request)
+    # _filtered_leads prefetches for the table view; none of it is needed here.
+    leads = (leads.exclude(phone='')
+             .prefetch_related(None)
+             .order_by('category', 'company_name', 'contact_name'))
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    set_export_filename(response, 'ezzy-google-contacts')
+    # Google's importer reads UTF-8 only with the BOM present.
+    response.write('\ufeff')
+    writer = safe_csv_writer(response, quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(GOOGLE_CONTACTS_HEADERS)
+
+    label_for = {
+        Lead.CATEGORY_DRIVER: f'* myContacts ::: EZZY Drivers ({CONTACT_TAGS["driver"]})',
+        Lead.CATEGORY_BUSINESS: f'* myContacts ::: EZZY Business ({CONTACT_TAGS["business"]})',
+    }
+    for lead in leads.iterator():
+        # A business lead with no named contact still deserves a phonebook entry —
+        # the company carries the tag instead so the search still finds it.
+        # …and a lead with neither still gets a findable, tagged entry rather than a
+        # nameless phone number sitting in the address book.
+        contact, company = lead.contact_name, lead.company_name
+        if _NAME_IS_PHONE_RE.match(strip_tags(contact) or 'x'):
+            contact = ''
+        if _NAME_IS_PHONE_RE.match(company or 'x'):
+            company = ''
+        name = (contact
+                or crm_contact_tags.apply_tag(company, lead.category)
+                or crm_contact_tags.apply_tag(f'Lead {lead.pk}', lead.category))
+        first, last = _split_name(name)
+        writer.writerow([
+            first,
+            last,
+            lead.company_name or '',
+            'Mobile',
+            _google_phone(lead.phone),
+            f'EZZY lead #{lead.pk} — {lead.get_category_display()} · {lead.stage_label}',
+            label_for.get(lead.category, '* myContacts'),
+        ])
+    return response
 
 
 # Friendly icon + label per WAHA message_type for text-less preview rows
@@ -702,7 +865,7 @@ def crm_lead_detail(request, lead_id):
     )
     wa_send_message = render_template(
         CRM_DRIVER_LEAD_MANUAL if lead.category == Lead.CATEGORY_DRIVER else CRM_LEAD_MANUAL,
-        lead_name=lead.contact_name or lead.company_name or 'there',
+        lead_name=strip_tags(lead.contact_name) or lead.company_name or 'there',
         company=lead.company_name or '',
         staff_name=request.user.get_full_name() or request.user.username,
     ) or ''
@@ -713,6 +876,8 @@ def crm_lead_detail(request, lead_id):
         'activities': lead.activities.select_related('created_by').order_by('-created_at'),
         'staff_users': _staff_users(),
         'stage_choices': stage_choices,
+        # Untagged name for the WhatsApp composer — the customer never sees "ZyDrv".
+        'lead_wa_name': strip_tags(lead.contact_name) or lead.company_name or '',
         'driver': driver,
         'driver_sections': driver_sections,
         # "Two cards in one": what has been absorbed here, and what still could be.
@@ -1152,6 +1317,9 @@ def crm_lead_create(request):
         lead = Lead.objects.create(
             source=Lead.SOURCE_MANUAL,
             category=category,
+            # Explicit, not the model default: the boards no longer share keys, so
+            # falling back to 'new' would strand a driver card in Unsorted.
+            stage=crm_services.initial_stage_key(category),
             company_name=company_name[:200],
             contact_name=contact_name[:100],
             phone=phone[:50],
@@ -1881,48 +2049,44 @@ def crm_contacts(request):
     return render(request, 'workforce/crm/contacts.html', context)
 
 
-@login_required(login_url='/accounts/login/')
-@staff_required
-def crm_reports(request):
-    """Funnel and conversion stats across the leads pipeline."""
+def _render_crm_reports(request, category, template):
+    """Scorecard for ONE pipeline. Every figure on the page — tiles, funnel, monthly
+    intake, per-staff and per-source — is filtered to `category`, and the outcome
+    keys are read off that board's own terminal columns, because the two boards name
+    their outcomes differently ("Won"/"Lost" vs "Approved"/"Rejected") and used to be
+    added together into a number that meant nothing."""
     today = timezone.localdate()
+    leads = Lead.objects.filter(category=category)
 
     stage_counts = {
-        (row['category'], row['stage']): row['n']
-        for row in Lead.objects.values('category', 'stage').annotate(n=Count('id'))
+        row['stage']: row['n']
+        for row in leads.values('stage').annotate(n=Count('id'))
     }
-    # One funnel PER BOARD. Merging them produced a nonsense column set: the boards
-    # share stage keys but not meanings, so "Quoted" and "Uploads Completed" were being
-    # added together under whichever label happened to come first.
-    funnels = []
-    for category, category_label in Lead.CATEGORY_CHOICES:
+    rows = [
+        {
+            'key': stage.key,
+            'label': stage.label,
+            'count': stage_counts.get(stage.key, 0),
+            'is_closed': stage.is_closed,
+        }
+        for stage in LeadStage.board_columns(category)
+    ]
+    if not rows:
+        # Unseeded DB — fall back to the legacy business keys so the page still draws.
         rows = [
-            {
-                'key': stage.key,
-                'label': stage.label,
-                'count': stage_counts.get((category, stage.key), 0),
-                'is_closed': stage.is_closed,
-            }
-            for stage in LeadStage.board_columns(category)
+            {'key': key, 'label': label, 'count': stage_counts.get(key, 0), 'is_closed': False}
+            for key, label in Lead.STAGE_CHOICES
         ]
-        if not rows:
-            rows = [
-                {'key': key, 'label': label,
-                 'count': stage_counts.get((category, key), 0), 'is_closed': False}
-                for key, label in Lead.STAGE_CHOICES
-            ]
-        total = sum(r['count'] for r in rows)
-        funnels.append({
-            'category': category,
-            'label': category_label,
-            'rows': rows,
-            'total': total,
-            'peak': max((r['count'] for r in rows), default=0),
-        })
+    funnel = {
+        'category': category,
+        'rows': rows,
+        'total': sum(r['count'] for r in rows),
+        'peak': max((r['count'] for r in rows), default=0),
+    }
 
     twelve_months_ago = (today.replace(day=1) - timedelta(days=365))
     monthly = (
-        Lead.objects.filter(created_at__date__gte=twelve_months_ago)
+        leads.filter(created_at__date__gte=twelve_months_ago)
         .annotate(month=TruncMonth('created_at'))
         .values('month', 'source')
         .annotate(n=Count('id'))
@@ -1944,15 +2108,26 @@ def crm_reports(request):
         ],
     }
 
+    # This board's own outcome columns — the driver board calls them Approved and
+    # Rejected, so neither the keys nor the words can be hardcoded.
+    won_keys = crm_services.outcome_stage_keys('won', category)
+    lost_keys = crm_services.outcome_stage_keys('lost', category)
+    outcome_labels = {
+        stage.outcome: stage.label
+        for stage in reversed(LeadStage.board_columns(category)) if stage.outcome
+    }
+    won_label = outcome_labels.get('won', 'Won')
+    lost_label = outcome_labels.get('lost', 'Lost')
+
     per_staff = []
     staff_rows = (
-        Lead.objects.filter(assigned_to__isnull=False)
+        leads.filter(assigned_to__isnull=False)
         .values('assigned_to__id', 'assigned_to__first_name',
                 'assigned_to__last_name', 'assigned_to__username')
         .annotate(
             total=Count('id'),
-            won=Count('id', filter=Q(stage=Lead.STAGE_WON)),
-            lost=Count('id', filter=Q(stage=Lead.STAGE_LOST)),
+            won=Count('id', filter=Q(stage__in=won_keys)),
+            lost=Count('id', filter=Q(stage__in=lost_keys)),
         )
         .order_by('-total')
     )
@@ -1969,8 +2144,8 @@ def crm_reports(request):
         })
 
     source_rows = (
-        Lead.objects.values('source')
-        .annotate(total=Count('id'), won=Count('id', filter=Q(stage=Lead.STAGE_WON)))
+        leads.values('source')
+        .annotate(total=Count('id'), won=Count('id', filter=Q(stage__in=won_keys)))
         .order_by('-total')
     )
     per_source = [
@@ -1983,34 +2158,52 @@ def crm_reports(request):
         for row in source_rows
     ]
 
-    closed_leads = Lead.objects.filter(closed_at__isnull=False)
     avg_days_to_close = None
     durations = [
         (lead.closed_at - lead.created_at).days
-        for lead in closed_leads.only('created_at', 'closed_at')
+        for lead in leads.filter(closed_at__isnull=False).only('created_at', 'closed_at')
     ]
     if durations:
         avg_days_to_close = round(sum(durations) / len(durations), 1)
 
-    total = Lead.objects.count()
-    # stage_counts is keyed by (category, stage), so sum across boards — reading it with
-    # a bare stage key silently returned 0 and zeroed every headline tile.
-    won = sum(n for (_cat, key), n in stage_counts.items() if key == Lead.STAGE_WON)
-    lost = sum(n for (_cat, key), n in stage_counts.items() if key == Lead.STAGE_LOST)
+    total = leads.count()
+    won = sum(n for key, n in stage_counts.items() if key in won_keys)
+    lost = sum(n for key, n in stage_counts.items() if key in lost_keys)
+    is_driver_report = category == Lead.CATEGORY_DRIVER
     context = {
-        'page_title': 'CRM Reports',
+        'page_title': 'Driver Reports' if is_driver_report else 'Business Reports',
+        'report_category': category,
+        'is_driver_report': is_driver_report,
+        'won_label': won_label,
+        'lost_label': lost_label,
         'total_count': total,
         'open_count': total - won - lost,
         'won_count': won,
         'lost_count': lost,
         'win_rate': round(won * 100 / (won + lost)) if (won + lost) else None,
         'avg_days_to_close': avg_days_to_close,
-        'funnels': funnels,
+        'funnel': funnel,
         'monthly_chart': monthly_chart,
         'per_staff': per_staff,
         'per_source': per_source,
     }
-    return render(request, 'workforce/crm/crm_reports.html', context)
+    return render(request, template, context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_reports(request):
+    """Business sales pipeline scorecard."""
+    return _render_crm_reports(
+        request, Lead.CATEGORY_BUSINESS, 'workforce/crm/crm_reports.html')
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_driver_reports(request):
+    """Driver recruitment scorecard — its own page, its own numbers."""
+    return _render_crm_reports(
+        request, Lead.CATEGORY_DRIVER, 'workforce/crm/driver_reports.html')
 
 
 # ── Board columns (LeadStage) — staff-managed pipeline configuration ─────────
@@ -2026,8 +2219,16 @@ def _stage_board(request):
     return board if board in valid else Lead.CATEGORY_BUSINESS
 
 
+# Each board configures its columns on its own page, so a save/delete/reorder
+# posted from one desk never bounces staff onto the other one.
+STAGE_PAGE_BY_BOARD = {
+    Lead.CATEGORY_BUSINESS: 'workforce:crm_stages_manage',
+    Lead.CATEGORY_DRIVER: 'workforce:crm_driver_stages_manage',
+}
+
+
 def _stages_redirect(board):
-    return redirect(f"{reverse('workforce:crm_stages_manage')}?board={board}")
+    return redirect(reverse(STAGE_PAGE_BY_BOARD.get(board, 'workforce:crm_stages_manage')))
 
 
 def _clean_stage_key(raw, label):
@@ -2039,10 +2240,26 @@ def _clean_stage_key(raw, label):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
-def crm_stages_manage(request, board_category=None):
+def crm_stages_manage(request):
+    """Business board columns — /workforce/crm/stages/."""
+    return _stages_manage(request, Lead.CATEGORY_BUSINESS)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_driver_stages_manage(request):
+    """Driver board columns — /workforce/crm/driver/stages/.
+
+    A separate page, not a tab: recruitment columns carry auto-file rules and a
+    write-back to the driver's real verification status, none of which exist on
+    the sales board, so the two consoles show different controls entirely.
+    """
+    return _stages_manage(request, Lead.CATEGORY_DRIVER)
+
+
+def _stages_manage(request, board):
     """Configure one board's kanban columns: list every column with its rules and
     lead count, plus the add form."""
-    board = board_category or _stage_board(request)
     stages = list(LeadStage.objects.filter(category=board).order_by('position', 'pk'))
 
     counts = {
@@ -2060,19 +2277,23 @@ def crm_stages_manage(request, board_category=None):
     ]
     orphan_count = sum(n for key, n in counts.items() if key not in known)
 
+    is_driver_board = board == Lead.CATEGORY_DRIVER
     context = {
-        'page_title': 'Board Columns',
+        'page_title': 'Driver Board Columns' if is_driver_board else 'Sales Board Columns',
         'board': board,
-        'is_driver_board': board == Lead.CATEGORY_DRIVER,
+        'is_driver_board': is_driver_board,
         'rows': rows,
         'orphan_count': orphan_count,
         'rule_groups': crm_stage_rules.RULE_GROUPS,
         'swatch_choices': LeadStage.SWATCH_CHOICES,
+        'outcome_choices': LeadStage.OUTCOME_CHOICES,
         'write_back_choices': LeadStage.WRITE_BACK_CHOICES,
         'next_position': (stages[-1].position + 1) if stages else 1,
         'move_targets': [(s.key, s.label) for s in stages],
     }
-    return render(request, 'workforce/crm/stages_manage.html', context)
+    template = ('workforce/crm/driver_stages_manage.html' if is_driver_board
+                else 'workforce/crm/stages_manage.html')
+    return render(request, template, context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -2104,6 +2325,14 @@ def crm_stage_save(request):
     if swatch not in {c for c, _ in LeadStage.SWATCH_CHOICES}:
         swatch = 'grey'
 
+    # Only a terminal column can be a win or a loss — an in-progress column that
+    # kept a stale outcome would be counted in the win rate while still open.
+    outcome = (request.POST.get('outcome') or '').strip()
+    if outcome not in {c for c, _ in LeadStage.OUTCOME_CHOICES}:
+        outcome = ''
+    if request.POST.get('is_closed') != '1':
+        outcome = ''
+
     hide_after = (request.POST.get('hide_after_days') or '').strip()
     try:
         hide_after_days = int(hide_after) if hide_after else None
@@ -2134,6 +2363,7 @@ def crm_stage_save(request):
         'write_back': write_back,
         'confirm_text': confirm_text,
         'needs_reason': request.POST.get('needs_reason') == '1',
+        'outcome': outcome,
         'dot_swatch': swatch,
         'is_active': request.POST.get('is_active') == '1',
     }

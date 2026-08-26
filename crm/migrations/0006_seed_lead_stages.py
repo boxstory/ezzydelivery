@@ -1,6 +1,8 @@
 # Purpose: Seed the 14 LeadStage rows (7 business + 7 driver) that reproduce the previously hardcoded board columns bit-for-bit.
 # Used by: `python manage.py migrate crm` — runs once; re-running is a no-op thanks to update_or_create on (category, key).
-# Notes: Driver labels/order/rules mirror the old DRIVER_STAGE_LABELS + driver_lead_target_stage exactly; swatches mirror the old per-key dot colours in crm.css. `verified`+`blocked` still lands in Rejected here on purpose — parity first; staff can add a Blocked column afterwards.
+# Notes: Driver keys were rewritten by 0012_driver_stage_keys — this list carries the FINAL keys so a fresh DB
+#        seeds them directly and 0012 becomes a no-op. An existing DB seeded the old (business-borrowed) keys
+#        here and is migrated by 0012 instead. Driver labels/order/rules mirror the old DRIVER_STAGE_LABELS + driver_lead_target_stage exactly; swatches mirror the old per-key dot colours in crm.css. `verified`+`blocked` still lands in Rejected here on purpose — parity first; staff can add a Blocked column afterwards.
 
 from django.db import migrations
 
@@ -17,19 +19,19 @@ BUSINESS_STAGES = [
 ]
 
 DRIVER_STAGES = [
-    ('new',         'New Application',   1, False, None, False,
+    ('new_app',      'New Application',   1, False, None, False,
      ['no_driver'], '', '', False, '', 'blue'),
-    ('contacted',   'Applied',           2, False, None, False,
+    ('applied',      'Applied',           2, False, None, False,
      ['verif:pending'], '', '', False, '', 'green'),
-    ('on_hold',     'Incomplete',        3, False, None, True,
+    ('incomplete',   'Incomplete',        3, False, None, True,
      ['verif:incomplete'], '', '', False, '', 'grey'),
-    ('quoted',      'Uploads Completed', 4, False, None, False,
+    ('uploads_done', 'Uploads Completed', 4, False, None, False,
      ['uploads_done'], '', '', False, '', 'violet'),
-    ('negotiating', 'Under Review',      5, False, None, False,
+    ('under_review', 'Under Review',      5, False, None, False,
      ['verif:under_review'], 'under_review', 'mark this driver under review', False, '', 'amber'),
-    ('won',         'Approved',          6, True,    30, False,
+    ('approved',     'Approved',          6, True,    30, False,
      ['verif:verified', 'dstatus:approved'], 'verified', 'approve this driver', False, '', 'forest'),
-    ('lost',        'Rejected',          7, True,    30, False,
+    ('rejected',     'Rejected',          7, True,    30, False,
      ['verif:rejected', 'dstatus:rejected', 'dstatus:blocked', 'dstatus:suspended'],
      'rejected', 'reject this driver', True, '', 'red'),
 ]

@@ -226,6 +226,22 @@
       return;
     }
 
+    // Show/hide the manual chat linker. It lives inside the conversation panel and
+    // starts open only when there is no matched chat to read.
+    var linkToggle = e.target.closest && e.target.closest('[data-chatlink-toggle]');
+    if (linkToggle) {
+      var linkerBox = document.getElementById('workforce_crm_detail_div_chat_link');
+      if (linkerBox) {
+        var nowOpen = linkerBox.classList.toggle('d-none') === false;
+        linkToggle.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
+        if (nowOpen) {
+          var boxInput = document.getElementById('workforce_crm_detail_input_wa_search');
+          if (boxInput) boxInput.focus();
+        }
+      }
+      return;
+    }
+
     // Manual WA chat link — pick a search result
     var resultItem = e.target.closest && e.target.closest('.crmd__link-result-item');
     if (resultItem) {

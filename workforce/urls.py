@@ -385,7 +385,11 @@ urlpatterns = [
     path('crm/whatsapp-inbox/resync/', crm_views.crm_wa_resync, name='crm_wa_resync'),
     path('crm/contacts/', crm_views.crm_contacts, name='crm_contacts'),
     path('crm/reports/', crm_views.crm_reports, name='crm_reports'),
+    path('crm/driver/reports/', crm_views.crm_driver_reports, name='crm_driver_reports'),
+    # Board columns — one page per board, so a business page never links into the
+    # driver desk (and the two consoles can show different controls).
     path('crm/stages/', crm_views.crm_stages_manage, name='crm_stages_manage'),
+    path('crm/driver/stages/', crm_views.crm_driver_stages_manage, name='crm_driver_stages_manage'),
     path('crm/stages/save/', crm_views.crm_stage_save, name='crm_stage_save'),
     path('crm/stages/delete/', crm_views.crm_stage_delete, name='crm_stage_delete'),
     path('crm/stages/reorder/', crm_views.crm_stage_reorder, name='crm_stage_reorder'),

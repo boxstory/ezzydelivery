@@ -51,6 +51,21 @@ class Lead(models.Model):
     ]
     CLOSED_STAGES = [STAGE_WON, STAGE_LOST]
 
+    # The seven STAGE_* keys above are the BUSINESS board's. The driver board used
+    # to borrow them (its "Approved" column was literally keyed 'won'), which made
+    # the two pipelines look like one. They are named here since crm migration
+    # 0012_driver_stage_keys. Neither set is exhaustive — staff add columns through
+    # /workforce/crm/stages/ and /workforce/crm/driver/stages/ — so resolve a stage
+    # through LeadStage whenever you can, and reach for a constant only where a rule
+    # genuinely means one specific seeded column.
+    DRIVER_STAGE_NEW = 'new_app'
+    DRIVER_STAGE_APPLIED = 'applied'
+    DRIVER_STAGE_INCOMPLETE = 'incomplete'
+    DRIVER_STAGE_UPLOADS_DONE = 'uploads_done'
+    DRIVER_STAGE_UNDER_REVIEW = 'under_review'
+    DRIVER_STAGE_APPROVED = 'approved'
+    DRIVER_STAGE_REJECTED = 'rejected'
+
     # Sentinel for `wa_session` meaning "show every number merged". Deliberately
     # not a legal WAHA session name (whatsapp.sessions._SESSION_RE rejects the
     # dunder), so a real session can never collide with it.
@@ -147,6 +162,20 @@ class Lead(models.Model):
             models.Index(fields=['stage', 'next_followup_at']),
         ]
 
+    def save(self, *args, **kwargs):
+        # Every lead's contact name ends in its category tag ("… ZyDrv" / "… ZyBuz") so the
+        # synced phone address book can be searched by tag. Done here rather than at each of
+        # the four creation sites; strip-then-append makes it idempotent and survives a
+        # category change. Customer-facing text uses contact_tags.strip_tags, never this.
+        from crm.contact_tags import apply_tag
+        tagged = apply_tag(self.contact_name, self.category)
+        if tagged != (self.contact_name or ''):
+            self.contact_name = tagged
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None and 'contact_name' not in update_fields:
+                kwargs['update_fields'] = list(update_fields) + ['contact_name']
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.company_name or self.contact_name or self.phone} ({self.stage_label})"
 
@@ -233,9 +262,24 @@ class LeadStage(models.Model):
     label = models.CharField(max_length=60)
     position = models.PositiveIntegerField(default=0, help_text='Left-to-right order on the board.')
 
+    # What a terminal column MEANS. Reports and the lead_won/lead_lost marketing
+    # triggers used to test `stage == 'won'`, which only worked while both boards
+    # happened to share the business keys. Boards now name their own columns
+    # (driver: approved/rejected), so the meaning is stored, not inferred.
+    OUTCOME_CHOICES = [
+        ('', 'Neither — just a terminal column'),
+        ('won', 'Won / approved'),
+        ('lost', 'Lost / rejected'),
+    ]
+
     is_closed = models.BooleanField(
         default=False,
         help_text='Terminal column — stamps closed_at and drops out of the Open total.',
+    )
+    outcome = models.CharField(
+        max_length=10, choices=OUTCOME_CHOICES, blank=True, default='',
+        help_text='Counts this column as a win or a loss in reports, and fires the '
+                  'lead_won / lead_lost auto-flows. Only meaningful on a terminal column.',
     )
     hide_after_days = models.PositiveIntegerField(
         null=True, blank=True,
@@ -306,15 +350,18 @@ class LeadStage(models.Model):
         """
         data = cache.get(STAGE_CACHE_KEY)
         if data is None:
-            labels, swatches, closed = {}, {}, {}
-            for cat, key, label, is_closed, swatch in cls.objects.values_list(
-                'category', 'key', 'label', 'is_closed', 'dot_swatch'
+            labels, swatches, closed, outcomes = {}, {}, {}, {}
+            for cat, key, label, is_closed, swatch, outcome in cls.objects.values_list(
+                'category', 'key', 'label', 'is_closed', 'dot_swatch', 'outcome'
             ):
                 labels[(cat, key)] = label
                 swatches[(cat, key)] = swatch
                 if is_closed:
                     closed.setdefault(cat, []).append(key)
-            data = {'labels': labels, 'swatches': swatches, 'closed': closed}
+                if outcome:
+                    outcomes.setdefault((cat, outcome), []).append(key)
+            data = {'labels': labels, 'swatches': swatches,
+                    'closed': closed, 'outcomes': outcomes}
             cache.set(STAGE_CACHE_KEY, data, STAGE_CACHE_TTL)
         return data
 
@@ -336,6 +383,21 @@ class LeadStage(models.Model):
         if category is None:
             return {k for keys in closed.values() for k in keys}
         return set(closed.get(category, ()))
+
+    @classmethod
+    def outcome_keys(cls, outcome, category=None):
+        """Stage keys that count as `outcome` ('won' | 'lost') — one board, or all.
+
+        Falls back to the legacy literal before the stages are seeded, so a fresh
+        DB mid-migrate still reports something sane instead of nothing.
+        """
+        buckets = cls._cached().get('outcomes') or {}
+        if not buckets:
+            legacy = {'won': Lead.STAGE_WON, 'lost': Lead.STAGE_LOST}.get(outcome)
+            return {legacy} if legacy else set()
+        if category is None:
+            return {k for (_cat, o), keys in buckets.items() if o == outcome for k in keys}
+        return set(buckets.get((category, outcome), ()))
 
     @classmethod
     def board_columns(cls, category):

@@ -1,0 +1,40 @@
+{% load workforce_tags %}
+{# Purpose: Workforce sidebar section — CRM Business (client sales pipeline). #}
+{# Used by: workforce/parts/dashboard_sidebar_workforce.html, under the Marketing heading. #}
+{# Notes: Driver recruitment has its own menu (sidebar/crm_driver.html). Shared CRM tools — WhatsApp Inbox, Contacts, Reports — carry their active_names HERE only, so a shared page highlights one menu instead of both. #}
+{% url 'workforce:crm_leads_board' as u_crm_board %}
+{% url 'workforce:crm_leads_list' as u_crm_list %}
+{% url 'workforce:crm_whatsapp_inbox' as u_crm_inbox %}
+{% url 'workforce:crm_reports' as u_crm_reports %}
+{% url 'workforce:crm_contacts' as u_crm_contacts %}
+{# Pricing Inquiries is the inbound form that feeds this pipeline — it used to sit #}
+{# under Onboarding, which put the arrival and the follow-up on opposite sidebars. #}
+{% url 'workforce:pricing_inquiries_list' as u_pricing_inquiries_list %}
+{% url 'workforce:business_verification_list' as u_business_verification_list %}
+{% url 'workforce:crm_stages_manage' as u_crm_stages %}
+{% with active="crm_leads_board,crm_leads_list,crm_lead_detail,crm_lead_create,crm_lead_update,crm_whatsapp_inbox,crm_reports,crm_contacts,crm_stages_manage,pricing_inquiries_list,pricing_inquiry_detail" %}
+<li id="workforce_sidebar_menu_crm_business" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+  <div id="workforce_sidebar_link_crm_business" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-crm-business" data-title="CRM Business">
+    <i class="fa-solid fa-briefcase me-2"></i>
+    <span>CRM Business</span>
+    <i class="fa-solid fa-chevron-down ms-auto"></i>
+  </div>
+  <div id="submenu-crm-business" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_board" url=u_crm_board icon="fa-solid fa-table-columns" label="Leads Board" active_names="crm_leads_board,crm_lead_detail,crm_lead_create,crm_lead_update" badge_var=crm_business_overdue_count badge_key="crm_business_overdue" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_list" url=u_crm_list icon="fa-solid fa-table-list" label="Leads List" active_names="crm_leads_list" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_pricing_inquiries" url=u_pricing_inquiries_list icon="fa-solid fa-file-invoice" label="Pricing Inquiries" active_names="pricing_inquiries_list,pricing_inquiry_detail" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_inbox" url=u_crm_inbox icon="fa-brands fa-whatsapp" label="WhatsApp Inbox" active_names="crm_whatsapp_inbox" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_contacts" url=u_crm_contacts icon="fa-solid fa-address-book" label="Contacts" active_names="crm_contacts" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_reports" url=u_crm_reports icon="fa-solid fa-chart-column" label="Reports" active_names="crm_reports" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_stages" url=u_crm_stages icon="fa-solid fa-table-columns" label="Board Columns" active_names="crm_stages_manage" %}
+      {# The decision queue this pipeline ends in. Operations owns the page, so it #}
+      {# only appears for staff who can actually open it; the highlight stays with #}
+      {# Onboarding, where the queue lives. #}
+      {% if wf_dept_ops %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_biz_verify" url=u_business_verification_list icon="fa-solid fa-building-circle-check" label="Business Verification" %}
+      {% endif %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

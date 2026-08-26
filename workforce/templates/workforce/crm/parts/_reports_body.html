@@ -1,0 +1,102 @@
+{# Purpose: CRM scorecard body — stat tiles, stage funnel, monthly intake chart and the two breakdown tables. #}
+{# Used by: workforce/crm/crm_reports.html (business) and workforce/crm/driver_reports.html (driver). #}
+{# Notes: crmr__ namespace; ApexCharts is loaded globally by head-dashboard.html and chart data crosses via json_script. Pipeline-agnostic — one funnel, scoped by the view; the outcome words come from `won_label`/`lost_label` because the driver board calls them Approved/Rejected. Series colour follows the source entity, never its position; the tables carry the same numbers for when a chart cannot draw. #}
+
+    <!-- STAT TILES -->
+    <div class="crmr__tiles">
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">Total Leads</span>
+        <span class="crmr__tile-value">{{ total_count }}</span>
+      </div>
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">Open</span>
+        <span class="crmr__tile-value">{{ open_count }}</span>
+      </div>
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">{{ won_label }}</span>
+        <span class="crmr__tile-value">{{ won_count }}</span>
+      </div>
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">{{ lost_label }}</span>
+        <span class="crmr__tile-value">{{ lost_count }}</span>
+      </div>
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">{% if is_driver_report %}Approval Rate{% else %}Win Rate{% endif %}</span>
+        <span class="crmr__tile-value">{% if win_rate is not None %}{{ win_rate }}%{% else %}—{% endif %}</span>
+      </div>
+      <div class="crmr__tile">
+        <span class="crmr__tile-label">Avg Days to {% if is_driver_report %}Decide{% else %}Close{% endif %}</span>
+        <span class="crmr__tile-value">{{ avg_days_to_close|default_if_none:"—" }}</span>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="crmr__charts">
+      <div class="crm__panel">
+        <div class="crm__panel-hd"><i class="fa-solid fa-filter"></i>
+          <h3>Pipeline by stage <span class="crmr__panel-note">{{ funnel.total }} lead{{ funnel.total|pluralize }}</span></h3>
+        </div>
+        <div class="crm__panel-body">
+          <div id="workforce_crm_reports_chart_stages" class="crmr__chart"></div>
+        </div>
+      </div>
+      <div class="crm__panel">
+        <div class="crm__panel-hd"><i class="fa-solid fa-chart-column"></i><h3>Leads per Month by Source</h3></div>
+        <div class="crm__panel-body">
+          <div id="workforce_crm_reports_chart_monthly" class="crmr__chart"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLES -->
+    <div class="crmr__tables">
+      <div class="crm__panel">
+        <div class="crm__panel-hd"><i class="fa-solid fa-user-tie"></i><h3>Per Staff</h3></div>
+        <div class="crm__scroll">
+          <table class="crm__table" id="workforce_crm_reports_table_staff">
+            <thead>
+              <tr><th>Staff</th><th class="crm__num">Leads</th><th class="crm__num">{{ won_label }}</th>
+                  <th class="crm__num">{{ lost_label }}</th>
+                  <th class="crm__num">{% if is_driver_report %}Approval Rate{% else %}Win Rate{% endif %}</th></tr>
+            </thead>
+            <tbody>
+              {% for row in per_staff %}
+              <tr>
+                <td>{{ row.name }}</td>
+                <td class="crm__num">{{ row.total }}</td>
+                <td class="crm__num">{{ row.won }}</td>
+                <td class="crm__num">{{ row.lost }}</td>
+                <td class="crm__num">{% if row.win_rate is not None %}{{ row.win_rate }}%{% else %}—{% endif %}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5"><div class="crm__empty">No assigned leads yet.</div></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="crm__panel">
+        <div class="crm__panel-hd"><i class="fa-solid fa-right-to-bracket"></i><h3>Per Source</h3></div>
+        <div class="crm__scroll">
+          <table class="crm__table" id="workforce_crm_reports_table_source">
+            <thead>
+              <tr><th>Source</th><th class="crm__num">Leads</th><th class="crm__num">{{ won_label }}</th>
+                  <th class="crm__num">Conversion</th></tr>
+            </thead>
+            <tbody>
+              {% for row in per_source %}
+              <tr>
+                <td>{{ row.label }}</td>
+                <td class="crm__num">{{ row.total }}</td>
+                <td class="crm__num">{{ row.won }}</td>
+                <td class="crm__num">{{ row.rate }}%</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4"><div class="crm__empty">No leads yet.</div></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>

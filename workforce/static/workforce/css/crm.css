@@ -30,6 +30,9 @@
   border-radius: 10px;
   overflow: hidden;
 }
+
+/* Everything below the header bar — one padded section */
+.crm__body { padding: 0.325rem; }
 .crm__head {
   display: flex;
   flex-wrap: wrap;
@@ -132,7 +135,11 @@
   pointer-events: none;
   transition: color 0.2s ease;
 }
-.crm__search-input {
+/* Scoped by the wrapper on purpose. A global `input[type="text"], input { padding:
+   0.15rem 0.875rem; font-size: 0.75rem }` loads after this file and outranks a lone
+   class, which squashed the field to 12px type and dragged the placeholder under the
+   magnifier. Two classes (0,0,2,0) beat that element+attribute rule (0,0,1,1). */
+.crm__search .crm__search-input {
   width: 100%;
   height: var(--crm-ctl-h);
   padding: 0 0.75rem 0 2.125rem;
@@ -196,6 +203,61 @@
   box-shadow: inset 0 0 0 1px var(--crm-ink);
 }
 
+/* ── FACETS UNDER SELECT2 ─────────────────────────────────────────────────── */
+/* The dashboard initialiser (main_dashboard_scripts) hands every filter select to
+   Select2, which absolutely-positions the real <select> and renders a sibling
+   `.select2-container.ez-filter-select` in its place. So none of the rules above are
+   what staff actually see — they are the no-JS fallback. Everything below re-fits the
+   rendered control to the CRM toolbar. */
+
+/* Select2 sets `width: 100% !important` on its container, so under flex the facets
+   each claimed the whole row and stacked. Columns of a stated width settle it: the
+   track is definite, so the 100% resolves against it instead of against nothing, and
+   the row stays a row without an !important fight. The hidden `category` input on the
+   list page generates no box, so it takes no track. */
+.crm__facets {
+  display: grid;
+  grid-auto-flow: column;
+  /* A fixed track, not minmax(): Select2's percentage width contributes nothing to
+     intrinsic sizing, so a flexible track measures short and the shrink-to-fit form
+     around it wrapped the search field onto its own line. */
+  grid-auto-columns: 11.5rem;
+  justify-content: start;
+}
+
+/* select2-filters.css sizes the picker at 34px for the older stacked forms; the CRM
+   toolbar runs every control at --crm-ctl-h, and a 2px staircase next to the search
+   field is exactly what that token exists to prevent. */
+.crm .select2-container.ez-filter-select .select2-selection--single {
+  height: var(--crm-ctl-h);
+  border-radius: 6px;
+  border-color: var(--crm-line-2);
+}
+.crm .select2-container.ez-filter-select .select2-selection--single .select2-selection__rendered {
+  height: calc(var(--crm-ctl-h) - 2px);
+  line-height: calc(var(--crm-ctl-h) - 2px);
+  font-size: 0.82rem;
+  color: var(--crm-ink-2);
+}
+.crm .select2-container.ez-filter-select .select2-selection--single .select2-selection__arrow {
+  height: calc(var(--crm-ctl-h) - 2px);
+}
+.crm .select2-container.ez-filter-select:hover .select2-selection--single {
+  border-color: var(--crm-ink-2);
+}
+
+/* Engaged facet, carried across to the rendered control: the native select still holds
+   `--on`, and the container is its next sibling. Ink edge + weight, no colour spend —
+   the yellow stays with the page's one hero action. */
+.crm .crm__facet-select--on + .select2-container.ez-filter-select .select2-selection--single {
+  border-color: var(--crm-ink);
+  box-shadow: inset 0 0 0 1px var(--crm-ink);
+}
+.crm .crm__facet-select--on + .select2-container.ez-filter-select .select2-selection__rendered {
+  color: var(--crm-ink);
+  font-weight: 600;
+}
+
 /* Actions ride to the right edge of the row; on a wrapped row they stay together. */
 .crm__filters > .crm__btn { height: var(--crm-ctl-h); margin-left: auto; }
 .crm__filters > .crm__btn ~ .crm__clear-all,
@@ -228,7 +290,14 @@
   .crm__toolbar { padding: 0.75rem; }
   .crm__filters { gap: 0.5rem; }
   .crm__search { flex: 1 1 100%; max-width: none; }
-  .crm__facets { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* grid-auto-flow is reset to row so a third facet wraps to a second line instead of
+     opening a third column off the edge of the phone. */
+  .crm__facets {
+    width: 100%;
+    display: grid;
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .crm__facet-select { width: 100%; min-width: 0; height: 2.5rem; }
   .crm__filters > .crm__btn,
   .crm__clear-all { flex: 1 1 8rem; margin-left: 0; height: 2.5rem; justify-content: center; }
@@ -404,6 +473,130 @@
 .crm__panel-body { padding: 1rem 1.1rem; }
 .crm__panel-body--flush { padding: 0; }
 
+/* ── BOARD FILTER BAR (crmb__) ────────────────────────────────────────────── */
+/* One line, two halves. Controls sit left as a single instrument; the right half is a
+   scope readout, because a kanban has no row count — filter a board and the only
+   evidence is cards silently missing from columns. The bar states what is on screen
+   and what is narrowing it, and names each engaged filter in a chip that removes
+   itself. Filtered state is carried by an ink rule down the left edge and a tinted
+   canvas, so a board that is not showing everything reads as such at a glance. */
+.crmb__filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.375rem 1.125rem;
+  padding: 0.375rem 0.75rem;
+  margin-bottom: 0.375rem;
+  background: var(--brand-white);
+  border: 1px solid var(--crm-line-2);
+  border-left: 3px solid var(--crm-line-2);
+  border-radius: 8px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.crmb__filterbar--on {
+  background: var(--crm-canvas);
+  border-left-color: var(--crm-ink);
+}
+
+/* The controls cluster keeps its natural width and never grows into the scope side.
+   Search + two facets always share one line; when the chips make the readout too wide
+   for the row it is the scope that drops to a second line, so the instrument stays
+   whole. An unfiltered board is therefore a single 50px line. */
+.crmb__filters { flex: 0 1 auto; min-width: 0; gap: 0.375rem; flex-wrap: nowrap; }
+/* A stated width, not just a flex-basis. Chrome measures this shrink-to-fit form from
+   the input's own intrinsic size (~219px, the default `size` attribute) and ignores
+   the basis, which left 69px missing and bumped the facets to a second line. */
+.crmb__filters .crm__search { flex: 0 0 18rem; width: 18rem; max-width: 18rem; }
+
+/* Scope readout — banked right, never wider than it needs to be. */
+.crmb__scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.375rem 0.75rem;
+  min-width: 0;
+}
+.crmb__scope-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--crm-muted);
+  white-space: nowrap;
+}
+.crmb__scope-num {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--crm-ink);
+}
+.crmb__scope-of { font-variant-numeric: tabular-nums; color: var(--crm-ink-2); }
+.crmb__scope-unit,
+.crmb__scope-cols { letter-spacing: 0.01em; }
+.crmb__scope-dot { color: var(--crm-line-2); }
+
+/* Chips name the filter in the operator's own words and carry their own removal URL,
+   so one facet can be dropped without walking back through the selects. */
+.crmb__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.crmb__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 16rem;
+  height: 1.625rem;
+  padding: 0 0.5rem;
+  font-size: 0.72rem;
+  color: var(--crm-ink);
+  background: var(--brand-white);
+  border: 1px solid var(--crm-line-2);
+  border-radius: 5px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.crmb__chip:hover { color: var(--crm-ink); border-color: var(--crm-ink-2); text-decoration: none; }
+.crmb__chip:focus-visible {
+  outline: none;
+  border-color: var(--crm-accent);
+  box-shadow: var(--crm-focus);
+}
+.crmb__chip-key {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--crm-muted);
+}
+.crmb__chip-val {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crmb__chip-x { font-size: 0.66rem; color: var(--crm-muted); }
+.crmb__chip:hover .crmb__chip-x { color: var(--crm-alert); }
+/* Reset drops every chip at once — a filled well rather than another outline, so it
+   reads as the end of the row instead of a fourth filter. */
+.crmb__chip--reset {
+  font-weight: 600;
+  color: var(--crm-ink-2);
+  background: var(--crm-well);
+  border-color: transparent;
+}
+.crmb__chip--reset:hover { color: var(--crm-ink); border-color: var(--crm-line-2); }
+
+@media (max-width: 991.98px) {
+  .crmb__filters { flex: 1 1 100%; flex-wrap: wrap; }
+  .crmb__filters .crm__search { flex: 1 1 12rem; width: auto; max-width: none; }
+  .crmb__scope { flex: 1 1 100%; justify-content: flex-start; }
+}
+@media (max-width: 767.98px) {
+  .crmb__filterbar { padding: 0.375rem; gap: 0.375rem; }
+  .crmb__scope-count { white-space: normal; }
+}
+
 /* ── BOARD (crmb__) ───────────────────────────────────────────────────────── */
 /* Pipeline rail: flowing stages (new→negotiating) chained by chevron connectors;
    a full-height hairline divider sets off the terminal bays (won/lost/on hold).
@@ -421,10 +614,11 @@
   overscroll-behavior-x: contain;
   align-items: stretch;
   /* Bounded to what is actually on screen (--crmb-lanes-h is measured by
-     crm_leads_board.js from the strip's own top offset) so the horizontal
-     scrollbar lands inside the viewport instead of below the fold, where
-     <main style="overflow:hidden"> put it out of reach. */
-  height: var(--crmb-lanes-h, calc(100vh - 260px));
+     crm_leads_board.js from the strip's own live top offset, re-measured whenever
+     anything above it moves) so the strip's bottom edge — and with it the horizontal
+     scrollbar — stays pinned to the bottom of the viewport instead of falling below
+     the fold, where <main style="overflow:hidden"> put it out of reach. */
+  height: var(--crmb-lanes-h, calc(100dvh - 260px));
   min-height: 22rem;
   background: var(--brand-white);
   scrollbar-width: thin;
@@ -636,17 +830,29 @@
 }
 
 /* ── DETAIL (crmd__) ──────────────────────────────────────────────────────── */
+/* Icon button in the hero action row, paired with the help button beside it —
+   same 1.75rem round shape as .wfnote__btn--ink on this light hero. */
 .crmd__back {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  margin-bottom: 0.8rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--crm-ink-2);
+  justify-content: center;
+  align-self: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid #d0d5dd;
+  border-radius: 50%;
+  background-color: var(--brand-white);
+  color: #001f3f;
+  font-size: 0.85rem;
+  line-height: 1;
+  flex: 0 0 auto;
   text-decoration: none;
 }
-.crmd__back:hover { color: var(--crm-ink); }
+.crmd__back:hover { background-color: #001f3f; border-color: #001f3f; color: #fff; }
+
+/* Everything below the hero — one padded section */
+.crmd__body { padding: 0.325rem; }
 .crmd__hero {
   display: flex;
   flex-wrap: wrap;
@@ -666,6 +872,9 @@
 .crmd__grid { display: grid; grid-template-columns: 1fr 380px; gap: 1rem; align-items: start; }
 @media (max-width: 991px) { .crmd__grid { grid-template-columns: 1fr; } }
 .crmd__left, .crmd__right { display: flex; flex-direction: column; gap: 1rem; }
+/* Source + Contact share one row inside the left column — same top edge, half each */
+.crmd__split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+@media (max-width: 1199px) { .crmd__split { grid-template-columns: 1fr; } }
 .crmd__field { display: flex; justify-content: space-between; gap: 1rem; padding: 0.4rem 0; border-bottom: 1px solid var(--crm-line); }
 .crmd__field:last-of-type { border-bottom: 0; }
 .crmd__field-lbl { font-size: 0.74rem; color: var(--crm-muted); }
@@ -814,6 +1023,11 @@
 .crmd__media-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1rem; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 
 /* Manual WhatsApp chat link (typeahead) */
+/* Manual chat linker — folded into the conversation panel, so one WhatsApp panel
+   instead of two saying the same thing */
+.crmd__linker { border-bottom: 1px solid var(--crm-line); background: var(--crm-canvas); }
+.crmd__linker-btn { margin-left: auto; font-size: 0.72rem; padding: 0.25rem 0.6rem; }
+
 .crmd__link-search-wrap { position: relative; }
 .crmd__link-results {
   position: absolute;
@@ -1062,29 +1276,6 @@
 @media (max-width: 991px) { .crmr__charts, .crmr__tables { grid-template-columns: 1fr; } }
 .crmr__tables { padding-top: 0; }
 .crmr__chart { min-height: 300px; }
-
-/* ── Board category tabs (Business / Drivers) ── */
-.crm__board-tabs {
-    display: inline-flex;
-    margin-top: 0.5rem;
-    border: 1px solid var(--brand-grey-200);
-    border-radius: var(--brand-radius-sm);
-    overflow: hidden;
-}
-.crm__board-tab {
-    display: inline-flex; align-items: center; gap: 0.375rem;
-    padding: 0.375rem 0.875rem;
-    font-size: 0.75rem; font-weight: 600;
-    color: var(--brand-grey-600);
-    text-decoration: none;
-    background: #fff;
-    transition: background 0.2s ease, color 0.2s ease;
-}
-.crm__board-tab + .crm__board-tab { border-left: 1px solid var(--brand-grey-200); }
-.crm__board-tab:hover { background: var(--brand-grey-100); color: var(--brand-grey-800); }
-.crm__board-tab--active,
-.crm__board-tab--active:hover { background: var(--brand-navy); color: #fff; }
-.crm__board-tab i { font-size: 0.7rem; }
 
 /* ── Driver Application panel on the lead detail (timeline + form sections) ── */
 .crmd__appnote {

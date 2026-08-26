@@ -10,12 +10,12 @@ from django.db import transaction
 from django.utils import timezone
 
 from . import stage_rules
+from .contact_tags import apply_tag, strip_tags
 from .models import Lead, LeadActivity, LeadStage
 
 logger = logging.getLogger(__name__)
 
 SITE_BASE_URL = 'https://ezzydelivery.qa'
-ADMIN_WHATSAPP_NUMBER = '97466451589'  # same admin target as send_admin_inquiry_notification
 
 # Identity mapping except won <-> converted (PricingEnquiry predates the Lead model)
 STAGE_TO_CRM_STATUS = {
@@ -44,6 +44,32 @@ def closed_stage_keys(category=None):
     Includes staff-created terminal columns, which is why callers must not use
     Lead.CLOSED_STAGES directly."""
     return list(LeadStage.closed_keys(category))
+
+
+def outcome_stage_keys(outcome, category=None):
+    """Stage keys a board counts as `outcome` ('won' | 'lost').
+
+    Reports and the win-rate columns used to test the literal key 'won', which
+    only held while both boards shared the business keys. The driver board names
+    its own outcome columns (approved/rejected), so the meaning is read off
+    LeadStage.outcome instead."""
+    return list(LeadStage.outcome_keys(outcome, category))
+
+
+def initial_stage_key(category):
+    """Where a brand-new lead on this board starts.
+
+    The board's catch-all column if it elected one, else its leftmost column.
+    Falls back to the legacy 'new' only on an unseeded DB — relying on the model
+    default instead would drop a driver card into a business key and strand it in
+    the Unsorted lane."""
+    columns = LeadStage.board_columns(category)
+    if not columns:
+        return Lead.STAGE_NEW
+    for column in columns:
+        if column.is_fallback:
+            return column.key
+    return columns[0].key
 
 
 def get_stage(category, key):
@@ -84,7 +110,7 @@ def fire_lead_trigger(trigger_key, lead, **extra):
 
         context = {
             'lead_id': lead.pk,
-            'lead_name': lead.contact_name or lead.company_name or '',
+            'lead_name': strip_tags(lead.contact_name) or lead.company_name or '',
             'lead_company': lead.company_name or '',
             'lead_phone': lead.phone or '',
             'phone': lead.phone or '',
@@ -297,6 +323,7 @@ def create_lead_from_wa_number(phone, user=None, category=Lead.CATEGORY_BUSINESS
     lead = Lead.objects.create(
         source=Lead.SOURCE_WA_INBOUND,
         category=category,
+        stage=initial_stage_key(category),
         phone=phone,
         contact_name=name[:100],
         company_name=name[:200] if (contact and contact.is_business) else '',
@@ -384,19 +411,33 @@ def set_lead_stage(lead, new_stage, user=None):
     # so a flow can greet a won lead without having to test the stage itself.
     fire_lead_trigger('lead_stage_changed', lead,
                       old_stage=old_display, new_stage=lead.stage_label)
-    if new_stage == Lead.STAGE_WON:
+    # Read the column's declared outcome, not its key — the driver board's win is
+    # called "approved", and testing the literal 'won' skipped it entirely.
+    outcome = stage.outcome if stage else (
+        'won' if new_stage == Lead.STAGE_WON else
+        'lost' if new_stage == Lead.STAGE_LOST else ''
+    )
+    if outcome == 'won':
         fire_lead_trigger('lead_won', lead)
-    elif new_stage == Lead.STAGE_LOST:
+    elif outcome == 'lost':
         fire_lead_trigger('lead_lost', lead)
     return lead
 
 
 def sync_lead_from_pricing_status(inquiry):
     """Called from the legacy pricing_inquiry_update_status view: pull the
-    inquiry's crm_status/assignee onto its lead WITHOUT writing back (no loop)."""
+    inquiry's crm_status/assignee onto its lead WITHOUT writing back (no loop).
+
+    Only *completed* form submissions get a lead automatically, so an inquiry a
+    visitor abandoned mid-form has none. Staff staging such a row on the detail
+    page is exactly the signal that it belongs on the board, so create it here
+    rather than leaving the status change stranded on the legacy page."""
     lead = getattr(inquiry, 'lead', None)
     if lead is None:
-        return None
+        lead, created = create_lead_from_pricing_inquiry(inquiry)
+        if created:
+            # Stage/assignee already come from the inquiry in the defaults.
+            return lead
 
     updates = []
     new_stage = CRM_STATUS_TO_STAGE.get(inquiry.crm_status)
@@ -437,7 +478,7 @@ def convert_lead_to_business(lead, user=None):
         inquiry = lead.pricing_enquiry
         business = Business.objects.create(
             business_id=business_id,
-            business_name=(lead.company_name or lead.contact_name or '')[:100],
+            business_name=(lead.company_name or strip_tags(lead.contact_name) or '')[:100],
             business_phone=lead.phone[:100],
             business_whatsapp=lead.phone[:100],
             business_product_category=(lead.product_category or '')[:100],
@@ -505,12 +546,13 @@ def _format_digest_message(leads, heading):
 
 def send_followup_digests(dry_run=False):
     """Send one WhatsApp digest per assignee with due/overdue leads.
-    Unassigned due leads go to the admin number. Safe to re-run (read-only).
+    Unassigned due leads go to the admin number configured on the trigger row.
+    Safe to re-run (read-only).
 
     Switched off with the ``wa_lead_followup_digest`` trigger (Auto Triggers →
     Marketing); the sender number and channel come from the ``followups`` route.
     """
-    from core.whatsapp_utils import send_routed_message, trigger_enabled
+    from core.whatsapp_utils import alert_recipient, send_routed_message, trigger_enabled
 
     if not trigger_enabled('wa_lead_followup_digest'):
         logger.info('crm digest: wa_lead_followup_digest is switched off — nothing sent')
@@ -521,9 +563,15 @@ def send_followup_digests(dry_run=False):
 
     for user, leads in grouped.items():
         if user is None:
-            number = ADMIN_WHATSAPP_NUMBER
+            # Unassigned leads have no staff owner to message, so they go to the
+            # digest trigger's "Sends to" number on the Auto Triggers page.
+            number = alert_recipient('wa_lead_followup_digest')
             heading = f'📋 CRM: {len(leads)} unassigned lead(s) need follow-up'
             label = 'admin (unassigned)'
+            if not number:
+                logger.warning('crm digest: no admin recipient configured — unassigned block skipped')
+                result['skipped'] += 1
+                continue
         else:
             profile = getattr(user, 'profile', None)
             number = normalize_phone(
@@ -734,7 +782,9 @@ def reconcile_driver_leads():
                 source=Lead.SOURCE_DRIVER_APP,
                 driver=d,
                 phone=phone[:50],
-                contact_name=name[:100],
+                # bulk_create below skips Lead.save(), so the category tag is applied here
+                # too — otherwise every reconciled driver card lands untagged.
+                contact_name=apply_tag(name, Lead.CATEGORY_DRIVER),
                 stage=target,
                 stage_changed_at=now,
                 closed_at=now if target in closed else None,
