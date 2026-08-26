@@ -12,6 +12,7 @@ from django.db import connection
 from collections import Counter
 from urllib.parse import quote
 import logging
+import time
 
 from core import signup_origin
 
@@ -49,14 +50,19 @@ class CloudflareIPMiddleware:
 
 class SessionTimeoutMiddleware:
     """
-    Middleware to automatically logout STAFF users after 1 day of inactivity.
+    Idle-logout for STAFF users only.
 
-    Drivers are exempt: they have no inactivity timeout and their session is
-    kept long-lived so Django's SESSION_COOKIE_AGE doesn't expire them either.
+    Staff share office machines, so their session dies after
+    settings.STAFF_SESSION_IDLE_TIMEOUT with no activity.
 
-    How it works:
+    Drivers and business clients are on personal phones, where an idle timeout
+    buys nothing and costs a re-login on the road. They ride SESSION_COOKIE_AGE
+    (rolling, because SESSION_SAVE_EVERY_REQUEST is True), and drivers get an
+    effectively unlimited expiry on top so the fleet PWA stays signed in.
+
+    How the staff path works:
     1. Tracks last activity time in session
-    2. On each request, checks if 1 day has passed since last activity
+    2. On each request, checks whether the idle window has elapsed
     3. If expired, logs out user and redirects to login with message
     4. If not expired, updates last activity time
     """
@@ -65,23 +71,42 @@ class SessionTimeoutMiddleware:
     # because SESSION_SAVE_EVERY_REQUEST is True.
     DRIVER_SESSION_AGE = 60 * 60 * 24 * 365
 
+    # A profile can gain is_driver mid-session (an application is approved while
+    # the applicant is still logged in), so the cached answer is re-checked this
+    # often rather than trusted for the life of the session.
+    DRIVER_CACHE_TTL = 600  # 10 minutes
+
     def __init__(self, get_response):
         self.get_response = get_response
-        # Timeout duration: 1 day = 86400 seconds
-        self.timeout_duration = timedelta(days=1)
+
+    @property
+    def timeout_duration(self):
+        return timedelta(seconds=getattr(settings, 'STAFF_SESSION_IDLE_TIMEOUT', 86400))
 
     def _is_driver(self, request):
-        """Return True if the authenticated user is a driver (cached on session)."""
+        """Return True if the authenticated user is a driver (cached on session).
+
+        The cache carries a timestamp. Caching the answer forever meant a user
+        who became a driver after logging in stayed classified as a non-driver
+        for the whole session — and so kept the staff idle timeout instead of
+        the long-lived driver session.
+        """
+        now = time.time()
         cached = request.session.get('_is_driver')
-        if cached is not None:
-            return cached
+        checked_at = request.session.get('_is_driver_at')
+        if cached is not None and isinstance(checked_at, (int, float)):
+            if now - checked_at < self.DRIVER_CACHE_TTL:
+                return cached
+
         is_driver = False
         try:
             profile = getattr(request.user, 'profile', None)
             is_driver = bool(profile and profile.is_driver)
         except Exception:
             is_driver = False
+
         request.session['_is_driver'] = is_driver
+        request.session['_is_driver_at'] = now
         return is_driver
 
     def __call__(self, request):
@@ -91,10 +116,20 @@ class SessionTimeoutMiddleware:
             return response
 
         # Drivers have no inactivity timeout. Keep their session long-lived so
-        # Django's SESSION_COOKIE_AGE (1 day) doesn't log them out either.
+        # Django's SESSION_COOKIE_AGE doesn't log them out either.
         if self._is_driver(request):
             request.session.set_expiry(self.DRIVER_SESSION_AGE)
             return self.get_response(request)
+
+        # Clients: no idle timeout, just the rolling SESSION_COOKIE_AGE window.
+        # Reset an expiry left behind by a driver-era session so a demoted
+        # driver doesn't keep the 1-year cookie.
+        if not request.user.is_staff:
+            if request.session.get_expiry_age() > settings.SESSION_COOKIE_AGE:
+                request.session.set_expiry(None)
+            return self.get_response(request)
+
+        # --- staff only, from here down ---
 
         # Skip timeout check for login/logout URLs to avoid redirect loops
         exempt_urls = [
@@ -120,7 +155,7 @@ class SessionTimeoutMiddleware:
             if timezone.is_naive(last_activity):
                 last_activity = timezone.make_aware(last_activity)
 
-            # Check if session has expired (1 day of inactivity)
+            # Check whether the idle window has elapsed
             time_since_activity = timezone.now() - last_activity
 
             if time_since_activity > self.timeout_duration:
@@ -147,6 +182,9 @@ class SessionWarningMiddleware:
     Middleware to inject session timeout warning into dashboard pages.
     Stores time_remaining on the request so templates can read it directly,
     avoiding expensive HTML decode/encode on every response.
+
+    Staff only: they are the only users with an idle timeout to warn about, and
+    `last_activity` is only maintained for them.
     """
 
     def __init__(self, get_response):
@@ -155,7 +193,7 @@ class SessionWarningMiddleware:
     def __call__(self, request):
         # Pre-compute session time remaining and stash on request
         # Templates can use {{ request.session_time_remaining }} if needed
-        if request.user.is_authenticated and 'dashboard' in request.path:
+        if request.user.is_authenticated and request.user.is_staff and 'dashboard' in request.path:
             last_activity = request.session.get('last_activity')
             if last_activity:
                 if isinstance(last_activity, str):
@@ -163,7 +201,8 @@ class SessionWarningMiddleware:
                 if timezone.is_naive(last_activity):
                     last_activity = timezone.make_aware(last_activity)
                 elapsed = (timezone.now() - last_activity).total_seconds()
-                request.session_time_remaining = max(0, int(86400 - elapsed))
+                idle_timeout = getattr(settings, 'STAFF_SESSION_IDLE_TIMEOUT', 86400)
+                request.session_time_remaining = max(0, int(idle_timeout - elapsed))
 
         return self.get_response(request)
 
@@ -278,6 +317,90 @@ class DriverStatusCheckMiddleware:
             except Exception:
                 pass
         return self.get_response(request)
+
+
+class DriverDeviceMiddleware:
+    """
+    Enforces the one-device-per-driver rule.
+
+    Costs two dict lookups for everyone else: the flags it reads are only ever
+    written for drivers, and they live in the session the request already
+    loaded, so there is no query on the hot path.
+
+    Three jobs:
+    1. A device that was retired when the driver signed in elsewhere is signed
+       out here, with a message that says why.
+    2. A device we have never confirmed is held at the verification page until a
+       WhatsApp code (or an ops release) clears it.
+    3. A freshly issued device token is written to its cookie on the way out.
+    """
+
+    # Paths a pending device is still allowed to reach: the gate itself, the way
+    # back out, and the static assets both need to render.
+    PENDING_ALLOWED_PREFIXES = (
+        '/fleet/device/',
+        '/accounts/logout/',
+        '/accounts/login/',
+        '/static/',
+        '/media/',
+        '/sw.js',
+    )
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    AUTH_PREFIXES = ('/accounts/login/', '/accounts/logout/')
+
+    def _pending_allowed(self, path):
+        return path.startswith(self.PENDING_ALLOWED_PREFIXES)
+
+    def _auth_path(self, path):
+        return path.startswith(self.AUTH_PREFIXES)
+
+    def __call__(self, request):
+        if not request.user.is_authenticated:
+            return self.get_response(request)
+
+        from fleet.device_service import (
+            SESSION_PENDING_DEVICE, SESSION_REVOKED, SESSION_SET_TOKEN,
+            DEVICE_COOKIE, DEVICE_COOKIE_AGE, enforcement_enabled,
+        )
+
+        if not enforcement_enabled():
+            return self.get_response(request)
+
+        # 1. Retired by a sign-in on another device. The auth URLs are exempt:
+        # intercepting them would swallow the POST of a driver signing back in,
+        # bouncing them to an empty form instead of logging them in.
+        if request.session.get(SESSION_REVOKED) and not self._auth_path(request.path):
+            logout(request)
+            # After logout(), not before — logout() flushes the session, which
+            # would take a message stored there with it.
+            messages.warning(
+                request,
+                'You were signed out because your account was signed in on another device. '
+                'If that was not you, change your password and tell operations.'
+            )
+            return redirect(reverse('account_login'))
+
+        # 2. Unconfirmed device — hold it at the gate.
+        if request.session.get(SESSION_PENDING_DEVICE) and not self._pending_allowed(request.path):
+            return redirect(reverse('fleet:device_verify'))
+
+        response = self.get_response(request)
+
+        # 3. Hand the new device its token. This runs before SessionMiddleware's
+        # response phase (which is further out), so popping still gets saved.
+        token = request.session.pop(SESSION_SET_TOKEN, None)
+        if token:
+            response.set_cookie(
+                DEVICE_COOKIE, token,
+                max_age=DEVICE_COOKIE_AGE,
+                httponly=True,
+                secure=settings.SESSION_COOKIE_SECURE,
+                samesite='Lax',
+            )
+        return response
 
 
 class StaffDepartmentMiddleware:

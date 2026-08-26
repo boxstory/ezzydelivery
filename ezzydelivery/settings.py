@@ -186,14 +186,33 @@ ACCOUNT_FORMS = {
 # Prefill username from the e-mail local part on social (Google/Facebook) signup
 SOCIALACCOUNT_ADAPTER = 'core.adapters.SocialAccountAdapter'
 
-# Session Configuration - Auto logout after 1 day of inactivity
-SESSION_COOKIE_AGE = 86400  # 1 day in seconds (86400 seconds = 24 hours)
-SESSION_SAVE_EVERY_REQUEST = True  # Refresh session on every request (updates last activity)
+# Session Configuration
+#
+# Two lifetimes, because the two audiences sit in different places:
+#   - Staff work on shared office machines, so they keep a real idle timeout —
+#     SessionTimeoutMiddleware signs them out after STAFF_SESSION_IDLE_TIMEOUT
+#     of no activity.
+#   - Clients and drivers are on their own phones, where an idle timeout only
+#     means re-typing a password on a bus. They ride SESSION_COOKIE_AGE, which
+#     rolls forward on every request, and drivers get an effectively unlimited
+#     expiry on top of that (see SessionTimeoutMiddleware.DRIVER_SESSION_AGE).
+#
+# This is what keeps the mobile PWA signed in between uses. The cookie is
+# server-set and HttpOnly, so unlike localStorage it is not subject to iOS
+# Safari's 7-day script-writable storage eviction.
+SESSION_COOKIE_AGE = config('SESSION_COOKIE_AGE', default=60 * 60 * 24 * 30, cast=int)  # 30 days
+STAFF_SESSION_IDLE_TIMEOUT = config('STAFF_SESSION_IDLE_TIMEOUT', default=60 * 60 * 24, cast=int)  # 1 day
+SESSION_SAVE_EVERY_REQUEST = True  # Rolling window: each request pushes the expiry forward
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Keep session even after browser close
 SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)  # True in production with HTTPS
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
 SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
 SESSION_COOKIE_NAME = 'ezzy_sessionid'  # Custom session cookie name for added security
+
+# One device per driver. This can lock the whole fleet out of the app if WhatsApp
+# delivery dies and nobody is at the ops console, so it stays a flag ops can drop
+# without a deploy.
+DRIVER_DEVICE_ENFORCEMENT = config('DRIVER_DEVICE_ENFORCEMENT', default=True, cast=bool)
 
 # Weak-password nudge — set False to switch the interstitial off without a deploy
 WEAK_PASSWORD_WARNING_ENABLED = config('WEAK_PASSWORD_WARNING_ENABLED', default=True, cast=bool)
@@ -213,6 +232,8 @@ MIDDLEWARE = [
     'core.middleware.SessionTimeoutMiddleware',
     'core.middleware.SessionWarningMiddleware',
     'core.middleware.NoCacheAuthMiddleware',
+    # One device per driver: retires the old phone, gates an unconfirmed one
+    'core.middleware.DriverDeviceMiddleware',
     # Fix 18: Force logout deactivated drivers accessing fleet pages
     'core.middleware.DriverStatusCheckMiddleware',
     # Staff department sub-roles — gates /workforce/ by ops/finance/marketing
@@ -239,6 +260,9 @@ if TESTING:
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
+    # Every driver fixture would otherwise land on the new-device gate instead of
+    # the page under test. fleet.tests_device turns it back on explicitly.
+    DRIVER_DEVICE_ENFORCEMENT = False
 
 ROOT_URLCONF = 'ezzydelivery.urls'
 

@@ -73,7 +73,9 @@ _OPS = [
 
     # First-mile pickup + hub
     'pickup_pool_status', 'pickup_staff_assign', 'pickup_staff_unassign',
-    'pickup_staff_cancel', 'pickup_staff_delete',
+    'pickup_staff_cancel', 'pickup_staff_delete', 'pickup_staff_create',
+    'pickup_staff_relocate',
+    'pickup_timeline_card',
     'pickup_automation_list', 'pickup_automation_save',
     'pickup_fleet_list', 'pickup_fleet_driver_search', 'pickup_fleet_update',
     'hub_batch_list', 'hub_batch_create', 'hub_batch_detail',
@@ -92,6 +94,8 @@ _OPS = [
     'driver_vehicle_add', 'driver_vehicle_edit', 'driver_vehicle_delete',
     'driver_document_add', 'driver_document_edit', 'driver_document_delete',
     'driver_remind_completion', 'export_drivers_csv', 'wf_driver_tasks',
+    # One-device-per-driver console
+    'driver_devices', 'driver_device_release', 'driver_device_revoke',
 
     # Sellers (account operations; sellers_pending is shared with MKT below)
     'sellers_list', 'sellers_active', 'sellers_inactive', 'seller_detail',
@@ -159,6 +163,11 @@ _FIN = [
     'client_charge_invoices', 'client_charge_invoice_detail',
     'client_charge_invoice_payment', 'client_charge_invoice_void',
     'client_charge_invoice_whatsapp',
+    # Line edits and the column picker on that same invoice console — they were
+    # left unclassified, so the fail-closed middleware bounced finance staff off
+    # their own page's controls.
+    'client_charge_invoice_line_add', 'client_charge_invoice_line_remove',
+    'client_charge_invoice_columns',
     # Driver -> Ezzy settlement
     'cod_settlement_report', 'cod_settlement_action', 'cod_settlement_pdf',
     # Ezzy -> Business payout (Leg 3)
@@ -175,7 +184,8 @@ _FIN = [
 
 _MKT = [
     # CRM pipeline
-    'crm_leads_board', 'crm_driver_leads_board', 'crm_leads_list', 'crm_lead_create',
+    'crm_leads_board', 'crm_driver_leads_board', 'crm_leads_list',
+    'crm_driver_leads_list', 'crm_lead_create',
     'crm_lead_detail', 'crm_lead_update', 'crm_lead_update_stage', 'crm_lead_unpin_stage',
     'crm_lead_add_activity', 'crm_lead_delete_activity', 'crm_lead_link_business',
     'crm_lead_ai_summary',
@@ -183,12 +193,14 @@ _MKT = [
     'crm_lead_link_chat', 'crm_lead_wa_media', 'crm_wa_contact_search',
     'crm_whatsapp_inbox', 'crm_wa_chat_preview', 'crm_wa_media',
     'crm_wa_promote', 'crm_wa_dismiss', 'crm_wa_resync',
-    'crm_contacts', 'crm_reports',
+    'crm_contacts', 'crm_reports', 'crm_driver_reports', 'crm_leads_export_google',
     # CRM board column configuration
-    'crm_stages_manage', 'crm_stage_save', 'crm_stage_delete', 'crm_stage_reorder',
+    'crm_stages_manage', 'crm_driver_stages_manage',
+    'crm_stage_save', 'crm_stage_delete', 'crm_stage_reorder',
     # Inbound forms
     'pricing_inquiries_list', 'pricing_inquiry_detail', 'pricing_inquiry_update_status',
     'pricing_inquiry_edit', 'pricing_inquiry_add_activity', 'pricing_inquiry_delete_activity',
+    'pricing_inquiry_quote_price',
     # Outbound comms
     'whatsapp_send_message', 'whatsapp_last_message',
 ]
@@ -202,6 +214,8 @@ _ADMIN = [
     'auto_flow_delete', 'auto_flow_test', 'auto_flow_logs',
     # AI gateway
     'wf_ai_config', 'wf_ai_models_api', 'wf_ai_config_test',
+    # Outbound WhatsApp wording (bodies every desk's composer opens with)
+    'wf_message_templates',
     # WhatsApp infrastructure (the sender routes are per-desk — see _MULTI)
     'whatsapp_instances_list', 'whatsapp_get_instances',
     # Seller integrations & secrets
@@ -237,6 +251,10 @@ _MULTI = {
     'auto_triggers_list': [OPS, FIN, MKT, ADMIN],
     'auto_trigger_toggle': [OPS, FIN, MKT, ADMIN],
     'auto_trigger_update': [OPS, FIN, MKT, ADMIN],
+    # The message body behind a row on that page. The Messages console itself
+    # stays admin-only (it lists every body on the platform); this write is
+    # narrowed to the bodies the desk's own rows send.
+    'auto_trigger_message_save': [OPS, FIN, MKT, ADMIN],
     'whatsapp_sender_routes_save': [OPS, FIN, MKT, ADMIN],
     'whatsapp_sender_route_toggle': [OPS, FIN, MKT, ADMIN],
 
@@ -254,6 +272,8 @@ _MULTI = {
     'crm_driver_leads_board': [OPS, MKT, ADMIN],
     'crm_leads_board': [OPS, MKT, ADMIN],
     'crm_leads_list': [OPS, MKT, ADMIN],
+    'crm_driver_leads_list': [OPS, MKT, ADMIN],
+    'crm_leads_export_google': [OPS, MKT, ADMIN],
     'crm_lead_detail': [OPS, MKT, ADMIN],
     'crm_lead_update': [OPS, MKT, ADMIN],
     'crm_lead_update_stage': [OPS, MKT, ADMIN],
@@ -262,6 +282,10 @@ _MULTI = {
     'crm_lead_unmerge': [OPS, MKT, ADMIN],
     'crm_lead_add_activity': [OPS, MKT, ADMIN],
     'crm_stages_manage': [OPS, MKT, ADMIN],
+    'crm_driver_stages_manage': [OPS, MKT, ADMIN],
+    # The driver funnel is co-owned with operations, like its board and list —
+    # so its scorecard opens for ops too. The business one stays marketing-only.
+    'crm_driver_reports': [OPS, MKT, ADMIN],
 }
 
 

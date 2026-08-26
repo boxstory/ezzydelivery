@@ -248,6 +248,19 @@ def business_required(view_func=None, redirect_url=None):
             logger.warning(
                 f"Non-business user {request.user.id} attempted to access {view_func.__name__}"
             )
+
+            # A business-flagged profile with no business record would bounce
+            # between here and core:main_dashboard forever (ERR_TOO_MANY_REDIRECTS).
+            # Send those users to business registration instead - it is a terminal
+            # page that lets them create the missing Business row.
+            if not redirect_url and profile.is_business:
+                messages.error(
+                    request,
+                    "No business record is linked to your account. "
+                    "Please complete your business registration or contact support."
+                )
+                return redirect('core:business_register')
+
             messages.error(request, "You don't have permission to access this page.")
             return redirect(redirect_url or 'core:main_dashboard')
 
