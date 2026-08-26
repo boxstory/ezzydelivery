@@ -6,4 +6,6 @@ class FleetConfig(AppConfig):
     name = 'fleet'
 
     def ready(self):
-        from fleet import signals
+        from fleet import signals  # noqa: F401
+        # One-device-per-driver: claims the device each login came from.
+        from fleet import device_signals  # noqa: F401

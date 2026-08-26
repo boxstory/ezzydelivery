@@ -3,6 +3,7 @@ from webpages import views as webpages_views
 from workforce import views as workforce_views
 from workforce import dispatch_views
 from workforce import crm_views
+from workforce import device_views
 from delivery import views as delivery_views
 from orders import views as orders_views
 from core import views as core_views
@@ -13,6 +14,13 @@ urlpatterns = [
 
     # Lazy "about this page" notes panel, fetched on first help-button click
     path('page-notes/<str:key>/', workforce_views.page_notes, name='page_notes'),
+
+    # One device per driver — pending approvals, release and revoke
+    path('driver-devices/', device_views.driver_devices, name='driver_devices'),
+    path('driver-devices/<int:device_id>/release/',
+         device_views.driver_device_release, name='driver_device_release'),
+    path('driver-devices/<int:device_id>/revoke/',
+         device_views.driver_device_revoke, name='driver_device_revoke'),
 
     # Staff role management (super admin) — department sub-roles per staff user
     path('staff-roles/', workforce_views.staff_roles_list, name='staff_roles_list'),

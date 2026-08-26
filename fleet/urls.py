@@ -4,6 +4,7 @@ from delivery import views as delivery_views
 from orders import views as orders_views
 from core import views as core_views
 from fleet import views as fleet_views
+from fleet import views_device as fleet_device_views
 from business import views as business_views
 
 app_name = 'fleet'
@@ -14,6 +15,10 @@ urlpatterns = [
 
      # backend
      path('dashboard/', fleet_views.fleet_dashboard, name='fleet_dashboard'),
+
+     # one-device-per-driver gate
+     path('device/verify/', fleet_device_views.device_verify, name='device_verify'),
+     path('device/send-code/', fleet_device_views.device_send_code, name='device_send_code'),
 
 
      # documents

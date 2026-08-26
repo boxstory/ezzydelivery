@@ -1,0 +1,133 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff console for the one-device-per-driver rule — release a pending device
+         when WhatsApp can't deliver a code, revoke one, and read the switch history.
+Used by: workforce.device_views.driver_devices at /workforce/driver-devices/
+Notes: Release is the documented fallback for a WAHA outage; it activates the device
+       without a code and records who approved it.
+{% endcomment %}
+{% block title %}Driver Devices - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'workforce/css/driver-devices.css' %}?v=20260824a">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="wfpage">
+
+  {% include "workforce/parts/components/_page_header.html" with title="Driver Devices" icon="fa-mobile-screen-button" subtitle="One device per driver — approve a new phone, or take one off" %}
+
+  <div class="wfpage__body">
+    <div class="wfcard">
+
+      <div class="wdev__toolbar d-flex flex-wrap align-items-center justify-content-between gap-2 p-2">
+        <div class="d-flex flex-wrap align-items-center gap-1">
+          {% for value, label in status_choices %}
+            <a href="?status={{ value }}{% if search %}&search={{ search }}{% endif %}"
+               class="wdev__tab{% if status == value %} wdev__tab--on{% endif %}">
+              {{ label }}{% if value == 'pending' and pending_count %} <span class="wdev__count">{{ pending_count }}</span>{% endif %}
+            </a>
+          {% endfor %}
+          <a href="?status=all{% if search %}&search={{ search }}{% endif %}"
+             class="wdev__tab{% if status == 'all' %} wdev__tab--on{% endif %}">All</a>
+        </div>
+
+        <form method="get" class="d-flex align-items-center gap-2"
+              id="workforce_driver_devices_form_filter">
+          <input type="hidden" name="status" value="{{ status }}">
+          <input type="text" name="search" value="{{ search }}"
+                 class="form-control form-control-sm wdev__search"
+                 id="workforce_driver_devices_input_search"
+                 placeholder="Driver, device or IP…">
+          <button type="submit" class="wdev__btn" id="workforce_driver_devices_btn_search">Search</button>
+        </form>
+      </div>
+
+      <div class="wfcard__body wfcard__body--flush table-responsive">
+        {% if page_obj.object_list %}
+        <table class="wdev__table" id="workforce_driver_devices_table_list">
+          <thead>
+            <tr>
+              <th>Driver</th>
+              <th>Device</th>
+              <th>Status</th>
+              <th>First seen</th>
+              <th>Last seen</th>
+              <th>Approved by</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for device in page_obj %}
+            <tr>
+              <td>
+                <div class="wdev__driver">{{ device.user.get_full_name|default:device.user.username }}</div>
+                <div class="wdev__meta">{{ device.user.username }}</div>
+              </td>
+              <td>
+                <div>{{ device.label|default:"Unknown device" }}</div>
+                <div class="wdev__meta wfmono">{{ device.ip_address|default:"—" }}</div>
+              </td>
+              <td>
+                <span class="wdev__status">
+                  <span class="wdev__swatch wdev__swatch--{{ device.status }}"></span>
+                  {{ device.get_status_display }}
+                </span>
+                {% if device.revoked_reason %}
+                  <div class="wdev__meta">{{ device.get_revoked_reason_display }}</div>
+                {% endif %}
+              </td>
+              <td class="wdev__meta">{{ device.created_at|date:"d M Y H:i" }}</td>
+              <td class="wdev__meta">{{ device.last_seen_at|date:"d M Y H:i" }}</td>
+              <td class="wdev__meta">
+                {% if device.approved_by %}
+                  {{ device.approved_by.get_full_name|default:device.approved_by.username }}
+                {% else %}—{% endif %}
+              </td>
+              <td class="text-end">
+                {% if device.status == 'pending' %}
+                  <form method="post" action="{% url 'workforce:driver_device_release' device.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="wdev__btn wdev__btn--release">Release</button>
+                  </form>
+                {% elif device.status == 'active' %}
+                  <form method="post" action="{% url 'workforce:driver_device_revoke' device.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="wdev__btn">Revoke</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="wdev__empty">
+          {% if status == 'pending' %}
+            No devices are waiting for approval.
+          {% else %}
+            No devices match this filter.
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      {% if page_obj.has_other_pages %}
+      <div class="d-flex align-items-center justify-content-between gap-2 p-2 border-top">
+        <span class="wdev__meta">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        <div class="d-flex gap-1">
+          {% if page_obj.has_previous %}
+            <a class="wdev__btn" href="?status={{ status }}&search={{ search }}&page={{ page_obj.previous_page_number }}">Previous</a>
+          {% endif %}
+          {% if page_obj.has_next %}
+            <a class="wdev__btn" href="?status={{ status }}&search={{ search }}&page={{ page_obj.next_page_number }}">Next</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock content %}

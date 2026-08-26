@@ -1,0 +1,80 @@
+{% extends "account/base.html" %}
+{% load static %}
+
+{% block head_title %}Confirm this device{% endblock head_title %}
+
+{% block extra_css %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'fleet/css/device-verify.css' %}?v=20260824a">
+{% endblock extra_css %}
+
+{% block account_content %}
+<div class="fdv__card p-4" id="fleet_device_verify_card_main">
+
+  <div class="d-flex align-items-center gap-3 mb-3">
+    <div class="fdv__icon d-flex align-items-center justify-content-center flex-shrink-0">
+      <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
+    </div>
+    <div>
+      <h1 class="fdv__title mb-1">Confirm this device</h1>
+      <p class="fdv__lead mb-0">Your driver account works on one device at a time.</p>
+    </div>
+  </div>
+
+  <div class="fdv__chip px-3 py-2 mb-3">
+    <i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>
+    Signing in from <strong>{{ device.label|default:"this device" }}</strong>
+  </div>
+
+  {% if has_phone %}
+    <p class="fdv__lead mb-3">
+      {% if code_sent %}
+        We sent a 6-digit code to your WhatsApp on <strong>{{ masked_phone }}</strong>.
+      {% else %}
+        We&rsquo;ll send a 6-digit code to your WhatsApp on <strong>{{ masked_phone }}</strong>.
+      {% endif %}
+    </p>
+
+    {% if code_sent %}
+      <form method="post" action="{% url 'fleet:device_verify' %}" class="mb-3">
+        {% csrf_token %}
+        <label for="fleet_device_verify_input_code" class="form-label fdv__lead">Confirmation code</label>
+        <input type="text" name="code" id="fleet_device_verify_input_code"
+               class="form-control fdv__code-input mb-3"
+               inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}"
+               maxlength="6" placeholder="000000" required autofocus>
+        <button type="submit" class="btn fdv__btn-primary w-100" id="fleet_device_verify_btn_confirm">
+          Confirm device
+        </button>
+      </form>
+    {% endif %}
+
+    <form method="post" action="{% url 'fleet:device_send_code' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-secondary fdv__btn-secondary w-100"
+              id="fleet_device_verify_btn_send">
+        {% if code_sent %}Send a new code{% else %}Send code{% endif %}
+      </button>
+    </form>
+  {% else %}
+    <div class="fdv__warn px-3 py-2 mb-3">
+      There is no WhatsApp number on your driver record, so we can&rsquo;t send a code.
+      Please contact operations to release this device.
+    </div>
+  {% endif %}
+
+  <p class="fdv__help mt-3 mb-0">
+    Didn&rsquo;t get the code? Operations can release this device for you.
+  </p>
+
+  <hr class="my-3">
+
+  <form method="post" action="{% url 'account_logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-link p-0 fdv__help" id="fleet_device_verify_btn_signout">
+      Sign out
+    </button>
+  </form>
+
+</div>
+{% endblock account_content %}

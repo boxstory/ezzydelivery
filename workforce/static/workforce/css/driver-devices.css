@@ -1,0 +1,122 @@
+/* Purpose: Staff console for the one-device-per-driver rule — pending approvals and device history.
+   Used by: workforce/templates/workforce/driver_devices.html
+   Notes:   Page shell (.wfpage/.wfcard/.wfmono) comes from staff-hero.css; only the
+            table, the status swatches and the row actions are declared here. */
+
+.wdev__toolbar {
+  border-bottom: 1px solid #eef1f5;
+  background: #fff;
+}
+
+.wdev__tab {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6c757d;
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.35rem;
+  border: 1px solid transparent;
+}
+
+.wdev__tab:hover { color: #001f3f; background: #f5f7fa; }
+
+.wdev__tab--on {
+  color: #001f3f;
+  background: #eef1f5;
+  border-color: #dee2e6;
+}
+
+.wdev__count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #6c757d;
+}
+
+.wdev__search {
+  font-size: 0.8rem;
+  max-width: 18rem;
+}
+
+/* --- table ------------------------------------------------------------- */
+.wdev__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.wdev__table th {
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6c757d;
+  border-bottom: 1px solid #dee2e6;
+  white-space: nowrap;
+}
+
+.wdev__table td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid #f1f3f6;
+  color: #333;
+  vertical-align: middle;
+}
+
+.wdev__table tbody tr:last-child td { border-bottom: 0; }
+.wdev__table tbody tr:hover { background: #fafbfc; }
+
+.wdev__driver { font-weight: 600; color: #001f3f; }
+.wdev__meta { font-size: 0.72rem; color: #6c757d; }
+
+/* Status reads as a swatch plus its word — no coloured pills. */
+.wdev__status { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+
+.wdev__swatch {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #b0b0b0;
+}
+
+.wdev__swatch--pending { background: var(--brand-warning-alt); }
+.wdev__swatch--active { background: var(--brand-success-light); }
+.wdev__swatch--revoked { background: #b0b0b0; }
+
+.wdev__btn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.35rem;
+  border: 1px solid #dee2e6;
+  background: #fff;
+  color: #001f3f;
+  white-space: nowrap;
+}
+
+.wdev__btn:hover { background: #f5f7fa; }
+
+.wdev__btn--release {
+  border-color: var(--brand-navy);
+  background: var(--brand-navy);
+  color: #fff;
+}
+
+.wdev__btn--release:hover { background: var(--brand-navy-light); color: #fff; }
+
+.wdev__empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
+/* A driver bouncing between devices is the signal this console exists for. */
+.wdev__flag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--brand-warning-text);
+}

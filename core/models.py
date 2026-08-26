@@ -359,6 +359,7 @@ class WhatsAppVerification(models.Model):
         - phone_add: Adding a new phone number
         - phone_update: Updating existing phone number
         - account_verify: Account verification
+        - device_verify: Confirming a driver's new device (one-device rule)
 
     Methods:
         is_expired(): Check if code has expired
@@ -377,6 +378,7 @@ class WhatsAppVerification(models.Model):
         ('phone_add', 'Phone Number Add'),
         ('phone_update', 'Phone Number Update'),
         ('account_verify', 'Account Verification'),
+        ('device_verify', 'Driver Device Verification'),
     )
 
     user = models.ForeignKey(

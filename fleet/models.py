@@ -1298,3 +1298,90 @@ class BusinessInvoicePayment(models.Model):
         indexes = [
             models.Index(fields=['invoice']),
         ]
+
+
+class DriverDevice(models.Model):
+    """
+    One row per phone a driver has ever signed in from.
+
+    Drivers are limited to one live device at a time: signing in somewhere new
+    revokes the previous device, and a device never seen before is only usable
+    once a WhatsApp code (or an ops approval) confirms it.
+
+    There is no hardware id to key any of this on — no browser exposes IMEI, a
+    serial, or a MAC address, and neither do modern native apps — so the device
+    identity is a random token this server issues and keeps in an HttpOnly
+    cookie. That is stronger than IMEI would be anyway: a secret nobody can read
+    off the back of the handset, and one we can revoke.
+
+    The history is the useful part for ops: a driver whose account keeps
+    bouncing between two devices is sharing credentials, and that shows up here
+    without anyone having to go looking.
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_ACTIVE = 'active'
+    STATUS_REVOKED = 'revoked'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Awaiting verification'),
+        (STATUS_ACTIVE, 'Active'),
+        (STATUS_REVOKED, 'Revoked'),
+    ]
+
+    REVOKED_NEW_DEVICE = 'new_device'
+    REVOKED_STAFF = 'staff'
+    REVOKED_REASON_CHOICES = [
+        (REVOKED_NEW_DEVICE, 'Signed in on another device'),
+        (REVOKED_STAFF, 'Revoked by staff'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='driver_devices', db_index=True)
+    device_token = models.CharField(
+        max_length=64, unique=True,
+        help_text="Random server-issued id, held in the driver's device cookie.")
+    session_key = models.CharField(max_length=40, blank=True, db_index=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+
+    user_agent = models.CharField(max_length=255, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    label = models.CharField(
+        max_length=80, blank=True,
+        help_text="Human-readable guess at the handset, e.g. 'Android · Chrome'.")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+    activated_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="First successful verification. A device that has one is never asked for a code again.")
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_reason = models.CharField(
+        max_length=20, choices=REVOKED_REASON_CHOICES, blank=True)
+
+    # Resend throttling lives on the row rather than the session, so clearing
+    # site data does not hand the sender a fresh allowance.
+    otp_sent_at = models.DateTimeField(null=True, blank=True)
+    otp_send_count = models.PositiveSmallIntegerField(default=0)
+
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='driver_devices_approved',
+        help_text="Set when ops released the device instead of a WhatsApp code.")
+
+    class Meta:
+        verbose_name = "Driver Device"
+        verbose_name_plural = "Driver Devices"
+        ordering = ['-last_seen_at']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.user} - {self.label or 'device'} ({self.status})"
+
+    @property
+    def is_known(self):
+        """True once the device has been verified, even if later revoked."""
+        return self.activated_at is not None
