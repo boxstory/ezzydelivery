@@ -46,17 +46,19 @@ def _safe_count_pickup_pending():
         return 0
 
 
-def _safe_count_crm_overdue():
-    """Count open CRM leads whose follow-up date has passed. Returns 0 if the
-    crm app or its migrations aren't ready (defensive)."""
+def _safe_count_crm_overdue(category=None):
+    """Count open CRM leads whose follow-up date has passed. `category` scopes the
+    count to one pipeline — the sidebar carries a separate badge for CRM Business
+    and CRM Driver, so a business badge must not count driver applicants. Returns 0
+    if the crm app or its migrations aren't ready (defensive)."""
     try:
         from django.utils import timezone
         from crm.models import Lead
         from crm.services import closed_stage_keys
-        return (
-            Lead.objects.filter(next_followup_at__lt=timezone.localdate())
-            .exclude(stage__in=closed_stage_keys()).count()
-        )
+        leads = Lead.objects.filter(next_followup_at__lt=timezone.localdate())
+        if category:
+            leads = leads.filter(category=category)
+        return leads.exclude(stage__in=closed_stage_keys(category)).count()
     except Exception:
         return 0
 
@@ -160,11 +162,12 @@ def workforce_sidebar_counts(request):
         # Sync errors from last auto-sync (mapping mismatch, etc.)
         'temp_orders_sync_errors': sync_errors,
 
-        # Orders not yet published to task (mirrors the /orders/to_publish/ list:
-        # no delivery task created and not cancelled).
+        # Orders awaiting publish (mirrors the /orders/to_publish/ list: keyed on
+        # order_status, not the one-way task_created latch, so an order sent back
+        # to "Hold for Review" is counted again).
         'pending_publish_count': Order.objects.filter(
-            task_created=False
-        ).exclude(order_status='cancelled').count(),
+            order_status__in=['to_review', 'ready_to_pickup']
+        ).count(),
 
         # Tasks created but not yet published to fleet drivers
         'unpublished_tasks_count': DeliveryTask.objects.filter(
@@ -179,8 +182,11 @@ def workforce_sidebar_counts(request):
         # notice the WhatsApp pipeline backlog.
         'address_verify_pending_count': _safe_count_avj(),
 
-        # Open CRM leads with an overdue follow-up (CRM sidebar badge)
+        # Open CRM leads with an overdue follow-up (CRM sidebar badges — one per
+        # pipeline, plus the combined figure other pages still read).
         'crm_overdue_count': _safe_count_crm_overdue(),
+        'crm_business_overdue_count': _safe_count_crm_overdue('business'),
+        'crm_driver_overdue_count': _safe_count_crm_overdue('driver'),
 
         # Unclaimed first-mile pickups (Pickup sidebar badge)
         'pickup_pending_count': _safe_count_pickup_pending(),

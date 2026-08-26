@@ -28,21 +28,22 @@
         {% include "workforce/parts/sidebar/fleet_accounts.html" %}
         {% include "workforce/parts/sidebar/sellers.html" %}
 
-        {% if wf_dept_fin or wf_dept_ops %}
-          <p class="dsb-section">Finance &amp; Fulfillment</p>
-          {% if wf_dept_fin %}
-            {% include "workforce/parts/sidebar/finance.html" %}
-          {% endif %}
-          {% if wf_dept_ops %}
-            {% include "workforce/parts/sidebar/inventory.html" %}
-            {% include "workforce/parts/sidebar/warehouse.html" %}
-          {% endif %}
+        {% if wf_dept_fin %}
+          <p class="dsb-section">Finance</p>
+          {% include "workforce/parts/sidebar/finance.html" %}
+        {% endif %}
+
+        {% if wf_dept_ops %}
+          <p class="dsb-section">Fulfillment</p>
+          {% include "workforce/parts/sidebar/inventory.html" %}
+          {% include "workforce/parts/sidebar/warehouse.html" %}
         {% endif %}
 
         {% if wf_dept_mkt or wf_dept_ops %}
           <p class="dsb-section">Marketing</p>
           {% if wf_dept_mkt %}
-            {% include "workforce/parts/sidebar/crm.html" %}
+            {% include "workforce/parts/sidebar/crm_business.html" %}
+            {% include "workforce/parts/sidebar/crm_driver.html" %}
             {% include "workforce/parts/sidebar/whatsapp.html" %}
           {% endif %}
           {% include "workforce/parts/sidebar/onboarding.html" %}
@@ -106,17 +107,21 @@ document.addEventListener('DOMContentLoaded', function () {
     {re: /^\/workforce\/tasks\//,                           menu: 'submenu-deliveries',    link: null},
     {re: /^\/workforce\/fleet\/driver-tasks/,               menu: 'submenu-accounts',      link: 'workforce_sidebar_link_driver_tasks'},
     {re: /^\/workforce\/fleet\/task-sheet/,                 menu: 'submenu-reports',       link: 'workforce_sidebar_link_task_sheets'},
-    {re: /^\/workforce\/fleet\/cod-ledger\//,               menu: 'submenu-finance',       link: 'workforce_sidebar_link_cod_ledger'},
-    {re: /^\/workforce\/fleet\/cod-settlement\//,           menu: 'submenu-finance',       link: 'workforce_sidebar_link_cod_settlement'},
+    {re: /^\/workforce\/fleet\/cod-ledger\//,               menu: null,                     link: 'workforce_sidebar_link_cod_ledger'},
+    {re: /^\/workforce\/fleet\/cod-settlement\//,           menu: 'submenu-finance-driver', link: 'workforce_sidebar_link_cod_settlement'},
+    {re: /^\/workforce\/fleet\/cod-legacy-reconciliation\//,menu: 'submenu-finance-driver', link: 'workforce_sidebar_link_cod_reconciliation'},
+    {re: /^\/workforce\/fleet\/cod-business-settlement\//,  menu: 'submenu-finance-seller', link: 'workforce_sidebar_link_business_cod_payout'},
+    {re: /^\/workforce\/client-charges\/invoices/,           menu: 'submenu-finance-seller', link: 'workforce_sidebar_link_finance_charge_invoices'},
+    {re: /^\/workforce\/client-charges\/collect/,            menu: 'submenu-finance-seller', link: 'workforce_sidebar_link_finance_charges_collect'},
     {re: /^\/workforce\/drivers\/\d+/,                      menu: 'submenu-accounts',      link: 'workforce_sidebar_link_all_drivers'},
     {re: /^\/workforce\/drivers\//,                         menu: 'submenu-accounts',      link: null},
     {re: /^\/workforce\/fleet\//,                           menu: 'submenu-accounts',      link: null},
     {re: /^\/workforce\/sellers\/api-configs\/\d+/,         menu: 'submenu-triggers',      link: 'workforce_sidebar_link_seller_api_configs'},
     {re: /^\/workforce\/sellers\/\d+/,                      menu: 'submenu-sellers',       link: 'workforce_sidebar_link_all_sellers'},
     {re: /^\/workforce\/sellers\//,                         menu: 'submenu-sellers',       link: null},
-    {re: /^\/workforce\/finance\//,                         menu: 'submenu-finance',       link: 'workforce_sidebar_link_finance_overview'},
-    {re: /^\/workforce\/seller-transactions\//,             menu: 'submenu-finance',       link: 'workforce_sidebar_link_seller_transactions'},
-    {re: /^\/workforce\/fleet\/transactions\//,             menu: 'submenu-finance',       link: 'workforce_sidebar_link_finance_transactions'},
+    {re: /^\/workforce\/finance\//,                         menu: null,                     link: 'workforce_sidebar_link_finance_overview'},
+    {re: /^\/workforce\/seller-transactions\//,             menu: 'submenu-finance-seller', link: 'workforce_sidebar_link_seller_transactions'},
+    {re: /^\/workforce\/fleet\/transactions\//,             menu: 'submenu-finance-driver', link: 'workforce_sidebar_link_finance_transactions'},
     {re: /^\/workforce\/suppliers\//,                       menu: 'submenu-warehouse',     link: 'workforce_sidebar_link_suppliers'},
     {re: /^\/workforce\/purchase-orders\//,                 menu: 'submenu-warehouse',     link: 'workforce_sidebar_link_purchase_orders'},
     {re: /^\/workforce\/warehouses\//,                      menu: 'submenu-verifications', link: 'workforce_sidebar_link_warehouses_list'},
@@ -146,13 +151,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
   for (var i = 0; i < subpageMap.length; i++) {
     if (subpageMap[i].re.test(path)) {
-      var submenu = document.getElementById(subpageMap[i].menu);
+      var submenu = subpageMap[i].menu ? document.getElementById(subpageMap[i].menu) : null;
       if (submenu && !submenu.classList.contains('show')) {
         submenu.classList.add('show');
       }
-      if (subpageMap[i].link && submenu && !submenu.querySelector('.nav-link.active')) {
+      if (subpageMap[i].link && (!submenu || !submenu.querySelector('.nav-link.active'))) {
         var lnk = document.getElementById(subpageMap[i].link);
-        if (lnk) lnk.classList.add('active');
+        if (lnk) {
+          lnk.classList.add('active');
+          // Top-level links (menu: null) carry the active bar on their own <li>
+          if (lnk.parentElement) lnk.parentElement.classList.add('active');
+        }
       }
       if (submenu) {
         var parentLi = submenu.parentElement;
@@ -161,6 +170,21 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
       break;
+    }
+  }
+
+  // Nested sub-groups (e.g. Finance > Driver / Seller): whichever leaf ended up
+  // active — server-rendered or set above — open every collapse above it.
+  var activeLeaf = document.querySelector('#workforce_sidebar_nav a.nav-link.active');
+  if (activeLeaf) {
+    var node = activeLeaf.parentElement;
+    while (node && node.id !== 'workforce_sidebar_nav') {
+      if (node.classList && node.classList.contains('collapse')) {
+        node.classList.add('show');
+        var toggle = document.querySelector('[data-bs-target="#' + node.id + '"]');
+        if (toggle) toggle.setAttribute('aria-expanded', 'true');
+      }
+      node = node.parentElement;
     }
   }
 });

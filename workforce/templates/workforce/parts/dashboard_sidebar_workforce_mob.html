@@ -299,29 +299,36 @@
                 <a id="workforce_sidebar_mob_link_finance_overview" href="{% url 'workforce:workforce_finance_dashboard' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-chart-pie"></i><span>Finance Overview</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_finance_transactions" href="{% url 'workforce:fleet_transactions' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-motorcycle"></i><span>Driver Transactions</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_seller_transactions" href="{% url 'workforce:seller_transactions' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-store"></i><span>Seller Transactions</span>
-                </a>
                 <a id="workforce_sidebar_mob_link_cod_ledger" href="{% url 'workforce:cod_ledger' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-book"></i><span>COD Ledger</span>
                 </a>
+
+                <div class="wsm__nav-group-label"><i class="fa-solid fa-motorcycle"></i><span>Driver</span></div>
+                <a id="workforce_sidebar_mob_link_finance_transactions" href="{% url 'workforce:fleet_transactions' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-right-left"></i><span>Driver Transactions</span>
+                </a>
                 <a id="workforce_sidebar_mob_link_cod_settlement" href="{% url 'workforce:cod_settlement_report' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-invoice-dollar"></i><span>COD Settlement</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_business_cod_payout" href="{% url 'workforce:cod_business_settlement_report' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-building-columns"></i><span>Business COD Payout</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_business_payout_history" href="{% url 'workforce:cod_business_payout_history' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-receipt"></i><span>Payout History</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_cod_reconciliation" href="{% url 'workforce:cod_legacy_reconciliation' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-scale-balanced"></i><span>COD Reconciliation</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_finance_earnings_verification" href="{% url 'workforce:earnings_verification' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-clipboard-check"></i><span>Earnings Verification</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_finance_driver_payouts" href="{% url 'workforce:fleet_drivers_earnings' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-money-bill-wave"></i><span>Driver Payouts</span>
+                </a>
+
+                <div class="wsm__nav-group-label"><i class="fa-solid fa-store"></i><span>Seller</span></div>
+                <a id="workforce_sidebar_mob_link_seller_transactions" href="{% url 'workforce:seller_transactions' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-right-left"></i><span>Seller Transactions</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_business_cod_payout" href="{% url 'workforce:cod_business_settlement_report' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-building-columns"></i><span>Business COD Payout</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_business_payout_history" href="{% url 'workforce:cod_business_payout_history' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-receipt"></i><span>Payout History</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_finance_client_charges" href="{% url 'workforce:client_charge_verification' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-invoice"></i><span>Client Charges</span>
@@ -331,9 +338,6 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_finance_charge_invoices" href="{% url 'workforce:client_charge_invoices' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-invoice-dollar"></i><span>Charge Invoices</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_finance_driver_payouts" href="{% url 'workforce:fleet_drivers_earnings' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-money-bill-wave"></i><span>Driver Payouts</span>
                 </a>
             </div>
         </div>
@@ -394,6 +398,9 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_wa_instances" href="{% url 'workforce:whatsapp_instances_list' %}" class="wsm__nav-link">
                     <i class="fa-brands fa-whatsapp"></i><span>WA Instances</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_message_templates" href="{% url 'workforce:wf_message_templates' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-comment-dots"></i><span>Messages</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_seller_api_configs" href="{% url 'workforce:wf_seller_api_configs' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-plug"></i><span>API Configs</span>
@@ -753,7 +760,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/client-charges\/invoices/,          section: 'finance',       link: 'workforce_sidebar_mob_link_finance_charge_invoices'},
         {re: /^\/workforce\/client-charges\/collect/,           section: 'finance',       link: 'workforce_sidebar_mob_link_finance_charges_collect'},
         {re: /^\/workforce\/fleet\/cod-legacy-reconciliation\//,section: 'finance',       link: 'workforce_sidebar_mob_link_cod_reconciliation'},
-        {re: /^\/workforce\/fleet\/cod-settlement\//,           section: 'accounts',      link: 'workforce_sidebar_mob_link_fleet_transactions'},
+        {re: /^\/workforce\/fleet\/cod-settlement\//,           section: 'finance',       link: 'workforce_sidebar_mob_link_cod_settlement'},
         {re: /^\/workforce\/drivers\/\d+/,                      section: 'accounts',      link: 'workforce_sidebar_mob_link_all_drivers'},
         {re: /^\/workforce\/drivers\//,                         section: 'accounts',      link: null},
         {re: /^\/workforce\/fleet\//,                           section: 'accounts',      link: null},

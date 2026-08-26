@@ -85,9 +85,10 @@ function copyToClipboard(text) {
  */
 function getStatusBadge(status) {
   var statusMap = {
-    // Order statuses
-    'pending': { color: 'warning', icon: 'clock', text: 'Pending' },
-    'published': { color: 'info', icon: 'cloud', text: 'Published' },
+    // Order statuses (values from orders.models.ORDER_STATUS_BY_CLIENT)
+    'to_review': { color: 'warning', icon: 'clock', text: 'Hold for Review' },
+    'ready_to_pickup': { color: 'info', icon: 'box', text: 'Ready to pickup' },
+    'publish': { color: 'info', icon: 'cloud', text: 'Published' },
     'assigned': { color: 'primary', icon: 'user-check', text: 'Assigned' },
     'in_transit': { color: 'primary', icon: 'truck', text: 'In Transit' },
     'delivered': { color: 'success', icon: 'check-circle', text: 'Delivered' },

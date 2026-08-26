@@ -249,6 +249,29 @@
     transition: max-height 0.5s ease-in;
 }
 
+/* Sub-group label inside a mobile section (Finance > Driver / Seller).
+   Static divider row, not a control — the section itself is the collapsible. */
+.wsm__nav-group-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem 0.3rem 1.75rem;
+    font-size: 0.625rem; /* 10px */
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brand-grey-500);
+    background: var(--brand-grey-50);
+    border-top: 0.0625rem solid var(--brand-grey-200);
+}
+
+.wsm__nav-group-label i {
+    color: var(--brand-grey-400);
+    font-size: 0.6875rem; /* 11px */
+    width: 1rem;
+    text-align: center;
+}
+
 .wsm__nav-link {
     display: flex;
     align-items: center;
@@ -966,6 +989,9 @@
 /* Width split (≈ search 32% | role 12% | daterange 28% | apply 14% | clear 14%) */
 .uvl__search {
     position: relative; flex: 32 1 0;
+    /* Floor: the bar is nowrap, so without a minimum the pickers beside it can
+       shrink the search box to a sliver and the field reads as "missing". */
+    min-width: 11rem;
 }
 .uvl__search__icon {
     position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%);
@@ -1031,6 +1057,36 @@ input.uvl__date:focus {
     background: var(--brand-grey-100, #fafafa); color: var(--brand-danger, #dc3545);
     border-color: var(--brand-danger, #dc3545);
 }
+/* Select2 takes over both filter pickers (the shared enhancer in
+   main_dashboard_scripts.html enhances every <select> in a GET filter bar). It
+   hides the native control and inserts a `.select2-container` with an inline
+   `width: 100%` — a nowrap flex item that then claims the whole bar, squeezing
+   the search input down to nothing. The native `select.uvl__select` flex rule
+   above never applies to it, so the split has to be restated on the container,
+   plus this bar's own 2rem control metrics (select2-filters.css ships 34px). */
+.uvl__toolbar > .select2-container.ez-filter-select {
+    width: auto !important;
+    flex: 12 1 0; min-width: 0; max-width: 12rem;
+}
+.uvl__toolbar .select2-container.ez-filter-select .select2-selection--single {
+    height: 2rem;
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: 0.5rem;
+    background: #fff;
+}
+.uvl__toolbar .select2-container.ez-filter-select .select2-selection--single .select2-selection__rendered {
+    height: 1.875rem; line-height: 1.875rem;
+    padding-left: 0.4rem; padding-right: 1.4rem;
+    font-size: 0.78rem; color: var(--brand-grey-900, #212529);
+}
+.uvl__toolbar .select2-container.ez-filter-select .select2-selection--single .select2-selection__arrow {
+    height: 1.875rem; right: 0.2rem;
+}
+.uvl__toolbar .select2-container.ez-filter-select.select2-container--focus .select2-selection--single,
+.uvl__toolbar .select2-container.ez-filter-select.select2-container--open .select2-selection--single {
+    border-color: var(--brand-navy, #001f3f);
+    box-shadow: 0 0 0 3px rgba(0, 31, 63, 0.08);
+}
 .uvl__result-summary {
     font-size: 0.75rem; color: var(--brand-grey-600, #5a6268);
     margin-bottom: 0.5rem; padding: 0 0.25rem;
@@ -1043,8 +1099,9 @@ input.uvl__date:focus {
 /* Mobile: wrap to multiple rows */
 @media (max-width: 575.98px) {
     .uvl__toolbar { flex-wrap: wrap; padding: 0.5rem; gap: 0.4rem; }
-    .uvl__search { flex: 1 1 100%; }
+    .uvl__search { flex: 1 1 100%; min-width: 0; }
     .uvl__toolbar > .uvl__select { flex: 1 1 45%; }
+    .uvl__toolbar > .select2-container.ez-filter-select { flex: 1 1 45%; max-width: none; }
     .uvl__daterange { flex: 1 1 100%; }
     .uvl__toolbar .uvl__btn { flex: 1 1 auto; }
     .uvl__toolbar .uvl__btn__label { display: inline; }
@@ -1273,7 +1330,12 @@ input.uvl__date:focus {
 .uvl__modal__close:hover { background: rgba(255,255,255,0.25); }
 
 /* Modal Body */
-.uvl__modal__body { padding: 1rem 1.25rem; }
+.uvl__modal__body {
+    padding: 1rem 1.25rem;
+    /* Keep a long lead list inside the card instead of pushing the footer
+       off-screen — header and footer stay put, the body scrolls. */
+    max-height: 65vh; overflow-y: auto;
+}
 
 /* Info Banner */
 .uvl__modal__info {
@@ -1346,8 +1408,10 @@ textarea.uvl__modal__textarea:focus {
 /* Link CRM Lead — searchable combobox */
 .uvl__lead-picker { position: relative; }
 .uvl__lead-picker__list {
-    position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 20;
-    max-height: 15rem; overflow-y: auto;
+    /* In normal flow, not absolute: `.uvl__modal` sets `overflow: hidden`, which
+       clipped a floating dropdown at the card edge. The body scrolls instead. */
+    position: static; margin-top: 0.25rem;
+    max-height: 13rem; overflow-y: auto;
     background: var(--brand-white, #fff);
     border: 1px solid var(--brand-grey-300, #dcdcdc);
     border-radius: 0.5rem;
@@ -1369,6 +1433,47 @@ textarea.uvl__modal__textarea:focus {
     color: var(--brand-grey-500, #6c757d);
 }
 .uvl__lead-picker__status { min-height: 1.2em; }
+
+/* Link CRM Lead — "Likely matches" suggestions above the search box */
+.uvl__lead-suggest {
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: 0.5rem;
+    background: var(--brand-grey-100, #fafafa);
+    padding: 0.5rem;
+    margin-top: 0.75rem;
+}
+.uvl__lead-suggest__title {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--brand-grey-600, #4a4a4a);
+    margin-bottom: 0.375rem;
+}
+.uvl__lead-suggest__list { display: flex; flex-direction: column; gap: 0.25rem; }
+.uvl__lead-suggest__item {
+    display: block; width: 100%; text-align: left;
+    padding: 0.375rem 0.5rem;
+    background: var(--brand-white, #fff);
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: 0.375rem;
+    cursor: pointer;
+}
+.uvl__lead-suggest__item:hover { border-color: var(--brand-navy, #001f3f); }
+.uvl__lead-suggest__item--selected {
+    border-color: var(--brand-navy, #001f3f);
+    box-shadow: 0 0 0 2px rgba(0, 31, 63, 0.1);
+}
+.uvl__lead-suggest__name {
+    display: block; font-size: 0.8rem; font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+.uvl__lead-suggest__sub {
+    display: block; font-size: 0.7rem;
+    color: var(--brand-grey-500, #6c757d);
+}
+.uvl__lead-suggest__why {
+    display: inline-block; margin-top: 0.25rem;
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.03em;
+    text-transform: uppercase; color: var(--brand-navy, #001f3f);
+}
 
 /* Modal Footer */
 .uvl__modal__footer {
@@ -1875,6 +1980,22 @@ textarea.uvl__modal__textarea:focus {
 }
 .wfd__hero-count__num   { font-size: 2rem; font-weight: 700; line-height: 1; color: var(--brand-primary, #f7c000); }
 .wfd__hero-count__label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.6); }
+
+/* Hero right bank: the count and the page-notes button read as one group on
+   the right edge. Without it the hero's space-between strands the count in
+   the middle of the band with the help button orphaned at the far right. */
+.wfd__hero-bank {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-left: auto;
+}
+.wfd__hero-bank .wfd__hero-count {
+    align-items: flex-end;
+    text-align: right;
+    padding-right: 0.7rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.14);
+}
 @media (max-width: 576px) {
     .wfd__hero {
         flex-direction: column;
@@ -1887,6 +2008,9 @@ textarea.uvl__modal__textarea:focus {
     .wfd__hero-actions {
         width: 100%;
     }
+    /* Column hero — the auto margin would shove the bank to the right edge
+       while the title stays left. Keep it in the same left rail. */
+    .wfd__hero-bank { margin-left: 0; }
 }
 
 /* ---------- FILTER SECTION (ops-console) ----------
@@ -5275,30 +5399,9 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
    Driver Detail Page Styles (wdd__ prefix)
    ========================================= */
 
-.wdd__page {
-    max-width: 1200px;
-    margin: 0 auto;
-}
 
-/* Breadcrumb */
-.wdd__breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-}
-
-.wdd__breadcrumb__link {
-    color: var(--brand-grey-500);
-    text-decoration: none;
-    transition: color 0.2s;
-}
-
-.wdd__breadcrumb__link:hover { color: var(--brand-primary-dark); }
-
-.wdd__breadcrumb__sep { color: var(--brand-grey-300); font-size: .75rem; }
-
-.wdd__breadcrumb__current { color: var(--brand-grey-700); font-weight: 600; }
+/* Breadcrumb lives inside the hero now — chip trail defined in the wdd__ block
+   at the end of this file. */
 
 /* Hero Card */
 .wdd__hero {
@@ -5314,77 +5417,6 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     color: #fff;
 }
 
-.wdd__hero__left {
-    display: flex;
-    gap: 1rem;
-    align-items: flex-start;
-    flex: 1;
-    min-width: 0;
-}
-
-.wdd__hero__avatar {
-    width: 52px;
-    height: 52px;
-    background: rgba(247, 192, 0, 0.15);
-    border: 2px solid var(--brand-primary);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    
-    color: var(--brand-primary);
-    flex-shrink: 0;
-}
-
-.wdd__hero__info { min-width: 0; }
-
-.wdd__hero__name {
-    font-size: 1.125rem;
-    font-weight: 700;
-    margin: 0 0 0.25rem;
-    line-height: 1.2;
-}
-
-.wdd__hero__meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    color: rgba(255,255,255,0.6);
-    margin-bottom: 0.625rem;
-    font-family: monospace;
-}
-
-.wdd__hero__meta i { font-size: .75rem; }
-
-.wdd__hero__contacts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-}
-
-.wdd__hero__contact-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.25rem 0.625rem;
-    background: rgba(255,255,255,0.1);
-    border-radius: 2rem;
-    color: rgba(255,255,255,0.85);
-    text-decoration: none;
-    transition: background 0.2s;
-}
-
-.wdd__hero__contact-chip:hover { background: rgba(255,255,255,0.2); color: #fff; }
-
-.wdd__hero__contact-chip--wa:hover { background: rgba(37,211,102,0.3); }
-
-.wdd__hero__right {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.5rem;
-    flex-shrink: 0;
-}
 
 .wdd__hero__status {
     display: inline-flex;
@@ -5431,9 +5463,6 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 .wdd__hero__toggle--activate:hover { background: rgba(34,197,94,0.28); color: #4ade80; }
 .wdd__hero__status--clickable { cursor: pointer; user-select: none; }
 .wdd__hero__status--clickable:hover { opacity: 0.85; }
-.wdd__status-row {
-    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
-}
 .wdd__status-row__label {
     font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
     color: #9ca3af; letter-spacing: 0.05em; min-width: 3.5rem;
@@ -6379,7 +6408,6 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 /* Responsive */
 @media (max-width: 768px) {
     .wdd__hero { flex-direction: column; }
-    .wdd__hero__right { flex-direction: row; align-items: center; }
     .wdd__stats { grid-template-columns: repeat(2, 1fr); }
     .wdd__summary-grid { grid-template-columns: repeat(2, 1fr); }
     .wdd__summary__cell:nth-child(2) { border-right: none; }
@@ -6394,7 +6422,6 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 
 @media (max-width: 480px) {
     .wdd__stats { grid-template-columns: 1fr 1fr; }
-    .wdd__hero__contacts { flex-direction: column; }
 }
 
 /* =========================================
@@ -19931,6 +19958,94 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     background: #fffdf4;
 }
 
+/* --- CRM pipeline strip: the second status axis, one segment per board column.
+       Quieter than the tally strip above it — this is a cross-reference, not the
+       page's primary filter, so it reads as a labelled ruled row. --- */
+.drl .drl__pipe {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.9rem;
+    min-width: 0;
+}
+.drl .drl__pipe-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.drl .drl__pipe-title i { color: #9ca3af; }
+/* Boards can carry ten-plus columns, so the strip wraps rather than scrolling —
+   a segment hidden off the right edge reads as "that stage does not exist". */
+.drl .drl__pipe-track {
+    display: flex;
+    flex-wrap: wrap;
+    flex: 1 1 auto;
+    min-width: 0;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+}
+.drl .drl__pipe-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 0 0 auto;
+    cursor: pointer;
+    border: 0;
+    border-left: 1px solid #eef1f5;
+    border-radius: 0;
+    background: transparent;
+    padding: 0.4rem 0.75rem;
+    box-shadow: inset 0 3px 0 transparent;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+.drl .drl__pipe-seg:first-child { border-left: 0; }
+/* Wrapped rows get their own rule so the second row does not float unattached */
+.drl .drl__pipe-seg { border-top: 1px solid transparent; }
+.drl .drl__pipe-track { row-gap: 0; }
+.drl .drl__pipe-seg:hover { background: #f8f9fb; }
+.drl .drl__pipe-seg:focus-visible { outline: 2px solid #f7c000; outline-offset: -2px; }
+.drl .drl__pipe-seg--active,
+.drl .drl__pipe-seg--active:hover {
+    box-shadow: inset 0 3px 0 #f7c000;
+    background: #fffdf4;
+}
+.drl .drl__pipe-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: #9ca3af;
+    flex-shrink: 0;
+}
+.drl .drl__pipe-label {
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #4b5563;
+}
+.drl .drl__pipe-count {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+    color: #001f3f;
+}
+.drl .drl__pipe-dot--sw-grey   { background: #9ca3af; }
+.drl .drl__pipe-dot--sw-slate  { background: #4b5563; }
+.drl .drl__pipe-dot--sw-blue   { background: #2a78d6; }
+.drl .drl__pipe-dot--sw-teal   { background: #0f8f8f; }
+.drl .drl__pipe-dot--sw-green  { background: #1baf7a; }
+.drl .drl__pipe-dot--sw-forest { background: #0a6e0a; }
+.drl .drl__pipe-dot--sw-violet { background: #4a3aa7; }
+.drl .drl__pipe-dot--sw-amber  { background: #eb6834; }
+.drl .drl__pipe-dot--sw-red    { background: #d64545; }
+
 /* --- Filter selects: same box as the text input and the multiselect toggle ---
    All three controls sit on one row, so they have to agree on the box. The
    text input (input.drl__filter-input) and the multiselect toggle
@@ -20041,6 +20156,34 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 .drl .drl__badge--warning { color: #92400e; }
 .drl .drl__badge--danger  { color: #dc2626; }
 
+/* --- CRM stage: second line under the standing, dot + text. Unscoped on purpose —
+       all four roster pages (drl/drp/dra/dri) share it, and crm.css is not loaded
+       on any of them, so the swatch palette is restated here. --- */
+.drl__crm-stage {
+    display: flex;              /* block-level, so it drops under the standing */
+    width: max-content;
+    max-width: 100%;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--brand-grey-600, #4b5563);
+    text-decoration: none;
+}
+.drl__crm-stage:hover { text-decoration: underline; color: #001f3f; }
+.drl__crm-stage i { font-size: 0.4rem; color: #9ca3af; }
+.drl__crm-stage .fa-thumbtack { font-size: 0.55rem; }
+.drl__crm-stage--sw-grey i   { color: #9ca3af; }
+.drl__crm-stage--sw-slate i  { color: #4b5563; }
+.drl__crm-stage--sw-blue i   { color: #2a78d6; }
+.drl__crm-stage--sw-teal i   { color: #0f8f8f; }
+.drl__crm-stage--sw-green i  { color: #1baf7a; }
+.drl__crm-stage--sw-forest i { color: #0a6e0a; }
+.drl__crm-stage--sw-violet i { color: #4a3aa7; }
+.drl__crm-stage--sw-amber i  { color: #eb6834; }
+.drl__crm-stage--sw-red i    { color: #d64545; }
+
 /* --- Duty: round dot + text — the live half of the roster --- */
 .drl .dra__avail-badge {
     background: transparent;
@@ -20145,6 +20288,28 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     box-shadow: none;
 }
 .drl .drl__btn--view:hover { border-color: #001f3f; background: #fff; color: #001f3f; transform: none; }
+
+/* Lead sits on its own line under View — same outline, muted ink so View leads.
+   Unscoped: shared by the pending/active/inactive rosters, which have no drl root. */
+.drl__btn--lead {
+    display: flex;              /* block-level, so it always starts a new line */
+    width: max-content;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+    background: #fff;
+    border: 1px solid #d5dbe3;
+    color: #4b5563;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 0.35rem;
+    box-shadow: none;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.drl__btn--lead:hover { border-color: #001f3f; color: #001f3f; transform: none; }
+.drl__btn--lead i { font-size: 0.7rem; color: #9ca3af; }
+.drl__btn--lead:hover i { color: #001f3f; }
 
 .drl .drl__empty i { color: #d1d5db; }
 
@@ -21404,18 +21569,57 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
    reads at a glance.
    ============================================================================ */
 
+/* Two-tier navy band. Tier 1 is identity + live counts + the page actions;
+   tier 2 is the filter rail, fenced off by a hairline. They were one wrapping
+   flex row before, which meant the filters, the counts and "Create pickup"
+   all queued behind the title and left a dead navy gutter down the right —
+   the actions ended up orphaned on a third line. */
 .ppl__hero {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
     background: #001f3f;
     border-bottom: 3px solid #f7c000;
     border-radius: 0.4rem 0.4rem 0 0;
     padding: 0.375rem 0.75rem;
     margin-bottom: 1rem;
 }
+.ppl__hero-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.125rem;
+}
+.ppl__hero-id { flex: 1 1 auto; min-width: 0; }
+/* Counts and actions travel together, so a wrap moves the whole right-hand
+   group instead of splitting it across two lines. */
+.ppl__hero-aside {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.125rem;
+    margin-left: auto;
+}
+.ppl__hero-acts {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding-left: 1.125rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+.ppl__hero-rail {
+    margin-top: 0.375rem;
+    padding-top: 0.375rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.ppl__filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.75rem;
+}
+/* The search box eats the slack so "Filter" lands on the hero's right edge,
+   under the actions above it — the band reads as one grid instead of a rail
+   that stops short. */
+.ppl__filters input[name="search"].ppl__ffield { flex: 1 1 13rem; }
 .ppl__hero-eyebrow {
     display: block;
     font-size: 0.63rem;
@@ -21433,9 +21637,16 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     margin: 0;
     line-height: 1.15;
 }
-.ppl__tallies { display: flex; align-items: center; gap: 1.1rem; }
-.ppl__tally { display: flex; flex-direction: column; align-items: flex-end; }
-.ppl__tally--alert { border-right: 3px solid #f7c000; padding-right: 0.75rem; }
+/* Live counts. The alert rule is red, not yellow: it is the same #ef4444 the
+   unclaimed rows carry in the table, so the triage colour means one thing on
+   this page — and the hero keeps yellow for its single bottom rule. */
+.ppl__tallies { display: flex; align-items: center; gap: 1.125rem; }
+.ppl__tally { display: flex; flex-direction: column; align-items: flex-start; }
+.ppl__tally--alert { border-left: 3px solid #ef4444; padding-left: 0.6rem; }
+.ppl__tally:not(.ppl__tally--alert) {
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+    padding-left: 1.125rem;
+}
 .ppl__tally-num {
     font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
     font-size: 1.5rem;
@@ -21492,16 +21703,164 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     box-shadow: none;
 }
 .ppl__fbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
     color: #fff;
+    background-color: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 0.3rem;
     font-size: 0.78rem;
+    font-weight: 600;
     padding: 0.24rem 0.7rem;
     min-height: 1.9rem;
     height: 1.9rem;
     line-height: 1.2;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
-.ppl__fbtn:hover { color: #001f3f; background: #f7c000; border-color: #f7c000; }
+.ppl__fbtn:hover { color: #001f3f; background-color: #f7c000; border-color: #f7c000; }
+.ppl__fbtn:focus-visible { outline: 2px solid #f7c000; outline-offset: 2px; }
+.ppl__fbtn i { font-size: 0.7rem; }
+
+/* Date window — the range preset and the From/To pair are one control, so they
+   sit in a hairline group rather than floating as three loose fields.
+   `color-scheme: dark` is what makes the native calendar indicator legible on
+   navy; without it the browser paints a near-black glyph on a dark field. */
+.ppl__fdates {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.2rem 0.45rem 0.2rem 0.2rem;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 0.35rem;
+    background-color: rgba(255, 255, 255, 0.03);
+}
+.ppl__fdate-lbl {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin: 0;
+}
+.ppl__hero input.ppl__fdate {
+    min-width: 8.4rem;
+    color-scheme: dark;
+}
+/* The From/To pair only exists under the "Custom range…" preset. Bootstrap's
+   .form-control declares display:block, which is an author rule and so outranks
+   the UA sheet's [hidden] — without this the boxes stay on screen under every
+   other preset. The labels need it only for consistency. */
+.ppl__fdates [data-pp-range][hidden] { display: none; }
+
+/* Window notice — a hidden active pickup is the one staff actually need, so the
+   date filter says what it swallowed. Ink + hairline, not an alert colour. */
+.ppl__windownote {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e4e7ec;
+    border-left: 3px solid #f7c000;
+    border-radius: 0.3rem;
+    background-color: #fff;
+    color: #475467;
+    font-size: 0.78rem;
+}
+/* Create-pickup panel: the repair hatch under the hero. Same paper + hairline
+   as the window notice so the two under-hero strips read as one family; the
+   yellow edge is the page's single accent and stays on the notice, so this one
+   takes the navy edge instead. */
+.ppl__mkcard {
+    margin-bottom: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid #e4e7ec;
+    border-left: 3px solid #001f3f;
+    border-radius: 0.3rem;
+    background-color: #fff;
+}
+.ppl__mklbl {
+    margin: 0;
+    color: #667085;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.ppl__mkcard .ppl__ffield {
+    border: 1px solid #d0d5dd;
+    color: #101828;
+    background-color: #fff;
+    font-size: 0.78rem;
+    min-height: 1.9rem;
+}
+.ppl__mkcard .ppl__ffield:focus {
+    border-color: #001f3f;
+    box-shadow: 0 0 0 2px rgba(0, 31, 63, 0.12);
+}
+
+/* "Collect from" holds staff-entered addresses of any length and is empty until
+   an order is looked up, so `w-auto` made it a sliver one moment and a row-
+   breaking bar the next. Fixed width: the panel never reflows as it fills. */
+.ppl__mkcard select.ppl__mkloc {
+    width: 20rem;
+    max-width: 100%;
+    text-overflow: ellipsis;
+}
+.ppl__mkmeta {
+    color: #001f3f;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.ppl__mkerr {
+    color: var(--brand-danger-text, #b42318);
+    font-size: 0.78rem;
+}
+
+/* Pickup-location dropdown in the client cell. It sits under the business name
+   where a plain sub-line used to be, so it stays sub-line sized and quiet — a
+   full-height form control there would out-shout the order number. */
+.ppl__locpick {
+    margin-top: 0.15rem;
+    max-width: 15rem;
+    padding: 0.1rem 1.4rem 0.1rem 0.35rem;
+    /* Bootstrap's arrow tile is sized for a full-height select; restate it so the
+       shrunken control does not clip or centre it wrongly. Never `background:`
+       shorthand here — that would drop the tile entirely. */
+    background-repeat: no-repeat;
+    background-position: right 0.35rem center;
+    background-size: 10px 8px;
+    border: 1px solid #e4e7ec;
+    border-radius: 0.25rem;
+    background-color: #fcfcfd;
+    color: #475467;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    min-height: 1.5rem;
+    height: auto;
+}
+.ppl__locpick:hover { border-color: #d0d5dd; background-color: #fff; }
+.ppl__locpick:focus {
+    border-color: #001f3f;
+    background-color: #fff;
+    color: #101828;
+    box-shadow: 0 0 0 2px rgba(0, 31, 63, 0.12);
+}
+.ppl__locpick:disabled { opacity: 0.5; }
+
+/* Ghost variant of the hero filter button — an action, not the primary filter */
+.ppl__fbtn--ghost { background-color: transparent; }
+
+.ppl__windownote i { color: #98a2b3; }
+.ppl__windownote strong { color: #001f3f; }
+.ppl__windownote a {
+    color: #001f3f;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
 
 /* --- Hero pickers (Select2, enhanced locally by the page script) -------------
    A native <select> hands its option list to the OS, so it cannot carry the
@@ -21718,6 +22077,7 @@ body .select2-container--default.ppl__pick-menu .select2-results__option[aria-se
 
 /* Actions: ink buttons, sharp corners (shared by row actions and the bulk bar) */
 .ppl__card .btn.ppl__btn,
+.ppl__mkcard .btn.ppl__btn,
 .ppl__bulk .btn.ppl__btn {
     border: 1px solid #001f3f;
     color: #001f3f;
@@ -21730,50 +22090,63 @@ body .select2-container--default.ppl__pick-menu .select2-results__option[aria-se
     box-shadow: none;
 }
 .ppl__card .btn.ppl__btn:hover,
+.ppl__mkcard .btn.ppl__btn:hover,
 .ppl__bulk .btn.ppl__btn:hover { background-color: #001f3f; color: #fff; }
+.ppl__mkcard .btn.ppl__btn--primary,
 .ppl__card .btn.ppl__btn--primary { background-color: #001f3f; color: #fff; }
+.ppl__mkcard .btn.ppl__btn--primary:hover,
 .ppl__card .btn.ppl__btn--primary:hover { background-color: #003366; border-color: #003366; }
 .ppl__card .btn.ppl__btn .ppl__code,
+.ppl__mkcard .btn.ppl__btn .ppl__code,
 .ppl__bulk .btn.ppl__btn .ppl__code { color: inherit; opacity: 0.65; }
 
 /* Quiet action: reads as secondary next to Assign, same ink on hover */
 .ppl__card .btn.ppl__btn--quiet,
+.ppl__mkcard .btn.ppl__btn--quiet,
 .ppl__bulk .btn.ppl__btn--quiet {
     border-color: #d0d5dd;
     color: #6c757d;
 }
 .ppl__card .btn.ppl__btn--quiet:hover,
+.ppl__mkcard .btn.ppl__btn--quiet:hover,
 .ppl__bulk .btn.ppl__btn--quiet:hover { background-color: #6c757d; border-color: #6c757d; color: #fff; }
 .ppl__card .btn.ppl__btn--quiet:disabled,
+.ppl__mkcard .btn.ppl__btn--quiet:disabled,
 .ppl__bulk .btn.ppl__btn--quiet:disabled { opacity: 0.4; background-color: #fff; color: #6c757d; }
 
 /* Destructive pair: outlined at rest so a row of actions stays monochrome-ish,
    filled only on hover. Warn = cancel the leg, danger = drop the row. */
 .ppl__card .btn.ppl__btn--warn,
+.ppl__mkcard .btn.ppl__btn--warn,
 .ppl__bulk .btn.ppl__btn--warn {
     border-color: var(--brand-warning);
     color: var(--brand-warning-text);
 }
 .ppl__card .btn.ppl__btn--warn:hover,
+.ppl__mkcard .btn.ppl__btn--warn:hover,
 .ppl__bulk .btn.ppl__btn--warn:hover {
     background-color: var(--brand-warning);
     border-color: var(--brand-warning);
     color: #fff;
 }
 .ppl__card .btn.ppl__btn--danger,
+.ppl__mkcard .btn.ppl__btn--danger,
 .ppl__bulk .btn.ppl__btn--danger {
     border-color: var(--brand-danger);
     color: var(--brand-danger);
 }
 .ppl__card .btn.ppl__btn--danger:hover,
+.ppl__mkcard .btn.ppl__btn--danger:hover,
 .ppl__bulk .btn.ppl__btn--danger:hover {
     background-color: var(--brand-danger);
     border-color: var(--brand-danger);
     color: #fff;
 }
 .ppl__card .btn.ppl__btn--warn:disabled,
+.ppl__mkcard .btn.ppl__btn--warn:disabled,
 .ppl__bulk .btn.ppl__btn--warn:disabled,
 .ppl__card .btn.ppl__btn--danger:disabled,
+.ppl__mkcard .btn.ppl__btn--danger:disabled,
 .ppl__bulk .btn.ppl__btn--danger:disabled { opacity: 0.4; background-color: #fff; }
 
 /* Four actions can sit in one row cell — let them wrap instead of stretching it. */
@@ -21840,12 +22213,36 @@ body .select2-container--default.ppl__pick-menu .select2-results__option[aria-se
     border-radius: 0.3rem;
 }
 .ppl__panel input.form-control:focus { border-color: #001f3f; box-shadow: 0 0 0 0.15rem rgba(0, 31, 63, 0.12); }
+/* The shared pickup strip already draws its own card, so inside the row panel it
+   drops the second border and the trailing gap it needs on a detail page. */
+.ppl__panel--timeline .pkl { border: 0; border-radius: 0; padding: 0; margin-bottom: 0; background: transparent; }
 
 @media (max-width: 767.98px) {
     .ppl__hero { padding: 0.375rem 0.75rem; }
-    .ppl__tally--alert { border-right: 0; padding-right: 0; }
+    /* Stacked: the aside takes the full width under the title and the counts
+       sit hard left, so the dividing rules would fence off nothing. */
+    .ppl__hero-aside { width: 100%; justify-content: space-between; }
+    .ppl__hero-acts { padding-left: 0; border-left: 0; }
+    .ppl__tally:not(.ppl__tally--alert) { border-left: 0; padding-left: 0; }
+    .ppl__filters .ppl__ffield,
+    .ppl__filters .ppl__fdates { flex: 1 1 auto; }
+    /* The preset + From + To do not fit one phone line, so the group wraps:
+       preset takes its own row and the From/To pair shares the next one.
+       These selectors carry .ppl__hero so they outweigh
+       `.ppl__filters .ppl__ffield` above — three classes beats two + element. */
+    .ppl__hero .ppl__fdates { flex-wrap: wrap; }
+    /* The preset is Select2-enhanced, so the flex item on this row is the
+       .ppl__pick container span, not the (hidden) native select. */
+    .ppl__hero .ppl__fdates > select.ppl__ffield,
+    .ppl__hero .ppl__fdates > .select2-container { flex: 1 1 100%; }
+    body .select2-container--default.ppl__pick .select2-selection--single { min-width: 0; }
+    .ppl__hero .ppl__fdate-lbl { flex: 0 0 2.2rem; }
+    .ppl__hero .ppl__fdates > input.ppl__fdate { flex: 1 1 7rem; min-width: 7rem; }
+    .ppl__hero input.ppl__ffield { min-width: 0; }
     .ppl__bulk { align-items: flex-start; }
     .ppl__bulk input.form-control.ppl__bulk-search { min-width: 100%; }
+    /* 20rem is wider than a phone once the panel padding is taken off. */
+    .ppl__mkcard select.ppl__mkloc { width: 100%; }
 }
 
 /* ============================================================================
@@ -23418,3 +23815,478 @@ a.wfstat__card:hover {
 /* The shared staff hero band (.wfhero signature applied to every *__hero block)
    lives in webpages/css/staff-hero.css — kept out of this file so the warehouse
    shell can load it without pulling in all 636K of workforce.css. */
+
+/* ── EARNINGS VERIFICATION PAGE SHELL ─────────────────────────────────────── */
+/* Hero sits flush; .ernv__body below it carries the page padding. */
+.ernv.container-fluid { padding-left: 0; padding-right: 0; }
+.ernv__body { padding: 0.325rem; }
+
+
+/* =============================================================================
+   DRIVER DETAIL (wdd__) — carried onto the Batch-2 order/delivery design system
+   Purpose: Make /workforce/drivers/<id>/ read as the same product as the order +
+            delivery-task pages — chip breadcrumb trail inside a flat navy hero,
+            quiet ledger cards with tinted icon tiles, monospace figures, one
+            yellow accent, ~10% tighter scale.
+   Used by: workforce/templates/workforce/driver_detail.html
+   Notes:   Appended last so it wins by source order over the original wdd__
+            rules (~line 5309). The navy band geometry itself still comes from
+            webpages/css/staff-hero.css — only the inside of the hero is here.
+============================================================================= */
+
+
+/* Hero, page shell, breadcrumb chips and section-card look now come from the
+   shared webpages/css/staff-hero.css (.wfpage / .wfhero__ / .wfcard__). What
+   stays here is only what is specific to this page. */
+
+/* --- Live state strip: account / shift / work preference ------------------- */
+.wdd__ctrl {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 1.25rem;
+    padding: 0.5rem 0.8rem;
+    margin-bottom: 0.8rem;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-left: 3px solid var(--brand-navy, #001f3f);
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.wdd__ctrl__cell {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+.wdd__ctrl__cell--grow { flex: 1 1 auto; }
+.wdd__ctrl__drawer {
+    flex: 1 0 100%;
+    margin-top: 0.15rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid #eef1f5;
+}
+.wdd__ctrl .wdd__status-row__label {
+    min-width: 0;
+    font-size: 0.63rem;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+}
+.wdd__ctrl .wdd__status-row__value {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    color: var(--brand-navy, #001f3f);
+}
+
+/* Standing + shift controls sit on paper, not on navy */
+.wdd__ctrl .wdd__hero__status {
+    padding: 0.16rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+}
+.wdd__ctrl .wdd__hero__status i:first-child { font-size: 0.5rem; }
+.wdd__ctrl .wdd__hero__status i:last-child { font-size: 0.55rem; opacity: 0.6; }
+.wdd__ctrl .wdd__hero__status--approved { background: #dcfce7; color: #15803d; }
+.wdd__ctrl .wdd__hero__status--pending  { background: #fef3c7; color: #92400e; }
+.wdd__ctrl .wdd__hero__status--rejected { background: #fef2f2; color: #dc2626; }
+
+.wdd__ctrl .wdd__hero__toggle {
+    padding: 0.2rem 0.6rem;
+    border-radius: 0.375rem;
+    font-size: 0.68rem;
+    background: #f1f3f5;
+    color: #495057;
+    border: 1px solid #e5e7eb;
+}
+.wdd__ctrl .wdd__hero__toggle:hover { background: #e9ecef; color: #212529; }
+.wdd__ctrl .wdd__hero__toggle--activate { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
+.wdd__ctrl .wdd__hero__toggle--activate:hover { background: #bbf7d0; color: #14532d; }
+.wdd__ctrl .wdd__hero__toggle--deactivate { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.wdd__ctrl .wdd__hero__toggle--deactivate:hover { background: #fecaca; color: #991b1b; }
+.wdd__ctrl .dra__avail-badge { border-radius: 0.375rem; font-size: 0.68rem; }
+
+/* --- Ledger figure rail (was the stats strip) ------------------------------ */
+.wdd__stats {
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+    gap: 0.35rem;
+    margin-bottom: 0.8rem;
+}
+.wdd__stats__item {
+    gap: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.wdd__stats__item:hover {
+    border-color: var(--brand-navy, #001f3f);
+    box-shadow: 0 1px 3px rgba(0, 31, 63, 0.12);
+}
+.wdd__stats__icon {
+    width: 1.65rem;
+    height: 1.65rem;
+    border-radius: 0.35rem;
+    font-size: 0.7rem;
+}
+.wdd__stats__value {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.95rem;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--brand-navy, #001f3f);
+}
+.wdd__stats__value small { font-size: 0.62rem; }
+.wdd__stats__label { font-size: 0.6rem; letter-spacing: 0.07em; font-weight: 600; }
+
+/* --- Tabs: navy ink, yellow underline, tighter ----------------------------- */
+.wdd__tabs {
+    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 0.8rem;
+}
+.wdd__tabs__btn {
+    padding: 0.45rem 0.75rem;
+    border-bottom-width: 2px;
+    margin-bottom: -1px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #6c757d;
+}
+.wdd__tabs__btn i { font-size: 0.68rem; }
+.wdd__tabs__btn.active {
+    color: var(--brand-navy, #001f3f);
+    border-bottom-color: var(--brand-primary, #f7c000);
+}
+.wdd__tabs__count {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.6rem;
+    border-radius: 0.25rem;
+    background: #eef1f5;
+    color: #6b7280;
+}
+.wdd__tabs__btn.active .wdd__tabs__count {
+    background: var(--brand-primary, #f7c000);
+    color: var(--brand-navy, #001f3f);
+}
+
+/* --- Sheets: hairline paper + quiet ledger headers with a tinted icon tile -- */
+.wdd__card {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    margin-bottom: 0.8rem;
+}
+.wdd__card__header {
+    padding: 0.5rem 0.8rem;
+    gap: 0.55rem;
+    background: #fff;
+    color: var(--brand-navy, #001f3f);
+    border-bottom: 1px solid #eef1f5;
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+}
+.wdd__card__header > i:first-child,
+.wdd__card__header > span:first-child > i:first-child {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 0.35rem;
+    background: #eef1f5;
+    color: var(--brand-navy, #001f3f);
+    font-size: 0.68rem;
+    flex-shrink: 0;
+}
+.wdd__card__header > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+.wdd__card__link { font-size: 0.68rem; color: var(--brand-navy, #001f3f); }
+.wdd__card__body { padding: 0.8rem; }
+.wdd__card__body--no-pad { padding: 0; }
+/* Proportional split like the order page's col-lg-8 / col-lg-4, so the activity
+   rail keeps growing with the viewport instead of stranding a fixed 380px. */
+.wdd__grid-2col {
+    gap: 0.8rem;
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 30%, 520px);
+}
+
+/* --- Figures render in mono (coded logistics data) ------------------------- */
+.wdd__summary__num,
+.wdd__cod__val,
+.wdd__info-row__value,
+.wdd__dtable__task-num,
+.wdd__timeline__title,
+.wdd__vehicle__plate,
+.wdd__doc__number {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+}
+.wdd__summary__cell { padding: 0.6rem 0.4rem; }
+.wdd__summary__num { font-size: 1.15rem; letter-spacing: -0.02em; }
+.wdd__summary__text,
+.wdd__cod__lbl { font-size: 0.6rem; letter-spacing: 0.07em; font-weight: 600; }
+.wdd__cod__item { padding: 0.6rem 0.4rem; }
+.wdd__cod__val { font-size: 0.95rem; letter-spacing: -0.02em; }
+.wdd__progress { height: 3px; margin-top: 0.6rem; }
+
+.wdd__info-row { padding: 0.45rem 0.8rem; }
+.wdd__info-row__label { font-size: 0.63rem; letter-spacing: 0.08em; font-weight: 600; }
+.wdd__info-row__value { font-size: 0.78rem; letter-spacing: -0.01em; color: var(--brand-navy, #001f3f); }
+.wdd__info-row__value code { font-family: inherit; background: #eef1f5; }
+
+.wdd__timeline__item { padding: 0.4rem 0.8rem; }
+.wdd__timeline__title { font-size: 0.75rem; color: var(--brand-navy, #001f3f); }
+.wdd__timeline__meta { font-size: 0.68rem; }
+
+.wdd__dtable thead th {
+    padding: 0.5rem 0.65rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    background: #f8f9fa;
+}
+.wdd__dtable tbody td { padding: 0.45rem 0.65rem; font-size: 0.75rem; }
+.wdd__dtable tbody tr:hover td { background: #fffbe8; }
+.wdd__dtable__task-num { color: var(--brand-navy, #001f3f); }
+
+/* --- Status marks: flat ledger badges, not candy pills --------------------- */
+.wdd__status-pill,
+.wdd__timeline__badge,
+.wdd__doc__tag {
+    border-radius: 0.375rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.05em;
+}
+.wdd__status-pill { padding: 0.14rem 0.45rem; }
+.wdd__status-pill--green, .wdd__timeline__badge--green { background: #dcfce7; color: #15803d; }
+.wdd__status-pill--amber, .wdd__timeline__badge--amber { background: #fef3c7; color: #92400e; }
+.wdd__status-pill--red,   .wdd__timeline__badge--red   { background: #fef2f2; color: #dc2626; }
+.wdd__status-pill--grey,  .wdd__timeline__badge--grey  { background: #f1f3f5; color: #495057; }
+
+/* --- Vehicle + document sheets: same hairline paper, no lift --------------- */
+.wdd__vehicle, .wdd__doc {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.8rem;
+    box-shadow: none;
+}
+.wdd__vehicle:hover, .wdd__doc:hover {
+    transform: none;
+    border-color: var(--brand-navy, #001f3f);
+    box-shadow: 0 1px 3px rgba(0, 31, 63, 0.12);
+}
+.wdd__vehicles-grid, .wdd__docs-grid { gap: 0.8rem; }
+.wdd__vehicle__icon, .wdd__doc__icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.35rem;
+    font-size: 0.8rem;
+    background: #eef1f5;
+    color: var(--brand-navy, #001f3f);
+}
+.wdd__doc__icon { background: #fff3c9; color: #8a6d00; }
+.wdd__vehicle__head, .wdd__doc__head { gap: 0.55rem; margin-bottom: 0.6rem; }
+.wdd__vehicle__type, .wdd__doc__type { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; }
+.wdd__vehicle__plate, .wdd__doc__number { font-size: 0.85rem; color: var(--brand-navy, #001f3f); }
+.wdd__vehicle__meta { padding-top: 0.6rem; gap: 0.5rem 0.8rem; border-top-color: #eef1f5; }
+.wdd__vehicle__meta-label { font-size: 0.6rem; letter-spacing: 0.08em; }
+.wdd__vehicle__meta-value {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    color: var(--brand-navy, #001f3f);
+}
+.wdd__vehicle__btn, .wdd__doc__btn, .wdd__doc__view-btn {
+    border-radius: 0.35rem;
+    font-size: 0.66rem;
+    padding: 0.3rem 0.6rem;
+}
+.wdd__vehicle__btn:hover, .wdd__doc__btn:hover, .wdd__doc__view-btn:hover {
+    transform: none;
+    box-shadow: none;
+}
+.wdd__doc__view-btn--available { background: #eef1f5; border-color: #dee2e6; color: var(--brand-navy, #001f3f); }
+.wdd__doc__view-btn--available:hover { background: var(--brand-navy, #001f3f); border-color: var(--brand-navy, #001f3f); color: #fff; }
+
+/* --- Add button + primary action: navy with a yellow underline ------------- */
+.wdd__add-btn,
+.wdd__btn--primary {
+    background: var(--brand-navy, #001f3f);
+    color: #fff;
+    border: none;
+    border-bottom: 2px solid var(--brand-primary, #f7c000);
+    border-radius: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.wdd__add-btn:hover,
+.wdd__btn--primary:hover {
+    background: #003366;
+    color: #fff;
+    transform: none;
+    box-shadow: none;
+}
+.wdd__btn--secondary {
+    border-radius: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.7rem;
+    border-color: #dee2e6;
+}
+.wdd__action-btn {
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.4rem;
+    font-size: 0.7rem;
+    border-color: #dee2e6;
+}
+.wdd__action-btn:hover { border-color: var(--brand-navy, #001f3f); background: #f8f9fa; }
+.wdd__action-btn:hover i { color: var(--brand-navy, #001f3f); }
+
+/* --- Forms: micro labels + the yellow focus ring --------------------------- */
+.wdd__form-grid { gap: 0.7rem; }
+.wdd__form-label { font-size: 0.63rem; letter-spacing: 0.08em; color: #6b7280; }
+.wdd__form-input {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.8rem;
+    border-radius: 0.4rem;
+    border-color: #dee2e6;
+}
+.wdd__form-input:focus {
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.22);
+}
+.wdd__form-input[type="number"] {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+.wdd__form-help { font-size: 0.68rem; }
+.wdd__form-actions { margin-top: 0.9rem; padding-top: 0.7rem; border-top-color: #eef1f5; }
+.wdd__empty { padding: 1.4rem; font-size: 0.75rem; }
+
+@media (max-width: 767.98px) {
+    .wdd__hero { gap: 0.5rem; }
+    .wdd__ctrl { gap: 0.4rem 0.8rem; }
+    .wdd__ctrl__cell { flex: 1 1 100%; }
+    .wdd__stats { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
+}
+
+/* ============================================================================
+   SKU CELL (wf-sku) — shared mono code mark for order-item tables
+   Used by: workforce/order_detail.html, workforce/parts/_order_detail_content.html
+   ========================================================================= */
+.wf-sku {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    color: var(--brand-navy, #001f3f);
+    white-space: nowrap;
+}
+
+/* ── MARKETING DESK RAIL (wfdesk__) ───────────────────────────────────────────
+   Shared furniture, not a page component: every console on one desk carries the
+   same strip so a page knows its siblings. The desk is named because eight bare
+   links otherwise read as a pile; the hairline splits the pipeline pages (where
+   work is moved along) from the inbound form (where it arrives). Monochrome —
+   the current page is marked with ink weight and a rule, never with the accent,
+   which each page already spends once on its own primary action.
+   Markup: workforce/parts/_marketing_desk_rail.html */
+.wfdesk {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.75rem;
+    padding: 0.375rem 0.75rem;
+    margin-bottom: 0.375rem;
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: 8px;
+}
+
+.wfdesk__label {
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--brand-grey-500, #6c757d);
+    white-space: nowrap;
+}
+
+.wfdesk__group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.125rem;
+}
+
+/* Business and Driver are two pipelines, not one list of pages, so each group
+   says which one it is. Quieter than the desk name so the strip still reads as
+   "Marketing desk: …" from left to right, and it sits tight against its own
+   links rather than floating between groups. */
+.wfdesk__label--group {
+    margin-right: 0.25rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--brand-grey-400, #9aa0a6);
+}
+
+/* A full-height hairline rather than a bullet — it separates two kinds of page,
+   so it should read as a boundary, not as another item in the list. */
+.wfdesk__rule {
+    width: 1px;
+    align-self: stretch;
+    min-height: 1.25rem;
+    background: var(--brand-grey-300, #dcdcdc);
+}
+
+.wfdesk__link {
+    display: inline-flex;
+    align-items: center;
+    height: 1.75rem;
+    padding: 0 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--brand-grey-600, #555);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.wfdesk__link:hover {
+    color: var(--brand-navy, #001f3f);
+    background: var(--brand-white, #fff);
+    border-color: var(--brand-grey-300, #dcdcdc);
+    text-decoration: none;
+}
+
+.wfdesk__link:focus-visible {
+    outline: none;
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.28);
+}
+
+/* The page you are on is a statement, not a target — no hover, no pointer. */
+.wfdesk__link--current {
+    font-weight: 700;
+    color: var(--brand-navy, #001f3f);
+    background: var(--brand-white, #fff);
+    border-color: var(--brand-grey-300, #dcdcdc);
+    box-shadow: inset 0 -2px 0 var(--brand-navy, #001f3f);
+    cursor: default;
+}
+
+@media (max-width: 575.98px) {
+    .wfdesk { padding: 0.375rem; }
+    /* The desk name takes its own line; the group names must NOT — they would
+       each break the strip into a column and turn a rail into a menu. */
+    .wfdesk__label { flex: 1 1 100%; }
+    .wfdesk__label--group { flex: 0 0 auto; }
+    .wfdesk__rule { display: none; }
+    /* With the hairlines gone, the group name is the only boundary left, so it
+       needs air in front of it. */
+    .wfdesk__group + .wfdesk__group { margin-left: 0.25rem; }
+}

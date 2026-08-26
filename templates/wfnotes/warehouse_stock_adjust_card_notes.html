@@ -12,7 +12,8 @@ Notes: Fetched by panel id "warehouse_stock_adjust_card_notes"; renaming this fi
         <ol class="wfnote__notes wfnote__flow">
             <li>Pick the business, the warehouse and — if it matters — the storage location.</li>
             <li>The sheet loads every product with its photo and the figure currently on record.</li>
-            <li>Type <strong>what you counted</strong>. The change is worked out for you and shown per row.</li>
+            <li>Choose how you are entering it — a <strong>counted total</strong>, or a <strong>&plusmn; change</strong>
+                such as <code>-1</code> for a damaged unit. The other figure is worked out for you.</li>
             <li>Give a reason, submit, and each corrected line writes an adjustment movement.</li>
         </ol>
 
@@ -21,10 +22,17 @@ Notes: Fetched by panel id "warehouse_stock_adjust_card_notes"; renaming this fi
                 <h2 class="wfnote__h">How the sheet behaves</h2>
                 <dl class="wfnote__list">
                     <div class="wfnote__item">
-                        <dt class="wfnote__term">Counted, not the difference</dt>
+                        <dt class="wfnote__term">Count total</dt>
                         <dd class="wfnote__def">Enter the physical count. The delta is derived at submit
                             time from the live figure, so a receipt or a pick landing while you type is
                             never overwritten with a stale number.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Adjust by &plusmn;</dt>
+                        <dd class="wfnote__def">Enter the change instead — <code>-1</code> for one damaged
+                            unit, <code>+2</code> for two found. Written off whatever is on hand at submit
+                            time, and refused if it would take the shelf below zero. Use this for damage
+                            and loss, where you know how many units went but not the new total.</dd>
                     </div>
                     <div class="wfnote__item">
                         <dt class="wfnote__term">Blank rows are skipped</dt>
@@ -49,9 +57,10 @@ Notes: Fetched by panel id "warehouse_stock_adjust_card_notes"; renaming this fi
                 <h2 class="wfnote__h">What happens on submit</h2>
                 <dl class="wfnote__list">
                     <div class="wfnote__item">
-                        <dt class="wfnote__term">The stock figure is replaced</dt>
-                        <dd class="wfnote__def">Set to what you counted, creating the stock row if the
-                            product had never been counted into that location.</dd>
+                        <dt class="wfnote__term">The stock figure is rewritten</dt>
+                        <dd class="wfnote__def">Set to what you counted, or moved by the change you
+                            entered — creating the stock row if the product had never been counted into
+                            that location.</dd>
                     </div>
                     <div class="wfnote__item">
                         <dt class="wfnote__term">A movement is recorded</dt>

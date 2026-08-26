@@ -308,6 +308,35 @@ class WfOrderListTest(WorkforceTestMixin, TestCase):
             reverse('workforce:wf_orders_all'), {'cStatus': 'to_review'})
         self.assertEqual(resp.status_code, 200)
 
+    def test_to_publish_lists_by_status_not_task_latch(self):
+        """An order sent back to review returns to /orders/to_publish/.
+
+        The page used to filter on task_created=False, a one-way latch that
+        never resets, so a published-then-un-published order could never
+        reappear (and in production the page listed nothing at all).
+        """
+        order = self.create_order(self.biz, self.pickup, status='to_review')
+        order.task_created = True  # already has a delivery task
+        order.save(update_fields=['task_created'])
+
+        resp = self.client.get(reverse('workforce:wf_orders_to_publish'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, order.order_number)
+
+    def test_to_publish_excludes_published_orders(self):
+        """An order at status 'publish' is off the to-publish list."""
+        order = self.create_order(self.biz, self.pickup, status='publish')
+        resp = self.client.get(reverse('workforce:wf_orders_to_publish'))
+        self.assertNotContains(resp, order.order_number)
+
+    def test_order_list_ignores_bogus_status_filter(self):
+        """?cStatus=published is not a choice; it must not silently hide rows."""
+        order = self.create_order(self.biz, self.pickup, status='publish')
+        resp = self.client.get(
+            reverse('workforce:wf_orders_all'), {'cStatus': 'published'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, order.order_number)
+
     def test_all_orders_filter_by_mobile(self):
         """#16: Filter by customer mobile"""
         self.create_order(self.biz, self.pickup)
@@ -685,11 +714,29 @@ class WfOrderStatusTest(WorkforceTestMixin, TestCase):
         resp = self.client.post(
             reverse('workforce:update_order_status',
                     kwargs={'order_id': self.order.id}),
-            json.dumps({'status': 'processing', 'status_type': 'order'}),
+            json.dumps({'status': 'ready_to_pickup', 'status_type': 'order'}),
             content_type='application/json')
         self.assertEqual(resp.status_code, 200)
         data = json.loads(resp.content)
         self.assertTrue(data['success'])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.order_status, 'ready_to_pickup')
+
+    def test_update_order_status_rejects_non_choice(self):
+        """Statuses outside ORDER_STATUS_BY_CLIENT are refused.
+
+        'processing' and 'published' used to sit in a hand-written whitelist
+        that had drifted from the model; order_status is a plain CharField, so
+        that whitelist is the only thing stopping an invalid value being saved.
+        """
+        for bogus in ('processing', 'published', 'to_publish', 'reported'):
+            with self.subTest(status=bogus):
+                resp = self.client.post(
+                    reverse('workforce:update_order_status',
+                            kwargs={'order_id': self.order.id}),
+                    json.dumps({'status': bogus, 'status_type': 'order'}),
+                    content_type='application/json')
+                self.assertEqual(resp.status_code, 400)
 
     def test_update_task_status_valid(self):
         """#53: Update task status"""
@@ -897,6 +944,60 @@ class WfDeliveryTaskTest(WorkforceTestMixin, TestCase):
             json.dumps({'status': 'bogus'}),
             content_type='application/json')
         self.assertEqual(resp.status_code, 400)
+
+    def _move_task_to(self, status):
+        """Drive the task straight to a status without the state machine."""
+        from delivery.models import DeliveryTask
+        DeliveryTask.objects.filter(id=self.task.id).update(dl_task_status=status)
+        self.task.refresh_from_db()
+
+    def test_update_task_status_failed_requires_reason(self):
+        """Closing a task as failed without a reason is rejected."""
+        self._move_task_to('out_for_delivery')
+        resp = self.client.post(
+            reverse('workforce:update_task_status',
+                    kwargs={'task_id': self.task.id}),
+            json.dumps({'status': 'failed'}),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+        self.task.refresh_from_db()
+        self.assertNotEqual(self.task.dl_task_status, 'failed')
+
+    def test_update_task_status_failed_records_reason(self):
+        """Staff reason lands on the same fields the driver app writes."""
+        self._move_task_to('out_for_delivery')
+        resp = self.client.post(
+            reverse('workforce:update_task_status',
+                    kwargs={'task_id': self.task.id}),
+            json.dumps({
+                'status': 'failed',
+                'failure_reason': 'customer_not_home',
+                'failure_notes': 'No answer after 3 calls',
+                'notes': 'Customer Not Home — No answer after 3 calls',
+            }),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.dl_task_status, 'failed')
+        self.assertEqual(self.task.failure_reason, 'customer_not_home')
+        self.assertEqual(self.task.failure_notes, 'No answer after 3 calls')
+
+    def test_update_task_status_cancel_mirrors_rejection_reason(self):
+        """Cancel/reject also fill rejection_reason for the record card."""
+        self._move_task_to('out_for_delivery')
+        resp = self.client.post(
+            reverse('workforce:update_task_status',
+                    kwargs={'task_id': self.task.id}),
+            json.dumps({
+                'status': 'cancelled',
+                'failure_reason': 'customer_refused',
+                'failure_notes': 'Changed mind',
+            }),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.failure_reason, 'customer_refused')
+        self.assertIn('Changed mind', self.task.rejection_reason or '')
 
 
 # =============================================================================

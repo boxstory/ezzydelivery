@@ -57,12 +57,15 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 import csv
 import os
+import re
+import difflib
 from django.contrib.auth.decorators import login_required
 from core.decorators import (
     staff_required, superuser_required, api_staff_required, department_required,
+    is_superadmin as _dec_is_superadmin,
 )
 from core.departments import (
     ADMIN as dept_ADMIN, FIN as dept_FIN, MKT as dept_MKT, OPS as dept_OPS,
@@ -119,6 +122,23 @@ def _parse_date_param(value):
         return dateutil_parser.parse(value).strftime('%Y-%m-%d')
     except (ValueError, TypeError):
         return ''
+
+
+def _parse_filter_date(value, end_of_day=False):
+    """
+    A From/To filter box into an aware datetime, or None when it is empty or junk.
+    `end_of_day` makes a To date inclusive of everything that happened that day.
+    """
+    iso = _parse_date_param(value)
+    if not iso:
+        return None
+    try:
+        naive = datetime.strptime(iso, '%Y-%m-%d')
+    except ValueError:
+        return None
+    if end_of_day:
+        naive = naive.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return timezone.make_aware(naive) if timezone.is_naive(naive) else naive
 
 
 def resolve_shopify_shop_handle(api_settings, persist=True):
@@ -1508,11 +1528,14 @@ def orders_by_seller(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def orders_to_publish(request):
+    # Keyed off order_status, NOT task_created. task_created is a one-way latch
+    # that never resets, so an order sent back to "Hold for Review" after being
+    # published would otherwise never return to this list.
     orders = orders_models.Order.objects.select_related(
         'business'
     ).prefetch_related('order_comments', 'delivery_task').filter(
-        task_created=False
-    ).exclude(order_status='cancelled')
+        order_status__in=['to_review', 'ready_to_pickup']
+    )
 
     orders, filter_context = apply_order_list_filters(request, orders)
     orders = paginate_queryset(request, orders.order_by('-created_at'))
@@ -5282,12 +5305,12 @@ def _resolve_woo_cols(order_dict):
 
 
 def _resolve_formula(formula, col_values):
-    """Resolve a formula like '{col1} {col2}' using col_values dict."""
-    import re
-    def replace_col(m):
-        col = m.group(1).strip()
-        return col_values.get(col, '')
-    return re.sub(r'\{([^}]+)\}', replace_col, formula)
+    """Delegate to _resolve_mapping_value — single source of truth.
+
+    This used to be a second, simpler implementation, which meant the Mapping
+    Manager's API test could preview a different string than the importers wrote.
+    """
+    return _resolve_mapping_value(formula, col_values)
 
 
 @login_required(login_url='/accounts/login/')
@@ -17030,6 +17053,36 @@ def staff_reports(request):
 # Documents section  ------------------------------------------------------------------------------------------------------
 
 
+# Window (days) inside which an ID document counts as "expiring soon" — long
+# enough that ops can chase a renewal before the driver is grounded.
+DOC_EXPIRY_SOON_DAYS = 30
+
+
+def _stamp_document_state(documents):
+    """Attach review state to each document so templates never do date math.
+
+    Sets `expiry_state` (expired / soon / valid / none), `days_left` and
+    `has_back` on every object. `has_real_file` already lives on the model —
+    the shipped placeholder image must not read as an uploaded scan.
+    """
+    today = timezone.localdate()
+    for doc in documents:
+        expiry = doc.document_expiry_date
+        if not expiry:
+            doc.expiry_state = 'none'
+            doc.days_left = None
+        else:
+            doc.days_left = (expiry - today).days
+            if doc.days_left < 0:
+                doc.expiry_state = 'expired'
+            elif doc.days_left <= DOC_EXPIRY_SOON_DAYS:
+                doc.expiry_state = 'soon'
+            else:
+                doc.expiry_state = 'valid'
+        doc.has_back = bool(doc.document_file_back and doc.document_file_back.name)
+    return documents
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def driver_documents_list(request):
@@ -20835,8 +20888,8 @@ def bulk_print_tasks(request):
 @staff_required
 def bulk_print_waybills(request):
     """Label-style waybills (same design as client dashboard Print Labels) for selected tasks."""
-    import base64
-    from delivery.label_utils import generate_barcode_image
+    from django.utils.safestring import mark_safe
+    from delivery.label_utils import generate_barcode_svg
 
     raw_ids = request.GET.get('ids', '').split(',')
     task_ids = [int(v) for v in raw_ids if v.isdigit() and len(v) <= 10][:100]
@@ -21891,7 +21944,9 @@ def qnas_test(request):
 @staff_required
 def pricing_inquiries_list(request):
     """List all 3PL pricing inquiry form submissions."""
-    inquiries = webpages_models.PricingEnquiry.objects.all().order_by('-date_created')
+    inquiries = (webpages_models.PricingEnquiry.objects
+                 .select_related('selected_plan')
+                 .order_by('-date_created'))
 
     search = request.GET.get('search', '').strip()
     if search:
@@ -24184,7 +24239,7 @@ def _temp_row_platform_key(temp_order):
 
 
 def _extract_products_from_raw_row(temp_order):
-    """Extract product_1/count_1..3 from raw_row using column mapping."""
+    """Extract product_1/count_1..MAX_PRODUCT_COLUMNS from raw_row using column mapping."""
     # --- Resolve raw headers (needed for new-format header-name lookups) ---
     raw_headers = []
     if temp_order.onedrive_source and getattr(temp_order.onedrive_source, 'last_headers', None):
