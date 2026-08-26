@@ -1,12 +1,12 @@
 # Purpose: Registry + resolver for editable outbound WhatsApp message bodies, plus the
 #          inventory of staff-driven manual composers that use them.
 # Used by: core.whatsapp_utils senders, workforce.views (order/task composers, auto_triggers_list,
-#          wf_ai_config Messages tab), workforce.crm_views lead detail.
+#          wf_message_templates page), workforce.crm_views lead detail.
 # Notes: Defaults live here so a fresh install works with no DB rows; staff edits are
 #        stored in core.MessageTemplate under the same key and always win. Entries with
 #        kind='composer' only pre-fill a textarea — switching one off gives staff a blank
 #        composer, it never blocks a send. Entries carrying `toggle_owner` have their
-#        on/off owned by an AutoTriggerConfig row, so the Messages tab hides the switch.
+#        on/off owned by an AutoTriggerConfig row, so the Messages page hides the switch.
 
 import logging
 
@@ -142,6 +142,22 @@ Once confirmed I will share your pricing on this chat.
 
 {items_line}📌 Verify your location: {verify_url}""",
     },
+}
+
+
+# ---------------------------------------------------------------------------
+# Which AutoTriggerConfig row SENDS each stored body.
+#
+# Not the same question as ``toggle_owner``, which says which trigger owns a
+# body's on/off switch. The driver thank-you keeps its own switch on the
+# Messages page yet is fired by ``wa_driver_application_thanks``, so it appears
+# here and not there; the verification body is the reverse case and appears in
+# both. Used by the Auto Triggers page to hang the body editor on the trigger
+# row that produces it.
+# ---------------------------------------------------------------------------
+TRIGGER_TEMPLATES = {
+    'wa_driver_application_thanks': DRIVER_APPLICATION_THANKS,
+    'wa_location_verification': ORDER_VERIFY_MANUAL,
 }
 
 

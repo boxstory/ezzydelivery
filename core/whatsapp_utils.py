@@ -153,6 +153,19 @@ Your account verification code is:
 
 This code will expire in 10 minutes.
         """,
+        'device_verify': f"""
+📲 *EZZY Delivery - New Device*
+
+Someone signed in to your driver account on a new device.
+
+Your confirmation code is:
+
+*{verification_code}*
+
+This code will expire in 10 minutes.
+
+If this was not you, do NOT share this code — change your password and tell operations right away.
+        """,
         'inquiry_thanks': f"""
 ✅ *Thank You for Your 3PL Inquiry!*
 
@@ -481,6 +494,56 @@ def get_route_instance(section):
              .filter(section=section, is_enabled=True).first())
     inst = route.instance if route else None
     return inst if (inst and inst.is_active) else None
+
+
+def default_sender_number():
+    """Phone number of the platform default WhatsApp instance, or ''.
+
+    The one number every unconfigured path falls back to. Read from the DB, not
+    from a constant in the source: staff swap numbers on the WhatsApp Instances
+    page, and a literal here would keep sending to a line nobody watches.
+    """
+    from core.models import WhatsAppInstance
+    inst = (WhatsAppInstance.objects.filter(is_active=True, is_default=True).first()
+            or WhatsAppInstance.objects.filter(is_active=True).first())
+    return (inst.phone_number or '') if inst else ''
+
+
+def section_number(section):
+    """The number a section sends from — its route's number, else the default.
+
+    Also the number to hand a customer when we ask them to message us for that
+    section, so the reply lands in the same thread the section answers from.
+    """
+    inst = get_route_instance(section)
+    return (inst.phone_number or '') if (inst and inst.phone_number) else default_sender_number()
+
+
+def alert_recipient(trigger_key):
+    """Staff number an internal alert is delivered TO, or ''.
+
+    Configured per trigger on the Auto Triggers page (``notify_number``);
+    blank falls back to the default sender number, which is what these alerts
+    used before the destination was configurable. Returns '' only when no
+    WhatsApp number exists at all — callers must not send in that case rather
+    than guess a destination.
+    """
+    from core.models import AutoTriggerConfig
+    number = ''
+    try:
+        number = (AutoTriggerConfig.objects
+                  .filter(trigger_key=trigger_key)
+                  .values_list('notify_number', flat=True).first()) or ''
+    except Exception:
+        logger.exception('Recipient lookup failed for %s — using the default number', trigger_key)
+    number = number.strip()
+    if number:
+        is_valid, phone, _err = validate_input_phone(number)
+        if is_valid:
+            return phone
+        logger.warning('Trigger %s has an unusable notify_number %r — using the default',
+                       trigger_key, number)
+    return default_sender_number()
 
 
 def get_route(section):
@@ -898,25 +961,54 @@ Best regards,
     return send_routed_message('crm_leads', phone_number, message)
 
 
-FLEET_WHATSAPP_NUMBER = '97466124545'
+def send_inquiry_resume_nudge(phone_number, business_name, resume_url):
+    """Nudge a lead who started the 3PL form and never finished it.
+
+    Sent the morning after they dropped off, once only, from the CRM & Leads
+    number so a reply lands with sales rather than in a no-man's-land. Switched
+    off with the ``wa_inquiry_resume_nudge`` trigger.
+
+    The link carries their own quote token, so they resume where they stopped
+    instead of retyping the answers they already gave.
+    """
+    if not trigger_enabled('wa_inquiry_resume_nudge'):
+        return {'success': False, 'disabled': True, 'error': 'Trigger is switched off'}
+
+    greeting = f"Hi {business_name}," if business_name else "Hi,"
+    message = f"""*Your EZZY Delivery quote is half-finished*
+
+{greeting}
+
+You started a delivery pricing request with us yesterday but did not get to the end of it.
+
+Your answers are saved. Pick up where you left off here:
+{resume_url}
+
+It takes about two minutes, and you will see your rate straight away.
+
+If you would rather just talk it through, reply to this message and someone from the team will help.
+
+*EZZY Delivery* 🚚
+"""
+    return send_routed_message('crm_leads', phone_number, message)
 
 
 def get_fleet_instance():
     """Return the WhatsApp instance driver-applicant messages send from, or None.
 
     Order of preference:
-      1. The ``driver_onboarding`` sender route, when staff configured one on
-         the Auto Triggers page — that page is the one place this is set.
-      2. The fleet admin number (97466124545), the historical default.
-      3. The orders/tasks route, so a send still goes out from a real number.
+      1. The ``driver_onboarding`` sender route — the Auto Triggers page is the
+         one place this is set, and migration 0029 seeded it with the fleet
+         number so the historical default is now a row staff can change.
+      2. The orders/tasks route, the other number drivers already hear from.
+      3. The platform default instance, so a send still leaves from a real line.
     """
     from core.models import WhatsAppInstance
-    routed = get_route_instance('driver_onboarding')
+    routed = get_route_instance('driver_onboarding') or get_route_instance('orders_tasks')
     if routed:
         return routed
-    inst = WhatsAppInstance.objects.filter(
-        phone_number=FLEET_WHATSAPP_NUMBER, is_active=True).first()
-    return inst or get_route_instance('orders_tasks')
+    return (WhatsAppInstance.objects.filter(is_active=True, is_default=True).first()
+            or WhatsAppInstance.objects.filter(is_active=True).first())
 
 
 def send_driver_application_thank_you(phone_number, first_name=''):
@@ -963,7 +1055,8 @@ def send_admin_inquiry_notification(inquiry):
     Send notification to admin about new 3PL inquiry submission via WhatsApp API
 
     Switched off with the ``wa_quote_admin_alert`` trigger; sends from the CRM &
-    Leads number so the alert sits in the same thread the sales desk works in.
+    Leads number so the alert sits in the same thread the sales desk works in,
+    and lands on that trigger's "Sends to" number (Auto Triggers page).
 
     Args:
         inquiry: PricingEnquiry object
@@ -999,7 +1092,64 @@ def send_admin_inquiry_notification(inquiry):
 {inquiry_url}
 """
 
-    return send_routed_message('crm_leads', '97466451589', message)
+    to_number = alert_recipient('wa_quote_admin_alert')
+    if not to_number:
+        return {'success': False, 'error': 'No alert recipient configured for wa_quote_admin_alert'}
+    return send_routed_message('crm_leads', to_number, message)
+
+
+def send_quote_agreement_notification(inquiry):
+    """
+    Alert the sales number when a prospect picks a plan on the quote page.
+
+    The destination is that trigger's "Sends to" number on the Auto Triggers
+    page. Switched off with the ``wa_quote_agreed_alert`` trigger. Two shapes: a fixed
+    plan they accepted, or the "discuss with sales" choice — which is a callback
+    request, not an agreed rate, and says so.
+
+    Args:
+        inquiry: PricingEnquiry object with the agreement already saved
+
+    Returns:
+        dict: Response with success status
+    """
+    if not trigger_enabled('wa_quote_agreed_alert'):
+        return {'success': False, 'disabled': True, 'error': 'Trigger is switched off'}
+
+    inquiry_url = f"https://ezzydelivery.qa/3pl/inquiry/{inquiry.id}/preview/"
+    plan = inquiry.selected_plan
+    wants_call = bool(plan and plan.is_custom_quote)
+
+    headline = ('🗣️ *QUOTE — CUSTOMER WANTS TO TALK*' if wants_call
+                else '🤝 *QUOTE ACCEPTED BY CUSTOMER*')
+    price_line = ('*Requested:* Custom plan — call back to agree a rate' if wants_call
+                  else f"*Agreed Price:* {inquiry.agreed_price_label}")
+
+    message = f"""{headline}
+
+*Company:* {inquiry.business_name}
+*Contact:* {inquiry.full_name}
+*Phone:* {inquiry.business_contact_number}
+
+*Plan:* {inquiry.agreed_plan_name or '—'}
+{price_line}
+*Confirmed:* {timezone.localtime(inquiry.plan_agreed_at).strftime('%Y-%m-%d %H:%M') if inquiry.plan_agreed_at else '—'}
+"""
+
+    if inquiry.plan_agreement_note:
+        message += f"\n*Customer note:* {inquiry.plan_agreement_note[:400]}\n"
+
+    message += f"""
+*Inquiry ID:* {inquiry.id}
+
+👉 View inquiry details:
+{inquiry_url}
+"""
+
+    to_number = alert_recipient('wa_quote_agreed_alert')
+    if not to_number:
+        return {'success': False, 'error': 'No alert recipient configured for wa_quote_agreed_alert'}
+    return send_routed_message('crm_leads', to_number, message)
 
 
 def verify_code(phone_number, code, verification_type):

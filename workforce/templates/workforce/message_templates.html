@@ -1,0 +1,317 @@
+{# Purpose: Staff console for every outbound WhatsApp body the platform owns — edit the wording, switch one off. #}
+{# Used by: workforce.views.wf_message_templates (URL workforce:wf_message_templates) #}
+{# Notes: wmt__ namespace. Each card is its own form POSTed back to this URL via fetch — nothing here touches .env, so no server reload. #}
+{#        Card ids stay `msg-<key>`: the Auto Triggers composer rows deep-link straight to a body. #}
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Message Templates - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/message-templates.css' %}?v=1" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="wmt">
+  <div class="wmt__wrap">
+
+    <!-- Masthead -->
+    <header class="wmt__hero wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Auto Triggers</span>
+        <h1 class="wfhero__title">Message Templates</h1>
+        <span class="wfhero__sub">
+          The WhatsApp wording the platform owns
+          <span class="wfhero__sep">·</span> what it sends on its own
+          <span class="wfhero__sep">·</span> and the starter text a staff composer opens with
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <div class="wfhero__tallies">
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ stats.total }}</span>
+            <span class="wfhero__tally-lbl">Messages</span>
+          </div>
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ stats.edited }}</span>
+            <span class="wfhero__tally-lbl">Edited</span>
+          </div>
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ stats.off }}</span>
+            <span class="wfhero__tally-lbl">Switched off</span>
+          </div>
+        </div>
+        <nav class="wfhero__actions">
+          <a class="wfhero__ghost btn btn-sm" href="{% url 'workforce:auto_triggers_list' %}">
+            <i class="fa-solid fa-bolt me-1" aria-hidden="true"></i>All Triggers
+          </a>
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_message_templates_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wfnote" id="workforce_message_templates_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_message_templates_card_notes' %}" hidden></div>
+
+    <!-- Global toast -->
+    <div class="wmt__toast" id="wmt_toast" role="status" aria-live="polite"></div>
+
+    <!-- Jump bar: one hop per sender route -->
+    {% if template_groups|length > 1 %}
+    <nav class="wmt__jump" aria-label="Jump to a group">
+      <span class="wmt__jump-kicker">Groups</span>
+      {% for group in template_groups %}
+      <a class="wmt__jump-link" href="#{{ group.anchor }}">
+        {{ group.label }}<span class="wmt__jump-count">{{ group.templates|length }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    {% for group in template_groups %}
+    <section class="wmt__group" id="{{ group.anchor }}">
+      <div class="wmt__group-head">
+        <h2 class="wmt__group-title">{{ group.label }}</h2>
+        <span class="wmt__plate">
+          <span class="wmt__plate-method">SENDS FROM</span>
+          <span class="wmt__plate-text">{{ group.sender_label }}</span>
+        </span>
+        <a class="wmt__group-link ms-auto" href="{% url 'workforce:auto_triggers_list' %}#route-row-{{ group.section }}">
+          Sender route<i class="fa-solid fa-arrow-up-right-from-square ms-1"></i>
+        </a>
+      </div>
+
+      {% for tpl in group.templates %}
+      <form class="wmt__card card mb-3" data-msg-form id="msg-{{ tpl.key }}">
+        <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+          <i class="fa-brands fa-whatsapp"></i><strong>{{ tpl.label }}</strong>
+          {% if tpl.kind == 'composer' %}
+            <span class="wmt__state wmt__state--kind">Composer starter</span>
+          {% else %}
+            <span class="wmt__state wmt__state--auto">Sent automatically</span>
+          {% endif %}
+          {% if tpl.is_customised %}<span class="wmt__state wmt__state--set">Edited</span>{% endif %}
+          {% if tpl.toggle_owner %}
+          {# On/off belongs to a trigger row — showing a second switch here would let #}
+          {# one page silently contradict the other. Point at the real one instead. #}
+          <a class="wmt__help ms-auto text-decoration-none"
+             href="{% url 'workforce:auto_triggers_list' %}#trigger-row-{{ tpl.toggle_owner }}">
+            On/off lives on the <code>{{ tpl.toggle_owner }}</code> trigger
+            <i class="fa-solid fa-arrow-up-right-from-square ms-1"></i>
+          </a>
+          {% else %}
+          <label class="wmt__switch ms-auto">
+            <input type="checkbox" role="switch" name="is_enabled" value="1" {% if tpl.is_enabled %}checked{% endif %}>
+            <span class="wmt__switch-track"></span>
+            <span class="wmt__switch-label">{% if tpl.is_enabled %}Sending{% else %}Off{% endif %}</span>
+          </label>
+          {% endif %}
+        </div>
+
+        <div class="card-body">
+          {% csrf_token %}
+          <input type="hidden" name="template_key" value="{{ tpl.key }}">
+
+          <div class="wmt__help mb-2">{{ tpl.description }}</div>
+
+          <div class="wmt__meta mb-3">
+            <span class="wmt__plate wmt__plate--quiet">
+              <span class="wmt__plate-method">FROM</span>
+              <span class="wmt__plate-text">{{ tpl.sender_label }}</span>
+            </span>
+            <span class="wmt__plate wmt__plate--quiet">
+              <span class="wmt__plate-method">KEY</span>
+              <span class="wmt__plate-text">{{ tpl.key }}</span>
+            </span>
+          </div>
+
+          <div class="wmt__editor">
+            <div class="wmt__editor-main">
+              <label class="form-label" for="wmt_tpl_{{ tpl.key }}">Message body</label>
+              <textarea class="form-control form-control-sm wmt__textarea" id="wmt_tpl_{{ tpl.key }}"
+                        name="body" rows="14" data-default="{{ tpl.default_body }}">{{ tpl.body }}</textarea>
+              <div class="wmt__help mt-1">
+                WhatsApp formatting: <code>*bold*</code>, <code>_italic_</code>, <code>```mono```</code>.
+              </div>
+            </div>
+
+            <aside class="wmt__editor-side">
+              {% if tpl.placeholder_list %}
+              <p class="wmt__side-title">Placeholders</p>
+              <div class="wmt__chips">
+                {% for ph in tpl.placeholder_list %}
+                <button type="button" class="wmt__chip" data-insert="&#123;{{ ph }}&#125;"
+                        data-target="#wmt_tpl_{{ tpl.key }}"
+                        title="Insert at the cursor">&#123;{{ ph }}&#125;</button>
+                {% endfor %}
+              </div>
+              <div class="wmt__help mb-3">Filled in at send time. Click one to drop it at the cursor.</div>
+              {% endif %}
+
+              {% if tpl.used_by %}
+              <p class="wmt__side-title">Opens on</p>
+              <ul class="wmt__uses">
+                {% for use in tpl.used_by %}
+                <li class="wmt__use">
+                  <span class="wmt__use-label">{{ use.label }}</span>
+                  {% for name, href in use.links %}
+                  <a class="wmt__use-link" href="{{ href }}">{{ name }}<i class="fa-solid fa-arrow-up-right-from-square ms-1"></i></a>
+                  {% endfor %}
+                </li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </aside>
+          </div>
+        </div>
+
+        <div class="wmt__card-foot">
+          <button type="button" class="btn btn-sm wmt__btn-ghost" data-tpl-reset="#wmt_tpl_{{ tpl.key }}">
+            <i class="fa-solid fa-rotate-left me-1"></i>Restore default text
+          </button>
+          <button type="button" class="btn btn-sm wmt__btn-ghost" data-tpl-preview="#wmt_tpl_{{ tpl.key }}">
+            <i class="fa-solid fa-eye me-1"></i>Preview
+          </button>
+          <button type="submit" class="btn btn-sm wmt__btn-save ms-auto"><i class="fa-solid fa-floppy-disk me-1"></i>Save message</button>
+        </div>
+        <div class="wmt__preview" data-preview hidden></div>
+        <div class="wmt__feedback" data-feedback></div>
+      </form>
+      {% endfor %}
+    </section>
+    {% empty %}
+    <div class="card"><div class="card-body">No editable messages registered.</div></div>
+    {% endfor %}
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const SAVE_URL = '{% url "workforce:wf_message_templates" %}';
+  const CSRF = (document.querySelector('input[name=csrfmiddlewaretoken]') || {}).value || '';
+
+  // --- toast ---
+  const toastEl = document.getElementById('wmt_toast');
+  let toastTimer = null;
+  function toast(msg, ok) {
+    if (!toastEl) return;
+    toastEl.textContent = msg;
+    toastEl.className = 'wmt__toast wmt__toast--show ' + (ok ? 'wmt__toast--ok' : 'wmt__toast--err');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.className = 'wmt__toast'; }, 2600);
+  }
+
+  // --- save one message ---
+  document.querySelectorAll('form[data-msg-form]').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const btn = form.querySelector('button[type=submit]');
+      const fb = form.querySelector('[data-feedback]');
+      const orig = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving…';
+      fetch(SAVE_URL, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': CSRF },
+        body: new FormData(form),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          btn.disabled = false; btn.innerHTML = orig;
+          if (d.success) {
+            toast(d.message || 'Saved', true);
+            if (fb) { fb.textContent = d.message; fb.className = 'wmt__feedback wmt__feedback--ok'; }
+          } else {
+            toast(d.message || 'Save failed', false);
+            if (fb) { fb.textContent = d.message || 'Save failed'; fb.className = 'wmt__feedback wmt__feedback--err'; }
+          }
+        })
+        .catch(function () { btn.disabled = false; btn.innerHTML = orig; toast('Network error', false); });
+    });
+  });
+
+  // --- restore the shipped text (staged in the box — still needs a save) ---
+  document.querySelectorAll('[data-tpl-reset]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const ta = document.querySelector(btn.dataset.tplReset);
+      if (!ta) return;
+      ta.value = ta.dataset.default || '';
+      ta.focus();
+      toast('Default text restored — save to apply', true);
+    });
+  });
+
+  // --- live switch label ---
+  document.querySelectorAll('form[data-msg-form] input[name="is_enabled"]').forEach(function (sw) {
+    sw.addEventListener('change', function () {
+      const lbl = sw.parentElement.querySelector('.wmt__switch-label');
+      if (lbl) lbl.textContent = sw.checked ? 'Sending' : 'Off';
+    });
+  });
+
+  // --- placeholder chips insert at the cursor ---
+  document.querySelectorAll('[data-insert]').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      const ta = document.querySelector(chip.dataset.target);
+      if (!ta) return;
+      const token = chip.dataset.insert;
+      const start = ta.selectionStart, end = ta.selectionEnd;
+      ta.value = ta.value.slice(0, start) + token + ta.value.slice(end);
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = start + token.length;
+    });
+  });
+
+  // --- preview: WhatsApp bubble with sample values in the placeholders ---
+  const SAMPLES = {
+    first_name: 'Ahmed', lead_name: 'Ahmed', contact_name: 'Ahmed', customer_name: 'Ahmed',
+    staff_name: 'Fatima', company: 'Doha Boutique', business_name: 'Doha Boutique',
+    order_number: 'EZ-10428', items_line: '📦 2 × Abaya (Black, M)\n',
+    verify_url: 'https://ezzydelivery.qa/v/8f3a2c',
+  };
+  function escapeHtml(s) {
+    return s.replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function renderWa(body) {
+    let out = escapeHtml(body.replace(/\{(\w+)\}/g, function (m, k) {
+      return Object.prototype.hasOwnProperty.call(SAMPLES, k) ? SAMPLES[k] : m;
+    }));
+    // WhatsApp's own markers, in the order it applies them.
+    out = out.replace(/```([\s\S]+?)```/g, '<code>$1</code>')
+             .replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>')
+             .replace(/_([^_\n]+)_/g, '<em>$1</em>')
+             .replace(/~([^~\n]+)~/g, '<s>$1</s>')
+             .replace(/\n/g, '<br>');
+    return out;
+  }
+  document.querySelectorAll('[data-tpl-preview]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const form = btn.closest('form');
+      const ta = document.querySelector(btn.dataset.tplPreview);
+      const box = form.querySelector('[data-preview]');
+      if (!ta || !box) return;
+      if (!box.hidden) { box.hidden = true; return; }
+      box.innerHTML = '<span class="wmt__preview-kicker">Preview · sample values</span>'
+                    + '<div class="wmt__bubble">' + renderWa(ta.value) + '</div>';
+      box.hidden = false;
+    });
+  });
+
+  // --- land on the card a deep link asked for ---
+  if (window.location.hash && window.location.hash.indexOf('#msg-') === 0) {
+    const target = document.getElementById(window.location.hash.slice(1));
+    if (target) {
+      target.classList.add('wmt__card--targeted');
+      target.scrollIntoView({ block: 'start' });
+    }
+  }
+})();
+</script>
+{% endblock content %}

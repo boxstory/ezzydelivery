@@ -3,7 +3,8 @@ Purpose: Tests for editable WhatsApp message bodies and the manual-composer inve
 Used by: python manage.py test core.tests_message_templates
 Notes: test_every_manual_composer_row_resolves is the load-bearing one — a typo in a link name
        or a section key would 500 the whole Auto Triggers page, which is where staff go to fix
-       WhatsApp routing in the first place.
+       WhatsApp routing in the first place. The bodies themselves are edited on
+       workforce:wf_message_templates (its own page since the AI Config Messages tab was split out).
 """
 
 from django.contrib.auth import get_user_model
@@ -95,21 +96,29 @@ class TemplateResolutionTests(TestCase):
             'delivery details and availability.\n\n📌 Verify your location: https://x/')
 
 
-class MessagesTabSaveTests(TestCase):
-    """The AI Config Messages tab write path."""
+class MessageTemplatesPageTests(TestCase):
+    """The Message Templates page — its own console since the AI Config
+    Messages tab was split out."""
 
     def setUp(self):
         self.user = User.objects.create_superuser(
             username='msgtpl_admin', email='a@b.co', password='x')
         self.client.force_login(self.user)
-        self.url = reverse('workforce:wf_ai_config')
+        self.url = reverse('workforce:wf_message_templates')
+
+    def test_page_renders_a_card_for_every_registered_template(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode()
+        for key in TEMPLATE_DEFAULTS:
+            with self.subTest(key=key):
+                self.assertIn(f'id="msg-{key}"', html)
 
     def test_saving_a_trigger_owned_template_keeps_it_enabled(self):
         """Its form renders no switch, so `is_enabled` is absent from the POST.
         Reading the missing field would silently disable order verification."""
         self.assertTrue(TEMPLATE_DEFAULTS[ORDER_VERIFY_MANUAL]['toggle_owner'])
         resp = self.client.post(self.url, {
-            'section': 'templates',
             'template_key': ORDER_VERIFY_MANUAL,
             'body': 'Hi {customer_name} — reworded.',
         }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
@@ -121,7 +130,6 @@ class MessagesTabSaveTests(TestCase):
     def test_composer_template_can_be_switched_off(self):
         self.assertEqual(TEMPLATE_DEFAULTS[CRM_LEAD_MANUAL]['kind'], KIND_COMPOSER)
         self.client.post(self.url, {
-            'section': 'templates',
             'template_key': CRM_LEAD_MANUAL,
             'body': 'anything',
         }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
@@ -129,7 +137,6 @@ class MessagesTabSaveTests(TestCase):
 
     def test_unedited_body_stores_nothing_so_it_follows_the_default(self):
         self.client.post(self.url, {
-            'section': 'templates',
             'template_key': CRM_LEAD_MANUAL,
             'is_enabled': '1',
             'body': TEMPLATE_DEFAULTS[CRM_LEAD_MANUAL]['body'],
@@ -140,7 +147,6 @@ class MessagesTabSaveTests(TestCase):
 
     def test_unknown_key_is_rejected(self):
         resp = self.client.post(self.url, {
-            'section': 'templates',
             'template_key': 'not_a_template',
             'body': 'x',
         }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')

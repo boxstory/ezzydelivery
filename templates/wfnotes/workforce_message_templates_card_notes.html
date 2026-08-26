@@ -1,0 +1,108 @@
+{% comment %}
+Purpose: "About this page" notes panel for message_templates.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_message_templates_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Every WhatsApp message whose <strong>wording belongs to the platform</strong> lives here — the
+            ones it sends on its own, and the starter text a staff composer opens with. Editing a body here
+            changes it <strong>everywhere it is used</strong>, immediately, for the next send. Nothing on this
+            page touches a server setting, so there is no reload and no deploy involved. Which
+            <em>number</em> each message leaves from is decided on <strong>All Triggers</strong>, not here.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Message body</dt>
+                        <dd class="wfnote__def">The text itself. Save applies it to the next send. Leaving it
+                            exactly as shipped stores nothing, so that message keeps following the built-in
+                            default even if the default is later improved.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Placeholders</dt>
+                        <dd class="wfnote__def">The chips on the right. Click one to drop it at the cursor.
+                            Each is replaced with real data at send time — a name you type by hand would go
+                            out to every recipient unchanged.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Preview</dt>
+                        <dd class="wfnote__def">Renders the body as a WhatsApp bubble with sample values, so
+                            bold, italics and line breaks can be checked before saving. Sample values only —
+                            it sends nothing.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Restore default text</dt>
+                        <dd class="wfnote__def">Puts the shipped wording back in the box. It is not applied
+                            until you press Save, so you can compare first.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sending / Off</dt>
+                        <dd class="wfnote__def">The switch in the card header. What "off" means depends on the
+                            kind of message — see the column beside this one.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Opens on</dt>
+                        <dd class="wfnote__def">The staff screens that open with this body. Use it to check a
+                            reworded message where staff will actually meet it.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading a card</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sent automatically</dt>
+                        <dd class="wfnote__def">The platform sends this one with nobody watching. Switching it
+                            off means it genuinely stops going out.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Composer starter</dt>
+                        <dd class="wfnote__def">Only pre-fills a textarea a staff member reads and edits before
+                            sending. Switching it off opens that composer <strong>blank</strong> — it never
+                            blocks a send.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edited</dt>
+                        <dd class="wfnote__def">Someone has changed this body from the shipped text. Without the
+                            badge, the card is showing the built-in default.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">FROM</dt>
+                        <dd class="wfnote__def">The number this message currently leaves from, resolved live
+                            from the sender route for its group. Change it on All Triggers.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">KEY</dt>
+                        <dd class="wfnote__def">The internal name of the message — what a log line or a support
+                            question refers to.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">On/off lives on … trigger</dt>
+                        <dd class="wfnote__def">Shown instead of a switch when an automation trigger already
+                            owns whether this message goes out. Two switches for one decision is how a page
+                            ends up lying, so this card links to the real one.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>A body is shared. The order verification text, for example, is used by the order page, the
+                    delivery task page, the verification queue's <em>Send now</em> and the automatic pipeline —
+                    all four change together.</li>
+                <li>An unknown placeholder is left in the message as-is rather than breaking the send, so a
+                    typo like <code>{customer}</code> will go out visibly wrong instead of silently failing.</li>
+                <li>Messages are grouped by <strong>sender route</strong>, which is what decides the number and
+                    the channel. Moving a number is a change on All Triggers; this page only follows it.</li>
+                <li>Formatting is WhatsApp's own: <code>*bold*</code>, <code>_italic_</code>,
+                    <code>~strike~</code>. HTML does nothing.</li>
+                <li>Switching off a composer starter does not stop staff messaging that customer — it only
+                    takes away the head start.</li>
+            </ul>
+        </section>

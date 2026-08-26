@@ -461,6 +461,7 @@ urlpatterns = [
     path('auto-triggers/', workforce_views.auto_triggers_list, name='auto_triggers_list'),
     path('auto-triggers/toggle/', workforce_views.auto_trigger_toggle, name='auto_trigger_toggle'),
     path('auto-triggers/update/', workforce_views.auto_trigger_update, name='auto_trigger_update'),
+    path('auto-triggers/message/save/', workforce_views.auto_trigger_message_save, name='auto_trigger_message_save'),
     path('auto-triggers/flows/', workforce_views.auto_flows_list, name='auto_flows_list'),
     path('auto-triggers/flows/add/', workforce_views.auto_flow_add, name='auto_flow_add'),
     path('auto-triggers/flows/<int:flow_id>/edit/', workforce_views.auto_flow_edit, name='auto_flow_edit'),
@@ -473,6 +474,7 @@ urlpatterns = [
     path('auto-triggers/ai-config/', workforce_views.wf_ai_config, name='wf_ai_config'),
     path('auto-triggers/ai-config/models/', workforce_views.wf_ai_models_api, name='wf_ai_models_api'),
     path('auto-triggers/ai-config/test/', workforce_views.wf_ai_config_test, name='wf_ai_config_test'),
+    path('auto-triggers/messages/', workforce_views.wf_message_templates, name='wf_message_templates'),
 
     # WhatsApp Instances
     path('auto-triggers/whatsapp-instances/', workforce_views.whatsapp_instances_list, name='whatsapp_instances_list'),

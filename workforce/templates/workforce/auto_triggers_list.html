@@ -6,12 +6,18 @@ Used by: workforce_views.auto_triggers_list at /workforce/auto-triggers/
 Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
        help button toggles it via the delegated handler in workforce.js.
        Rows are already filtered to the viewer's departments in the view; the department
-       tabs below only narrow what is on screen (data-dept on every row).
+       tabs and the search box below only narrow what is on screen (data-dept on every row).
+       Search is client-side over each row's rendered text, ANDed with the active tab;
+       both filters write themselves back to the URL (?dept=&q=).
+       Inside every card the rows are bucketed into subject sub-sections (Orders / Delivery
+       Tasks / Business Leads / Driver Onboarding / COD / Platform) by TRIGGER_DOMAINS in
+       workforce/views.py. A row carries a space-separated group list ("notif notif:order")
+       so BOTH its section heading and its sub-heading disappear when a filter empties them.
 {% endcomment %}
 
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}?v=20260718f" rel="stylesheet" type="text/css" />
-<link href="{% static 'workforce/css/auto-triggers.css' %}?v=20260807b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/auto-triggers.css' %}?v=20260822d" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -34,21 +40,41 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
     <div class="wfnote" id="workforce_auto_triggers_list_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_auto_triggers_list_card_notes' %}" hidden></div>
 
-    <!-- Department split: one tab per desk the viewer holds -->
-    {% if dept_tabs|length > 1 %}
-    <nav id="workforce_auto_triggers_nav_departments" class="atl__tabs d-flex flex-wrap align-items-center gap-1 mb-3"
-         aria-label="Filter triggers by department">
-        <span class="atl__tabs-label">Department</span>
-        <button type="button" class="atl__tab" data-dept-tab="all">
-            All<span class="atl__tab-count">{{ total_rows }}</span>
-        </button>
-        {% for tab in dept_tabs %}
-        <button type="button" class="atl__tab" data-dept-tab="{{ tab.code }}">
-            {{ tab.label }}<span class="atl__tab-count">{{ tab.count }}</span>
-        </button>
-        {% endfor %}
-    </nav>
-    {% elif dept_tabs %}
+    <!-- Filter rail: free-text search + one tab per desk the viewer holds.
+         Both narrow the SAME rows client-side; the server already scoped them. -->
+    <div class="atl__filterbar d-flex flex-wrap align-items-center gap-2 mb-3">
+        <div class="atl__search">
+            <i class="fa-solid fa-magnifying-glass atl__search-icon" aria-hidden="true"></i>
+            <input type="search" id="workforce_auto_triggers_input_search"
+                   class="form-control atl__search-input"
+                   placeholder="Search name, key, number, page…"
+                   autocomplete="off" spellcheck="false"
+                   aria-label="Search triggers" aria-controls="workforce_auto_triggers_empty_filter">
+            <button type="button" class="atl__search-clear d-none" data-atl-search-clear
+                    title="Clear search">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                <span class="visually-hidden">Clear search</span>
+            </button>
+        </div>
+        <span class="atl__search-count" data-atl-search-count aria-live="polite" hidden></span>
+
+        {% if dept_tabs|length > 1 %}
+        <nav id="workforce_auto_triggers_nav_departments" class="atl__tabs d-flex flex-wrap align-items-center gap-1 ms-auto"
+             aria-label="Filter triggers by department">
+            <span class="atl__tabs-label">Department</span>
+            <button type="button" class="atl__tab" data-dept-tab="all">
+                All<span class="atl__tab-count">{{ total_rows }}</span>
+            </button>
+            {% for tab in dept_tabs %}
+            <button type="button" class="atl__tab" data-dept-tab="{{ tab.code }}">
+                {{ tab.label }}<span class="atl__tab-count">{{ tab.count }}</span>
+            </button>
+            {% endfor %}
+        </nav>
+        {% endif %}
+    </div>
+
+    {% if dept_tabs|length == 1 %}
     <p class="atl__deskline mb-3">
         <i class="fa-solid fa-user-group me-1" aria-hidden="true"></i>
         {{ dept_tabs.0.label }} desk — {{ dept_tabs.0.count }} trigger{{ dept_tabs.0.count|pluralize }} owned by your department.
@@ -57,7 +83,8 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
 
     <div id="workforce_auto_triggers_empty_filter" class="atl__empty d-none">
         <i class="fa-solid fa-inbox me-1" aria-hidden="true"></i>
-        No automatic triggers are assigned to this department yet.
+        <span data-atl-empty="dept">No automatic triggers are assigned to this department yet.</span>
+        <span data-atl-empty="search" hidden>Nothing matches <strong data-atl-empty-query></strong>. <button type="button" class="atl__empty-reset" data-atl-search-clear>Clear search</button></span>
     </div>
 
     <!-- WhatsApp Notifications Section -->
@@ -77,11 +104,9 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                     <thead class="table-light">
                         <tr>
                             <th class="atl__col--num">#</th>
-                            <th class="atl__col--trigger">Trigger</th>
-                            <th class="atl__col--desc">Description</th>
-                            <th class="atl__col--action">Action</th>
+                            <th class="atl__col--id">Trigger</th>
                             <th class="atl__col--pages">Pages</th>
-                            <th class="atl__col--from">From WhatsApp</th>
+                            <th class="atl__col--from">Sends from</th>
                             <th class="atl__col--status">Status</th>
                             <th class="atl__col--switch text-center">Enabled</th>
                             <th class="atl__col--edit text-center">Edit</th>
@@ -90,34 +115,43 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                     <tbody>
                         <!-- Sub-group: Sender Routing -->
                         <tr class="table-light" data-dept-group-header="routes">
-                            <td colspan="9" class="fw-bold text-uppercase small text-muted">
+                            <td colspan="7" class="fw-bold text-uppercase small text-muted">
                                 <i class="fa-solid fa-route me-1"></i>Sender Routing — which number <em class="text-lowercase fw-normal">and channel</em> each section sends from
                             </td>
                         </tr>
-                        {% for r in wa_routes %}
-                        <tr id="route-row-{{ r.section }}" data-dept="{{ r.department }}" data-dept-group="routes">
-                            <td class="atl__rownum">{{ forloop.counter }}</td>
-                            <td>
-                                <strong>{{ r.label }}</strong>
-                                <div><code class="text-muted small user-select-all atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ r.code }}</code></div>
-                                <div class="atl__dept" data-dept-chip>{{ r.department_label }}</div>
-                            </td>
-                            <td>{{ r.description }}</td>
-                            <td><code>{{ r.action }}</code></td>
-                            <td>
-                                {% if r.links %}
-                                <div class="d-flex flex-column gap-1 align-items-start">
-                                    {% for name, url in r.links %}
-                                    <a href="{{ url }}" class="wa-notif__page-link">
-                                        {{ name }}<i class="fa-solid fa-arrow-up-right-from-square"></i>
-                                    </a>
-                                    {% endfor %}
+                        {% for g in route_groups %}
+                        <tr class="atl__subhead" data-dept-group-header="{{ g.group }}">
+                            <td colspan="7"><i class="fa-solid {{ g.icon }}" aria-hidden="true"></i>{{ g.label }}</td>
+                        </tr>
+                        {% for r in g.rows %}
+                        <tr id="route-row-{{ r.section }}" data-dept="{{ r.department }}" data-dept-group="routes {{ g.group }}">
+                            <td class="atl__rownum">{{ r.num }}</td>
+                            <td class="atl__cell--id">
+                                <div class="atl__id">
+                                    <strong class="atl__label">{{ r.label }}</strong>
+                                    <code class="atl__key atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ r.code }}</code>
+                                    <span class="atl__dept" data-dept-chip>{{ r.department_label }}</span>
                                 </div>
-                                {% else %}
-                                <span class="text-muted small">—</span>
-                                {% endif %}
+                                <div class="atl__desc">{{ r.description }}</div>
+                                <div class="atl__meta">
+                                    {% if r.action %}
+                                    <span class="atl__meta-item">
+                                        <span class="atl__meta-label">Runs</span>
+                                        <code>{{ r.action }}</code>
+                                    </span>
+                                    {% endif %}
+                                </div>
                             </td>
-                            <td>
+                            <td class="atl__cell--pages">
+                                {% for name, url in r.links %}
+                                <a href="{{ url }}" class="wa-notif__page-link">
+                                    {{ name }}<i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                </a>
+                                {% empty %}
+                                <span class="atl__pages-none">—</span>
+                                {% endfor %}
+                            </td>
+                            <td class="atl__cell--voice">
                                 <div id="route-fromcell-{{ r.section }}" data-instance-id="{{ r.instance.id|default:'' }}">
                                     {% if r.instance %}
                                         <span class="badge wa-notif__from-badge" title="{{ r.instance.label }} · {{ r.instance.instance_name }}">
@@ -158,50 +192,64 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                             </td>
                         </tr>
                         {% endfor %}
+                        {% endfor %}
                         <!-- Sub-group: Manual Composers -->
                         <tr class="table-light" data-dept-group-header="composers">
-                            <td colspan="9" class="fw-bold text-uppercase small text-muted">
+                            <td colspan="7" class="fw-bold text-uppercase small text-muted">
                                 <i class="fa-solid fa-keyboard me-1"></i>Manual Composers — where staff type a message <em class="text-lowercase fw-normal">and send it themselves</em>
                             </td>
                         </tr>
-                        {% for c in wa_composers %}
-                        <tr id="composer-row-{{ c.code }}" data-dept="{{ c.department }}" data-dept-group="composers">
-                            <td class="atl__rownum">{{ forloop.counter }}</td>
-                            <td>
-                                <strong>{{ c.label }}</strong>
-                                <div><code class="text-muted small user-select-all atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ c.code }}</code></div>
-                                <div class="atl__dept" data-dept-chip>{{ c.department_label }}</div>
-                            </td>
-                            <td>{{ c.description }}</td>
-                            <td><code>{{ c.action }}</code></td>
-                            <td>
-                                {% if c.links %}
-                                <div class="d-flex flex-column gap-1 align-items-start">
-                                    {% for name, url in c.links %}
-                                    <a href="{{ url }}" class="wa-notif__page-link">
-                                        {{ name }}<i class="fa-solid fa-arrow-up-right-from-square"></i>
-                                    </a>
-                                    {% endfor %}
+                        {% for g in composer_groups %}
+                        <tr class="atl__subhead" data-dept-group-header="{{ g.group }}">
+                            <td colspan="7"><i class="fa-solid {{ g.icon }}" aria-hidden="true"></i>{{ g.label }}</td>
+                        </tr>
+                        {% for c in g.rows %}
+                        <tr id="composer-row-{{ c.code }}" data-dept="{{ c.department }}" data-dept-group="composers {{ g.group }}">
+                            <td class="atl__rownum">{{ c.num }}</td>
+                            <td class="atl__cell--id">
+                                <div class="atl__id">
+                                    <strong class="atl__label">{{ c.label }}</strong>
+                                    <code class="atl__key atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ c.code }}</code>
+                                    <span class="atl__dept" data-dept-chip>{{ c.department_label }}</span>
                                 </div>
-                                {% else %}
-                                <span class="text-muted small">every list &amp; detail page</span>
-                                {% endif %}
+                                <div class="atl__desc">{{ c.description }}</div>
+                                <div class="atl__meta">
+                                    {% if c.action %}
+                                    <span class="atl__meta-item">
+                                        <span class="atl__meta-label">Runs</span>
+                                        <code>{{ c.action }}</code>
+                                    </span>
+                                    {% endif %}
+                                </div>
                             </td>
-                            <td>
+                            <td class="atl__cell--pages">
+                                {% for name, url in c.links %}
+                                <a href="{{ url }}" class="wa-notif__page-link">
+                                    {{ name }}<i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                </a>
+                                {% empty %}
+                                <span class="atl__pages-none">every list &amp; detail page</span>
+                                {% endfor %}
+                            </td>
+                            <td class="atl__cell--voice">
                                 {% if c.section %}
-                                    {# The number is not set here — it is whatever the route above says. #}
-                                    <a href="#route-row-{{ c.section }}" class="atl__uses-route" title="Uses the {{ c.route_label }} sender route">
-                                        <i class="fa-solid fa-route me-1"></i>{{ c.route_label }}
-                                    </a>
+                                    {% comment %}
+                                    The number is not set here — it is whatever the route says. It still
+                                    leads, same as every other row in this column; the route name is the
+                                    provenance caption underneath it.
+                                    {% endcomment %}
                                     {% if c.route %}
-                                    <div class="mt-1">
                                         {% if c.route.instance %}
                                             <span class="badge wa-notif__from-badge"><i class="fa-brands fa-whatsapp me-1"></i>{{ c.route.instance.phone_number|default:c.route.instance.instance_name }}</span>
                                         {% elif wa_sender.number %}
                                             <span class="badge wa-notif__from-badge wa-notif__from-badge--default"><i class="fa-brands fa-whatsapp me-1"></i>{{ wa_sender.number }}</span>
                                         {% endif %}
-                                    </div>
                                     {% endif %}
+                                    <div class="mt-1">
+                                        <a href="#route-row-{{ c.section }}" class="atl__uses-route" title="Set by the {{ c.route_label }} sender route">
+                                            <i class="fa-solid fa-route me-1"></i>{{ c.route_label }}
+                                        </a>
+                                    </div>
                                 {% else %}
                                     <span class="text-muted small">Not routed here</span>
                                 {% endif %}
@@ -209,44 +257,78 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                             <td class="atl__cell--rail">
                                 {% if not c.template %}
                                     <span class="badge bg-secondary-subtle text-secondary border" title="Staff type the whole message — there is no stored body to edit">Free text</span>
-                                {% elif c.template.is_enabled %}
-                                    <span class="badge bg-success">Pre-filled</span>
                                 {% else %}
-                                    <span class="badge bg-secondary" title="Composer opens blank — sending still works">Blank</span>
+                                    <span data-msg-state="{{ c.template.key }}">
+                                    {% if c.template.is_enabled %}
+                                        <span class="badge bg-success">Pre-filled</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary" title="Composer opens blank — sending still works">Blank</span>
+                                    {% endif %}
+                                    </span>
                                 {% endif %}
                             </td>
                             <td class="text-center">
                                 <span class="text-muted small" title="A person sends this — there is nothing to switch off">Manual</span>
                             </td>
                             <td class="text-center">
-                                {% if c.template_url %}
-                                <a href="{{ c.template_url }}" class="btn btn-sm btn-outline-secondary" title="Edit the message body: {{ c.template.label }}">
-                                    <i class="fa-solid fa-pen-to-square"></i>
-                                </a>
+                                {% if c.template %}
+                                <div class="atl__actions btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            onclick="openMessageModal('{{ c.template.key }}')"
+                                            title="Edit the message body: {{ c.template.label }}">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                    </button>
+                                    {% if can_open_messages_page %}
+                                    <a href="{{ c.template_url }}" class="btn btn-sm btn-outline-secondary"
+                                       title="Open this message on the Messages page">
+                                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
                                 {% else %}
                                 <span class="text-muted small">—</span>
                                 {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
+                        {% endfor %}
                         <!-- Sub-group: Notification Triggers -->
                         <tr class="table-light" data-dept-group-header="notif">
-                            <td colspan="9" class="fw-bold text-uppercase small text-muted">
+                            <td colspan="7" class="fw-bold text-uppercase small text-muted">
                                 <i class="fa-brands fa-whatsapp me-1"></i>Notification Triggers — automatic messages per event
                             </td>
                         </tr>
-                        {% for t in wa_triggers %}
-                        <tr id="trigger-row-{{ t.trigger_key }}" data-dept="{{ t.department }}" data-dept-group="notif">
-                            <td class="atl__rownum">{{ forloop.counter }}</td>
-                            <td>
-                                <strong id="label-{{ t.trigger_key }}">{{ t.label }}</strong>
-                                <div><code class="text-muted small user-select-all atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ t.trigger_key }}</code></div>
-                                <div class="atl__dept" data-dept-chip>{{ t.get_department_display }}</div>
+                        {% for g in wa_groups %}
+                        <tr class="atl__subhead" data-dept-group-header="{{ g.group }}">
+                            <td colspan="7"><i class="fa-solid {{ g.icon }}" aria-hidden="true"></i>{{ g.label }}</td>
+                        </tr>
+                        {% for t in g.rows %}
+                        <tr id="trigger-row-{{ t.trigger_key }}" data-dept="{{ t.department }}" data-dept-group="notif {{ g.group }}">
+                            <td class="atl__rownum">{{ t.num }}</td>
+                            <td class="atl__cell--id">
+                                <div class="atl__id">
+                                    <strong class="atl__label" id="label-{{ t.trigger_key }}">{{ t.label }}</strong>
+                                    <code class="atl__key atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ t.trigger_key }}</code>
+                                    <span class="atl__dept" data-dept-chip>{{ t.get_department_display }}</span>
+                                </div>
+                                <div class="atl__desc" id="desc-{{ t.trigger_key }}">{{ t.description }}</div>
+                                <div class="atl__meta">
+                                    <span class="atl__meta-item{% if not t.action %} d-none{% endif %}">
+                                        <span class="atl__meta-label">Runs</span>
+                                        <code id="action-{{ t.trigger_key }}">{{ t.action }}</code>
+                                    </span>
+                                </div>
                             </td>
-                            <td><span id="desc-{{ t.trigger_key }}">{{ t.description }}</span></td>
-                            <td><code id="action-{{ t.trigger_key }}">{{ t.action }}</code></td>
-                            <td><span class="text-muted small">—</span></td>
-                            <td>
+                            <td class="atl__cell--pages">
+                                {% for name, url in t.page_links %}
+                                <a href="{{ url }}" class="wa-notif__page-link">
+                                    {{ name }}<i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                </a>
+                                {% empty %}
+                                <span class="atl__pages-none">—</span>
+                                {% endfor %}
+                            </td>
+                            <td class="atl__cell--voice">
                                 <div id="fromcell-{{ t.trigger_key }}" data-instance-id="{{ t.whatsapp_instance_id|default:'' }}" data-channel="{{ t.whatsapp_channel }}">
                                     {% if t.whatsapp_instance %}
                                         <span class="badge wa-notif__from-badge" title="Override · {{ t.whatsapp_instance.label }} · {{ t.whatsapp_instance.instance_name }}">
@@ -275,6 +357,27 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                                         </span>
                                     {% endif %}
                                 </div>
+                                {% comment %}
+                                Only staff-alert triggers get a destination line. Everything else
+                                writes to the customer / driver on the record, which is not ours
+                                to choose — an empty slot there is the honest reading.
+                                {% endcomment %}
+                                {% if t.recipient_for %}
+                                <div class="mt-1" id="tocell-{{ t.trigger_key }}"
+                                     data-notify-number="{{ t.notify_number }}"
+                                     data-recipient-for="{{ t.recipient_for }}">
+                                    {% if t.recipient_number %}
+                                        <span class="badge wa-notif__to-badge{% if t.recipient_is_default %} wa-notif__to-badge--default{% endif %}"
+                                              title="{{ t.recipient_for }}{% if t.recipient_is_default %} · default number (no override set){% endif %}">
+                                            <i class="fa-solid fa-arrow-right-long me-1"></i>to {{ t.recipient_number }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary border" title="{{ t.recipient_for }} — nothing will be sent until a number is set">
+                                            <i class="fa-solid fa-arrow-right-long me-1"></i>no recipient
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
                             </td>
                             <td class="atl__cell--rail">
                                 <span class="badge {% if t.is_enabled %}bg-success{% else %}bg-secondary{% endif %}" id="badge-{{ t.trigger_key }}">
@@ -290,13 +393,29 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                                 </div>
                             </td>
                             <td class="text-center">
-                                <button class="btn btn-sm btn-outline-secondary" onclick="openEditModal('{{ t.trigger_key }}', '{{ t.category }}')" title="Edit trigger">
-                                    <i class="fa-solid fa-pen-to-square"></i>
-                                </button>
+                                <div class="atl__actions btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openEditModal('{{ t.trigger_key }}', '{{ t.category }}')" title="Edit trigger">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                    </button>
+                                    {% if t.template %}
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            onclick="openMessageModal('{{ t.template.key }}')"
+                                            title="Edit the message body: {{ t.template.label }}">
+                                        <i class="fa-solid fa-comment-dots"></i>
+                                    </button>
+                                    {% if can_open_messages_page %}
+                                    <a href="{{ t.template_url }}" class="btn btn-sm btn-outline-secondary"
+                                       title="Open this message on the Messages page">
+                                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
+                        {% endfor %}
                         {% empty %}
-                        <tr><td colspan="9" class="text-center text-muted py-3">No WhatsApp triggers configured</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-3">No WhatsApp triggers configured</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -321,25 +440,51 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                     <thead class="table-light">
                         <tr>
                             <th class="atl__col--num">#</th>
-                            <th class="atl__col--trigger-wide">Event</th>
-                            <th class="atl__col--desc-wide">Description</th>
-                            <th class="atl__col--action-wide">Action</th>
+                            <th class="atl__col--event">Event</th>
+                            <th class="atl__col--key">Trigger key</th>
+                            <th class="atl__col--runs">Runs</th>
                             <th class="atl__col--status">Status</th>
                             <th class="atl__col--switch text-center">Enabled</th>
                             <th class="atl__col--edit text-center">Edit</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for t in wh_triggers %}
-                        <tr id="trigger-row-{{ t.trigger_key }}" data-dept="{{ t.department }}">
-                            <td class="atl__rownum">{{ forloop.counter }}</td>
-                            <td>
-                                <code id="label-{{ t.trigger_key }}">{{ t.label }}</code>
-                                <div><code class="text-muted small user-select-all atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ t.trigger_key }}</code></div>
-                                <div class="atl__dept" data-dept-chip>{{ t.get_department_display }}</div>
+                        {% for g in wh_groups %}
+                        <tr class="atl__subhead" data-dept-group-header="{{ g.group }}">
+                            <td colspan="7"><i class="fa-solid {{ g.icon }}" aria-hidden="true"></i>{{ g.label }}</td>
+                        </tr>
+                        {% for t in g.rows %}
+                        <tr id="trigger-row-{{ t.trigger_key }}" data-dept="{{ t.department }}" data-dept-group="{{ g.group }}">
+                            <td class="atl__rownum">{{ t.num }}</td>
+                            <td class="atl__cell--id">
+                                <div class="atl__id">
+                                    <strong class="atl__label atl__label--code" id="label-{{ t.trigger_key }}">{{ t.label }}</strong>
+                                    <span class="atl__dept" data-dept-chip>{{ t.get_department_display }}</span>
+                                </div>
+                                <div class="atl__desc" id="desc-{{ t.trigger_key }}">{{ t.description }}</div>
                             </td>
-                            <td><span id="desc-{{ t.trigger_key }}">{{ t.description }}</span></td>
-                            <td><code id="action-{{ t.trigger_key }}">{{ t.action }}</code></td>
+                            {% comment %}
+                            The key is the handle you paste into a subscriber config or a log
+                            grep, so on this table it gets its own column instead of riding
+                            behind the label — one x to scan down, still click-to-copy.
+                            {% endcomment %}
+                            <td class="atl__cell--key">
+                                <code class="atl__key atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ t.trigger_key }}</code>
+                            </td>
+                            {% comment %}
+                            "Runs" has its own column here instead of the meta rail under the
+                            description: a webhook row is a handler, so the code path IS the
+                            payload of the row, and every value in one column is scannable.
+                            The .atl__meta-item wrapper stays because the edit-modal save
+                            path finds it with closest() to hide an emptied action.
+                            {% endcomment %}
+                            <td class="atl__cell--runs">
+                                <span class="atl__meta-item{% if not t.action %} d-none{% endif %}">
+                                    <code id="action-{{ t.trigger_key }}">{{ t.action }}</code>
+                                </span>
+                                <span class="atl__runs-none{% if t.action %} d-none{% endif %}"
+                                      data-runs-none="{{ t.trigger_key }}">—</span>
+                            </td>
                             <td class="atl__cell--rail">
                                 <span class="badge {% if t.is_enabled %}bg-success{% else %}bg-secondary{% endif %}" id="badge-{{ t.trigger_key }}">
                                     {% if t.is_enabled %}Active{% else %}Disabled{% endif %}
@@ -359,6 +504,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                                 </button>
                             </td>
                         </tr>
+                        {% endfor %}
                         {% empty %}
                         <tr><td colspan="7" class="text-center text-muted py-3">No webhook triggers configured</td></tr>
                         {% endfor %}
@@ -385,25 +531,34 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                     <thead class="table-light">
                         <tr>
                             <th class="atl__col--num">#</th>
-                            <th class="atl__col--trigger-wide">Trigger</th>
-                            <th class="atl__col--desc-wide">Description</th>
-                            <th class="atl__col--action-wide">Action</th>
+                            <th class="atl__col--id-wide">Trigger</th>
                             <th class="atl__col--status">Status</th>
                             <th class="atl__col--switch text-center">Enabled</th>
                             <th class="atl__col--edit text-center">Edit</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for t in sys_triggers %}
-                        <tr id="trigger-row-{{ t.trigger_key }}" data-dept="{{ t.department }}">
-                            <td class="atl__rownum">{{ forloop.counter }}</td>
-                            <td>
-                                <strong id="label-{{ t.trigger_key }}">{{ t.label }}</strong>
-                                <div><code class="text-muted small user-select-all atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ t.trigger_key }}</code></div>
-                                <div class="atl__dept" data-dept-chip>{{ t.get_department_display }}</div>
+                        {% for g in sys_groups %}
+                        <tr class="atl__subhead" data-dept-group-header="{{ g.group }}">
+                            <td colspan="5"><i class="fa-solid {{ g.icon }}" aria-hidden="true"></i>{{ g.label }}</td>
+                        </tr>
+                        {% for t in g.rows %}
+                        <tr id="trigger-row-{{ t.trigger_key }}" data-dept="{{ t.department }}" data-dept-group="{{ g.group }}">
+                            <td class="atl__rownum">{{ t.num }}</td>
+                            <td class="atl__cell--id">
+                                <div class="atl__id">
+                                    <strong class="atl__label" id="label-{{ t.trigger_key }}">{{ t.label }}</strong>
+                                    <code class="atl__key atl__copy" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent).then(()=> showToast &amp;&amp; showToast('Copied!','success'))">{{ t.trigger_key }}</code>
+                                    <span class="atl__dept" data-dept-chip>{{ t.get_department_display }}</span>
+                                </div>
+                                <div class="atl__desc" id="desc-{{ t.trigger_key }}">{{ t.description }}</div>
+                                <div class="atl__meta">
+                                    <span class="atl__meta-item{% if not t.action %} d-none{% endif %}">
+                                        <span class="atl__meta-label">Runs</span>
+                                        <code id="action-{{ t.trigger_key }}">{{ t.action }}</code>
+                                    </span>
+                                </div>
                             </td>
-                            <td><span id="desc-{{ t.trigger_key }}">{{ t.description }}</span></td>
-                            <td><code id="action-{{ t.trigger_key }}">{{ t.action }}</code></td>
                             <td class="atl__cell--rail">
                                 <span class="badge {% if t.is_enabled %}bg-success{% else %}bg-secondary{% endif %}" id="badge-{{ t.trigger_key }}">
                                     {% if t.is_enabled %}Active{% else %}Disabled{% endif %}
@@ -423,8 +578,9 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                                 </button>
                             </td>
                         </tr>
+                        {% endfor %}
                         {% empty %}
-                        <tr><td colspan="7" class="text-center text-muted py-3">No system triggers configured</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted py-3">No system triggers configured</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -510,6 +666,20 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                     </select>
                     <div class="form-text">Force this trigger through Evolution API or WAHA, or leave Default to follow the server config.</div>
                 </div>
+                <!-- Staff destination — shown only for alerts that go to a desk -->
+                <div class="mb-3 d-none" id="editWaRecipientBlock">
+                    <label class="form-label fw-bold" for="editWaRecipient"><i class="fa-solid fa-arrow-right-long wa-notif__icon me-1"></i>Sends to (staff number)</label>
+                    <select class="form-select" id="editWaRecipient" onchange="onRecipientChange()">
+                        <option value="">Default ({{ wa_sender.number|default:"not set" }})</option>
+                        {% for inst in wa_instances %}{% if inst.phone_number %}
+                        <option value="{{ inst.phone_number }}">{{ inst.phone_number }}{% if inst.label %} — {{ inst.label }}{% endif %}</option>
+                        {% endif %}{% endfor %}
+                        <option value="__custom__">Other number…</option>
+                    </select>
+                    <input type="text" class="form-control mt-2 d-none" id="editWaRecipientCustom"
+                           inputmode="numeric" autocomplete="off" placeholder="e.g. 97455512345 or 55512345">
+                    <div class="form-text" id="editWaRecipientHelp"></div>
+                </div>
                 <div class="mb-3">
                     <label for="editTriggerLabel" class="form-label fw-bold">Label</label>
                     <input type="text" class="form-control" id="editTriggerLabel">
@@ -533,16 +703,105 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
     </div>
 </div>
 
+{% comment %}
+Edit Message Modal — the WhatsApp body a row actually sends. Composer rows used
+to link out to the Messages console here, which navigated away mid-edit and, for
+any desk that is not super admin, landed on a page they cannot open at all.
+The console link survives as a secondary action for those who can use it.
+{% endcomment %}
+<div class="modal fade" id="editMessageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-brands fa-whatsapp me-2"></i><span id="editMsgTitle">Message body</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editMsgKey">
+                <p class="atl__msg-desc" id="editMsgDesc"></p>
+
+                <div class="form-check form-switch mb-3" id="editMsgEnabledBlock">
+                    <input class="form-check-input" type="checkbox" role="switch" id="editMsgEnabled">
+                    <label class="form-check-label" for="editMsgEnabled" id="editMsgEnabledLabel">Sending</label>
+                </div>
+                <p class="atl__msg-owned d-none" id="editMsgOwned"></p>
+
+                <label class="form-label fw-bold" for="editMsgBody">Message body</label>
+                <textarea class="form-control atl__msg-body" id="editMsgBody" rows="14"></textarea>
+                <div class="form-text">
+                    WhatsApp formatting: <code>*bold*</code>, <code>_italic_</code>, <code>```mono```</code>.
+                </div>
+
+                <div class="mt-3 d-none" id="editMsgChipsBlock">
+                    <span class="form-label fw-bold d-block mb-1">Placeholders</span>
+                    <div class="atl__msg-chips" id="editMsgChips"></div>
+                    <div class="form-text">Filled in at send time. Click one to drop it at the cursor.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm me-auto" onclick="resetMessageBody()">
+                    <i class="fa-solid fa-rotate-left me-1"></i>Restore default text
+                </button>
+                {% if can_open_messages_page %}
+                <a class="btn btn-outline-secondary btn-sm" id="editMsgPageLink" href="{% url 'workforce:wf_message_templates' %}"
+                   title="Open the full Messages console at this body">
+                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Messages page
+                </a>
+                {% endif %}
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="saveMessageBtn" onclick="saveMessage()">
+                    <i class="fa-solid fa-check me-1"></i>Save message
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ msg_editor|json_script:"atl_msg_editor" }}
+
 <script>
-// --- Department tabs --------------------------------------------------------
+// --- Filters: search + department tabs --------------------------------------
 // The server already narrowed the rows to the departments this user holds; this
-// only decides which of those are on screen. Cards with nothing left are hidden
-// so a desk never stares at three empty tables.
+// only decides which of those are on screen. Both filters are ANDed: a row shows
+// when its desk matches the tab AND every search word appears in its text. Cards
+// with nothing left are hidden so a desk never stares at three empty tables.
 (function () {
     var page = document.querySelector('.atl');
     if (!page) return;
     var tabs = Array.prototype.slice.call(page.querySelectorAll('[data-dept-tab]'));
     var emptyBox = document.getElementById('workforce_auto_triggers_empty_filter');
+    var searchInput = document.getElementById('workforce_auto_triggers_input_search');
+    var countBox = page.querySelector('[data-atl-search-count]');
+    var emptyDeptMsg = emptyBox && emptyBox.querySelector('[data-atl-empty="dept"]');
+    var emptySearchMsg = emptyBox && emptyBox.querySelector('[data-atl-empty="search"]');
+    var emptyQuery = emptyBox && emptyBox.querySelector('[data-atl-empty-query]');
+    var allRows = Array.prototype.slice.call(page.querySelectorAll('tbody tr[data-dept]'));
+    var totalRows = allRows.length;
+    var currentDept = 'all';
+    var currentQuery = '';
+
+    // One flat haystack per row, built once: label, key, description, "Runs",
+    // page names, number, channel, status — everything the row prints. Cached on
+    // the node because the toggle handlers rewrite parts of it later and we want
+    // the search to keep matching what the row was catalogued as.
+    function haystack(row) {
+        if (!row._atlText) {
+            row._atlText = (row.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        }
+        return row._atlText;
+    }
+    allRows.forEach(haystack);
+
+    function matches(row, terms) {
+        if (!terms.length) return true;
+        var text = haystack(row);
+        for (var i = 0; i < terms.length; i++) {
+            if (text.indexOf(terms[i]) === -1) return false;
+        }
+        return true;
+    }
 
     // "n / m on" per section. Counts the rows currently ON SCREEN, so the reading
     // follows the department tabs, and re-runs after every toggle. Exposed on
@@ -566,12 +825,15 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
     }
     window.atlRecount = recount;
 
-    function applyDept(dept) {
+    function applyFilters() {
+        var dept = currentDept;
+        var terms = currentQuery.split(/\s+/).filter(Boolean);
         var totalVisible = 0;
         page.querySelectorAll('.card').forEach(function (card) {
             var shown = 0;
             card.querySelectorAll('tbody tr[data-dept]').forEach(function (row) {
-                var show = (dept === 'all' || row.dataset.dept === dept);
+                var show = (dept === 'all' || row.dataset.dept === dept)
+                    && matches(row, terms);
                 row.classList.toggle('d-none', !show);
                 if (show) {
                     shown++;
@@ -579,11 +841,13 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                     if (num) num.textContent = shown;
                 }
             });
-            // A sub-group heading survives only if its group still has a row.
+            // A heading survives only if its group still has a row. Rows carry a
+            // space-separated group list ("notif notif:order"), so ~= covers both
+            // the section heading and the subject sub-heading under it.
             card.querySelectorAll('tbody tr[data-dept-group-header]').forEach(function (hdr) {
                 var group = hdr.dataset.deptGroupHeader;
                 var alive = card.querySelector(
-                    'tbody tr[data-dept-group="' + group + '"]:not(.d-none)');
+                    'tbody tr[data-dept-group~="' + group + '"]:not(.d-none)');
                 hdr.classList.toggle('d-none', !alive);
             });
             card.classList.toggle('d-none', shown === 0);
@@ -593,7 +857,18 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
         page.querySelectorAll('[data-dept-chip]').forEach(function (chip) {
             chip.classList.toggle('d-none', dept !== 'all');
         });
-        if (emptyBox) emptyBox.classList.toggle('d-none', totalVisible > 0);
+        if (emptyBox) {
+            emptyBox.classList.toggle('d-none', totalVisible > 0);
+            // Two different dead ends: an empty desk and a search with no hit.
+            // Say which one it is, and hand back a way out of the second.
+            if (emptyDeptMsg) emptyDeptMsg.hidden = !!terms.length;
+            if (emptySearchMsg) emptySearchMsg.hidden = !terms.length;
+            if (emptyQuery) emptyQuery.textContent = '“' + currentQuery + '”';
+        }
+        if (countBox) {
+            countBox.hidden = !terms.length;
+            countBox.textContent = totalVisible + ' of ' + totalRows + ' shown';
+        }
         recount();
         tabs.forEach(function (btn) {
             btn.classList.toggle('atl__tab--active', btn.dataset.deptTab === dept);
@@ -602,14 +877,73 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
             var url = new URL(window.location.href);
             if (dept === 'all') { url.searchParams.delete('dept'); }
             else { url.searchParams.set('dept', dept); }
+            if (currentQuery) { url.searchParams.set('q', currentQuery); }
+            else { url.searchParams.delete('q'); }
             window.history.replaceState({}, '', url);
         } catch (e) { /* history is a nicety, never break the filter over it */ }
     }
-
     tabs.forEach(function (btn) {
-        btn.addEventListener('click', function () { applyDept(btn.dataset.deptTab); });
+        btn.addEventListener('click', function () {
+            currentDept = btn.dataset.deptTab;
+            applyFilters();
+        });
     });
-    applyDept("{{ active_dept|escapejs }}");
+
+    if (searchInput) {
+        var clearBtns = Array.prototype.slice.call(
+            page.querySelectorAll('[data-atl-search-clear]'));
+        var syncClear = function () {
+            clearBtns.forEach(function (b) {
+                if (b.classList.contains('atl__search-clear')) {
+                    b.classList.toggle('d-none', !currentQuery);
+                }
+            });
+        };
+        searchInput.addEventListener('input', function () {
+            currentQuery = searchInput.value.replace(/\s+/g, ' ').trim().toLowerCase();
+            syncClear();
+            applyFilters();
+        });
+        // Esc clears without leaving the field — the native search "x" only
+        // fires input in some browsers, so both paths funnel through here.
+        searchInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && searchInput.value) {
+                e.preventDefault();
+                searchInput.value = '';
+                searchInput.dispatchEvent(new Event('input'));
+            }
+        });
+        clearBtns.forEach(function (b) {
+            b.addEventListener('click', function () {
+                searchInput.value = '';
+                searchInput.dispatchEvent(new Event('input'));
+                searchInput.focus();
+            });
+        });
+        // "/" jumps to the box, the way every console search does.
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+            var el = document.activeElement;
+            var tag = el ? (el.tagName || '').toLowerCase() : '';
+            if (tag === 'input' || tag === 'textarea' || tag === 'select'
+                || (el && el.isContentEditable)) return;
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+        });
+        // A ?q= in the URL survives a reload and shareable links.
+        try {
+            var q0 = new URL(window.location.href).searchParams.get('q') || '';
+            if (q0) {
+                searchInput.value = q0;
+                currentQuery = q0.replace(/\s+/g, ' ').trim().toLowerCase();
+            }
+        } catch (e) { /* no query restore is fine */ }
+        syncClear();
+    }
+
+    currentDept = "{{ active_dept|escapejs }}";
+    applyFilters();
 })();
 
 function openRouteModal(section, label) {
@@ -749,6 +1083,35 @@ function updateFromCell(key, data) {
     cell.innerHTML = html;
 }
 
+// "Other number…" reveals the free-text box; every other choice hides it, so
+// only one of the two controls can ever hold the value being saved.
+function onRecipientChange() {
+    var sel = document.getElementById('editWaRecipient');
+    var box = document.getElementById('editWaRecipientCustom');
+    var custom = sel.value === '__custom__';
+    box.classList.toggle('d-none', !custom);
+    if (custom) box.focus();
+}
+
+// Rebuild a trigger's "to {number}" line after save
+function updateToCell(key, data) {
+    var cell = document.getElementById('tocell-' + key);
+    if (!cell) return;
+    var num = (data.notify_number || '').trim();
+    cell.dataset.notifyNumber = num;
+    var isDefault = !num;
+    var shown = num || WA_SENDER_DEFAULT.number;
+    var who = cell.dataset.recipientFor || '';
+    if (shown) {
+        cell.innerHTML = '<span class="badge wa-notif__to-badge' + (isDefault ? ' wa-notif__to-badge--default' : '') +
+            '" title="' + who + (isDefault ? ' · default number (no override set)' : '') +
+            '"><i class="fa-solid fa-arrow-right-long me-1"></i>to ' + shown + '</span>';
+    } else {
+        cell.innerHTML = '<span class="badge bg-secondary-subtle text-secondary border" title="' + who +
+            ' — nothing will be sent until a number is set"><i class="fa-solid fa-arrow-right-long me-1"></i>no recipient</span>';
+    }
+}
+
 function openEditModal(key, category) {
     document.getElementById('editTriggerKey').value = key;
     document.getElementById('editTriggerLabel').value = (document.getElementById('label-' + key) || {}).textContent?.trim() || '';
@@ -769,8 +1132,169 @@ function openEditModal(key, category) {
         chBlock.classList.add('d-none');
     }
 
+    // Destination: present only when the row carries a "to" cell, i.e. this
+    // trigger alerts a staff desk. A stored number that is not one of our own
+    // instances drops into the free-text box rather than being lost.
+    var toBlock = document.getElementById('editWaRecipientBlock');
+    var toCell = document.getElementById('tocell-' + key);
+    if (toCell) {
+        var sel = document.getElementById('editWaRecipient');
+        var box = document.getElementById('editWaRecipientCustom');
+        var num = (toCell.dataset.notifyNumber || '').trim();
+        var known = Array.prototype.some.call(sel.options, function (o) { return o.value === num; });
+        sel.value = num ? (known ? num : '__custom__') : '';
+        box.value = (num && !known) ? num : '';
+        onRecipientChange();
+        document.getElementById('editWaRecipientHelp').textContent =
+            (toCell.dataset.recipientFor || '') + ' — leave Default to use the platform default number.';
+        toBlock.classList.remove('d-none');
+    } else {
+        toBlock.classList.add('d-none');
+    }
+
     new bootstrap.Modal(document.getElementById('editTriggerModal')).show();
 }
+
+// --- Message bodies ---------------------------------------------------------
+// Every body reachable from a row on this page, shipped with the HTML so the
+// popup opens without a round trip. Saves go back to the trigger-page endpoint,
+// not the admin-only Messages console.
+var ATL_MESSAGES = JSON.parse(document.getElementById('atl_msg_editor').textContent);
+
+function openMessageModal(key) {
+    var tpl = ATL_MESSAGES[key];
+    if (!tpl) { alert('This message is not editable here.'); return; }
+
+    document.getElementById('editMsgKey').value = key;
+    document.getElementById('editMsgTitle').textContent = tpl.label;
+    document.getElementById('editMsgDesc').textContent = tpl.description || '';
+    document.getElementById('editMsgBody').value = tpl.body || '';
+
+    // On/off belongs to a trigger for some bodies — showing a second switch
+    // here would let one control silently contradict the other.
+    var swBlock = document.getElementById('editMsgEnabledBlock');
+    var owned = document.getElementById('editMsgOwned');
+    if (tpl.toggle_owner) {
+        swBlock.classList.add('d-none');
+        owned.classList.remove('d-none');
+        owned.innerHTML = 'On/off for this message lives on the <code>' + tpl.toggle_owner +
+            '</code> trigger row above — the text here is sent whenever that trigger is on.';
+    } else {
+        swBlock.classList.remove('d-none');
+        owned.classList.add('d-none');
+        var sw = document.getElementById('editMsgEnabled');
+        sw.checked = !!tpl.is_enabled;
+        setMsgEnabledLabel();
+    }
+
+    var chipsBlock = document.getElementById('editMsgChipsBlock');
+    var chips = document.getElementById('editMsgChips');
+    chips.innerHTML = '';
+    if (tpl.placeholders && tpl.placeholders.length) {
+        tpl.placeholders.forEach(function (ph) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'atl__msg-chip';
+            b.textContent = '{' + ph + '}';
+            b.title = 'Insert at the cursor';
+            b.addEventListener('click', function () { insertPlaceholder('{' + ph + '}'); });
+            chips.appendChild(b);
+        });
+        chipsBlock.classList.remove('d-none');
+    } else {
+        chipsBlock.classList.add('d-none');
+    }
+
+    var link = document.getElementById('editMsgPageLink');
+    if (link) link.href = tpl.url;
+
+    new bootstrap.Modal(document.getElementById('editMessageModal')).show();
+}
+
+function setMsgEnabledLabel() {
+    var sw = document.getElementById('editMsgEnabled');
+    document.getElementById('editMsgEnabledLabel').textContent =
+        sw.checked ? 'Sending' : 'Off — the composer opens blank';
+}
+
+function insertPlaceholder(token) {
+    var ta = document.getElementById('editMsgBody');
+    var start = ta.selectionStart, end = ta.selectionEnd;
+    ta.value = ta.value.slice(0, start) + token + ta.value.slice(end);
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = start + token.length;
+}
+
+// Stages the shipped text in the box — it still needs a save to apply.
+function resetMessageBody() {
+    var tpl = ATL_MESSAGES[document.getElementById('editMsgKey').value];
+    if (!tpl) return;
+    var ta = document.getElementById('editMsgBody');
+    ta.value = tpl.default_body || '';
+    ta.focus();
+    if (typeof showToast === 'function') showToast('Default text restored — save to apply', 'success');
+}
+
+function saveMessage() {
+    var key = document.getElementById('editMsgKey').value;
+    var tpl = ATL_MESSAGES[key];
+    var body = document.getElementById('editMsgBody').value;
+    var btn = document.getElementById('saveMessageBtn');
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...';
+
+    var form = new FormData();
+    form.append('template_key', key);
+    form.append('body', body);
+    if (tpl && !tpl.toggle_owner && document.getElementById('editMsgEnabled').checked) {
+        form.append('is_enabled', '1');
+    }
+
+    fetch("{% url 'workforce:auto_trigger_message_save' %}", {
+        method: 'POST',
+        headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': getCSRFToken()},
+        body: form
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (!data.success) {
+            alert('Error: ' + (data.error || 'Failed to save'));
+            return;
+        }
+        // Keep the in-page copy current so re-opening the popup (or Restore)
+        // reflects what is actually stored, without a reload.
+        if (tpl) {
+            tpl.body = data.body;
+            tpl.is_enabled = data.is_enabled;
+            tpl.is_customised = data.is_customised;
+        }
+        updateMsgStateCells(key, data.is_enabled);
+        bootstrap.Modal.getInstance(document.getElementById('editMessageModal')).hide();
+        if (typeof showToast === 'function') showToast(data.message || 'Message saved', 'success');
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        alert('Error: ' + err.message);
+    });
+}
+
+// One body can back several composer rows — repaint every one of them.
+function updateMsgStateCells(key, isEnabled) {
+    document.querySelectorAll('[data-msg-state="' + key + '"]').forEach(function (cell) {
+        cell.innerHTML = isEnabled
+            ? '<span class="badge bg-success">Pre-filled</span>'
+            : '<span class="badge bg-secondary" title="Composer opens blank — sending still works">Blank</span>';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    var sw = document.getElementById('editMsgEnabled');
+    if (sw) sw.addEventListener('change', setMsgEnabledLabel);
+});
 
 function saveTrigger() {
     const key = document.getElementById('editTriggerKey').value;
@@ -788,6 +1312,14 @@ function saveTrigger() {
         payload.whatsapp_instance_id = document.getElementById('editWaInstance').value;
         payload.whatsapp_channel = document.getElementById('editWaChannel').value;
     }
+    // Destination, only for the staff-alert triggers that show the block
+    const toBlock = document.getElementById('editWaRecipientBlock');
+    if (toBlock && !toBlock.classList.contains('d-none')) {
+        const sel = document.getElementById('editWaRecipient').value;
+        payload.notify_number = (sel === '__custom__')
+            ? document.getElementById('editWaRecipientCustom').value.trim()
+            : sel;
+    }
 
     fetch("{% url 'workforce:auto_trigger_update' %}", {
         method: 'POST',
@@ -804,8 +1336,19 @@ function saveTrigger() {
             const actionEl = document.getElementById('action-' + key);
             if (labelEl) labelEl.textContent = data.label;
             if (descEl) descEl.textContent = data.description;
-            if (actionEl) actionEl.textContent = data.action;
+            if (actionEl) {
+                actionEl.textContent = data.action;
+                // The "Runs" label is hidden when a trigger has no action — give it
+                // back the moment someone types one in, instead of on next reload.
+                const runs = actionEl.closest('.atl__meta-item');
+                if (runs) runs.classList.toggle('d-none', !data.action);
+                // On the Webhook table "Runs" is a column, so an empty one has to
+                // fall back to a dash rather than leave a hole in the grid.
+                const runsNone = document.querySelector('[data-runs-none="' + key + '"]');
+                if (runsNone) runsNone.classList.toggle('d-none', !!data.action);
+            }
             updateFromCell(key, data);
+            if ('notify_number' in data) updateToCell(key, data);
             if ('whatsapp_channel' in data) {
                 var cell = document.getElementById('fromcell-' + key);
                 if (cell) cell.dataset.channel = data.whatsapp_channel || '';

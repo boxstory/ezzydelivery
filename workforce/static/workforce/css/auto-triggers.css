@@ -1,9 +1,11 @@
 /* Purpose: Auto Triggers ledger design layer — restrained console styling for /workforce/auto-triggers/
    Used by: workforce/templates/workforce/auto_triggers_list.html (page wrapper class .atl)
    Notes: Visual overrides only (colors, chrome); layout stays Bootstrap utilities. Status pills become swatch+text.
-          The three tables share ONE column grid (percentages below, table-layout:fixed) so the
-          Status/Enabled/Edit control rail lands on the same x in all of them — the page reads as
-          one ledger, not three. Change a rail width and you must change it in every ..--rail* rule. */
+          Every row reads in three zones, split by two hairlines: IDENTITY (what fires, what it does,
+          where it appears) | VOICE (which number, which channel) | CONTROL (status, switch, edit).
+          The three tables share ONE column grid so the two hairlines and the control rail land on the
+          same x in all of them — the page reads as one ledger, not three. Change a zone width and you
+          must change it in both grids below (they are arithmetically matched, see the comment there). */
 
 .atl {
   --atl-ink: #16233a;
@@ -14,6 +16,65 @@
   --atl-ok: #2fae5f;
   --atl-off: #9aa3af;
   --atl-warn: #d97706;
+}
+
+/* ---- Filter rail: search field + department tabs ---- */
+.atl .atl__search {
+  position: relative;
+  flex: 0 1 22rem;
+  min-width: 13rem;
+}
+.atl .atl__search-icon {
+  position: absolute;
+  top: 50%;
+  left: 0.65rem;
+  transform: translateY(-50%);
+  color: var(--atl-off);
+  font-size: 0.75rem;
+  pointer-events: none;
+}
+/* Chrome (border, radius, focus ring) is left to the Brand Kit — it pins
+   `.form-control` border and radius with !important, and the gold focus ring is
+   what every other input in this shell, including this page's edit modals,
+   already does. Ours is only the compact metric, so the field sits level with
+   the department tabs beside it, plus room for the two inset icons. */
+.atl .atl__search-input.form-control {
+  color: var(--atl-ink);
+  font-size: 0.78rem;
+  min-height: 2rem;
+  padding: 0.3rem 1.9rem;
+}
+.atl .atl__search-input::placeholder { color: var(--atl-off); }
+/* We ship our own clear control; the UA one would sit beside it. */
+.atl .atl__search-input::-webkit-search-cancel-button,
+.atl .atl__search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+.atl .atl__search-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  transform: translateY(-50%);
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--atl-muted);
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0.3rem 0.35rem;
+}
+.atl .atl__search-clear:hover { background: #eef1f5; color: var(--atl-ink); }
+.atl .atl__search-count {
+  color: var(--atl-muted);
+  font-family: var(--bs-font-monospace);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.atl .atl__empty-reset {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  color: var(--atl-ink);
+  font-size: inherit;
+  padding: 0;
 }
 
 /* ---- Department split: tab rail, desk caption, row tag ---- */
@@ -55,14 +116,6 @@
   font-size: 0.78rem;
 }
 .atl .atl__deskline i { color: var(--atl-off); }
-.atl .atl__dept {
-  color: var(--atl-muted);
-  font-size: 0.62rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  margin-top: 0.15rem;
-}
 /* warehouse.css ships `#main-content .card { display: flex !important }`, which
    reaches every page in this shell and outguns Bootstrap's .d-none. Re-assert the
    hide here (ID + classes) so a department tab can drop an empty category card. */
@@ -98,50 +151,277 @@
 .atl .card-header i { color: rgba(255, 255, 255, 0.5); }
 .atl .card-header .fs-5 { font-size: 0.9rem !important; }
 .atl .card-header .wa-notif__icon { color: #25d366 !important; }
-.atl .card-header .badge {
-  background: transparent;
-  border: 1px solid rgba(246, 195, 68, 0.55);
-  color: var(--atl-gold);
-  font-family: var(--bs-font-monospace);
-  font-size: 0.64rem;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  border-radius: 3px;
-}
 
 /* ---- Table: hairline ledger ---- */
 .atl thead th {
   background: #f7f8fb;
   color: var(--atl-muted);
-  font-size: 0.66rem;
+  font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   border-bottom: 1px solid var(--atl-hair);
-  padding: 0.55rem 0.75rem;
+  padding: 0.375rem 0.65rem;
+  white-space: nowrap;
 }
 .atl tbody td {
   font-size: 0.83rem;
   color: var(--atl-ink);
-  padding: 0.65rem 0.75rem;
+  padding: 0.375rem 0.65rem;
   border-color: var(--atl-hair);
   vertical-align: top;
+  line-height: 1.45;
 }
 .atl .table-light { --bs-table-bg: #fbfcfe; }
 .atl tbody tr.table-light td {
   color: var(--atl-muted);
   font-size: 0.68rem;
   letter-spacing: 0.08em;
-  padding: 0.45rem 0.75rem;
+  padding: 0.375rem 0.65rem;
 }
+/* ---- Subject sub-heading (Orders / Tasks / Leads / Drivers / COD) ----
+   A second tier under the tinted section heading, so the two never read as the
+   same rank: no fill, ink text instead of muted, and a short gold tick in the
+   number column standing in for indentation a table cannot do. */
+.atl tbody tr.atl__subhead td {
+  background: #fff;
+  border-top: 1px solid var(--atl-hair);
+  border-bottom: 1px solid var(--atl-hair);
+  padding: 0.5rem 0.65rem 0.375rem 1.6rem;
+  position: relative;
+  color: var(--atl-ink);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.atl tbody tr.atl__subhead td::before {
+  content: "";
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  width: 0.55rem;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--atl-gold);
+}
+.atl tbody tr.atl__subhead td i {
+  margin-right: 0.4rem;
+  color: var(--atl-off);
+  font-size: 0.72rem;
+}
+.atl tbody tr.atl__subhead:hover td { background: #fff; }
+
 .atl tbody strong { font-weight: 600; }
 .atl code {
   color: #5b6472;
   background: transparent;
   font-size: 0.72rem;
 }
+.atl .atl__rownum {
+  color: var(--atl-off);
+  font-family: var(--bs-font-monospace);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  /* Two-digit row numbers stacked vertically ("1" over "1") before this: the
+     column is narrow and td carried overflow-wrap:anywhere. Numbers never break. */
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 0.35rem;
+}
+.atl .atl__copy { cursor: pointer; }
 
-/* ---- Status: swatch + text, not pills ---- */
+/* ================================================================
+   ZONE 1 — IDENTITY: what fires, what it does, where it appears
+   One headline row (label · key · desk), the description as its own
+   line at a readable measure, then a labelled meta rail. Description,
+   action and pages used to be three ~180px columns, which wrapped
+   200-character prose into 8 lines and pushed rows past 200px tall.
+   ================================================================ */
+.atl .atl__id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.55rem;
+}
+.atl .atl__label {
+  color: var(--atl-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+/* Webhook events are named by their event string, not by prose */
+.atl .atl__label--code {
+  font-family: var(--bs-font-monospace);
+  font-size: 0.79rem;
+  font-weight: 600;
+}
+.atl .atl__key {
+  color: #7b8596;
+  font-family: var(--bs-font-monospace);
+  font-size: 0.7rem;
+  overflow-wrap: break-word;
+  user-select: all;
+}
+.atl .atl__dept {
+  color: var(--atl-off);
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  white-space: nowrap;
+}
+.atl .atl__desc {
+  color: #4c5568;
+  font-size: 0.79rem;
+  line-height: 1.5;
+  margin-top: 0.1rem;
+  /* A line of prose stops being readable past ~80 characters, and the identity
+     zone is wider than that on a 1440 monitor. */
+  max-width: 76ch;
+  overflow-wrap: break-word;
+}
+.atl .atl__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 1.1rem;
+  margin-top: 0.2rem;
+}
+.atl .atl__meta-item {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.atl .atl__meta-label {
+  color: #a3abb8;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+.atl .atl__meta code {
+  font-size: 0.71rem;
+  overflow-wrap: break-word;
+}
+.atl .atl__meta-plain {
+  color: var(--atl-muted);
+  font-size: 0.74rem;
+}
+
+/* Pages column: one working surface per line, so a row of three references
+   reads as a list instead of a wrapped sentence. */
+.atl .atl__cell--pages {
+  vertical-align: top;
+  padding-top: 0.5rem;
+}
+.atl .atl__pages-none {
+  color: var(--atl-muted);
+  font-size: 0.72rem;
+}
+
+/* Pages column links: quiet ink references (hardened against themed link defaults) */
+.atl .wa-notif__page-link {
+  color: #3d4451 !important;
+  text-decoration: none !important;
+  font-size: 0.74rem;
+  font-weight: 500;
+  border-bottom: 1px dotted #b8bec9;
+  /* Each reference holds together; the rail wraps between links, not inside one */
+  white-space: nowrap;
+}
+/* Line by line: each link is its own row, self-width so the dotted rule stops
+   at the end of the word rather than running the whole column. A long name
+   wraps onto a second line rather than truncating — a clipped page name is
+   not a page name. */
+.atl .atl__cell--pages .wa-notif__page-link {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 0.28rem;
+  white-space: normal;
+  line-height: 1.35;
+}
+.atl .atl__cell--pages .wa-notif__page-link:last-child { margin-bottom: 0; }
+.atl .wa-notif__page-link i { font-size: 0.6rem; margin-left: 0.2rem; opacity: 0.6; }
+.atl .wa-notif__page-link:hover {
+  color: #111826 !important;
+  border-bottom-color: currentColor;
+  border-bottom-style: solid;
+}
+
+/* ================================================================
+   ZONE 2 — VOICE: which number this speaks from, over which channel
+   ================================================================ */
+.atl tbody .wa-notif__from-badge {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--atl-ink);
+  font-family: var(--bs-font-monospace);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.atl tbody .wa-notif__from-badge i { color: #25d366; }
+.atl tbody .wa-notif__from-badge--default { color: var(--atl-muted); font-weight: 500; }
+.atl tbody .wa-notif__via-badge {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--atl-muted);
+  font-size: 0.7rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.atl tbody .wa-notif__via-badge i { color: var(--atl-off); }
+/* Channel picked, but that stack isn't configured on this server — the row would
+   not actually deliver, so it reads struck-through rather than merely quiet. */
+.atl tbody .wa-notif__via-badge--off { text-decoration: line-through; opacity: 0.7; }
+
+/* Destination line — only the handful of triggers that alert a staff desk carry
+   one. Same monospace number as the sender above it so the pair reads as
+   from → to, with the arrow (not a second green icon) marking the direction. */
+.atl tbody .wa-notif__to-badge {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--atl-ink);
+  font-family: var(--bs-font-monospace);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.atl tbody .wa-notif__to-badge i { color: var(--atl-muted); }
+.atl tbody .wa-notif__to-badge--default { color: var(--atl-muted); font-weight: 500; }
+
+/* Manual-composer rows: "this rides that route above" pointer.
+   Reads as a cross-reference, not a page link — it jumps within this table. */
+.atl .atl__uses-route {
+  color: var(--atl-muted) !important;
+  text-decoration: none !important;
+  /* Sits under the number as a caption, matching the "via <channel>" line on
+     the rows above it — the number leads in this column, always. */
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  border-bottom: 1px dotted #c3cad4;
+  white-space: normal;
+}
+.atl .atl__uses-route:hover {
+  color: var(--atl-ink) !important;
+  border-bottom-color: currentColor;
+}
+.atl .atl__uses-route i { color: var(--atl-off); }
+
+/* ================================================================
+   ZONE 3 — CONTROL: status, switch, edit
+   ================================================================ */
+/* Status: swatch + text, not pills */
 .atl tbody .badge.bg-success,
 .atl tbody .badge.bg-secondary,
 .atl tbody .badge.bg-warning {
@@ -152,6 +432,7 @@
   padding: 0 0 0 0.8rem;
   border-radius: 0;
   position: relative;
+  white-space: nowrap;
 }
 .atl tbody .badge.bg-success::before,
 .atl tbody .badge.bg-secondary::before,
@@ -178,68 +459,13 @@
   font-weight: 400;
 }
 
-/* ---- Sender identity: mono number, quiet channel caption ---- */
-.atl tbody .wa-notif__from-badge {
-  background: transparent;
-  border: none;
-  padding: 0;
-  color: var(--atl-ink);
-  font-family: var(--bs-font-monospace);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-.atl tbody .wa-notif__from-badge i { color: #25d366; }
-.atl tbody .wa-notif__from-badge--default { color: var(--atl-muted); font-weight: 500; }
-.atl tbody .wa-notif__via-badge {
-  background: transparent;
-  border: none;
-  padding: 0;
-  color: var(--atl-muted);
-  font-size: 0.7rem;
-  font-weight: 400;
-}
-.atl tbody .wa-notif__via-badge i { color: var(--atl-off); }
-/* Channel picked, but that stack isn't configured on this server — the row would
-   not actually deliver, so it reads struck-through rather than merely quiet. */
-.atl tbody .wa-notif__via-badge--off { text-decoration: line-through; opacity: 0.7; }
-
-/* ---- Pages column links: quiet ink references (hardened against themed link defaults) ---- */
-.atl .wa-notif__page-link {
-  color: #3d4451 !important;
-  text-decoration: none !important;
-  font-size: 0.78rem;
-  font-weight: 500;
-  border-bottom: 1px dotted #b8bec9;
-  /* Was nowrap — under the fixed column grid a long link ("Verification
-     Trigger") overflowed into the next column instead of wrapping. */
-  white-space: normal;
-}
-.atl .wa-notif__page-link:hover {
-  color: #111826 !important;
-  border-bottom-color: currentColor;
-  border-bottom-style: solid;
-}
-
-/* ---- Manual-composer rows: "this rides that route above" pointer ---- */
-/* Reads as a cross-reference, not a page link — it jumps within this table. */
-.atl .atl__uses-route {
-  color: var(--atl-muted) !important;
-  text-decoration: none !important;
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  border-bottom: 1px dotted #c3cad4;
-  white-space: normal;
-}
-.atl .atl__uses-route:hover {
-  color: var(--atl-ink) !important;
-  border-bottom-color: currentColor;
-}
-.atl .atl__uses-route i { color: var(--atl-off); }
-
-/* ---- Controls: navy switch, ghost edit button ---- */
 /* brandkit-overrides.css squares all [type=checkbox] with !important — restore the switch shape here */
-.atl .form-switch .form-check-input {
+/* Bootstrap draws a switch with a background-image knob; brandkit-overrides
+   re-declares `background` on .form-check-input, which wipes it and leaves a
+   yellow square. Restore the knob here — and in the modal too, which Bootstrap
+   moves to the page root and so falls outside .atl. */
+.atl .form-switch .form-check-input,
+#editMessageModal .form-switch .form-check-input {
   width: 2.1rem !important;
   height: 1.15rem !important;
   border: 1px solid #c7cdd6 !important;
@@ -247,13 +473,20 @@
   background-color: #eef0f4;
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23848d9c'/%3e%3c/svg%3e") !important;
 }
-.atl .form-switch .form-check-input:checked {
-  background-color: var(--atl-navy) !important;
-  border-color: var(--atl-navy) !important;
+.atl .form-switch .form-check-input:checked,
+#editMessageModal .form-switch .form-check-input:checked {
+  background-color: var(--atl-navy, #14213d) !important;
+  border-color: var(--atl-navy, #14213d) !important;
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e") !important;
 }
-.atl .form-switch .form-check-input:focus {
+.atl .form-switch .form-check-input:focus,
+#editMessageModal .form-switch .form-check-input:focus {
   box-shadow: 0 0 0 0.15rem rgba(20, 33, 61, 0.15) !important;
+}
+#editMessageModal .form-check-label {
+  color: #4c5568;
+  font-size: 0.82rem;
+  padding-left: 0.15rem;
 }
 .atl tbody .btn-outline-secondary {
   --bs-btn-color: #7a8494;
@@ -266,48 +499,72 @@
 
 /* ================================================================
    ONE LEDGER — shared column grid
-   The three tables carried different auto-widths, so Status/Enabled/Edit
-   zig-zagged by up to 62px down the page. Fixed layout + one rail spec
-   pins the control columns to the same x in every table.
+   Zone boundaries must land on the same x in all three tables:
+     WhatsApp table:  3.2 + 39   + 14 + 17.5 -> control at 73.7
+     Webhook table:   3.2 + 33   + 20 + 17.5 -> control at 73.7
+     System table:    3.2 + 70.5             -> control at 73.7
+   Keep those three sums equal when changing any width. The webhook grid
+   breaks its identity block into Event | Trigger key | Runs; the key/runs
+   boundary lands at 56.2, exactly where the WhatsApp table's VOICE hairline
+   falls (3.2 + 39 + 14), so the extra division sits ON an existing rule.
    ================================================================ */
 .atl table { table-layout: fixed; width: 100%; }
 
-/* Shared in all three tables */
-.atl .atl__col--num    { width: 3.5%; }
-.atl .atl__col--status { width: 8%; }
-.atl .atl__col--switch { width: 7%; }
-.atl .atl__col--edit   { width: 5.5%; }
+.atl .atl__col--num    { width: 3.2%; }
+.atl .atl__col--id     { width: 39%; }
+.atl .atl__col--pages  { width: 14%; }
+.atl .atl__col--from   { width: 17.5%; }
+.atl .atl__col--event  { width: 33%; }
+.atl .atl__col--key    { width: 20%; }
+.atl .atl__col--runs   { width: 17.5%; }
+.atl .atl__col--id-wide { width: 70.5%; }
+.atl .atl__col--status { width: 8.5%; }
+.atl .atl__col--switch { width: 7.8%; }
+/* Rows that carry a message body stack up to three actions here — edit the
+   trigger, edit the body, open the Messages console. */
+.atl .atl__col--edit   { width: 10%; }
 
-/* WhatsApp table (5 content columns). Action carries the longest strings
-   ("sendText — Delivery confirmation to customer") so it outweighs Pages and
-   From, which hold a short link stack and one phone number. */
-   Trigger is sized off the longest trigger_key (wa_location_verification, 24
-   mono chars) so keys never break mid-word. */
-.atl .atl__col--trigger { width: 17%; }
-.atl .atl__col--desc    { width: 18%; }
-.atl .atl__col--action  { width: 16%; }
-.atl .atl__col--pages   { width: 11%; }
-.atl .atl__col--from    { width: 14%; }
-
-/* Webhook + system tables (3 content columns, same 76% of content space) */
-.atl .atl__col--trigger-wide { width: 20%; }
-.atl .atl__col--desc-wide    { width: 29%; }
-.atl .atl__col--action-wide  { width: 27%; }
-
-/* Fixed layout means a long trigger_key can no longer stretch its column */
-.atl code,
-.atl tbody td { overflow-wrap: anywhere; }
-
-/* The rail: one hairline separating what a trigger IS from what you can DO to it */
+/* The hairlines: what a trigger IS | WHERE it lives | how it SPEAKS | what you can DO to it */
+.atl .atl__col--pages,
+.atl .atl__col--from,
+.atl .atl__col--key,
+.atl .atl__col--runs,
 .atl .atl__col--status,
+.atl .atl__cell--pages,
+.atl .atl__cell--voice,
+.atl .atl__cell--key,
+.atl .atl__cell--runs,
 .atl .atl__cell--rail { border-left: 1px solid var(--atl-hair); }
 
-/* ---- Density: rows carry 2 lines, not 3 — take back the padding ---- */
-.atl tbody td { padding: 0.375rem 0.75rem; line-height: 1.45; }
-.atl thead th { padding: 0.375rem 0.75rem; }
-.atl tbody tr.table-light td { padding: 0.375rem 0.75rem; }
-.atl .atl__rownum { color: var(--atl-off); font-family: var(--bs-font-monospace); font-size: 0.72rem; }
-.atl .atl__copy { cursor: pointer; }
+/* ---- "Trigger key" and "Runs" as their own columns (Webhook Events) ----
+   Both are machine values, not prose: monospace, breaking on their own
+   characters so a long handler name never widens the column. The key keeps the
+   click-to-copy affordance it had inline; Runs shows a dash when unset. */
+.atl .atl__cell--key code.atl__key {
+  display: block;
+  padding: 0;
+  background: transparent;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+.atl .atl__cell--runs { font-size: 0.72rem; line-height: 1.4; }
+/* The wrapper only survives so the edit-modal save path can closest() to it;
+   inline-flex from the meta rail would let it shrink below the text here. */
+.atl .atl__cell--runs .atl__meta-item { display: block; }
+.atl .atl__cell--runs code {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #5b6472;
+}
+.atl .atl__runs-none { color: var(--atl-off); }
+
+/* ---- Narrow screens: below ~992px the fixed grid crushes the identity
+   column, so hand the widths back to the browser and let the table scroll. ---- */
+@media (max-width: 991.98px) {
+  .atl table { table-layout: auto; }
+  .atl .table-responsive { overflow-x: auto; }
+  .atl .atl__desc { max-width: 46ch; }
+}
 
 /* ---- Section headers: one badge treatment, and a live state reading ----
    Bootstrap's .bg-* utilities and brandkit-overrides both use !important, which
@@ -352,12 +609,71 @@
 }
 .atl .atl__live--none .atl__live-on { color: rgba(255, 255, 255, 0.45); }
 
-/* ---- Narrow screens: below ~992px the fixed grid crushes the content
-   columns, so hand the widths back to the browser and let the table scroll.
-   The rail stops aligning there — measured at 1100px it still holds, which
-   covers the laptops staff actually use. ---- */
-@media (max-width: 991.98px) {
-  .atl table { table-layout: auto; }
-  .atl .table-responsive { overflow-x: auto; }
-  .atl thead th { white-space: nowrap; }
+/* ---- Control rail: the action cluster ----
+   A row can carry up to three actions (edit the trigger, edit the body it
+   sends, open the Messages console). They are one control, so they read as one
+   segmented block rather than three loose buttons on a 9% column. */
+.atl .atl__actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+}
+/* Bootstrap's --bs-btn-padding-x is out-declared by brandkit-overrides, which
+   sets .btn padding outright — three default-width buttons overflow this column
+   by ~38px at 1366. Declared directly so the cluster fits the rail. */
+.atl .atl__actions > .btn {
+  padding: 0.2rem 0.4rem !important;
+  font-size: 0.78rem !important;
+  min-height: 1.7rem;
+  color: #566072;
+}
+.atl .atl__actions > .btn:hover {
+  background: #f4f6f9;
+  border-color: #c3cad4;
+  color: var(--atl-ink);
+}
+
+/* ---- Message body popup ----
+   Sits outside .atl (Bootstrap moves modals to the page root), so it is scoped
+   by id instead of by the page wrapper class. */
+#editMessageModal .atl__msg-desc {
+  color: #4c5568;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  margin-bottom: 0.9rem;
+}
+#editMessageModal .atl__msg-owned {
+  background: #f7f8fa;
+  border-left: 2px solid #f6c344;
+  color: #5b6478;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin-bottom: 0.9rem;
+  padding: 0.45rem 0.65rem;
+}
+#editMessageModal .atl__msg-owned code {
+  color: #16233a;
+  font-size: 0.74rem;
+}
+#editMessageModal .atl__msg-body {
+  font-family: var(--bs-font-monospace);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+#editMessageModal .atl__msg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+#editMessageModal .atl__msg-chip {
+  background: #fff;
+  border: 1px solid #e2e6ec;
+  border-radius: 3px;
+  color: #56607a;
+  font-family: var(--bs-font-monospace);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.45rem;
+}
+#editMessageModal .atl__msg-chip:hover {
+  border-color: #c3cad4;
+  color: #16233a;
 }

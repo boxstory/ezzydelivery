@@ -26551,6 +26551,154 @@ def _visible_trigger_departments(user):
             if code in held]
 
 
+# --- Auto Triggers: subject sub-sections -------------------------------------
+# The department tabs answer "whose desk owns this row". These answer the
+# question a reader actually arrives with — "what does it act on" — so a long
+# table breaks into Orders / Tasks / Leads / Drivers / COD instead of one wall.
+# Ordered; every card renders its buckets in this order and skips empty ones.
+TRIGGER_DOMAIN_ORDER = [
+    ('order', 'Orders', 'fa-box'),
+    ('task', 'Delivery Tasks & Fleet', 'fa-truck-fast'),
+    ('crm', 'Business Leads & CRM', 'fa-handshake'),
+    ('driver', 'Driver Leads & Onboarding', 'fa-id-card'),
+    ('cod', 'COD & Payouts', 'fa-money-bill-wave'),
+    ('marketing', 'Marketing', 'fa-bullhorn'),
+    ('platform', 'Platform Internals', 'fa-gears'),
+]
+
+# trigger_key / composer code / route section -> domain above.
+# Anything unmapped falls to 'platform', which is where a genuinely internal
+# row belongs anyway — an unmapped row is visible, never dropped.
+TRIGGER_DOMAINS = {
+    # WhatsApp sender routes
+    'route_orders_tasks': 'order',
+    'route_crm_leads': 'crm',
+    'route_driver_onboarding': 'driver',
+    'route_marketing_campaigns': 'marketing',
+    'route_followups': 'crm',
+    # Manual composers
+    'composer_order_detail': 'order',
+    'composer_verify_queue': 'order',
+    'composer_task_detail': 'task',
+    'composer_task_reply': 'task',
+    'composer_crm_lead': 'crm',
+    'composer_pricing_inquiry': 'crm',
+    'composer_crm_driver_lead': 'driver',
+    'composer_driver_profile': 'driver',
+    'composer_wa_chats': 'platform',
+    'composer_wa_me_links': 'platform',
+    # WhatsApp notification triggers
+    'wa_order_cancelled': 'order',
+    'wa_location_verification': 'order',
+    'wa_driver_assigned': 'task',
+    'wa_out_for_delivery': 'task',
+    'wa_delivered': 'task',
+    'wa_delivery_failed': 'task',
+    'wa_quote_thank_you': 'crm',
+    'wa_quote_admin_alert': 'crm',
+    'wa_quote_agreed_alert': 'crm',
+    'wa_lead_followup_digest': 'crm',
+    'wa_inquiry_resume_nudge': 'crm',
+    'wa_driver_application_thanks': 'driver',
+    'wa_driver_profile_reminder': 'driver',
+    # Webhook events
+    'wh_task_accepted': 'task',
+    'wh_task_completed': 'task',
+    'wh_task_rejected': 'task',
+    'wh_task_status_update': 'task',
+    'wh_driver_location': 'driver',
+    'wh_driver_status': 'driver',
+    'wh_document_uploaded': 'driver',
+    'wh_cod_collected': 'cod',
+    # System auto-actions — orders
+    'staff_order_create': 'order',
+    'staff_order_edit': 'order',
+    'staff_order_cancel': 'order',
+    'staff_order_publish': 'order',
+    'staff_order_verify': 'order',
+    'staff_orders_imported': 'order',
+    'staff_temp_orders_transferred': 'order',
+    'sys_sync_order_status': 'order',
+    'sys_create_qr_code': 'order',
+    'sys_create_shipping_label': 'order',
+    # System auto-actions — tasks / dispatch
+    'staff_task_assign_driver': 'task',
+    'staff_task_cancel': 'task',
+    'staff_task_publish': 'task',
+    'staff_task_reschedule': 'task',
+    'staff_task_status_change': 'task',
+    'staff_batch_created': 'task',
+    'staff_batch_dispatched': 'task',
+    'sys_hub_delivery_tasks': 'task',
+    'sys_track_failed_attempts': 'task',
+    'sys_gps_status_points': 'task',
+    # System auto-actions — leads
+    'lead_created': 'crm',
+    'lead_stage_changed': 'crm',
+    'lead_won': 'crm',
+    'lead_lost': 'crm',
+    # System auto-actions — drivers
+    'driver_application_submitted': 'driver',
+    'staff_driver_approved': 'driver',
+    'staff_driver_rejected': 'driver',
+    'staff_driver_suspended': 'driver',
+    'sys_driver_notification': 'driver',
+    'sys_sync_driver_availability': 'driver',
+    # System auto-actions — money
+    'staff_cod_collected': 'cod',
+    'staff_cod_settled': 'cod',
+    'business_cod_settled': 'cod',
+    'staff_earnings_approved': 'cod',
+    # System auto-actions — platform
+    'sys_state_machine': 'platform',
+    'sys_status_history': 'platform',
+}
+
+
+def _domain_groups(rows, code_of, group_key, set_num, set_domain):
+    """
+    Bucket `rows` into TRIGGER_DOMAIN_ORDER, dropping empty buckets.
+
+    `code_of(row)` yields the key looked up in TRIGGER_DOMAINS. `set_num` /
+    `set_domain` write the running row number and the domain back onto the row,
+    because the rows are a mix of dicts and model instances and the template
+    reads them the same way either way. Numbering runs across the whole card,
+    not per bucket, so it still reads as one list once a filter renumbers it.
+    """
+    buckets = {}
+    for i, row in enumerate(rows, start=1):
+        domain = TRIGGER_DOMAINS.get(code_of(row), 'platform')
+        set_num(row, i)
+        set_domain(row, domain)
+        buckets.setdefault(domain, []).append(row)
+    return [{'code': code, 'label': label, 'icon': icon,
+             'group': f'{group_key}:{code}', 'rows': buckets[code]}
+            for code, label, icon in TRIGGER_DOMAIN_ORDER if code in buckets]
+
+
+def _dict_groups(rows, key, group_key):
+    """_domain_groups for the dict-shaped rows (routes, composers)."""
+    def _set_num(row, n):
+        row['num'] = n
+
+    def _set_domain(row, d):
+        row['domain'] = d
+
+    return _domain_groups(rows, lambda r: r[key], group_key, _set_num, _set_domain)
+
+
+def _model_groups(rows, group_key):
+    """_domain_groups for AutoTriggerConfig instances."""
+    def _set_num(row, n):
+        row.num = n
+
+    def _set_domain(row, d):
+        row.domain = d
+
+    return _domain_groups(rows, lambda t: t.trigger_key, group_key,
+                          _set_num, _set_domain)
+
+
 @login_required(login_url='account_login')
 @department_required(dept_OPS, dept_FIN, dept_MKT, dept_ADMIN)
 def auto_triggers_list(request):
@@ -26639,8 +26787,44 @@ def auto_triggers_list(request):
             'source': 'settings',
         }
 
+    # "Sends to" — the destination of the few triggers that alert a staff desk
+    # instead of a customer. Every other WhatsApp trigger writes to the number on
+    # the order / lead / driver record, so it has nothing to configure here and
+    # the row shows no destination at all.
+    for t in wa_triggers:
+        t.recipient_for = AutoTriggerConfig.RECIPIENT_TRIGGERS.get(t.trigger_key, '')
+        t.recipient_is_default = not (t.notify_number or '').strip()
+        t.recipient_number = (t.notify_number or '').strip() or wa_sender['number']
+
     # Active instances to populate the "Send from" dropdown in the Edit modal.
     wa_instances = WhatsAppInstance.objects.filter(is_active=True)
+
+    # "Pages" — where a person goes to see the records this trigger fires on.
+    # The trigger itself has no page; these are the working surfaces behind it,
+    # so a reader can jump from "Delivered" to the orders that produce it.
+    from django.urls import reverse
+    _p_orders = ('Orders', 'workforce:wf_orders_all')
+    _p_tasks = ('Delivery Tasks', 'workforce:dl_list_all')
+    _p_leads = ('Leads Board', 'workforce:crm_leads_board')
+    _p_drv_leads = ('Driver Leads', 'workforce:crm_driver_leads_board')
+    _p_drv_apps = ('Driver Applications', 'workforce:driver_verification_list')
+    trigger_pages = {
+        'wa_driver_assigned': [_p_orders, _p_tasks],
+        'wa_out_for_delivery': [_p_orders, _p_tasks],
+        'wa_delivered': [_p_orders, _p_tasks],
+        'wa_delivery_failed': [_p_orders, _p_tasks],
+        'wa_location_verification': [_p_orders, _p_tasks],
+        'wa_order_cancelled': [_p_orders],
+        'wa_driver_application_thanks': [_p_drv_leads, _p_drv_apps],
+        'wa_driver_profile_reminder': [_p_drv_leads, _p_drv_apps],
+        'wa_quote_thank_you': [_p_leads],
+        'wa_quote_admin_alert': [_p_leads],
+        'wa_quote_agreed_alert': [_p_leads],
+        'wa_lead_followup_digest': [('Leads List', 'workforce:crm_leads_list')],
+    }
+    for t in wa_triggers:
+        t.page_links = [(name, reverse(target))
+                        for name, target in trigger_pages.get(t.trigger_key, [])]
 
     # Section → sender routing (which number each part of the platform sends from).
     from core.models import WhatsAppSenderRoute
@@ -26660,12 +26844,15 @@ def auto_triggers_list(request):
         'crm_leads': {
             'description': 'Business leads only: CRM lead pages, the WhatsApp leads '
                            'inbox, the 3PL quote thank-you and the new-quote alert to '
-                           'sales. Driver leads have their own route below.',
-            'action': 'crm business lead pages / WA inbox / quote form',
+                           'sales. Also the number the public "Chat on WhatsApp" button '
+                           'on the pricing page opens — a prospect must land in the same '
+                           'thread we answer from. Driver leads have their own route below.',
+            'action': 'crm business lead pages / WA inbox / quote form / public chat button',
             'links': [
                 ('Leads Board', reverse('workforce:crm_leads_board')),
                 ('WA Inbox', reverse('workforce:crm_whatsapp_inbox')),
                 ('Quote Thank-You', '#trigger-row-wa_quote_thank_you'),
+                ('Pricing Form', '/3pl/inquiry/'),
             ],
         },
         'driver_onboarding': {
@@ -26739,10 +26926,12 @@ def auto_triggers_list(request):
     # triggers; they ride the same sender routes though, and leaving them off
     # this page meant half the outbound paths were invisible here. Each row
     # points at the route that carries it and at the body staff can edit.
-    from core.message_templates import MANUAL_COMPOSERS, get_template
+    from core.message_templates import (
+        MANUAL_COMPOSERS, TRIGGER_TEMPLATES, get_template,
+    )
     route_labels = dict(WhatsAppSenderRoute.SECTION_CHOICES)
     route_view = {r['section']: r for r in wa_routes}
-    ai_config_url = reverse('workforce:wf_ai_config')
+    msg_templates_url = reverse('workforce:wf_message_templates')
     wa_composers = []
     for c in MANUAL_COMPOSERS:
         if c['department'] not in my_depts:
@@ -26763,8 +26952,38 @@ def auto_triggers_list(request):
             'route_label': route_labels.get(c['section'], ''),
             'route': route_view.get(c['section']),
             'template': tpl,
-            'template_url': f'{ai_config_url}#msg-{tpl["key"]}' if tpl else '',
+            'template_url': f'{msg_templates_url}#msg-{tpl["key"]}' if tpl else '',
         })
+
+    # The body a WhatsApp trigger actually sends, hung on the trigger row, so
+    # the wording is edited in the same popup as the rest of the row instead of
+    # throwing the reader onto another page mid-edit.
+    for t in wa_triggers:
+        tpl = get_template(TRIGGER_TEMPLATES[t.trigger_key]) \
+            if t.trigger_key in TRIGGER_TEMPLATES else None
+        t.template = tpl
+        t.template_url = f'{msg_templates_url}#msg-{tpl["key"]}' if tpl else ''
+
+    # Every body reachable from a row on THIS page, keyed for the editor popup.
+    # Same set the save endpoint re-derives, so a desk can only write a body it
+    # can see here.
+    msg_editor = {}
+    for tpl in ([c['template'] for c in wa_composers]
+                + [t.template for t in wa_triggers]):
+        if not tpl or tpl['key'] in msg_editor:
+            continue
+        msg_editor[tpl['key']] = {
+            'key': tpl['key'],
+            'label': tpl['label'],
+            'description': tpl['description'],
+            'body': tpl['body'],
+            'default_body': tpl['default_body'],
+            'is_enabled': tpl['is_enabled'],
+            'is_customised': tpl['is_customised'],
+            'toggle_owner': tpl['toggle_owner'],
+            'placeholders': [p.strip() for p in (tpl['placeholders'] or '').split(',') if p.strip()],
+            'url': f'{msg_templates_url}#msg-{tpl["key"]}',
+        }
 
     # Department tabs. Only desks the viewer holds, and only those with rows —
     # an empty tab is a dead end, not information.
@@ -26794,12 +27013,26 @@ def auto_triggers_list(request):
         requested_dept = 'all' if len(dept_tabs) > 1 else (
             dept_tabs[0]['code'] if dept_tabs else 'all')
 
+    # Subject sub-sections inside each card (Orders / Tasks / Leads / …). The
+    # grouping is presentation only — the same rows, bucketed — so the search,
+    # the department tabs and the "n / m on" counters keep working untouched.
+    route_groups = _dict_groups(wa_routes, 'code', 'routes')
+    composer_groups = _dict_groups(wa_composers, 'code', 'composers')
+    wa_groups = _model_groups(wa_triggers, 'notif')
+    wh_groups = _model_groups(wh_triggers, 'webhook')
+    sys_groups = _model_groups(sys_triggers, 'system')
+
     return render(request, 'workforce/auto_triggers_list.html', {
         'wa_routes': wa_routes,
         'wa_composers': wa_composers,
         'wa_triggers': wa_triggers,
         'wh_triggers': wh_triggers,
         'sys_triggers': sys_triggers,
+        'route_groups': route_groups,
+        'composer_groups': composer_groups,
+        'wa_groups': wa_groups,
+        'wh_groups': wh_groups,
+        'sys_groups': sys_groups,
         'wa_sender': wa_sender,
         'wa_instances': wa_instances,
         'dept_tabs': dept_tabs,
@@ -26809,6 +27042,11 @@ def auto_triggers_list(request):
                        + len(wh_triggers) + len(sys_triggers)),
         'wa_channel_choices': AutoTriggerConfig.WHATSAPP_CHANNEL_CHOICES,
         'route_channel_choices': WhatsAppSenderRoute.CHANNEL_CHOICES,
+        'msg_editor': msg_editor,
+        # The Messages console is super-admin only. Rendering the "open it"
+        # button for an ops or marketing desk would bounce them to the dashboard
+        # — they get the popup, which is the whole point of it existing.
+        'can_open_messages_page': _dec_is_superadmin(request.user),
         'wa_channel_state': {
             'evolution': bool(evo_ready),
             'waha': bool(waha_enabled and waha_ready),
@@ -27521,6 +27759,22 @@ def auto_trigger_update(request):
             trigger.whatsapp_channel = ch if ch in valid else ''
             update_fields.append('whatsapp_channel')
 
+        # Staff destination — only for the triggers that alert a desk. Rejected
+        # rather than ignored when the number is unusable: silently keeping the
+        # old destination is exactly the failure this control exists to end.
+        if 'notify_number' in body and trigger.trigger_key in AutoTriggerConfig.RECIPIENT_TRIGGERS:
+            raw = (body.get('notify_number') or '').strip()
+            if raw:
+                from core.whatsapp_utils import validate_input_phone
+                is_valid, phone, err = validate_input_phone(raw)
+                if not is_valid:
+                    return JsonResponse(
+                        {'success': False, 'error': err or 'Invalid phone number'}, status=400)
+                trigger.notify_number = phone
+            else:
+                trigger.notify_number = ''
+            update_fields.append('notify_number')
+
         trigger.save(update_fields=update_fields)
 
         inst = trigger.whatsapp_instance
@@ -27536,9 +27790,88 @@ def auto_trigger_update(request):
             'whatsapp_instance_name': inst.instance_name if inst else '',
             'whatsapp_channel': trigger.whatsapp_channel,
             'channel_label': dict(AutoTriggerConfig.WHATSAPP_CHANNEL_CHOICES).get(trigger.whatsapp_channel, ''),
+            'notify_number': trigger.notify_number,
+            'has_recipient': trigger.trigger_key in AutoTriggerConfig.RECIPIENT_TRIGGERS,
         })
     except AutoTriggerConfig.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Trigger not found'}, status=404)
+
+
+def _auto_trigger_template_keys(user):
+    """Message bodies reachable from the Auto Triggers page for `user`.
+
+    A body is editable there only because some row the desk can see sends it —
+    a manual composer it owns, or a WhatsApp trigger in its department. Derived
+    the same way the page derives it, so the popup and the save endpoint can
+    never disagree about what a desk may write.
+    """
+    from core.message_templates import MANUAL_COMPOSERS, TRIGGER_TEMPLATES
+    from core.models import AutoTriggerConfig
+
+    my_depts = _trigger_departments(user)
+    keys = {c['template_key'] for c in MANUAL_COMPOSERS
+            if c['template_key'] and c['department'] in my_depts}
+    owned_triggers = set(AutoTriggerConfig.objects
+                         .filter(category='whatsapp', department__in=my_depts)
+                         .values_list('trigger_key', flat=True))
+    keys.update(tpl_key for trg_key, tpl_key in TRIGGER_TEMPLATES.items()
+                if trg_key in owned_triggers)
+    return keys
+
+
+@login_required(login_url='account_login')
+@department_required(dept_OPS, dept_FIN, dept_MKT, dept_ADMIN)
+def auto_trigger_message_save(request):
+    """Save one WhatsApp message body from the Auto Triggers edit popup.
+
+    The same write the Messages console performs, minus its super-admin gate:
+    that page shows every body on the platform, while this only reaches the ones
+    a desk already sees on its own rows. Bodies were previously a hyperlink out
+    of the page, which dropped staff onto a console they often cannot open.
+    """
+    from core.message_templates import TEMPLATE_DEFAULTS, get_template
+    from core.models import MessageTemplate
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    key = (request.POST.get('template_key') or '').strip()
+    if key not in TEMPLATE_DEFAULTS:
+        return JsonResponse({'success': False, 'error': 'Unknown message template'}, status=400)
+    if key not in _auto_trigger_template_keys(request.user):
+        return JsonResponse(
+            {'success': False, 'error': 'This message belongs to another department'},
+            status=403)
+
+    body = (request.POST.get('body') or '').strip()
+    if not body:
+        return JsonResponse({'success': False, 'error': 'The message body cannot be empty'},
+                            status=400)
+    # An untouched copy of the shipped text stores nothing, so the row keeps
+    # following the code default instead of freezing today's wording.
+    stored = '' if body == TEMPLATE_DEFAULTS[key]['body'].strip() else body
+
+    # Bodies whose on/off belongs to a trigger render no switch — reading the
+    # field would silently disable them on every save.
+    if TEMPLATE_DEFAULTS[key].get('toggle_owner'):
+        is_enabled = True
+    else:
+        is_enabled = request.POST.get('is_enabled') in ('1', 'on', 'true')
+
+    MessageTemplate.objects.update_or_create(
+        key=key,
+        defaults={'body': stored, 'is_enabled': is_enabled, 'updated_by': request.user},
+    )
+
+    tpl = get_template(key)
+    return JsonResponse({
+        'success': True,
+        'message': 'Message saved.' if stored else 'Message reset to the default text.',
+        'key': key,
+        'body': tpl['body'],
+        'is_enabled': tpl['is_enabled'],
+        'is_customised': tpl['is_customised'],
+    })
 
 
 @login_required(login_url='account_login')
@@ -29651,46 +29984,8 @@ def wf_ai_config(request):
         section = request.POST.get('section', '').strip()
         saved = []
 
-        # Message bodies live in the DB, not .env — no server reload needed.
-        if section == 'templates':
-            from core.models import MessageTemplate
-            from core.message_templates import TEMPLATE_DEFAULTS
-
-            key = request.POST.get('template_key', '').strip()
-            if key not in TEMPLATE_DEFAULTS:
-                msg = 'Unknown message template.'
-                if is_ajax:
-                    return JsonResponse({'success': False, 'message': msg}, status=400)
-                from django.contrib import messages as django_messages
-                django_messages.error(request, msg)
-                return redirect('workforce:wf_ai_config')
-
-            body = request.POST.get('body', '').strip()
-            # Blank (or an untouched copy of the shipped text) stores nothing, so
-            # the row keeps following the code default.
-            if body == TEMPLATE_DEFAULTS[key]['body'].strip():
-                body = ''
-            # Templates whose on/off belongs to a trigger render no switch, so the
-            # field is absent from this POST — reading it would silently disable
-            # them on every save.
-            if TEMPLATE_DEFAULTS[key].get('toggle_owner'):
-                is_enabled = True
-            else:
-                is_enabled = request.POST.get('is_enabled') in ('1', 'on', 'true')
-            MessageTemplate.objects.update_or_create(
-                key=key,
-                defaults={
-                    'body': body,
-                    'is_enabled': is_enabled,
-                    'updated_by': request.user,
-                },
-            )
-            msg = 'Message saved.' if body else 'Message reset to the default text.'
-            if is_ajax:
-                return JsonResponse({'success': True, 'message': msg, 'section': section})
-            from django.contrib import messages as django_messages
-            django_messages.success(request, msg)
-            return redirect('workforce:wf_ai_config')
+        # Message bodies moved to their own page (workforce:wf_message_templates)
+        # — this view only writes .env keys and reloads gunicorn.
 
         for key in EDITABLE_KEYS:
             if key in request.POST:
@@ -29872,28 +30167,8 @@ def wf_ai_config(request):
         else:
             k['needs_key'] = _is_primary and not k['masked']
 
-    # Editable automatic-message bodies (Messages tab). Each row shows the number
-    # it actually sends from, resolved live from the WhatsApp instance config.
-    from core.message_templates import list_templates
-    from core.whatsapp_utils import get_fleet_instance, get_route_instance
-    _fleet_inst = get_fleet_instance()
-    _fleet_label = (
-        (_fleet_inst.phone_number or _fleet_inst.instance_name) if _fleet_inst
-        else 'Not configured'
-    )
-    message_templates = list_templates()
-    for _tpl in message_templates:
-        # Prefer the number the template's section actually routes to, so this
-        # page and the Auto Triggers page can never disagree about the sender.
-        _route_inst = get_route_instance(_tpl['section']) if _tpl['section'] else None
-        if _route_inst:
-            _tpl['sender_label'] = _route_inst.phone_number or _route_inst.instance_name
-        else:
-            _tpl['sender_label'] = _fleet_label if _tpl['sender'] == 'fleet' else 'Default sender'
-
     return render(request, 'workforce/ai_config.html', {
         'env': env,
-        'message_templates': message_templates,
         'chat_provider':          env.get('AI_CHAT_PROVIDER', 'anthropic') or 'anthropic',
         'chat_fallback_provider': env.get('AI_CHAT_FALLBACK_PROVIDER', '') or '',
         'wa_provider':            env.get('AI_WA_PROVIDER',   'anthropic') or 'anthropic',
@@ -30156,6 +30431,127 @@ def wf_ai_models_api(request):
 
     cache.set(cache_key, models, timeout=3600)
     return JsonResponse({'models': models, 'cached': False})
+
+
+# ---------------------------------------------------------------------------
+# Message Templates
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='account_login')
+@superuser_required
+def wf_message_templates(request):
+    """Standalone console for the outbound WhatsApp wording the platform owns.
+
+    Used to be the "Messages" tab on the AI Config page, which made message
+    copy a footnote of provider/model plumbing. Bodies live in
+    core.message_templates (shipped default) overridden by core.MessageTemplate
+    (staff edit) — nothing here touches .env, so no server reload is involved.
+    """
+    from core.message_templates import (
+        MANUAL_COMPOSERS, TEMPLATE_DEFAULTS, list_templates,
+    )
+    from core.models import MessageTemplate, WhatsAppSenderRoute
+    from core.whatsapp_utils import get_fleet_instance, get_route_instance
+
+    if request.method == 'POST':
+        is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+        key = request.POST.get('template_key', '').strip()
+        if key not in TEMPLATE_DEFAULTS:
+            msg = 'Unknown message template.'
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': msg}, status=400)
+            from django.contrib import messages as django_messages
+            django_messages.error(request, msg)
+            return redirect('workforce:wf_message_templates')
+
+        body = request.POST.get('body', '').strip()
+        # Blank (or an untouched copy of the shipped text) stores nothing, so
+        # the row keeps following the code default.
+        if body == TEMPLATE_DEFAULTS[key]['body'].strip():
+            body = ''
+        # Templates whose on/off belongs to a trigger render no switch, so the
+        # field is absent from this POST — reading it would silently disable
+        # them on every save.
+        if TEMPLATE_DEFAULTS[key].get('toggle_owner'):
+            is_enabled = True
+        else:
+            is_enabled = request.POST.get('is_enabled') in ('1', 'on', 'true')
+        MessageTemplate.objects.update_or_create(
+            key=key,
+            defaults={
+                'body': body,
+                'is_enabled': is_enabled,
+                'updated_by': request.user,
+            },
+        )
+        msg = 'Message saved.' if body else 'Message reset to the default text.'
+        if is_ajax:
+            return JsonResponse({'success': True, 'message': msg, 'key': key})
+        from django.contrib import messages as django_messages
+        django_messages.success(request, msg)
+        return redirect('workforce:wf_message_templates')
+
+    # Which staff surfaces open with each body. A message edited here changes
+    # every one of them, so the card says so rather than leaving staff to guess.
+    used_by = {}
+    for c in MANUAL_COMPOSERS:
+        if not c['template_key']:
+            continue
+        used_by.setdefault(c['template_key'], []).append({
+            'label': c['label'],
+            'links': [(name, target if c.get('url_is_path') else reverse(target))
+                      for name, target in c.get('links', [])],
+        })
+
+    section_labels = dict(WhatsAppSenderRoute.SECTION_CHOICES)
+    fleet_inst = get_fleet_instance()
+    fleet_label = (
+        (fleet_inst.phone_number or fleet_inst.instance_name) if fleet_inst
+        else 'Not configured'
+    )
+
+    templates = list_templates()
+    for tpl in templates:
+        # Prefer the number the template's section actually routes to, so this
+        # page and the Auto Triggers page can never disagree about the sender.
+        route_inst = get_route_instance(tpl['section']) if tpl['section'] else None
+        if route_inst:
+            tpl['sender_label'] = route_inst.phone_number or route_inst.instance_name
+        else:
+            tpl['sender_label'] = fleet_label if tpl['sender'] == 'fleet' else 'Default sender'
+        tpl['section_label'] = section_labels.get(tpl['section'], 'Unrouted')
+        tpl['used_by'] = used_by.get(tpl['key'], [])
+        tpl['placeholder_list'] = [
+            p.strip() for p in (tpl['placeholders'] or '').split(',') if p.strip()
+        ]
+
+    # Grouped by sender route: the section decides the number and the channel,
+    # so messages that go out together are read together.
+    groups, order = {}, []
+    for tpl in templates:
+        sec = tpl['section'] or ''
+        if sec not in groups:
+            groups[sec] = {
+                'section': sec,
+                'anchor': f'sec-{sec or "none"}',
+                'label': tpl['section_label'],
+                'sender_label': tpl['sender_label'],
+                'templates': [],
+            }
+            order.append(sec)
+        groups[sec]['templates'].append(tpl)
+    template_groups = [groups[s] for s in order]
+
+    return render(request, 'workforce/message_templates.html', {
+        'message_templates': templates,
+        'template_groups': template_groups,
+        'stats': {
+            'total': len(templates),
+            'edited': sum(1 for t in templates if t['is_customised']),
+            'off': sum(1 for t in templates if not t['is_enabled']),
+            'auto': sum(1 for t in templates if t['kind'] == 'auto'),
+        },
+    })
 
 
 # FIRST-MILE PICKUP AUTOMATION CONFIG --------------------------------------------------------------------------------------------------

@@ -461,6 +461,15 @@ class AutoTriggerConfig(models.Model):
         max_length=20, blank=True, default='', choices=WHATSAPP_CHANNEL_CHOICES,
         help_text='Channel this trigger sends through (blank = by config).'
     )
+    # Where an INTERNAL alert is delivered to. Only the triggers listed in
+    # RECIPIENT_TRIGGERS below have a staff destination at all — every other
+    # trigger writes to a customer or a driver, whose number comes from the
+    # record itself and can never be configured here. Blank = the platform
+    # default number, so these desk numbers stop living in the source.
+    notify_number = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text='Staff number this alert is delivered TO (blank = default sender number).'
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -471,6 +480,19 @@ class AutoTriggerConfig(models.Model):
     def __str__(self):
         status = 'ON' if self.is_enabled else 'OFF'
         return f"[{status}] {self.label}"
+
+    # Triggers that message a STAFF DESK rather than a customer or driver, and
+    # so have a destination worth configuring. Code-defined (like the sender
+    # sections) because the destination only exists if the sending function was
+    # written to ask for it — a row added here without a matching
+    # ``alert_recipient()`` call in the sender would be a dead control.
+    # Value = who the alert is for, shown on the Auto Triggers page.
+    RECIPIENT_TRIGGERS = {
+        'wa_quote_admin_alert': 'Sales desk — new 3PL quote requests',
+        'wa_quote_agreed_alert': 'Sales desk — customer accepted a quote',
+        'wa_lead_followup_digest': 'Admin — the unassigned-leads digest only '
+                                   '(assigned staff get theirs on their own number)',
+    }
 
     @classmethod
     def is_trigger_enabled(cls, trigger_key):
@@ -708,9 +730,9 @@ class MessageTemplate(models.Model):
     """Staff-edited body of an automatic outbound message (WhatsApp).
 
     core/message_templates.py holds the shipped default for every key. A row
-    here only exists once someone edits or switches off that message on the AI
-    Config page — an absent row means "use the code default", so a fresh
-    install sends the right thing with no seeding step.
+    here only exists once someone edits or switches off that message on the
+    Message Templates page — an absent row means "use the code default", so a
+    fresh install sends the right thing with no seeding step.
     """
 
     key = models.CharField(
