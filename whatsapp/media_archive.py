@@ -4,6 +4,7 @@
 
 import logging
 import mimetypes
+import re
 from datetime import timedelta
 
 import requests
@@ -47,13 +48,24 @@ def archive_message_media(msg):
         logger.info('archive media: HTTP %s for msg %s', resp.status_code, msg.pk)
         return 'failed'
 
+    # The fetch above reads the whole body into memory. A sender controls how big
+    # their attachment is, so cap it rather than letting one message balloon a
+    # worker. 25 MB matches media_validators() on the field.
+    _MAX_MEDIA_BYTES = 25 * 1024 * 1024
+    if len(resp.content) > _MAX_MEDIA_BYTES:
+        logger.warning('archive media: msg %s is %s bytes, over the %s cap — skipped',
+                       msg.pk, len(resp.content), _MAX_MEDIA_BYTES)
+        return 'failed'
+
     mime = (media.get('mime') or msg.media_mime or '').split(';')[0].strip()
     ext = mimetypes.guess_extension(mime) or ''
     if ext == '.jpe':
         ext = '.jpg'
     tail = url.rsplit('/', 1)[-1]
     if not ext and '.' in tail:
-        ext = '.' + tail.rsplit('.', 1)[-1][:8]
+        # Last-resort extension from the payload URL — strip it to word chars so a
+        # crafted URL cannot choose a path segment or a double extension.
+        ext = '.' + re.sub(r'[^A-Za-z0-9]', '', tail.rsplit('.', 1)[-1])[:8]
     msg.media_file.save(f'{msg.pk}{ext}', ContentFile(resp.content), save=False)
     if mime and not msg.media_mime:
         msg.media_mime = mime

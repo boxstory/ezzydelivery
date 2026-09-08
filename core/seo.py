@@ -73,7 +73,10 @@ class SEOMetadata:
 
         # Use defaults if not provided
         description = description or SEOMetadata.DEFAULT_DESCRIPTION
-        url = url or SEOMetadata.SITE_URL
+        # canonical/og:url stay empty unless the caller passes the page URL —
+        # head.html falls back to the current request path. Never default to
+        # SITE_URL: that marks every page as a duplicate of the homepage.
+        url = url or ''
         image = image or f"{SEOMetadata.SITE_URL}/static/images/ezzy-delivery-og.jpg"
 
         return {

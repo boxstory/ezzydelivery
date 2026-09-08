@@ -21,6 +21,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Field, Submit
 
 from fleet import models as fleet_models
+from core.forms_base import SanitizedForm, SanitizedFormMixin, SanitizedModelForm
 
 # Local aliases for commonly used models
 ContactUs = webpages_models.ContactUs
@@ -34,7 +35,7 @@ DeliveryRequest = webpages_models.DeliveryRequest
 # =============================================================================
 
 
-class ContactForm(forms.Form):
+class ContactForm(SanitizedForm):
     """
     General contact form for website visitors.
 
@@ -91,7 +92,7 @@ class ContactForm(forms.Form):
 # =============================================================================
 
 
-class CareersForm(forms.ModelForm):
+class CareersForm(SanitizedModelForm):
     """
     Job application form for the careers page.
 
@@ -143,7 +144,7 @@ class CareersForm(forms.ModelForm):
 # =============================================================================
 
 
-class PricingEnquiryForm(forms.ModelForm):
+class PricingEnquiryForm(SanitizedModelForm):
     """
     Multi-step pricing inquiry form for potential business stores.
 
@@ -302,7 +303,7 @@ class PricingEnquiryForm(forms.ModelForm):
 # =============================================================================
 
 
-class DeliveryRequestForm(forms.ModelForm):
+class DeliveryRequestForm(SanitizedModelForm):
     """
     One-time delivery request form for non-business users.
 

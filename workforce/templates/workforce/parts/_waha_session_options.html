@@ -1,0 +1,34 @@
+{# Purpose: WAHA Session picker — the live WhatsApp numbers linked to WAHA, instead of a free-text session name. #}
+{# Used by: workforce/whatsapp_instances_list.html (add + edit modals); pass field_id for the label's `for`. #}
+{# Notes: A typo in this field is silent — sends go to a session WAHA doesn't have and fail with no clue why. #}
+<select class="form-select" name="waha_session" id="{{ field_id }}">
+    <option value="">— Not set (use the “{{ waha_default }}” session) —</option>
+    {% for s in waha_sessions %}
+    <option value="{{ s.name }}">
+        {{ s.name }}{% if s.phone %} — +{{ s.phone }}{% endif %}{% if s.push_name %} ({{ s.push_name }}){% endif %}{% if s.status != 'WORKING' %} — {{ s.status }}{% endif %}
+    </option>
+    {% endfor %}
+    {% if waha_orphan_sessions %}
+    {% comment %}
+    Saved names WAHA no longer reports. Kept selectable so opening this modal
+    can't silently blank a value the operator never touched.
+    {% endcomment %}
+    <optgroup label="Saved but not found in WAHA">
+        {% for name in waha_orphan_sessions %}
+        <option value="{{ name }}">{{ name }} — no such session</option>
+        {% endfor %}
+    </optgroup>
+    {% endif %}
+</select>
+{% if waha_unreachable %}
+<small class="text-warning d-block mt-1">
+    <i class="fa-solid fa-triangle-exclamation me-1"></i>
+    WAHA is unreachable, so the list of numbers could not be loaded. Existing values are preserved.
+</small>
+{% else %}
+<small class="text-muted d-block mt-1">
+    Which WhatsApp number this instance sends from over WAHA. Link a new number from the
+    <a href="/waha/wa-dashboard/" target="_blank" rel="noopener">WAHA dashboard <span aria-hidden="true">&#8599;</span></a>
+    (“+ Add number”), then pick it here.
+</small>
+{% endif %}

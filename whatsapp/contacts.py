@@ -10,6 +10,7 @@ import requests
 from django.conf import settings
 from django.utils import timezone
 
+from . import sessions as wa_sessions
 from .models import WhatsAppContact
 
 logger = logging.getLogger(__name__)
@@ -34,9 +35,13 @@ def _waha_get(path, params=None, timeout=30):
 def sync_contacts(session=None):
     """Pull lids + contacts from WAHA and upsert WhatsAppContact rows.
 
+    Rows are scoped to the session: lids are issued per linked device, so each
+    of our numbers hands out a different lid for the same person. Syncing two
+    sessions into one row would flap the lid on every cron pass.
+
     Returns {'seen': n, 'created': n, 'updated': n} or raises on WAHA failure.
     """
-    session = session or getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
+    session = wa_sessions.normalize(session)
 
     lid_to_phone = {}
     for row in _waha_get(f'/api/{session}/lids', params={'limit': 100000}, timeout=20):
@@ -49,7 +54,10 @@ def sync_contacts(session=None):
     # One merged record per phone. @lid ids resolve through the lids map;
     # unresolvable @lid-only entries are skipped (no usable number to store).
     merged = {}
-    for c in _waha_get('/api/contacts/all', params={'session': session}, timeout=60):
+    # 180s, not 60s: the main number's directory is ~6.5 MB / ~8.6k contacts and
+    # WAHA takes ~80s to serialise it, so a 60s cap failed every nightly pass and
+    # silently froze that session's names (the inbox then shows bare lids).
+    for c in _waha_get('/api/contacts/all', params={'session': session}, timeout=180):
         if not isinstance(c, dict) or c.get('isGroup') or c.get('isMe'):
             continue
         cid = str(c.get('id') or '')
@@ -112,7 +120,7 @@ def sync_contacts(session=None):
     # a name, a business flag, address-book membership, or a lid mapping.
     now = timezone.now()
     created = updated = 0
-    existing = {c.phone: c for c in WhatsAppContact.objects.all()}
+    existing = {c.phone: c for c in WhatsAppContact.objects.filter(session=session)}
     to_create, to_update = [], []
     for phone, rec in merged.items():
         lid = phone_to_lid.get(phone, '')
@@ -122,7 +130,7 @@ def sync_contacts(session=None):
         obj = existing.get(phone)
         if obj is None:
             to_create.append(WhatsAppContact(
-                phone=phone, lid=lid, saved_name=rec['saved_name'],
+                session=session, phone=phone, lid=lid, saved_name=rec['saved_name'],
                 push_name=rec['push_name'], is_business=rec['is_business'],
                 is_my_contact=rec['is_my_contact'], synced_at=now,
             ))

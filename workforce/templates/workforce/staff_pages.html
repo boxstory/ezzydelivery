@@ -1,0 +1,264 @@
+{# Purpose: Super-admin editor for the page→department map — move a page to another desk, switch it off, classify routes that have none. #}
+{# Used by: workforce.views.staff_pages_list (URL workforce:staff_pages_list) #}
+{# Notes: Defaults ship in core/departments.py; edits here are stored as PageDepartment overrides and apply on the next request. #}
+{#        Setting a page back to its shipped default deletes the override rather than storing a no-op row. #}
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Staff Pages - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/staff-roles.css' %}?v=20260801b" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="srol">
+  <div class="srol__wrap">
+
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Access Control</span>
+        <h1 class="wfhero__title">Staff Pages</h1>
+        <span class="wfhero__sub">
+          Which desk owns each page
+          <span class="wfhero__sep">·</span> move it, switch it off, or classify one that has no desk
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <div class="wfhero__tallies">
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ total_count }}</span>
+            <span class="wfhero__tally-lbl">Pages</span>
+          </div>
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ changed_count }}</span>
+            <span class="wfhero__tally-lbl">Changed</span>
+          </div>
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ unassigned_count }}</span>
+            <span class="wfhero__tally-lbl">No desk</span>
+          </div>
+        </div>
+        <nav class="wfhero__actions">
+          <a href="{% url 'workforce:staff_roles_list' %}" class="wfhero__ghost">Staff roles ▸</a>
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_staff_pages_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wfnote" id="workforce_staff_pages_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_staff_pages_card_notes' %}" hidden></div>
+
+    <form method="get" class="d-flex flex-wrap gap-2 mb-3">
+      <input type="text" name="search" value="{{ search }}" class="form-control srol__search"
+             placeholder="Search page name or URL...">
+      {% if dept_filter %}<input type="hidden" name="dept" value="{{ dept_filter }}">{% endif %}
+      <button type="submit" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-magnifying-glass"></i>
+      </button>
+      {% if search or dept_filter %}
+      <a href="{% url 'workforce:staff_pages_list' %}" class="btn btn-outline-danger">
+        <i class="fa-solid fa-xmark"></i>
+      </a>
+      {% endif %}
+    </form>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+      <span class="text-muted small"><i class="fa-solid fa-filter"></i> Show:</span>
+      <a href="?{% if search %}search={{ search }}{% endif %}"
+         class="btn btn-sm {% if not dept_filter %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        All <span class="srol__pill-num">{{ total_count }}</span>
+      </a>
+      {% for dept in departments %}
+      <a href="?dept={{ dept.code }}{% if search %}&search={{ search }}{% endif %}"
+         class="btn btn-sm {% if dept_filter == dept.code %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        {{ dept.label }} <span class="srol__pill-num">{{ dept.count }}</span>
+      </a>
+      {% endfor %}
+      <a href="?dept={{ shared_code }}{% if search %}&search={{ search }}{% endif %}"
+         class="btn btn-sm {% if dept_filter == shared_code %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        All staff <span class="srol__pill-num">{{ shared_count }}</span>
+      </a>
+      <a href="?dept=unassigned{% if search %}&search={{ search }}{% endif %}"
+         class="btn btn-sm {% if dept_filter == 'unassigned' %}btn-secondary{% else %}btn-outline-warning{% endif %}">
+        No desk <span class="srol__pill-num">{{ unassigned_count }}</span>
+      </a>
+      <a href="?dept=disabled{% if search %}&search={{ search }}{% endif %}"
+         class="btn btn-sm {% if dept_filter == 'disabled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        Switched off <span class="srol__pill-num">{{ disabled_count }}</span>
+      </a>
+      <a href="?dept=changed{% if search %}&search={{ search }}{% endif %}"
+         class="btn btn-sm {% if dept_filter == 'changed' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        Changed <span class="srol__pill-num">{{ changed_count }}</span>
+      </a>
+    </div>
+
+    <div class="srol__tablewrap">
+      <table id="workforce_staff_pages_table_view" class="table srol__table align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Page</th>
+            <th scope="col" class="srol__col-dept">Operations</th>
+            <th scope="col" class="srol__col-dept">Finance</th>
+            <th scope="col" class="srol__col-dept">Marketing</th>
+            <th scope="col" class="srol__col-dept">Super Admin</th>
+            <th scope="col" class="srol__col-dept">All staff</th>
+            <th scope="col" class="srol__col-dept">On</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr class="srol__row{% if row.unassigned %} srol__row--orphan{% endif %}{% if not row.enabled %} srol__row--off{% endif %}"
+              data-url-name="{{ row.url_name }}">
+            <th scope="row" class="srol__who">
+              <span class="srol__name">{{ row.url_name }}</span>
+              <span class="srol__meta">
+                {{ row.pattern }}
+                {% if row.overridden %}<span class="srol__dot">·</span><span class="srol__tag">changed</span>{% endif %}
+                {% if not row.gated %}<span class="srol__dot">·</span><span class="srol__tag srol__tag--ns">{{ row.namespace }}</span>{% endif %}
+              </span>
+              {% if row.unassigned %}
+              <span class="srol__warn">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                Not listed under any department — tick a desk to classify it
+              </span>
+              {% endif %}
+            </th>
+
+            <td class="srol__cell">
+              <label class="srol__toggle">
+                <input type="checkbox" class="srol__check srol__check--dept" data-department="ops"
+                       {% if 'ops' in row.departments %}checked{% endif %}
+                       aria-label="Operations for {{ row.url_name }}">
+                <span class="srol__switch" aria-hidden="true"></span>
+              </label>
+            </td>
+            <td class="srol__cell">
+              <label class="srol__toggle">
+                <input type="checkbox" class="srol__check srol__check--dept" data-department="fin"
+                       {% if 'fin' in row.departments %}checked{% endif %}
+                       aria-label="Finance for {{ row.url_name }}">
+                <span class="srol__switch" aria-hidden="true"></span>
+              </label>
+            </td>
+            <td class="srol__cell">
+              <label class="srol__toggle">
+                <input type="checkbox" class="srol__check srol__check--dept" data-department="mkt"
+                       {% if 'mkt' in row.departments %}checked{% endif %}
+                       aria-label="Marketing for {{ row.url_name }}">
+                <span class="srol__switch" aria-hidden="true"></span>
+              </label>
+            </td>
+            <td class="srol__cell">
+              <label class="srol__toggle">
+                <input type="checkbox" class="srol__check srol__check--dept" data-department="admin"
+                       {% if 'admin' in row.departments %}checked{% endif %}
+                       aria-label="Super Admin for {{ row.url_name }}">
+                <span class="srol__switch" aria-hidden="true"></span>
+              </label>
+            </td>
+            <td class="srol__cell">
+              <label class="srol__toggle" title="Every staff member, whatever their desk">
+                <input type="checkbox" class="srol__check srol__check--dept" data-department="shared"
+                       {% if 'shared' in row.departments %}checked{% endif %}
+                       aria-label="All staff for {{ row.url_name }}">
+                <span class="srol__switch srol__switch--shared" aria-hidden="true"></span>
+              </label>
+            </td>
+            <td class="srol__cell">
+              <label class="srol__toggle" title="Switch the page off for everyone but super admins">
+                <input type="checkbox" class="srol__check srol__check--enabled"
+                       {% if row.enabled %}checked{% endif %}
+                       aria-label="Enabled for {{ row.url_name }}">
+                <span class="srol__switch srol__switch--power" aria-hidden="true"></span>
+              </label>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="srol__empty">No pages match this filter.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="srol__foot">
+      A page with no desk is blocked for everyone except super admins — that is how new,
+      unclassified routes behave until you assign them. Setting a page back to its shipped
+      default clears the override. "All staff" cannot be combined with a specific desk.
+    </p>
+
+  </div>
+</div>
+
+<script>
+// Page→department editor. Every toggle sends the row's whole state, so the
+// server always receives a complete assignment rather than a partial diff.
+document.addEventListener('DOMContentLoaded', function () {
+  var table = document.getElementById('workforce_staff_pages_table_view');
+  if (!table) return;
+
+  var csrf = document.querySelector('meta[name="csrf-token"]');
+  var token = csrf ? csrf.content : '';
+
+  function readRow(row) {
+    var departments = [];
+    row.querySelectorAll('.srol__check--dept').forEach(function (box) {
+      if (box.checked) departments.push(box.getAttribute('data-department'));
+    });
+    var power = row.querySelector('.srol__check--enabled');
+    return {
+      url_name: row.getAttribute('data-url-name'),
+      departments: departments,
+      enabled: power ? power.checked : true
+    };
+  }
+
+  table.addEventListener('change', function (event) {
+    var box = event.target;
+    if (!box.classList.contains('srol__check')) return;
+
+    var row = box.closest('.srol__row');
+    var payload = readRow(row);
+    var boxes = row.querySelectorAll('.srol__check');
+
+    boxes.forEach(function (b) { b.disabled = true; });
+    row.classList.add('srol__row--saving');
+
+    fetch('{% url "workforce:staff_page_update" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': token,
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) { return res.json().then(function (d) { return {ok: res.ok, data: d}; }); })
+      .then(function (result) {
+        if (!result.ok || !result.data.success) {
+          box.checked = !box.checked;   // put the toggle back
+          window.alert(result.data.error || 'Could not save that change.');
+          return;
+        }
+        row.classList.toggle('srol__row--orphan', payload.departments.length === 0);
+        row.classList.toggle('srol__row--off', !payload.enabled);
+      })
+      .catch(function () {
+        box.checked = !box.checked;
+        window.alert('Network error — the change was not saved.');
+      })
+      .finally(function () {
+        boxes.forEach(function (b) { b.disabled = false; });
+        row.classList.remove('srol__row--saving');
+      });
+  });
+});
+</script>
+{% endblock content %}

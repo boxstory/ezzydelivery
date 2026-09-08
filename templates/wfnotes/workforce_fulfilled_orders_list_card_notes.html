@@ -1,0 +1,99 @@
+{% comment %}
+Purpose: "About this page" notes panel for fulfilled_orders_list.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_fulfilled_orders_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The closed-out end of the order book: every order that has reached <strong>delivered</strong> or
+            <strong>fulfilled</strong>, newest first. Nothing is edited here — this is the page for answering
+            "what did we complete", "for which supplier", "over what dates" and "how much cash was riding on it".
+            To work on an order use the main orders list; to chase what is still moving use Tasks.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Search</dt>
+                        <dd class="wfnote__def">Matches our order number, the client's own order code, the
+                            customer name and the customer phone.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Supplier</dt>
+                        <dd class="wfnote__def">Narrows to one client. Applies as soon as you pick — no need to
+                            press Apply.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">From / To date</dt>
+                        <dd class="wfnote__def">Filters on the day the order was <em>delivered</em>, not the day
+                            it was created. Either end can be left blank.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Status</dt>
+                        <dd class="wfnote__def">Split the list into delivered or fulfilled. Also applies on
+                            change.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Clear</dt>
+                        <dd class="wfnote__def">Drops every filter and takes you back to the whole archive.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Eye icon</dt>
+                        <dd class="wfnote__def">Opens the full orders list already searched for that order number,
+                            where the items, address and history live.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Go to Tasks</dt>
+                        <dd class="wfnote__def">Jumps to the delivery task list — the operational side, including
+                            everything still in flight.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What the numbers mean</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Total orders</dt>
+                        <dd class="wfnote__def">How many rows the current filter matches — the two status counts
+                            below it always add up to this.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Fulfilled</dt>
+                        <dd class="wfnote__def">Orders sitting in fulfilled status within that same filter.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Delivered</dt>
+                        <dd class="wfnote__def">Orders sitting in delivered status within that same filter.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Total COD</dt>
+                        <dd class="wfnote__def">The COD amounts on the filtered orders added up, counting only
+                            orders that actually carry a COD figure.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Delivered at</dt>
+                        <dd class="wfnote__def">When the order was closed out. It can be blank on older or
+                            manually closed records, which is why some rows show N/A.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>All four tiles move with the filters. Read them as "for what I am looking at", never as a
+                    company-wide total.</li>
+                <li>Setting a date range <strong>drops every order with no delivered-at timestamp</strong>, so a
+                    date-filtered count can be lower than the same list unfiltered.</li>
+                <li>Total COD is what was <strong>due</strong> on those orders — it is not proof the cash was
+                    collected, handed in or settled with the client. Use the COD and settlement pages for money
+                    that has actually moved.</li>
+                <li>The supplier dropdown only lists active clients with the fulfilment service switched on, so an
+                    order can appear in the table while its client is missing from the filter.</li>
+                <li>Fifty orders per page, and the pager keeps your filters.</li>
+            </ul>
+        </section>
+    

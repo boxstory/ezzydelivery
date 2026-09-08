@@ -1,0 +1,109 @@
+{% comment %}
+Purpose: "About this page" notes panel for workforce_finance_dashboard.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_finance_dashboard_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      The money overview for the whole operation: how much cash the fleet is holding, where every riyal of
+      COD currently sits, what drivers have earned, and how deliveries performed. Nothing on this page can
+      be edited — it is a roll-up of driver wallets, driver transactions and orders, and every figure
+      links out to the page that can actually act on it. Almost everything respects the period picker in
+      the top right; a few figures do not, and those are listed below.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Period</dt>
+            <dd class="wfnote__def">The dropdown in the hero sets the window for every section at once.
+              The small <em>7d / 30d / 90d / 1yr</em> pills beside each section heading do the same thing
+              — they are shortcuts, not per-section filters.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">COD with fleet</dt>
+            <dd class="wfnote__def">Cash sitting with approved drivers right now — the total, the average
+              per driver, how many drivers are carrying anything, and earnings still owed to them.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">COD pipeline</dt>
+            <dd class="wfnote__def">The flow bar and the six tiles trace collected money through to
+              settled. Each tile's button opens the working page for that stage.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Metrics</dt>
+            <dd class="wfnote__def">Earnings, settlements, pending, charges, payables and receivables for
+              the period, then delivery counts, average order value, delivery fees, active drivers and the
+              success rate.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Top COD</dt>
+            <dd class="wfnote__def">The ten drivers holding the most cash, with their wallet balance
+              beside it. Driver names open the driver record.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Breakdown</dt>
+            <dd class="wfnote__def">Every transaction type in the period with its count and total, plus
+              the last twenty transactions in full.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Quick links</dt>
+            <dd class="wfnote__def">The strip at the bottom jumps to COD in Hand, Driver Earnings, All
+              Transactions and the COD Settlement report.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">COD pipeline terms</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Collected</dt>
+            <dd class="wfnote__def">Everything drivers took from customers in the period. The top of the
+              funnel.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">In hand</dt>
+            <dd class="wfnote__def">What drivers are carrying <strong>right now</strong>. This is a live
+              balance, not a period figure.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">In bank</dt>
+            <dd class="wfnote__def">Deposits drivers made into the bank during the period.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Settled</dt>
+            <dd class="wfnote__def">Driver-side closure — deposits plus cash handed in at the desk. The
+              driver no longer owes it.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">To settle</dt>
+            <dd class="wfnote__def">Collected minus what the drivers have cleared minus what has gone out
+              to clients. Never shown below zero.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Returns</dt>
+            <dd class="wfnote__def">COD given back — refused deliveries and reversed collections.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li><strong>In hand and pending earnings are live balances</strong> across all approved drivers.
+          Changing the period does not change them, so they will not tie back to the other tiles.</li>
+        <li>Client settlement is counted <strong>gross</strong> here — charges withheld on a payout invoice
+          are added back, otherwise "to settle" could never close to zero.</li>
+        <li>COD in Hand is a driver's own balance, while the settlement report is per client. The same
+          money appears under both until it is paid over — it is not double counting.</li>
+        <li>Failed deliveries count by when the order was last touched, not when it was attempted, so a
+          short period can show a failure that belongs to an older order.</li>
+        <li>Average value adds COD and the delivery fee together, so it is the value carried, not revenue.</li>
+        <li>Recent Transactions is only the latest twenty. Use <em>View All</em> for anything you intend
+          to reconcile against.</li>
+      </ul>
+    </section>
+  

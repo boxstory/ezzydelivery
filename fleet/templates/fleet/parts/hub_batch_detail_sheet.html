@@ -167,7 +167,8 @@ function closeHubBatchDetail() {
 
 async function updateHubBatchStatus(newStatus) {
     if (!_currentBatchId) return;
-    const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+    // Meta tag, not the cookie — CSRF_COOKIE_HTTPONLY makes a cookie read always empty.
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     try {
         const resp = await fetch(`/api/driver/hub-batches/${_currentBatchId}/status/`, {

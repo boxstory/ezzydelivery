@@ -1,0 +1,115 @@
+{% comment %}
+Purpose: "About this page" notes panel for cod_ledger.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_cod_ledger_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      The <strong>book of record for cash on delivery</strong>. Every movement of COD money is written here as
+      its own row and never changed afterwards: the customer paying the driver, the driver handing in to Ezzy,
+      Ezzy paying the client, and any returns or reversals along the way. This is the page you open to answer
+      "where is this money now" for a single order, driver or client. Acting on that money happens elsewhere —
+      <strong>Driver Settlement</strong> collects from drivers, <strong>Business Payout</strong> pays clients.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">From / To</dt>
+            <dd class="wfnote__def">Limits rows by the date the transaction was recorded, not the delivery
+              date.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Type</dt>
+            <dd class="wfnote__def">One leg of the cash journey — collection, hand-in, client payout, return
+              or reversal.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Payment</dt>
+            <dd class="wfnote__def">How the money moved: cash, POS card, Fawran, bank transfer or ATM
+              deposit.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Driver / Business</dt>
+            <dd class="wfnote__def">Narrow to one driver or one client. Rows carry the client either directly
+              or through the order behind the task.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">COD Status</dt>
+            <dd class="wfnote__def">Filters on the order's current COD position — with the driver, handed to
+              Ezzy, settled with the business, and so on.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Search</dt>
+            <dd class="wfnote__def">Free text across transaction code, reference number, order number,
+              customer name, driver first name, business name and notes.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Summary tiles</dt>
+            <dd class="wfnote__def">Collected, handed to Ezzy, paid to business, returned, and the row count —
+              all recalculated for whatever filter is active.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Running balances</dt>
+            <dd class="wfnote__def">Each row records the driver's COD in hand and wallet balance <em>after</em>
+              that transaction, so you can walk a balance forwards or backwards.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Reset</dt>
+            <dd class="wfnote__def">Clears every filter and returns to the full ledger.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">Transaction types</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">COD Collection</dt>
+            <dd class="wfnote__def">The customer paid the driver on delivery. Money is now in the driver's
+              hands.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">COD Deposit</dt>
+            <dd class="wfnote__def">The driver handed money in to Ezzy. This is the type real hand-ins carry.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Driver Settlement</dt>
+            <dd class="wfnote__def">The older label for the same hand-in leg; both are counted together as
+              "handed to Ezzy".</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">COD Return</dt>
+            <dd class="wfnote__def">Cash going back out — a refund or a failed delivery whose money is
+              returned.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Client Settlement</dt>
+            <dd class="wfnote__def">Ezzy paid the collected COD across to the client business.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Reversal</dt>
+            <dd class="wfnote__def">A client settlement that was undone. It sits next to the original rather
+              than replacing it.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>The ledger is <strong>read-only and append-only</strong>. A mistake is corrected by recording the
+          opposite movement, never by editing or deleting a row.</li>
+        <li>The tiles follow your filter. A figure quoted from this page means nothing without saying which
+          dates and which filters produced it.</li>
+        <li>Rows only cover COD. Driver earnings, deductions and delivery charges are separate transaction
+          types and are deliberately excluded here.</li>
+        <li>The COD in hand and wallet figures are the balances <strong>at the moment of that row</strong>, not
+          the driver's balance today.</li>
+        <li>Electronic payments (POS, Fawran, bank) reached Ezzy directly and were never physical cash in the
+          driver's hands — check <strong>Legacy Variance</strong> before chasing a driver over one.</li>
+      </ul>
+    </section>
+  

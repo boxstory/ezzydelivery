@@ -1,0 +1,62 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/warehouse_capacity_preview.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_warehouse_capacity_preview_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            A <strong>dry run of the location codes</strong> your capacity settings will produce, before
+            any of them exist. Check the shape and the naming read the way the building actually does,
+            then generate — that is the step that creates the real zones, racks, shelves and bins.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the preview</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">It is abridged</dt>
+                        <dd class="wfnote__def">Only the first three racks, shelves and bins are drawn,
+                            with a "… n more" line standing in for the rest. The full set is still
+                            created.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Codes are joined</dt>
+                        <dd class="wfnote__def">Each level is added to its parent's code, so a bin
+                            carries its whole address.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Existing locations</dt>
+                        <dd class="wfnote__def">The count shown is what this warehouse already has. If
+                            it is not zero, you are re-running the setup.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Generating</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Safe by default</dt>
+                        <dd class="wfnote__def">Locations that already exist are left alone; only
+                            missing ones are added.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Delete existing</dt>
+                        <dd class="wfnote__def">Wipes every location in this warehouse first. Only for
+                            a building with no stock in it — stock rows point at those locations.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Only bins are pickable</dt>
+                        <dd class="wfnote__def">Zones, racks and shelves are created as containers, so
+                            stock is never placed directly in them.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Go back and adjust</strong> rather than generating a layout you already
+                        doubt — renaming afterwards is far more work.</li>
+                    <li><strong>Large layouts take a moment</strong> to create; let it finish.</li>
+                </ul>
+            </section>
+        </div>

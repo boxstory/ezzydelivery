@@ -120,6 +120,7 @@ Parameters:
                 <div class="odp__field">
                     <span class="odp__field__label">Zone</span>
                     <span class="odp__field__value odp__field__value--mono">{{ order.dl_zone|default:"-" }}</span>
+                    {% include "includes/components/_route_distance.html" with order=order %}
                 </div>
             </div>
             <div class="col-3">
@@ -149,9 +150,10 @@ Parameters:
                     <span class="odp__field__label">Lat / Long</span>
                     <div class="odp__field__value odp__latlong-row" id="orderLatLng{{ order.id }}">
                         {% if order.latitude and order.longitude %}
-                        <a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="odp__latlong-link">
+                        <span class="odp__latlong-link">
                             <i class="fa-solid fa-map-pin"></i> {{ order.latitude }}, {{ order.longitude }}
-                        </a>
+                        </span>
+                        {% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-odc" lat=order.latitude lon=order.longitude label="Delivery location" size="sm" %}
                         {% if order.coords_accuracy %}
                         <span class="odp__loc-acc odp__loc-acc--{{ order.coords_accuracy }}">
                             <i class="fa-solid fa-location-crosshairs"></i>

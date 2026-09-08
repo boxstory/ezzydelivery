@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
@@ -16,16 +17,13 @@
       <span class="pwa-detail-topbar__title">Edit Member</span>
     </div>
 
-    <!-- Header (desktop only) -->
-    <div class="form-header d-none d-md-flex" id="client_teams_update_section_header">
-        <h1 id="client_teams_update_title_form">
-            <i class="fa-solid fa-user-pen"></i>
-            {{ form_title|default:"Update Team Member" }}
-        </h1>
-        <a href="{% url 'business:business_teams' business.business_id %}" class="back-link">
-            <i class="fa-solid fa-arrow-left"></i>
-            Back to Team
-        </a>
+    <!-- Page header (desktop only) -->
+    <div class="d-none d-md-block" id="client_teams_update_section_header">
+        {% bconheader eyebrow="Business" live="Team" icon="fa-solid fa-user-pen" title=form_title|default:"Update Team Member" subtitle="Change this member's details and access." %}
+            <a href="{% url 'business:business_teams' business.business_id %}" class="bcon__btn bcon__btn--ghost">
+                <i class="fa-solid fa-arrow-left"></i> Back to Team
+            </a>
+        {% endbconheader %}
     </div>
 
     <!-- Form Card -->

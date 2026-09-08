@@ -154,17 +154,43 @@ def _pick_phone(obj, *attrs):
     return ''
 
 
-def _resolve_recipient_phones(flow, task=None, order=None):
+def _staff_phones(department=None):
+    """WhatsApp numbers of active staff, optionally one department only.
+
+    Staff numbers live on core.Profile (whatsapp, else phone). ``department``
+    is a core.departments code and maps to the Profile.dept_* flags.
+    """
+    from core.models import Profile
+
+    qs = Profile.objects.filter(user__is_active=True, user__is_staff=True)
+    dept_field = {'ops': 'dept_operations', 'fin': 'dept_finance',
+                  'mkt': 'dept_marketing'}.get(department or '')
+    if dept_field:
+        qs = qs.filter(**{dept_field: True})
+
+    phones = []
+    for profile in qs.only('id', 'whatsapp', 'phone'):
+        p = _pick_phone(profile, 'whatsapp', 'phone')
+        if p and is_valid_phone(p) and p not in phones:
+            phones.append(p)
+    return phones
+
+
+def _resolve_recipient_phones(flow, task=None, order=None, context=None):
     """Resolve recipient type to list of phone numbers.
 
     Either ``task`` (DeliveryTask) or ``order`` (Order) may be supplied —
     triggers fired at the order level (e.g. ``staff_order_publish``) pass only
     ``order``; task-level triggers pass ``task`` and we derive the order from
-    it. All phones are normalized to Qatar 974-prefixed form before return so
-    the WhatsApp existence check succeeds for local-format numbers.
+    it. ``context`` is the flow's template context and carries a ``phone`` for
+    events that are about a person rather than an order — a lead, a driver
+    applicant — which is what the ``context_phone`` recipient sends to. All
+    phones are normalized to Qatar 974-prefixed form before return so the
+    WhatsApp existence check succeeds for local-format numbers.
     """
     config = flow.action_config or {}
     recipient = config.get('recipient', 'customer')
+    context = context or {}
     phones = []
 
     if order is None and task is not None:
@@ -228,6 +254,22 @@ def _resolve_recipient_phones(flow, task=None, order=None):
             n = _normalize_qatar_phone(raw)
             if n and is_valid_phone(n):
                 phones.append(n)
+
+    elif recipient == 'context_phone':
+        # Whoever the event is about: the lead, the driver applicant. Order-less
+        # triggers put that number in the context under 'phone'.
+        raw = (context.get('phone') or context.get('lead_phone')
+               or context.get('driver_phone') or '')
+        n = _normalize_qatar_phone(raw)
+        if n and is_valid_phone(n):
+            phones.append(n)
+
+    elif recipient in ('staff_ops', 'staff_fin', 'staff_mkt', 'staff_all'):
+        # These were offered in the flow form long before anything resolved
+        # them, so a staff-recipient flow failed with "No phone numbers
+        # resolved" every time it fired.
+        dept = {'staff_ops': 'ops', 'staff_fin': 'fin', 'staff_mkt': 'mkt'}.get(recipient)
+        phones.extend(_staff_phones(dept))
 
     return phones
 
@@ -296,7 +338,8 @@ def flush_due_digests():
                 raise ValueError(
                     f"No recipients resolved for '{config.get('recipient', 'customer')}' "
                     f"— digests support broadcast recipients only "
-                    f"(all_active_drivers, available_drivers, zone_drivers, custom, custom_group)"
+                    f"(all_active_drivers, available_drivers, zone_drivers, "
+                    f"staff_ops, staff_fin, staff_mkt, staff_all, custom, custom_group)"
                 )
 
             is_group = config.get('recipient') == 'custom_group'
@@ -445,7 +488,7 @@ def _execute_single_flow(flow, context, task=None, order=None):
             if not suppressed:
                 # Stage: Resolve recipients
                 stages.append(('Resolve Recipients', 'running', ''))
-                phones = _resolve_recipient_phones(flow, task=task, order=order)
+                phones = _resolve_recipient_phones(flow, task=task, order=order, context=context)
                 if not phones:
                     raise ValueError(f"No phone numbers resolved for recipient type: {config.get('recipient', 'customer')}")
                 stages[-1] = ('Resolve Recipients', 'ok', f"{len(phones)} recipient(s): {', '.join(phones[:3])}{'...' if len(phones) > 3 else ''}")

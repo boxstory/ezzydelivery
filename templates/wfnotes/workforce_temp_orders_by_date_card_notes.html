@@ -1,0 +1,110 @@
+{% comment %}
+Purpose: "About this page" notes panel for temp_orders_by_date.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_temp_orders_by_date_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The day-by-day view of everything our import sources have collected. Each row is a
+            <strong>raw order line pulled from a client's own system</strong> — a shop, a spreadsheet or a public
+            order link — and is not a real order yet. Unlike <strong>Browse Temp Orders</strong>, which digs into
+            one client's full history, this page pulls fresh data from <strong>every source at once</strong> and
+            then lets you slice it by date. Use it for the morning sweep: fetch today, see what came in, and work
+            through the New rows.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sync &amp; Refresh</dt>
+                        <dd class="wfnote__def">Pulls from every import source right now and reloads. It runs while you
+                            wait rather than in the background, so give it up to a couple of minutes.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sync &amp; Fetch</dt>
+                        <dd class="wfnote__def">The same sweep, then applies your date range and filters. A banner
+                            afterwards says how many rows were new and how many were updated.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Quick dates</dt>
+                        <dd class="wfnote__def">Today, Yesterday, This Week and This Month fill both date boxes and
+                            submit the form for you.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Business, status and source, on top of the date range. <em>Clear</em>
+                            drops all of them.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Eye button</dt>
+                        <dd class="wfnote__def">Opens the full record for that row, including the raw data exactly as the
+                            source sent it — the fastest way to see why a field came through wrong.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Select rows</dt>
+                        <dd class="wfnote__def">Tick rows (or the header box for the whole page) to reveal the action bar
+                            at the bottom and the Import button in the header.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Preview &amp; Import</dt>
+                        <dd class="wfnote__def">A two-step popup: step one shows how each row will map and lets you drop
+                            rows from the batch; step two shows the same fields as editable boxes before you transfer.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Row status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">New</dt>
+                        <dd class="wfnote__def">Collected and waiting — the working queue.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Imported</dt>
+                        <dd class="wfnote__def">Already dealt with. The row is greyed out in the table.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Skipped</dt>
+                        <dd class="wfnote__def">Deliberately passed over and kept only for the record.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Sources</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">OD / GS</dt>
+                        <dd class="wfnote__def">A OneDrive or Google spreadsheet the client keeps their orders in. The
+                            Row column is the line number in that sheet.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">SP / WC</dt>
+                        <dd class="wfnote__def">A Shopify or WooCommerce shop, pulled through the client's approved store
+                            connection.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">PL</dt>
+                        <dd class="wfnote__def">A public order link — a form the client hands out to their own customers.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Opening the page with a date range set <strong>triggers a sync by itself</strong>. If it feels slow on
+                    first load, that is the sweep running, not a hang.</li>
+                <li>Dates are matched against the order date the source supplied, which is plain text. A source that
+                    writes dates in an unusual format can fall outside your range even though the row exists.</li>
+                <li>The status tallies and the per-client badges follow the <strong>date range only</strong> — they ignore
+                    the business, status and source filters.</li>
+                <li>Edits you type in the verify step are <strong>not sent</strong> with the transfer; only the row ids
+                    are. Fix the data at source and resync instead of correcting it in the popup.</li>
+                <li>If transferring returns an error, use <em>Auto-Import</em> on <strong>Browse Temp Orders</strong>
+                    instead — it is the maintained route from a raw row to a real order.</li>
+                <li>Ticking the header box only selects the rows on the page in front of you, not the whole filtered set.</li>
+            </ul>
+        </section>
+    

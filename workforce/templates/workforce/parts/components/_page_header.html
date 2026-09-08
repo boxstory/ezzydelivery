@@ -1,4 +1,5 @@
-{# Shared Page Hero — include with title, icon, subtitle, note args #}
+{# Shared Page Hero — include with title, icon, subtitle, note args. #}
+{# Pass notes_id="<panel id>" to get the page-notes help button on the right. #}
 <div class="wfd__hero">
     <div class="wfd__hero-content">
         <h1 class="wfd__hero-title">
@@ -7,4 +8,12 @@
         {% if subtitle %}<p class="wfd__hero-subtitle">{{ subtitle }}</p>{% endif %}
         {% if note %}<p class="wfd__hero-note"><i class="fa-solid fa-circle-info"></i>{{ note }}</p>{% endif %}
     </div>
+    {% if notes_id %}
+    {# Opens the page-notes card (wfnote) that the page renders right below this hero. #}
+    <button type="button" class="wfnote__btn" data-wfnote-toggle
+            aria-expanded="false" aria-controls="{{ notes_id }}" title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+    </button>
+    {% endif %}
 </div>

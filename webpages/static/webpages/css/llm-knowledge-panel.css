@@ -128,18 +128,24 @@
   background: var(--brand-surface, #ffffff);
 }
 
+/* display:flex also suppresses the default disclosure triangle, which is why
+   list-style:none and the -webkit-details-marker rule below are belt-and-braces. */
 .lkp__faq summary {
   cursor: pointer;
   font-weight: 700;
   color: var(--brand-primary, #0b3d2e);
   list-style: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .lkp__faq summary::-webkit-details-marker { display: none; }
 
 .lkp__faq summary::after {
   content: "+";
-  float: right;
+  flex: 0 0 auto;
   font-weight: 800;
   color: var(--brand-text-muted, #667085);
 }

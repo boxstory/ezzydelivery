@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: 3-step order export wizard — pick business, pick source (DB / live store API), filter and download
+Used by: workforce.views.wf_export_page at /workforce/export/
+Notes: Header is a light band, so the notes button carries the --ink modifier.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block extra_css %}
 <link href="{% static 'workforce/css/wf_export.css' %}" rel="stylesheet" type="text/css" />
@@ -18,7 +25,16 @@
     <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-light btn-sm mt-2">
       <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
     </a>
+    <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_export_page_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
   </div>
+
+  <div class="wfnote" id="workforce_export_page_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_export_page_card_notes' %}" hidden></div>
 
   <!-- Breadcrumb (steps 2 & 3) -->
   {% if step != 'select_business' %}
@@ -324,7 +340,7 @@
           <td>{{ order.dl_building|default:"-" }}</td>
           <td>{{ order.dl_street|default:"-" }}</td>
           <td>{{ order.dl_zone|default:"-" }}</td>
-          <td class="wexp__cell--link">{% if order.latitude and order.longitude %}<a href="https://maps.google.com/?q={{ order.latitude }},{{ order.longitude }}" target="_blank"><i class="fa-solid fa-location-dot me-1"></i>Map</a>{% else %}-{% endif %}</td>
+          <td class="wexp__cell--link">{% if order.latitude and order.longitude %}{% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-exp" lat=order.latitude lon=order.longitude label="Delivery location" btn_label="Map" size="sm" %}{% else %}-{% endif %}</td>
           <td>{% if order.scheduled_delivery and order.scheduled_date %}{{ order.scheduled_date|date:"d/m/Y" }}{% if order.scheduled_time %} {{ order.scheduled_time|time:"H:i" }}{% endif %}{% else %}-{% endif %}</td>
           <td>{{ order.customer_phone|default:"-" }}</td>
           <td>{{ order.customer_whatsapp|default:"-" }}</td>

@@ -1,0 +1,68 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/stock_card.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_stock_card_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The <strong>full stock history of one product</strong>: where its units are sitting now,
+            and every movement that got them there. Use it when a number looks wrong — the transaction
+            list shows who changed what, when, and what the quantity was before and after. Nothing on
+            this page can be edited.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Stock levels by warehouse</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">One row per place</dt>
+                        <dd class="wfnote__def">A row for each warehouse and location holding this
+                            product. Several rows for one warehouse means the stock is split across bins.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">On hand / reserved</dt>
+                        <dd class="wfnote__def">Present at that location, and how much of it is already
+                            committed to orders. The difference is what is free.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Reorder point</dt>
+                        <dd class="wfnote__def">The level at which this location raises a low-stock
+                            alert. Set per stock row, not per product.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Transaction history</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Before / after</dt>
+                        <dd class="wfnote__def">The quantity at that location either side of the
+                            movement. Reading down the column shows the balance as it changed.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Type</dt>
+                        <dd class="wfnote__def">What caused it — a receipt, a pick, a put-away, a count
+                            adjustment, a return. The full ledger is on the Transactions page.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">By</dt>
+                        <dd class="wfnote__def">The user the system recorded for that movement. Blank
+                            means it was made by an automatic process rather than a person.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Last 50 only</dt>
+                        <dd class="wfnote__def">Newest first, capped at fifty rows. Older movements are
+                            still on the Transactions page.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>A seller sees a narrower page.</strong> Only warehouses linked to
+                        their business appear, so their totals can be lower than a staff view.</li>
+                    <li><strong>Quantities never change from here</strong> — correct a wrong figure
+                        with a cycle count, which writes a proper adjustment.</li>
+                </ul>
+            </section>
+        </div>

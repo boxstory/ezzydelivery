@@ -101,8 +101,13 @@ def create_pickup_task_if_needed(order, source=''):
         return None, 'error'
 
 
-def cancel_pickup_for_order(order):
-    """Order got cancelled — cancel its pickup task unless already dropped/handed off."""
+def cancel_pickup_for_order(order, reason='Order was cancelled'):
+    """
+    The order (or its delivery leg) ended — cancel the first-mile pickup unless it
+    was already executed. `reason` is the human line written to the order timeline
+    and the driver notification, so a task-driven cancel doesn't claim the client
+    cancelled the order. Idempotent: an already-cancelled pickup is left alone.
+    """
     from delivery.models import PickupTask
     from fleet.models import DriverNotification
 
@@ -114,15 +119,15 @@ def cancel_pickup_for_order(order):
         old_status = pickup.status
         pickup.status = 'cancelled'
         pickup.save(update_fields=['status', 'updated_at'])
-        log_pickup_history(pickup, old_status, 'cancelled', notes='Order was cancelled')
+        log_pickup_history(pickup, old_status, 'cancelled', notes=reason)
         if pickup.driver:
             DriverNotification.objects.create(
                 driver=pickup.driver,
                 title='Pickup cancelled',
-                message=f"Pickup for order {order.order_number} was cancelled by the client.",
+                message=f"Pickup for order {order.order_number} was cancelled — {reason.lower()}.",
                 notification_type='alert',
             )
-        logger.info(f"PickupTask cancelled for order {order.order_number}")
+        logger.info(f"PickupTask cancelled for order {order.order_number} ({reason})")
     except Exception as e:
         logger.error(f"PickupTask cancel failed for order {order.pk}: {e}", exc_info=True)
 

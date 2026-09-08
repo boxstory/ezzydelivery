@@ -1,0 +1,63 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/rma_create.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_rma_create_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Raises a <strong>return request against one delivered order</strong>. Tick the items the
+            customer is sending back, set the quantity for each, and give a reason. This only records
+            the expectation — nothing is received and no stock moves until the parcel physically arrives
+            and is inspected.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Filling it in</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Items</dt>
+                        <dd class="wfnote__def">Only order lines linked to a product record can be
+                            returned, because the return has to land against real stock.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Quantity</dt>
+                        <dd class="wfnote__def">Defaults to the whole line and is capped at what was
+                            ordered — you cannot take back more than went out.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Reason</dt>
+                        <dd class="wfnote__def">Applies to the return and is copied onto each line.
+                            Pick the closest match; the notes box is for the detail.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Warehouse</dt>
+                        <dd class="wfnote__def">Chosen for you — the seller's active warehouse link. If
+                            the seller has none, the return is created without one and cannot restock
+                            until that is fixed.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What happens next</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">You land on the RMA</dt>
+                        <dd class="wfnote__def">With its own number, sitting at <em>requested</em>.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Receive, then inspect</dt>
+                        <dd class="wfnote__def">Mark the parcel received when it arrives, then judge
+                            each item's condition. Restocking happens there, not here.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>No stock changes on this page.</strong> Creating a request never adds
+                        units back.</li>
+                    <li><strong>One request per batch of goods</strong> — if the customer sends more
+                        back later, raise a second return.</li>
+                </ul>
+            </section>
+        </div>

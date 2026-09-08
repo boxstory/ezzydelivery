@@ -1,6 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Staff archive of closed-out orders (delivered / fulfilled) with supplier, date and COD totals
+Used by: workforce.views.fulfilled_orders_list at /workforce/fulfilled-orders/
+Notes: Read-only — filters swap #main-content over HTMX; date filters run on delivered_at.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Purchase Orders - Fulfilled{% endblock title %}
 
@@ -18,8 +25,17 @@
             <a href="{% url 'workforce:dl_list_all' %}" class="btn btn-outline-light btn-sm">
                 <i class="fa-solid fa-truck me-1"></i>Go to Tasks
             </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_fulfilled_orders_list_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_fulfilled_orders_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_fulfilled_orders_list_card_notes' %}" hidden></div>
 
     <!-- Summary Stats -->
     <div class="fol__stats">

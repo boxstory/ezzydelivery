@@ -36,6 +36,8 @@ from core import models as core_models
 from orders import models as orders_models
 from business import models as business_models
 from fleet import models as fleet_models
+from core.validators import document_validators, image_validators
+from core.validators import image_validators
 
 
 # =============================================================================
@@ -76,6 +78,9 @@ class DlAddressUpdate(models.Model):
             - dl_task_number: Delivery task code
             - order: Parent order
             - time_slot: Preferred delivery time
+            - notes: Free-text address flags, e.g. the "[ZONE-MISMATCH]" line
+              written by orders.signals when a human pin disagrees with the
+              typed zone
 
     Related:
         delivery.views.dl_address_link - Customer address update page
@@ -95,6 +100,7 @@ class DlAddressUpdate(models.Model):
     is_office = models.BooleanField(default=False)
     dl_task_number = models.CharField(max_length=100)
     time_slot = models.CharField(max_length=100, blank=True, null=True)
+    notes = models.TextField(blank=True, default='')
     order = models.ForeignKey(orders_models.Order, on_delete=models.DO_NOTHING, related_name='delivery_addresses')
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -246,7 +252,10 @@ class DeliveryTask(models.Model):
     ]
     dl_speed = models.CharField(
         max_length=100, choices=DL_SPEED_CHOICES, blank=True)
-    dl_price = models.IntegerField(default=20, null=True, blank=True)
+    dl_price = models.DecimalField(
+        max_digits=10, decimal_places=2, default=20, null=True, blank=True,
+        help_text="System-calculated delivery charge billed to the client (QAR, fils-accurate)"
+    )
     dl_to_address = models.ForeignKey(
         DlAddressUpdate, on_delete=models.DO_NOTHING, blank=True, null=True)
 
@@ -334,6 +343,29 @@ class DeliveryTask(models.Model):
         null=True, blank=True,
         help_text="Split COD payment by method: {cash: 100, fawran: 50}"
     )
+    cod_reference = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text="Transfer/terminal reference for electronic COD (Fawran, POS) "
+                  "— the only way to reconcile a collection against the bank"
+    )
+
+    # Bank reconciliation of the electronic leg. Cash closes when the driver
+    # hands it in; Fawran/POS/bank/ATM money goes straight to Ezzy's account and
+    # is only closed when finance matches it against a statement line. These
+    # fields carry that second, separate confirmation.
+    cod_reconciled = models.BooleanField(
+        default=False,
+        help_text="Finance matched the electronic COD leg against the bank/terminal statement"
+    )
+    cod_reconciled_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the electronic COD leg was reconciled"
+    )
+    cod_reconciled_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='cod_reconciliations',
+        help_text="Staff member who reconciled the electronic COD leg"
+    )
 
     # Earnings Verification Fields (for staff approval)
     EARNINGS_VERIFICATION_STATUS = [
@@ -370,6 +402,34 @@ class DeliveryTask(models.Model):
     earnings_notes = models.TextField(
         blank=True, null=True,
         help_text="Staff notes about earnings verification"
+    )
+
+    # Client Delivery-Charge Verification Fields (client-side mirror of the
+    # driver earnings verification set above — what we bill the business).
+    CHARGE_VERIFICATION_STATUS = [
+        ('pending', 'Pending Verification'),
+        ('verified', 'Verified'),
+        ('published', 'Published'),
+        ('rejected', 'Rejected'),
+    ]
+    charge_verification_status = models.CharField(
+        max_length=20, choices=CHARGE_VERIFICATION_STATUS, default='pending',
+        db_index=True,
+        help_text="Client delivery-charge verification status by staff"
+    )
+    verified_delivery_charge = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Staff-verified/adjusted delivery charge billed to the client "
+                  "(replaces raw dl_price on the client payout)"
+    )
+    charge_verified_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='verified_delivery_charges',
+        help_text="Staff member who verified the client delivery charge"
+    )
+    charge_verified_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the client delivery charge was verified by staff"
     )
 
     # --- Failure & Retry Tracking ---
@@ -424,6 +484,23 @@ class DeliveryTask(models.Model):
         'fleet.DriverTransaction', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='client_settled_tasks',
         help_text="The COD client-settlement (business payout) transaction this task was paid in"
+    )
+    settled_delivery_charge = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Delivery charge actually deducted at the business payout. Frozen at "
+                  "payout time so a later edit to verified_delivery_charge cannot make "
+                  "an issued invoice disagree with the money that moved."
+    )
+
+    # --- Charge Invoice (receivable leg) ---
+    # Set when the delivery charge is BILLED to the client instead of withheld
+    # from a COD payout — the only route for a prepaid seller, who hands back no
+    # COD to withhold from. A task carries at most one of the two: this FK or
+    # settled_delivery_charge. Both being empty means the charge is still to bill.
+    charge_invoice = models.ForeignKey(
+        'fleet.BusinessChargeInvoice', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='tasks',
+        help_text="Charge invoice this delivery's fee was billed on"
     )
 
     # --- Hub Model (Two-Leg Delivery) ---
@@ -490,6 +567,60 @@ class DeliveryTask(models.Model):
     def has_cod(self):
         """Check if this delivery involves COD collection"""
         return self.order and self.order.cod_amount and self.order.cod_amount > 0
+
+    @property
+    def electronic_cod_legs(self):
+        """The electronic COD this collection carries, per method.
+
+        A collection is not always one method: payment_split records mixed
+        hand-overs like {cash: 600, fawran: 25}, and only the electronic part
+        of that ever needs matching against a bank statement. Falls back to
+        payment_method when there is no split.
+
+        Returns {method: Decimal} for electronic methods with a non-zero
+        amount — empty when the collection is pure cash.
+        """
+        from decimal import Decimal, InvalidOperation
+        from fleet.wallet_service import WalletService
+
+        if not self.cod_collected:
+            return {}
+
+        legs = {}
+        split = self.payment_split or {}
+        if isinstance(split, dict):
+            for method in WalletService.ELECTRONIC_METHODS:
+                try:
+                    amount = Decimal(str(split.get(method) or 0))
+                except (InvalidOperation, TypeError, ValueError):
+                    continue
+                if amount > 0:
+                    legs[method] = amount
+        if legs:
+            return legs
+
+        method = self.payment_method or ''
+        if method in WalletService.ELECTRONIC_METHODS:
+            return {method: self.cod_collected_amount or Decimal('0')}
+        return {}
+
+    @property
+    def electronic_cod_amount(self):
+        """Total electronic COD on this collection (0 when pure cash)."""
+        from decimal import Decimal
+        return sum(self.electronic_cod_legs.values(), Decimal('0'))
+
+    @property
+    def billable_charge(self):
+        """Delivery charge to bill the business — verified figure, else dl_price."""
+        from delivery.charges import billable_charge
+        return billable_charge(self)
+
+    @property
+    def charge_paid(self):
+        """Delivery charge a payout actually deducted (falls back to billable_charge)."""
+        from delivery.charges import charge_paid
+        return charge_paid(self)
 
     def calculate_driver_earnings(self):
         """
@@ -603,7 +734,8 @@ class DeliveryTaskQRCode(models.Model):
         DeliveryTask, on_delete=models.CASCADE, related_name='task_qrcode')
     task_number = models.CharField(max_length=100)
     qrcode = models.ImageField(
-        upload_to="delivery/qrcodes/", blank=True, null=True)
+        upload_to="delivery/qrcodes/", blank=True, null=True,
+        validators=image_validators(max_mb=2))
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -712,6 +844,85 @@ class ZoneName(models.Model):
         """Returns the name of the first active zone group this zone belongs to"""
         group = self.zone_groups.filter(is_active=True).order_by('display_order').first()
         return group.name if group else None
+
+    @staticmethod
+    def _point_in_polygon(lat, lon, polygon):
+        """
+        Ray-casting point-in-polygon test.
+        polygon is [[lat, lon], [lat, lon], ...]. Returns True if (lat, lon) is inside.
+        """
+        inside = False
+        n = len(polygon)
+        j = n - 1
+        for i in range(n):
+            yi, xi = float(polygon[i][0]), float(polygon[i][1])
+            yj, xj = float(polygon[j][0]), float(polygon[j][1])
+            if ((xi > lon) != (xj > lon)) and \
+                    (lat < (yj - yi) * (lon - xi) / (xj - xi) + yi):
+                inside = not inside
+            j = i
+        return inside
+
+    @staticmethod
+    def _haversine_m(lat1, lon1, lat2, lon2):
+        """Great-circle distance in metres between two (lat, lon) points."""
+        import math
+        R = 6371000
+        p1, p2 = math.radians(lat1), math.radians(lat2)
+        dp = math.radians(lat2 - lat1)
+        dl = math.radians(lon2 - lon1)
+        a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+        return 2 * R * math.asin(math.sqrt(a))
+
+    @classmethod
+    def find_by_coords(cls, lat, lon, max_center_km=None):
+        """
+        Resolve which active zone a GPS coordinate belongs to.
+
+        Strategy (polygon-first, nearest-center fallback):
+        1. Point-in-polygon test against every zone that has a boundary polygon.
+           The first zone whose polygon contains the point is returned (authoritative).
+        2. If no polygon contains the point (or no polygons defined), fall back to
+           the active zone whose center point is nearest by great-circle distance.
+
+        Args:
+            lat, lon: coordinate to resolve (float or Decimal-compatible).
+            max_center_km: if set, the nearest-center fallback only matches when the
+                nearest center is within this many kilometres (else returns None).
+
+        Returns:
+            (ZoneName, match_info) tuple, or (None, info) if nothing matched.
+            match_info = {'method': 'polygon'|'center', 'distance_m': float|None}
+        """
+        try:
+            lat = float(lat)
+            lon = float(lon)
+        except (TypeError, ValueError):
+            return None, {'method': None, 'distance_m': None}
+
+        active = cls.objects.filter(is_active=True)
+
+        # 1. Polygon containment (authoritative)
+        for zone in active:
+            if zone.has_polygon and cls._point_in_polygon(lat, lon, zone.polygon):
+                return zone, {'method': 'polygon', 'distance_m': None}
+
+        # 2. Nearest zone center fallback
+        nearest = None
+        nearest_dist = None
+        for zone in active:
+            if zone.latitude is None or zone.longitude is None:
+                continue
+            d = cls._haversine_m(lat, lon, float(zone.latitude), float(zone.longitude))
+            if nearest_dist is None or d < nearest_dist:
+                nearest, nearest_dist = zone, d
+
+        if nearest is not None:
+            if max_center_km is not None and nearest_dist > max_center_km * 1000:
+                return None, {'method': None, 'distance_m': nearest_dist}
+            return nearest, {'method': 'center', 'distance_m': nearest_dist}
+
+        return None, {'method': None, 'distance_m': None}
 
     class Meta:
         verbose_name = "Zone"
@@ -956,7 +1167,9 @@ class ShippingLabel(models.Model):
     barcode_data = models.CharField(max_length=255, blank=True, null=True)
 
     # Label file
-    label_file = models.FileField(upload_to=shipping_label_upload_path, blank=True, null=True)
+    label_file = models.FileField(
+        upload_to=shipping_label_upload_path, blank=True, null=True,
+        validators=document_validators(max_mb=10))
     label_format = models.CharField(max_length=10, choices=LABEL_FORMAT, default='png')
 
     # Label content (stored for regeneration)
@@ -1004,8 +1217,12 @@ class ShippingLabel(models.Model):
 
 def delivery_proof_upload_path(instance, filename):
     import os
+    from core.validators import IMAGE_EXTENSIONS, safe_upload_name
     biz_code = instance.delivery_task.business.business_code if instance.delivery_task and instance.delivery_task.business else 'unknown'
-    return os.path.join('delivery_proofs', str(biz_code), filename)
+    # Never store the driver's own filename: it decides the extension, and a
+    # `proof.html` under MEDIA_ROOT is served as text/html from our origin.
+    return os.path.join('delivery_proofs', str(biz_code),
+                        safe_upload_name(filename, IMAGE_EXTENSIONS, fallback_ext='jpg'))
 
 
 class DeliveryProof(models.Model):
@@ -1024,7 +1241,8 @@ class DeliveryProof(models.Model):
         'DeliveryTask', on_delete=models.CASCADE, related_name='delivery_proofs'
     )
     proof_type = models.CharField(max_length=20, choices=PROOF_TYPE_CHOICES, default='photo')
-    photo = models.ImageField(upload_to=delivery_proof_upload_path)
+    photo = models.ImageField(
+        upload_to=delivery_proof_upload_path, validators=image_validators(max_mb=10))
     notes = models.CharField(max_length=255, blank=True, default='')
     barcode_data = models.CharField(
         max_length=255, blank=True, default='',
@@ -1043,3 +1261,79 @@ class DeliveryProof(models.Model):
 
     def __str__(self):
         return f"Proof {self.proof_type} for {self.delivery_task.dl_task_number}"
+
+
+class DeliveryLocationReview(models.Model):
+    """A delivery marked complete a long way from where the customer's pin sits.
+
+    One of the two points is wrong and the system cannot tell which: either the
+    driver pressed "delivered" away from the drop, or the customer's saved
+    coordinates are in the wrong place. Staff decide, and the decision is what
+    corrects the record — nothing is moved automatically on a guess.
+    """
+
+    STATUS_CHOICES = [
+        ('pending',          'Awaiting review'),
+        ('driver_correct',   'Driver GPS correct — customer pin moved'),
+        ('customer_correct', 'Customer pin correct — driver was away from the drop'),
+        ('both_wrong',       'Both wrong — address needs re-verification'),
+        ('dismissed',        'Not a real discrepancy'),
+    ]
+
+    task = models.OneToOneField(
+        DeliveryTask, on_delete=models.CASCADE, related_name='location_review'
+    )
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='location_reviews'
+    )
+    driver = models.ForeignKey(
+        'fleet.Driver', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='location_reviews'
+    )
+
+    gap_km = models.FloatField(
+        help_text="Straight-line km between the driver's delivery GPS and the "
+                  "customer's marked location"
+    )
+    driver_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    driver_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    customer_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    customer_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    gps_accuracy = models.FloatField(
+        null=True, blank=True,
+        help_text="Reported accuracy of the driver's fix, in metres — a loose fix "
+                  "is weaker evidence than a tight one"
+    )
+
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True
+    )
+    coords_updated = models.BooleanField(
+        default=False,
+        help_text="Whether approving this review actually moved the order's coordinates"
+    )
+    review_notes = models.TextField(blank=True, default='')
+    reviewed_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='location_reviews'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'delivery_location_review'
+        ordering = ['-gap_km', '-created_at']
+        verbose_name = 'Delivery Location Review'
+        indexes = [
+            models.Index(fields=['status', '-gap_km'], name='dlr_status_gap_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.task.dl_task_number}: {self.gap_km:.1f} km apart ({self.status})"
+
+    @property
+    def is_open(self):
+        return self.status == 'pending'

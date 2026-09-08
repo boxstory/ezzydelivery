@@ -17,7 +17,9 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from . import sessions as wa_sessions
 from .models import WhatsAppMessage
+from core.validators import safe_int
 
 
 logger = logging.getLogger(__name__)
@@ -159,14 +161,20 @@ def _sender_color(sender_id):
     return _SENDER_PALETTE[h[0] % len(_SENDER_PALETTE)]
 
 
-_LID_CACHE_KEY = 'waha_lid_map_v1'
+# Keyed per session: a lid identifies a contact relative to the linked device,
+# so each of our numbers hands out a different lid for the same person. A
+# session-less key would let the two sessions' maps overwrite each other.
 _LID_CACHE_TTL = 6 * 3600
 
 
+def _lid_cache_key(session):
+    return f'waha_lid_map_v2:{session}'
+
+
 def _lid_map(base, session, api_key):
-    """lid digits -> phone digits, from WAHA's /lids API. Cached 6h."""
+    """lid digits -> phone digits, from WAHA's /lids API. Cached 6h per session."""
     from django.core.cache import cache
-    mp = cache.get(_LID_CACHE_KEY)
+    mp = cache.get(_lid_cache_key(session))
     if isinstance(mp, dict):
         return mp
     mp = {}
@@ -185,9 +193,9 @@ def _lid_map(base, session, api_key):
                     if lid and pn:
                         mp[lid] = pn
     except (requests.exceptions.RequestException, ValueError) as e:
-        logger.warning("waha lids fetch failed: %s", e)
+        logger.warning("waha lids fetch failed (session=%s): %s", session, e)
         return mp  # don't cache a failed fetch
-    cache.set(_LID_CACHE_KEY, mp, _LID_CACHE_TTL)
+    cache.set(_lid_cache_key(session), mp, _LID_CACHE_TTL)
     return mp
 
 
@@ -221,7 +229,7 @@ def _resolve_lid_senders(msgs, base, session, api_key):
         except (requests.exceptions.RequestException, ValueError):
             pass
     if updated:
-        cache.set(_LID_CACHE_KEY, mp, _LID_CACHE_TTL)
+        cache.set(_lid_cache_key(session), mp, _LID_CACHE_TTL)
     for m in msgs:
         s = m.get('sender')
         if s and s.get('_lid'):
@@ -352,7 +360,7 @@ def _messages_response(request, chat_id):
     is_group = str(chat_id).endswith('@g.us')
 
     try:
-        limit = int(request.GET.get('limit', '50'))
+        limit = safe_int(request.GET.get('limit'), default=50, minimum=1, maximum=500)
     except (TypeError, ValueError):
         limit = 50
     if limit < 1:
@@ -361,12 +369,12 @@ def _messages_response(request, chat_id):
         limit = 200
 
     try:
-        before_ts = int(request.GET.get('before_ts', '0') or '0')
+        before_ts = safe_int(request.GET.get('before_ts'), default=0, minimum=0)
     except (TypeError, ValueError):
         before_ts = 0
 
     base = _waha_base()
-    session = getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
+    session = wa_sessions.from_request(request)
     api_key = getattr(settings, 'WAHA_API_KEY', '') or ''
 
     if before_ts > 0:
@@ -374,6 +382,7 @@ def _messages_response(request, chat_id):
         cutoff_dt = datetime.fromtimestamp(before_ts, tz=dt_tz.utc)
         qs = (
             WhatsAppMessage.objects
+            .filter(session=session)
             .filter(received_at__lt=cutoff_dt)
             .filter(Q(from_number=stripped_id) | Q(to_number=stripped_id))
             .order_by('-received_at')[:limit]
@@ -386,7 +395,7 @@ def _messages_response(request, chat_id):
         # many newer-than-cutoff items WAHA holds, so pull a generous batch
         # and filter by ts — caller passes `older_offset` to skip already-shown.
         try:
-            older_offset = int(request.GET.get('older_offset', '0') or '0')
+            older_offset = safe_int(request.GET.get('older_offset'), default=0, minimum=0, maximum=100000)
         except (TypeError, ValueError):
             older_offset = 0
         if older_offset < 0:
@@ -449,6 +458,7 @@ def _messages_response(request, chat_id):
     # ---- Initial-open mode ----
     qs = (
         WhatsAppMessage.objects
+        .filter(session=session)
         .filter(Q(from_number=stripped_id) | Q(to_number=stripped_id))
         .order_by('-received_at')[:limit]
     )
@@ -519,8 +529,11 @@ def _chat_latest_response(request):
     """
     from django.db.models import Max
     latest = {}
+    # Scoped to the session whose chat list is on screen — otherwise a customer
+    # who also messaged our other number would bump this thread's timestamp.
+    scoped = WhatsAppMessage.objects.filter(session=wa_sessions.from_request(request))
 
-    rows = WhatsAppMessage.objects.values('from_number').annotate(ts=Max('received_at'))
+    rows = scoped.values('from_number').annotate(ts=Max('received_at'))
     for r in rows:
         n = r.get('from_number') or ''
         ts = r.get('ts')
@@ -528,7 +541,7 @@ def _chat_latest_response(request):
             continue
         latest[n] = max(latest.get(n, 0), int(ts.timestamp()))
 
-    rows = WhatsAppMessage.objects.values('to_number').annotate(ts=Max('received_at'))
+    rows = scoped.values('to_number').annotate(ts=Max('received_at'))
     for r in rows:
         n = r.get('to_number') or ''
         ts = r.get('ts')
@@ -572,7 +585,7 @@ def wa_chats_send(request):
     if not isinstance(to, str) or not isinstance(text, str) or not to or not text:
         return JsonResponse({"ok": False, "error": "to and text required"}, status=400)
 
-    session = data.get('session') or getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
+    session = wa_sessions.normalize(data.get('session'))
 
     if '@' not in to:
         digits = re.sub(r'\D', '', to)
@@ -619,7 +632,7 @@ def wa_chats_resync(request):
         return JsonResponse({"ok": False, "error": "chatId required"}, status=400)
 
     base = _waha_base()
-    session = getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
+    session = wa_sessions.from_request(request)
     api_key = getattr(settings, 'WAHA_API_KEY', '') or ''
     url = f"{base}/api/{session}/chats/{chat_id}/messages"
 
@@ -680,7 +693,6 @@ def wa_chats_resync(request):
         direction = 'outbound' if m.get('fromMe') is True else 'inbound'
 
         defaults = {
-            'session': session,
             'direction': direction,
             'from_number': from_number,
             'to_number': to_number,
@@ -694,6 +706,7 @@ def wa_chats_resync(request):
         }
 
         obj, created = WhatsAppMessage.objects.get_or_create(
+            session=session,
             waha_message_id=waha_id,
             defaults=defaults,
         )
@@ -723,8 +736,12 @@ def wa_chats_resync(request):
 
 
 def _render_page(request):
-    session = getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
-    html = _CHATS_HTML.replace('%SESSION%', session)
+    session = wa_sessions.from_request(request)
+    html = (
+        _CHATS_HTML
+        .replace('%SESSION_TABS%', wa_sessions.render_tabs(session, request.path))
+        .replace('%SESSION%', session)
+    )
     return HttpResponse(html, content_type='text/html; charset=utf-8')
 
 
@@ -1057,6 +1074,33 @@ body {
 .wa-comp__send:disabled { background: #b6cfc6; cursor: not-allowed; }
 
 .wa-empty { color: var(--wa-muted); padding: 1.25rem; text-align: center; font-size: 0.8125rem; }
+
+/* Session tabs — one per WhatsApp number linked to WAHA. Hidden entirely when
+   only one session exists, so the single-number layout is unchanged. */
+.wa-sess { display: flex; gap: 0.25rem; padding: 0.375rem 0.5rem 0; border-bottom: 1px solid var(--wa-line); }
+.wa-sess__tab {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.375rem 0.375rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-decoration: none;
+  color: var(--wa-muted);
+  border: 1px solid transparent;
+  border-bottom: 0;
+}
+.wa-sess__tab:hover { background: rgba(0,0,0,0.03); }
+.wa-sess__tab--on {
+  color: var(--wa-brand);
+  font-weight: 600;
+  background: #fff;
+  border-color: var(--wa-line);
+}
+.wa-sess__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-sess__num { display: block; font-size: 0.6875rem; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.wa-sess__dot { display: inline-block; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; margin-right: 0.25rem; background: #b9b9b9; }
+.wa-sess__dot--on { background: var(--wa-brand); }
 </style>
 </head>
 <body>
@@ -1066,6 +1110,7 @@ body {
       <span class="wa-chip">WAHA</span>
       <span class="wa-side__phone" id="wa-phone-text">agent inbox</span>
     </div>
+    %SESSION_TABS%
     <div class="wa-side__filters">
       <input class="wa-search" id="wa-search" placeholder="Search or new number…" autocomplete="off">
       <div class="wa-side__selects">
@@ -1092,7 +1137,7 @@ body {
         <div class="wa-conv__sub" id="wa-conv-sub"></div>
       </div>
       <div class="wa-conv__spacer"></div>
-      <a class="wa-btn wa-btn--ghost wa-session" id="wa-session-link" href="/waha/wa-dashboard/" title="Session health &amp; QR"><span class="wa-session__dot" id="wa-session-dot"></span><span id="wa-session-text">Session</span></a>
+      <a class="wa-btn wa-btn--ghost wa-session" id="wa-session-link" href="/waha/wa-dashboard/?session=%SESSION%" title="Session health &amp; QR"><span class="wa-session__dot" id="wa-session-dot"></span><span id="wa-session-text">Session</span></a>
       <button class="wa-btn wa-btn--ghost" id="wa-resync" type="button" title="Resync from WAHA">↻ Resync</button>
     </div>
     <div class="wa-msgs" id="wa-msgs">
@@ -1111,6 +1156,13 @@ body {
   'use strict';
 
   var SESSION = '%SESSION%';
+
+  // Every call to our own endpoints must say which number it means — the DB
+  // queries behind them are session-scoped. WAHA's own /waha/api/<session>/…
+  // routes already carry it in the path and don't need this.
+  function wq(url) {
+    return url + (url.indexOf('?') < 0 ? '?' : '&') + 'session=' + encodeURIComponent(SESSION);
+  }
 
   var SENDER_PALETTE = ["#06cf9c","#7f66ff","#e542a3","#3fa9f5","#f5871f","#15c2c4","#b85cff","#f04a4a"];
   var LABEL_CACHE_KEY = 'wa_label_map_v1';
@@ -1290,7 +1342,7 @@ body {
       });
   }
   function enrichChatTimes() {
-    return fetch('/waha/wa-chats/?chat_latest=1', { credentials: 'same-origin' })
+    return fetch(wq('/waha/wa-chats/?chat_latest=1'), { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
         if (!j || !j.ok || !j.latest) return;
@@ -1601,7 +1653,7 @@ body {
     if (box) box.innerHTML = '<div class="wa-empty">Loading messages…</div>';
     hideError();
     var chatIdAtCall = state.activeChatId;
-    var url = '/waha/wa-chats/?messages=1&chatId=' + encodeURIComponent(chatIdAtCall) + '&limit=50';
+    var url = wq('/waha/wa-chats/?messages=1&chatId=' + encodeURIComponent(chatIdAtCall) + '&limit=50');
     state.msgsLoading = true;
     fetch(url, { credentials: 'same-origin' })
       .then(function (r) {
@@ -1647,9 +1699,9 @@ body {
     loader.textContent = 'Loading older messages…';
     box.insertBefore(loader, box.firstChild);
     var prevHeight = box.scrollHeight;
-    var url = '/waha/wa-chats/?messages=1&chatId=' + encodeURIComponent(chatIdAtCall) +
+    var url = wq('/waha/wa-chats/?messages=1&chatId=' + encodeURIComponent(chatIdAtCall) +
               '&limit=50&before_ts=' + state.msgsOldestTs +
-              '&older_offset=' + (state.msgsLiveOffsetSeen || 0);
+              '&older_offset=' + (state.msgsLiveOffsetSeen || 0));
     fetch(url, { credentials: 'same-origin' })
       .then(function (r) {
         return r.text().then(function (raw) {
@@ -1906,7 +1958,7 @@ body {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ to: state.activeChatId, text: txt }),
+      body: JSON.stringify({ to: state.activeChatId, text: txt, session: SESSION }),
     })
       .then(function (r) {
         return r.text().then(function (raw) {
@@ -1935,7 +1987,7 @@ body {
     if (!state.activeChatId) return;
     var btn = $('wa-resync');
     btn.disabled = true;
-    fetch('/waha/wa-chats/resync/?chatId=' + encodeURIComponent(state.activeChatId), {
+    fetch(wq('/waha/wa-chats/resync/?chatId=' + encodeURIComponent(state.activeChatId)), {
       method: 'POST',
       credentials: 'same-origin',
     })

@@ -1,10 +1,20 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff roster of approved drivers — availability, contact, vehicle, rating, wallet balance
+Used by: workforce_views.drivers_active at /workforce/drivers/active/
+Notes: Read-only list; every change is made on the driver detail page.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 {% block title %}Active Drivers - Ezzy Delivery{% endblock title %}
 {% block content %}
 <div class="dra">
     <!-- Hero Header -->
-    {% include "workforce/parts/components/_page_header.html" with title="Active Drivers" icon="fa-circle-check" subtitle="All approved and active fleet members" %}
+    {% include "workforce/parts/components/_page_header.html" with title="Active Drivers" icon="fa-circle-check" subtitle="All approved and active fleet members" notes_id="workforce_drivers_active_card_notes" %}
+
+    <div class="wfnote wfnote--inset" id="workforce_drivers_active_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_drivers_active_card_notes' %}" hidden></div>
 
     <!-- Filter -->
     <div class="dra__filter">

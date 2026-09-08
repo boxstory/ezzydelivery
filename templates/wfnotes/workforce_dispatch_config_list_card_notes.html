@@ -1,0 +1,88 @@
+{% comment %}
+Purpose: "About this page" notes panel for config_list.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_dispatch_config_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The dials that decide <strong>how aggressively each store batches</strong>. One row per pickup
+            location that has ever had its dispatch settings saved: how many orders may share a trip, how long
+            the engine waits for a second order before giving up, the delivery time it is aiming at, and whether
+            batching and automatic rider assignment are switched on there at all. Every batch you see on the
+            dispatch dashboard was built using the numbers on this page.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit</dt>
+                        <dd class="wfnote__def">Opens that location's settings form. This is the only control on
+                            the page — nothing is editable in the table itself.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">System defaults</dt>
+                        <dd class="wfnote__def">The values a location falls back on before anyone has saved
+                            settings for it. Reference only, not editable from here.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The columns</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Max batch</dt>
+                        <dd class="wfnote__def">How many orders may share one trip. The moment a batch reaches
+                            this number it is released without waiting any longer.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Hold window</dt>
+                        <dd class="wfnote__def">How long a lone order waits, in seconds, for a second order to
+                            the same zone. Longer means more batching and later deliveries.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Max hold</dt>
+                        <dd class="wfnote__def">The longer window used instead during that location's peak
+                            hours, when a partner order is likely to appear.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">SLA</dt>
+                        <dd class="wfnote__def">The delivery time being promised. Each order's deadline is its
+                            creation time plus this many minutes.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">SLA buffer</dt>
+                        <dd class="wfnote__def">The rescue margin. Once an order is this close to its deadline
+                            its batch is force-released, whatever the timer says.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Batching</dt>
+                        <dd class="wfnote__def">Off means no grouping at all at that location — every order
+                            goes out on its own.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Auto-assign</dt>
+                        <dd class="wfnote__def">Whether released batches are handed to riders automatically or
+                            left for staff.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>An empty table does <strong>not</strong> mean batching is off. A location gets its row the
+                    first time its settings are opened or its first order is batched; until then it quietly runs
+                    on the system defaults shown below the table.</li>
+                <li>Changes take effect on the <strong>next</strong> batch. Batches already holding keep the
+                    window and the SLA deadlines they were created with.</li>
+                <li>Turning <em>Batching</em> off does not stop deliveries — every order at that location simply
+                    becomes its own single-order batch and is released straight away.</li>
+                <li>Turning <em>Auto-Assign</em> off leaves released batches sitting in <em>Ready</em> until
+                    someone moves them by hand. Watch the dispatch dashboard if you do this.</li>
+                <li>Every save is written to the dispatch log against your username.</li>
+            </ul>
+        </section>
+    

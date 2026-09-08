@@ -1,0 +1,109 @@
+{% comment %}
+Purpose: "About this page" notes panel for cod_legacy_reconciliation.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_cod_legacy_reconciliation_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      A read-only audit of one historical problem. Drivers used to include <strong>Fawran and POS
+      collections</strong> in their cash hand-ins, even though that money went straight to Ezzy and was
+      never in the driver's pocket. Every card below is one such hand-in: the amount recorded against it
+      is larger than the notes the driver could physically have counted out. Submissions now exclude
+      electronic collections, so this is a closed set that cannot grow — the job here is matching the cash
+      desk and the bank, not fixing balances.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Filters</dt>
+            <dd class="wfnote__def">Narrow the set by driver, deposit date range, payment method,
+              business, the order's COD status, or a free-text search over deposit code, task number,
+              order number, customer and payment reference. <em>Apply</em> reloads, <em>Reset</em> clears
+              everything.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Legs to list</dt>
+            <dd class="wfnote__def">Choose whether each card prints only the electronic legs or every leg
+              in the deposit. This changes what is printed, never what is counted.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Export CSV</dt>
+            <dd class="wfnote__def">Opens the column picker and exports the electronic legs that match
+              your filters — one row per leg, with deposit code, driver, task, order, business, method,
+              amount, collection time, reference and COD status.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Row links</dt>
+            <dd class="wfnote__def">Task numbers open the delivery task; <em>Transactions</em> on a card
+              header opens that driver's COD submission history.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">COD Ledger</dt>
+            <dd class="wfnote__def">The live, full COD view — go there for anything that is not part of
+              this historical set.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">The four figures</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Declared</dt>
+            <dd class="wfnote__def">What the hand-in was recorded as — the driver's submitted amount.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Electronic</dt>
+            <dd class="wfnote__def">The part of it collected by Fawran, POS, bank or ATM. That money never
+              existed as cash in the driver's hands.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Physical cash</dt>
+            <dd class="wfnote__def">Declared minus electronic — what should actually have been counted at
+              the desk for that hand-in.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Beyond legs</dt>
+            <dd class="wfnote__def">Declared minus every linked task in the deposit. A separate anomaly —
+              money handed in that no task accounts for. It is shown apart so it is not confused with the
+              electronic sweep.</dd>
+          </div>
+        </dl>
+
+        <h2 class="wfnote__h">Order COD status</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">With Ezzy</dt>
+            <dd class="wfnote__def">Collected and held by us, not yet paid over to the client.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">With business</dt>
+            <dd class="wfnote__def">Already settled to the client. Shown for information only — client
+              settlement is out of scope on this page.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">With driver</dt>
+            <dd class="wfnote__def">Still flagged as sitting with the driver. On an electronic leg that is
+              wrong by definition and worth chasing on the task itself.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>The page has <strong>no save, edit or write action of any kind</strong>. Restating these
+          deposits would move figures that have already been settled and reported.</li>
+        <li>Driver balances are already right. What is overstated is the recorded size of the hand-in, so
+          this is a cash-desk and bank matching exercise.</li>
+        <li>Filters change which deposits and legs are <strong>printed</strong>. Each deposit's own
+          figures always cover its complete leg set, because a hand-in only reconciles as a whole.</li>
+        <li>The driver and business dropdowns list only names that appear inside this affected set, so a
+          driver missing from the list simply has no affected deposit.</li>
+        <li>The CSV covers electronic legs only, and is capped at 5,000 rows.</li>
+      </ul>
+    </section>
+  

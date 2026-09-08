@@ -49,6 +49,7 @@ from business import models as business_models
 from delivery import models as delivery_models
 from orders import models as orders_models
 import os
+from core.validators import document_validators
 
 User = get_user_model()
 
@@ -64,13 +65,19 @@ def api_key_upload_path(instance, filename):
 
 
 def task_document_upload_path(instance, filename):
-    """Generate upload path for task documents"""
-    return f'tasks/{instance.task.id}/documents/{filename}'
+    """Generate upload path for task documents.
+
+    The client's filename is discarded — it chooses the stored extension, and a
+    `.html` document under MEDIA_ROOT is served as text/html from our own origin.
+    """
+    from core.validators import DOCUMENT_EXTENSIONS, safe_upload_name
+    return f'tasks/{instance.task.id}/documents/{safe_upload_name(filename, DOCUMENT_EXTENSIONS)}'
 
 
 def order_document_upload_path(instance, filename):
-    """Generate upload path for order documents"""
-    return f'orders/{instance.order.id}/documents/{filename}'
+    """Generate upload path for order documents. See task_document_upload_path."""
+    from core.validators import DOCUMENT_EXTENSIONS, safe_upload_name
+    return f'orders/{instance.order.id}/documents/{safe_upload_name(filename, DOCUMENT_EXTENSIONS)}'
 
 
 class ClientApiKey(models.Model):
@@ -240,7 +247,8 @@ class TaskDocument(models.Model):
         related_name='task_documents'
     )
     document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES, default='other')
-    document_file = models.FileField(upload_to=task_document_upload_path)
+    document_file = models.FileField(
+        upload_to=task_document_upload_path, validators=document_validators(max_mb=10))
     document_name = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     uploaded_by = models.ForeignKey(
@@ -276,7 +284,8 @@ class OrderDocument(models.Model):
         related_name='order_documents'
     )
     document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES, default='other')
-    document_file = models.FileField(upload_to=order_document_upload_path)
+    document_file = models.FileField(
+        upload_to=order_document_upload_path, validators=document_validators(max_mb=10))
     document_name = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     uploaded_by = models.ForeignKey(

@@ -1,0 +1,159 @@
+{% comment %}
+Purpose: "About this page" notes panel for orders_list_view.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_parts_lists_orders_list_view_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+            <p class="wfnote__lede">
+                Every row is one <strong>order</strong> — what a client sold and wants us to deliver. This is
+                the step before delivery: orders are reviewed here, then <em>published</em>, which raises the
+                delivery task a driver can be given. The same screen is reused for several different order
+                queues — all orders, orders waiting to be published, already-published orders, fulfilled and
+                non-fulfilled clients, and orders pending verification. <strong>The heading always reads "All
+                Orders", so it is the menu item you clicked (and the address bar) that tells you which slice
+                you are on</strong>; the filters, buttons and status words below behave the same on all of them.
+            </p>
+
+            <div class="wfnote__cols">
+                <section class="wfnote__sec">
+                    <h2 class="wfnote__h">What you can do here</h2>
+                    <dl class="wfnote__list">
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Filters</dt>
+                            <dd class="wfnote__def">Client, DL code, and a name/mobile search, plus dropdowns
+                                for order status and delivery status. Whatever is applied is echoed back as
+                                removable tags under the bar, each with its own cross.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Date buttons</dt>
+                            <dd class="wfnote__def">Today, Yesterday, 3 Days, Last Week, Month or Custom.
+                                These filter on when the order was <strong>created</strong>, not its delivery
+                                date. <em>Custom</em> reveals the two date boxes.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Sorting</dt>
+                            <dd class="wfnote__def">The COD and Date column headings are links — click to
+                                sort, click again to reverse.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Export CSV</dt>
+                            <dd class="wfnote__def">Opens a column picker so you choose exactly which fields
+                                go into the file. The export follows the filters currently applied.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Bulk toolbar</dt>
+                            <dd class="wfnote__def">Tick rows to enable it: parse addresses out of free text
+                                with AI, or set a status across the selection — hold for review, ready to
+                                pickup, publish to delivery, delivered, cancelled or reported.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">View</dt>
+                            <dd class="wfnote__def">The eye icon slides the order open in a side panel without
+                                leaving the list; the order number itself opens the full page.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Edit</dt>
+                            <dd class="wfnote__def">Opens the order form — the place to fix an address, zone,
+                                COD amount or items.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Publish</dt>
+                            <dd class="wfnote__def">Only on orders still <em>To Review</em> or
+                                <em>To Publish</em>. It creates the delivery task, which is what makes the
+                                order visible to the delivery side.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Cancel</dt>
+                            <dd class="wfnote__def">Hidden once an order is published or already cancelled.
+                                Asks for confirmation first.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Delete</dt>
+                            <dd class="wfnote__def">Superadmins only, and permanent — the confirmation says so.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">WhatsApp</dt>
+                            <dd class="wfnote__def">Two options: the green icon opens WhatsApp with a
+                                pre-written message and the customer's location-verification link; the
+                                paper-plane sends from one of our own numbers through the gateway, with the
+                                text editable before it goes.</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="wfnote__sec">
+                    <h2 class="wfnote__h">Order status (OD)</h2>
+                    <dl class="wfnote__list">
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">To Review</dt>
+                            <dd class="wfnote__def">Held back deliberately — something needs checking before
+                                it goes anywhere.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">To Publish</dt>
+                            <dd class="wfnote__def">Cleared, but no delivery task raised yet.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Ready / Publish</dt>
+                            <dd class="wfnote__def">Ready for collection, or queued to go out.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Published</dt>
+                            <dd class="wfnote__def">A delivery task exists. From here on the delivery pages
+                                own it.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Delivered</dt>
+                            <dd class="wfnote__def">The goods reached the customer. <em>Fulfilled</em> is the
+                                warehouse equivalent.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Cancelled</dt>
+                            <dd class="wfnote__def">Dropped — it will not be delivered.</dd>
+                        </div>
+                    </dl>
+
+                    <h2 class="wfnote__h">Other row markers</h2>
+                    <dl class="wfnote__list">
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">DL badge</dt>
+                            <dd class="wfnote__def">The delivery task's own status, shown only once a task
+                                exists. No DL line means nothing has been published.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Stock flags</dt>
+                            <dd class="wfnote__def"><em>Out of Stock</em> or <em>Low Stock</em> — reconfirm
+                                with the client before dispatching these.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Transferred</dt>
+                            <dd class="wfnote__def">The order came across from another client account.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Address</dt>
+                            <dd class="wfnote__def">A hollow pin means no coordinates were ever captured. The
+                                accuracy label says who set the point — client, staff, driver, or an
+                                estimate — and anything weaker than street level is a delivery a driver will
+                                struggle with.</dd>
+                        </div>
+                    </dl>
+                </section>
+            </div>
+
+            <section class="wfnote__sec wfnote__sec--note">
+                <h2 class="wfnote__h">Worth knowing</h2>
+                <ul class="wfnote__notes">
+                    <li>Publishing is two steps. This page raises the delivery <strong>task</strong>; the task
+                        still has to be pushed to the fleet before any driver can see it. The
+                        <strong>Tasks to Fleet</strong> button in the header goes to that second backlog and
+                        its badge is a live count.</li>
+                    <li>Cancel and delete are not the same. Cancelling keeps the order and its history;
+                        deleting removes it for good and is superadmin-only.</li>
+                    <li>The date buttons filter on creation time. An order created last week for delivery
+                        today will not appear under <strong>Today</strong>.</li>
+                    <li>Bulk status changes apply to every ticked row at once, with no undo — check the
+                        selected count before confirming.</li>
+                    <li>Fixing an address here does not re-notify a driver who already has the task. If it is
+                        already published, follow it up on the delivery-task page too.</li>
+                </ul>
+            </section>
+        

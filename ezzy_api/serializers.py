@@ -11,9 +11,54 @@ User = get_user_model()
 
 
 class OrderSerializer(serializers.ModelSerializer):
+    """Client-facing order serializer for /api/v1/orderlist/.
+
+    `fields = '__all__'` here was a mass-assignment hole: it made 62 columns
+    writable, so a merchant with a write-scope API key could create an order
+    already flagged as COD-settled and staff-verified, with a forged
+    `verified_by`. Everything a client legitimately supplies is listed below;
+    everything the platform decides is read-only.
+    """
+
     class Meta:
         model = orders_models.Order
         fields = '__all__'
+        # The settlement, verification and attribution cluster — these are staff
+        # and system decisions. `workforce/views.py` reads cod_status_by_staff to
+        # decide settled-vs-owed, so a client-writable value corrupts payouts.
+        read_only_fields = (
+            'business', 'order_number',
+            'cod_status_by_staff', 'cod_amount_locked',
+            'verification_status', 'verification_notes',
+            'address_verified', 'address_verified_at', 'address_verified_by',
+            'verified_at', 'verified_by', 'qnas_status',
+            'task_status', 'delivered_at', 'fulfilled_at',
+            'stock_reserved', 'is_transferred', 'transferred_at', 'transferred_by',
+            'cancelled_by',
+            # Written once by orders/signals.py as the immutable "as received"
+            # snapshot; a caller-supplied value used to survive and forge it.
+            'original_order_data',
+        )
+
+    def validate_pickup_location(self, value):
+        """Refuse a pickup location belonging to another tenant.
+
+        The view forces `business` on save, but an unscoped FK still let a
+        caller attach someone else's pickup location, which then propagates
+        into the DeliveryTask. Mirrors the check at ezzy_api/views.py:3096.
+        """
+        business = self.context.get('business')
+        if value is not None and business is not None and value.business_id != business.pk:
+            raise serializers.ValidationError('Pickup location not found for this business.')
+        return value
+
+    def validate_hub_warehouse(self, value):
+        business = self.context.get('business')
+        if value is not None and business is not None:
+            owner_id = getattr(value, 'business_id', None)
+            if owner_id is not None and owner_id != business.pk:
+                raise serializers.ValidationError('Warehouse not found for this business.')
+        return value
 
 
 # Driver App Serializers
@@ -81,6 +126,12 @@ class DeliveryTaskListSerializer(serializers.ModelSerializer):
     customer_phone = serializers.CharField(source='order.customer_phone', read_only=True)
     customer_address = serializers.CharField(source='order.customer_address', read_only=True)
     cod_amount = serializers.IntegerField(source='order.cod_amount', read_only=True)
+    # dl_price became a DecimalField so the client charge can hold fils. Declared
+    # explicitly because DRF serialises Decimals as JSON *strings* by default,
+    # which would have turned an existing integer field into "20.00" for every
+    # external consumer of this endpoint. Kept as a JSON number.
+    dl_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, coerce_to_string=False, read_only=True)
 
     class Meta:
         model = delivery_models.DeliveryTask

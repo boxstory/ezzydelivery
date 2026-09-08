@@ -1,5 +1,13 @@
 {% extends "workforce/wf_base_dashboard.html" %}
 {% load static %}
+{% comment %}
+Purpose: Expanded (stat-card) variant of the warehouse-to-client link console
+Used by: no view currently renders it — workforce.views.warehouses_list uses the compact
+         workforce/warehouses_list.html; this file expects the same context
+Notes: Link/unlink post to workforce:warehouse_link_business / warehouse_unlink_business. Carries
+       the shared wfnote__ page-notes card under the header, hidden on load; the header help button
+       toggles it via workforce.js.
+{% endcomment %}
 
 {% block title %}Warehouse Management - Business Links{% endblock %}
 
@@ -11,16 +19,27 @@
 <div class="container-fluid py-4">
 
   <!-- Page Header -->
-  <div class="wle__header">
-    <h1>
-      <i class="fa-solid fa-warehouse me-2"></i>
-      Warehouse Management
-    </h1>
-    <p>
-      <i class="fa-solid fa-info-circle me-1"></i>
-      Manage warehouse-business links and fulfillment center connections
-    </p>
+  <div class="wle__header d-flex align-items-start justify-content-between gap-2">
+    <div>
+      <h1>
+        <i class="fa-solid fa-warehouse me-2"></i>
+        Warehouse Management
+      </h1>
+      <p>
+        <i class="fa-solid fa-info-circle me-1"></i>
+        Manage warehouse-business links and fulfillment center connections
+      </p>
+    </div>
+    <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_warehouses_list_enhanced_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
   </div>
+
+  <div class="wfnote" id="workforce_warehouses_list_enhanced_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_warehouses_list_enhanced_card_notes' %}" hidden></div>
 
   <!-- Summary Statistics -->
   <div class="wle__stats-grid">

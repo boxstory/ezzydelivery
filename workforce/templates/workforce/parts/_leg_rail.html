@@ -1,0 +1,17 @@
+{% comment %}
+Purpose: Shared 6-step progress rail used by both job legs (first-mile pickup and delivery).
+Used by: workforce/parts/_pickup_leg_card.html, workforce/parts/_delivery_leg_card.html.
+Notes: Pass rail_steps = list of {label, done, now, time, approx}; approx prefixes the time with
+       "≈" for stages the system infers rather than stamps.
+{% endcomment %}
+<div class="lgr__rail">
+    {% for step in rail_steps %}
+    <div class="lgr__step{% if step.done %} lgr__step--done{% endif %}{% if step.now %} lgr__step--now{% endif %}">
+        <span class="lgr__dot"></span>
+        <span class="lgr__step-label">{{ step.label }}</span>
+        {% if step.time %}
+        <span class="lgr__step-time"{% if step.approx %} title="No timestamp recorded for this stage — showing the closest known time"{% endif %}>{% if step.approx %}&asymp;{% endif %}{{ step.time|date:"d M, H:i" }}</span>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>

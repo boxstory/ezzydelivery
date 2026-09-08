@@ -1,6 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Staff CRUD for public-URL order import sources (scraped HTML tables) per business
+Used by: workforce_views.public_link_sources_page at /workforce/public-link-sources/
+Notes: Adding a source syncs it immediately; the active toggle posts back over AJAX.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block content %}
 <div style="min-width:0;max-width:100%">
@@ -19,8 +26,17 @@
             <button class="btn btn-dark btn-sm" data-bs-toggle="collapse" data-bs-target="#addSourceForm">
                 <i class="fa-solid fa-plus me-1"></i>Add Source
             </button>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_public_link_sources_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </header>
+
+    <div class="wfnote" id="workforce_public_link_sources_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_public_link_sources_card_notes' %}" hidden></div>
 
     <!-- Add Source Form -->
     <div class="collapse mb-3 px-2" id="addSourceForm">
@@ -136,6 +152,7 @@
             </tbody>
         </table>
     </div>
+    {% include "includes/components/_pagination.html" with page_obj=sources_page per_page=per_page pagination_id="public_link_sources" %}
 </div>
 {% endblock content %}
 

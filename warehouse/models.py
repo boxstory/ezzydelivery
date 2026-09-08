@@ -35,6 +35,7 @@ from django.db import models
 from django.conf import settings
 
 from business import models as business_models
+from core.email_normalize import EmailNormalizedModel
 from product import models as product_models
 
 logger = logging.getLogger('warehouse')
@@ -114,7 +115,7 @@ ALERT_STATUS_CHOICES = [
 # =============================================================================
 
 
-class Warehouse(models.Model):
+class Warehouse(EmailNormalizedModel, models.Model):
     """
     Fulfillment Center - Independent warehouse entity managed by staff.
 
@@ -124,6 +125,8 @@ class Warehouse(models.Model):
     - Multiple sellers can be linked to one warehouse
     - One seller can be linked to multiple warehouses
     """
+    EMAIL_FIELDS = ('email',)
+
     name = models.CharField(max_length=200, help_text="Fulfillment center name")
     code = models.CharField(max_length=50, unique=True, db_index=True, help_text="Unique warehouse code")
     description = models.TextField(blank=True, help_text="Warehouse description and details")

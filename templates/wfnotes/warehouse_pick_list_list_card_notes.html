@@ -1,0 +1,84 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/pick_list_list.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_pick_list_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Every <strong>picking job in the warehouse</strong>, open and finished. A pick list batches
+            several orders into one walk of the shelves, grouped by product so the same item is
+            collected once rather than order by order. Lists containing a same-day order are pushed to
+            the top of this page, then the newest first.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Status, in order</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pending</dt>
+                        <dd class="wfnote__def">Created, nobody on it yet. <em>Start</em> claims it for
+                            you and begins picking in one step.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assigned</dt>
+                        <dd class="wfnote__def">Claimed by a picker but not started. The name is in the
+                            Assigned To column.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">In progress</dt>
+                        <dd class="wfnote__def">Being walked now. <em>Continue</em> opens it at the
+                            products still to collect.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Completed</dt>
+                        <dd class="wfnote__def">Every line picked. Set automatically by the last tick —
+                            the next step is packing.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Packing / packed</dt>
+                        <dd class="wfnote__def">Sorted into orders at the pack station; packed means
+                            every order in the list is boxed and ready for dispatch.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Status, business and zone. Zone is the part of the
+                            warehouse the list was raised against.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Same Day badge</dt>
+                        <dd class="wfnote__def">At least one order in that list is a same-day delivery.
+                            That is why it sits above older lists regardless of age.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Items</dt>
+                        <dd class="wfnote__def">Lines picked out of lines total — progress, not units.
+                            One line can be several units of the same product.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Create pick list</dt>
+                        <dd class="wfnote__def">Batches orders that are ready for pickup and have no
+                            list yet into a new one.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Drop to shelf</dt>
+                        <dd class="wfnote__def">Superadmin only. Tick lists, and every picked unit goes
+                            back to its shelf location with a return movement logged; pick and pack
+                            progress is cleared and the list returns to Pending. Use it when a batch was
+                            picked in error.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Ticking a line is progress, not stock.</strong> On-hand falls when the
+                        order is fulfilled, not when the picker ticks it.</li>
+                    <li><strong>A seller account sees only its linked warehouses' lists.</strong></li>
+                </ul>
+            </section>
+        </div>

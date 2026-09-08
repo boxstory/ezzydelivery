@@ -1,0 +1,100 @@
+{% comment %}
+Purpose: "About this page" notes panel for client_charge_verification.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_client_charge_verification_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+      <p class="wfnote__lede">
+        This console decides <strong>what each delivery costs the business</strong>. One row is one
+        completed delivery — COD or prepaid, it makes no difference. The system's calculated charge sits
+        read-only next to an editable figure you can agree, adjust or refuse, with the driver's activity
+        trail beside it so the whole job can be judged, not just the fee. The agreed figure is what the
+        <strong>Client Payout</strong> desk deducts from the COD it hands back. This is the client-side
+        twin of <strong>Driver Earnings</strong>: one says what we pay the driver, this says what we bill
+        the client.
+      </p>
+
+      <div class="wfnote__cols">
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">What you can do here</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Filters</dt>
+              <dd class="wfnote__def">Narrow by business, by verification status and by period. The page
+                opens on <em>Pending</em> over the last 90 days, so rows you have already dealt with are
+                out of the way.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Verified figure</dt>
+              <dd class="wfnote__def">Type the charge you want billed for that one delivery. It replaces
+                the calculated figure. Zero is a valid answer and will be respected.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Set selected to</dt>
+              <dd class="wfnote__def">Writes one amount across every ticked row at once, so a flat rate
+                does not have to be retyped line by line.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Verify</dt>
+              <dd class="wfnote__def">Saves the figures on the ticked rows and stamps them with your name
+                and the time. They stay editable.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Verify &amp; publish</dt>
+              <dd class="wfnote__def">Agrees the figure and locks the row. Use it once the number is
+                final.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Reject</dt>
+              <dd class="wfnote__def">Marks the charge as refused so it is visibly unresolved. It does not
+                zero the amount or stop the payout.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Log</dt>
+              <dd class="wfnote__def">Opens the driver's activity trail for that job — waiting time,
+                re-attempts, partial delivery — the context behind a disputed charge.</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">Statuses</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Pending</dt>
+              <dd class="wfnote__def">Nobody has looked at it. If it stays this way, the calculated charge
+                is what the payout deducts — silence still bills.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Verified</dt>
+              <dd class="wfnote__def">A figure has been agreed and attributed, but it can still be
+                changed.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Published</dt>
+              <dd class="wfnote__def">Committed. The row is greyed and its amount is read-only — bulk
+                actions skip it and tell you how many they skipped.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Rejected</dt>
+              <dd class="wfnote__def">Refused during review. Still editable, and still billable until
+                someone sets it to what it should be.</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+
+      <section class="wfnote__sec wfnote__sec--note">
+        <h2 class="wfnote__h">Worth knowing</h2>
+        <ul class="wfnote__notes">
+          <li>Publishing <strong>books nothing</strong>. No transaction is written here — the charge is only
+            posted as a deduction line when the business payout runs.</li>
+          <li>Rows already <strong>paid out to the business</strong> are locked too, even if never published:
+            their figure is on an issued invoice and rewriting it would make the document disagree with the
+            money that moved.</li>
+          <li>Verifying without typing anything keeps the calculated charge and treats it as agreed.</li>
+          <li>Charges over 10,000 QAR and negative amounts are refused as data-entry mistakes.</li>
+          <li>Only 500 deliveries can be actioned in one go, and the business dropdown lists only accounts
+            with deliveries inside the chosen period.</li>
+        </ul>
+      </section>
+    

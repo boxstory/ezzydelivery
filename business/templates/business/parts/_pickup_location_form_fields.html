@@ -1,0 +1,153 @@
+{% comment %}
+Purpose: Field layout for the client store (pickup location) add/update form — QNAS verify + WhatsApp/Maps pin paste fill the lat/lon.
+Used by: business/parts/pickup_location_add.html, business/parts/pickup_location_update.html
+Notes: Helper JS (qnasValidateAndFill, whatsappLocationFill, locDropHandle) ships in workforce/js/qnas-verify.js, already loaded by business_dashboard_base.html.
+{% endcomment %}
+
+<!-- Store identity -->
+<div class="row g-3">
+  <div class="col-12 col-md-6">
+    <label class="form-label" for="{{ form.pickup_location_title.id_for_label }}">
+      <i class="fa-solid fa-store me-1 text-muted"></i>{{ form.pickup_location_title.label }}
+    </label>
+    {{ form.pickup_location_title }}
+    {% for error in form.pickup_location_title.errors %}
+    <div class="invalid-feedback d-block">{{ error }}</div>
+    {% endfor %}
+  </div>
+  <div class="col-12 col-md-6">
+    <label class="form-label" for="{{ form.locality.id_for_label }}">
+      <i class="fa-solid fa-map-pin me-1 text-muted"></i>{{ form.locality.label }}
+    </label>
+    {{ form.locality }}
+    {% for error in form.locality.errors %}
+    <div class="invalid-feedback d-block">{{ error }}</div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Address numbers + QNAS lookup -->
+<div class="row g-3 mt-0">
+  <div class="col-4 col-md-2">
+    <label class="form-label" for="{{ form.pickup_zone_no.id_for_label }}">
+      <i class="fa-solid fa-map me-1 text-muted"></i>{{ form.pickup_zone_no.label }}
+    </label>
+    {{ form.pickup_zone_no }}
+  </div>
+  <div class="col-4 col-md-2">
+    <label class="form-label" for="{{ form.pickup_street_no.id_for_label }}">
+      <i class="fa-solid fa-road me-1 text-muted"></i>{{ form.pickup_street_no.label }}
+    </label>
+    {{ form.pickup_street_no }}
+  </div>
+  <div class="col-4 col-md-2">
+    <label class="form-label" for="{{ form.pickup_building_no.id_for_label }}">
+      <i class="fa-solid fa-building me-1 text-muted"></i>{{ form.pickup_building_no.label }}
+      <span class="bpl-form__req" title="Required">*</span>
+    </label>
+    {{ form.pickup_building_no }}
+  </div>
+  <div class="col-12 col-md-auto d-flex align-items-end">
+    <button type="button" class="btn btn-sm btn-outline-warning bpl-form__qnas-btn"
+            id="client_location_form_btn_qnas"
+            onclick="qnasValidateAndFill({zoneId:'{{ form.pickup_zone_no.id_for_label }}', streetId:'{{ form.pickup_street_no.id_for_label }}', buildingId:'{{ form.pickup_building_no.id_for_label }}', latId:'{{ form.pickup_lat.id_for_label }}', lngId:'{{ form.pickup_lon.id_for_label }}', zoneNameId:'client_location_form_input_zonename', resultId:'client_location_form_result_qnas', btnId:'client_location_form_btn_qnas', mapId:'client_location_form_link_map'})">
+      <i class="fa-solid fa-satellite-dish me-1"></i>Verify QNAS &amp; Fill Coordinates
+    </button>
+  </div>
+</div>
+<!-- Address errors render full width — the number columns are too narrow to hold a sentence -->
+{% for error in form.pickup_zone_no.errors %}
+<div class="invalid-feedback d-block mt-1"><strong>Zone:</strong> {{ error }}</div>
+{% endfor %}
+{% for error in form.pickup_street_no.errors %}
+<div class="invalid-feedback d-block mt-1"><strong>Street:</strong> {{ error }}</div>
+{% endfor %}
+{% for error in form.pickup_building_no.errors %}
+<div class="invalid-feedback d-block mt-1"><strong>Building:</strong> {{ error }}</div>
+{% endfor %}
+<div class="bpl-form__note mt-2">
+  <i class="fa-solid fa-triangle-exclamation bpl-form__note-icon"></i>
+  <span>{{ form.pickup_building_no.help_text }}</span>
+</div>
+<div id="client_location_form_result_qnas" class="mt-2"></div>
+
+<!-- Paste / drop a shared WhatsApp or Google Maps pin -->
+<div class="row g-3 mt-0">
+  <div class="col-12">
+    <label class="form-label" for="client_location_form_input_locpaste">
+      <i class="fa-brands fa-whatsapp me-1 bpl-form__wa-icon"></i>Paste WhatsApp / Google Maps Location
+    </label>
+    <div id="client_location_form_drop_loc" class="bpl-form__loc-drop"
+         ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+         ondrop="locDropHandle(event, {latId:'{{ form.pickup_lat.id_for_label }}', lngId:'{{ form.pickup_lon.id_for_label }}', mapId:'client_location_form_link_map', resultId:'client_location_form_result_loc', inputId:'client_location_form_input_locpaste'})">
+      <i class="fa-solid fa-location-dot bpl-form__loc-drop__icon"></i>
+      <input type="text" id="client_location_form_input_locpaste" inputmode="url"
+             class="form-control form-control-sm bpl-form__loc-drop__input"
+             placeholder="Paste the shared pin link (e.g. https://maps.google.com/?q=25.286106,51.534817) or drop it here"
+             oninput="whatsappLocationFill(this.value, {latId:'{{ form.pickup_lat.id_for_label }}', lngId:'{{ form.pickup_lon.id_for_label }}', mapId:'client_location_form_link_map', resultId:'client_location_form_result_loc'})">
+    </div>
+    <div id="client_location_form_result_loc" class="mt-1"></div>
+  </div>
+</div>
+
+<!-- Coordinates -->
+<div class="row g-3 mt-0">
+  <div class="col-6 col-md-3">
+    <label class="form-label" for="{{ form.pickup_lat.id_for_label }}">{{ form.pickup_lat.label }}</label>
+    {{ form.pickup_lat }}
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label" for="{{ form.pickup_lon.id_for_label }}">{{ form.pickup_lon.label }}</label>
+    {{ form.pickup_lon }}
+  </div>
+  <div class="col-8 col-md-4">
+    <label class="form-label" for="client_location_form_input_zonename">Zone Name</label>
+    <input type="text" id="client_location_form_input_zonename" class="form-control"
+           placeholder="Auto-filled by QNAS" readonly tabindex="-1">
+  </div>
+  <div class="col-4 col-md-2 d-flex align-items-end">
+    <a id="client_location_form_link_map" href="#" target="_blank" hx-boost="false"
+       class="btn btn-sm btn-outline-secondary disabled bpl-form__map-btn" title="View pin on Google Maps">
+      <i class="fa-solid fa-map-location-dot"></i>
+    </a>
+  </div>
+</div>
+{% for error in form.pickup_lat.errors %}
+<div class="invalid-feedback d-block mt-1"><strong>Latitude:</strong> {{ error }}</div>
+{% endfor %}
+{% for error in form.pickup_lon.errors %}
+<div class="invalid-feedback d-block mt-1"><strong>Longitude:</strong> {{ error }}</div>
+{% endfor %}
+
+<!-- Status & flags -->
+<div class="row g-3 mt-0">
+  <div class="col-12 col-md-6">
+    <label class="form-label" for="{{ form.pickup_status.id_for_label }}">
+      <i class="fa-solid fa-toggle-on me-1 text-muted"></i>{{ form.pickup_status.label }}
+    </label>
+    {{ form.pickup_status }}
+    {% for error in form.pickup_status.errors %}
+    <div class="invalid-feedback d-block">{{ error }}</div>
+    {% endfor %}
+  </div>
+  <div class="col-12 col-md-6 d-flex flex-column justify-content-end gap-3">
+    <div class="form-check bpl-form__check">
+      {{ form.is_fulfilment_center }}
+      <div>
+        <label class="form-check-label" for="{{ form.is_fulfilment_center.id_for_label }}">
+          {{ form.is_fulfilment_center.label }}
+        </label>
+        <div class="form-text">Stock is held here and orders ship from this address</div>
+      </div>
+    </div>
+    <div class="form-check bpl-form__check">
+      {{ form.is_default }}
+      <div>
+        <label class="form-check-label" for="{{ form.is_default.id_for_label }}">
+          {{ form.is_default.label }}
+        </label>
+        <div class="form-text">{{ form.is_default.help_text }}</div>
+      </div>
+    </div>
+  </div>
+</div>

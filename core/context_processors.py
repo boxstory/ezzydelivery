@@ -9,6 +9,7 @@ Also provides utility functions for views to get cached user data:
 import datetime
 from core.seo import SEOMetadata
 import json
+from core.json_utils import safe_json
 
 
 # =============================================================================
@@ -117,8 +118,10 @@ def seo_defaults(request):
     # Get current path for canonical URL
     current_url = request.build_absolute_uri()
 
-    # Default metadata
+    # Default metadata — flagged so base.html lets a template's
+    # {% block title %} outrank it (view-passed seo has no flag and wins)
     default_meta = SEOMetadata.get_page_meta(url=current_url)
+    default_meta['is_default'] = True
 
     return {
         'seo': default_meta,
@@ -235,40 +238,56 @@ def dl_task_status_choices(request):
     from delivery.models import DeliveryTask
     choices = [{'value': v, 'label': l} for v, l in DeliveryTask._meta.get_field('dl_task_status').choices]
     return {
-        'dl_task_status_choices_json': json.dumps(choices),
+        'dl_task_status_choices_json': safe_json(choices),
         'dl_task_status_choices': choices,
     }
 
 
+#: Statuses that mean the driver is out on the road right now, as opposed to
+#: merely holding a task. GPS tracking spends its high-accuracy battery budget
+#: on exactly this set, and delivery.tasks raises its "GPS lost" alert on the
+#: same one — the two must not drift apart.
+DRIVER_ON_DUTY_STATUSES = ['picked_up', 'start_ride', 'out_for_delivery', 'in_transit']
+DRIVER_PENDING_STATUSES = ['assigned', 'accepted', 'contacted', 'non_reachable'] + DRIVER_ON_DUTY_STATUSES
+
+
 def driver_pending_tasks(request):
     """
-    Inject pending_tasks_count for fleet PWA bottom nav badge.
+    Inject pending_tasks_count for the fleet PWA bottom nav badge, and
+    driver_on_duty for the GPS module's power profile.
     Only queries for authenticated users on /fleet/ paths.
     """
+    empty = {'pending_tasks_count': 0, 'driver_on_duty': False}
     if not hasattr(request, 'user') or not request.user.is_authenticated:
-        return {'pending_tasks_count': 0}
+        return empty
 
     # Only run on fleet URLs to avoid overhead on every page
     path = request.path
     if not path.startswith('/fleet/'):
-        return {'pending_tasks_count': 0}
+        return empty
 
     # Check request cache to avoid duplicate queries per request
-    if hasattr(request, '_driver_pending_tasks_count'):
-        return {'pending_tasks_count': request._driver_pending_tasks_count}
+    if hasattr(request, '_driver_pending_tasks'):
+        return request._driver_pending_tasks
 
     try:
         from fleet.models import Driver
         from delivery.models import DeliveryTask
         driver = Driver.objects.only('driver_id').get(user_id=request.user.id)
-        count = DeliveryTask.objects.filter(
+        # One query answers both questions — the badge count and whether any of
+        # those tasks is actually in flight.
+        statuses = list(DeliveryTask.objects.filter(
             driver=driver,
-            dl_task_status__in=['assigned', 'accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable']
-        ).count()
-        request._driver_pending_tasks_count = count
-        return {'pending_tasks_count': count}
+            dl_task_status__in=DRIVER_PENDING_STATUSES,
+        ).values_list('dl_task_status', flat=True))
+        ctx = {
+            'pending_tasks_count': len(statuses),
+            'driver_on_duty': any(s in DRIVER_ON_DUTY_STATUSES for s in statuses),
+        }
+        request._driver_pending_tasks = ctx
+        return ctx
     except Exception:
-        return {'pending_tasks_count': 0}
+        return empty
 
 
 def google_one_tap(request):
@@ -281,3 +300,45 @@ def google_one_tap(request):
         return {'GOOGLE_ONE_TAP_CLIENT_ID': app.client_id}
     except Exception:
         return {'GOOGLE_ONE_TAP_CLIENT_ID': ''}
+
+
+def pagination_defaults(request):
+    """Supply `per_page` and `filter_params` to every template so the shared
+    pagination component keeps the user's page size and their filters.
+
+    Both were being lost the same way. The component reads them off the
+    template context, and most list views paginate correctly off ?per_page=
+    and filter correctly off the query string, but never put either value
+    back in context — so the selector re-rendered as 50 and every pagination
+    link was built with no filters. Page 2 then quietly showed a different,
+    unfiltered data set at a page size the user had not chosen.
+
+    `per_page` is compared as a STRING by the component when marking the
+    selected <option>, so it is returned as one.
+
+    `filter_params` is the whole query string minus page/per_page (the
+    component supplies those itself). Taking the entire QueryDict rather than
+    an allow-list means a filter cannot be dropped by someone forgetting to
+    add it here later.
+
+    A view that passes its own value still wins: render() context is applied
+    after context processors.
+    """
+    if not hasattr(request, 'GET'):
+        return {'per_page': '50', 'filter_params': ''}
+
+    per_page = '50'
+    raw = request.GET.get('per_page')
+    if raw:
+        try:
+            value = int(raw)
+            if value in (10, 25, 50, 100):
+                per_page = str(value)
+        except (ValueError, TypeError):
+            pass
+
+    params = request.GET.copy()
+    params.pop('page', None)
+    params.pop('per_page', None)
+
+    return {'per_page': per_page, 'filter_params': params.urlencode()}

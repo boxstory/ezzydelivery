@@ -1,0 +1,131 @@
+{% comment %}
+Purpose: "About this page" notes panel for tasks_live_map.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_tasks_live_map_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+        The whole operation on one map. Every pin is a <strong>delivery task</strong> plotted at the
+        customer's coordinates, coloured by where it has got to; every car is a <strong>driver</strong>
+        plotted at their last GPS ping. It opens on the last three days showing only the work still in play,
+        and refreshes itself every half minute. Use it to see whether a driver is anywhere near the job they
+        are holding, to spot a cluster of failures in one zone, or to answer "where is my order" without
+        opening anything.
+    </p>
+
+    <div class="wfnote__cols">
+        <section class="wfnote__sec">
+            <h2 class="wfnote__h">What you can do here</h2>
+            <dl class="wfnote__list">
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Date range</dt>
+                    <dd class="wfnote__def">Sets which task dates are plotted. Defaults to the last three
+                        days. <em>Apply</em> reloads the pins without leaving the map.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Deliveries chip</dt>
+                    <dd class="wfnote__def">Shows how many tasks are loaded, and opens a list of pickup
+                        locations so you can watch one client's outbound work alone.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Drivers chip</dt>
+                    <dd class="wfnote__def">Shows how many drivers are loaded, and opens a driver list so you
+                        can follow one or a few. <em>Show All</em> clears the choice.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Status buttons</dt>
+                    <dd class="wfnote__def">Multi-select, not tabs — each one toggles that group of pins on or
+                        off. <em>All</em> turns the lot on, or off again if everything is already on.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Drivers button</dt>
+                    <dd class="wfnote__def">Hides or shows the driver layer, for when the cars are covering
+                        the pins you are trying to read.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Live switch</dt>
+                    <dd class="wfnote__def">On, drivers sit at their GPS position and everything refreshes
+                        every 30 seconds. Off (<em>Static</em>), each driver is shown at their most recent
+                        task instead and nothing auto-updates.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Recenter</dt>
+                    <dd class="wfnote__def">Zooms back out to fit every loaded pin — the way back after
+                        chasing one driver across the map.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Task popup</dt>
+                    <dd class="wfnote__def">Click a pin for the task number, status, date, driver, customer
+                        and address. The phone number dials, and <em>View Task</em> opens the full delivery
+                        task in a new tab.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Driver popup</dt>
+                    <dd class="wfnote__def">Click a car for how fresh their GPS is, their speed, and the list
+                        of jobs they are carrying — each one a link to that task.</dd>
+                </div>
+            </dl>
+        </section>
+
+        <section class="wfnote__sec">
+            <h2 class="wfnote__h">Pin colours</h2>
+            <dl class="wfnote__list">
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">New</dt>
+                    <dd class="wfnote__def">Awaiting review or still pending — nobody is on it yet.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Active</dt>
+                    <dd class="wfnote__def">Assigned, accepted or picked up. A driver has it in hand.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">In transit</dt>
+                    <dd class="wfnote__def">On the road — ride started, out for delivery, or the customer has
+                        been contacted.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Issue</dt>
+                    <dd class="wfnote__def">Failed, rejected, cancelled or the customer was unreachable. Off
+                        by default, so turn it on when you are hunting problems.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Delivered</dt>
+                    <dd class="wfnote__def">Done. Also off by default, to keep finished work out of the way.</dd>
+                </div>
+            </dl>
+
+            <h2 class="wfnote__h">Driver markers</h2>
+            <dl class="wfnote__list">
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Live</dt>
+                    <dd class="wfnote__def">A GPS ping within the last ten minutes. Trust the position.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">Stale</dt>
+                    <dd class="wfnote__def">Last ping is older than ten minutes. They have almost certainly
+                        moved since — the popup says how long ago.</dd>
+                </div>
+                <div class="wfnote__item">
+                    <dt class="wfnote__term">No GPS</dt>
+                    <dd class="wfnote__def">No ping at all. The car is drawn at one of their task locations as
+                        a fallback, which is a guess, not a position.</dd>
+                </div>
+            </dl>
+        </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+        <h2 class="wfnote__h">Worth knowing</h2>
+        <ul class="wfnote__notes">
+            <li>The map is <strong>read-only</strong>. Nothing here reassigns, cancels or updates anything —
+                open the task itself to act on it.</li>
+            <li>A task with no coordinates on its order or address <strong>cannot be plotted</strong>. The
+                deliveries count includes it, so a missing pin is usually a missing coordinate, not a missing
+                job.</li>
+            <li>A driver marker is only ever as good as their last ping. Never tell a customer a driver is
+                "five minutes away" off a stale or no-GPS marker.</li>
+            <li>Only tasks for <strong>active businesses</strong> are loaded, and only approved drivers are
+                listed, so a suspended client's work will not appear here.</li>
+            <li>Drivers with recent GPS but no jobs still show up — that is how you find someone free and
+                nearby.</li>
+        </ul>
+    </section>

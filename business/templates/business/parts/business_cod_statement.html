@@ -1,5 +1,5 @@
 {% extends "business_dashboard_base.html" %}
-{% load static %}
+{% load static business_console %}
 
 {% block title %}COD Statement{% endblock %}
 
@@ -52,15 +52,21 @@
       <p class="pwa-finance-stat__label">Settled (QR)</p>
     </div>
     <div class="pwa-finance-stat">
-      <div class="pwa-stat-card__icon pwa-stat-card__icon--danger" style="margin: 0 auto 6px;">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--warning" style="margin: 0 auto 6px;">
+        <i class="fas fa-truck-fast"></i>
+      </div>
+      <p class="pwa-finance-stat__value">{{ cod_with_driver|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">With Driver (QR)</p>
+    </div>
+    <div class="pwa-finance-stat">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--primary" style="margin: 0 auto 6px;">
         <i class="fas fa-clock"></i>
       </div>
-      {% with pending=stats.total_cod|default:0 %}
-      <p class="pwa-finance-stat__value">{{ pending|floatformat:0 }}</p>
-      {% endwith %}
-      <p class="pwa-finance-stat__label">Pending (QR)</p>
+      <p class="pwa-finance-stat__value">{{ cod_ready|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Ready for Payout (QR)</p>
     </div>
   </div>
+  <p class="pwa-stats-note">Outstanding totals are all-time; the filter applies to the lists below.</p>
 
   <!-- Settlement history -->
   {% if settlements %}
@@ -69,20 +75,40 @@
     <span class="pwa-section-header__badge pwa-section-header__badge--success">{{ settlements|length }}</span>
   </div>
   <div class="pwa-txn-list">
+    {% comment %} Mobile previously showed only the net amount with no invoice link, so the
+       gap between COD collected and money received had no explanation on a phone. {% endcomment %}
     {% for s in settlements %}
-    <div class="pwa-txn-item">
+    {% if s.transaction_type == 'cod_client_settle' %}
+    <a href="{% url 'business:business_cod_payout_invoice' s.transaction_code %}" class="pwa-txn-item pwa-txn-item--link">
       <div class="pwa-txn-item__icon pwa-txn-item__icon--settle">
         <i class="fas fa-handshake"></i>
       </div>
       <div class="pwa-txn-item__info">
-        <p class="pwa-txn-item__type">{{ s.description|default:"COD Settlement"|truncatewords:5 }}</p>
-        <p class="pwa-txn-item__desc">By {{ s.created_by.first_name|default:"-" }}</p>
+        <p class="pwa-txn-item__type">{{ s.transaction_code|default:"COD Payout" }}</p>
+        <p class="pwa-txn-item__desc">
+          {{ s.gross_cod|floatformat:0 }} COD{% if s.deductions_total %} − {{ s.deductions_total|floatformat:0 }} charges{% endif %}
+        </p>
       </div>
       <div class="pwa-txn-item__right">
-        <p class="pwa-txn-item__amount pwa-txn-item__amount--positive">{{ s.amount|floatformat:0 }} QR</p>
+        <p class="pwa-txn-item__amount pwa-txn-item__amount--positive">{{ s.net_paid|floatformat:0 }} QR</p>
+        <p class="pwa-txn-item__date">{{ s.created_at|date:"d M" }} <i class="fas fa-chevron-right ms-1"></i></p>
+      </div>
+    </a>
+    {% else %}
+    <div class="pwa-txn-item">
+      <div class="pwa-txn-item__icon pwa-txn-item__icon--settle">
+        <i class="fas fa-rotate-left"></i>
+      </div>
+      <div class="pwa-txn-item__info">
+        <p class="pwa-txn-item__type">Payout reversed</p>
+        <p class="pwa-txn-item__desc">{{ s.transaction_code|default:"-" }}</p>
+      </div>
+      <div class="pwa-txn-item__right">
+        <p class="pwa-txn-item__amount pwa-txn-item__amount--negative">−{{ s.amount|floatformat:0 }} QR</p>
         <p class="pwa-txn-item__date">{{ s.created_at|date:"d M" }}</p>
       </div>
     </div>
+    {% endif %}
     {% endfor %}
   </div>
   {% endif %}
@@ -90,7 +116,7 @@
   <!-- COD Deliveries list -->
   <div class="pwa-section-header">
     <h3 class="pwa-section-header__title">COD Deliveries</h3>
-    <span class="pwa-section-header__badge pwa-section-header__badge--warning">{{ cod_deliveries|length }}</span>
+    <span class="pwa-section-header__badge pwa-section-header__badge--warning">{{ cod_deliveries_total }}</span>
   </div>
   <div class="pwa-txn-list">
     {% for task in cod_deliveries %}
@@ -120,35 +146,28 @@
     </div>
     {% endfor %}
   </div>
+  {% include "includes/components/_pagination.html" with page_obj=cod_deliveries_page filter_params=pagination_filter_params per_page=per_page pagination_id="cod_deliveries_mob" variant="compact" show_goto="false" %}
 </div>
 
 <!-- ==========================================
      Desktop View (visible >= 768px only)
      ========================================== -->
 <div class="d-none d-md-block" id="cod_desktop_view">
-<div class="bcon__page pt-3">
-  <div class="bcon__header">
-    <div class="bcon__header-main">
-      <div class="bcon__eyebrow">
-        <span>{{ business.business_name|truncatechars:22 }}</span>
-        <span class="bcon__eyebrow-sep"></span>
-        <span>Finance</span>
-        <span class="bcon__eyebrow-sep"></span>
-        <span class="bcon__eyebrow-live">Last {{ selected_days }} days</span>
-      </div>
-      <h1 class="bcon__title"><i class="fa-solid fa-file-invoice-dollar"></i> COD Statement</h1>
-    </div>
-    <div class="bcon__actions">
-      <form method="GET">
-        <select name="days" class="form-select form-select-sm" onchange="this.form.submit()">
-          <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
-          <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
-          <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
-          <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
-        </select>
-      </form>
-    </div>
-  </div>
+<div class="bcon__page">
+  {# The period is part of the page's identity, so it rides in the eyebrow — built
+     here because tag arguments resolve variables, they do not interpolate. #}
+  {% with days_str=selected_days|stringformat:"s" %}{% with period="Last "|add:days_str|add:" days" %}
+  {% bconheader eyebrow="Finance" live=period icon="fa-solid fa-file-invoice-dollar" title="COD Statement" subtitle=business.business_name %}
+    <form method="GET">
+      <select name="days" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+        <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+        <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+        <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+      </select>
+    </form>
+  {% endbconheader %}
+  {% endwith %}{% endwith %}
 </div>
 
 <!-- COD Summary Plates -->
@@ -176,16 +195,30 @@
     <p class="bcon__plate-value">{{ total_settled|floatformat:0 }} <small>QAR</small></p>
     <p class="bcon__plate-foot">{{ stats.settled_driver|default:0 }} orders</p>
   </div>
-  <div class="bcon__plate {% if stats.total_cod and total_settled < stats.total_cod %}bcon__plate--danger{% else %}bcon__plate--navy{% endif %} bcon__rise bcon__rise--4">
+  {% comment %} Outstanding COD is all-time, not filtered by the period selector above —
+     money collected months ago and still unpaid is owed today. Split by leg: cash a
+     driver is still carrying cannot be paid out yet; cash already with EzzyDelivery can. {% endcomment %}
+  <div class="bcon__plate bcon__plate--warning bcon__rise bcon__rise--4">
     <div class="bcon__plate-top">
-      <p class="bcon__plate-label">Pending Settlement</p>
-      <span class="bcon__plate-icon bcon__plate-icon--danger"><i class="fa-solid fa-clock"></i></span>
+      <p class="bcon__plate-label">With Driver</p>
+      <span class="bcon__plate-icon bcon__plate-icon--warning"><i class="fa-solid fa-truck-fast"></i></span>
     </div>
-    {% with pending=stats.total_cod|default:0 %}
-    <p class="bcon__plate-value">{{ pending|floatformat:0 }} <small>QAR</small></p>
-    {% endwith %}
+    <p class="bcon__plate-value">{{ cod_with_driver|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">{{ cod_with_driver_count }} orders · not yet handed over</p>
+  </div>
+  <div class="bcon__plate bcon__plate--navy bcon__rise bcon__rise--4">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Ready for Payout</p>
+      <span class="bcon__plate-icon bcon__plate-icon--navy"><i class="fa-solid fa-clock"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ cod_ready|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">{{ cod_ready_count }} orders · awaiting transfer</p>
   </div>
 </div>
+<p class="bcon__note px-2">
+  <i class="fa-solid fa-circle-info"></i>
+  With Driver and Ready for Payout are live totals across all time — the period filter above applies to the lists below.
+</p>
 
 <!-- Settlement History -->
 {% if settlements %}
@@ -197,13 +230,17 @@
     </div>
     <div class="bcon__panel-body--flush bcon__ledger-wrap">
       <table class="bcon__ledger">
+        {% comment %} A payout transfers the COD less the charges owed on it. All three are
+           stated, so the transfer can be reconciled against the COD collected
+           instead of appearing smaller than it for no visible reason. {% endcomment %}
         <thead>
           <tr>
             <th>Date</th>
             <th>Code</th>
-            <th>Description</th>
-            <th>By</th>
-            <th class="bcon__td--right">Amount</th>
+            <th class="bcon__td--right">COD Released</th>
+            <th class="bcon__td--right">Charges</th>
+            <th class="bcon__td--right">Paid to You</th>
+            <th>Invoice</th>
           </tr>
         </thead>
         <tbody>
@@ -211,12 +248,31 @@
           <tr>
             <td data-label="Date" class="bcon__num">{{ s.created_at|date:"d M" }} <small class="text-muted">{{ s.created_at|time:"H:i" }}</small></td>
             <td data-label="Code"><span class="bcon__chip">{{ s.transaction_code|default:"-" }}</span></td>
-            <td data-label="Description" title="{{ s.description|default:'' }}">{{ s.description|default:"-"|truncatewords:8 }}</td>
-            <td data-label="By">{{ s.created_by.first_name|default:"-" }}</td>
-            <td data-label="Amount" class="bcon__amount bcon__amount--success">{{ s.amount|floatformat:0 }} <small>QAR</small></td>
+            {% if s.transaction_type == 'cod_client_settle' %}
+            <td data-label="COD Released" class="bcon__num bcon__td--right">{{ s.gross_cod|floatformat:2 }}</td>
+            <td data-label="Charges" class="bcon__num bcon__td--right">{% if s.deductions_total %}−{{ s.deductions_total|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td data-label="Paid to You" class="bcon__amount bcon__amount--success">{{ s.net_paid|floatformat:2 }} <small>QAR</small></td>
+            <td data-label="Invoice">
+              <a href="{% url 'business:business_cod_payout_invoice' s.transaction_code %}" class="bcon__chip">View</a>
+            </td>
+            {% else %}
+            <td data-label="COD Released" class="bcon__num bcon__td--right">—</td>
+            <td data-label="Charges" class="bcon__num bcon__td--right">—</td>
+            <td data-label="Paid to You" class="bcon__amount bcon__amount--danger">−{{ s.amount|floatformat:2 }} <small>QAR</small></td>
+            <td data-label="Invoice"><span class="bcon__chip">Reversed</span></td>
+            {% endif %}
           </tr>
           {% endfor %}
         </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2">Total</td>
+            <td class="bcon__num bcon__td--right">{{ total_gross|floatformat:2 }}</td>
+            <td class="bcon__num bcon__td--right">{% if total_deductions %}−{{ total_deductions|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td class="bcon__amount bcon__amount--success">{{ total_settled|floatformat:2 }} <small>QAR</small></td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   </div>
@@ -228,7 +284,7 @@
   <div class="bcon__panel">
     <div class="bcon__panel-head">
       <h5 class="bcon__panel-title"><i class="fa-solid fa-money-bill"></i> COD Deliveries</h5>
-      <span class="bcon__badge bcon__badge--warning">{{ cod_deliveries|length }} items</span>
+      <span class="bcon__badge bcon__badge--warning">{{ cod_deliveries_total }} items</span>
     </div>
     <div class="bcon__panel-body--flush bcon__ledger-wrap">
       <table class="bcon__ledger">
@@ -266,6 +322,7 @@
         </tbody>
       </table>
     </div>
+    {% include "includes/components/_pagination.html" with page_obj=cod_deliveries_page filter_params=pagination_filter_params per_page=per_page pagination_id="cod_deliveries" %}
   </div>
 </div>
 </div><!-- end desktop view -->

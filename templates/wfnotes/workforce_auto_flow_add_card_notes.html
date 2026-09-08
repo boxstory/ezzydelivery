@@ -1,0 +1,120 @@
+{% comment %}
+Purpose: "About this page" notes panel for auto_flow_add.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_auto_flow_add_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            This is the builder for a single <strong>automation flow</strong> — one rule that says
+            "when this happens, do that". You pick a trigger from the catalogue maintained on
+            <strong>Auto Triggers</strong>, optionally narrow it with conditions, then choose one action
+            and fill in its settings. Saving takes you back to <strong>Automation Flows</strong>, where the
+            flow can be switched on, test-run, and inspected in its log. The same page is reused when you
+            edit an existing flow.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Flow name</dt>
+                        <dd class="wfnote__def">Free text, shown on the flows list and in every log entry.
+                            Describe the outcome, not the mechanics.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Trigger</dt>
+                        <dd class="wfnote__def">The event that starts the flow, grouped into WhatsApp,
+                            Webhook and System. Picking one shows its description, the underlying action
+                            it maps to, and its category — and opens the condition panel for that category.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Apply to</dt>
+                        <dd class="wfnote__def">Limit the flow to one client, or leave it on all businesses.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Conditions</dt>
+                        <dd class="wfnote__def">Extra gates that must all pass before the action runs —
+                            a specific status, a COD rule, a webhook event, a from&nbsp;&rarr;&nbsp;to status
+                            move, verified addresses only, or driver-assigned only. Which set you see
+                            depends on the trigger's category.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Active hours</dt>
+                        <dd class="wfnote__def">Only fire between these two times. Leave both empty for 24/7.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Max per day</dt>
+                        <dd class="wfnote__def">Cap on how often this flow may fire in a day. Blank means unlimited.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Action</dt>
+                        <dd class="wfnote__def">What the flow does. Choosing one swaps the right-hand
+                            <em>Action Config</em> panel to that action's settings.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Flow summary</dt>
+                        <dd class="wfnote__def">Appears once both a trigger and an action are chosen —
+                            a one-line read-back of the rule before you save.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Actions you can pick</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">WhatsApp</dt>
+                        <dd class="wfnote__def">Send a message. You choose the sending number, the recipient
+                            (customer, driver, seller, staff, a custom number or a group), a message template
+                            with <em>{variable}</em> placeholders, and an optional delay in seconds.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Webhook</dt>
+                        <dd class="wfnote__def">Call an external URL with GET, POST or PUT. Custom headers and
+                            the payload body are both JSON; an empty payload sends the full event data.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Order status</dt>
+                        <dd class="wfnote__def">Move the triggering order to a chosen status, or every order
+                            of the same business.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Task status</dt>
+                        <dd class="wfnote__def">Move the delivery task to a chosen status, with an optional
+                            note recorded against the change.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assign driver</dt>
+                        <dd class="wfnote__def">Nearest, least loaded, zone-based, or one named driver —
+                            with an option to notify them afterwards.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Notification</dt>
+                        <dd class="wfnote__def">In-app message to the assigned driver, all staff, or the
+                            business owner, with a title, body and severity.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Create task</dt>
+                        <dd class="wfnote__def">Raise a delivery task — standard, hub delivery or return —
+                            at a chosen starting status, optionally published to the fleet straight away.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>A new flow is <strong>live the moment you save it</strong>. If it isn't ready, switch it
+                    off on the flows list.</li>
+                <li>A flow only fires when both it <em>and</em> its trigger are enabled. Enabling the trigger
+                    is done on <strong>Auto Triggers</strong>, not here.</li>
+                <li>Only the config panel matching the selected action is used. Anything you typed into a
+                    different action's panel before switching is ignored on save.</li>
+                <li>Re-opening a saved flow does not refill every condition dropdown — the status and event
+                    pickers come back blank, so re-select them before saving or they will be cleared.</li>
+                <li>Conditions and action settings are stored together as the flow's config; you can read the
+                    stored values back with <em>View</em> in the Config column on the flows list.</li>
+            </ul>
+        </section>
+    

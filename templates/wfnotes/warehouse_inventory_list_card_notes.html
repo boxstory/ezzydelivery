@@ -1,0 +1,94 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/inventory_list.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_inventory_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            <strong>What is on the shelves right now</strong>, one row per product per storage location.
+            A product stored in two places is two rows, so the same item can appear more than once.
+            Staff see every warehouse; a seller account sees only warehouses their business is linked
+            to. This is a reading page — quantities change through receiving, picking and counting, not
+            by editing here.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading a row</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">On hand</dt>
+                        <dd class="wfnote__def">Physically present at that location, including units
+                            already promised to an order.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Reserved</dt>
+                        <dd class="wfnote__def">Held for orders that are not yet picked. Still on the
+                            shelf, but not free to sell.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Available</dt>
+                        <dd class="wfnote__def">On hand minus reserved — the number that actually
+                            matters when someone asks "can we sell this?"</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Value</dt>
+                        <dd class="wfnote__def">On hand × the product's price. The three tiles above
+                            the table total the whole filtered set, not just this page.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Low stock badge</dt>
+                        <dd class="wfnote__def">Shown when on hand has fallen to or below the row's
+                            reorder point plus what is reserved — i.e. reordering is already overdue.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Location</dt>
+                        <dd class="wfnote__def">The bin code the stock sits in. Blank means the stock
+                            was received into the warehouse without a location being chosen.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Search</dt>
+                        <dd class="wfnote__def">Matches product name, SKU, brand, product id and
+                            barcode — a scanned barcode finds the row directly.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Warehouse, category and — for staff — business. The
+                            low-stock switch keeps only rows carrying the low-stock badge.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Column sorting</dt>
+                        <dd class="wfnote__def">Name, brand, SKU, category, warehouse, location, price,
+                            on hand and reserved sort the whole filtered list, not the visible page.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Details</dt>
+                        <dd class="wfnote__def">Opens the row in a popup — full product record, stock
+                            figures and its most recent movements, without leaving the list.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">View</dt>
+                        <dd class="wfnote__def">Goes to the product's stock card: every warehouse it
+                            sits in plus its transaction history.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Receive stock</dt>
+                        <dd class="wfnote__def">The only way to add units from this page. Editing a
+                            product record never changes a quantity.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Incoming is not here.</strong> Units still expected show on the
+                        dashboard, and only become on hand once received.</li>
+                    <li><strong>A missing row is not zero stock</strong> — it means no stock record
+                        exists for that product and location pair yet.</li>
+                </ul>
+            </section>
+        </div>

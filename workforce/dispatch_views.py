@@ -9,6 +9,7 @@ from datetime import timedelta
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from core.decorators import staff_required
+from core.pagination import paginate as core_paginate
 from django.contrib import messages
 from django.http import JsonResponse
 from django.utils import timezone
@@ -22,6 +23,7 @@ from dispatch.models import (
 from dispatch.services import BatchService
 from business.models import PickupLocation
 from fleet.models import Driver
+from core.validators import safe_int
 
 logger = logging.getLogger('dispatch')
 
@@ -617,8 +619,11 @@ def config_list(request):
         'pickup_location'
     ).order_by('pickup_location__pickup_location_title')
 
+    configs_page, _ = core_paginate(request, configs, default=25)
+
     context = {
-        'configs': configs,
+        'configs': configs_page,
+        'configs_page': configs_page,
     }
 
     return render(request, 'workforce/dispatch/config_list.html', context)
@@ -634,23 +639,23 @@ def config_edit(request, location_id):
     if request.method == 'POST':
         # Update config fields with safe int conversion
         try:
-            config.max_batch_size = int(request.POST.get('max_batch_size', 2))
+            config.max_batch_size = safe_int(request.POST.get('max_batch_size'), default=2, minimum=1, maximum=50)
         except (ValueError, TypeError):
             config.max_batch_size = 2
         try:
-            config.hold_window_seconds = int(request.POST.get('hold_window_seconds', 180))
+            config.hold_window_seconds = safe_int(request.POST.get('hold_window_seconds'), default=180, minimum=0, maximum=86400)
         except (ValueError, TypeError):
             config.hold_window_seconds = 180
         try:
-            config.sla_minutes = int(request.POST.get('sla_minutes', 60))
+            config.sla_minutes = safe_int(request.POST.get('sla_minutes'), default=60, minimum=1, maximum=10080)
         except (ValueError, TypeError):
             config.sla_minutes = 60
         try:
-            config.sla_buffer_minutes = int(request.POST.get('sla_buffer_minutes', 15))
+            config.sla_buffer_minutes = safe_int(request.POST.get('sla_buffer_minutes'), default=15, minimum=0, maximum=1440)
         except (ValueError, TypeError):
             config.sla_buffer_minutes = 15
         try:
-            config.max_orders_per_rider = int(request.POST.get('max_orders_per_rider', 2))
+            config.max_orders_per_rider = safe_int(request.POST.get('max_orders_per_rider'), default=2, minimum=1, maximum=50)
         except (ValueError, TypeError):
             config.max_orders_per_rider = 2
         config.batching_enabled = request.POST.get('batching_enabled') == 'on'

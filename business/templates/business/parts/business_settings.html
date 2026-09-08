@@ -1,8 +1,9 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-settings-pro.css' %}?v=20260301a">
+<link rel="stylesheet" href="{% static 'business/css/business-settings-pro.css' %}?v=20260801a">
 {% endblock extra_css %}
 
 {% block content %}
@@ -17,14 +18,8 @@
   </div>
 
   <!-- Page Header (desktop only) -->
-  <div class="bset__header d-none d-md-block" id="client_settings_section_header">
-    <div class="bset__header-content">
-      <div class="bset__header-icon"><i class="fa-solid fa-gear"></i></div>
-      <div>
-        <h1 class="bset__title">Business Settings</h1>
-        <p class="bset__subtitle">{{ business.business_name }}</p>
-      </div>
-    </div>
+  <div class="d-none d-md-block" id="client_settings_section_header">
+    {% bconheader eyebrow="Business" live="Settings" icon="fa-solid fa-gear" title="Business Settings" subtitle=business.business_name %}{% endbconheader %}
   </div>
 
   <!-- ── STORE LOCATIONS ── -->
@@ -33,7 +28,7 @@
       <div class="bset__section-label">
         <i class="fa-solid fa-store"></i>
         <span>Store Locations</span>
-        {% if stores %}<span class="bset__count-badge">{{ stores.count }}</span>{% endif %}
+        {% if stores %}<span class="bset__count-badge">{{ stores_total }}</span>{% endif %}
       </div>
       <a href="{% url 'business:pickup_location_add' %}" class="bset__btn-add" id="client_settings_btn_new_store">
         <i class="fa-solid fa-plus"></i> Add Store
@@ -82,6 +77,11 @@
         </div>
         {% endfor %}
       </div>
+      {% if stores_total > preview_size %}
+      <a href="{% url 'business:pickup_location_list' %}" class="bset__view-all">
+        View all {{ stores_total }} stores <i class="fa-solid fa-arrow-right"></i>
+      </a>
+      {% endif %}
       {% else %}
       <div class="bset__empty">
         <div class="bset__empty-icon"><i class="fa-solid fa-store-slash"></i></div>
@@ -100,7 +100,7 @@
       <div class="bset__section-label">
         <i class="fa-solid fa-users"></i>
         <span>Team Members</span>
-        {% if teams %}<span class="bset__count-badge">{{ teams.count }}</span>{% endif %}
+        {% if teams %}<span class="bset__count-badge">{{ teams_total }}</span>{% endif %}
       </div>
       <a href="{% url 'business:business_teams_add' business.business_id %}" class="bset__btn-add" id="client_settings_btn_new_team">
         <i class="fa-solid fa-plus"></i> Add Member
@@ -147,6 +147,11 @@
         </div>
         {% endfor %}
       </div>
+      {% if teams_total > preview_size %}
+      <a href="{% url 'business:business_teams' business.business_id %}" class="bset__view-all">
+        View all {{ teams_total }} team members <i class="fa-solid fa-arrow-right"></i>
+      </a>
+      {% endif %}
       {% else %}
       <div class="bset__empty">
         <div class="bset__empty-icon"><i class="fa-solid fa-user-plus"></i></div>
@@ -165,7 +170,7 @@
       <div class="bset__section-label">
         <i class="fa-solid fa-plug"></i>
         <span>API Integrations</span>
-        {% if business_apis %}<span class="bset__count-badge">{{ business_apis.count }}</span>{% endif %}
+        {% if business_apis %}<span class="bset__count-badge">{{ business_apis_total }}</span>{% endif %}
       </div>
       <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bset__btn-add" id="client_settings_btn_new_api">
         <i class="fa-solid fa-plus"></i> Add API
@@ -205,6 +210,11 @@
         </div>
         {% endfor %}
       </div>
+      {% if business_apis_total > preview_size %}
+      <a href="{% url 'business:business_settings_api_list' business.business_id %}" class="bset__view-all">
+        View all {{ business_apis_total }} integrations <i class="fa-solid fa-arrow-right"></i>
+      </a>
+      {% endif %}
       {% else %}
       <div class="bset__empty">
         <div class="bset__empty-icon"><i class="fa-solid fa-plug-circle-plus"></i></div>

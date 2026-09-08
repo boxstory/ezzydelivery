@@ -11,16 +11,100 @@ The browser talks to /waha/api/... directly; nginx reverse-proxies to the
 WAHA container with X-Api-Key injected, so the API key never reaches the
 client.
 """
-from django.conf import settings
 from django.http import HttpResponse
+from django.utils.html import escape
 from django.views.decorators.cache import never_cache
+
+from . import sessions as wa_sessions
 
 
 @never_cache
 def wa_dashboard(request):
-    session = settings.WAHA_DEFAULT_SESSION
-    html = _DASHBOARD_HTML.replace('%SESSION%', session)
+    session = wa_sessions.from_request(request)
+    html = (
+        _DASHBOARD_HTML
+        .replace('%SESSION_TABS%', wa_sessions.render_tabs(
+            session, request.path, always=True, add_button=True,
+        ))
+        .replace('%SESSION_ROUTES%', _routes_html(session))
+        .replace('%SESSION%', session)
+    )
     return HttpResponse(html, content_type='text/html; charset=utf-8')
+
+
+def _routes_html(active):
+    """Read-only 'what sends from this number' panel.
+
+    Ops keep asking which number a given section actually uses; without this the
+    answer lives on a different page under a different login. Rows for the
+    session on screen are marked, so switching tabs answers "what is this number
+    responsible for?" directly.
+    """
+    routes = wa_sessions.section_routes()
+    if not routes:
+        return ''
+    parts = [
+        '<div class="wa-routes">',
+        '<div class="wa-routes__hd">'
+        '<span>Sections sending from this number</span>'
+        # This page can't write the setting (htpasswd only, no staff session),
+        # so the primary action here is "go where you can" — hence a real,
+        # visible link rather than a footnote.
+        '<a class="wa-routes__edit" href="/workforce/auto-triggers/whatsapp-instances/"'
+        ' target="_blank" rel="noopener"'
+        ' title="Set each number\'s WAHA session (opens in a new tab, staff login)">'
+        'Edit settings <span aria-hidden="true">&#8599;</span></a>'
+        '</div>',
+    ]
+    unmapped = 0
+    for r in routes:
+        mine = r['session'] == active
+        if not r['enabled']:
+            # No route row, or the toggle is off — falls back to the default.
+            target, detail, warn = 'default sender', 'unrouted', False
+        elif r['mapped'] and not r['live']:
+            # Mapped, but that session has no device on it (QR screen, stopped,
+            # failed). Sends will fail — not the same as "configured".
+            unmapped += 1
+            target = escape(r['instance_label'] or r['session'])
+            detail = f'session {escape(r["status"].lower())}'
+            warn = True
+        elif r['mapped']:
+            target = escape(r['instance_label'] or r['session'])
+            detail = f'+{escape(r["phone"])}' if r['phone'] else escape(r['session'])
+            warn = False
+        else:
+            # Routed on the Evolution side, but no WAHA session behind it —
+            # say so plainly rather than implying that number is live on WAHA.
+            unmapped += 1
+            target = escape(r['instance_label'] or r['session'])
+            detail = 'no WAHA session → default'
+            warn = True
+        parts.append(
+            '<div class="wa-routes__row{on}">'
+            '<span class="wa-routes__sec">{label}</span>'
+            '<span class="wa-routes__to">{target}'
+            '<span class="wa-routes__num{wcls}">{detail}</span></span>'
+            '</div>'.format(
+                on=' wa-routes__row--mine' if mine else '',
+                label=escape(r['label']), target=target, detail=detail,
+                wcls=' wa-routes__num--warn' if warn else '',
+            )
+        )
+    note = (
+        f'{unmapped} section(s) are not sending from the number they name — either '
+        'no WAHA session is set (so they fall back to the default session) or that '
+        'session has no device connected. '
+        if unmapped else 'Rows on this number are highlighted. '
+    )
+    parts.append(
+        '<div class="wa-routes__ft">' + note +
+        'Fill <b>WAHA Session</b> on the number\'s row via <b>Edit settings</b> above. '
+        'To change which section uses which number instead, open '
+        '<a href="/workforce/auto-triggers/" target="_blank" rel="noopener">Auto Triggers '
+        '<span aria-hidden="true">&#8599;</span></a>. Both need a staff login.</div></div>'
+    )
+    return ''.join(parts)
 
 
 # WhatsApp-parity colors, intentional. This ops page deliberately uses the
@@ -174,6 +258,123 @@ _DASHBOARD_HTML = r"""<!doctype html>
   }
   .wa-foot a:hover { text-decoration: underline; }
   .wa-foot .sep { margin: 0 0.5rem; opacity: 0.6; }
+
+  /* One tab per WhatsApp number linked to WAHA. Every control on this page
+     already targets SESSION, so switching tabs is a plain page navigation.
+     Rendered as nothing when only one session exists. */
+  .wa-sess {
+    display: flex;
+    gap: 0.375rem;
+    margin: 0 0 0.875rem;
+    padding: 0.25rem;
+    background: var(--wa-bg, #f0f2f5);
+    border-radius: 0.5rem;
+  }
+  .wa-sess__tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.4375rem 0.5rem;
+    border-radius: 0.375rem;
+    text-align: center;
+    text-decoration: none;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    color: var(--wa-muted);
+  }
+  .wa-sess__tab:hover { background: rgba(0, 0, 0, 0.04); }
+  .wa-sess__tab--on {
+    background: #ffffff;
+    color: var(--wa-green);
+    font-weight: 600;
+    box-shadow: 0 0.0625rem 0.125rem rgba(0, 0, 0, 0.08);
+  }
+  .wa-sess__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wa-sess__num { display: block; font-size: 0.6875rem; opacity: 0.75; font-variant-numeric: tabular-nums; }
+  .wa-sess__dot {
+    display: inline-block;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 50%;
+    margin-right: 0.25rem;
+    background: #b9b9b9;
+  }
+  .wa-sess__dot--on { background: var(--wa-green); }
+  /* "+ Add number" sits in the tab strip as a button, not a link — it POSTs. */
+  .wa-sess__tab--add {
+    border: 0.0625rem dashed var(--wa-border);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    color: var(--wa-muted);
+  }
+  .wa-sess__tab--add:hover { border-color: var(--wa-green); color: var(--wa-green); }
+
+  /* Section routing — read-only mirror of the Auto Triggers config. */
+  .wa-routes {
+    margin-top: 1.25rem;
+    border: 0.0625rem solid var(--wa-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+  .wa-routes__hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--wa-muted);
+    background: var(--wa-bg, #f0f2f5);
+    border-bottom: 0.0625rem solid var(--wa-border);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .wa-routes__edit {
+    flex: none;
+    padding: 0.1875rem 0.5rem;
+    border: 0.0625rem solid var(--wa-green);
+    border-radius: 0.25rem;
+    color: var(--wa-green);
+    text-decoration: none;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.6875rem;
+    white-space: nowrap;
+  }
+  .wa-routes__edit:hover { background: var(--wa-green); color: #fff; }
+  .wa-routes__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    border-bottom: 0.0625rem solid var(--wa-border);
+  }
+  .wa-routes__row:last-of-type { border-bottom: 0; }
+  .wa-routes__row--mine { background: rgba(0, 168, 132, 0.06); }
+  .wa-routes__row--mine .wa-routes__to { color: var(--wa-green); font-weight: 600; }
+  .wa-routes__sec { color: var(--wa-muted); }
+  .wa-routes__to { text-align: right; }
+  .wa-routes__num {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 400;
+    color: var(--wa-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .wa-routes__ft {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.6875rem;
+    color: var(--wa-muted);
+    border-top: 0.0625rem solid var(--wa-border);
+    background: var(--wa-bg, #f0f2f5);
+  }
+  .wa-routes__ft a { color: var(--wa-green); }
+  /* Routed on Evolution but with no WAHA session behind it — an actionable
+     gap, not an error, so amber rather than the destructive red. */
+  .wa-routes__num--warn { color: #b45309; }
 </style>
 </head>
 <body>
@@ -186,6 +387,7 @@ _DASHBOARD_HTML = r"""<!doctype html>
         <span id="wa-status-text">LOADING</span>
       </div>
     </div>
+    %SESSION_TABS%
     <p class="wa-desc" id="wa-desc">Loading…</p>
     <div class="wa-actions" id="wa-actions"></div>
     <div class="wa-qr" id="wa-qr">
@@ -193,8 +395,9 @@ _DASHBOARD_HTML = r"""<!doctype html>
       <div class="wa-qr-wait" id="wa-qr-wait">QR not ready yet — waiting for session…</div>
       <div class="wa-qr-hint">Open WhatsApp → Linked devices → Link a device</div>
     </div>
+    %SESSION_ROUTES%
     <div class="wa-foot">
-      <a href="/waha/wa-chats/" target="_blank" rel="noopener">Chat Dashboard</a>
+      <a href="/waha/wa-chats/?session=%SESSION%" target="_blank" rel="noopener">Chat Dashboard</a>
       <span class="sep">·</span>
       <a href="/waha/" target="_blank" rel="noopener">WAHA Swagger</a>
       <span class="sep">·</span>
@@ -240,6 +443,46 @@ _DASHBOARD_HTML = r"""<!doctype html>
       qrImgEl.src = QR_URL + '&t=' + Date.now();
     }, QR_RETRY_MS);
   });
+
+  // Link another WhatsApp number. Creating the session is all this needs —
+  // navigating to its tab then shows the QR pane for the actual pairing.
+  const addBtn = document.getElementById('wa-add-session');
+  if (addBtn) {
+    addBtn.addEventListener('click', async function () {
+      const raw = window.prompt(
+        'Name for the new number\'s session (letters, digits, - and _ only).\n'
+        + 'Use something that says what the number is for, e.g. "fleet" or "marketing".'
+      );
+      if (raw === null) return;
+      const name = raw.trim();
+      if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) {
+        window.alert('Invalid name. Use only letters, digits, hyphen and underscore.');
+        return;
+      }
+      addBtn.disabled = true;
+      try {
+        const res = await fetch('/waha/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ name: name, start: true })
+        });
+        if (!res.ok) {
+          const detail = await res.text();
+          window.alert('Could not create the session (HTTP ' + res.status + ').\n'
+            + (detail || '').slice(0, 300));
+          addBtn.disabled = false;
+          return;
+        }
+      } catch (e) {
+        window.alert('Could not reach WAHA: ' + e);
+        addBtn.disabled = false;
+        return;
+      }
+      // Land on the new session's tab so the QR pane is one click away.
+      window.location.search = '?session=' + encodeURIComponent(name);
+    });
+  }
 
   function setDot(color) { dotEl.style.background = color; }
 

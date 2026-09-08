@@ -1,0 +1,127 @@
+{% comment %}
+Purpose: "About this page" notes panel for orders_add.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_orders_add_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Type an order into the system by hand, in a client's name — for the orders that arrive by
+            phone, WhatsApp or walk-in instead of through an integration or an import. Pick the seller
+            first; the form only appears once one is chosen, because the pickup locations and the
+            product list depend on them. The order you create lands in <strong>Orders</strong> with a
+            fresh order number, marked <em>to review</em> and awaiting address verification, exactly as
+            if the client had sent it themselves.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Select seller</dt>
+                        <dd class="wfnote__def">Reloads the page against that client. Changing it after
+                            you have started typing loses what is on the form, so pick it first.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">AI auto-fill</dt>
+                        <dd class="wfnote__def">Paste the customer's message as it came in and let it
+                            split out name, phone, address and COD into the fields below. Always read
+                            back what it filled — it is a time-saver, not an authority.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">AI parse</dt>
+                        <dd class="wfnote__def">Next to the address box. Pulls zone, street and building
+                            numbers out of a free-text address and then validates them.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Validate</dt>
+                        <dd class="wfnote__def">Checks the zone/street/building triple against the
+                            national address service and fills in coordinates and the zone name. The
+                            plate above the fields mirrors what you have typed.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Shared location</dt>
+                        <dd class="wfnote__def">Paste or drop a WhatsApp or Google Maps link to set
+                            coordinates directly. Latitude and longitude cannot be typed by hand.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Products</dt>
+                        <dd class="wfnote__def">Optional item lines with quantity and price, totalled as
+                            you go. <em>Add Product</em> gives you another row, the cross removes one.
+                            For fulfilment clients the picker is fed from warehouse stock.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Money</dt>
+                        <dd class="wfnote__def">COD is what the driver collects from the customer;
+                            delivery fee is what we charge the client. They are separate figures and
+                            neither is calculated from the product lines.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Scheduling</dt>
+                        <dd class="wfnote__def">Tick <em>Scheduled Delivery</em> to reveal a date and
+                            time. The free-text preference box beside it is a note for staff, not a
+                            schedule the system acts on.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Notes</dt>
+                        <dd class="wfnote__def">Three boxes: what the customer said, what the seller
+                            said, and staff-only remarks.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Choices explained</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pickup location</dt>
+                        <dd class="wfnote__def">Where the goods are collected from. Fulfilment centres are
+                            listed first and pre-selected — those goods are already with us, so no
+                            pickup run is raised.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Normal delivery</dt>
+                        <dd class="wfnote__def">The usual job: collect from the client, deliver to the
+                            customer.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pick and drop</dt>
+                        <dd class="wfnote__def">A point-to-point run rather than a shop-to-customer
+                            delivery.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Standard</dt>
+                        <dd class="wfnote__def">The 48-hour service. Use it unless the client has paid
+                            for speed.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Same day</dt>
+                        <dd class="wfnote__def">Marks the order for same-day handling so dispatch treats
+                            it as urgent.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Order code</dt>
+                        <dd class="wfnote__def">The client's own reference. Leave it blank and one is
+                            generated — fill it in when the client has a number of their own, so the two
+                            systems can be matched later.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Arabic names and addresses are <strong>translated to English</strong> on save and
+                    Arabic digits converted, with the original text kept alongside. Do not re-type them
+                    yourself.</li>
+                <li>Leaving WhatsApp blank copies the phone number into it, so the customer still gets
+                    messages. Fill it in only when the two numbers differ.</li>
+                <li>The order is created as <em>to review</em> with address verification pending — it is
+                    not dispatchable straight away and still needs the usual checks in Orders.</li>
+                <li>Customer and seller notes are merged into one short line on the order and get
+                    truncated. Put anything long in internal notes.</li>
+                <li>There is no draft. Nothing exists until <em>Create Order</em> succeeds, and after it
+                    does you are taken to the orders list — corrections happen through Edit Order.</li>
+            </ul>
+        </section>
+    

@@ -18,6 +18,7 @@ from datetime import timedelta, date
 
 from django.test import TestCase, TransactionTestCase, Client
 from django.contrib.auth import get_user_model
+from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
 
@@ -250,7 +251,7 @@ class DriverVehicleModelTest(DriverTestMixin, TestCase):
             vehicle_type='bike',
             vehicle_no='QA-5678',
         )
-        self.assertEqual(vehicle.vehicle_status, 'Inactive')
+        self.assertEqual(vehicle.vehicle_status, 'inactive')
 
     def test_multiple_vehicles_per_driver(self):
         fleet_models.DriverVehicle.objects.create(
@@ -428,24 +429,47 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
         self.assertEqual(trans.pending_earnings_after, Decimal('20.00'))
 
     def test_cod_collection_transaction(self):
-        # Start with positive wallet balance
-        self.driver.wallet_balance = Decimal('5000.00')
-        self.driver.save()
+        # Both cod_in_hand and wallet_balance are derived from the task truth
+        # (see WalletService.live_cod_in_hand), so the collection has to exist
+        # on a task — a bare ledger row moves neither balance.
+        business, pickup, order = self.create_business_and_order(
+            self.user, self.profile)
+        task = self.create_delivery_task(
+            order, business, pickup, driver=self.driver, status='delivered',
+            task_number='COD-COLLECT', cod_collected=True,
+            cod_collected_amount=Decimal('100.00'), payment_method='cash')
 
         trans = WalletService.record_transaction(
             driver=self.driver,
             transaction_type='cod_collection',
             amount=Decimal('100.00'),
             description='COD collected',
+            delivery_task=task,
         )
         self.driver.refresh_from_db()
-        self.assertEqual(self.driver.wallet_balance, Decimal('4900.00'))
-        # cod_in_hand is now derived from tasks (see WalletService.live_cod_in_hand),
-        # so record_transaction no longer mutates it — it stays at its prior value.
+        self.assertEqual(self.driver.cod_in_hand, Decimal('100.00'))
+        # Cash held for Ezzy is a liability: the wallet goes negative by it.
+        self.assertEqual(self.driver.wallet_balance, Decimal('-100.00'))
+
+    def test_cod_collection_without_task_moves_nothing(self):
+        """A collection row with no task behind it is not a liability."""
+        self.driver.wallet_balance = Decimal('5000.00')
+        self.driver.save()
+
+        WalletService.record_transaction(
+            driver=self.driver,
+            transaction_type='cod_collection',
+            amount=Decimal('100.00'),
+            description='COD collected',
+        )
+        self.driver.refresh_from_db()
         self.assertEqual(self.driver.cod_in_hand, Decimal('0.00'))
+        # The hand-set 5000 was never backed by tasks or adjustments, so the
+        # re-derivation drops it rather than carrying the drift forward.
+        self.assertEqual(self.driver.wallet_balance, Decimal('0.00'))
 
     def test_cod_deposit_transaction(self):
-        # Set up driver with COD in hand
+        # Deposit with nothing outstanding: both balances derive back to zero.
         self.driver.wallet_balance = Decimal('-100.00')
         self.driver.cod_in_hand = Decimal('100.00')
         self.driver.save()
@@ -458,9 +482,7 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
         )
         self.driver.refresh_from_db()
         self.assertEqual(self.driver.wallet_balance, Decimal('0.00'))
-        # record_transaction moves wallet_balance only; cod_in_hand is synced from
-        # task state by submit_cod_to_admin, not here, so it is unchanged.
-        self.assertEqual(self.driver.cod_in_hand, Decimal('100.00'))
+        self.assertEqual(self.driver.cod_in_hand, Decimal('0.00'))
 
     def test_settlement_transaction(self):
         self.driver.pending_earnings = Decimal('500.00')
@@ -487,8 +509,15 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
         self.assertEqual(self.driver.wallet_balance, Decimal('50.00'))
 
     def test_deduction_transaction(self):
-        self.driver.wallet_balance = Decimal('100.00')
-        self.driver.save()
+        # Seed the opening balance through the ledger, not by writing the field:
+        # wallet_balance is re-derived from adjustments minus live COD, so a raw
+        # field write is discarded on the next transaction.
+        WalletService.record_transaction(
+            driver=self.driver,
+            transaction_type='adjustment',
+            amount=Decimal('100.00'),
+            description='Opening balance',
+        )
 
         trans = WalletService.record_transaction(
             driver=self.driver,
@@ -510,21 +539,28 @@ class WalletServiceRecordTransactionTest(DriverTestMixin, TransactionTestCase):
         self.assertEqual(self.driver.wallet_balance, Decimal('10.00'))
 
     def test_transaction_records_balance_snapshots(self):
-        self.driver.wallet_balance = Decimal('1000.00')
-        self.driver.cod_in_hand = Decimal('200.00')
+        """The *_after columns are the running balance the ledger prints, so
+        they must be the balance after this row, not the one before it."""
         self.driver.pending_earnings = Decimal('50.00')
         self.driver.save()
+
+        business, pickup, order = self.create_business_and_order(
+            self.user, self.profile)
+        task = self.create_delivery_task(
+            order, business, pickup, driver=self.driver, status='delivered',
+            task_number='COD-SNAP', cod_collected=True,
+            cod_collected_amount=Decimal('100.00'), payment_method='cash')
 
         trans = WalletService.record_transaction(
             driver=self.driver,
             transaction_type='cod_collection',
             amount=Decimal('100.00'),
             description='COD collected',
+            delivery_task=task,
         )
-        self.assertEqual(trans.wallet_balance_after, Decimal('900.00'))
-        # cod_in_hand is no longer incremented by record_transaction, so the
-        # snapshot reflects the value at call time (unchanged), not 200+100.
-        self.assertEqual(trans.cod_in_hand_after, Decimal('200.00'))
+        self.assertEqual(trans.cod_in_hand_after, Decimal('100.00'))
+        self.assertEqual(trans.wallet_balance_after, Decimal('-100.00'))
+        self.assertEqual(trans.pending_earnings_after, Decimal('50.00'))
 
     def test_multiple_sequential_transactions(self):
         # Simulate a day: earn, collect COD, collect more COD, deposit COD
@@ -919,9 +955,17 @@ class FleetDashboardViewTest(DriverTestMixin, TestCase):
         self.assertIn(response.status_code, [301, 302])
 
     def test_fleets_list_loads(self):
+        # The all-drivers list is staff-only; a plain driver is bounced to their
+        # own dashboard (see fleet.views.fleets).
+        self.user.is_staff = True
+        self.user.save(update_fields=['is_staff'])
         response = self.client.get('/fleet/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('fleets', response.context)
+
+    def test_fleets_list_blocked_for_non_staff(self):
+        response = self.client.get('/fleet/')
+        self.assertEqual(response.status_code, 302)
 
 
 # =============================================================================
@@ -1226,12 +1270,27 @@ class CODSubmissionViewTest(DriverTestMixin, TestCase):
         self.assertIn(response.status_code, [301, 302])
 
     def test_cod_submission_post_success(self):
+        # The view never trusts a posted amount — it sums the cash COD of the
+        # delivery tasks being settled, so the hand-in needs real tasks behind it.
+        business, pickup, order = self.create_business_and_order(
+            self.user, self.profile)
+        handed_in = self.create_delivery_task(
+            order, business, pickup, driver=self.driver, status='delivered',
+            task_number='COD-200', cod_collected=True,
+            cod_collected_amount=Decimal('200.00'), payment_method='cash')
+        self.create_delivery_task(
+            order, business, pickup, driver=self.driver, status='delivered',
+            task_number='COD-300', cod_collected=True,
+            cod_collected_amount=Decimal('300.00'), payment_method='cash')
+
         response = self.client.post('/fleet/cod_submission/', {
-            'amount': '200',
+            'delivery_ids': str(handed_in.id),
             'reference_number': 'REF001',
             'notes': 'Cash deposit',
         })
         self.assertIn(response.status_code, [301, 302])
+        handed_in.refresh_from_db()
+        self.assertTrue(handed_in.cod_settled)
         self.driver.refresh_from_db()
         self.assertEqual(self.driver.cod_in_hand, Decimal('300.00'))
 
@@ -1493,8 +1552,10 @@ class PickupScannerViewTest(DriverTestMixin, TestCase):
         self.assertTrue(data['success'])
         self.assertEqual(data['task_number'], 'SCAN-001')
 
+        # A scan takes an assigned task through 'accepted' and lands on
+        # 'picked_up' — the only pickup state a driver may reach from there.
         task.refresh_from_db()
-        self.assertEqual(task.dl_task_status, 'in_transit')
+        self.assertEqual(task.dl_task_status, 'picked_up')
 
     def test_scan_process_empty_code(self):
         response = self.client.post(
@@ -1681,9 +1742,11 @@ class StartRideViewTest(DriverTestMixin, TestCase):
             self.user, self.profile)
 
     def test_start_ride_success(self):
+        # 'accepted' is the only status a driver may start a ride from —
+        # out_for_delivery is not reachable from 'assigned'.
         task = self.create_delivery_task(
             self.order, self.business, self.pickup,
-            driver=self.driver, status='assigned', task_number='RIDE-001',
+            driver=self.driver, status='accepted', task_number='RIDE-001',
             dl_task_publish=True)
         delivery_models.AssignedDriver.objects.create(
             driver=self.driver, dl_task=task)
@@ -1697,6 +1760,25 @@ class StartRideViewTest(DriverTestMixin, TestCase):
 
         task.refresh_from_db()
         self.assertEqual(task.dl_task_status, 'out_for_delivery')
+
+    def test_start_ride_before_accepting_is_rejected(self):
+        """A still-assigned task cannot go out for delivery — and must not
+        report success, or the driver is navigated on an unchanged task."""
+        task = self.create_delivery_task(
+            self.order, self.business, self.pickup,
+            driver=self.driver, status='assigned', task_number='RIDE-003',
+            dl_task_publish=True)
+        delivery_models.AssignedDriver.objects.create(
+            driver=self.driver, dl_task=task)
+
+        response = self.client.post(
+            '/delivery/delivery_task/start_ride/',
+            {'task_id': task.id})
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+
+        task.refresh_from_db()
+        self.assertEqual(task.dl_task_status, 'assigned')
 
     def test_start_ride_not_assigned_to_me(self):
         task = self.create_delivery_task(
@@ -1970,3 +2052,494 @@ class FleetURLResolutionTest(TestCase):
                 self.assertIsNotNone(url, f"{url_name} should resolve")
             except Exception as e:
                 self.fail(f"URL {url_name} with args {args} failed: {e}")
+
+
+# =============================================================================
+# BUSINESS COD PAYOUT (LEG 3) — NET INVOICE, FROZEN FEE, UPSTREAM FENCES
+# =============================================================================
+
+class ClientPayoutMixin(DriverTestMixin):
+    """Fixtures for a business whose COD is held by Ezzy and ready to pay out."""
+
+    def make_payout_candidates(self, count=2, cod=Decimal('100.00'),
+                               dl_price=Decimal('20.00'), verified=None):
+        self.user, self.profile = self.create_driver_user()
+        self.driver = self.create_driver(self.user, self.profile)
+        self.business, self.pickup, self.order = self.create_business_and_order(
+            self.user, self.profile)
+        tasks = []
+        for i in range(count):
+            tasks.append(self.create_delivery_task(
+                self.order, self.business, pickup=self.pickup, driver=self.driver,
+                task_number=f'PAY-{i}', status='delivered',
+                cod_collected=True, cod_settled=True, cod_client_settled=False,
+                cod_collected_amount=cod, dl_price=dl_price,
+                verified_delivery_charge=verified,
+                completed_at=timezone.now()))
+        return tasks
+
+
+class BillableChargeResolverTest(ClientPayoutMixin, TestCase):
+    """delivery.charges is the one place the billed charge is decided."""
+
+    def test_falls_back_to_dl_price_when_unverified(self):
+        task = self.make_payout_candidates(count=1)[0]
+        self.assertEqual(task.billable_charge, Decimal('20.00'))
+
+    def test_verified_zero_is_not_replaced_by_dl_price(self):
+        # The whole point of resolving on `is not None`: a charge staff
+        # deliberately agreed at 0.00 must stay 0.00.
+        task = self.make_payout_candidates(count=1, verified=Decimal('0.00'))[0]
+        self.assertEqual(task.billable_charge, Decimal('0.00'))
+
+    def test_verified_figure_wins(self):
+        task = self.make_payout_candidates(count=1, verified=Decimal('7.25'))[0]
+        self.assertEqual(task.billable_charge, Decimal('7.25'))
+
+    def test_charge_paid_prefers_the_frozen_figure(self):
+        task = self.make_payout_candidates(count=1, verified=Decimal('7.25'))[0]
+        task.settled_delivery_charge = Decimal('5.00')
+        self.assertEqual(task.charge_paid, Decimal('5.00'))
+
+
+class BusinessPayoutNetInvoiceTest(ClientPayoutMixin, TransactionTestCase):
+    """The payout books the NET, and every reader can recover the gross."""
+
+    def test_transaction_holds_net_and_lines_hold_the_deductions(self):
+        tasks = self.make_payout_candidates(count=2)  # 200 COD, 40 fees
+        txn, count = WalletService.settle_cod_with_client(
+            business=self.business, amount=Decimal('200.00'),
+            delivery_task_ids=[t.id for t in tasks], created_by=self.user,
+            deductions=[
+                {'kind': 'delivery_charge', 'label': 'Delivery charges', 'amount': Decimal('40.00')},
+                {'kind': 'fulfillment_charge', 'label': 'Fulfilment', 'amount': Decimal('25.00')},
+            ],
+            charge_by_task={t.id: Decimal('20.00') for t in tasks})
+        self.assertEqual(count, 2)
+        self.assertEqual(txn.amount, Decimal('135.00'))  # 200 - 40 - 25
+
+        gross, deductions, net = WalletService.payout_figures(txn)
+        self.assertEqual((gross, deductions, net),
+                         (Decimal('200.00'), Decimal('65.00'), Decimal('135.00')))
+
+    def test_gross_is_recoverable_in_aggregate(self):
+        """payout_totals must agree with payout_figures — the staff COD pipeline
+        subtracts this from gross legs, so a net figure would strand the
+        deductions in 'to settle' forever."""
+        tasks = self.make_payout_candidates(count=2)
+        txn, _ = WalletService.settle_cod_with_client(
+            business=self.business, amount=Decimal('200.00'),
+            delivery_task_ids=[t.id for t in tasks], created_by=self.user,
+            deductions=[{'kind': 'delivery_charge', 'label': 'Delivery charges',
+                         'amount': Decimal('40.00')}],
+            charge_by_task={t.id: Decimal('20.00') for t in tasks})
+        qs = fleet_models.DriverTransaction.objects.filter(
+            transaction_type='cod_client_settle')
+        self.assertEqual(WalletService.payout_totals(qs),
+                         WalletService.payout_figures(txn))
+
+    def test_fee_is_frozen_on_each_task(self):
+        tasks = self.make_payout_candidates(count=2)
+        WalletService.settle_cod_with_client(
+            business=self.business, amount=Decimal('200.00'),
+            delivery_task_ids=[t.id for t in tasks], created_by=self.user,
+            deductions=[{'kind': 'delivery_charge', 'label': 'Delivery charges',
+                         'amount': Decimal('40.00')}],
+            charge_by_task={t.id: Decimal('20.00') for t in tasks})
+        for t in tasks:
+            t.refresh_from_db()
+            self.assertEqual(t.settled_delivery_charge, Decimal('20.00'))
+
+    def test_frozen_fee_survives_a_later_charge_edit(self):
+        """The invoice must state what was paid, not what the charge says today."""
+        tasks = self.make_payout_candidates(count=1)
+        WalletService.settle_cod_with_client(
+            business=self.business, amount=Decimal('100.00'),
+            delivery_task_ids=[tasks[0].id], created_by=self.user,
+            deductions=[{'kind': 'delivery_charge', 'label': 'Delivery charges',
+                         'amount': Decimal('20.00')}],
+            charge_by_task={tasks[0].id: Decimal('20.00')})
+        task = delivery_models.DeliveryTask.objects.get(id=tasks[0].id)
+        task.verified_delivery_charge = Decimal('999.00')
+        task.save(update_fields=['verified_delivery_charge'])
+        self.assertEqual(task.billable_charge, Decimal('999.00'))
+        self.assertEqual(task.charge_paid, Decimal('20.00'))
+
+    def test_reversal_returns_the_net_and_clears_the_freeze(self):
+        tasks = self.make_payout_candidates(count=2)
+        txn, _ = WalletService.settle_cod_with_client(
+            business=self.business, amount=Decimal('200.00'),
+            delivery_task_ids=[t.id for t in tasks], created_by=self.user,
+            deductions=[{'kind': 'delivery_charge', 'label': 'Delivery charges',
+                         'amount': Decimal('40.00')}],
+            charge_by_task={t.id: Decimal('20.00') for t in tasks})
+        reversal, count = WalletService.reverse_cod_client_settlement(
+            settle_txn=txn, created_by=self.user)
+        self.assertEqual(count, 2)
+        # Exactly the money that left, never the gross.
+        self.assertEqual(reversal.amount, Decimal('160.00'))
+        for t in tasks:
+            t.refresh_from_db()
+            self.assertFalse(t.cod_client_settled)
+            self.assertIsNone(t.settled_delivery_charge)
+
+    def test_deductions_cannot_exceed_the_cod(self):
+        tasks = self.make_payout_candidates(count=1)
+        with self.assertRaises(ValueError):
+            WalletService.settle_cod_with_client(
+                business=self.business, amount=Decimal('100.00'),
+                delivery_task_ids=[tasks[0].id], created_by=self.user,
+                deductions=[{'kind': 'other_charge', 'label': 'Too much',
+                             'amount': Decimal('150.00')}])
+
+
+class BusinessPayoutActionTest(ClientPayoutMixin, TransactionTestCase):
+    """The staff endpoint: honest results, server-side totals."""
+
+    def setUp(self):
+        self.tasks = self.make_payout_candidates(count=2)
+        self.staff = User.objects.create_user(
+            username='payoutstaff', email='ps@test.com', password='Staff@12345',
+            is_staff=True)
+        core_models.Profile.objects.create(
+            user=self.staff, first_name='Pay', last_name='Staff', phone=55599999,
+            dept_finance=True)
+        self.client = Client()
+        self.client.force_login(self.staff)
+
+    def test_payout_nets_the_charges_and_reports_the_invoice(self):
+        resp = self.client.post(
+            reverse('workforce:cod_business_settlement_action'),
+            {'task_ids[]': [t.id for t in self.tasks], 'payment_method': 'bank',
+             'deduct_charges': '1'})
+        data = resp.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['total_settled'], 160.0)  # 200 COD - 40 fees
+        self.assertTrue(data['invoice_codes'])
+        self.assertFalse(data['partial'])
+
+    def test_nothing_settled_reports_failure_not_success(self):
+        """A run where every account was already paid used to return
+        success:True with settled_count 0 — staff read that as a payout."""
+        delivery_models.DeliveryTask.objects.filter(
+            id__in=[t.id for t in self.tasks]).update(cod_client_settled=True)
+        resp = self.client.post(
+            reverse('workforce:cod_business_settlement_action'),
+            {'task_ids[]': [t.id for t in self.tasks], 'payment_method': 'bank'})
+        self.assertEqual(resp.status_code, 400)
+        data = resp.json()
+        self.assertFalse(data['success'])
+        self.assertTrue(data['skipped_businesses'])
+
+    def test_client_total_is_ignored(self):
+        """Whatever the browser claims, the amount comes from the locked rows."""
+        resp = self.client.post(
+            reverse('workforce:cod_business_settlement_action'),
+            {'task_ids[]': [t.id for t in self.tasks], 'payment_method': 'bank',
+             'deduct_charges': '0', 'total': '999999'})
+        self.assertEqual(resp.json()['total_settled'], 200.0)
+
+
+class ClientChargeLockAfterPayoutTest(ClientPayoutMixin, TransactionTestCase):
+    """A charge on an issued invoice is not editable."""
+
+    def setUp(self):
+        self.tasks = self.make_payout_candidates(count=1)
+        self.staff = User.objects.create_user(
+            username='chargestaff', email='cs@test.com', password='Staff@12345',
+            is_staff=True)
+        core_models.Profile.objects.create(
+            user=self.staff, first_name='Charge', last_name='Staff', phone=55599998,
+            dept_finance=True)
+        self.client = Client()
+        self.client.force_login(self.staff)
+
+    def test_edit_refused_once_paid(self):
+        WalletService.settle_cod_with_client(
+            business=self.business, amount=Decimal('100.00'),
+            delivery_task_ids=[self.tasks[0].id], created_by=self.staff,
+            deductions=[{'kind': 'delivery_charge', 'label': 'Delivery charges',
+                         'amount': Decimal('20.00')}],
+            charge_by_task={self.tasks[0].id: Decimal('20.00')})
+        resp = self.client.post(
+            reverse('workforce:client_charge_verification_action'),
+            {'task_ids[]': [self.tasks[0].id], 'action': 'set_amount',
+             'bulk_amount': '999'})
+        data = resp.json()
+        self.assertEqual(data['updated'], 0)
+        self.assertEqual(data['skipped_paid'], 1)
+        self.tasks[0].refresh_from_db()
+        self.assertNotEqual(self.tasks[0].verified_delivery_charge, Decimal('999.00'))
+
+    def test_edit_allowed_before_payout(self):
+        resp = self.client.post(
+            reverse('workforce:client_charge_verification_action'),
+            {'task_ids[]': [self.tasks[0].id], 'action': 'set_amount',
+             'bulk_amount': '12.50'})
+        self.assertEqual(resp.json()['updated'], 1)
+        self.tasks[0].refresh_from_db()
+        self.assertEqual(self.tasks[0].verified_delivery_charge, Decimal('12.50'))
+
+
+class BulkSettleCODFenceTest(ClientPayoutMixin, TransactionTestCase):
+    """A COD already deposited must not be selectable for a second hand-in."""
+
+    def setUp(self):
+        self.tasks = self.make_payout_candidates(count=1)
+        self.staff = User.objects.create_user(
+            username='fencestaff', email='fs@test.com', password='Staff@12345',
+            is_staff=True)
+        core_models.Profile.objects.create(
+            user=self.staff, first_name='Fence', last_name='Staff', phone=55599997,
+            dept_finance=True)
+        self.client = Client()
+        self.client.force_login(self.staff)
+
+    def _cod_txn(self, task, settled):
+        delivery_models.DeliveryTask.objects.filter(id=task.id).update(cod_settled=settled)
+        return fleet_models.DriverTransaction.objects.create(
+            driver=self.driver, transaction_type='cod_collection',
+            amount=Decimal('-100.00'), description='COD collected',
+            delivery_task=task)
+
+    def test_already_deposited_cod_is_refused(self):
+        txn = self._cod_txn(self.tasks[0], settled=True)
+        self.client.post(reverse('workforce:bulk_settle_transactions'),
+                         {'driver_id': self.driver.driver_id,
+                          'transaction_ids': json.dumps([txn.id])})
+        txn.refresh_from_db()
+        self.assertIsNone(txn.settlement, "an already-deposited COD row was settled again")
+        self.assertFalse(fleet_models.DriverTransaction.objects.filter(
+            transaction_type='cod_deposit').exists(), "a phantom deposit was minted")
+
+    def test_undeposited_cod_still_settles(self):
+        txn = self._cod_txn(self.tasks[0], settled=False)
+        self.client.post(reverse('workforce:bulk_settle_transactions'),
+                         {'driver_id': self.driver.driver_id,
+                          'transaction_ids': json.dumps([txn.id])})
+        txn.refresh_from_db()
+        self.assertIsNotNone(txn.settlement, "a genuine pending COD row was blocked")
+
+    def _prepaid_task(self, number='PREPAID-0'):
+        """A delivered order with nothing to collect — no DriverTransaction."""
+        order = orders_models.Order.objects.create(
+            business=self.business,
+            client_order_code=f'ZERO-{number}',
+            customer_name='Prepaid Customer',
+            customer_phone='55501234',
+            customer_address='Test Address Doha',
+            dl_zone=70, dl_building=7000, dl_street=700,
+            pickup_location=self.pickup,
+            cod_amount=Decimal('0.00'))
+        return self.create_delivery_task(
+            order, self.business, pickup=self.pickup, driver=self.driver,
+            task_number=number, status='delivered',
+            cod_collected=False, cod_settled=False,
+            cod_collected_amount=Decimal('0.00'), dl_price=Decimal('20.00'),
+            completed_at=timezone.now())
+
+    def test_staff_settle_sweeps_pending_prepaid(self):
+        """A prepaid delivery has no ledger row, so a staff settle must sweep it.
+
+        Without this it is unreachable from staff side entirely and accumulates
+        forever — the bug this covers.
+        """
+        prepaid = self._prepaid_task()
+        txn = self._cod_txn(self.tasks[0], settled=False)
+        self.client.post(reverse('workforce:bulk_settle_transactions'),
+                         {'driver_id': self.driver.driver_id,
+                          'transaction_ids': json.dumps([txn.id])})
+        prepaid.refresh_from_db()
+        self.assertTrue(prepaid.cod_settled,
+                        "a pending prepaid delivery was left behind by a staff settle")
+        self.assertIsNotNone(prepaid.cod_settled_at)
+
+    def test_prepaid_sweep_moves_no_money(self):
+        """The sweep closes deliveries; it must not invent a balance."""
+        self._prepaid_task()
+        txn = self._cod_txn(self.tasks[0], settled=False)
+        before = fleet_models.Driver.objects.get(pk=self.driver.pk).wallet_balance
+        self.client.post(reverse('workforce:bulk_settle_transactions'),
+                         {'driver_id': self.driver.driver_id,
+                          'transaction_ids': json.dumps([txn.id])})
+        after = fleet_models.Driver.objects.get(pk=self.driver.pk).wallet_balance
+        # The only wallet movement allowed is the COD deposit for the cash leg.
+        self.assertEqual(after - before, Decimal('100.00'),
+                         "the prepaid sweep moved money it should not have")
+
+
+# =============================================================================
+# CHARGES TO COLLECT — the receivable leg
+# =============================================================================
+
+class ChargeInvoiceTest(ClientPayoutMixin, TransactionTestCase):
+    """Billing a client for delivery charges no COD payout will recover."""
+
+    def setUp(self):
+        # Two COD deliveries at 20.00 each, ready to pay out.
+        self.tasks = self.make_payout_candidates(count=2)
+
+    def _prepaid_task(self, number='PP-1', dl_price=Decimal('20.00')):
+        order = orders_models.Order.objects.create(
+            business=self.business, client_order_code=f'PP-{number}',
+            customer_name='Prepaid Customer', customer_phone='55501234',
+            customer_address='Test Address Doha',
+            dl_zone=70, dl_building=7000, dl_street=700,
+            pickup_location=self.pickup, cod_amount=Decimal('0.00'))
+        return self.create_delivery_task(
+            order, self.business, pickup=self.pickup, driver=self.driver,
+            task_number=number, status='delivered',
+            cod_collected=False, cod_settled=False,
+            cod_collected_amount=Decimal('0.00'), dl_price=dl_price,
+            completed_at=timezone.now())
+
+    def test_prepaid_delivery_is_billable(self):
+        """The case the payout console can never reach: nothing to withhold from."""
+        from fleet import billing_service
+
+        prepaid = self._prepaid_task()
+        ids = set(billing_service.billable_tasks(
+            business_id=self.business.business_id).values_list('id', flat=True))
+        self.assertIn(prepaid.id, ids)
+
+    def test_issue_books_revenue_and_freezes_the_figure(self):
+        from fleet import billing_service
+
+        prepaid = self._prepaid_task()
+        invoice, billed, skipped = billing_service.issue_charge_invoice(
+            business=self.business, task_ids=[prepaid.id],
+            extras=[{'kind': 'inventory_handling', 'label': 'Handling',
+                     'amount': Decimal('5.00')}],
+            created_by=self.user)
+
+        self.assertEqual(billed, 1)
+        self.assertEqual(skipped, 0)
+        self.assertEqual(invoice.total_amount, Decimal('25.00'))
+        self.assertEqual(invoice.amount_due, Decimal('25.00'))
+        self.assertEqual(invoice.lines.count(), 2)
+
+        prepaid.refresh_from_db()
+        self.assertEqual(prepaid.charge_invoice_id, invoice.pk)
+
+        # The line keeps the figure even if the verified charge is edited later.
+        line = invoice.lines.filter(delivery_task=prepaid).first()
+        delivery_models.DeliveryTask.objects.filter(id=prepaid.id).update(
+            verified_delivery_charge=Decimal('99.00'))
+        line.refresh_from_db()
+        self.assertEqual(line.amount, Decimal('20.00'))
+
+        self.assertTrue(fleet_models.DriverTransaction.objects.filter(
+            business=self.business, transaction_type='delivery_charge',
+            reference_number=invoice.invoice_code, amount=Decimal('20.00')).exists())
+
+    def test_invoicing_twice_bills_nothing_the_second_time(self):
+        from fleet import billing_service
+
+        prepaid = self._prepaid_task()
+        billing_service.issue_charge_invoice(
+            business=self.business, task_ids=[prepaid.id], created_by=self.user)
+        second, billed, skipped = billing_service.issue_charge_invoice(
+            business=self.business, task_ids=[prepaid.id], created_by=self.user)
+        self.assertIsNone(second)
+        self.assertEqual(billed, 0)
+        self.assertEqual(skipped, 1)
+
+    def test_charge_withheld_at_payout_is_never_billed_again(self):
+        """The double-charge the two legs could otherwise commit together."""
+        from fleet import billing_service
+
+        WalletService.settle_cod_with_client(
+            business=self.business, amount=Decimal('200.00'),
+            delivery_task_ids=[t.id for t in self.tasks], created_by=self.user,
+            deductions=[{'kind': 'delivery_charge', 'label': 'Delivery charges',
+                         'amount': Decimal('40.00')}],
+            charge_by_task={t.id: Decimal('20.00') for t in self.tasks})
+
+        ids = set(billing_service.billable_tasks(
+            business_id=self.business.business_id).values_list('id', flat=True))
+        for t in self.tasks:
+            self.assertNotIn(t.id, ids,
+                             "a fee already withheld at payout was offered for billing again")
+
+    def test_payout_does_not_withhold_a_fee_already_invoiced(self):
+        """The same fence from the other side — the payout desk must stand down."""
+        from fleet import billing_service
+
+        billing_service.issue_charge_invoice(
+            business=self.business, task_ids=[self.tasks[0].id], created_by=self.user)
+
+        staff = User.objects.create_user(
+            username='billstaff', email='bs@test.com', password='Staff@12345',
+            is_staff=True)
+        core_models.Profile.objects.create(
+            user=staff, first_name='Bill', last_name='Staff', phone=55599996,
+            dept_finance=True)
+        client = Client()
+        client.force_login(staff)
+
+        resp = client.post(reverse('workforce:cod_business_settlement_action'), {
+            'task_ids[]': [t.id for t in self.tasks],
+            'payment_method': 'bank', 'deduct_charges': '1'})
+        data = resp.json()
+        self.assertTrue(data['success'], data)
+        # Only the un-invoiced delivery's 20.00 comes off the COD.
+        self.assertEqual(Decimal(str(data['settled_businesses'][0]['delivery_charge'])),
+                         Decimal('20.00'))
+
+    def test_payment_advances_status_and_overpayment_is_refused(self):
+        from fleet import billing_service
+
+        prepaid = self._prepaid_task()
+        invoice, _, _ = billing_service.issue_charge_invoice(
+            business=self.business, task_ids=[prepaid.id], created_by=self.user)
+
+        billing_service.record_invoice_payment(
+            invoice, amount=Decimal('5.00'), created_by=self.user)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'part_paid')
+        self.assertEqual(invoice.amount_due, Decimal('15.00'))
+
+        with self.assertRaises(ValueError):
+            billing_service.record_invoice_payment(
+                invoice, amount=Decimal('500.00'), created_by=self.user)
+
+        billing_service.record_invoice_payment(
+            invoice, amount=Decimal('15.00'), created_by=self.user)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'paid')
+        self.assertEqual(invoice.amount_due, Decimal('0.00'))
+
+    def test_void_unbooks_the_revenue_and_frees_the_deliveries(self):
+        from fleet import billing_service
+
+        prepaid = self._prepaid_task()
+        invoice, _, _ = billing_service.issue_charge_invoice(
+            business=self.business, task_ids=[prepaid.id], created_by=self.user)
+        billing_service.void_charge_invoice(invoice, created_by=self.user, reason='test')
+
+        invoice.refresh_from_db()
+        prepaid.refresh_from_db()
+        self.assertEqual(invoice.status, 'void')
+        self.assertIsNone(prepaid.charge_invoice_id)
+
+        booked = fleet_models.DriverTransaction.objects.filter(
+            business=self.business, transaction_type='delivery_charge',
+            reference_number=invoice.invoice_code,
+        ).aggregate(total=Sum('amount'))['total']
+        self.assertEqual(booked, Decimal('0.00'), "voiding left revenue on the books")
+
+        # And the delivery is billable again.
+        ids = set(billing_service.billable_tasks(
+            business_id=self.business.business_id).values_list('id', flat=True))
+        self.assertIn(prepaid.id, ids)
+
+    def test_void_is_refused_once_money_has_been_received(self):
+        from fleet import billing_service
+
+        prepaid = self._prepaid_task()
+        invoice, _, _ = billing_service.issue_charge_invoice(
+            business=self.business, task_ids=[prepaid.id], created_by=self.user)
+        billing_service.record_invoice_payment(
+            invoice, amount=Decimal('5.00'), created_by=self.user)
+        with self.assertRaises(ValueError):
+            billing_service.void_charge_invoice(invoice, created_by=self.user)

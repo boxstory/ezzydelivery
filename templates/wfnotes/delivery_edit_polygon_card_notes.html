@@ -1,0 +1,112 @@
+{% comment %}
+Purpose: "About this page" notes panel for edit_polygon.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "delivery_edit_polygon_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      This is where a zone's <strong>boundary</strong> is drawn. The shape you save is the authoritative
+      answer to "which zone is this address in" — when an order's coordinates fall inside it, the order is
+      that zone, full stop. Every other zone's boundary is drawn on the map at the same time so you can trace
+      along the neighbours instead of guessing, because gaps and overlaps between shapes are what send
+      deliveries to the wrong place. You are editing one zone only: the one named in the bar under the title.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Draw New</dt>
+            <dd class="wfnote__def">Clears whatever is there and starts a fresh outline: click to drop each
+              point, double-click to close the shape.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Edit Points</dt>
+            <dd class="wfnote__def">Turns the existing shape's corners into handles you can drag. The small
+              squares on the edges add a new point; select a point and press Delete to remove it.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Clear All</dt>
+            <dd class="wfnote__def">Removes the shape from the map after a confirmation. Nothing is saved
+              until you press Save, so the stored boundary is still intact.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Undo</dt>
+            <dd class="wfnote__def">Steps back through this session's shapes — it remembers the last twenty.
+              Closing the page loses that history.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Layer toggles</dt>
+            <dd class="wfnote__def">Show or hide neighbouring zones and all other zones, for when the
+              reference boundaries get in the way of drawing.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Check Proximity</dt>
+            <dd class="wfnote__def">Tests every point against the other zones' boundaries and flags any that
+              sit within 20 metres, marking them red on the map and listing which zone they are too close to.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Re-fetch QNAS</dt>
+            <dd class="wfnote__def">Pulls the official boundary for this zone from the national address
+              service and loads it onto the map, replacing what is drawn. It asks first, and still needs a
+              Save.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Save Polygon</dt>
+            <dd class="wfnote__def">Writes the shape to the zone and returns you to the zone map. If any
+              points are too close to another zone you get the warning first and can carry on anyway.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Cancel</dt>
+            <dd class="wfnote__def">Leaves without saving, back to the zone map. Everything drawn is
+              discarded.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">Reading the map</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Current zone</dt>
+            <dd class="wfnote__def">The navy shape — the only one you can edit.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Neighbours</dt>
+            <dd class="wfnote__def">Zones recorded as adjacent to this one. These are the borders your shape
+              should meet cleanly.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Other zones</dt>
+            <dd class="wfnote__def">Everything else that has a boundary, shown for context.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Points</dt>
+            <dd class="wfnote__def">The live corner count of the shape on the map — not what is stored. The
+              info bar above shows the stored count for comparison.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Red circles</dt>
+            <dd class="wfnote__def">Points flagged by the proximity check. Hover one to see which zone it is
+              too close to and by how much.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>Saving also <strong>moves the zone's centre point</strong> to the middle of the new shape,
+          overwriting any point set by hand on the zone map.</li>
+        <li>A boundary needs at least three points, and coordinates are validated on save — a shape that is
+          too small or malformed is rejected rather than half-saved.</li>
+        <li>The proximity warning is advice, not a block. Overriding it is how gaps and overlaps get created,
+          and those are what push an address into the wrong zone.</li>
+        <li>The saved boundary applies to <strong>future</strong> zone lookups only. Orders already created
+          keep the zone they were given.</li>
+        <li><em>Clear All</em>, <em>Draw New</em> and <em>Re-fetch QNAS</em> only change the map. Nothing
+          reaches the database until you press Save.</li>
+      </ul>
+    </section>
+  

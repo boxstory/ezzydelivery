@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'business/css/business.css' %}">
@@ -17,24 +18,19 @@
     </div>
 
     <!-- Header (desktop only) -->
-    <div class="bjr__header d-none d-md-flex" id="client_join_requests_section_header">
-        <div class="bjr__header-left">
-            <div class="bjr__header-icon"><i class="fa-solid fa-users-gear"></i></div>
-            <div>
-                <h1 class="bjr__title">Team Join Requests</h1>
-                <p class="bjr__subtitle">Users requesting to join your business team</p>
-            </div>
-        </div>
-        <a href="{% url 'business:business_teams' business.business_id %}" class="bjr__back-link" id="client_join_requests_btn_back">
-            <i class="fa-solid fa-arrow-left"></i> Back to Team
-        </a>
+    <div class="d-none d-md-block" id="client_join_requests_section_header">
+        {% bconheader eyebrow="Team" live="Requests" icon="fa-solid fa-users-gear" title="Team Join Requests" subtitle="Users requesting to join your business team." %}
+            <a href="{% url 'business:business_teams' business.business_id %}" class="bcon__btn bcon__btn--ghost" id="client_join_requests_btn_back">
+                <i class="fa-solid fa-arrow-left"></i> Back to Team
+            </a>
+        {% endbconheader %}
     </div>
 
     <!-- Filter Pills -->
     <div class="bjr__filters" id="client_join_requests_section_filters">
         <a href="?status=pending" class="bjr__pill {% if current_filter == 'pending' %}bjr__pill--active{% endif %}">
             <i class="fa-solid fa-clock"></i> Pending
-            {% if current_filter == 'pending' %}<span class="bjr__pill-count">{{ join_requests|length }}</span>{% endif %}
+            {% if current_filter == 'pending' %}<span class="bjr__pill-count">{{ join_requests_total }}</span>{% endif %}
         </a>
         <a href="?status=accepted" class="bjr__pill {% if current_filter == 'accepted' %}bjr__pill--active{% endif %}">
             <i class="fa-solid fa-circle-check"></i> Accepted
@@ -141,6 +137,7 @@
         </div>
         {% endfor %}
     </div>
+    {% include "includes/components/_pagination.html" with page_obj=join_requests_page per_page=per_page pagination_id="join_requests" variant="compact" show_goto="false" %}
 
     {% else %}
     <div class="bjr__empty" id="client_join_requests_empty_state">

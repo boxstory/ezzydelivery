@@ -16,13 +16,17 @@ echo "==> 1/4 System check (deploy)"
 # check --deploy exits non-zero on ERRORS (warnings pass)
 python manage.py check --deploy 2>&1 | grep -v "^\[INFO\]" | tail -4
 
-echo "==> 2/4 Missing migrations check"
+echo "==> 2/5 Missing migrations check"
 python manage.py makemigrations --check --dry-run > /dev/null
 
-echo "==> 3/4 Test suite"
+# A multi-line {# #} is not a comment — Django renders it as visible page text.
+echo "==> 3/5 Template comment check"
+python scripts/check_template_comments.py
+
+echo "==> 4/5 Test suite"
 python manage.py test --keepdb --noinput 2>&1 | tail -5
 
-echo "==> 4/4 Collect static"
+echo "==> 5/5 Collect static"
 python manage.py collectstatic --noinput | tail -1
 
 echo "PREDEPLOY GATE PASSED — safe to reload gunicorn:"

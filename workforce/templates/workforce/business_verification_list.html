@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Approval queue for client sign-ups — approve (with business code), mark under review, reject, link a CRM lead
+Used by: workforce_views.business_verification_list at /workforce/business-verification/
+Notes: Approving posts to update_verification_status, which also activates the business account.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Business Verification - Staff Dashboard{% endblock title %}
 
@@ -20,7 +27,16 @@
             <div class="wfd__hero-stat wfd__hero-stat--danger"><span class="wfd__hero-stat__num">{{ status_counts.rejected|default:"0" }}</span><span class="wfd__hero-stat__label">Rejected</span></div>
         </div>
     </div>
+    <button type="button" class="wfnote__btn" data-wfnote-toggle
+            aria-expanded="false" aria-controls="workforce_business_verification_list_card_notes"
+            title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+    </button>
 </div>
+
+<div class="wfnote" id="workforce_business_verification_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_business_verification_list_card_notes' %}" hidden></div>
 
 <!-- Search + Sort -->
 <form method="get" class="d-flex gap-2 mb-3 flex-wrap">
@@ -204,27 +220,37 @@
                              style="width: {{ business.profile.get_profile_completion_percentage }}%"></div>
                     </div>
                     <div class="small text-muted mt-1">
-                        {% if business.profile.is_profile_completed %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
+                        {# Same percentage as the bar: the stored is_profile_completed flag drifts behind the fields #}
+                        {% if business.profile.get_profile_completion_percentage == 100 %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
                     </div>
                 </div>
             </div>
             <!-- Business Profile Completion -->
             <div class="col-sm-6">
+                {# Real field-by-field percentage, not the binary is_business_profile_completed flag, which only flips on approval #}
+                {% with biz_completion=business.profile.get_business_profile_completion_percentage %}
                 <div class="uvl__progress-wrap">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="uvl__section-head"><i class="fa-solid fa-building"></i> Business Profile</span>
-                        <span class="uvl__progress-pct {% if business.profile.is_business_profile_completed %}uvl__progress-pct--ok{% else %}uvl__progress-pct--low{% endif %}">
-                            {% if business.profile.is_business_profile_completed %}100{% else %}0{% endif %}%
+                        <span class="uvl__section-head">
+                            <i class="fa-solid fa-building"></i> Business Profile
+                            <span class="uvl__origin-note"
+                                  title="How this user arrived{% if business.profile.signup_landing_path %} — landed on {{ business.profile.signup_landing_path }}{% endif %}{% if business.profile.signup_referrer %} — referred by {{ business.profile.signup_referrer }}{% endif %}{% if business.profile.signup_source_inferred %} (guessed from the account, not tracked at signup){% endif %}">
+                                (via {{ business.profile.get_signup_source_display }}{% if business.profile.signup_source_inferred %} · inferred{% endif %})
+                            </span>
+                        </span>
+                        <span class="uvl__progress-pct {% if biz_completion == 100 %}uvl__progress-pct--ok{% elif biz_completion >= 50 %}uvl__progress-pct--warn{% else %}uvl__progress-pct--low{% endif %}">
+                            {{ biz_completion }}%
                         </span>
                     </div>
                     <div class="uvl__progress-bar">
-                        <div class="uvl__progress-fill {% if business.profile.is_business_profile_completed %}uvl__progress-fill--ok{% else %}uvl__progress-fill--low{% endif %}"
-                             style="width: {% if business.profile.is_business_profile_completed %}100{% else %}0{% endif %}%"></div>
+                        <div class="uvl__progress-fill {% if biz_completion == 100 %}uvl__progress-fill--ok{% elif biz_completion >= 50 %}uvl__progress-fill--warn{% else %}uvl__progress-fill--low{% endif %}"
+                             style="width: {{ biz_completion }}%"></div>
                     </div>
                     <div class="small text-muted mt-1">
-                        {% if business.profile.is_business_profile_completed %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
+                        {% if biz_completion == 100 %}<i class="fa-solid fa-check text-success"></i> Complete{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
                     </div>
                 </div>
+                {% endwith %}
             </div>
         </div>
 

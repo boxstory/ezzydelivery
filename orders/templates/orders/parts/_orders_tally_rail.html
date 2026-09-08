@@ -1,0 +1,45 @@
+{# Purpose: Tally rail — segment counts that double as status filters, plus COD owed #}
+{# Used by: orders/parts/order_all_list_content.html, welded to the bottom of the cockpit hero #}
+{# Notes: Counts come from the scoped window, so they hold steady as segments are switched #}
+{% load humanize %}
+<nav class="oal__rail" id="orders_list_rail_tally" aria-label="Filter orders by status">
+  <a class="oal__rail-seg{% if active_segment == 'all' %} oal__rail-seg--on{% endif %}"
+     href="?{{ scope_params }}">
+    <span class="oal__rail-num">{{ tally.total }}</span>
+    <span class="oal__rail-label">All</span>
+  </a>
+  <a class="oal__rail-seg{% if active_segment == 'to_review' %} oal__rail-seg--on{% endif %}"
+     href="?{% if scope_params %}{{ scope_params }}&amp;{% endif %}cStatus=to_review">
+    <span class="oal__rail-num">{{ tally.review }}</span>
+    <span class="oal__rail-label">Review</span>
+  </a>
+  <a class="oal__rail-seg{% if active_segment == 'ready_to_pickup' %} oal__rail-seg--on{% endif %}"
+     href="?{% if scope_params %}{{ scope_params }}&amp;{% endif %}cStatus=ready_to_pickup">
+    <span class="oal__rail-num">{{ tally.ready }}</span>
+    <span class="oal__rail-label">Ready</span>
+  </a>
+  <a class="oal__rail-seg{% if active_segment == 'publish' %} oal__rail-seg--on{% endif %}"
+     href="?{% if scope_params %}{{ scope_params }}&amp;{% endif %}cStatus=publish">
+    <span class="oal__rail-num">{{ tally.published }}</span>
+    <span class="oal__rail-label">Published</span>
+  </a>
+  <a class="oal__rail-seg{% if active_segment == 'active' %} oal__rail-seg--on{% endif %}"
+     href="?{% if scope_params %}{{ scope_params }}&amp;{% endif %}dlStatus=active">
+    <span class="oal__rail-num">{{ tally.transit }}</span>
+    <span class="oal__rail-label">In transit</span>
+  </a>
+  <a class="oal__rail-seg{% if active_segment == 'delivered' %} oal__rail-seg--on{% endif %}"
+     href="?{% if scope_params %}{{ scope_params }}&amp;{% endif %}dlStatus=delivered">
+    <span class="oal__rail-num">{{ tally.delivered }}</span>
+    <span class="oal__rail-label">Delivered</span>
+  </a>
+  <a class="oal__rail-seg{% if tally.failed %} oal__rail-seg--alert{% endif %}{% if active_segment == 'failed' %} oal__rail-seg--on{% endif %}"
+     href="?{% if scope_params %}{{ scope_params }}&amp;{% endif %}dlStatus=failed">
+    <span class="oal__rail-num">{{ tally.failed }}</span>
+    <span class="oal__rail-label">Failed</span>
+  </a>
+  <div class="oal__rail-money">
+    <span class="oal__rail-money-label">COD outstanding</span>
+    <span class="oal__rail-money-value">{{ tally.cod_due|floatformat:0|intcomma }}<small>QAR</small></span>
+  </div>
+</nav>

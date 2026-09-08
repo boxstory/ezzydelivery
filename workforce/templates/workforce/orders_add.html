@@ -1,6 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Staff manual order entry on behalf of a client — customer, QNAS address, products, COD
+Used by: workforce_views.wf_orders_add at /workforce/orders/add/
+Notes: Seller is chosen by GET reload first; the order form only renders once a seller is selected.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Add Order - Staff Dashboard{% endblock title %}
 
@@ -21,8 +28,17 @@
             <a href="{% url 'workforce:dl_list_all' %}" class="btn btn-outline-light btn-sm">
                 <i class="fa-solid fa-truck me-1"></i>Go to Tasks
             </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_orders_add_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_orders_add_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_orders_add_card_notes' %}" hidden></div>
 
     <div class="p-3">
         <!-- Seller Selection Card -->
@@ -92,19 +108,164 @@
                             <i class="fa-solid fa-user me-2 woa__icon-accent"></i>Customer Information
                         </h6>
                         <div class="row mb-4">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="woa__form-label" for="customer_name">Customer Name <span class="text-danger">*</span></label>
                                 <input type="text" class="woa__form-input" id="customer_name" name="customer_name" required>
                             </div>
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="woa__form-label" for="customer_phone">Phone Number <span class="text-danger">*</span></label>
                                 <input type="tel" class="woa__form-input" id="customer_phone" name="customer_phone" required placeholder="+974 XXXX XXXX">
                             </div>
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="woa__form-label" for="customer_whatsapp">WhatsApp Number</label>
                                 <input type="tel" class="woa__form-input" id="customer_whatsapp" name="customer_whatsapp" placeholder="+974 XXXX XXXX">
                             </div>
-                            <div class="col-md-6 mb-3">
+
+                            <!-- Pickup Location — option cards + add card (was a select in Order Details) -->
+                            <div class="col-12 mb-3">
+                                <span class="woa__form-label mb-1">Pickup Location</span>
+                                <div class="woa__pl" id="woa_pickup_picker"
+                                     data-add-url="{% url 'workforce:wf_pickup_location_add' selected_business.business_id %}">
+                                    <div class="woa__pl-grid" id="woa_pickup_grid">
+                                        {% for location in pickup_locations %}
+                                        <label class="woa__pl-card{% if location.is_default %} woa__pl-card--default{% endif %}{% if location.pickup_status != 'active' %} woa__pl-card--off{% endif %}{% if location.id == default_pickup_id %} woa__pl-card--on{% endif %}">
+                                            <input type="radio" class="woa__pl-input" name="pickup_location"
+                                                   value="{{ location.id }}" {% if location.id == default_pickup_id %}checked{% endif %}>
+                                            <span class="woa__pl-tick"><i class="fa-solid fa-check"></i></span>
+                                            <span class="woa__pl-title">
+                                                {{ location.pickup_location_title }}
+                                                {% if location.is_default %}<i class="fa-solid fa-star woa__pl-star" title="Seller default"></i>{% endif %}
+                                            </span>
+                                            <span class="woa__pl-sub">{{ location.locality|default:"—" }}</span>
+                                            <span class="woa__pl-code">
+                                                Z {{ location.pickup_zone_no|default:"—" }} / S {{ location.pickup_street_no|default:"—" }} / B {{ location.pickup_building_no|default:"—" }}
+                                            </span>
+                                            {% if location.is_default or location.is_fulfilment_center or location.pickup_status != 'active' %}
+                                            <span class="woa__pl-flag">
+                                                {% if location.is_default %}Seller default{% endif %}
+                                                {% if location.is_fulfilment_center %}{% if location.is_default %} · {% endif %}Fulfilment centre{% endif %}
+                                                {% if location.pickup_status != 'active' %}<span class="woa__pl-flag-off">{% if location.is_default or location.is_fulfilment_center %} · {% endif %}{{ location.get_pickup_status_display }}</span>{% endif %}
+                                            </span>
+                                            {% endif %}
+                                        </label>
+                                        {% endfor %}
+                                        <button type="button" class="woa__pl-add" id="woa_pickup_add_btn"
+                                                aria-expanded="false" aria-controls="woa_pickup_form">
+                                            <span class="woa__pl-add-icon"><i class="fa-solid fa-plus"></i></span>
+                                            <span class="woa__pl-add-label">Add pickup location</span>
+                                            <span class="woa__pl-add-sub">Saves to this seller</span>
+                                        </button>
+                                    </div>
+
+                                    <div class="woa__pl-form" id="woa_pickup_form" hidden>
+                                        <div class="woa__pl-form-head">
+                                            <span class="woa__pl-form-title">New pickup location</span>
+                                            <button type="button" class="woa__pl-form-close" id="woa_pickup_cancel_btn" title="Cancel">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </div>
+                                        <!-- Same address tooling as the Delivery Address section: QNAS plate,
+                                             Zone/Street/Building + Validate, and shared-location paste/drop. -->
+                                        <div class="qnas-plate" role="group" aria-label="Pickup Qatar national address code">
+                                            <div class="qnas-plate__cell">
+                                                <span class="qnas-plate__tag">Zone</span>
+                                                <span class="qnas-plate__num qnas-plate__num--empty" id="woaPlPlateZone">—</span>
+                                            </div>
+                                            <span class="qnas-plate__div">/</span>
+                                            <div class="qnas-plate__cell">
+                                                <span class="qnas-plate__tag">Street</span>
+                                                <span class="qnas-plate__num qnas-plate__num--empty" id="woaPlPlateStreet">—</span>
+                                            </div>
+                                            <span class="qnas-plate__div">/</span>
+                                            <div class="qnas-plate__cell">
+                                                <span class="qnas-plate__tag">Building</span>
+                                                <span class="qnas-plate__num qnas-plate__num--empty" id="woaPlPlateBldg">—</span>
+                                            </div>
+                                            <div class="qnas-plate__name qnas-plate__name--empty" id="woaPlPlateZoneWrap">
+                                                <i class="fa-solid fa-location-dot"></i>
+                                                <span id="woaPlPlateZoneName">Zone name not resolved</span>
+                                            </div>
+                                        </div>
+                                        <div class="row g-2 mb-2">
+                                            <div class="col-md-6">
+                                                <label class="woa__form-label" for="woa_pl_title">Title <span class="text-danger">*</span></label>
+                                                <input type="text" class="woa__form-input" id="woa_pl_title" placeholder="e.g., Main Store">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="woa__form-label" for="woa_pl_locality">Locality</label>
+                                                <input type="text" class="woa__form-input" id="woa_pl_locality" placeholder="e.g., West Bay">
+                                            </div>
+                                        </div>
+                                        <div class="row g-2 mb-2">
+                                            <div class="col-4 col-md-3">
+                                                <label class="woa__form-label" for="woa_pl_zone"><i class="fa-solid fa-map me-1"></i>Zone</label>
+                                                <input type="number" class="woa__form-input" id="woa_pl_zone" min="0" placeholder="e.g., 45">
+                                            </div>
+                                            <div class="col-4 col-md-3">
+                                                <label class="woa__form-label" for="woa_pl_street"><i class="fa-solid fa-road me-1"></i>Street</label>
+                                                <input type="number" class="woa__form-input" id="woa_pl_street" min="0" placeholder="e.g., 123">
+                                            </div>
+                                            <div class="col-4 col-md-3">
+                                                <label class="woa__form-label" for="woa_pl_building"><i class="fa-solid fa-building me-1"></i>Building</label>
+                                                <input type="number" class="woa__form-input" id="woa_pl_building" min="0" placeholder="e.g., 56">
+                                            </div>
+                                            <div class="col-auto d-flex align-items-end">
+                                                <button type="button" class="btn btn-sm btn-outline-warning woa__pl-qnas-btn" id="woa_pl_qnas_btn"
+                                                        onclick="qnasValidateAndFill({zoneId:'woa_pl_zone', streetId:'woa_pl_street', buildingId:'woa_pl_building', latId:'woa_pl_lat', lngId:'woa_pl_lon', zoneNameId:'woa_pl_zone_name', resultId:'woa_pl_qnas_result', btnId:'woa_pl_qnas_btn', mapId:'woa_pl_map_link', accuracyId:'woa_pl_accuracy', accuracyBadgeId:'woa_pl_accuracy_badge'})">
+                                                    <i class="fa-solid fa-satellite-dish me-1"></i>Validate
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="row g-2 mb-2">
+                                            <div class="col-12">
+                                                <label class="woa__form-label" for="woa_pl_loc_paste">Paste / Drop Shared Location</label>
+                                                <div id="woa_pl_loc_drop" class="oap__loc-drop"
+                                                     ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+                                                     ondrop="locDropHandle(event, {latId:'woa_pl_lat', lngId:'woa_pl_lon', mapId:'woa_pl_map_link', accuracyId:'woa_pl_accuracy', accuracyBadgeId:'woa_pl_accuracy_badge', resultId:'woa_pl_loc_result', inputId:'woa_pl_loc_paste'})">
+                                                    <i class="fa-solid fa-location-dot oap__loc-drop__icon"></i>
+                                                    <input type="text" id="woa_pl_loc_paste" class="form-control form-control-sm oap__loc-drop__input"
+                                                           placeholder="Paste WhatsApp/Google Maps link (e.g. https://maps.google.com/?q=25.247,51.427) or drop the shared location here"
+                                                           oninput="whatsappLocationFill(this.value, {latId:'woa_pl_lat', lngId:'woa_pl_lon', mapId:'woa_pl_map_link', accuracyId:'woa_pl_accuracy', accuracyBadgeId:'woa_pl_accuracy_badge', resultId:'woa_pl_loc_result'})">
+                                                </div>
+                                                <div id="woa_pl_loc_result" class="mt-1"></div>
+                                            </div>
+                                        </div>
+                                        <div class="row g-2">
+                                            <div class="col-4 col-md-3">
+                                                <label class="woa__form-label" for="woa_pl_lat">Latitude</label>
+                                                <input type="text" class="woa__form-input" id="woa_pl_lat" placeholder="--" readonly>
+                                            </div>
+                                            <div class="col-4 col-md-3">
+                                                <label class="woa__form-label" for="woa_pl_lon">Longitude</label>
+                                                <input type="text" class="woa__form-input" id="woa_pl_lon" placeholder="--" readonly>
+                                            </div>
+                                            <div class="col-4 col-md-3">
+                                                <label class="woa__form-label" for="woa_pl_zone_name">Zone Name</label>
+                                                <input type="text" class="woa__form-input" id="woa_pl_zone_name" placeholder="Auto-filled" readonly>
+                                            </div>
+                                            <div class="col-auto d-flex align-items-end gap-2">
+                                                <a id="woa_pl_map_link" href="#" target="_blank" class="btn btn-sm btn-outline-secondary disabled woa__pl-map-btn" title="View on Google Maps">
+                                                    <i class="fa-solid fa-map-location-dot"></i>
+                                                </a>
+                                                <input type="hidden" id="woa_pl_accuracy" value="">
+                                            </div>
+                                        </div>
+                                        <div class="d-flex gap-2 mt-2">
+                                            <span id="woa_pl_accuracy_badge"></span>
+                                            <div id="woa_pl_qnas_result"></div>
+                                        </div>
+                                        <div class="woa__pl-form-actions">
+                                            <button type="button" class="woa__btn woa__btn--primary" id="woa_pickup_save_btn">
+                                                <span class="woa-pl-idle"><i class="fa-solid fa-check me-1"></i>Save &amp; select</span>
+                                                <span class="woa-pl-loading d-none"><span class="spinner-border spinner-border-sm me-1"></span>Saving…</span>
+                                            </button>
+                                            <span class="woa__pl-form-msg" id="woa_pickup_form_msg"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4 mb-3">
                                 <label class="woa__form-label" for="client_order_code">Client Order Code</label>
                                 <input type="text" class="woa__form-input" id="client_order_code" name="client_order_code" placeholder="Leave blank for auto-generate">
                             </div>
@@ -292,17 +453,6 @@
                             <div class="col-md-4 mb-3">
                                 <label class="woa__form-label" for="dl_amount">Delivery Fee (QAR)</label>
                                 <input type="number" class="woa__form-input" id="dl_amount" name="dl_amount" min="0" value="0">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="woa__form-label" for="pickup_location">Pickup Location</label>
-                                <select class="woa__form-input" id="pickup_location" name="pickup_location">
-                                    {% for location in pickup_locations %}
-                                        <option value="{{ location.id }}" {% if location.is_fulfilment_center %}selected{% endif %}>{{ location.pickup_location_title }}</option>
-                                    {% endfor %}
-                                    {% if not pickup_locations %}
-                                        <option value="">-- No Locations Available --</option>
-                                    {% endif %}
-                                </select>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="woa__form-label" for="order_type">Order Type</label>
@@ -686,6 +836,160 @@ function _initInlineProducts() {
         if (zn) setZoneName(zn.value);
     }, 1000);
     sync();
+})();
+</script>
+
+<script>
+// ---- Pickup Location option cards + inline "add location" card ----
+(function() {
+    var picker = document.getElementById('woa_pickup_picker');
+    if (!picker) return;
+    var grid     = document.getElementById('woa_pickup_grid');
+    var addBtn   = document.getElementById('woa_pickup_add_btn');
+    var panel    = document.getElementById('woa_pickup_form');
+    var cancel   = document.getElementById('woa_pickup_cancel_btn');
+    var saveBtn  = document.getElementById('woa_pickup_save_btn');
+    var msg      = document.getElementById('woa_pickup_form_msg');
+    var addUrl   = picker.dataset.addUrl;
+    var csrfEl   = document.querySelector('[name=csrfmiddlewaretoken]');
+
+    // Selected card highlight follows the radio, whatever checks it.
+    function paintSelection() {
+        grid.querySelectorAll('.woa__pl-card').forEach(function(card) {
+            var input = card.querySelector('.woa__pl-input');
+            card.classList.toggle('woa__pl-card--on', !!(input && input.checked));
+        });
+    }
+    grid.addEventListener('change', function(e) {
+        if (e.target.classList.contains('woa__pl-input')) paintSelection();
+    });
+
+    var FIELD_IDS = ['woa_pl_title', 'woa_pl_locality', 'woa_pl_zone', 'woa_pl_street',
+                     'woa_pl_building', 'woa_pl_lat', 'woa_pl_lon', 'woa_pl_zone_name',
+                     'woa_pl_accuracy', 'woa_pl_loc_paste'];
+
+    function togglePanel(open) {
+        panel.hidden = !open;
+        addBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        addBtn.classList.toggle('woa__pl-add--open', open);
+        if (open) document.getElementById('woa_pl_title').focus();
+    }
+
+    // Blank the panel back to its resting state — fields, plate, QNAS button,
+    // map link and every result/badge the location helpers wrote into.
+    function resetPanel() {
+        FIELD_IDS.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        ['woa_pl_qnas_result', 'woa_pl_loc_result', 'woa_pl_accuracy_badge'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.innerHTML = '';
+        });
+        var qBtn = document.getElementById('woa_pl_qnas_btn');
+        if (qBtn) {
+            qBtn.disabled = false;
+            qBtn.className = 'btn btn-sm btn-outline-warning woa__pl-qnas-btn';
+            qBtn.innerHTML = '<i class="fa-solid fa-satellite-dish me-1"></i>Validate';
+        }
+        var map = document.getElementById('woa_pl_map_link');
+        if (map) {
+            map.href = '#';
+            map.className = 'btn btn-sm btn-outline-secondary disabled woa__pl-map-btn';
+        }
+        syncPlate();
+    }
+
+    // ---- QNAS plate mirror (same signature plate as the delivery address) ----
+    function setPlateCell(id, value) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var v = (value || '').toString().trim();
+        el.textContent = v || '—';
+        el.classList.toggle('qnas-plate__num--empty', !v);
+    }
+    function syncPlate() {
+        setPlateCell('woaPlPlateZone', (document.getElementById('woa_pl_zone') || {}).value);
+        setPlateCell('woaPlPlateStreet', (document.getElementById('woa_pl_street') || {}).value);
+        setPlateCell('woaPlPlateBldg', (document.getElementById('woa_pl_building') || {}).value);
+        var wrap = document.getElementById('woaPlPlateZoneWrap');
+        var nameEl = document.getElementById('woaPlPlateZoneName');
+        var zn = ((document.getElementById('woa_pl_zone_name') || {}).value || '').trim();
+        if (nameEl && wrap) {
+            nameEl.textContent = zn || 'Zone name not resolved';
+            wrap.classList.toggle('qnas-plate__name--empty', !zn);
+        }
+    }
+    ['woa_pl_zone', 'woa_pl_street', 'woa_pl_building'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', syncPlate);
+    });
+    // Zone name is filled programmatically by qnasValidateAndFill (no input event),
+    // so reconcile the plate on a slow tick while the panel is open.
+    setInterval(function() { if (!panel.hidden) syncPlate(); }, 1000);
+    addBtn.addEventListener('click', function() { togglePanel(panel.hidden); });
+    cancel.addEventListener('click', function() { togglePanel(false); msg.textContent = ''; resetPanel(); });
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function addCard(loc) {
+        var label = document.createElement('label');
+        label.className = 'woa__pl-card woa__pl-card--on';
+        label.innerHTML =
+            '<input type="radio" class="woa__pl-input" name="pickup_location" value="' + esc(loc.id) + '" checked>' +
+            '<span class="woa__pl-tick"><i class="fa-solid fa-check"></i></span>' +
+            '<span class="woa__pl-title">' + esc(loc.title) + '</span>' +
+            '<span class="woa__pl-sub">' + esc(loc.locality || '—') + '</span>' +
+            '<span class="woa__pl-code">Z ' + esc(loc.zone || '—') + ' / S ' + esc(loc.street || '—') +
+            ' / B ' + esc(loc.building || '—') + '</span>';
+        grid.insertBefore(label, addBtn);
+        paintSelection();
+    }
+
+    saveBtn.addEventListener('click', async function() {
+        var title = document.getElementById('woa_pl_title').value.trim();
+        if (!title) { msg.className = 'woa__pl-form-msg woa__pl-form-msg--err'; msg.textContent = 'Title is required'; return; }
+        var body = new FormData();
+        body.append('pickup_location_title', title);
+        body.append('locality', document.getElementById('woa_pl_locality').value.trim());
+        body.append('pickup_zone_no', document.getElementById('woa_pl_zone').value.trim());
+        body.append('pickup_street_no', document.getElementById('woa_pl_street').value.trim());
+        body.append('pickup_building_no', document.getElementById('woa_pl_building').value.trim());
+        body.append('pickup_lat', document.getElementById('woa_pl_lat').value.trim());
+        body.append('pickup_lon', document.getElementById('woa_pl_lon').value.trim());
+
+        var idle = saveBtn.querySelector('.woa-pl-idle');
+        var loading = saveBtn.querySelector('.woa-pl-loading');
+        saveBtn.disabled = true; idle.classList.add('d-none'); loading.classList.remove('d-none');
+        msg.textContent = '';
+        try {
+            var resp = await fetch(addUrl, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfEl ? csrfEl.value : '' },
+                body: body
+            });
+            var data = await resp.json();
+            if (data.success && data.location) {
+                addCard(data.location);
+                resetPanel();
+                togglePanel(false);
+            } else {
+                msg.className = 'woa__pl-form-msg woa__pl-form-msg--err';
+                msg.textContent = data.error || 'Could not save location';
+            }
+        } catch (err) {
+            msg.className = 'woa__pl-form-msg woa__pl-form-msg--err';
+            msg.textContent = 'Network error';
+        } finally {
+            saveBtn.disabled = false; idle.classList.remove('d-none'); loading.classList.add('d-none');
+        }
+    });
+
+    paintSelection();
 })();
 </script>
 {% endblock extra_js %}

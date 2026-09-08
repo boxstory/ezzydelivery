@@ -249,6 +249,11 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                         <label class="td-split-label">Fawran</label>
                         <input type="number" id="tdSplitFawran" class="td-form-input td-split-input" placeholder="0.00" step="0.01" min="0" onchange="updateRemaining()">
                     </div>
+                    <div class="td-split-row" id="tdCodRefRow" hidden>
+                        <i class="fa-solid fa-receipt" style="color:#7c3aed;width:24px;"></i>
+                        <label class="td-split-label">Ref.</label>
+                        <input type="text" id="tdCodReference" class="td-form-input td-split-input" placeholder="Fawran / POS ref" maxlength="100">
+                    </div>
                     <div class="td-remaining-box">
                         <strong>Remaining:</strong> <span id="tdRemaining" style="color:var(--fleet-primary);">0.00</span> QR
                     </div>
@@ -940,6 +945,9 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const fawran = parseFloat(document.getElementById('tdSplitFawran').value) || 0;
         const remaining = codAmt - (cash + pos + fawran);
         document.getElementById('tdRemaining').textContent = remaining.toFixed(2);
+        // Reference only matters for the electronic legs — it is what makes a
+        // Fawran/POS collection reconcilable against the bank statement.
+        document.getElementById('tdCodRefRow').hidden = (pos + fawran) <= 0;
         if (remaining < 0) {
             document.getElementById('tdRemaining').style.color = 'var(--fleet-danger)';
         } else if (remaining > 0.01) {
@@ -1031,6 +1039,8 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         // Always send payment mode (even for non-COD)
         const payMethod = document.querySelector('input[name="tdPaymentMethod"]:checked');
         if (payMethod) fd.append('payment_method', payMethod.value);
+        const codRef = (document.getElementById('tdCodReference').value || '').trim();
+        if (codRef) fd.append('cod_reference', codRef);
         fetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
             method: 'POST',
             headers: { 'X-CSRFToken': csrf },

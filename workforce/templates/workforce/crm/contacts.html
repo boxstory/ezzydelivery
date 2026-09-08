@@ -4,9 +4,10 @@
 {# Purpose: WhatsApp contact directory — synced phone ↔ lid ↔ name reference for CRM staff. #}
 {# Used by: workforce.crm_views.crm_contacts #}
 {# Notes: crmc__ rows reuse crm__ table shell; directory is refreshed by the inbox Resync button (Celery task). #}
+{#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260718k" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260807j" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -33,8 +34,17 @@
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-table-columns"></i> Board
         </a>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_crm_contacts_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
       </div>
     </div>
+
+    <div class="wfnote" id="workforce_crm_contacts_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_contacts_card_notes' %}" hidden></div>
 
     <!-- TOOLBAR -->
     <div class="crm__toolbar">
@@ -53,7 +63,9 @@
                  hx-include="#workforce_crm_contacts_form_filter">
         </div>
         {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
-        <button type="submit" class="crm__btn crm__btn--primary">Search</button>
+        <button type="submit" class="crm__btn crm__btn--ink">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Search
+        </button>
       </form>
     </div>
 
@@ -90,7 +102,11 @@
               {% endif %}
             </td>
             <td class="crm__num">+{{ c.phone }}</td>
-            <td class="crm__num">{% if c.lid %}<span class="crmi__lid">{{ c.lid }}@lid</span>{% else %}—{% endif %}</td>
+            <td class="crm__num">
+              {% if c.lid %}<span class="crmi__lid">{{ c.lid }}@lid</span>{% else %}—{% endif %}
+              {# A lid is device-relative — same person, different lid per number — so label the session or two rows look like duplicates. #}
+              {% if wa_multi_session %}<div class="crmi__lid">via {{ c.session }}</div>{% endif %}
+            </td>
             <td>
               {% if c.is_my_contact %}<span class="crm__chip">saved</span>{% endif %}
               {% if c.is_business %}<span class="crm__chip">business</span>{% endif %}

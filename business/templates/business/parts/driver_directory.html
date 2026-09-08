@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% block content %}
 <div class="bdd" id="business_driver_directory_container_main">
 
@@ -14,20 +15,13 @@
     </a>
   </div>
 
-  <!-- Hero Banner (desktop only) -->
-  <div class="bdd__hero d-none d-md-flex">
-    <div class="d-flex align-items-center gap-3">
-      <div class="bdd__hero-icon">
-        <i class="fa-solid fa-address-book"></i>
-      </div>
-      <div>
-        <h1 class="bdd__hero-title">Driver Directory</h1>
-        <p class="bdd__hero-sub">Manage your fleet driver contacts</p>
-      </div>
-    </div>
-    <a href="{% url 'fleet:fleets' %}" class="bdd__hero-action">
-      <i class="fa-solid fa-magnifying-glass"></i> Search Drivers
-    </a>
+  <!-- Page header (desktop only — the mobile PWA uses the top bar above) -->
+  <div class="d-none d-md-block">
+    {% bconheader eyebrow="Fleet" live="Directory" icon="fa-solid fa-address-book" title="Driver Directory" subtitle="Manage your fleet driver contacts." %}
+      <a href="{% url 'fleet:fleets' %}" class="bcon__btn bcon__btn--secondary">
+        <i class="fa-solid fa-magnifying-glass"></i> Search Drivers
+      </a>
+    {% endbconheader %}
   </div>
 
   <!-- Driver Table Card -->
@@ -36,7 +30,7 @@
       <i class="fa-solid fa-users"></i>
       <span>DRIVER CONTACTS</span>
       {% if contacts %}
-        <span class="bdd__badge bdd__badge--info ms-auto">{{ contacts|length }} driver{{ contacts|length|pluralize }}</span>
+        <span class="bdd__badge bdd__badge--info ms-auto">{{ contacts_total }} driver{{ contacts_total|pluralize }}</span>
       {% endif %}
     </div>
 
@@ -107,6 +101,7 @@
         </tbody>
       </table>
     </div>
+    {% include "includes/components/_pagination.html" with page_obj=contacts_page per_page=per_page pagination_id="driver_directory" variant="compact" show_goto="false" %}
     {% else %}
     <!-- Empty State -->
     <div class="bdd__empty">

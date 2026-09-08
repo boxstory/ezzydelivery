@@ -68,9 +68,7 @@
           <span class="odp__route-addr">{{ order.pickup_location.locality }}</span>
           {% endif %}
           {% if order.pickup_location.pickup_lat and order.pickup_location.pickup_lon %}
-          <a href="https://www.google.com/maps?q={{ order.pickup_location.pickup_lat }},{{ order.pickup_location.pickup_lon }}" target="_blank" class="odp__route-map-link" hx-boost="false">
-            <i class="fa-solid fa-location-pin"></i> Pin
-          </a>
+          {% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-pick" lat=order.pickup_location.pickup_lat lon=order.pickup_location.pickup_lon label="Pickup location" btn_label="Pin" size="sm" %}
           {% elif order.pickup_location.locality %}
           <a href="https://maps.google.com/?q={{ order.pickup_location.locality|urlencode }}" target="_blank" class="odp__route-map-link" hx-boost="false">
             <i class="fa-solid fa-location-pin"></i> Pin
@@ -116,9 +114,13 @@
             <div class="odt__field odt__field--compact odt__field--compact-wide">
               <span class="odt__field__label"><i class="fa-solid fa-crosshairs fa-xs"></i> Lat / Lng</span>
               <span class="odt__field__value odt__field__value--mono">
-                <a href="https://maps.google.com/?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="odt__link" hx-boost="false">
-                  {{ order.latitude|floatformat:6 }}, {{ order.longitude|floatformat:6 }}
-                </a>
+                {% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-odp" lat=order.latitude lon=order.longitude label="Delivery location" text=order.latitude|floatformat:6|add:", "|add:order.longitude|floatformat:6 size="sm" %}
+              </span>
+            </div>
+            <div class="odt__field odt__field--compact">
+              <span class="odt__field__label"><i class="fa-solid fa-route fa-xs"></i> Distance</span>
+              <span class="odt__field__value">
+                {% include "includes/components/_route_distance.html" with order=order %}
               </span>
             </div>
             {% if order.coords_accuracy %}

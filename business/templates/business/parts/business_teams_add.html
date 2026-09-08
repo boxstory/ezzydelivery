@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
@@ -18,15 +19,12 @@
     </div>
 
     <!-- Header (desktop only) -->
-    <div class="bta__header d-none d-md-flex" id="client_teams_add_section_header">
-        <h1 class="bta__title" id="client_teams_add_title_form">
-            <i class="fa-solid fa-user-plus"></i>
-            {{ form_title|default:"Add Team Member" }}
-        </h1>
-        <a href="{% url 'business:business_teams' business.business_id %}" class="bta__back-link">
-            <i class="fa-solid fa-arrow-left"></i>
-            Back to Team
-        </a>
+    <div class="d-none d-md-block" id="client_teams_add_section_header">
+        {% bconheader eyebrow="Business" live="Team" icon="fa-solid fa-user-plus" title=form_title|default:"Add Team Member" subtitle="Invite a colleague and set what they can access." %}
+            <a href="{% url 'business:business_teams' business.business_id %}" class="bcon__btn bcon__btn--ghost">
+                <i class="fa-solid fa-arrow-left"></i> Back to Team
+            </a>
+        {% endbconheader %}
     </div>
 
     <!-- Join Request Banner -->

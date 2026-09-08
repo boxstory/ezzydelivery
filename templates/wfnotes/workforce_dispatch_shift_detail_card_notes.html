@@ -1,0 +1,85 @@
+{% comment %}
+Purpose: "About this page" notes panel for shift_detail.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_dispatch_shift_detail_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            One rider's stint at one store. A shift is what makes a rider eligible for that location's batches,
+            so this page answers two questions: was the rider actually available when we needed them, and what
+            did they carry while they were. The left column is the record of the shift itself, the table on the
+            right is every batch handed to them during it. The scored version of the same work — batching rate,
+            SLA, orders per hour — is on the KPI dashboard.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit</dt>
+                        <dd class="wfnote__def">Appears only while the shift is still <em>Scheduled</em> — change
+                            the planned hours or move the status. Once the rider has clocked in the button is
+                            gone.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Batch links</dt>
+                        <dd class="wfnote__def">Each batch code opens that batch: the orders inside, their SLA
+                            deadlines and the full activity log.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Performance</dt>
+                        <dd class="wfnote__def">The two counters on this shift — batches finished and orders
+                            delivered. They only move when a batch is <strong>completed</strong>.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the record</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Scheduled</dt>
+                        <dd class="wfnote__def">The hours planned when the shift was created. Nothing is judged
+                            against these except the automatic close at the end time.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Actual</dt>
+                        <dd class="wfnote__def">Stamped when the rider clocks in and out from the app. Blank
+                            means they never clocked in — which also means they were never offered a batch.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assigned</dt>
+                        <dd class="wfnote__def">When the batch was handed to the rider. From here the orders'
+                            delivery tasks sit with them as in-transit.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Completed</dt>
+                        <dd class="wfnote__def">When the rider closed the batch. A dash means the batch is still
+                            out, or was cancelled.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">COD</dt>
+                        <dd class="wfnote__def">Cash carried on that batch. A rider's COD headroom is checked
+                            before a batch with cash is given to them.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>The table lists batches <strong>tied to this shift</strong> — a batch assigned to the rider
+                    while no shift was active is not linked here and will not show up.</li>
+                <li>Working hours for KPI purposes come from actual start to actual end minus break minutes, not
+                    from the scheduled times. A shift with no clock-in contributes no hours and skews orders per
+                    hour.</li>
+                <li>Only <strong>completed</strong> shifts are picked up by the nightly KPI run — a shift stuck
+                    on Active never gets scored.</li>
+                <li>A batch of one order is a single delivery that failed to find a partner. Lots of those on a
+                    shift pull the rider's batching percentage down without being their fault.</li>
+                <li>Nothing on this page moves money. COD and driver earnings settle on the order and payout
+                    pages.</li>
+            </ul>
+        </section>
+    

@@ -62,6 +62,12 @@ class Conversation(models.Model):
         db_index=True,
         help_text='Phone number for WhatsApp conversations'
     )
+    external_id = models.CharField(
+        max_length=128,
+        blank=True,
+        db_index=True,
+        help_text='External session key from an integration (e.g. n8n session_id / WhatsApp number)'
+    )
 
     # Conversation state
     context = models.JSONField(

@@ -1,0 +1,117 @@
+{% comment %}
+Purpose: "About this page" notes panel for onedrive_sources.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_onedrive_sources_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Clients who keep their orders in an Excel file on OneDrive get a source row here. A source ties
+            one shared workbook to one business. Unlike the other import channels, OneDrive is worked
+            <strong>hands-on from this page</strong>: you open the workbook, pick a sheet, page through the
+            actual rows, tick the ones you want, map the columns, and import. Rows already imported are
+            remembered so the same line is not brought in twice.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Add source</dt>
+                        <dd class="wfnote__def">Business, a label to recognise it by, and the share link.
+                            Share the file as <em>anyone with the link</em> first, or we cannot open it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Browse</dt>
+                        <dd class="wfnote__def">Downloads the workbook and lists its sheets with row
+                            counts. The sheet used last time is starred and opens automatically, positioned
+                            near where the last import stopped. Disabled while the source is inactive.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Go to row</dt>
+                        <dd class="wfnote__def">Jumps the preview to a specific spreadsheet row number.
+                            Row 1 is always treated as the header.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Row ticks</dt>
+                        <dd class="wfnote__def">Choose exactly which rows to bring in. Rows already
+                            imported are highlighted, show their order number, and start unticked.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Map columns</dt>
+                        <dd class="wfnote__def">Point each spreadsheet column at one of our order fields.
+                            A saved mapping loads automatically; otherwise headers are matched by name as a
+                            starting guess.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Save mapping</dt>
+                        <dd class="wfnote__def">Stores the mapping against the source so the next import
+                            starts correct. <em>Reset</em> throws it away and guesses from the headers
+                            again.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Import</dt>
+                        <dd class="wfnote__def">Creates real orders from the ticked rows using the mapping
+                            on screen, after a verification step.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit / power / delete</dt>
+                        <dd class="wfnote__def">Change the label or link, park a source without deleting
+                            it, or remove it entirely.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Import history</dt>
+                        <dd class="wfnote__def">The header link opens the log filtered to OneDrive runs,
+                            with the raw rows and errors of each one.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading a row</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Status</dt>
+                        <dd class="wfnote__def"><em>Active</em> can be browsed and imported;
+                            <em>Inactive</em> is parked and its Browse button is disabled.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Last import</dt>
+                        <dd class="wfnote__def">When the source was last imported, how many orders it
+                            produced and who ran it. <em>Never</em> means it has not been used yet.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Required columns</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Must map</dt>
+                        <dd class="wfnote__def">Customer name, phone and address. The import refuses to run
+                            until all three are pointed at a column.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Worth mapping</dt>
+                        <dd class="wfnote__def">Order ID, zone, street, building, COD amount, product and
+                            quantity, notes and a location link — anything left unmapped simply arrives
+                            empty on the order.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Browse reads the workbook <strong>live</strong> every time. A client editing the file
+                    while you work means the preview and the import can disagree — re-browse before
+                    importing anything sensitive.</li>
+                <li>The already-imported marks are matched by spreadsheet <strong>row number</strong>. If
+                    the client inserts or deletes rows above, those marks shift and previously imported
+                    lines can look new.</li>
+                <li>Import creates real orders straight away — there is no staging step and no undo from
+                    this page.</li>
+                <li>Deleting a source removes the connection, not the orders already imported from it.</li>
+                <li>A saved mapping belongs to the source, not the sheet. Switching to a differently laid
+                    out sheet in the same workbook means checking the mapping again.</li>
+            </ul>
+        </section>
+    

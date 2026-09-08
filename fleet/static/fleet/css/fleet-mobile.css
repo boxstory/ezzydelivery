@@ -2495,14 +2495,21 @@ a.task-filter:hover:not(.task-filter--active) {
   border-color: #001f3f;
 }
 
+/* row-reverse puts the checkbox on the right without a float, so Bootstrap's own
+   float/negative-margin on .form-check-input is inert (floats do not apply to flex
+   items) and the label no longer needs a hand-tuned padding gutter. */
 .zone-group-card .form-check {
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-start;
+  gap: 15px;
 }
 
 .zone-group-card .form-check-input {
-  float: right;
-  margin-top: 8px;
+  flex: 0 0 auto;
+  margin: 8px 0 0;
   width: 20px;
   height: 20px;
 }
@@ -2513,9 +2520,8 @@ a.task-filter:hover:not(.task-filter--active) {
 }
 
 .zone-group-card .form-check-label {
-  display: block;
+  flex: 1 1 auto;
   cursor: pointer;
-  padding-right: 35px;
 }
 
 .zone-group-name {

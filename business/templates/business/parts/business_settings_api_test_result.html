@@ -1,192 +1,97 @@
-{% load static %}
+{# Purpose: HTMX result partial for the connection test — status line, per-call probe rows, and remedy steps. #}
+{# Used by: business/views.py business_settings_api_test_result, swapped into #api-response-div on business_settings_api_test.html. #}
+{# Notes: `succeeded` on the data div drives the header run-state badge. The status code comes from the server, never re-derived in JS. #}
 
-<!-- API Status Data for JavaScript -->
-<div id="api-test-status-data" class="d-none" data-status="{{ status }}" data-api-type="{{ api.api_type }}"></div>
+<div id="api-test-status-data" class="d-none"
+     data-status="{{ status }}"
+     data-api-type="{{ api.api_type }}"
+     data-succeeded="{% if succeeded %}true{% else %}false{% endif %}"></div>
 
-<div class="bapi__result-card">
-    <div class="bapi__result-header">
-        <h3>
-            <i class="fa-solid fa-chart-simple"></i>
-            Test Results
-        </h3>
-        <span class="bapi__result-time">
-            <i class="fa-regular fa-clock"></i>
-            {{ update_time }}
-        </span>
-    </div>
-    <div class="bapi__result-body">
-        <!-- Stats Grid -->
-        <div class="bapi__result-grid">
-            <div class="bapi__result-item">
-                <div class="bapi__result-label">API Provider</div>
-                <div class="bapi__result-value bapi__result-value--highlight">{{ api.api_type|upper }}</div>
-            </div>
-            <div class="bapi__result-item">
-                <div class="bapi__result-label">HTTP Status</div>
-                <div class="bapi__result-value">{{ status }}</div>
-            </div>
-            <div class="bapi__result-item">
-                <div class="bapi__result-label">{% if api.api_type == 'google_sheet' %}Data Rows{% else %}Orders Found{% endif %}</div>
-                <div class="bapi__result-value">{{ order_count|default:"0" }}</div>
-            </div>
-            <div class="bapi__result-item">
-                <div class="bapi__result-label">{% if api.api_type == 'google_sheet' %}Sheets Found{% else %}Products Found{% endif %}</div>
-                <div class="bapi__result-value">{{ product_count|default:"0" }}</div>
-            </div>
-        </div>
-
-        <!-- Google Sheets breakdown -->
-        {% if sheets_info %}
-        <div class="bapi__sheets-list mt-3">
-            <table class="table table-sm table-bordered mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th><i class="fa-solid fa-table-cells me-1"></i>Sheet Name</th>
-                        <th class="text-end">Rows</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for sheet in sheets_info %}
-                    <tr>
-                        <td>{{ sheet.name }}</td>
-                        <td class="text-end">{{ sheet.rows }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-
-        <!-- Status Section -->
-        {% if status == 200 %}
-        <div class="bapi__status-section bapi__status-section--success">
-            <div class="bapi__status-icon">
-                <i class="fa-solid fa-check"></i>
-            </div>
-            <div class="bapi__status-content">
-                <h4>Connection Successful</h4>
-                <p>Your API credentials are working correctly. Orders and products can be synced.</p>
-            </div>
-        </div>
-        {% elif status == 401 %}
-        <div class="bapi__status-section bapi__status-section--error">
-            <div class="bapi__status-icon">
-                <i class="fa-solid fa-lock"></i>
-            </div>
-            <div class="bapi__status-content">
-                <h4>Authentication Failed (401)</h4>
-                <p>Invalid API credentials. Please check your API key and access token.</p>
-            </div>
-        </div>
-        <!-- Guide for 401 -->
-        <div class="bapi__guide-box">
-            <div class="bapi__guide-header">
-                <i class="fa-solid fa-lightbulb"></i>
-                <span>How to Fix</span>
-            </div>
-            <ol class="bapi__guide-list">
-                <li><strong>Verify API Key:</strong> Go to your {{ api.api_type|title }} admin panel and copy your API key again</li>
-                <li><strong>Check Access Token:</strong> Ensure your access token has not expired or been revoked</li>
-                <li><strong>Permissions:</strong> Make sure the API credentials have <code>read_orders</code> and <code>read_products</code> permissions</li>
-                <li><strong>Update Settings:</strong> Click "Edit API Settings" to update your credentials</li>
-            </ol>
-        </div>
-        {% elif status == 403 %}
-        <div class="bapi__status-section bapi__status-section--error">
-            <div class="bapi__status-icon">
-                <i class="fa-solid fa-ban"></i>
-            </div>
-            <div class="bapi__status-content">
-                <h4>Access Forbidden (403)</h4>
-                <p>Your API key doesn't have permission to access this resource.</p>
-            </div>
-        </div>
-        <div class="bapi__guide-box">
-            <div class="bapi__guide-header">
-                <i class="fa-solid fa-lightbulb"></i>
-                <span>How to Fix</span>
-            </div>
-            <ol class="bapi__guide-list">
-                <li><strong>Check Scopes:</strong> Your API key needs <code>read_orders</code> and <code>read_products</code> scopes</li>
-                <li><strong>Regenerate Key:</strong> Create a new API key with the correct permissions in {{ api.api_type|title }}</li>
-                <li><strong>Store Access:</strong> Ensure the API key has access to this specific store</li>
-            </ol>
-        </div>
-        {% elif status == 404 %}
-        <div class="bapi__status-section bapi__status-section--warning">
-            <div class="bapi__status-icon">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-            </div>
-            <div class="bapi__status-content">
-                <h4>Endpoint Not Found (404)</h4>
-                <p>The API endpoint URL may be incorrect or the store doesn't exist.</p>
-            </div>
-        </div>
-        <div class="bapi__guide-box">
-            <div class="bapi__guide-header">
-                <i class="fa-solid fa-lightbulb"></i>
-                <span>How to Fix</span>
-            </div>
-            <ol class="bapi__guide-list">
-                <li><strong>Check Store URL:</strong> Verify your store URL is correct (e.g., <code>mystore.myshopify.com</code>)</li>
-                <li><strong>API Endpoints:</strong> Ensure order and product endpoints are correctly configured</li>
-                <li><strong>API Version:</strong> The API version may have changed - update to the latest version</li>
-            </ol>
-        </div>
-        {% elif status >= 500 %}
-        <div class="bapi__status-section bapi__status-section--error">
-            <div class="bapi__status-icon">
-                <i class="fa-solid fa-server"></i>
-            </div>
-            <div class="bapi__status-content">
-                <h4>Server Error ({{ status }})</h4>
-                <p>The {{ api.api_type|title }} server encountered an error. This is usually temporary.</p>
-            </div>
-        </div>
-        <div class="bapi__guide-box">
-            <div class="bapi__guide-header">
-                <i class="fa-solid fa-lightbulb"></i>
-                <span>How to Fix</span>
-            </div>
-            <ol class="bapi__guide-list">
-                <li><strong>Wait & Retry:</strong> Server errors are often temporary - try again in a few minutes</li>
-                <li><strong>Check Status:</strong> Visit {{ api.api_type|title }}'s status page for any ongoing issues</li>
-                <li><strong>Contact Support:</strong> If the issue persists, contact {{ api.api_type|title }} support</li>
-            </ol>
-        </div>
-        {% elif error_message %}
-        <div class="bapi__status-section bapi__status-section--error">
-            <div class="bapi__status-icon">
-                <i class="fa-solid fa-circle-exclamation"></i>
-            </div>
-            <div class="bapi__status-content">
-                <h4>Test Failed</h4>
-                <p>{{ error_message }}</p>
-            </div>
-        </div>
-        {% else %}
-        <div class="bapi__status-section bapi__status-section--error">
-            <div class="bapi__status-icon">
-                <i class="fa-solid fa-circle-exclamation"></i>
-            </div>
-            <div class="bapi__status-content">
-                <h4>Connection Issue ({{ status }})</h4>
-                <p>Unable to connect to the API. Please check your configuration.</p>
-            </div>
-        </div>
-        <div class="bapi__guide-box">
-            <div class="bapi__guide-header">
-                <i class="fa-solid fa-lightbulb"></i>
-                <span>How to Fix</span>
-            </div>
-            <ol class="bapi__guide-list">
-                <li><strong>Verify Store URL:</strong> Make sure your store URL is correct and accessible</li>
-                <li><strong>Check Credentials:</strong> Ensure API key, access token, and secret are all correct</li>
-                <li><strong>API Endpoints:</strong> Verify the order and product endpoint paths</li>
-                <li><strong>Contact Admin:</strong> If issues persist, contact our support team for assistance</li>
-            </ol>
-        </div>
-        {% endif %}
-    </div>
+{# The code the server actually returned, at size — the one thing worth reading first. #}
+<div class="bapi__statusline {% if succeeded %}bapi__statusline--ok{% elif status == 404 %}bapi__statusline--warn{% elif status %}bapi__statusline--error{% else %}bapi__statusline--none{% endif %}">
+  <span class="bapi__statusline-code">{% if status %}{{ status }}{% else %}n/a{% endif %}</span>
+  <div class="bapi__statusline-main">
+    <p class="bapi__statusline-text">
+      {% if succeeded %}Connection working
+      {% elif status == 401 %}Credentials rejected
+      {% elif status == 403 %}Access forbidden
+      {% elif status == 404 %}Endpoint not found
+      {% elif status >= 500 %}{{ api.api_type|title }} server error
+      {% else %}Could not reach the store{% endif %}
+    </p>
+    {# Only worth showing when there is no code to name the cause — otherwise the code and title already say it. #}
+    {% if not status and error_message %}
+    <p class="bapi__statusline-detail">{{ error_message }}</p>
+    {% endif %}
+    <p class="bapi__statusline-meta">
+      {{ api.api_type }}
+      {% if target_host %} · {{ target_host }}{% endif %}
+      {% if total_ms %} · {{ total_ms }} ms{% endif %}
+      · {{ update_time }}
+    </p>
+  </div>
 </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+
+{# One row per call the test made, so a partial failure names the leg that broke. #}
+{% if probes %}
+<ol class="bapi__probes">
+  {% for probe in probes %}
+  <li class="bapi__probe {% if not probe.status %}{% elif probe.status >= 200 and probe.status < 300 %}bapi__probe--ok{% elif probe.status == 404 %}bapi__probe--warn{% else %}bapi__probe--error{% endif %}">
+    <span class="bapi__probe-name">{{ probe.label }}</span>
+    <code class="bapi__probe-path">{{ probe.path }}</code>
+    {% if probe.detail %}<span class="bapi__probe-detail">{{ probe.detail }}</span>{% endif %}
+    <span class="bapi__probe-status">{% if probe.status %}{{ probe.status }}{% else %}—{% endif %}</span>
+    <span class="bapi__probe-ms">{% if probe.ms %}{{ probe.ms }} ms{% endif %}</span>
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}
+
+{% if sheets_info %}
+<div class="bapi__sheets">
+  <table>
+    <thead>
+      <tr><th>Sheet</th><th class="num">Rows</th></tr>
+    </thead>
+    <tbody>
+      {% for sheet in sheets_info %}
+      <tr><td>{{ sheet.name }}</td><td class="num">{{ sheet.rows }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if not succeeded %}
+<div class="bapi__fix">
+  <div class="bapi__fix-head">
+    <i class="fa-solid fa-screwdriver-wrench"></i>
+    How to fix
+  </div>
+  <ol class="bapi__fix-list">
+    {% if status == 401 %}
+    <li><strong>Check the access token.</strong> On Shopify it starts with <code>shpat_</code> — the API secret (<code>shpss_</code>) will not work here.</li>
+    <li><strong>Finish the OAuth step.</strong> Saving credentials does not connect the store; open the integration and press Connect with Shopify.</li>
+    <li><strong>Confirm the token is still valid.</strong> Uninstalling or reinstalling the app in your store revokes it.</li>
+    <li><strong>Re-enter it.</strong> Use Edit settings to paste a fresh token, then run the test again.</li>
+    {% elif status == 403 %}
+    <li><strong>Grant the read scopes.</strong> The credentials need <code>read_orders</code> and <code>read_products</code> at minimum.</li>
+    <li><strong>Reinstall after changing scopes.</strong> Scope changes only take effect once the app is reinstalled.</li>
+    <li><strong>Check the key belongs to this store.</strong> A key from another store returns 403 against this one.</li>
+    {% elif status == 404 %}
+    <li><strong>Check the store URL.</strong> Shopify needs the permanent <code>.myshopify.com</code> handle, not your customer-facing domain.</li>
+    <li><strong>Check the endpoint paths.</strong> They should look like <code>/admin/api/2024-01/orders.json</code>.</li>
+    <li><strong>Check the API version.</strong> Shopify retires versions; move to a current one if yours is old.</li>
+    {% elif status >= 500 %}
+    <li><strong>Try again in a few minutes.</strong> Server errors on the store's side are usually brief.</li>
+    <li><strong>Check the platform status page.</strong> A wider outage will show up there.</li>
+    <li><strong>Contact us</strong> if it keeps failing for more than an hour.</li>
+    {% else %}
+    <li><strong>Check the store URL.</strong> It must be reachable over HTTPS from the public internet.</li>
+    <li><strong>Check every credential.</strong> Key, secret, and access token all have to be present and current.</li>
+    <li><strong>Check the endpoint paths</strong> on the integration's settings.</li>
+    <li><strong>Contact us</strong> with the status line above if none of that helps.</li>
+    {% endif %}
+  </ol>
+</div>
+{% endif %}

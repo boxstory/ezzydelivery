@@ -1,30 +1,19 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block head_title %}Tracking Page Settings{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="container-fluid biz-dash__page">
   <div class="row justify-content-center">
     <div class="col-12 col-lg-8">
 
-      <!-- Page Header -->
-      <div class="bcon__header mb-4">
-        <div class="bcon__header-main">
-          <div class="bcon__eyebrow">
-            <span>Settings</span>
-            <span class="bcon__eyebrow-sep"></span>
-            <span class="bcon__eyebrow-live">Tracking Page</span>
-          </div>
-          <h1 class="bcon__title"><i class="fa-solid fa-palette"></i> Tracking Page Settings</h1>
-          <p class="bcon__subtitle">Customize the branded tracking page your customers see when they track their orders.</p>
-        </div>
+      {% bconheader eyebrow="Settings" live="Tracking Page" icon="fa-solid fa-palette" title="Tracking Page Settings" subtitle="Customize the branded tracking page your customers see when they track their orders." %}
         {% if sample_url %}
-        <div class="bcon__actions">
-          <a href="{{ sample_url }}" target="_blank" class="bcon__btn bcon__btn--secondary"><i class="fa-solid fa-external-link-alt"></i> Preview</a>
-        </div>
+        <a href="{{ sample_url }}" target="_blank" class="bcon__btn bcon__btn--secondary"><i class="fa-solid fa-external-link-alt"></i> Preview</a>
         {% endif %}
-      </div>
+      {% endbconheader %}
 
       {% if messages %}
       {% for message in messages %}

@@ -1,5 +1,5 @@
 {% extends "business_dashboard_base.html" %}
-{% load static %}
+{% load static business_console %}
 
 {% block title %}Finance Dashboard{% endblock %}
 
@@ -63,6 +63,9 @@
     <a href="{% url 'business:business_transactions' %}" class="pwa-quick-link pwa-quick-link--outline">
       <i class="fas fa-list"></i> Transactions
     </a>
+    <a href="{% url 'business:business_charge_invoices' %}" class="pwa-quick-link pwa-quick-link--outline">
+      <i class="fas fa-file-invoice"></i> Invoices
+    </a>
   </div>
 
   <!-- Billing summary card -->
@@ -120,31 +123,22 @@
      Desktop View (visible >= 768px only)
      ========================================== -->
 <div class="d-none d-md-block" id="finance_desktop_view">
-<div class="bcon__page pt-3">
+<div class="bcon__page">
 
   <!-- Page header -->
-  <div class="bcon__header">
-    <div class="bcon__header-main">
-      <div class="bcon__eyebrow">
-        <span>{{ business.business_name|truncatechars:22 }}</span>
-        <span class="bcon__eyebrow-sep"></span>
-        <span>Finance</span>
-        <span class="bcon__eyebrow-sep"></span>
-        <span class="bcon__eyebrow-live">Last {{ selected_days }} days</span>
-      </div>
-      <h1 class="bcon__title"><i class="fa-solid fa-chart-pie"></i> Finance Overview</h1>
-    </div>
-    <div class="bcon__actions">
-      <form method="GET">
-        <select name="days" class="form-select form-select-sm" onchange="this.form.submit()">
-          <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
-          <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
-          <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
-          <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
-        </select>
-      </form>
-    </div>
-  </div>
+  {# stringformat first: `add` returns "" when asked to concat a str with an int. #}
+  {% with days_str=selected_days|stringformat:"s" %}{% with period="Last "|add:days_str|add:" days" %}
+  {% bconheader eyebrow="Finance" live=period icon="fa-solid fa-chart-pie" title="Finance Overview" subtitle=business.business_name %}
+    <form method="GET">
+      <select name="days" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+        <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+        <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+        <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+      </select>
+    </form>
+  {% endbconheader %}
+  {% endwith %}{% endwith %}
 </div>
 
 <!-- KPI Plates -->
@@ -179,7 +173,12 @@
       <span class="bcon__plate-icon bcon__plate-icon--success"><i class="fa-solid fa-handshake"></i></span>
     </div>
     <p class="bcon__plate-value">{{ cod_client_settled|floatformat:0 }} <small>QAR</small></p>
-    <p class="bcon__plate-foot">{{ cod_stats.settled_count|default:0 }} orders settled</p>
+    {% comment %} The plate is the cash transferred. Charges withheld at payout are named here
+       rather than repeated under Service Charges, where they read as still owed. {% endcomment %}
+    <p class="bcon__plate-foot">
+      {{ cod_stats.settled_count|default:0 }} orders settled{% if cod_client_deductions %} ·
+      {{ cod_client_gross|floatformat:0 }} released less {{ cod_client_deductions|floatformat:0 }} charges{% endif %}
+    </p>
   </div>
 </div>
 
@@ -287,6 +286,7 @@
   <div class="bcon__actions mt-3">
     <a href="{% url 'business:business_transactions' %}" class="bcon__btn bcon__btn--secondary"><i class="fas fa-list"></i> All Transactions</a>
     <a href="{% url 'business:business_cod_statement' %}" class="bcon__btn bcon__btn--secondary"><i class="fas fa-money-bill"></i> COD Statement</a>
+    <a href="{% url 'business:business_charge_invoices' %}" class="bcon__btn bcon__btn--secondary"><i class="fas fa-file-invoice"></i> Invoices{% if invoice_unpaid_count %} ({{ invoice_unpaid_count }}){% endif %}</a>
   </div>
 </div>
 </div><!-- end desktop view -->

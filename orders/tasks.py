@@ -211,6 +211,20 @@ def sync_all_temp_orders(self, source_type=None, source_id=None):
 sync_onedrive_temp_orders = sync_all_temp_orders
 
 
+def _stamp_source_sync(source, row_count=0):
+    """Record a real last-sync time on the source row.
+
+    Called only after a source has actually been fetched successfully.
+    TempOrder.synced_at cannot be used for this: it is auto_now, so it moves
+    whenever any row is edited or marked imported by staff.
+    """
+    from django.utils import timezone
+
+    source.last_sync_at = timezone.now()
+    source.last_sync_count = row_count or 0
+    source.save(update_fields=['last_sync_at', 'last_sync_count'])
+
+
 # =============================================================================
 # OneDrive sync
 # =============================================================================
@@ -488,6 +502,8 @@ def _sync_onedrive_source(source):
     _enforce_temp_order_limit({
         'source_type': 'onedrive', 'onedrive_source': source,
     })
+
+    _stamp_source_sync(source, len(seen_row_nums))
 
     return created, updated
 
@@ -801,6 +817,8 @@ def _sync_google_sheet_source(api_settings):
         'sheet_name': worksheet.title,
     })
 
+    _stamp_source_sync(api_settings, len(seen_row_nums))
+
     return created, updated
 
 
@@ -829,6 +847,56 @@ def _sync_all_api(api_type, api_settings_id=None):
     return total_c, total_u, errors
 
 
+def _pick(row, *keys, limit=None):
+    """First non-empty value among `keys`, stringified, trimmed and length-capped
+    to the TempOrder column width."""
+    for k in keys:
+        val = row.get(k)
+        if val in (None, ''):
+            continue
+        text = str(val).strip()
+        if text:
+            return text[:limit] if limit else text
+    return ''
+
+
+def _api_row_to_temp_defaults(row, business, api_type):
+    """Denormalized TempOrder columns for one Shopify/Woo row-dict.
+
+    Single source of truth for the full sync (`_sync_api_source`) and the per-row
+    refetch (`workforce.views._apply_api_row_to_temp_order`). Those two were
+    hand-written separately once and drifted: the refetch read only the legacy
+    flat keys, so every auto-import of a billing-only Shopify store silently
+    blanked the mapped address and phone microseconds before creating the Order.
+    Both callers go through here now so they cannot diverge again.
+
+    Coerce every mapped field to '' — TempOrder string columns are NOT NULL, and
+    source feeds (e.g. Shopify shipping_address.phone) deliver an explicit None
+    that .get(key, '') does NOT replace. db-field keys come first: they are what
+    the business's saved mapping produced, and they fall back to the legacy flat
+    keys for rows from a feed that has no mapping.
+    """
+    fin_status = str(row.get('financial_status') or '').lower()
+    return {
+        'business': business,
+        'source_type': api_type,
+        'client_order_code': _pick(row, 'client_order_code', 'order_id', 'platform_id', limit=100),
+        'customer_name': _pick(row, 'customer_name', 'customer', 'name', limit=200),
+        'customer_phone': _pick(row, 'customer_phone', 'phone', limit=100),
+        'customer_address': _pick(row, 'customer_address', 'address', limit=500),
+        'dl_zone': _pick(row, 'dl_zone', limit=100),
+        'dl_street': _pick(row, 'dl_street', limit=100),
+        'dl_building': _pick(row, 'dl_building', limit=100),
+        # Paid orders carry no COD regardless of what the mapping says — the
+        # money already moved through the store's gateway.
+        'cod_amount': '' if fin_status == 'paid' else _pick(row, 'cod_amount', 'cod', limit=50),
+        'order_date': _convert_excel_date(row.get('order_date') or row.get('date', '')) or '',
+        'package_desc': _pick(row, 'package_desc', limit=500),
+        'financial_status': _pick(row, 'financial_status', limit=50),
+        'raw_row': row,
+    }
+
+
 def _sync_api_source(api_settings):
     """Fetch orders from Shopify/WooCommerce and upsert into TempOrder."""
     from orders.models import TempOrder, Order
@@ -843,6 +911,8 @@ def _sync_api_source(api_settings):
         live_orders = _fetch_woocommerce_orders(api_settings)
 
     if not live_orders:
+        # Fetch succeeded, store just had nothing new — still a real sync.
+        _stamp_source_sync(api_settings, 0)
         return 0, 0
 
     existing = {
@@ -870,23 +940,8 @@ def _sync_api_source(api_settings):
         already_imported = pid in imported_pids
         status = 'imported' if already_imported else 'new'
 
-        # Coerce every mapped field to '' — TempOrder string columns are NOT
-        # NULL, and source feeds (e.g. Shopify shipping_address.phone) deliver
-        # an explicit None that .get(key, '') does NOT replace.
-        defaults = {
-            'business': business,
-            'source_type': api_type,
-            'client_order_code': o.get('order_id') or o.get('platform_id') or '',
-            'customer_name': o.get('customer') or o.get('name') or '',
-            'customer_phone': o.get('phone') or '',
-            'customer_address': o.get('address') or '',
-            'cod_amount': str(o.get('cod', '')) if o.get('cod') else '',
-            'order_date': _convert_excel_date(o.get('date', '')) or '',
-            'package_desc': o.get('package_desc') or '',
-            'financial_status': o.get('financial_status') or '',
-            'raw_row': o,
-            'status': status,
-        }
+        defaults = _api_row_to_temp_defaults(o, business, api_type)
+        defaults['status'] = status
 
         if pid in existing:
             temp_order = existing[pid]
@@ -918,11 +973,43 @@ def _sync_api_source(api_settings):
         'source_type': api_type, 'api_settings': api_settings,
     })
 
+    _stamp_source_sync(api_settings, len(seen_pids))
+
     return created, updated
 
 
-def _shopify_order_to_row(o):
-    """Convert a Shopify Order resource into the row-dict shape used by TempOrder.raw_row."""
+def _business_mapping(api_settings, platform=None):
+    """The business's saved column mapping for a platform, or {} when none is set.
+
+    Defaults to the source's own api_type so Shopify and WooCommerce share one
+    lookup — a legacy flat mapping (no per-platform nesting) is not returned,
+    because it was written against a different column vocabulary.
+    """
+    raw = (getattr(api_settings.business, 'import_mapping', None) or {})
+    nested_keys = ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link')
+    if any(k in raw for k in nested_keys):
+        return raw.get(platform or api_settings.api_type) or {}
+    return {}
+
+
+# raw_row keys the sync depends on structurally — a mapping must never overwrite them.
+_RESERVED_ROW_KEYS = {'platform_id', 'source', 'line_items'}
+
+
+def _shopify_order_to_row(o, mapping=None):
+    """Convert a Shopify Order resource into the row-dict shape used by TempOrder.raw_row.
+
+    Emits three overlapping key sets so one row serves every reader:
+      * legacy flat keys ('name', 'phone', 'address', …) — what rows synced before
+        mapping support look like, still read as a fallback
+      * the full Shopify virtual columns ('address.phone', 'billing.latitude', …),
+        identical to what the Mapping Manager offers in its dropdown
+      * db-field keys ('customer_phone', 'dl_latitude', …) produced by applying the
+        business's saved Shopify mapping to those virtual columns
+
+    The db-field keys are what make the Mapping Manager actually drive this sync:
+    change the mapping, re-sync, and the temp orders follow.
+    """
     ship = getattr(o, 'shipping_address', None)
     line_items = getattr(o, 'line_items', []) or []
     items_data = []
@@ -937,10 +1024,15 @@ def _shopify_order_to_row(o):
             'price': li.price,
             'sku': getattr(li, 'sku', '') or '',
         })
+    # Shipping address if the order has one, else billing — the same rule the
+    # address.* virtual columns use. Plenty of stores ship from the billing
+    # address only, and a shipping-only fallback leaves these keys empty for
+    # every one of their orders.
+    addr = ship or getattr(o, 'billing_address', None)
     customer_name = ''
-    if ship:
-        first = getattr(ship, 'first_name', '') or ''
-        last = getattr(ship, 'last_name', '') or ''
+    if addr:
+        first = getattr(addr, 'first_name', '') or ''
+        last = getattr(addr, 'last_name', '') or ''
         customer_name = f"{first} {last}".strip()
     if not customer_name:
         cust = getattr(o, 'customer', None)
@@ -954,11 +1046,11 @@ def _shopify_order_to_row(o):
         'order_id': o.name,
         'name': customer_name or (getattr(o, 'contact_email', '') or ''),
         'customer': customer_name or (getattr(o, 'contact_email', '') or ''),
-        'phone': (getattr(ship, 'phone', '') or '') if ship else '',
+        'phone': (getattr(addr, 'phone', '') or '') if addr else '',
         'address': ', '.join(filter(None, [
-            getattr(ship, 'address1', '') or '',
-            getattr(ship, 'address2', '') or '',
-        ])) if ship else '',
+            getattr(addr, 'address1', '') or '',
+            getattr(addr, 'address2', '') or '',
+        ])) if addr else '',
         'cod': '' if fin_status == 'paid' else o.total_price,
         'total_price': o.total_price,
         'date': o.created_at,
@@ -972,6 +1064,22 @@ def _shopify_order_to_row(o):
     desc_parts = [f"{it['name']} x{it['qty']}" for it in items_data]
     row['package_desc'] = ', '.join(desc_parts)
     row['package_qty'] = str(sum(it['qty'] for it in items_data))
+
+    # Imported lazily: workforce.views imports orders models, so a module-level
+    # import here would be circular.
+    from workforce.views import _shopify_extract_row, _resolve_mapping_value
+
+    virtual = _shopify_extract_row(o, str(getattr(o, 'id', '')))
+    row.update({k: v for k, v in virtual.items() if k not in _RESERVED_ROW_KEYS})
+
+    for db_field, src_col in (mapping or {}).items():
+        if not db_field or db_field.startswith('_') or not src_col:
+            continue
+        if db_field in _RESERVED_ROW_KEYS:
+            continue
+        val = _resolve_mapping_value(src_col, virtual)
+        if val:
+            row[db_field] = val
     return row
 
 
@@ -987,9 +1095,10 @@ def _shopify_activate(api_settings):
 
 def _fetch_shopify_orders(api_settings):
     shopify = _shopify_activate(api_settings)
+    mapping = _business_mapping(api_settings)
     try:
         orders = shopify.Order.find(limit=50, status='any')
-        return [_shopify_order_to_row(o) for o in orders]
+        return [_shopify_order_to_row(o, mapping) for o in orders]
     finally:
         shopify.ShopifyResource.clear_session()
 
@@ -999,8 +1108,13 @@ def _fetch_single_shopify_order(api_settings, platform_id):
 
     Used by the per-row Resync flow to refresh a single TempOrder without
     paginating the entire order list. Works for orders outside the recent 50.
+
+    Must apply the business mapping exactly like the full sync does — a row
+    built without it carries no db-field keys, and the caller then writes the
+    empty legacy fallbacks over good data.
     """
     shopify = _shopify_activate(api_settings)
+    mapping = _business_mapping(api_settings)
     try:
         try:
             o = shopify.Order.find(int(platform_id))
@@ -1008,13 +1122,18 @@ def _fetch_single_shopify_order(api_settings, platform_id):
             return None
         if not o:
             return None
-        return _shopify_order_to_row(o)
+        return _shopify_order_to_row(o, mapping)
     finally:
         shopify.ShopifyResource.clear_session()
 
 
-def _woo_order_to_row(o):
-    """Convert a WooCommerce order dict into the row-dict shape used by TempOrder.raw_row."""
+def _woo_order_to_row(o, mapping=None):
+    """Convert a WooCommerce order dict into the row-dict shape used by TempOrder.raw_row.
+
+    Emits the same three overlapping key sets as _shopify_order_to_row: legacy
+    flat keys, the WooCommerce virtual columns the Mapping Manager offers, and
+    the db-field keys produced by applying the business's saved Woo mapping.
+    """
     billing = o.get('billing', {})
     shipping = o.get('shipping', {})
     addr_parts = [shipping.get('address_1') or billing.get('address_1'), shipping.get('city') or billing.get('city')]
@@ -1045,6 +1164,22 @@ def _woo_order_to_row(o):
     desc_parts = [f"{it['name']} x{it['qty']}" for it in items_data]
     row['package_desc'] = ', '.join(desc_parts)
     row['package_qty'] = str(sum(it['qty'] for it in items_data))
+
+    # Imported lazily: workforce.views imports orders models, so a module-level
+    # import here would be circular.
+    from workforce.views import _woo_extract_row, _resolve_mapping_value
+
+    virtual = _woo_extract_row(o)
+    row.update({k: v for k, v in virtual.items() if k not in _RESERVED_ROW_KEYS})
+
+    for db_field, src_col in (mapping or {}).items():
+        if not db_field or db_field.startswith('_') or not src_col:
+            continue
+        if db_field in _RESERVED_ROW_KEYS:
+            continue
+        val = _resolve_mapping_value(src_col, virtual)
+        if val:
+            row[db_field] = val
     return row
 
 
@@ -1061,6 +1196,7 @@ def _woo_api_client(api_settings):
 
 def _fetch_woocommerce_orders(api_settings):
     wcapi = _woo_api_client(api_settings)
+    mapping = _business_mapping(api_settings)
     all_orders = []
     page = 1
     while True:
@@ -1070,7 +1206,7 @@ def _fetch_woocommerce_orders(api_settings):
         batch = r.json()
         if not batch:
             break
-        all_orders.extend([_woo_order_to_row(o) for o in batch])
+        all_orders.extend([_woo_order_to_row(o, mapping) for o in batch])
         total_pages = int(r.headers.get('X-WP-TotalPages', 1))
         if page >= total_pages:
             break
@@ -1092,7 +1228,7 @@ def _fetch_single_woo_order(api_settings, platform_id):
     data = r.json()
     if not data or not data.get('id'):
         return None
-    return _woo_order_to_row(data)
+    return _woo_order_to_row(data, _business_mapping(api_settings))
 
 
 # =============================================================================
@@ -1242,6 +1378,8 @@ def _sync_public_link_source(source):
 
     headers, rows = _parse_html_table(resp.text)
     if not headers or not rows:
+        # Page fetched fine, it just had no table rows — still a real sync.
+        _stamp_source_sync(source, 0)
         return 0, 0
 
     # Use saved mapping only — skip if no mapping configured

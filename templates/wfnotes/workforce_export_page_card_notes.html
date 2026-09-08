@@ -1,0 +1,98 @@
+{% comment %}
+Purpose: "About this page" notes panel for export_page.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_export_page_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      Pulls an order sheet out of the system for one client, as Excel or CSV. It runs in three steps —
+      pick the client, pick where the orders come from, then set a date range, preview what you are about to
+      download and export it. The breadcrumb under the header is how you step back. Nothing here changes an
+      order; it is a read-and-download page.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Pick client</dt>
+            <dd class="wfnote__def">Every active client, with how many of their orders we hold and badges for
+              any store connection they have set up.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Pick source</dt>
+            <dd class="wfnote__def">Our own database, or the client's store. A store card only appears if that
+              connection has been set up and verified for them.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Date from / to</dt>
+            <dd class="wfnote__def">The window to pull. It starts on yesterday-to-today rather than everything,
+              so widen it deliberately.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Order status</dt>
+            <dd class="wfnote__def">Database source only — hold for review, ready to pickup, published,
+              delivered or cancelled.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Filter</dt>
+            <dd class="wfnote__def">Builds the preview. Until you press it nothing is fetched, so a blank screen
+              at this step is normal.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Export Excel / CSV</dt>
+            <dd class="wfnote__def">Downloads exactly what the filter matched — the whole set, not just the page
+              you can see.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Row ticks</dt>
+            <dd class="wfnote__def">On the live Shopify preview only. Tick rows and the export narrows to those;
+              the badge switches to a "selected" count and <em>Clear</em> resets it.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Order link</dt>
+            <dd class="wfnote__def">In the database preview the order code opens that order in a new tab.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">The sources</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Database</dt>
+            <dd class="wfnote__def">Orders already imported into EzzyDelivery. The richest sheet — building,
+              street, zone, coordinates, map links, scheduled slot and up to five products per order.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Shopify (live)</dt>
+            <dd class="wfnote__def">Goes to the client's store and reads orders straight out of it, so it
+              includes orders we have never imported. Narrower sheet — up to three products, and the COD column
+              is left blank on orders the store already marked paid.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">WooCommerce</dt>
+            <dd class="wfnote__def">Despite the label, this returns the WooCommerce orders already in our
+              database rather than a live read of the shop.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>The <strong>Database</strong> source only lists orders on the Shopify platform or with no platform set
+          — manual and Shopify imports. Orders imported from WooCommerce come out under the WooCommerce card
+          instead, which is why a client's totals can look short.</li>
+        <li>A live Shopify pull depends on the client's stored credentials. If they are wrong or expired you get a
+          red error band rather than an empty list — that is a connection problem, not a "no orders" answer.</li>
+        <li>Exports are capped at <strong>10,000 rows</strong>. Split a big pull by date rather than hoping it all
+          comes through.</li>
+        <li>The date range works on the order date, and the export always re-runs the filter — so an export can
+          include rows added since you pressed Filter.</li>
+        <li>Live Shopify results are held in the page, not saved. Reloading or stepping back means fetching them
+          again.</li>
+      </ul>
+    </section>
+  

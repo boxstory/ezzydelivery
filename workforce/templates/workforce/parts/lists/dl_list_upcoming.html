@@ -1,0 +1,389 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% load custom_filters %}
+{% comment %}
+Purpose: Upcoming deliveries — open tasks dated after today, soonest first
+Used by: workforce.views.tasks_upcoming_list
+Notes: Reuses the .wfl navy hero + dl-table from the Follow-Up console; the extra
+       due-date / reason columns live in upcoming-list.css under .wfup. The "Why"
+       column names the source of the future date (driver postpone, reschedule
+       after failure, or a delivery date set on the order itself).
+{% endcomment %}
+{% block extra_css %}
+<link href="{% static 'orders/css/orders.css' %}?v=20260808a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/followup-list.css' %}?v=20260729c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/upcoming-list.css' %}?v=20260808a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+{% block content %}
+<div class="wfl wfup">
+<!-- Page Header — navy authority surface, forward book shaped by horizon -->
+<header class="wfl__hero">
+    <div class="wfl__hero__lead">
+        <span class="wfl__hero__icon"><i class="fa-solid {{ page_icon|default:'fa-calendar-days' }}" aria-hidden="true"></i></span>
+        <div>
+            <h1 class="wfl__hero__title">{{ page_title|default:"Upcoming Deliveries" }}</h1>
+            <span class="wfl__hero__sub">{{ page_subtitle|default:"Postponed and future-dated tasks, soonest first" }}</span>
+        </div>
+    </div>
+    <div class="wfl__hero__aside">
+        <div class="wfl__hero__shape" role="group" aria-label="Forward book by delivery horizon">
+            <div class="wfl__tier">
+                <span class="wfl__tier__num" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</span>
+                <span class="wfl__tier__lbl">Scheduled</span>
+            </div>
+            <span class="wfl__hero__div" aria-hidden="true"></span>
+            <div class="wfl__tier wfup__tier--tomorrow">
+                <span class="wfl__tier__num">{{ due_tomorrow|default:"0" }}</span>
+                <span class="wfl__tier__lbl">Tomorrow</span>
+            </div>
+            <div class="wfl__tier wfup__tier--week">
+                <span class="wfl__tier__num">{{ due_week|default:"0" }}</span>
+                <span class="wfl__tier__lbl">In 2–7 days</span>
+            </div>
+            <div class="wfl__tier wfup__tier--later">
+                <span class="wfl__tier__num">{{ due_later|default:"0" }}</span>
+                <span class="wfl__tier__lbl">Later</span>
+            </div>
+        </div>
+        <span class="wfl__hero__div" aria-hidden="true"></span>
+        <!-- Driver filter lives here but belongs to the filter form below (HTML form owner) -->
+        <label class="visually-hidden" for="workforce_upcoming_select_driver">Driver</label>
+        <select class="form-select form-select-sm wfl__hero__select" name="driver"
+                id="workforce_upcoming_select_driver" form="upcomingFilterForm"
+                onchange="this.form.submit()">
+            <option value="">All Drivers</option>
+            {% for d in active_drivers %}
+            <option value="{{ d.driver_id }}" {% if current_driver == d.driver_id|stringformat:"s" %}selected{% endif %}>
+                {{ d.user.first_name }} {{ d.user.last_name }}
+            </option>
+            {% endfor %}
+        </select>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_parts_lists_dl_list_upcoming_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
+    </div>
+</header>
+
+<div class="col-12 p-3" role="main" aria-label="Upcoming Deliveries List">
+
+    <div class="wfnote" id="workforce_parts_lists_dl_list_upcoming_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_parts_lists_dl_list_upcoming_card_notes' %}" hidden></div>
+
+    <!-- Quick Filters Bar -->
+    <form method="get" id="upcomingFilterForm" class="mb-3">
+        {% if current_sort and current_sort != 'due' %}<input type="hidden" name="sort" value="{{ current_sort }}{% if current_dir == 'desc' %}-desc{% endif %}">{% endif %}
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <!-- Driver filter for this form is rendered in the hero aside -->
+            <!-- Delivery date window -->
+            <div class="d-flex align-items-center gap-1">
+                <span class="text-muted small">Due</span>
+                <input type="date" name="dateFrom" class="form-control form-control-sm wfup__date-input"
+                       value="{{ current_date_from }}" onchange="this.form.submit()"
+                       title="Due from" aria-label="Due from">
+                <span class="text-muted small">to</span>
+                <input type="date" name="dateTo" class="form-control form-control-sm wfup__date-input"
+                       value="{{ current_date_to }}" onchange="this.form.submit()"
+                       title="Due to" aria-label="Due to">
+            </div>
+            <span class="text-muted small">Why:</span>
+            <label class="visually-hidden" for="workforce_upcoming_select_reason">Reason</label>
+            <select name="reason" id="workforce_upcoming_select_reason"
+                    class="form-select form-select-sm wfup__reason-select" onchange="this.form.submit()">
+                <option value="">All reasons</option>
+                {% for r_val, r_label in reason_choices %}
+                <option value="{{ r_val }}" {% if current_reason == r_val %}selected{% endif %}>{{ r_label }}</option>
+                {% endfor %}
+            </select>
+            {% if current_statuses or current_driver or current_reason or request.GET.dateFrom or request.GET.dateTo %}
+            <a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary ms-1">
+                <i class="fa-solid fa-xmark me-1"></i>Clear filters
+            </a>
+            {% endif %}
+        </div>
+        <!-- Status Checkbox Pills -->
+        <div class="d-flex flex-wrap gap-2">
+            {% for s_val, s_label in active_statuses %}
+            <label class="followup-filter-pill {% if s_val in current_statuses %}followup-filter-pill--active{% endif %}">
+                <input type="checkbox" name="status" value="{{ s_val }}" class="visually-hidden" {% if s_val in current_statuses %}checked{% endif %} onchange="this.form.submit()">
+                {{ s_label }}
+            </label>
+            {% endfor %}
+        </div>
+    </form>
+
+    <!-- Tasks Table -->
+    {% if dl_tasks %}
+    <div class="dl-table-wrapper" id="tasksTableContainer">
+        <!-- Bulk Actions Bar -->
+        <div class="dl-bulk-bar" id="bulkActionsBar" style="display: none;">
+            <div class="dl-bulk-bar__inner">
+                <div class="dl-bulk-bar__left">
+                    <span class="dl-bulk-bar__count"><span id="selectedCount">0</span> selected</span>
+                    <button type="button" class="btn btn-sm btn-light" onclick="clearAllSelections()">
+                        <i class="fa-solid fa-xmark me-1"></i>Clear
+                    </button>
+                </div>
+                <div class="dl-bulk-bar__actions">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="bulkAction('assign_driver')" title="Assign Driver">
+                        <i class="fa-solid fa-user-plus me-1"></i>Assign Driver
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('print')" title="Print Selected">
+                        <i class="fa-solid fa-print me-1"></i>Print
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('export')" title="Export Selected">
+                        <i class="fa-solid fa-file-csv me-1"></i>Export
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="dl-table">
+                <thead>
+                    <tr>
+                        <th class="dl-table__th-check">
+                            <input type="checkbox" class="form-check-input" id="selectAllTasks" onchange="toggleSelectAll(this)">
+                        </th>
+                        <th class="dl-table__th-id">
+                            <a href="?sort={% if current_sort == 'task' and current_dir == 'asc' %}task-desc{% else %}task{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'task' %} dl-table__sort--active{% endif %}">
+                                <span>Task #</span>
+                                <span class="dl-table__sort-sub">Order #</span>
+                                <i class="fa-solid fa-sort{% if current_sort == 'task' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
+                            </a>
+                        </th>
+                        <th class="wfup__th-due">
+                            <a href="?sort={% if current_sort == 'due' and current_dir == 'asc' %}due-desc{% else %}due{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'due' %} dl-table__sort--active{% endif %}">
+                                <span>Delivery Day</span>
+                                <span class="dl-table__sort-sub">Time window</span>
+                                <i class="fa-solid fa-sort{% if current_sort == 'due' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
+                            </a>
+                        </th>
+                        <th class="wfup__th-why">
+                            <div class="dl-table__sort dl-table__sort--stack" style="cursor:default;">
+                                <span>Why</span>
+                                <span class="dl-table__sort-sub">Moved by / note</span>
+                            </div>
+                        </th>
+                        <th class="dl-table__th-driver">
+                            <a href="?sort={% if current_sort == 'driver' and current_dir == 'asc' %}driver-desc{% else %}driver{% endif %}{{ filter_params_nosort }}" class="dl-table__sort{% if current_sort == 'driver' %} dl-table__sort--active{% endif %}">
+                                Driver <i class="fa-solid fa-sort{% if current_sort == 'driver' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
+                            </a>
+                        </th>
+                        <th class="dl-table__th-status">
+                            <a href="?sort={% if current_sort == 'status' and current_dir == 'asc' %}status-desc{% else %}status{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'status' %} dl-table__sort--active{% endif %}">
+                                <span>DL Status</span>
+                                <span class="dl-table__sort-sub">Publish</span>
+                                <i class="fa-solid fa-sort{% if current_sort == 'status' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
+                            </a>
+                        </th>
+                        <th class="dl-table__th-customer">
+                            <div class="dl-table__sort dl-table__sort--stack" style="cursor:default;">
+                                <span>Customer</span>
+                                <span class="dl-table__sort-sub">Phone</span>
+                            </div>
+                        </th>
+                        <th class="dl-table__th-zone">
+                            <div class="dl-table__sort dl-table__sort--stack" style="cursor:default;">
+                                <span>Zone</span>
+                                <span class="dl-table__sort-sub">Address</span>
+                            </div>
+                        </th>
+                        <th class="dl-table__th-cod">
+                            <a href="?sort={% if current_sort == 'cod' and current_dir == 'desc' %}cod-asc{% else %}cod{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'cod' %} dl-table__sort--active{% endif %}">
+                                <span>COD</span>
+                                <span class="dl-table__sort-sub">Status</span>
+                                <i class="fa-solid fa-sort{% if current_sort == 'cod' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
+                            </a>
+                        </th>
+                        <th class="dl-table__th-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dl in dl_tasks %}
+                    <tr class="dl-table__row wfup__row--{{ dl.horizon_tier }}" data-task-id="{{ dl.id }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
+                        <td class="dl-table__td-check" onclick="event.stopPropagation();">
+                            <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" onchange="updateBulkSelection()">
+                        </td>
+                        <!-- Task # + Order # -->
+                        <td class="dl-table__td-id">
+                            <div class="dl-table__id-stack">
+                                <span class="dl-table__task-num">{{ dl.dl_task_number|default:"--" }}</span>
+                                <span class="dl-table__order-num" title="{{ dl.order.client_order_code }}">{{ dl.order.client_order_code|default:"--"|truncatechars:14 }}</span>
+                            </div>
+                        </td>
+                        <!-- Delivery day -->
+                        <td class="wfup__due-cell">
+                            <div class="wfup__due">
+                                <span class="wfup__due__date">{{ dl.due_date|date:"D, d M" }}</span>
+                                <span class="wfup__due__away wfup__due__away--{{ dl.horizon_tier }}">
+                                    {% if dl.days_away == 1 %}Tomorrow{% else %}in {{ dl.days_away }} days{% endif %}
+                                </span>
+                                {% if dl.preferred_time %}
+                                <span class="wfup__due__slot">{{ dl.get_preferred_time_display }}</span>
+                                {% elif dl.order.preferred_time_slot %}
+                                <span class="wfup__due__slot">{{ dl.order.get_preferred_time_slot_display }}</span>
+                                {% elif dl.order.scheduled_time %}
+                                <span class="wfup__due__slot">{{ dl.order.scheduled_time|time:"H:i" }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <!-- Why it is future dated -->
+                        <td class="wfup__why-cell">
+                            <div class="wfup__why wfup__why--{{ dl.upcoming_reason }}">
+                                <span class="wfup__why__label">
+                                    {% if dl.upcoming_reason == 'postponed' %}Postponed
+                                    {% elif dl.upcoming_reason == 'rescheduled' %}Rescheduled
+                                    {% elif dl.upcoming_reason == 'scheduled' %}Scheduled at order
+                                    {% else %}Future dated{% endif %}
+                                </span>
+                                {% if dl.upcoming_reason == 'postponed' and dl.postpone_entry %}
+                                <span class="wfup__why__meta">
+                                    {% if dl.postpone_entry.changed_by %}{{ dl.postpone_entry.changed_by.get_full_name|default:dl.postpone_entry.changed_by.username|truncatechars:18 }} · {% endif %}{{ dl.postpone_entry.created_at|date:"d M" }}
+                                </span>
+                                {% if dl.postpone_note %}
+                                <span class="wfup__why__note" title="{{ dl.postpone_note }}">{{ dl.postpone_note|truncatechars:44 }}</span>
+                                {% endif %}
+                                {% elif dl.upcoming_reason == 'rescheduled' %}
+                                <span class="wfup__why__meta">Attempt {{ dl.failed_attempt_count }}{% if dl.reschedule_reason %} · {{ dl.reschedule_reason|truncatechars:28 }}{% endif %}</span>
+                                {% elif dl.upcoming_reason == 'scheduled' %}
+                                <span class="wfup__why__meta">Set on the order{% if dl.order.scheduled_note %} · {{ dl.order.scheduled_note|truncatechars:28 }}{% endif %}</span>
+                                {% else %}
+                                <span class="wfup__why__meta">Task dated {{ dl.dl_task_date|date:"d M" }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <!-- Driver -->
+                        <td class="dl-table__td-driver">
+                            {% if dl.driver %}
+                            <span class="dl-table__driver-name fw-semibold">{{ dl.driver|truncatechars:14 }}</span>
+                            {% else %}
+                            <span class="dl-table__driver-none text-danger fw-semibold">Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <!-- Status -->
+                        <td class="dl-table__td-status" onclick="event.stopPropagation();">
+                            <div class="dl-status-stack">
+                                <div class="dl-status-row">
+                                    {% if dl.dl_task_status %}
+                                    <span class="dl-badge dl-badge--{{ dl.dl_task_status }}">
+                                        {{ dl.get_dl_task_status_display }}
+                                    </span>
+                                    {% else %}--{% endif %}
+                                    <button class="dl-table__edit-btn dl-table__edit-btn--status status-modal-trigger"
+                                        data-bs-toggle="modal" data-bs-target="#statusModal"
+                                        data-task-id="{{ dl.id }}"
+                                        data-task-number="{{ dl.dl_task_number }}"
+                                        data-status-type="task"
+                                        data-current-status="{{ dl.dl_task_status }}"
+                                        data-driver-id="{{ dl.driver_id|default:'' }}"
+                                        data-driver-name="{{ dl.driver|default:'' }}"
+                                        data-customer-name="{{ dl.order.customer_name|default:'' }}"
+                                        data-task-notes="{{ dl.dl_task_description|default:'' }}"
+                                        onclick="if(window.setStatusModalTask) window.setStatusModalTask(this);"
+                                        title="Update Task Status">
+                                        <i class="fa-solid fa-circle-dot"></i>
+                                    </button>
+                                </div>
+                                {% if dl.dl_task_publish %}
+                                <span class="dl-badge dl-badge--published small">
+                                    <i class="fa-solid fa-truck-fast me-1"></i>Published
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <!-- Customer -->
+                        <td class="dl-table__td-customer">
+                            <div class="dl-table__customer-stack">
+                                <span class="dl-table__customer-name">{{ dl.order.customer_name|default:"--"|truncatechars:18 }}</span>
+                                <span class="dl-table__customer-phone">{{ dl.order.customer_phone|default:"--" }}</span>
+                            </div>
+                        </td>
+                        <!-- Zone / Address -->
+                        <td class="dl-table__td-zone">
+                            <div class="dl-table__address-stack">
+                                <div class="dl-table__address-line1">
+                                    {% if dl.order.dl_zone %}{% get_zone_display dl.order as zone_display %}<strong>{{ zone_display }}</strong>{% else %}<strong>--</strong>{% endif %}
+                                </div>
+                                {% if dl.order.dl_zone %}
+                                <div class="dl-table__address-line2">
+                                    Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}
+                                </div>
+                                {% endif %}
+                                <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">
+                                    {{ dl.order.customer_address|default:""|truncatechars:35 }}
+                                </div>
+                            </div>
+                        </td>
+                        <!-- COD -->
+                        <td class="dl-table__td-cod">
+                            <div class="dl-table__cod-stack">
+                                <span class="dl-table__cod-amount">{{ dl.order.cod_amount|default:"0" }} QR</span>
+                                {% if dl.order.cod_status_by_staff %}
+                                <span class="dl-table__cod-status" title="{{ dl.order.get_cod_status_by_staff_display }}">{% if dl.order.cod_status_by_staff == 'not_collected' %}Not Collected{% elif dl.order.cod_status_by_staff == 'partially_collected' %}Partial{% elif dl.order.cod_status_by_staff == 'fully_paid' %}Collected{% elif dl.order.cod_status_by_staff == 'cod_with_driver' %}With Driver{% elif dl.order.cod_status_by_staff == 'cod_with_ezzy' %}With Ezzy{% elif dl.order.cod_status_by_staff == 'cod_settled_with_business' %}Settled{% else %}{{ dl.order.get_cod_status_by_staff_display }}{% endif %}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <!-- Actions -->
+                        <td class="dl-table__td-actions" onclick="event.stopPropagation();">
+                            <div class="dl-table__action-group">
+                                <a href="/workforce/delivery-task/{{ dl.id }}/" class="dl-table__action-btn dl-table__action-btn--view" title="View">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <a href="/workforce/delivery-task/{{ dl.id }}/edit/" class="dl-table__action-btn" title="Change delivery date">
+                                    <i class="fa-solid fa-calendar-day"></i>
+                                </a>
+                                <a href="https://wa.me/{{ dl.order.customer_phone|whatsapp_number }}?text=Hi%20{{ dl.order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ dl.order.order_number|urlencode }}.%20Your%20delivery%20is%20scheduled%20for%20{{ dl.due_date|date:'d M Y'|urlencode }}.%20Please%20confirm%20this%20works%20for%20you." target="_blank" class="dl-table__action-btn dl-table__action-btn--whatsapp" title="WhatsApp">
+                                    <i class="fa-brands fa-whatsapp"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="dl-table__empty">
+                            <i class="fa-solid fa-inbox me-2"></i>No upcoming deliveries
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% include "includes/components/_pagination.html" with page_obj=dl_tasks filter_params=filter_params %}
+    {% else %}
+    <!-- Empty State -->
+    <div class="text-center py-5">
+        <div class="mb-4">
+            <i class="fa-solid fa-calendar-check fa-4x text-muted opacity-50"></i>
+        </div>
+        <h4 class="text-muted mb-3">Nothing Scheduled Ahead</h4>
+        <p class="text-muted mb-4">
+            {% if current_statuses or current_driver or current_reason or request.GET.dateFrom or request.GET.dateTo %}
+            No upcoming deliveries match your current filters.
+            {% else %}
+            No open task is dated past today. Postponed deliveries and orders with a
+            requested delivery date will appear here.
+            {% endif %}
+        </p>
+        {% if current_statuses or current_driver or current_reason or request.GET.dateFrom or request.GET.dateTo %}
+        <a href="{{ request.path }}" class="btn btn-primary">
+            <i class="fa fa-times me-2"></i>Clear Filters
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+</div><!-- /.wfl.wfup -->
+
+<!-- Status Update Modal -->
+{% include "workforce/parts/components/_tasks_status_modal.html" %}
+
+<!-- Scripts -->
+<script src="{% static 'orders/js/orders_main.js' %}"></script>
+{% include "workforce/parts/components/_tasks_view_scripts.html" %}
+{% endblock content %}

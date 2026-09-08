@@ -1,23 +1,22 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'business/css/business.css' %}">
+{# The bapi__ layer carries the Shopify setup guide included further down. #}
+<link rel="stylesheet" href="{% static 'business/css/business-api-console.css' %}?v=20260801e">
 {% endblock extra_css %}
 
 {% block content %}
 <div class="form-container" id="client_api_update_container_main">
-    <!-- Header -->
-    <div class="form-header" id="client_api_update_section_header">
-        <h1 id="client_api_update_title_form">
-            <i class="fa-solid fa-pen-to-square"></i>
-            {{ form_title|default:"Update API Integration" }}
-        </h1>
-        <a href="{% url 'business:business_settings' business.business_id %}" class="back-link">
-            <i class="fa-solid fa-arrow-left"></i>
-            Back to Settings
-        </a>
+    <div id="client_api_update_section_header">
+        {% bconheader eyebrow="Settings" live="Integrations" icon="fa-solid fa-pen-to-square" title=form_title|default:"Update API Integration" subtitle="Edit the credentials and import rules for this connection." %}
+            <a href="{% url 'business:business_settings' business.business_id %}" class="bcon__btn bcon__btn--ghost">
+                <i class="fa-solid fa-arrow-left"></i> Back to Settings
+            </a>
+        {% endbconheader %}
     </div>
 
     <!-- Form Card -->
@@ -56,10 +55,29 @@
                 </a>
                 <button type="submit" class="btn-submit" id="client_api_update_btn_submit">
                     <i class="fa-solid fa-paper-plane"></i>
-                    Submit for Approval
+                    <span id="client_api_submit_label">Submit for Approval</span>
                 </button>
             </div>
         </form>
+
+        {% if api and api.api_type == 'shopify' %}
+        <div class="form-card-footer" id="client_api_shopify_oauth_connect" style="display:none;">
+            {% if api.api_key and api.site_api_url %}
+            <a href="{% url 'business:shopify_oauth_start' business.business_id api.id %}"
+               class="btn-submit" id="client_api_update_btn_oauth">
+                <i class="fa-brands fa-shopify"></i>
+                Connect with Shopify
+            </a>
+            {% else %}
+            <button type="button" class="btn-submit" id="client_api_update_btn_oauth" disabled
+                    title="Save Client ID, Client Secret and Store URL first">
+                <i class="fa-brands fa-shopify"></i>
+                Connect with Shopify
+            </button>
+            <span class="form-info-note-text ms-2">Save Client ID, Client Secret and Store URL first.</span>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- Warning Note -->
@@ -79,5 +97,5 @@
 {% endblock content %}
 
 {% block extra_js %}
-<script src="{% static 'business/js/api_form_fields.js' %}?v=20260523b"></script>
+<script src="{% static 'business/js/api_form_fields.js' %}?v=20260801d"></script>
 {% endblock extra_js %}

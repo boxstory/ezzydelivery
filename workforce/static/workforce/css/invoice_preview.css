@@ -1,0 +1,125 @@
+/* Purpose: On-screen A4 sheet preview for the bpi__ invoices — shows the real page breaks and a page count without opening the print dialog. */
+/* Used by: workforce/templates/workforce/{client_charge_invoice,cod_business_payout_invoice,driver_payout_invoice}.html via invoice_preview.js */
+/* Notes: Paper geometry is read from the --bpi-paper-* vars below, which the @media print block in
+   cod_payout_invoice.css uses too — change a measurement in one place or the preview stops
+   matching the printer. The real .bpi__sheet stays in the DOM (hidden on screen in preview mode)
+   so printing is never served by this file. */
+
+.bpi {
+  /* Shared paper geometry — print block and preview both read these */
+  --bpi-paper-w: 210mm;
+  --bpi-paper-h: 297mm;
+  --bpi-page-margin: 6mm;
+  --bpi-paper-pad-x: 10mm;
+  --bpi-band-reserve: 20mm;
+  /* Height the closing artwork actually occupies (1600x113 across a 198mm page
+     area). The reserve above is deliberately taller — the difference is the
+     clear strip the page number sits in. */
+  --bpi-band-art: 14mm;
+  --bpi-paper-table-fs: 0.72rem;
+}
+
+/* ── Preview shell ────────────────────────────────────────── */
+.bprev { display: none; }
+.bpi--preview .bprev { display: block; }
+.bpi--preview .bpi__sheet { display: none; }
+
+.bprev__meta {
+  max-width: var(--bpi-paper-w);
+  margin: 0 auto 0.75rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+}
+
+/* ── One sheet of A4 ──────────────────────────────────────── */
+.bprev__sheet {
+  width: var(--bpi-paper-w);
+  height: var(--bpi-paper-h);
+  margin: 0 auto 1.125rem;
+  padding: var(--bpi-page-margin);
+  background: #fff;
+  /* outline, not border: box-sizing is border-box app-wide, so a border would
+     eat 2px out of the 210x297mm and the page area would stop matching the
+     printer's — which is the one thing this preview exists to get right. */
+  outline: 1px solid var(--tlr-rule);
+  box-shadow: var(--brand-shadow-sm);
+  overflow: hidden;
+}
+
+/* The page area — everything inside the printer's page margin. The watermark
+   hangs off this box, not off the sheet, so it resolves against exactly the
+   same rectangle the printed page uses (see .bpi__sheet::before in the print
+   block of cod_payout_invoice.css). */
+.bprev__area {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: url('../../webpages/img/letterhead-watermark.png') no-repeat left 8% bottom 6% / 42% auto;
+}
+
+/* Bands span the page area edge to edge, exactly as they do on paper */
+.bprev__area .bpi__lp-top,
+.bprev__area .bpi__lp-bottom {
+  width: 100%;
+  margin: 0;
+}
+.bprev__area .bpi__lp-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* Text block — carries the same side padding the printed sheet uses */
+.bprev__body {
+  padding: 0 var(--bpi-paper-pad-x);
+}
+
+/* ── Print-parity type ────────────────────────────────────────
+   Mirrors the @media print rules in cod_payout_invoice.css. Kept in step via
+   the shared vars above; the nowrap columns matter because a wrap here would
+   report a page break the printer will not make. */
+.bprev__body .bpi__table { font-size: var(--bpi-paper-table-fs); }
+.bprev__body .bpi__table-wrap { overflow: visible; margin-top: 1rem; }
+.bprev__body .bpi__num,
+.bprev__body .bpi__order,
+.bprev__body .bpi__date { white-space: nowrap; word-break: normal; }
+.bprev__body .bpi__table td { word-break: break-word; }
+.bprev__body .bpi__summary { margin-top: 1.25rem; }
+.bprev__body .bpi__foot { margin-top: 2.5rem; }
+
+/* ── Page number ──────────────────────────────────────────── */
+.bprev__num {
+  position: absolute;
+  right: 0;
+  /* Inside the reserved strip, clear of both the artwork and the last row —
+     the body is allowed to fill right down to --bpi-band-reserve. */
+  bottom: calc(var(--bpi-band-art) + 1mm);
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+}
+
+/* Offscreen rig the paginator measures in — same width as a real page area */
+.bprev__rig {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  visibility: hidden;
+  width: calc(var(--bpi-paper-w) - (2 * var(--bpi-page-margin)));
+}
+
+/* The preview is a screen aid only — paper always comes from .bpi__sheet */
+@media print {
+  .bprev { display: none !important; }
+  .bpi--preview .bpi__sheet { display: block !important; }
+}
+
+@media (max-width: 900px) {
+  .bprev__sheet { transform: scale(0.62); transform-origin: top center; margin-bottom: -100mm; }
+}

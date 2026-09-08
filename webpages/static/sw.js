@@ -1,7 +1,11 @@
 // EzzyDriver Service Worker
-const CACHE_NAME = 'ezzydriver-v6';
-const STATIC_CACHE = 'ezzydriver-static-v6';
-const DYNAMIC_CACHE = 'ezzydriver-dynamic-v6';
+const CACHE_NAME = 'ezzydriver-v7';
+const STATIC_CACHE = 'ezzydriver-static-v7';
+const DYNAMIC_CACHE = 'ezzydriver-dynamic-v7';
+
+// Shared GPS queue implementation — the same module the page uses, so a ping
+// queued in the tab and one replayed here go through identical code.
+importScripts('/static/fleet/js/ezzy-gps-queue.js');
 
 // Static assets to cache
 const STATIC_ASSETS = [
@@ -102,6 +106,24 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
+});
+
+// Replay queued GPS pings once connectivity returns.
+//
+// This is the only path that works after the driver has closed the app: the
+// browser wakes the worker when the device is back online and the queue drains
+// without any page being open. Rejecting the promise tells the browser to
+// retry the sync later with its own backoff, which costs no battery in between.
+self.addEventListener('sync', event => {
+  if (!self.EzzyGPSQueue || event.tag !== self.EzzyGPSQueue.SYNC_TAG) return;
+  event.waitUntil(
+    self.EzzyGPSQueue.flush().then(sent => {
+      console.log('[SW] Replayed', sent, 'queued GPS ping(s)');
+      return self.EzzyGPSQueue.count().then(left => {
+        if (left > 0) throw new Error('GPS queue not empty — retry sync');
+      });
+    })
+  );
 });
 
 // Handle push notifications

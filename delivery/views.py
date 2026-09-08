@@ -43,6 +43,7 @@ from django.forms.fields import DateTimeField
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from core.decorators import api_staff_required
+from core.pagination import paginate
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db import transaction, IntegrityError
@@ -62,6 +63,7 @@ from webpages import forms as webpages_forms
 from orders import forms as orders_forms
 from delivery import forms as delivery_forms
 from fleet import forms as fleet_forms
+from core.json_utils import safe_json
 
 # Local aliases for commonly used models
 DeliveryTask = delivery_models.DeliveryTask
@@ -75,6 +77,42 @@ Driver = fleet_models.Driver
 Profile = core_models.Profile
 
 logger = logging.getLogger('delivery')
+
+
+# =============================================================================
+# PAGINATION HELPERS (shared brand pagination component)
+# =============================================================================
+
+PER_PAGE_CHOICES = [10, 25, 50, 100]
+
+
+def get_per_page(request, default=50):
+    """
+    Validated `per_page` for the shared pagination component.
+    Returns a STRING — the component compares it as a string when marking the
+    selected <option>, so an int would leave the selector blank.
+    """
+    raw = request.GET.get('per_page')
+    if raw:
+        try:
+            value = int(raw)
+            if value in PER_PAGE_CHOICES:
+                return str(value)
+        except (ValueError, TypeError):
+            pass
+    return str(default)
+
+
+def get_filter_params(request):
+    """
+    Urlencoded query string of every GET param except `page` / `per_page`
+    (the pagination component supplies those itself). Keeping the whole
+    QueryDict means no filter can silently be dropped on page 2.
+    """
+    params = request.GET.copy()
+    params.pop('page', None)
+    params.pop('per_page', None)
+    return params.urlencode()
 
 
 # =============================================================================
@@ -296,15 +334,15 @@ def all_delivery_tasks(request):
     accepted_count = accepted_tasks.count()
     history_count = history_tasks.count()
 
-    # Select which tasks to show based on tab
-    if tab == 'all':
-        cards = all_tasks[:50]
-    elif tab == 'assigned':
-        cards = assigned_tasks[:50]
-    elif tab == 'accepted':
-        cards = accepted_tasks[:50]
-    else:  # tab == 'history'
-        cards = history_tasks[:50]
+    # Select which tasks to show based on tab.
+    # These used to be hard [:50] slices with no page navigation, so a driver
+    # with more than 50 tasks in a tab simply could not reach the rest.
+    tab_queryset = {
+        'all': all_tasks,
+        'assigned': assigned_tasks,
+        'accepted': accepted_tasks,
+    }.get(tab, history_tasks)
+    cards, cards_total = paginate(request, tab_queryset)
 
     logger.debug(f"Fetched tasks: {all_count} all, {assigned_count} assigned, {accepted_count} accepted, {history_count} history")
 
@@ -334,6 +372,8 @@ def all_delivery_tasks(request):
 
     context = {
         'cards': cards,
+        'cards_page': cards,
+        'cards_total': cards_total,
         'all_count': all_count,
         'assigned_count': assigned_count,
         'accepted_count': accepted_count,
@@ -529,6 +569,18 @@ def start_ride(request):
             task._status_actor = 'driver'  # state machine: accepted → out_for_delivery allowed for driver
             task._status_changed_by = request.user
             task.save(update_fields=['dl_task_status'])
+
+            # pre_save rolls the field back in place when the transition is not
+            # legal for a driver (e.g. the task is still 'assigned' and has not
+            # been accepted). Reporting success there navigates the driver into
+            # the delivery screen on a task that never left its old status.
+            if task.dl_task_status != 'out_for_delivery':
+                from delivery.state_machine import can_transition
+                _, reason = can_transition(task.dl_task_status, 'out_for_delivery', actor='driver')
+                logger.warning(
+                    f"Driver {driver.driver_id} start ride rejected for task {task_id}: {reason}")
+                return JsonResponse({"success": False, "error": reason or "Cannot start ride for this task"})
+
             logger.info(f"Driver {driver.driver_id} started ride for task {task_id}")
 
             return JsonResponse({
@@ -730,10 +782,13 @@ def assigned_tasks(request):
             'task_qrcode',
         ).order_by('-id')
 
-        logger.info(f"Driver {driver.driver_id} has {assigned_tasks.count()} assigned tasks")
+        tasks_page, tasks_total = paginate(request, assigned_tasks)
+        logger.info(f"Driver {driver.driver_id} has {tasks_total} assigned tasks")
 
         context = {
-            'tasks': assigned_tasks,
+            'tasks': tasks_page,
+            'tasks_page': tasks_page,
+            'tasks_total': tasks_total,
             'driver': driver,
         }
         return render(request, 'delivery/parts/assigned_tasks.html', context)
@@ -883,7 +938,7 @@ def zone_map(request):
 
     context = {
         'zones': zones,
-        'zones_json': json.dumps(zones_data),
+        'zones_json': safe_json(zones_data),
         'zone_groups': zone_groups,
         'total_zones': total_zones,
         'zones_with_coords': zones_with_coords,
@@ -1067,8 +1122,8 @@ def edit_zone_polygon(request, zone_number):
 
     context = {
         'zone': zone,
-        'zone_polygon_json': json.dumps(zone.polygon if zone.polygon else []),
-        'all_polygons_json': json.dumps(all_polygons_data),
+        'zone_polygon_json': safe_json(zone.polygon if zone.polygon else []),
+        'all_polygons_json': safe_json(all_polygons_data),
         'center_lat': float(zone.latitude) if zone.latitude else 25.276987,
         'center_lng': float(zone.longitude) if zone.longitude else 51.520008,
     }
@@ -1177,7 +1232,8 @@ def zone_areas(request):
     ).filter(area_count__gt=0).order_by('zone_number')
 
     # Pagination
-    paginator = Paginator(areas, 50)
+    per_page = get_per_page(request, default=50)
+    paginator = Paginator(areas, int(per_page))
     areas_page = paginator.get_page(page)
 
     # Stats
@@ -1225,6 +1281,9 @@ def zone_areas(request):
         'search': search,
         'zone_filter': zone_filter,
         'suggestions': suggestions,
+        # Pagination component: carries search / zone
+        'per_page': per_page,
+        'filter_params': get_filter_params(request),
     }
     return render(request, 'delivery/zone_areas.html', context)
 
@@ -1353,7 +1412,8 @@ def zone_list(request):
     groups = delivery_models.ZoneGroup.objects.filter(is_active=True).order_by('display_order')
 
     # Pagination
-    paginator = Paginator(zones, 50)
+    per_page = get_per_page(request, default=50)
+    paginator = Paginator(zones, int(per_page))
     zones_page = paginator.get_page(page)
 
     # Stats
@@ -1370,6 +1430,9 @@ def zone_list(request):
         'search': search,
         'group_filter': group_filter,
         'polygon_filter': polygon_filter,
+        # Pagination component: carries search / group / polygon
+        'per_page': per_page,
+        'filter_params': get_filter_params(request),
     }
     return render(request, 'delivery/zone_list.html', context)
 

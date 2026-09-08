@@ -1,0 +1,1383 @@
+/*
+ * Purpose: Visual layer for the client API settings pages — integration cards, the connection link strip, credential cards, and the key-generation modals.
+ * Used by: business/parts/business_settings_api_list.html, business_settings_api_add.html, business_settings_api_update.html (via _shopify_setup_guide.html).
+ * Notes: BEM prefix `bapi__`. Sits on top of business-console.css (`bcon__`) — furniture (command band, panels, badges, buttons, empty states) comes from there; this file only adds what the API surface needs. Replaces the old bapi list block that was deleted from business.css.
+ */
+
+/* ============================================================================
+   PAGE SHELL
+   ============================================================================ */
+.bapi__page {
+  padding: 0.75rem 0.5rem 0;
+}
+
+/* The command band ships its own 0.5rem side margin for pages with no gutter;
+   this page already has one, so reset it and keep a single rhythm. */
+.bapi__page .bcon__command {
+  margin: 0 0 0.75rem;
+}
+
+/* ============================================================================
+   SECTION — a bcon panel. Shared with the Shopify setup guide on add/update.
+   ============================================================================ */
+.bapi__section {
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-md);
+  box-shadow: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  overflow: hidden;
+}
+
+.bapi__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: var(--brand-grey-100);
+  border-bottom: 1px solid var(--brand-grey-200);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+}
+
+.bapi__section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-navy);
+  margin: 0;
+}
+
+.bapi__section-title i {
+  color: var(--brand-primary);
+  font-size: 0.8rem;
+}
+
+/* Count reads as a figure, not a prize ribbon */
+.bapi__section-badge {
+  font-family: var(--bcon-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-grey-500);
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.35rem;
+  margin-left: 0.15rem;
+}
+
+.bapi__section-body {
+  padding: 0.75rem;
+}
+
+/* ============================================================================
+   CARD GRID
+   ============================================================================ */
+.bapi__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: 0.75rem;
+}
+
+/* ============================================================================
+   CARD — shared frame for integrations and credentials.
+   Left index edge carries state at a glance; everything else stays hairline.
+   ============================================================================ */
+.bapi__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-sm);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bapi__card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--bcon-edge, 3px);
+  background: var(--brand-grey-300);
+}
+
+.bapi__card:hover {
+  border-color: var(--brand-grey-300);
+  box-shadow: var(--brand-shadow-sm);
+}
+
+.bapi__card--live::before    { background: var(--brand-success-light); }
+.bapi__card--pending::before { background: var(--brand-warning-alt); }
+.bapi__card--broken::before  { background: var(--brand-danger); }
+.bapi__card--off::before     { background: var(--brand-grey-300); }
+
+.bapi__card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.75rem 0.5rem 0.875rem;
+}
+
+.bapi__card-id {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.bapi__card-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  margin: 0;
+  line-height: 1.2;
+  text-transform: capitalize;
+}
+
+/* The store host is a machine value — mono, and allowed to wrap */
+.bapi__card-host {
+  display: block;
+  font-family: var(--bcon-mono);
+  font-size: 0.68rem;
+  color: var(--brand-grey-500);
+  margin-top: 0.15rem;
+  word-break: break-all;
+  line-height: 1.35;
+}
+
+.bapi__card-host--empty { color: var(--brand-grey-400); font-style: italic; }
+
+/* ============================================================================
+   PLATFORM MARK — tinted plate, hairline border. The hue is information
+   (which platform), so it stays; the saturated gradient fill does not.
+   ============================================================================ */
+.bapi__mark {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--brand-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+  border: 1px solid var(--brand-grey-200);
+  background: var(--brand-grey-100);
+  color: var(--brand-navy);
+}
+
+.bapi__mark--shopify     { background: #f2f8ea; color: #4f7d24; border-color: #dbead0; }
+.bapi__mark--woocommerce { background: #f7f1f6; color: #7f4876; border-color: #e6d9e4; }
+.bapi__mark--magento     { background: #fef3ea; color: #b3491a; border-color: #f6ddcb; }
+.bapi__mark--custom      { background: var(--brand-info-bg); color: var(--brand-info); border-color: #bfdbfe; }
+
+/* ============================================================================
+   LINK STRIP — the page signature. Draws the handshake itself: platform,
+   joint, EzzyDelivery. A live link is a solid rule, a pending one dashed,
+   a token-less one visibly broken. Caption states it in words as well.
+   ============================================================================ */
+.bapi__link {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0.625rem 0.875rem 0.5rem;
+  background: var(--brand-grey-100);
+  border-top: 1px solid var(--brand-grey-200);
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.bapi__link-node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 0.3rem;
+  font-family: var(--bcon-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid var(--brand-grey-250);
+  color: var(--brand-grey-600);
+}
+
+.bapi__link-node--ezzy {
+  background: var(--brand-navy);
+  border-color: var(--brand-navy);
+  color: #fff;
+  letter-spacing: 0.03em;
+}
+
+.bapi__link-rule {
+  flex: 1;
+  height: 0;
+  min-width: 0.75rem;
+  border-top: 2px solid var(--brand-grey-300);
+}
+
+.bapi__link-joint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  font-size: 0.55rem;
+  flex-shrink: 0;
+  background: var(--brand-grey-300);
+  color: #fff;
+}
+
+/* Live — an unbroken navy pipe */
+.bapi__link--live .bapi__link-rule  { border-top-color: var(--brand-navy); }
+.bapi__link--live .bapi__link-joint { background: var(--brand-success-light); }
+
+/* Pending — credentials saved, handshake not confirmed */
+.bapi__link--pending .bapi__link-rule {
+  border-top-style: dashed;
+  border-top-color: var(--brand-warning-alt);
+}
+.bapi__link--pending .bapi__link-joint { background: var(--brand-warning-alt); }
+
+/* Broken — no token at all, so the pipe is drawn with the gap it has */
+.bapi__link--broken .bapi__link-rule {
+  border-top-color: var(--brand-danger);
+  opacity: 0.55;
+}
+.bapi__link--broken .bapi__link-joint {
+  background: #fff;
+  border: 1.5px solid var(--brand-danger);
+  color: var(--brand-danger);
+}
+
+.bapi__link-state {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--bcon-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0;
+  padding: 0.4rem 0.875rem 0;
+  color: var(--brand-grey-500);
+}
+
+.bapi__link-state--live    { color: var(--brand-success); }
+.bapi__link-state--pending { color: var(--brand-warning-text); }
+.bapi__link-state--broken  { color: var(--brand-danger); }
+
+/* ============================================================================
+   FACTS — label over value, mono values, two per row
+   ============================================================================ */
+.bapi__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+  padding: 0.625rem 0.875rem 0.75rem;
+}
+
+.bapi__facts--stack { grid-template-columns: minmax(0, 1fr); gap: 0.375rem; }
+
+.bapi__fact { min-width: 0; margin: 0; }
+
+.bapi__fact dt,
+.bapi__fact-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--brand-grey-500);
+  margin: 0 0 0.1rem;
+}
+
+.bapi__fact dd,
+.bapi__fact-value {
+  font-family: var(--bcon-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  margin: 0;
+  word-break: break-word;
+}
+
+.bapi__fact-value--muted { color: var(--brand-grey-450); font-weight: 500; }
+
+/* Row form: label left, value right — used on credential cards */
+.bapi__fact--row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--brand-grey-100);
+}
+.bapi__fact--row:last-child { border-bottom: none; }
+.bapi__fact--row .bapi__fact-label { margin: 0; }
+.bapi__fact--row .bapi__fact-value { text-align: right; }
+
+/* ============================================================================
+   CREDENTIAL — the key prefix is how a developer identifies the key, so it
+   leads the card at size instead of a decorative icon.
+   ============================================================================ */
+.bapi__cred {
+  display: block;
+  font-family: var(--bcon-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--brand-navy);
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.3rem;
+  padding: 0.375rem 0.5rem;
+  margin: 0 0.875rem 0.125rem;
+  word-break: break-all;
+}
+
+.bapi__cred-note {
+  font-size: 0.65rem;
+  color: var(--brand-grey-450);
+  margin: 0;
+  padding: 0.3rem 0.875rem 0;
+}
+
+/* ============================================================================
+   CARD ACTIONS — quiet by default; colour only arrives on hover
+   ============================================================================ */
+.bapi__card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: auto;
+  padding: 0.5rem 0.75rem 0.5rem 0.875rem;
+  border-top: 1px solid var(--brand-grey-200);
+  background: var(--brand-grey-100);
+}
+
+.bapi__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--brand-grey-600);
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.3rem;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.bapi__action i { font-size: 0.7rem; }
+
+/* Only the in-card row shares its width evenly; a header action keeps its size */
+.bapi__card-actions .bapi__action { flex: 1 1 auto; }
+
+.bapi__action:hover {
+  color: var(--brand-navy);
+  border-color: var(--brand-grey-400);
+  background: #fff;
+}
+
+.bapi__action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.15rem rgba(247, 192, 0, 0.4);
+}
+
+/* Connect is the recovery action on a broken link — it gets the weight */
+/* Matches the specificity of the `.bapi__card-actions .bapi__action` sizing
+   rule above, otherwise that one wins and Connect never gets its own row. */
+.bapi__card-actions .bapi__action--connect { flex: 0 0 100%; }
+
+.bapi__action--connect {
+  color: #fff;
+  background: var(--brand-navy);
+  border-color: var(--brand-navy);
+}
+.bapi__action--connect:hover {
+  color: #fff;
+  background: var(--brand-navy-light);
+  border-color: var(--brand-navy-light);
+}
+
+.bapi__action--danger:hover {
+  color: var(--brand-danger);
+  border-color: #fecaca;
+  background: var(--brand-danger-bg);
+}
+
+/* ============================================================================
+   ADVISORY — one hairline note, no gradient banner
+   ============================================================================ */
+.bapi__advice,
+.bapi__tip-banner,
+.bapi__security-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.625rem;
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-200);
+  border-left: var(--bcon-edge, 3px) solid var(--brand-grey-300);
+  border-radius: var(--brand-radius-sm);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--brand-grey-600);
+}
+
+.bapi__advice i,
+.bapi__tip-banner i,
+.bapi__security-banner i {
+  color: var(--brand-grey-450);
+  font-size: 0.8rem;
+  margin-top: 0.1rem;
+  flex-shrink: 0;
+}
+
+.bapi__advice p,
+.bapi__tip-banner p,
+.bapi__security-banner p { margin: 0; }
+
+.bapi__advice strong,
+.bapi__tip-banner strong,
+.bapi__security-banner strong { color: var(--brand-grey-800); font-weight: 700; }
+
+.bapi__advice--secure { border-left-color: var(--brand-navy); }
+.bapi__security-banner { border-left-color: var(--brand-navy); }
+
+/* The Shopify guide sits inside a tip banner and carries a full procedure */
+.bapi__tip-banner ol { margin: 0 0 0.5rem; padding-left: 1.1rem; }
+.bapi__tip-banner li { margin-bottom: 0.2rem; }
+.bapi__tip-banner code {
+  font-family: var(--bcon-mono);
+  font-size: 0.68rem;
+  color: var(--brand-navy);
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.2rem;
+  padding: 0.05rem 0.25rem;
+}
+
+/* Redirect URI block on the guide */
+.bapi__url-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-left: var(--bcon-edge, 3px) solid var(--brand-primary);
+  border-radius: var(--brand-radius-sm);
+  padding: 0.375rem 0.5rem;
+}
+
+.bapi__url-display code { border: none; background: transparent; padding: 0; word-break: break-all; }
+
+/* ============================================================================
+   EMPTY STATE — bcon__empty handles the layout; this only adds the action
+   ============================================================================ */
+.bapi__empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.375rem;
+  padding: 2.25rem 1rem;
+}
+
+.bapi__empty-state .empty-state-icon,
+.bapi__empty-state > i {
+  font-size: 1.75rem;
+  color: var(--brand-grey-300);
+  margin-bottom: 0.25rem;
+}
+
+.bapi__empty-state h4 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--brand-grey-700);
+  margin: 0;
+}
+
+.bapi__empty-state p {
+  font-size: 0.78rem;
+  color: var(--brand-grey-500);
+  margin: 0;
+  max-width: 24rem;
+}
+
+.bapi__btn-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  color: #fff;
+  background: var(--brand-navy);
+  border: 1px solid var(--brand-navy);
+  border-radius: var(--brand-radius-sm);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.bapi__btn-empty:hover { background: var(--brand-navy-light); color: #fff; }
+
+/* ============================================================================
+   MODALS — key generation and the one-time reveal
+   ============================================================================ */
+.bapi__modal-header--dark,
+.bapi__modal-header--success {
+  background: var(--brand-navy);
+  color: #fff;
+  border-bottom: 2px solid var(--brand-primary);
+  padding: 0.75rem 1rem;
+}
+
+.bapi__modal-header--success { border-bottom-color: var(--brand-success-bright); }
+
+.bapi__modal-header--dark .modal-title,
+.bapi__modal-header--success .modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.bapi__modal-header--dark .modal-title i { color: var(--brand-primary); }
+.bapi__modal-header--success .modal-title i { color: var(--brand-success-bright); }
+
+.bapi__modal-header--dark .btn-close,
+.bapi__modal-header--success .btn-close { filter: invert(1); opacity: 0.7; }
+
+.bapi__form-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500);
+  margin-bottom: 0.25rem;
+}
+
+.bapi__form-label i { color: var(--brand-grey-400); }
+
+.bapi__form-input {
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--brand-grey-250);
+  border-radius: var(--brand-radius-sm);
+}
+
+.bapi__form-input:focus {
+  border-color: var(--brand-primary);
+  box-shadow: none;
+}
+
+.bapi__form-hint {
+  font-size: 0.68rem;
+  color: var(--brand-grey-500);
+  margin-top: 0.25rem;
+}
+
+.bapi__modal-info-box,
+.bapi__modal-warning-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--brand-grey-600);
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-200);
+  border-left: var(--bcon-edge, 3px) solid var(--brand-navy);
+  border-radius: var(--brand-radius-sm);
+}
+
+.bapi__modal-info-box p,
+.bapi__modal-warning-box p { display: flex; gap: 0.5rem; margin: 0; }
+
+.bapi__modal-info-box i { color: var(--brand-grey-450); margin-top: 0.15rem; }
+
+.bapi__modal-warning-box {
+  margin-bottom: 0.75rem;
+  color: var(--brand-warning-text);
+  background: var(--brand-warning-bg);
+  border-color: #fde68a;
+  border-left-color: var(--brand-warning-alt);
+}
+.bapi__modal-warning-box i { color: var(--brand-warning-alt); margin-top: 0.15rem; }
+
+.bapi__generated-key-box { margin-bottom: 0.75rem; }
+
+.bapi__generated-key-box label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500);
+  margin-bottom: 0.25rem;
+}
+
+.bapi__generated-key-box .input-group { display: flex; gap: 0.375rem; }
+
+.bapi__generated-key-box .form-control {
+  flex: 1;
+  font-family: var(--bcon-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--brand-navy);
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-250);
+  border-radius: var(--brand-radius-sm);
+  padding: 0.375rem 0.5rem;
+}
+
+.bapi__btn-copy-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  flex-shrink: 0;
+  color: var(--brand-navy);
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
+  border-radius: var(--brand-radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.bapi__btn-copy-key:hover { background: var(--brand-primary-dark); }
+.bapi__btn-copy-key:focus-visible { outline: 2px solid var(--brand-navy); outline-offset: 1px; }
+
+.bapi__modal-footer {
+  gap: 0.375rem;
+  padding: 0.625rem 1rem;
+  background: var(--brand-grey-100);
+  border-top: 1px solid var(--brand-grey-200);
+}
+
+.bapi__btn-modal--cancel,
+.bapi__btn-modal--primary,
+.bapi__btn-modal--success {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: var(--brand-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.bapi__btn-modal--cancel {
+  color: var(--brand-grey-600);
+  background: #fff;
+  border-color: var(--brand-grey-250);
+}
+.bapi__btn-modal--cancel:hover { color: var(--brand-navy); border-color: var(--brand-grey-400); }
+
+.bapi__btn-modal--primary,
+.bapi__btn-modal--success {
+  color: #fff;
+  background: var(--brand-navy);
+  border-color: var(--brand-navy);
+}
+.bapi__btn-modal--primary:hover,
+.bapi__btn-modal--success:hover { background: var(--brand-navy-light); border-color: var(--brand-navy-light); }
+
+/* ============================================================================
+   TOAST
+   ============================================================================ */
+.bapi__toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-navy);
+  border-left: var(--bcon-edge, 3px) solid var(--brand-success-bright);
+  border-radius: var(--brand-radius-sm);
+  box-shadow: var(--brand-shadow-lg);
+  animation: bapi-toast-in 0.25s ease both;
+}
+
+.bapi__toast i { color: var(--brand-success-bright); }
+
+@keyframes bapi-toast-in {
+  from { opacity: 0; transform: translateY(0.5rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================================
+   RESPONSIVE
+   ============================================================================ */
+@media (max-width: 575.98px) {
+  .bapi__grid { grid-template-columns: minmax(0, 1fr); }
+  .bapi__facts { grid-template-columns: minmax(0, 1fr); }
+  .bapi__section-header { align-items: flex-start; }
+  .bapi__card-actions .bapi__action { flex: 1 1 45%; }
+  /* Header action drops to its own line — give it the full width to tap */
+  .bapi__section-header .bapi__action { flex: 1 1 100%; padding: 0.5rem; }
+  .bapi__toast { left: 1rem; right: 1rem; bottom: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bapi__toast { animation: none; }
+  .bapi__card,
+  .bapi__action,
+  .bapi__btn-empty { transition: none; }
+}
+
+/* ============================================================================
+   SHOPIFY SETUP GUIDE — numbered procedure, hairline rail, no banner
+   ============================================================================ */
+.bapi__guide-intro {
+  border-left: var(--bcon-edge, 3px) solid var(--brand-navy);
+  background: var(--brand-grey-100);
+  border-radius: var(--brand-radius-sm);
+  padding: 0.375rem 0.75rem;
+  margin-bottom: 1.125rem;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--brand-grey-600);
+}
+
+/* Both setup paths are always documented. The one matching the selected mode
+   reads as the live instruction; the other stays legible as reference. */
+#client_api_shopify_guide_custom_app,
+#client_api_shopify_guide_oauth {
+  padding-bottom: 1.5rem;
+}
+
+/* Hairline between the two stacked paths so they don't read as one procedure */
+#client_api_shopify_guide_custom_app {
+  border-bottom: 1px solid var(--brand-grey-300);
+  margin-bottom: 1.5rem;
+}
+
+.bapi__guide--muted {
+  opacity: 0.55;
+}
+
+.bapi__guide--muted .bapi__guide-intro {
+  border-left-color: var(--brand-grey-300);
+}
+
+.bapi__guide--active .bapi__guide-intro {
+  border-left-color: var(--brand-primary);
+  background: var(--brand-grey-200);
+}
+
+.bapi__guide--muted:hover,
+.bapi__guide--muted:focus-within {
+  opacity: 1;
+}
+
+.bapi__guide--active,
+.bapi__guide--muted {
+  transition: opacity 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bapi__guide--active,
+  .bapi__guide--muted { transition: none; }
+}
+
+.bapi__guide-kicker {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-primary-text);
+  margin-bottom: 0.125rem;
+}
+
+/* Steps sit on a vertical hairline with navy numbered markers */
+.bapi__guide-steps {
+  list-style: none;
+  counter-reset: bapi-step;
+  margin: 0;
+  padding: 0 0 0 1.75rem;
+  border-left: 1px solid var(--brand-grey-200);
+}
+
+.bapi__guide-step {
+  counter-increment: bapi-step;
+  position: relative;
+  padding-bottom: 1.125rem;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--brand-grey-600);
+}
+
+.bapi__guide-step:last-child { padding-bottom: 0; }
+
+.bapi__guide-step::before {
+  content: counter(bapi-step);
+  position: absolute;
+  left: -2.4rem;
+  top: -0.05rem;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: var(--brand-navy);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bapi__guide-step-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  margin-bottom: 0.125rem;
+}
+
+.bapi__guide-step p { margin: 0 0 0.375rem; }
+.bapi__guide-step p:last-child { margin-bottom: 0; }
+
+/* Breadcrumb of a menu path inside Shopify's admin */
+.bapi__guide-path {
+  font-weight: 600;
+  color: var(--brand-grey-800);
+}
+
+.bapi__guide-path i {
+  font-size: 0.55rem;
+  color: var(--brand-grey-400);
+  margin: 0 0.125rem;
+  vertical-align: middle;
+}
+
+/* Scope list — token on the left, why we need it on the right */
+.bapi__guide-scopes {
+  list-style: none;
+  margin: 0 0 0.375rem;
+  padding: 0;
+}
+
+/* Grid, not flex: the column reserves the width so the code chip itself can
+   stay shrink-wrapped. Stretching the chip makes it read as an empty input. */
+.bapi__guide-scopes li {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.bapi__guide-scopes li:last-child { border-bottom: 0; }
+.bapi__guide-scopes code { justify-self: start; }
+.bapi__guide-scopes span { color: var(--brand-grey-500); font-size: 0.72rem; }
+
+/* Field mapping — what to type where on our own form */
+.bapi__guide-fields {
+  margin: 0 0 0.375rem;
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 0.125rem 0.75rem;
+}
+
+.bapi__guide-fields dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+}
+
+.bapi__guide-fields dd {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--brand-grey-500);
+}
+
+/* Inline caution inside a step */
+.bapi__guide-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.375rem 0;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--brand-radius-sm);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  background: var(--brand-grey-100);
+  border-left: var(--bcon-edge, 3px) solid var(--brand-grey-300);
+  color: var(--brand-grey-600);
+}
+
+.bapi__guide-note i { font-size: 0.75rem; margin-top: 0.15rem; flex-shrink: 0; color: var(--brand-grey-450); }
+.bapi__guide-note--warn { background: var(--brand-warning-bg); border-left-color: var(--brand-warning); }
+.bapi__guide-note--warn i { color: var(--brand-warning); }
+.bapi__guide-note--warn div { color: var(--brand-warning-text); }
+
+/* Reference blocks below the procedure */
+.bapi__guide-aside {
+  margin-top: 1.125rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--brand-grey-200);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--brand-grey-600);
+}
+
+.bapi__guide-aside-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500);
+  margin-bottom: 0.375rem;
+}
+
+/* Troubleshooting ledger */
+.bapi__guide-table { margin-bottom: 0; }
+
+/* Header colours come from the brandkit's global `.table thead th` rule, which
+   is !important — this only sets the label typography it leaves alone. */
+.bapi__guide-table thead th {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.375rem 0.75rem;
+  white-space: nowrap;
+}
+
+.bapi__guide-table tbody td {
+  font-size: 0.75rem;
+  color: var(--brand-grey-600);
+  border-bottom: 1px solid var(--brand-grey-200);
+  padding: 0.375rem 0.75rem;
+  vertical-align: top;
+  --bs-table-bg: transparent;
+  box-shadow: none;
+}
+
+.bapi__guide-table tbody tr:hover { background: var(--brand-grey-50); }
+
+.bapi__guide-table tbody td:first-child {
+  font-family: var(--bcon-mono);
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  width: 34%;
+  min-width: 13rem;
+}
+
+.bapi__guide-step code,
+.bapi__guide-scopes code,
+.bapi__guide-fields code,
+.bapi__guide-aside code,
+.bapi__guide-table code {
+  font-family: var(--bcon-mono);
+  font-size: 0.7rem;
+  color: var(--brand-navy);
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.2rem;
+  padding: 0.05rem 0.25rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+  .bapi__guide-steps { padding-left: 1.375rem; }
+  .bapi__guide-step::before { left: -2.05rem; width: 1.2rem; height: 1.2rem; font-size: 0.64rem; }
+  .bapi__guide-scopes li { grid-template-columns: minmax(0, 1fr); gap: 0.125rem; }
+  .bapi__guide-table tbody td:first-child { min-width: 8rem; width: auto; }
+  .bapi__guide-fields { grid-template-columns: minmax(0, 1fr); gap: 0 0; }
+  .bapi__guide-fields dd { margin-bottom: 0.375rem; }
+}
+
+/* The brandkit's global `.btn` clears the border and forces a 0.6rem/1.2rem pad,
+   which cancels both .btn-sm and .btn-outline-secondary. Restore a compact
+   hairline secondary for the copy affordances in the setup guide. */
+.bapi__copy-btn.btn {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px solid var(--brand-grey-300);
+  border-radius: var(--brand-radius-sm);
+  background: var(--brand-grey-100);
+  color: var(--brand-grey-800);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.bapi__copy-btn.btn:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+  color: var(--brand-grey-800);
+}
+
+/* The guide's generic `code` chip styling above also matches the copyable URL
+   blocks, which must stay borderless and wrap — a long callback URL otherwise
+   overflows its box on narrow screens. Restate it after, at equal specificity. */
+.bapi__url-display code {
+  border: none;
+  background: transparent;
+  padding: 0;
+  white-space: normal;
+  word-break: break-all;
+}
+
+/* ============================================================================
+   CONNECTION TEST CONSOLE — the page is a request/response transcript.
+   Everything HTTP-shaped (verb, path, status code, timing) is set in mono;
+   prose stays in the body face. Used by business_settings_api_test.html and
+   the result partial it swaps in over HTMX.
+   ============================================================================ */
+
+/* Quiet link that sits on the navy command band next to the run CTA */
+.bapi__band-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  padding: 0.5rem 0.25rem;
+  transition: color 0.15s ease;
+}
+.bapi__band-link:hover { color: #fff; }
+
+/* Run state — Ready / Running / Complete / Failed. Never the HTTP code:
+   that belongs to the status line, and two copies of it disagree eventually. */
+.bapi__runstate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: var(--bcon-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500);
+}
+.bapi__runstate::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand-grey-400);
+}
+.bapi__runstate--running { color: var(--brand-warning-text); }
+.bapi__runstate--running::before {
+  background: var(--brand-warning-alt);
+  animation: bapi-blink 1s ease-in-out infinite;
+}
+.bapi__runstate--done   { color: var(--brand-success); }
+.bapi__runstate--done::before { background: var(--brand-success-light); }
+.bapi__runstate--failed { color: var(--brand-danger); }
+.bapi__runstate--failed::before { background: var(--brand-danger); }
+
+@keyframes bapi-blink { 50% { opacity: 0.25; } }
+
+/* ----------------------------------------------------------------------------
+   ENDPOINT / REQUEST LINES — what the test will call, shown before you run it
+   ---------------------------------------------------------------------------- */
+/* Block, not flex: a long URL has to wrap as one continuous string. Flex
+   items would hold the host and path in separate columns on narrow screens. */
+.bapi__reqline {
+  display: block;
+  font-family: var(--bcon-mono);
+  font-size: 0.72rem;
+  color: var(--brand-grey-700);
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-200);
+  border-left: var(--bcon-edge, 3px) solid var(--brand-grey-300);
+  border-radius: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  margin-bottom: 0.375rem;
+  word-break: break-all;
+}
+.bapi__reqline:last-child { margin-bottom: 0; }
+
+.bapi__verb {
+  font-weight: 700;
+  color: var(--brand-navy);
+  margin-right: 0.4rem;
+}
+
+.bapi__reqline-host { color: var(--brand-grey-450); }
+
+/* Idle transcript */
+.bapi__console { padding: 0.375rem 0; }
+
+.bapi__console-hint {
+  font-size: 0.75rem;
+  color: var(--brand-grey-500);
+  margin: 0 0 0.5rem;
+}
+.bapi__console-hint--foot { margin: 0.625rem 0 0; }
+.bapi__console-hint strong { color: var(--brand-grey-800); font-weight: 600; }
+
+/* ----------------------------------------------------------------------------
+   STATUS LINE — the signature. The code the server actually returned, at size.
+   ---------------------------------------------------------------------------- */
+.bapi__statusline {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--brand-grey-200);
+  border-left: 4px solid var(--brand-grey-400);
+  border-radius: var(--brand-radius-sm);
+  background: var(--brand-grey-100);
+}
+
+.bapi__statusline-code {
+  font-family: var(--bcon-mono);
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-grey-600);
+  flex-shrink: 0;
+}
+
+.bapi__statusline-main { min-width: 0; }
+
+.bapi__statusline-text {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Raw cause, shown only when no HTTP code came back to name it */
+.bapi__statusline-detail {
+  font-size: 0.78rem;
+  color: var(--brand-grey-600);
+  margin: 0.2rem 0 0;
+}
+
+.bapi__statusline-meta {
+  font-family: var(--bcon-mono);
+  font-size: 0.65rem;
+  color: var(--brand-grey-500);
+  margin: 0.2rem 0 0;
+  word-break: break-word;
+}
+
+.bapi__statusline--ok {
+  background: var(--brand-success-bg);
+  border-color: #bbf7d0;
+  border-left-color: var(--brand-success-light);
+}
+.bapi__statusline--ok .bapi__statusline-code { color: var(--brand-success); }
+
+.bapi__statusline--warn {
+  background: var(--brand-warning-bg);
+  border-color: #fde68a;
+  border-left-color: var(--brand-warning-alt);
+}
+.bapi__statusline--warn .bapi__statusline-code { color: var(--brand-warning-text); }
+
+.bapi__statusline--error {
+  background: var(--brand-danger-bg);
+  border-color: #fecaca;
+  border-left-color: var(--brand-danger);
+}
+.bapi__statusline--error .bapi__statusline-code { color: var(--brand-danger); }
+
+/* No code came back at all — the call never reached a server */
+.bapi__statusline--none { border-left-color: var(--brand-grey-500); }
+.bapi__statusline--none .bapi__statusline-code { font-size: 1.25rem; color: var(--brand-grey-500); }
+
+/* ----------------------------------------------------------------------------
+   PROBE ROWS — one line per call the test made, so a partial failure names
+   the leg that broke instead of hiding behind a single verdict.
+   ---------------------------------------------------------------------------- */
+.bapi__probes {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-sm);
+  overflow: hidden;
+}
+
+.bapi__probe {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.625rem;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--brand-grey-100);
+}
+.bapi__probe:last-child { border-bottom: none; }
+
+.bapi__probe::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--brand-grey-300);
+}
+.bapi__probe--ok::before    { background: var(--brand-success-light); }
+.bapi__probe--error::before { background: var(--brand-danger); }
+.bapi__probe--warn::before  { background: var(--brand-warning-alt); }
+
+.bapi__probe-name {
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  flex-shrink: 0;
+  min-width: 4.5rem;
+}
+
+.bapi__probe-path {
+  font-family: var(--bcon-mono);
+  font-size: 0.68rem;
+  color: var(--brand-grey-450);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bapi__probe-detail {
+  font-size: 0.68rem;
+  color: var(--brand-grey-500);
+  flex-shrink: 0;
+}
+
+.bapi__probe-status,
+.bapi__probe-ms {
+  font-family: var(--bcon-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  color: var(--brand-grey-600);
+}
+.bapi__probe-ms { font-weight: 500; color: var(--brand-grey-450); min-width: 3.5rem; text-align: right; }
+.bapi__probe--ok .bapi__probe-status    { color: var(--brand-success); }
+.bapi__probe--error .bapi__probe-status { color: var(--brand-danger); }
+.bapi__probe--warn .bapi__probe-status  { color: var(--brand-warning-text); }
+
+/* ----------------------------------------------------------------------------
+   HOW TO FIX — numbered remedies under a failed status line
+   ---------------------------------------------------------------------------- */
+.bapi__fix {
+  margin-top: 0.75rem;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-sm);
+  overflow: hidden;
+}
+
+.bapi__fix-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.625rem;
+  background: var(--brand-grey-100);
+  border-bottom: 1px solid var(--brand-grey-200);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-navy);
+}
+.bapi__fix-head i { color: var(--brand-grey-450); }
+
+.bapi__fix-list {
+  margin: 0;
+  padding: 0.5rem 0.625rem 0.5rem 1.75rem;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--brand-grey-600);
+}
+.bapi__fix-list li { margin-bottom: 0.3rem; }
+.bapi__fix-list li:last-child { margin-bottom: 0; }
+.bapi__fix-list strong { color: var(--brand-grey-800); font-weight: 700; }
+.bapi__fix-list code {
+  font-family: var(--bcon-mono);
+  font-size: 0.7rem;
+  color: var(--brand-navy);
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.2rem;
+  padding: 0.05rem 0.25rem;
+}
+
+/* Sheet breakdown for Google Sheets integrations */
+.bapi__sheets { margin-top: 0.75rem; }
+.bapi__sheets table { width: 100%; font-size: 0.75rem; border-collapse: collapse; }
+.bapi__sheets th {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500);
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+.bapi__sheets td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--brand-grey-100);
+  color: var(--brand-grey-700);
+}
+.bapi__sheets tr:last-child td { border-bottom: none; }
+.bapi__sheets .num { font-family: var(--bcon-mono); font-weight: 700; text-align: right; }
+
+@media (max-width: 575.98px) {
+  .bapi__statusline-code { font-size: 1.5rem; }
+  .bapi__probe { flex-wrap: wrap; row-gap: 0.15rem; }
+  .bapi__probe-path { flex: 1 1 100%; order: 3; padding-left: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bapi__runstate--running::before { animation: none; }
+}

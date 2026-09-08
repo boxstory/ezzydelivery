@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block title %}Inbound Product Requests{% endblock %}
 
@@ -9,24 +10,11 @@
 
 {% block content %}
 <div class="bir">
-  <!-- Page Header -->
-  <div class="bir__header">
-    <div class="bir__header-content">
-      <div class="bir__header-text">
-        <h1 class="bir__title">
-          <i class="fa-solid fa-arrow-right-to-bracket"></i>
-          Inbound Requests
-        </h1>
-        <p class="bir__subtitle">Send products to warehouse for storage and fulfillment</p>
-      </div>
-      <div class="bir__header-actions">
-        <a href="{% url 'business:inbound_request_create' %}" class="bir__btn bir__btn--primary">
-          <i class="fa-solid fa-plus"></i>
-          <span>New Request</span>
-        </a>
-      </div>
-    </div>
-  </div>
+  {% bconheader eyebrow="Warehouse" live="Inbound" icon="fa-solid fa-arrow-right-to-bracket" title="Inbound Requests" subtitle="Send products to warehouse for storage and fulfillment." %}
+    <a href="{% url 'business:inbound_request_create' %}" class="bcon__btn bcon__btn--primary">
+      <i class="fa-solid fa-plus"></i> New Request
+    </a>
+  {% endbconheader %}
 
   <!-- Stats Grid -->
   <div class="bir__stats">

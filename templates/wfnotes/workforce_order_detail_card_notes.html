@@ -1,0 +1,129 @@
+{% comment %}
+Purpose: "About this page" notes panel for order_detail.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_order_detail_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Everything we hold about one order, on one page: who the customer is, where it goes, what is
+            in the box, what money is involved, and what has happened to it so far. This is the page you
+            work from when a client calls about an order or a driver cannot find an address. The actions
+            in the header change with the order's state — you only see what the order can actually do
+            right now.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit</dt>
+                        <dd class="wfnote__def">Opens the full edit form for the customer, address, package,
+                            money and statuses.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Publish to Task</dt>
+                        <dd class="wfnote__def">Turns the order into a delivery task drivers can be given.
+                            Only offered while the order is still under review or waiting for pickup.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Repeat Order</dt>
+                        <dd class="wfnote__def">Copies this order into a brand-new draft — for the customer
+                            who orders the same thing again. It does not touch this order.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Cancel</dt>
+                        <dd class="wfnote__def">Kills the order. Hidden once it has been published,
+                            delivered or already cancelled.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">WhatsApp</dt>
+                        <dd class="wfnote__def">Opens a composer pre-filled with the customer's number and
+                            an order message, so you can send from the right business number.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Parse Address</dt>
+                        <dd class="wfnote__def">Reads the written address and proposes zone, street and
+                            building.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Verify QNAS</dt>
+                        <dd class="wfnote__def">Checks those numbers against the national address service
+                            and writes back the coordinates it resolves.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Update Location</dt>
+                        <dd class="wfnote__def">A map where you can drag the pin, or paste a shared
+                            WhatsApp or Maps link, to set exactly where the driver should go.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Verify link</dt>
+                        <dd class="wfnote__def">The address-verification message sent to the customer. Send
+                            it now, re-send it, or jump to the whole queue.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Timeline</dt>
+                        <dd class="wfnote__def">Every status change and staff edit, in order, with who did
+                            it. Start here when you are asked what happened.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">View Task</dt>
+                        <dd class="wfnote__def">Jumps to the delivery task once one exists — driver,
+                            attempts, proof and cash all live there, not here.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Verification link states</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Queued</dt>
+                        <dd class="wfnote__def">Waiting to go out, possibly at a scheduled time. <em>Send
+                            now</em> jumps the queue.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sent</dt>
+                        <dd class="wfnote__def">Delivered to the customer's WhatsApp; no reply yet.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pinned</dt>
+                        <dd class="wfnote__def">The customer shared their location and the order now has a
+                            confirmed pin. This is the outcome you want.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Manual review</dt>
+                        <dd class="wfnote__def">They replied with something that could not be read
+                            automatically. A person has to look at it in the queue.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Send failed</dt>
+                        <dd class="wfnote__def">The message never left. The reason is shown next to it —
+                            usually a bad number or the WhatsApp connection being down.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Cancelled</dt>
+                        <dd class="wfnote__def">Dropped and will not be sent.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li><em>Publish to Task</em> is the point of no return for the order side — once a task
+                    exists, the driver-facing work is managed on the task, not here.</li>
+                <li><strong>COD is what the driver collects; the delivery fee is what we bill the
+                    client.</strong> The Total on this page is only the two added together and is not an
+                    amount anyone ever pays.</li>
+                <li>Address tools write to <strong>this order</strong>. If the task is already with a
+                    driver, tell them — a corrected pin does not reach a phone that has already loaded the
+                    job.</li>
+                <li>A partial delivery shows what came back and how much cash was actually collected,
+                    which will be less than the original COD. Do not treat the original figure as owed.</li>
+                <li>The pickup card only appears when a first-mile collection was raised for this order;
+                    orders shipped from our own warehouse never have one.</li>
+                <li>Nothing on this page is a draft — every action takes effect straight away.</li>
+            </ul>
+        </section>
+    

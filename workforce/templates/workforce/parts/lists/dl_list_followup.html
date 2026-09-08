@@ -2,40 +2,81 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% load custom_filters %}
+{% comment %}
+Purpose: Chase list for open delivery tasks — newest driver update first, shaped by staleness
+Used by: workforce.views.tasks_followup_list
+Notes: Rows are tiered fresh / aging / stale off updated_at; the pickup column shows the
+       first-mile leg. Carries the shared wfnote__ page-notes card under the hero, hidden on
+       load; the hero help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}?v=20260718b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/followup-list.css' %}?v=20260729c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-<!-- Page Header -->
-<header class="oli__hero">
-    <div class="oli__hero__left">
-        <h2><i class="fa-solid {{ page_icon|default:'fa-flag' }} me-1" aria-hidden="true"></i>{{ page_title|default:"Follow-Up Tasks" }}</h2>
-        <span class="oli__hero__subtitle">| {{ page_subtitle|default:"Latest updates by driver & status" }}</span>
-    </div>
-    <div class="oli__hero__right">
-        <div class="oli__hero__count" aria-label="Task count summary">
-            <span class="oli__hero__count-value" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</span>
-            <span class="oli__hero__count-label">tasks</span>
+<div class="wfl">
+<!-- Page Header — navy authority surface, backlog shaped by staleness -->
+<header class="wfl__hero">
+    <div class="wfl__hero__lead">
+        <span class="wfl__hero__icon"><i class="fa-solid {{ page_icon|default:'fa-flag' }}" aria-hidden="true"></i></span>
+        <div>
+            <h1 class="wfl__hero__title">{{ page_title|default:"Follow-Up Tasks" }}</h1>
+            <span class="wfl__hero__sub">{{ page_subtitle|default:"Latest updates by driver & status" }}</span>
         </div>
+    </div>
+    <div class="wfl__hero__aside">
+        <div class="wfl__hero__shape" role="group" aria-label="Queue by time since last update">
+            <div class="wfl__tier">
+                <span class="wfl__tier__num" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</span>
+                <span class="wfl__tier__lbl">In queue</span>
+            </div>
+            <span class="wfl__hero__div" aria-hidden="true"></span>
+            <div class="wfl__tier wfl__tier--fresh">
+                <span class="wfl__tier__num">{{ stale_fresh|default:"0" }}</span>
+                <span class="wfl__tier__lbl">Fresh · &lt;24h</span>
+            </div>
+            <div class="wfl__tier wfl__tier--aging">
+                <span class="wfl__tier__num">{{ stale_aging|default:"0" }}</span>
+                <span class="wfl__tier__lbl">Aging · 1–3d</span>
+            </div>
+            <div class="wfl__tier wfl__tier--stale">
+                <span class="wfl__tier__num">{{ stale_stale|default:"0" }}</span>
+                <span class="wfl__tier__lbl">Stale · 3d+</span>
+            </div>
+        </div>
+        <span class="wfl__hero__div" aria-hidden="true"></span>
+        <!-- Driver filter lives here but belongs to the filter form below (HTML form owner) -->
+        <label class="visually-hidden" for="workforce_followup_select_driver">Driver</label>
+        <select class="form-select form-select-sm wfl__hero__select" name="driver"
+                id="workforce_followup_select_driver" form="followupFilterForm"
+                onchange="this.form.submit()">
+            <option value="">All Drivers</option>
+            {% for d in active_drivers %}
+            <option value="{{ d.driver_id }}" {% if current_driver == d.driver_id|stringformat:"s" %}selected{% endif %}>
+                {{ d.user.first_name }} {{ d.user.last_name }}
+            </option>
+            {% endfor %}
+        </select>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_parts_lists_dl_list_followup_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
 </header>
 
 <div class="col-12 p-3" role="main" aria-label="Follow-Up Tasks List">
 
+    <div class="wfnote" id="workforce_parts_lists_dl_list_followup_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_parts_lists_dl_list_followup_card_notes' %}" hidden></div>
+
     <!-- Quick Filters Bar -->
     <form method="get" id="followupFilterForm" class="mb-3">
         {% if current_sort and current_sort != 'updated' %}<input type="hidden" name="sort" value="{{ current_sort }}{% if current_dir == 'desc' %}-desc{% endif %}">{% endif %}
         <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-            <!-- Driver Filter -->
-            <select class="form-select form-select-sm" name="driver" style="max-width: 210px;" onchange="this.form.submit()">
-                <option value="">All Drivers</option>
-                {% for d in active_drivers %}
-                <option value="{{ d.driver_id }}" {% if current_driver == d.driver_id|stringformat:"s" %}selected{% endif %}>
-                    {{ d.user.first_name }} {{ d.user.last_name }}
-                </option>
-                {% endfor %}
-            </select>
-            <!-- Date Range Filter (defaults to last 7 days) -->
+            <!-- Driver filter for this form is rendered in the hero aside -->
+            <!-- Date Range Filter (defaults to last 30 days) -->
             <div class="d-flex align-items-center gap-1">
                 <input type="date" name="dateFrom" class="form-control form-control-sm" style="max-width: 150px;"
                        value="{{ current_date_from|date:'Y-m-d' }}" onchange="this.form.submit()"
@@ -124,6 +165,13 @@
                                 Driver <i class="fa-solid fa-sort{% if current_sort == 'driver' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
                             </a>
                         </th>
+                        <th class="wfl__th-pickup">
+                            <a href="?sort={% if current_sort == 'pickup' and current_dir == 'asc' %}pickup-desc{% else %}pickup{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'pickup' %} dl-table__sort--active{% endif %}">
+                                <span>Pickup</span>
+                                <span class="dl-table__sort-sub">Plan</span>
+                                <i class="fa-solid fa-sort{% if current_sort == 'pickup' %}{% if current_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}"></i>
+                            </a>
+                        </th>
                         <th class="dl-table__th-status">
                             <a href="?sort={% if current_sort == 'status' and current_dir == 'asc' %}status-desc{% else %}status{% endif %}{{ filter_params_nosort }}" class="dl-table__sort dl-table__sort--stack{% if current_sort == 'status' %} dl-table__sort--active{% endif %}">
                                 <span>DL Status</span>
@@ -155,7 +203,7 @@
                 </thead>
                 <tbody>
                     {% for dl in dl_tasks %}
-                    <tr class="dl-table__row" data-task-id="{{ dl.id }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
+                    <tr class="dl-table__row dl-table__row--{{ dl.staleness_tier }}" data-task-id="{{ dl.id }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
                         <td class="dl-table__td-check" onclick="event.stopPropagation();">
                             <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" onchange="updateBulkSelection()">
                         </td>
@@ -169,7 +217,7 @@
                         <!-- Last Updated -->
                         <td>
                             <div class="d-flex flex-column">
-                                <span class="small fw-semibold">{{ dl.updated_at|timesince }} ago</span>
+                                <span class="wfl__age wfl__age--{{ dl.staleness_tier }}">{{ dl.updated_at|timesince }} ago</span>
                                 <span class="small text-muted">{{ dl.updated_at|date:"d M H:i" }}</span>
                             </div>
                         </td>
@@ -180,6 +228,19 @@
                             {% else %}
                             <span class="dl-table__driver-none text-danger fw-semibold">Unassigned</span>
                             {% endif %}
+                        </td>
+                        <!-- First-mile pickup leg (empty for clients without pickup automation) -->
+                        <td class="wfl__pk-cell">
+                            {% with pk=dl.order.pickup_task %}
+                            {% if pk %}
+                            <div class="wfl__pk wfl__pk--{{ pk.status }}" title="{{ pk.get_status_display }} · {{ pk.get_disposition_display }}{% if pk.driver %} · {{ pk.driver }}{% endif %}">
+                                <span class="wfl__pk__status">{% if pk.status == 'arrived' %}Arrived{% elif pk.status == 'in_progress' %}In Progress{% elif pk.status == 'handed_off' %}Handed Off{% else %}{{ pk.get_status_display }}{% endif %}</span>
+                                <span class="wfl__pk__plan">{% if pk.disposition == 'drop' %}Hub{% elif pk.disposition == 'self_deliver' %}Self{% else %}Transfer{% endif %}{% if pk.driver %} · {{ pk.driver|truncatechars:10 }}{% endif %}</span>
+                            </div>
+                            {% else %}
+                            <span class="wfl__pk-none">--</span>
+                            {% endif %}
+                            {% endwith %}
                         </td>
                         <!-- Status -->
                         <td class="dl-table__td-status" onclick="event.stopPropagation();">
@@ -225,17 +286,19 @@
                         <td class="dl-table__td-zone">
                             <div class="dl-table__address-stack">
                                 <div class="dl-table__address-line1">
-                                    {% if dl.order.latitude and dl.order.longitude %}<a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__location-pin" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-location-dot"></i></a>{% else %}<span class="dl-table__location-pin dl-table__location-pin--missing" title="Location not available"><i class="fa-solid fa-location-dot"></i></span>{% endif %} {% if dl.order.dl_zone %}{% get_zone_display dl.order as zone_display %}<strong>{{ zone_display }}</strong>{% else %}<strong>--</strong>{% endif %}
+                                    {% if dl.order.latitude and dl.order.longitude %}<button type="button" class="dl-table__location-pin" title="Show on map" aria-expanded="false" data-mappoint-toggle="mpt_map_fu{{ dl.id }}"><i class="fa-solid fa-location-dot"></i></button>{% else %}<span class="dl-table__location-pin dl-table__location-pin--missing" title="Location not available"><i class="fa-solid fa-location-dot"></i></span>{% endif %} {% if dl.order.dl_zone %}{% get_zone_display dl.order as zone_display %}<strong>{{ zone_display }}</strong>{% else %}<strong>--</strong>{% endif %}
                                 </div>
                                 {% if dl.order.dl_zone %}
                                 <div class="dl-table__address-line2">
                                     Z{{ dl.order.dl_zone }}{% if dl.order.dl_street %}/S{{ dl.order.dl_street }}{% endif %}{% if dl.order.dl_building %}/B{{ dl.order.dl_building }}{% endif %}
+                                    {% include "includes/components/_route_distance.html" with order=dl.order %}
                                 </div>
                                 {% endif %}
                                 {% if dl.order.latitude and dl.order.longitude %}
                                 <div class="dl-table__coords">
-                                    <a href="https://www.google.com/maps?q={{ dl.order.latitude }},{{ dl.order.longitude }}" target="_blank" class="dl-table__coords-link" title="View on map" onclick="event.stopPropagation();"><i class="fa-solid fa-map-pin"></i>
-                                    {{ dl.order.latitude|floatformat:4 }}, {{ dl.order.longitude|floatformat:4 }}</a>
+                                    {# The pin above opens this row's map; same coordinates, so text. #}
+                                    <span class="dl-table__coords-link"><i class="fa-solid fa-map-pin"></i>
+                                    {{ dl.order.latitude|floatformat:4 }}, {{ dl.order.longitude|floatformat:4 }}</span>
                                     {% if dl.order.coords_accuracy %}
                                     <span class="orc__loc-acc orc__loc-acc--{{ dl.order.coords_accuracy }}">{% if dl.order.coords_accuracy == 'by_customer' %}By Client{% elif dl.order.coords_accuracy == 'by_staff' %}By Staff{% elif dl.order.coords_accuracy == 'by_driver' %}By Driver{% elif dl.order.coords_accuracy == 'exact' %}Exact{% elif dl.order.coords_accuracy == 'street' %}Street{% elif dl.order.coords_accuracy == 'landmark' %}Landmark{% elif dl.order.coords_accuracy == 'zone_center' %}Zone{% elif dl.order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
                                     {% endif %}
@@ -244,6 +307,14 @@
                                 <div class="dl-table__address-line2" title="{{ dl.order.customer_address }}">
                                     {{ dl.order.customer_address|default:""|truncatechars:35 }}
                                 </div>
+                                {% if dl.order.latitude and dl.order.longitude %}
+                                {# Opened by the pin above; inside the cell so the row expands. #}
+                                <div class="mpt__panel" hidden>
+                                  <div class="mpt__map mpt__map--sm" id="mpt_map_fu{{ dl.id }}"
+                                       data-lat="{{ dl.order.latitude }}" data-lon="{{ dl.order.longitude }}"
+                                       data-label="{{ dl.order.customer_name|default:'Delivery location' }}"></div>
+                                </div>
+                                {% endif %}
                             </div>
                         </td>
                         <!-- COD -->
@@ -286,7 +357,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="dl-table__empty">
+                        <td colspan="10" class="dl-table__empty">
                             <i class="fa-solid fa-inbox me-2"></i>No tasks to display
                         </td>
                     </tr>
@@ -320,6 +391,7 @@
     </div>
     {% endif %}
 </div>
+</div><!-- /.wfl -->
 
 <!-- Status Update Modal -->
 {% include "workforce/parts/components/_tasks_status_modal.html" %}

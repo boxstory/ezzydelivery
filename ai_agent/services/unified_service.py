@@ -17,6 +17,24 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+def _loads_lenient(resp):
+    """Parse an OpenAI-style response body tolerantly.
+
+    Some gateways (e.g. 9Router's 'free' routing) append trailing bytes or an
+    extra frame after the JSON object, which makes resp.json() raise
+    'Extra data'. Fall back to decoding just the first complete JSON object.
+    """
+    try:
+        return resp.json()
+    except ValueError:
+        text = (resp.text or '').lstrip()
+        # Strip a leading SSE 'data:' prefix if present.
+        if text.startswith('data:'):
+            text = text[5:].lstrip()
+        obj, _ = json.JSONDecoder().raw_decode(text)
+        return obj
+
+
 class OpenAICompatService:
     """Chat service for OpenAI-compatible APIs (OpenAI, xAI/Grok). No SDK required."""
 
@@ -25,18 +43,25 @@ class OpenAICompatService:
         'xai':    'https://api.x.ai/v1/chat/completions',
         'groq':   'https://api.groq.com/openai/v1/chat/completions',
         'zhipu':  'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+        # 'router' (self-hosted 9Router gateway) is resolved from ROUTER_BASE_URL below.
     }
     KEY_SETTINGS = {
         'openai': ('OPENAI_API_KEY',  'gpt-4o'),
         'xai':    ('XAI_API_KEY',     'grok-3'),
         'groq':   ('GROQ_API_KEY',    'llama-3.3-70b-versatile'),
         'zhipu':  ('GLM_API_KEY',     'glm-4.7-flash'),
+        'router': ('AI_API_KEY',      'free'),
     }
 
     def __init__(self, provider: str, model: str = ''):
         self.provider   = provider
         self.max_tokens = getattr(settings, 'AI_AGENT_MAX_TOKENS', 4096)
-        self.endpoint   = self.ENDPOINTS[provider]
+        if provider == 'router':
+            # Shared OpenAI-compatible gateway (9Router) — base URL from settings.
+            base = (getattr(settings, 'AI_BASE_URL', '') or '').rstrip('/')
+            self.endpoint = f'{base}/chat/completions' if base else ''
+        else:
+            self.endpoint = self.ENDPOINTS[provider]
         key_setting, default_model = self.KEY_SETTINGS[provider]
         self.api_key = getattr(settings, key_setting, '') or ''
         self.model   = model or default_model
@@ -258,6 +283,7 @@ class OpenAICompatService:
             'model':      self.model,
             'max_tokens': self.max_tokens,
             'messages':   oai_messages,
+            'stream':     False,   # some gateways (9Router 'free' routing) stream by default
         }
         if oai_tools:
             payload['tools'] = oai_tools
@@ -343,10 +369,12 @@ class OpenAICompatService:
                 self._log_usage(conversation, 0, 0, latency_ms, False, user_id, business_id, err_msg)
                 return {'error': True, 'message': err_msg, 'content': None, 'tool_calls': []}
 
-            data       = resp.json()
+            data       = _loads_lenient(resp)
             choice     = data['choices'][0]
             message    = choice['message']
-            content    = message.get('content') or ''
+            # Reasoning models (e.g. 9Router free routing) may return null content
+            # with the answer under 'reasoning' — fall back to that.
+            content    = message.get('content') or message.get('reasoning') or ''
             usage      = data.get('usage', {})
             tokens_in  = usage.get('prompt_tokens', 0)
             tokens_out = usage.get('completion_tokens', 0)
@@ -501,7 +529,7 @@ def _build_service(provider: str, model: str):
     from ai_agent.services.claude_service import get_claude_service
     if provider == 'anthropic':
         return get_claude_service()
-    elif provider in ('openai', 'xai', 'groq', 'zhipu'):
+    elif provider in ('openai', 'xai', 'groq', 'zhipu', 'router'):
         return OpenAICompatService(provider, model)
     elif provider == 'gemini':
         return GeminiService(model)
@@ -529,29 +557,43 @@ class FallbackService:
             return True, msg
         ok2, msg2 = self.fallback.is_available()
         if ok2:
-            return True, f"Primary unavailable ({msg}); fallback {self.fallback.provider} available"
+            return True, f"Primary unavailable ({msg}); fallback {self._pname(self.fallback)} available"
         return False, f"Both primary ({msg}) and fallback ({msg2}) unavailable"
+
+    @staticmethod
+    def _pname(svc) -> str:
+        return getattr(svc, 'provider', None) or type(svc).__name__
 
     def _is_rate_limit_error(self, result: dict) -> bool:
         msg = (result.get('message') or '').lower()
         return any(sig in msg for sig in self._RATE_LIMIT_SIGNALS)
 
+    def _should_fallback(self, result: dict) -> bool:
+        # Any hard error, OR a "successful" but empty reply with no tool calls
+        # (some gateway free-routing models return blank content) — fall back to
+        # the reliable provider so the user always gets an answer.
+        if result.get('error'):
+            return True
+        no_content = not (result.get('content') or '').strip()
+        no_tools = not (result.get('tool_calls') or [])
+        return no_content and no_tools
+
     def chat(self, **kwargs) -> dict:
         result = self.primary.chat(**kwargs)
-        if result.get('error') and self._is_rate_limit_error(result):
+        if self._should_fallback(result):
             logger.warning(
-                "[fallback] %s rate-limited/timed out — switching to %s",
-                self.primary.provider, self.fallback.provider,
+                "[fallback] %s failed/empty — switching to %s",
+                self._pname(self.primary), self._pname(self.fallback),
             )
             return self.fallback.chat(**kwargs)
         return result
 
     def chat_stream(self, **kwargs):
         result = self.primary.chat(**kwargs)
-        if result.get('error') and self._is_rate_limit_error(result):
+        if self._should_fallback(result):
             logger.warning(
-                "[fallback] %s rate-limited/timed out — switching to %s (stream)",
-                self.primary.provider, self.fallback.provider,
+                "[fallback] %s failed/empty — switching to %s (stream)",
+                self._pname(self.primary), self._pname(self.fallback),
             )
             result = self.fallback.chat(**kwargs)
         if result.get('error'):

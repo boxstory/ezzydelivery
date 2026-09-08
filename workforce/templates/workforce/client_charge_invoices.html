@@ -1,0 +1,177 @@
+{# Purpose: Every charge invoice issued to a client — billed, paid, still outstanding, and how old. #}
+{# Used by: workforce.views.client_charge_invoices (URL workforce:client_charge_invoices) #}
+{# Notes: Reuses the teller vocabulary (bcp__) from the payout desk. Voided invoices keep their row, struck through, #}
+{#        and are excluded from every total because they claim nothing. #}
+{% extends "wf_dashboard_base.html" %}
+{% load static humanize %}
+
+{% block title %}Charge Invoices{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260808a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260808a" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="bcp">
+  <div class="bcp__wrap">
+
+    <!-- Masthead -->
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Receivable · Business ▸ Ezzy</span>
+        <h1 class="wfhero__title">Charge Invoices</h1>
+        <span class="wfhero__sub">
+          What each client has been billed for delivery
+          <span class="wfhero__sep">·</span> voided invoices are excluded from the totals
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <div class="wfhero__tallies">
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ unpaid_count|intcomma }}</span>
+            <span class="wfhero__tally-lbl">Unpaid</span>
+          </div>
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ live_count|intcomma }}</span>
+            <span class="wfhero__tally-lbl">Invoice{{ live_count|pluralize }}</span>
+          </div>
+        </div>
+        <nav class="wfhero__actions">
+          <a href="{% url 'workforce:client_charges_collect' %}" class="wfhero__ghost">New invoice ▸</a>
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_client_charge_invoices_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wfnote" id="workforce_client_charge_invoices_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_client_charge_invoices_card_notes' %}" hidden></div>
+
+    <section class="wfstat" aria-label="Invoice totals">
+      <div class="wfstat__card">
+        <span class="wfstat__label">Billed</span>
+        <span class="wfstat__value">{{ total_billed|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">charged across live invoices</span>
+      </div>
+      <div class="wfstat__card">
+        <span class="wfstat__label">Collected</span>
+        <span class="wfstat__value">{{ total_paid|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">money actually received</span>
+      </div>
+      <div class="wfstat__card wfstat__card--here">
+        <span class="wfstat__label">Outstanding</span>
+        <span class="wfstat__value">{{ total_outstanding|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">still to be collected</span>
+      </div>
+      <div class="wfstat__card {% if not void_count %}wfstat__card--null{% endif %}">
+        <span class="wfstat__label">Voided</span>
+        <span class="wfstat__value">{% if void_count %}{{ void_count|intcomma }}{% else %}—{% endif %}</span>
+        <span class="wfstat__sub">{% if void_count %}cancelled, excluded above{% else %}none cancelled{% endif %}</span>
+      </div>
+    </section>
+
+    <!-- Filters -->
+    <form method="GET" class="bcp__window" id="workforce_charge_invoices_form_filter">
+      <div class="bcp__field bcp__field--account">
+        <label class="bcp__field-label" for="workforce_charge_invoices_select_business">Account</label>
+        <select name="business_id" id="workforce_charge_invoices_select_business" class="bcp__select">
+          <option value="">All accounts</option>
+          {% for biz in all_businesses %}
+          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id|stringformat:"s" %}selected{% endif %}>
+            {{ biz.business_code|default:biz.business_id }} - {{ biz.business_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_charge_invoices_select_status">Status</label>
+        <select name="status" id="workforce_charge_invoices_select_status" class="bcp__select">
+          <option value="">Any</option>
+          {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_charge_invoices_input_from">From</label>
+        <input type="date" name="date_from" id="workforce_charge_invoices_input_from" class="bcp__input" value="{{ date_from }}">
+      </div>
+      <div class="bcp__window-actions">
+        <button type="submit" class="bcp__primary">Apply</button>
+        <a href="{% url 'workforce:client_charge_invoices' %}" class="bcp__ghost">Clear</a>
+      </div>
+    </form>
+
+    {% if invoices %}
+    <section>
+      <div class="bcp__table-wrap">
+        <table class="bcp__table" id="workforce_charge_invoices_table_view">
+          <thead>
+            <tr>
+              <th class="bcp__date">Issued</th>
+              <th>Invoice</th>
+              <th>Account</th>
+              <th>Lines</th>
+              <th>Status</th>
+              <th class="bcp__num">Billed</th>
+              <th class="bcp__num">Paid</th>
+              <th class="bcp__num">Due</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in invoices %}
+            <tr {% if inv.is_void %}class="bcp__row--void"{% endif %}>
+              <td class="bcp__date">{{ inv.issued_at|date:"d M Y" }}</td>
+              <td class="bcp__order">
+                <a href="{% url 'workforce:client_charge_invoice_detail' inv.invoice_code %}">{{ inv.invoice_code }}</a>
+                {% if inv.period_from %}<span class="bcp__sub-line">{{ inv.period_from|date:"d M" }} – {{ inv.period_to|date:"d M" }}</span>{% endif %}
+              </td>
+              <td class="bcp__truncate" title="{{ inv.business.business_name|default:'' }}">
+                {{ inv.business.business_name|default:"—" }}
+              </td>
+              <td class="bcp__date">{{ inv.line_count }}</td>
+              <td>
+                <span class="ccc__pill ccc__pill--{{ inv.status }}">{{ inv.get_status_display }}</span>
+                {% if inv.amount_due > 0 and not inv.is_void and inv.days_outstanding > 0 %}
+                <span class="ccc__age">{{ inv.days_outstanding }}d</span>
+                {% endif %}
+              </td>
+              <td class="bcp__num">{{ inv.total_amount|floatformat:2|intcomma }}</td>
+              <td class="bcp__num bcp__num--cod">{% if inv.amount_paid %}{{ inv.amount_paid|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+              <td class="bcp__num bcp__num--fee">{% if inv.is_void %}—{% else %}{{ inv.amount_due|floatformat:2|intcomma }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5">Total (excludes voided)</td>
+              <td class="bcp__num">{{ total_billed|floatformat:2|intcomma }}</td>
+              <td class="bcp__num bcp__num--cod">{{ total_paid|floatformat:2|intcomma }}</td>
+              <td class="bcp__num bcp__num--fee">{{ total_outstanding|floatformat:2|intcomma }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% include "includes/components/_pagination.html" with page_obj=invoices_page pagination_id="charge_invoices" %}
+    </section>
+    {% else %}
+    <section class="bcp__empty">
+      <p class="bcp__empty-mark">NO INVOICES</p>
+      <p class="bcp__empty-text">
+        Charges billed to a client will appear here.
+        <a href="{% url 'workforce:client_charges_collect' %}">Open the collection desk ▸</a>
+      </p>
+    </section>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

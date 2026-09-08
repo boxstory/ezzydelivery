@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% block content %}
 <div class="btl" id="client_teams_list_container_main">
 
@@ -16,29 +17,20 @@
     {% endif %}
   </div>
 
-  <!-- Page Header (desktop only) -->
-  <div class="btl__header d-none d-md-flex">
-    <div class="btl__header-left">
-      <div class="btl__header-icon">
-        <i class="fa-solid fa-users"></i>
-      </div>
-      <div>
-        <h1 class="btl__title">Team Members</h1>
-        <p class="btl__subtitle">Manage your business team</p>
-      </div>
-    </div>
-    <div class="d-flex align-items-center gap-2">
+  <!-- Page header (desktop only) -->
+  <div class="d-none d-md-block">
+    {% bconheader eyebrow="Business" live="Team" icon="fa-solid fa-users" title="Team Members" subtitle="Manage your business team." %}
       {% if can_manage_team and join_request_count > 0 %}
-      <a href="{% url 'business:business_join_requests' business.business_id %}" class="btl__request-badge" id="client_teams_list_btn_requests">
+      <a href="{% url 'business:business_join_requests' business.business_id %}" class="bcon__btn bcon__btn--secondary" id="client_teams_list_btn_requests">
           <i class="fa-solid fa-bell"></i> {{ join_request_count }} Join Request{{ join_request_count|pluralize }}
       </a>
       {% endif %}
       {% if can_manage_team %}
-      <a href="{% url 'business:business_teams_add' business.business_id %}" class="btl__add-btn" id="client_teams_list_btn_new">
+      <a href="{% url 'business:business_teams_add' business.business_id %}" class="bcon__btn bcon__btn--primary" id="client_teams_list_btn_new">
         <i class="fa-solid fa-user-plus"></i> Add Member
       </a>
       {% endif %}
-    </div>
+    {% endbconheader %}
   </div>
 
   <!-- How to Add Team Members Guide -->
@@ -163,7 +155,7 @@
                  class="btl__avatar-img">
           </div>
           <h3 class="btl__name">{{ team.team_name|default:team.user.username }}</h3>
-          <span class="btl__email">{{ team.team_email|default:team.user.email }}</span>
+          <span class="btl__email">{{ team.team_email|default:team.user.email|lower }}</span>
         </div>
 
         <!-- Details -->
@@ -208,6 +200,7 @@
         {% endif %}
       </div>
       {% endfor %}
+      {% include "includes/components/_pagination.html" with page_obj=teams_page per_page=per_page pagination_id="business_teams" variant="compact" show_goto="false" %}
     {% else %}
       <!-- Empty State -->
       <div class="btl__empty">

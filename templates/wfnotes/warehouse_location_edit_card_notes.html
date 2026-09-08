@@ -1,0 +1,50 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/location_edit.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_location_edit_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Changes <strong>one storage location</strong> — its code, name, type or place in the tree.
+            Stock rows, put-away tasks and pick routes all point at this location, so an edit here
+            changes what those pages display. Nothing about the stock itself moves.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What an edit affects</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Code</dt>
+                        <dd class="wfnote__def">Shown on stock rows, pick routes and count sheets. If
+                            the shelf label says something else, picking slows to a crawl.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Parent</dt>
+                        <dd class="wfnote__def">Moves the location within the tree. Everything under it
+                            moves with it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Type</dt>
+                        <dd class="wfnote__def">Rarely right to change on a live location — a bin
+                            holding stock that becomes a shelf leaves stock in a container level.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Quantities</dt>
+                        <dd class="wfnote__def">Untouched. Whatever was in this location stays in it,
+                            under the new label.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Relabel the shelf too.</strong> The system and the building have to
+                        agree, or the code is worse than useless.</li>
+                    <li><strong>Existing bin codes are not rebuilt</strong> when a parent is renamed —
+                        check the children still read correctly.</li>
+                    <li><strong>Emptying a location is a stock job</strong>, not an edit: move the
+                        units with a put-away or correct them with a count.</li>
+                </ul>
+            </section>
+        </div>

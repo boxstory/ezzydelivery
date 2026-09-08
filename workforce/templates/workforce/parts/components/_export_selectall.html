@@ -1,0 +1,22 @@
+{% comment %}
+Purpose: "export everything matching this filter" toggle that sits next to a list page's export button.
+Used by: list pages with [data-export-row] checkboxes; driven by export-columns.js.
+Notes: Stays hidden until every row on the page is ticked, since only then is "the page" a partial
+       selection. It changes the EXPORT scope only — bulk actions still act on the ticked rows.
+       total = paginator count, noun = what is being counted, limit = the export's row cap.
+{% endcomment %}
+<span class="wfsel__all" data-export-selectall hidden
+      data-export-total="{{ total|default:0 }}"
+      data-export-noun="{{ noun|default:'rows' }}"
+      data-export-limit="{{ limit|default:0 }}">
+  <button type="button" class="wfsel__all-btn" data-export-selectall-btn></button>
+  <span class="wfsel__all-on" data-export-selectall-on hidden>
+    <i class="fa-solid fa-check" aria-hidden="true"></i>
+    <span data-export-selectall-msg></span>
+    <button type="button" class="wfsel__all-clear" data-export-selectall-clear
+            title="Go back to exporting only the ticked rows">
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      <span class="visually-hidden">Export only the ticked rows</span>
+    </button>
+  </span>
+</span>

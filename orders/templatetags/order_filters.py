@@ -115,3 +115,56 @@ def get_zone_display(order):
     except Exception as e:
         logger.debug(f"Error getting zone display: {e}")
         return "No Zone"
+
+
+# ---------------------------------------------------------------------------
+# Orders manifest (client console) — row state resolution
+# ---------------------------------------------------------------------------
+
+# Lane = the colour of the 3px rail on the left edge of a manifest row. Only rows
+# that need the merchant's attention get one; settled rows stay unmarked so the
+# exceptions are the only thing carrying colour.
+_LANE_BY_STATE = {
+    'failed': 'alert',
+    'review': 'warn',
+    'ready': 'live',
+    'assigned': 'live',
+    'transit': 'live',
+    'pending': 'live',
+    'delivered': 'settled',
+    'cancelled': 'settled',
+}
+
+
+@register.simple_tag
+def manifest_state(order):
+    """
+    Resolve one manifest row's display state.
+
+    Returns a dict of {state, label, lane} where `state` is the semantic modifier
+    used for the status dot, `label` is the human text, and `lane` is the row-rail
+    modifier ('alert' / 'warn' / 'live' / '' for settled rows). Stock problems
+    override the lane because they block dispatch regardless of delivery progress.
+    """
+    from business.templatetags.business_pwa_tags import (
+        _resolve_order_status, _DL_STATUS_MAP, _ORDER_STATUS_MAP,
+    )
+
+    source, key = _resolve_order_status(order)
+    status_map = _DL_STATUS_MAP if source == 'dl' else _ORDER_STATUS_MAP
+    state, label, _icon = status_map[key]
+
+    # The shared PWA map calls a published-but-undispatched order "Pending". On the
+    # manifest that clashes with the Published tally and the Publish action, and an
+    # action should keep its name through the whole flow.
+    if source == 'order' and key == 'publish':
+        label = 'Published'
+
+    lane = _LANE_BY_STATE.get(state, 'live')
+    stock = getattr(order, 'stock_flag', '')
+    if stock == 'out_of_stock':
+        lane = 'alert'
+    elif stock == 'low_stock' and lane != 'alert':
+        lane = 'warn'
+
+    return {'state': state, 'label': label, 'lane': lane}

@@ -1,10 +1,17 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff reference list of every Qatar delivery zone — polygon, areas, neighbours, groups
+Used by: delivery.views.zone_list at /delivery/zones/
+Notes: Search covers area names and falls back to trigram fuzzy matching when nothing matches
+       exactly. Carries the shared wfnote__ page-notes card under the hero, hidden on load; the
+       hero help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Zone List{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
+<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260728g">
 {% endblock extra_css %}
 
 {% block content %}
@@ -23,7 +30,16 @@
     <a href="{% url 'delivery:zone_map' %}" class="znl__hero-btn">
       <i class="fa-solid fa-map"></i> View Map
     </a>
+    <button type="button" class="wfnote__btn" data-wfnote-toggle
+            aria-expanded="false" aria-controls="delivery_zone_list_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
   </div>
+
+  <div class="wfnote" id="delivery_zone_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'delivery_zone_list_card_notes' %}" hidden></div>
 
   <!-- Stats -->
   <div class="znl__stats">
@@ -136,34 +152,7 @@
     {% endif %}
   </div>
 
-  <!-- Pagination -->
-  {% if zones.has_other_pages %}
-    <div class="znl__pager">
-      <div class="znl__pager-info">
-        Showing {{ zones.start_index }}-{{ zones.end_index }} of {{ zones.paginator.count }} zones
-      </div>
-      <div class="znl__pager-links">
-        {% if zones.has_previous %}
-          <a href="?page={{ zones.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}{% if polygon_filter %}&polygon={{ polygon_filter }}{% endif %}">
-            <i class="fa-solid fa-chevron-left"></i>
-          </a>
-        {% endif %}
-
-        {% for num in zones.paginator.page_range %}
-          {% if zones.number == num %}
-            <span class="znl__pager--active">{{ num }}</span>
-          {% elif num > zones.number|add:'-3' and num < zones.number|add:'3' %}
-            <a href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}{% if polygon_filter %}&polygon={{ polygon_filter }}{% endif %}">{{ num }}</a>
-          {% endif %}
-        {% endfor %}
-
-        {% if zones.has_next %}
-          <a href="?page={{ zones.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}{% if polygon_filter %}&polygon={{ polygon_filter }}{% endif %}">
-            <i class="fa-solid fa-chevron-right"></i>
-          </a>
-        {% endif %}
-      </div>
-    </div>
-  {% endif %}
+  <!-- Pagination (shared brand component) — filter_params carries search / group / polygon -->
+  {% include "includes/components/_pagination.html" with page_obj=zones filter_params=filter_params per_page=per_page pagination_id="delivery_zone_list" %}
 </div>
 {% endblock content %}

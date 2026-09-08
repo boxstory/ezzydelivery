@@ -29,7 +29,7 @@
         </div>
         <i class="fa-solid fa-chevron-down wh-mob__chevron" id="wh_chev_inventory"></i>
       </div>
-      <div class="wh-mob__section-body {% if request.resolver_match.url_name in 'inventory_list,stock_card,receive_stock,confirm_receive,transaction_list,low_stock_alerts' %}wh-mob__section-body--open{% endif %}" id="wh_sec_inventory">
+      <div class="wh-mob__section-body {% if request.resolver_match.url_name in 'inventory_list,stock_card,receive_stock,confirm_receive,stock_adjust,transaction_list,low_stock_alerts' %}wh-mob__section-body--open{% endif %}" id="wh_sec_inventory">
         <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}wh-mob__sublink--active{% endif %}"
            href="{% url 'warehouse:inventory_list' %}" onclick="closeWhMobileSidebar()">
           <i class="fa-solid fa-list"></i> Stock Levels
@@ -37,6 +37,10 @@
         <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'receive_stock' %}wh-mob__sublink--active{% endif %}"
            href="{% url 'warehouse:receive_stock' %}" onclick="closeWhMobileSidebar()">
           <i class="fa-solid fa-truck-loading"></i> Receive Stock
+        </a>
+        <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'stock_adjust' %}wh-mob__sublink--active{% endif %}"
+           href="{% url 'warehouse:stock_adjust' %}" onclick="closeWhMobileSidebar()">
+          <i class="fa-solid fa-scale-balanced"></i> Stock Adjustment
         </a>
         <a class="wh-mob__sublink {% if request.resolver_match.url_name == 'transaction_list' %}wh-mob__sublink--active{% endif %}"
            href="{% url 'warehouse:transaction_list' %}" onclick="closeWhMobileSidebar()">

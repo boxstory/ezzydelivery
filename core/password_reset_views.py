@@ -5,6 +5,8 @@ Notes: OTP is sent via core.whatsapp_utils (Evolution API fallback). Request/ver
         rate limited and the request step is enumeration-safe (same response whether or not
         an account exists).
 """
+import logging
+
 from django.shortcuts import render, redirect
 from django.contrib.auth import get_user_model
 from django.contrib import messages
@@ -15,9 +17,12 @@ from .whatsapp_utils import (
     create_verification,
     verify_code,
     send_password_reset_completion_notification,
-    validate_input_phone
+    validate_input_phone,
+    whatsapp_auth_channel_down
 )
 from .models import Profile, WhatsAppVerification
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -88,6 +93,18 @@ def password_reset_request(request):
             messages.error(request, f'Invalid phone number: {error_msg}')
             return render(request, 'accounts/password_reset_request.html')
 
+        # A total WhatsApp outage is reported before the account lookup, so the
+        # answer is identical for every number and still tells the truth instead
+        # of promising a code that cannot be sent.
+        if whatsapp_auth_channel_down():
+            logger.error('Password reset unavailable: no connected WhatsApp instance')
+            messages.error(
+                request,
+                'WhatsApp verification is temporarily unavailable. '
+                'Please contact support to reset your password.'
+            )
+            return render(request, 'accounts/password_reset_request.html')
+
         # Generic confirmation shown in all cases (no account enumeration).
         generic_msg = 'If an account with that number exists, a verification code has been sent to WhatsApp.'
 
@@ -106,11 +123,13 @@ def password_reset_request(request):
                     verification_type='password_reset'
                 )
                 if not (result.get('success') and result.get('send_result', {}).get('success')):
-                    # Log-style detail kept server-side; user sees generic message.
-                    pass
+                    # Detail stays server-side; the user still sees generic_msg so
+                    # a failed send cannot be used to confirm the account exists.
+                    logger.error('Password reset code to %s not delivered: %s',
+                                 sanitized_phone, result)
             except Exception:
                 # Never leak internal errors / account existence.
-                pass
+                logger.exception('Password reset send failed for %s', sanitized_phone)
 
         # Always behave identically: stash phone and move to verify step.
         request.session['reset_phone'] = sanitized_phone

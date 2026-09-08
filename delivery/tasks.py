@@ -26,6 +26,10 @@ def check_delivery_task_health(self):
     """
     from delivery.models import DeliveryTask
     from fleet.models import Driver, DriverLocation, DriverActivityLog
+    # Same set the driver PWA uses to pick its high-accuracy GPS profile — if
+    # this alert watched a wider set it would fire for drivers the app is
+    # deliberately tracking at the cheap idle rate.
+    from core.context_processors import DRIVER_ON_DUTY_STATUSES
 
     now = timezone.now()
     alerts = []
@@ -69,11 +73,14 @@ def check_delivery_task_health(self):
     # Fix 2: GPS heartbeat — no location ping for 10+ min during active delivery
     try:
         active_tasks = DeliveryTask.objects.filter(
-            dl_task_status__in=['picked_up', 'start_ride', 'out_for_delivery', 'in_transit'],
+            dl_task_status__in=DRIVER_ON_DUTY_STATUSES,
             driver__isnull=False,
             dl_task_publish=True,
         ).select_related('driver')
         for task in active_tasks[:30]:
+            # Contact recency, so this must stay on created_at: a parked driver
+            # whose phone keeps returning the same cached fix is still checking
+            # in, and is not the outage this alert is for.
             latest_loc = DriverLocation.objects.filter(
                 driver=task.driver
             ).order_by('-created_at').first()

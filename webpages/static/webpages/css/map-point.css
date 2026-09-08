@@ -1,0 +1,105 @@
+/* Purpose: Shared location display utilities — the inline map point, and the route-distance chip. */
+/* Used by: templates/includes/components/_map_point.html and _route_distance.html, sitewide. */
+/* Notes: Sized to sit inside a table cell without pushing the row; the map panel is a separate block. */
+
+.mpt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.mpt__text {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--brand-grey-600, #555);
+}
+.mpt__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.7rem;
+    line-height: 1.4;
+    background: transparent;
+    border: 1px solid var(--brand-grey-400, #bbb);
+    border-radius: 0.2rem;
+    color: var(--brand-grey-600, #555);
+    cursor: pointer;
+}
+.mpt__btn:hover {
+    border-color: var(--brand-navy, #001f3f);
+    color: var(--brand-navy, #001f3f);
+}
+.mpt__btn--on {
+    background: var(--brand-navy, #001f3f);
+    border-color: var(--brand-navy, #001f3f);
+    color: #fff;
+}
+
+.mpt__panel { margin: 0.4rem 0; }
+.mpt__map {
+    height: 15rem;
+    width: 100%;
+    min-width: 12rem;
+    border: 1px solid var(--brand-grey-400, #bbb);
+    background: var(--brand-grey-100, #f2f2f2);
+}
+.mpt__map--sm { height: 10rem; }
+.mpt__map--lg { height: 22rem; }
+
+/* Markers are drawn as plain dots so two points read as a pair, not as pins
+   competing for attention. */
+.mpt__marker {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.mpt__legend {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.35rem 0 0;
+    font-size: 0.7rem;
+    color: var(--brand-grey-600, #555);
+}
+.mpt__key {
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    margin-left: 0.6rem;
+}
+.mpt__key:first-child { margin-left: 0; }
+
+.mpt__error {
+    margin: 0;
+    padding: 1rem;
+    font-size: 0.78rem;
+    color: var(--brand-grey-600, #555);
+}
+
+/* ── Route distance chip ─────────────────────────────────────────────── */
+/* The driving distance from pickup to drop, read from the stored figure.
+   A "~" and the muted treatment mean it fell back to a straight line or a
+   zone centre, which reads roughly a third short of the real drive. */
+.rdist {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--brand-navy, #001f3f);
+}
+.rdist i {
+    font-size: 0.66rem;
+    color: var(--brand-grey-500, #777);
+}
+.rdist--approx {
+    font-weight: 500;
+    color: var(--brand-grey-600, #555);
+}

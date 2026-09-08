@@ -1,10 +1,17 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff list of every named area/neighbourhood and the zone it belongs to, with pin editing
+Used by: delivery.views.zone_areas at /delivery/zone-areas/ (pin saves to delivery:update_area_pin)
+Notes: Leaflet drag-a-pin modal writes the area's lat/lng straight back over AJAX. Carries the
+       shared wfnote__ page-notes card under the hero, hidden on load; the hero help button
+       toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Zone Areas{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
+<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260728g">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 {% endblock extra_css %}
 
@@ -19,7 +26,16 @@
       <h1 class="zna__hero-title">Zone Areas</h1>
       <p class="zna__hero-sub">Browse all delivery areas and their zone assignments</p>
     </div>
+    <button type="button" class="wfnote__btn ms-auto" data-wfnote-toggle
+            aria-expanded="false" aria-controls="delivery_zone_areas_card_notes"
+            title="About this page">
+      <i class="fa-solid fa-question" aria-hidden="true"></i>
+      <span class="visually-hidden">Show notes</span>
+    </button>
   </div>
+
+  <div class="wfnote" id="delivery_zone_areas_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'delivery_zone_areas_card_notes' %}" hidden></div>
 
   <!-- Stats -->
   <div class="zna__stats">
@@ -88,9 +104,7 @@
               <td>
                 {% if area.latitude and area.longitude %}
                   <span class="zna__coords">{{ area.latitude }}, {{ area.longitude }}</span>
-                  <a href="https://www.google.com/maps?q={{ area.latitude }},{{ area.longitude }}" target="_blank" rel="noopener" class="zna__map-link" title="Open in Google Maps">
-                    <i class="fa-solid fa-map-pin"></i>
-                  </a>
+                  {% include "includes/components/_map_point.html" with uid=area.id|stringformat:"s"|add:"-zna" lat=area.latitude lon=area.longitude label=area.area_name|default:"Zone area" size="sm" %}
                 {% else %}
                   <span class="text-muted">-</span>
                 {% endif %}
@@ -142,35 +156,8 @@
     {% endif %}
   </div>
 
-  <!-- Pagination -->
-  {% if areas.has_other_pages %}
-    <div class="zna__pager">
-      <div class="zna__pager-info">
-        Showing {{ areas.start_index }}-{{ areas.end_index }} of {{ areas.paginator.count }} areas
-      </div>
-      <div class="zna__pager-links">
-        {% if areas.has_previous %}
-          <a href="?page={{ areas.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}">
-            <i class="fa-solid fa-chevron-left"></i>
-          </a>
-        {% endif %}
-
-        {% for num in areas.paginator.page_range %}
-          {% if areas.number == num %}
-            <span class="zna__pager--active">{{ num }}</span>
-          {% elif num > areas.number|add:'-3' and num < areas.number|add:'3' %}
-            <a href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}">{{ num }}</a>
-          {% endif %}
-        {% endfor %}
-
-        {% if areas.has_next %}
-          <a href="?page={{ areas.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}">
-            <i class="fa-solid fa-chevron-right"></i>
-          </a>
-        {% endif %}
-      </div>
-    </div>
-  {% endif %}
+  <!-- Pagination (shared brand component) — filter_params carries search / zone -->
+  {% include "includes/components/_pagination.html" with page_obj=areas filter_params=filter_params per_page=per_page pagination_id="delivery_zone_areas" %}
 </div>
 <!-- Edit Pin Modal -->
 <div id="zna-pin-modal" class="zna__pin-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="zna-pin-modal-title">
@@ -323,7 +310,13 @@
             // Was empty — rebuild the coords cell
             const coordsTd = editBtn.closest('tr').querySelectorAll('td')[3];
             coordsTd.innerHTML = '<span class="zna__coords">' + data.latitude + ', ' + data.longitude + '</span>'
-              + ' <a href="https://www.google.com/maps?q=' + data.latitude + ',' + data.longitude + '" target="_blank" rel="noopener" class="zna__map-link" title="Open in Google Maps"><i class="fa-solid fa-map-pin"></i></a>';
+              // Same markup shape as the _map_point component, so the delegated
+              // handler in map-point.js picks it up with no extra wiring.
+              + ' <span class="mpt"><button type="button" class="mpt__btn" aria-expanded="false"'
+              + ' data-mappoint-toggle="mpt_map_zna' + currentAreaId + '" title="Show on map">'
+              + '<i class="fa-solid fa-map-pin"></i></button></span>'
+              + '<div class="mpt__panel" hidden><div class="mpt__map mpt__map--sm" id="mpt_map_zna' + currentAreaId + '"'
+              + ' data-lat="' + data.latitude + '" data-lon="' + data.longitude + '"></div></div>';
           }
         }
         closeModal();

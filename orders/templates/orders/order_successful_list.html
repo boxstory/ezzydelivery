@@ -1,29 +1,18 @@
 {% extends "business_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% load business_console %}
 
 {% block content %}
 <div class="osl" id="orders_successful_list_container_main">
-    <!-- Hero Header -->
-    <div class="osl__hero">
-        <div class="osl__hero-content">
-            <div class="osl__hero-left">
-                <h1 class="osl__title">
-                    <i class="fas fa-check-circle"></i>
-                    Successful Orders
-                </h1>
-                <p class="osl__subtitle">Orders completed successfully</p>
-            </div>
-            <div class="osl__hero-actions">
-                <a href="{% url 'delivery:all_delivery_tasks' %}" class="osl__btn osl__btn--outline" id="orders_successful_list_btn_go_tasks">
-                    <i class="fa fa-truck"></i> Go to Tasks
-                </a>
-                <a href="{% url 'orders:add_order' %}" class="osl__btn osl__btn--primary" id="orders_successful_list_btn_add_orders">
-                    <i class="fa fa-plus"></i> Add Orders
-                </a>
-            </div>
-        </div>
-    </div>
+    {% bconheader eyebrow="Orders" live="Successful" icon="fa-solid fa-circle-check" title="Successful Orders" subtitle="Orders completed successfully." %}
+        <a href="{% url 'delivery:all_delivery_tasks' %}" class="bcon__btn bcon__btn--secondary" id="orders_successful_list_btn_go_tasks">
+            <i class="fa-solid fa-truck"></i> Go to Tasks
+        </a>
+        <a href="{% url 'orders:add_order' %}" class="bcon__btn bcon__btn--primary" id="orders_successful_list_btn_add_orders">
+            <i class="fa-solid fa-plus"></i> Add Orders
+        </a>
+    {% endbconheader %}
 
     <!-- Desktop Section -->
     <section class="d-none d-md-block" id="orders_successful_list_section_desktop">

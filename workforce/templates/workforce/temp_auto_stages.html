@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static custom_filters %}
+{% comment %}
+Purpose: Staff config — which auto-import stages run per business when a temp order is auto-imported
+Used by: workforce_views.temp_auto_stages at /workforce/temp-orders/auto-stages/
+Notes: Only businesses with temp_order_enabled are listed; flags live in Business.import_mapping.
+       Carries the shared page-notes card (wfnote__) under the hero, hidden on load; the hero help
+       button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block content %}
 <div style="min-width:0;max-width:100%">
@@ -12,8 +19,17 @@
             <a href="{% url 'workforce:temp_orders' %}" class="btn btn-outline-dark btn-sm">
                 <i class="fa-solid fa-arrow-left me-1"></i>Back to Temp Orders
             </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_temp_auto_stages_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </header>
+
+    <div class="wfnote" id="workforce_temp_auto_stages_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_temp_auto_stages_card_notes' %}" hidden></div>
 
     <div class="px-2 mb-2 small text-muted">
         Each tick enables that stage for the business. Unticked stages are skipped during auto-import.
@@ -82,6 +98,7 @@
             </tbody>
         </table>
     </div>
+    {% include "includes/components/_pagination.html" with page_obj=rows_page per_page=per_page pagination_id="temp_auto_stages" %}
 
     <div id="stageSaveToast"
          class="position-fixed bottom-0 end-0 m-3 px-3 py-2 rounded shadow-sm small d-none"
@@ -91,7 +108,7 @@
 </div>
 
 <script>
-const STAGE_KEYS = {{ stage_keys|safe }};
+const STAGE_KEYS = {{ stage_keys_json }};
 const SAVE_URL = '{% url "workforce:temp_auto_stages_save" %}';
 const CSRF = (() => {
     const inp = document.querySelector('[name=csrfmiddlewaretoken]');

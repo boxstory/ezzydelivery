@@ -1,0 +1,89 @@
+{% comment %}
+Purpose: "About this page" notes panel for batch_detail.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_dispatch_batch_detail_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            One batch, in full. A batch is the trip a rider makes with orders that all leave the
+            <strong>same pickup location</strong> for the <strong>same delivery zone</strong> — normally two
+            orders, sometimes just one. This page shows how the batch was built, who is carrying it, which
+            orders are inside with their SLA deadlines, and a timestamped log of everything that happened to
+            it. It is the page to open when someone asks why an order left late or went out alone.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Release now</dt>
+                        <dd class="wfnote__def">Offered only while the batch is holding. Ends the wait
+                            immediately and closes the batch with whatever it has, so it can be picked up by a
+                            rider. Recorded against your username as a manual override.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Cancel batch</dt>
+                        <dd class="wfnote__def">Offered while the batch is still pending, holding or ready.
+                            Marks it cancelled so no rider can be given it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Order links</dt>
+                        <dd class="wfnote__def">Each order number opens that order in a new tab, where the
+                            delivery task, driver and money live.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Activity log</dt>
+                        <dd class="wfnote__def">Read-only history for this batch: created, orders added,
+                            released with a reason, assigned, started, completed or cancelled.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Fields explained</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Release reason</dt>
+                        <dd class="wfnote__def">Why the batch stopped waiting. <em>Batch Full</em> — it reached
+                            its order limit. <em>Hold Window Expired</em> — the timer ran out with no partner
+                            order. <em>SLA Risk</em> — an order inside was close to its deadline and was rescued.
+                            <em>Manual Release</em> — staff pressed the button. <em>Off-Peak Single Release</em> —
+                            batching is switched off for that location, so it went out alone.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Total COD</dt>
+                        <dd class="wfnote__def">The cash the rider carries for the whole batch — the sum of the
+                            orders' COD. A rider without enough credit headroom is skipped when the batch is
+                            being assigned.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Seq</dt>
+                        <dd class="wfnote__def">The order of drops inside the batch — the first order in is
+                            delivered first.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">SLA deadline</dt>
+                        <dd class="wfnote__def">Set when the order joined the batch: the time the order was
+                            created plus the location's SLA target. <em>AT RISK</em> means the deadline came
+                            close enough that the system force-released the batch.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Cancelling stops the batch, <strong>not the orders</strong>. Their delivery tasks are left
+                    exactly as they are — handle those on the order or task pages.</li>
+                <li>Releasing does not choose a rider. The batch moves to <em>Ready</em> and a background pass
+                    assigns it, usually within seconds, to someone on an Active shift at this location.</li>
+                <li>When a batch is assigned, the delivery tasks of its orders are switched to that rider and
+                    marked in-transit automatically.</li>
+                <li>Nothing here can add or remove an order once the batch exists — the engine decides
+                    membership at the moment each order is verified.</li>
+                <li>SLA compliance is judged on the <strong>whole batch's</strong> completion time against each
+                    order's own deadline, which is why one slow drop can breach both orders.</li>
+            </ul>
+        </section>
+    

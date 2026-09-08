@@ -1,0 +1,246 @@
+{# Purpose: Super-admin console for staff department sub-roles — who sees Operations, Finance, Marketing. #}
+{# Used by: workforce.views.staff_roles_list (URL workforce:staff_roles_list) #}
+{# Notes: Ticking a box PATCHes one department via workforce:staff_role_update and takes effect on that user's next page load. #}
+{#        Super-admin rows are read-only: that flag bypasses departments entirely and stays a Django-admin change. #}
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Staff Roles - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/staff-roles.css' %}?v=20260801b" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="srol">
+  <div class="srol__wrap">
+
+    <!-- Masthead -->
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Access Control</span>
+        <h1 class="wfhero__title">Staff Roles</h1>
+        <span class="wfhero__sub">
+          Staff access is two questions
+          <span class="wfhero__sep">·</span> <em>is_staff</em> lets them in
+          <span class="wfhero__sep">·</span> departments decide which desks
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <div class="wfhero__tallies">
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ stats.total }}</span>
+            <span class="wfhero__tally-lbl">Staff</span>
+          </div>
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ stats.admin }}</span>
+            <span class="wfhero__tally-lbl">Super Admin</span>
+          </div>
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ stats.none }}</span>
+            <span class="wfhero__tally-lbl">No desk</span>
+          </div>
+        </div>
+        <nav class="wfhero__actions">
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_staff_roles_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wfnote" id="workforce_staff_roles_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_staff_roles_card_notes' %}" hidden></div>
+
+    <!-- Department legend: what each desk actually unlocks -->
+    <div class="row g-2 mb-3">
+      {% for dept in departments %}
+      <div class="col-12 col-sm-6 col-lg-3">
+        <a class="srol__legend srol__legend--{{ dept.code }}"
+           href="{% url 'workforce:staff_pages_list' %}?dept={{ dept.code }}"
+           title="Edit which pages belong to {{ dept.label }}">
+          <span class="srol__legend-swatch" aria-hidden="true"></span>
+          <span class="srol__legend-name">{{ dept.label }}</span>
+          <span class="srol__legend-count">{{ dept.pages }} pages</span>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Search + department filter -->
+    <form method="get" class="d-flex flex-wrap gap-2 mb-3">
+      <input type="text" name="search" value="{{ search }}" class="form-control srol__search"
+             placeholder="Search name, email, phone, user number...">
+      <button type="submit" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-magnifying-glass"></i>
+      </button>
+      {% if search or dept_filter %}
+      <a href="{% url 'workforce:staff_roles_list' %}" class="btn btn-outline-danger">
+        <i class="fa-solid fa-xmark"></i>
+      </a>
+      {% endif %}
+    </form>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+      <span class="text-muted small"><i class="fa-solid fa-filter"></i> Desk:</span>
+      <a href="?{% if search %}search={{ search }}{% endif %}"
+         class="btn btn-sm {% if not dept_filter %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        All <span class="srol__pill-num">{{ stats.total }}</span>
+      </a>
+      <a href="?dept=ops{% if search %}&search={{ search }}{% endif %}"
+         class="btn btn-sm {% if dept_filter == 'ops' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        Operations <span class="srol__pill-num">{{ stats.ops }}</span>
+      </a>
+      <a href="?dept=fin{% if search %}&search={{ search }}{% endif %}"
+         class="btn btn-sm {% if dept_filter == 'fin' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        Finance <span class="srol__pill-num">{{ stats.fin }}</span>
+      </a>
+      <a href="?dept=mkt{% if search %}&search={{ search }}{% endif %}"
+         class="btn btn-sm {% if dept_filter == 'mkt' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        Marketing <span class="srol__pill-num">{{ stats.mkt }}</span>
+      </a>
+      <a href="?dept=admin{% if search %}&search={{ search }}{% endif %}"
+         class="btn btn-sm {% if dept_filter == 'admin' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        Super Admin <span class="srol__pill-num">{{ stats.admin }}</span>
+      </a>
+      <a href="?dept=none{% if search %}&search={{ search }}{% endif %}"
+         class="btn btn-sm {% if dept_filter == 'none' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        No desk <span class="srol__pill-num">{{ stats.none }}</span>
+      </a>
+    </div>
+
+    <div class="srol__tablewrap">
+      <table id="workforce_staff_roles_table_view" class="table srol__table align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Staff member</th>
+            <th scope="col" class="srol__col-dept">Operations</th>
+            <th scope="col" class="srol__col-dept">Finance</th>
+            <th scope="col" class="srol__col-dept">Marketing</th>
+            <th scope="col" class="srol__col-dept">Super Admin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr class="srol__row{% if row.is_orphan %} srol__row--orphan{% endif %}"
+              data-profile-id="{{ row.profile.id }}">
+            <th scope="row" class="srol__who">
+              <span class="srol__name">
+                {{ row.profile.first_name|default:"" }} {{ row.profile.last_name|default:"" }}
+                {% if not row.profile.first_name and not row.profile.last_name %}
+                  {{ row.profile.username|default:row.profile.user_number }}
+                {% endif %}
+              </span>
+              <span class="srol__meta">
+                {{ row.profile.user_number }}
+                {% if row.profile.email %}<span class="srol__dot">·</span>{{ row.profile.email }}{% endif %}
+              </span>
+              {% if row.is_orphan %}
+              <span class="srol__warn">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                No desk assigned — can sign in but every section is blocked
+              </span>
+              {% endif %}
+            </th>
+
+            {% for code in assignable %}
+            <td class="srol__cell">
+              {% if row.profile.is_superadmin %}
+                <span class="srol__locked" title="Super admins hold every department">
+                  <i class="fa-solid fa-check"></i>
+                </span>
+              {% else %}
+                <label class="srol__toggle">
+                  <input type="checkbox" class="srol__check" data-department="{{ code }}"
+                         {% if code in row.held %}checked{% endif %}
+                         aria-label="{{ code }} department for {{ row.profile.user_number }}">
+                  <span class="srol__switch" aria-hidden="true"></span>
+                </label>
+              {% endif %}
+            </td>
+            {% endfor %}
+
+            <td class="srol__cell">
+              {% if row.profile.is_superadmin %}
+                <span class="srol__badge srol__badge--admin">Super Admin</span>
+              {% else %}
+                <span class="srol__dash">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="srol__empty">
+              No staff match this filter.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="srol__foot">
+      Changes save immediately and apply on that person's next page load.
+      Super Admin is not editable here — it bypasses departments entirely, so it stays a Django-admin change.
+    </p>
+
+  </div>
+</div>
+
+<script>
+// Staff role toggles. One checkbox = one department on one profile; the row
+// reverts if the server refuses so the UI never shows access that isn't real.
+document.addEventListener('DOMContentLoaded', function () {
+  var table = document.getElementById('workforce_staff_roles_table_view');
+  if (!table) return;
+
+  var csrf = document.querySelector('meta[name="csrf-token"]');
+  var token = csrf ? csrf.content : '';
+
+  table.addEventListener('change', function (event) {
+    var box = event.target;
+    if (!box.classList.contains('srol__check')) return;
+
+    var row = box.closest('.srol__row');
+    var profileId = row.getAttribute('data-profile-id');
+    var department = box.getAttribute('data-department');
+    var enabled = box.checked;
+
+    box.disabled = true;
+    row.classList.add('srol__row--saving');
+
+    fetch('/workforce/staff-roles/' + profileId + '/update/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': token,
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify({department: department, enabled: enabled})
+    })
+      .then(function (res) { return res.json().then(function (d) { return {ok: res.ok, data: d}; }); })
+      .then(function (result) {
+        if (!result.ok || !result.data.success) {
+          box.checked = !enabled;
+          window.alert(result.data.error || 'Could not save that change.');
+          return;
+        }
+        // An empty desk list is worth flagging on the spot.
+        var held = result.data.held || [];
+        row.classList.toggle('srol__row--orphan', held.length === 0);
+      })
+      .catch(function () {
+        box.checked = !enabled;
+        window.alert('Network error — the change was not saved.');
+      })
+      .finally(function () {
+        box.disabled = false;
+        row.classList.remove('srol__row--saving');
+      });
+  });
+});
+</script>
+{% endblock content %}

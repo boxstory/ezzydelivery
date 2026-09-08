@@ -17,8 +17,12 @@ Dependencies:
 from django.conf import settings
 from django.db import models
 
+from core import signup_origin
+from core.email_normalize import EmailNormalizedModel
+from core.validators import image_validators
 
-class Profile(models.Model):
+
+class Profile(EmailNormalizedModel, models.Model):
     """
     Extended user profile model for EzzyDelivery platform.
 
@@ -42,6 +46,11 @@ class Profile(models.Model):
         verification_status: pending, under_review, verified, rejected, incomplete
         verification_applied_at, verified_at, verified_by, rejection_reason
 
+    Signup Origin:
+        signup_source: driver_join, business_join, team_join, pricing_inquiry,
+                       website, direct_login, unknown
+        signup_landing_path, signup_referrer, signup_utm, signup_source_inferred
+
     Usage:
         >>> user = User.objects.get(username='john')
         >>> profile = user.profile
@@ -53,6 +62,8 @@ class Profile(models.Model):
         - Driver (fleet app): profile.driver
         - BusinessTeamProfile (business app): profile.businessteam
     """
+    EMAIL_FIELDS = ('email',)
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
 
@@ -78,10 +89,35 @@ class Profile(models.Model):
     is_driver = models.BooleanField(default=False)
     is_superadmin = models.BooleanField(default=False, help_text='Super admin — can approve driver status changes and other sensitive actions')
 
+    # Staff departments — sub-roles that only matter when is_staff is True.
+    # is_staff says "may enter the staff dashboard"; these say "which desks".
+    # A user can hold several. Super admins bypass them entirely.
+    # The URL-name -> department map lives in core/departments.py.
+    dept_operations = models.BooleanField(
+        default=False, help_text='Staff department: Operations — orders, tasks, drivers, dispatch, warehouse')
+    dept_finance = models.BooleanField(
+        default=False, help_text='Staff department: Finance — COD, settlements, payouts, transactions')
+    dept_marketing = models.BooleanField(
+        default=False, help_text='Staff department: Marketing — CRM leads, WhatsApp inbox, pricing inquiries')
+
     # Profile completion tracking
     is_profile_completed = models.BooleanField(default=False)
     is_business_profile_completed = models.BooleanField(default=False)
     is_driver_profile_completed = models.BooleanField(default=False)
+
+    # Password strength nudge — set at login, since that is the only moment the
+    # plaintext is available. The reasons are deliberately NOT stored: knowing why
+    # a password is weak narrows the guesses if the database ever leaks.
+    WEAK_PASSWORD_MAX_SKIPS = 3
+    weak_password = models.BooleanField(
+        default=False,
+        help_text='Last password seen at login failed the strength rules'
+    )
+    weak_password_skips = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Times the user postponed the change-password warning (max 3)'
+    )
+    weak_password_checked_at = models.DateTimeField(blank=True, null=True)
 
     # Verification status
     VERIFICATION_STATUS_CHOICES = (
@@ -106,6 +142,21 @@ class Profile(models.Model):
         related_name='verified_profiles'
     )
     rejection_reason = models.TextField(blank=True, null=True)
+
+    # How this user arrived — captured on the session before signup (see core/signup_origin.py)
+    signup_source = models.CharField(
+        max_length=20,
+        choices=signup_origin.SOURCE_CHOICES,
+        default=signup_origin.SOURCE_UNKNOWN,
+        db_index=True,
+    )
+    signup_source_inferred = models.BooleanField(
+        default=False,
+        help_text='Source was guessed from the account afterwards, not tracked at signup',
+    )
+    signup_landing_path = models.CharField(max_length=255, blank=True, default='')
+    signup_referrer = models.CharField(max_length=255, blank=True, default='')
+    signup_utm = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -132,6 +183,30 @@ class Profile(models.Model):
 
     class Meta:
         verbose_name_plural = "Profiles"
+
+    @property
+    def staff_departments(self):
+        """
+        Department codes this profile holds, e.g. {'ops', 'fin'}.
+
+        Super admins report every department plus 'admin'. Reads the booleans
+        directly so it works on a bare Profile with no user loaded.
+        """
+        from core.departments import ADMIN, ASSIGNABLE_DEPARTMENTS, DEPARTMENT_FIELDS
+
+        if self.is_superadmin:
+            return set(ASSIGNABLE_DEPARTMENTS) | {ADMIN}
+        return {
+            code for code, field in DEPARTMENT_FIELDS.items()
+            if getattr(self, field, False)
+        }
+
+    def get_department_labels(self):
+        """Human-readable department names, for admin lists and the roles page."""
+        from core.departments import DEPARTMENT_CHOICES
+
+        held = self.staff_departments
+        return [label for code, label in DEPARTMENT_CHOICES if code in held]
 
     def get_profile_completion_percentage(self):
         """Calculate profile completion percentage"""
@@ -164,12 +239,16 @@ class Profile(models.Model):
         return int((completed / len(required_fields)) * 100)
 
     def get_business_profile_completion_percentage(self):
-        """Calculate business profile completion percentage"""
-        if not self.is_business:
-            return 0
+        """Percentage of the business record filled in, 0 when there is no business.
+
+        Reads the record rather than the is_business flag: an applicant part-way
+        through registration has a Business row before the flag is ever set.
+        """
         try:
             from business.models import Business
-            business = Business.objects.get(profile=self)
+            business = Business.objects.filter(profile=self).first()
+            if business is None:
+                return 0
             required_fields = ['business_name', 'business_phone', 'business_whatsapp',
                              'business_email', 'business_product_category', 'business_qid']
             completed = sum(1 for field in required_fields if getattr(business, field, None))
@@ -178,18 +257,33 @@ class Profile(models.Model):
             return 0
 
     def get_driver_profile_completion_percentage(self):
-        """Calculate driver profile completion percentage"""
-        if not self.is_driver:
-            return 0
+        """Percentage of the driver record filled in, 0 when there is no driver.
+
+        Reads the record rather than the is_driver flag, which is only set once
+        an application is accepted — mid-application progress still counts.
+        """
         try:
             from fleet.models import Driver
-            driver = Driver.objects.get(profile=self)
+            driver = Driver.objects.filter(profile=self).first()
+            if driver is None:
+                return 0
             required_fields = ['driver_phone', 'driver_whatsapp', 'driver_languages',
                              'driver_license_number', 'driver_bio']
             completed = sum(1 for field in required_fields if getattr(driver, field, None))
             return int((completed / len(required_fields)) * 100)
         except Exception:
             return 0
+
+    def get_role_profile_completion_percentage(self):
+        """Completion of whichever role record this user has.
+
+        Replaces adding the two percentages together, which reported over 100%
+        for anyone holding both a business and a driver record.
+        """
+        return max(
+            self.get_business_profile_completion_percentage(),
+            self.get_driver_profile_completion_percentage(),
+        )
 
     def can_apply_for_verification(self):
         """Check if user can apply for verification"""
@@ -233,7 +327,8 @@ class ProfilePicture(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile_picture')
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='profile_picture')
     profile_picture = models.ImageField(
-        upload_to=user_directory_path, default='user/avatar.png', blank=True, null=True)
+        upload_to=user_directory_path, default='user/avatar.png', blank=True, null=True,
+        validators=image_validators(max_mb=5))
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -331,9 +426,24 @@ class AutoTriggerConfig(models.Model):
         ('waha', 'WAHA'),
     ]
 
+    # Which staff desk owns this trigger. Codes match core.departments so the
+    # Auto Triggers page can filter rows by the viewer's departments.
+    # 'admin' = platform internals; only super admins ever see those rows, and
+    # it is the default so a NEW trigger is never exposed to a desk by accident.
+    DEPARTMENT_CHOICES = [
+        ('ops', 'Operations'),
+        ('fin', 'Finance'),
+        ('mkt', 'Marketing'),
+        ('admin', 'Admin / Platform'),
+    ]
+
     trigger_key = models.CharField(max_length=100, unique=True)
     label = models.CharField(max_length=200)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    department = models.CharField(
+        max_length=10, choices=DEPARTMENT_CHOICES, default='admin', db_index=True,
+        help_text='Staff desk that owns this trigger (admin = super admin only).'
+    )
     is_enabled = models.BooleanField(default=True)
     description = models.TextField(blank=True, default='')
     action = models.CharField(max_length=255, blank=True, default='')
@@ -352,7 +462,7 @@ class AutoTriggerConfig(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['category', 'trigger_key']
+        ordering = ['department', 'category', 'trigger_key']
         verbose_name = 'Auto Trigger Config'
         verbose_name_plural = 'Auto Trigger Configs'
 
@@ -492,21 +602,85 @@ class WhatsAppInstance(models.Model):
         super().save(*args, **kwargs)
 
 
+class WhatsAppSendLog(models.Model):
+    """One send attempt on one instance — the evidence behind its health badge.
+
+    Deliberately stores no message body. These rows cover OTPs and password
+    reset codes, so keeping the text would put live credentials in a table that
+    staff can read from the instances console.
+
+    Keyed by instance_name rather than a FK so a log survives its instance row
+    being deleted — the failures are usually what you go looking for afterwards.
+    """
+
+    CHANNEL_CHOICES = [
+        ('evolution', 'Evolution API'),
+        ('waha', 'WAHA'),
+    ]
+
+    instance_name = models.CharField(max_length=100, db_index=True)
+    channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default='evolution')
+    phone_number = models.CharField(max_length=30, blank=True, default='', help_text="Recipient, partially masked")
+    success = models.BooleanField(default=False)
+    status_code = models.PositiveSmallIntegerField(null=True, blank=True)
+    detail = models.CharField(max_length=255, blank=True, default='', help_text="Error text, or empty when the send succeeded")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'WhatsApp Send Log'
+        verbose_name_plural = 'WhatsApp Send Logs'
+
+    def __str__(self):
+        return f"{self.instance_name} → {self.phone_number} {'OK' if self.success else 'FAILED'}"
+
+
 class WhatsAppSenderRoute(models.Model):
     """Maps a platform section to the WhatsApp instance its messages must send from."""
 
+    CHANNEL_EVOLUTION = 'evolution'
+    CHANNEL_WAHA = 'waha'
+    CHANNEL_CHOICES = [
+        (CHANNEL_EVOLUTION, 'Evolution API'),
+        (CHANNEL_WAHA, 'WAHA'),
+    ]
+
     SECTION_CHOICES = [
         ('orders_tasks', 'Orders & Delivery Tasks'),
-        ('crm_leads', 'CRM & Leads'),
+        ('crm_leads', 'CRM — Business Leads'),
+        ('driver_onboarding', 'CRM — Driver Leads & Join Form'),
         ('marketing_campaigns', 'Marketing Campaigns'),
         ('followups', 'Follow-up Digests'),
     ]
+
+    # Staff desk that owns each route, so the Auto Triggers page shows a desk
+    # only the routes it actually sends from. Sections are code-defined, so this
+    # is a static map rather than a column. Codes match core.departments.
+    SECTION_DEPARTMENTS = {
+        'orders_tasks': 'ops',
+        'crm_leads': 'mkt',
+        'driver_onboarding': 'mkt',
+        'marketing_campaigns': 'mkt',
+        'followups': 'mkt',
+    }
 
     section = models.CharField(max_length=30, choices=SECTION_CHOICES, unique=True)
     instance = models.ForeignKey(
         WhatsAppInstance, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='sender_routes',
         help_text='WhatsApp number this section sends from (blank = default).'
+    )
+    # Which API actually carries this section's messages. A number can exist on
+    # both stacks at once (WhatsAppInstance holds an Evolution instance_name AND
+    # a waha_session), so the number and the channel are two separate choices —
+    # driver leads can run on WAHA while business leads stay on Evolution.
+    # Named explicitly rather than "default by config": a section that quietly
+    # follows a global flag is exactly what makes a wrong-number send hard to
+    # explain, and every route here is staff-facing.
+    channel = models.CharField(
+        max_length=20, choices=CHANNEL_CHOICES, default=CHANNEL_EVOLUTION,
+        help_text='API this section sends through. WAHA uses the number\'s '
+                  'WAHA session; Evolution uses its instance name.'
     )
     is_enabled = models.BooleanField(
         default=True,
@@ -522,3 +696,93 @@ class WhatsAppSenderRoute(models.Model):
     def __str__(self):
         target = self.instance.label if self.instance else 'default'
         return f"{self.get_section_display()} → {target}"
+
+    @property
+    def department(self):
+        """Desk that owns this route; unknown sections stay super-admin only."""
+        return self.SECTION_DEPARTMENTS.get(self.section, 'admin')
+
+class MessageTemplate(models.Model):
+    """Staff-edited body of an automatic outbound message (WhatsApp).
+
+    core/message_templates.py holds the shipped default for every key. A row
+    here only exists once someone edits or switches off that message on the AI
+    Config page — an absent row means "use the code default", so a fresh
+    install sends the right thing with no seeding step.
+    """
+
+    key = models.CharField(
+        max_length=100, unique=True, db_index=True,
+        help_text="Template key from core.message_templates.TEMPLATE_DEFAULTS")
+    body = models.TextField(
+        blank=True, default='',
+        help_text="Message body; {placeholders} are filled at send time. Blank = code default.")
+    is_enabled = models.BooleanField(
+        default=True, help_text="Off = this message is not sent at all.")
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='message_templates_updated')
+
+    class Meta:
+        ordering = ['key']
+        verbose_name = 'Message Template'
+        verbose_name_plural = 'Message Templates'
+
+    def __str__(self):
+        status = 'ON' if self.is_enabled else 'OFF'
+        return f"[{status}] {self.key}"
+
+
+class PageDepartment(models.Model):
+    """
+    Editable override of a page's department assignment.
+
+    core/departments.py holds the shipped defaults for every workforce route.
+    This table only stores what a super admin has *changed* from those defaults —
+    a page moved to another desk, a page switched off, or a route that had no
+    classification at all. An absent row means "use the code default", so the
+    table stays small and the code map remains readable.
+
+    Managed from /workforce/staff-pages/. Reads go through
+    core.departments.effective_map(), which caches until a row changes.
+    """
+
+    url_name = models.CharField(
+        max_length=100, unique=True, db_index=True,
+        help_text="URL name without namespace, e.g. cod_ledger")
+    namespace = models.CharField(
+        max_length=50, default='workforce',
+        help_text="URL namespace the name belongs to")
+    departments = models.CharField(
+        max_length=120, blank=True, default='',
+        help_text="Comma-separated department codes, e.g. 'ops,fin'. "
+                  "'shared' means every staff member.")
+    is_enabled = models.BooleanField(
+        default=True,
+        help_text="Unticked blocks the page for everyone except super admins")
+    label = models.CharField(max_length=150, blank=True, default='')
+    notes = models.CharField(max_length=255, blank=True, default='')
+
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        blank=True, null=True, related_name='page_department_changes')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['url_name']
+        verbose_name = 'Page Department'
+        verbose_name_plural = 'Page Departments'
+
+    def __str__(self):
+        return f"{self.url_name} → {self.departments or 'unassigned'}"
+
+    @property
+    def department_set(self):
+        """Department codes as a set, ignoring blanks and stray whitespace."""
+        return {c.strip() for c in self.departments.split(',') if c.strip()}
+
+    def set_departments(self, codes):
+        """Store a collection of codes in a stable, comparable order."""
+        self.departments = ','.join(sorted({str(c).strip() for c in codes if str(c).strip()}))

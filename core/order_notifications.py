@@ -332,16 +332,14 @@ def _send_whatsapp_via_waha(phone, message, event, order, instance=None):
     instance_name is used as the WAHA session so the message goes out from
     the selected number. None = the configured default session.
     """
+    from whatsapp import sessions as wa_sessions
+
     base_url = getattr(settings, 'WAHA_BASE_URL', '') or ''
     api_key = getattr(settings, 'WAHA_API_KEY', '') or ''
-    session = getattr(settings, 'WAHA_DEFAULT_SESSION', 'default') or 'default'
     # Same number serves both channels via different identifiers: use the
-    # instance's dedicated WAHA session if set; otherwise keep the global
-    # default session (the Evolution instance_name is NOT a WAHA session).
-    if instance is not None:
-        waha_sess = (getattr(instance, 'waha_session', '') or '').strip()
-        if waha_sess:
-            session = waha_sess
+    # instance's dedicated WAHA session if set; otherwise the global default
+    # session (the Evolution instance_name is NOT a WAHA session).
+    session = wa_sessions.for_instance(instance)
     if not base_url or not api_key:
         logger.debug(f"WAHA notification skipped ({event}): WAHA_BASE_URL or WAHA_API_KEY not configured")
         return
@@ -390,7 +388,7 @@ def _send_whatsapp_via_waha(phone, message, event, order, instance=None):
             waha_message_id=wid,
             session=session,
             direction='outbound',
-            from_number=getattr(settings, 'WAHA_DEFAULT_FROM', '') or '',
+            from_number=wa_sessions.sender_number(session),
             to_number=digits,
             body=str(message).strip(),
             message_type='text',

@@ -1,0 +1,66 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/rma_detail.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_rma_detail_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Working one <strong>customer return</strong> from parcel to decision. Mark the return
+            received when it lands, then judge each item: what condition it came back in, and what
+            should happen to it. The inspection decision is the moment stock either goes back on the
+            books or does not.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The two steps</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Mark received</dt>
+                        <dd class="wfnote__def">Applies to the whole return at once and moves it to
+                            <em>received</em>. It records arrival, not condition.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Condition</dt>
+                        <dd class="wfnote__def">What you are looking at — sellable, damaged, and so on.
+                            It is written onto the line and onto the stock movement if it restocks.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Disposition</dt>
+                        <dd class="wfnote__def">What to do with it. <em>Restock</em> puts the units
+                            straight back into the warehouse's stock with a return movement against this
+                            RMA number; any other choice leaves stock untouched.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Automatic resolve</dt>
+                        <dd class="wfnote__def">Once every line is inspected, the return closes as
+                            <em>resolved</em> by itself.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The counters</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Received / inspected</dt>
+                        <dd class="wfnote__def">Lines arrived, and lines judged. Inspected is the one
+                            that decides when the return closes.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Restocked</dt>
+                        <dd class="wfnote__def">Lines that actually went back into stock — always less
+                            than or equal to inspected, since not everything is sellable.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Restock needs a warehouse and an existing stock row</strong> for that
+                        product. Without them the line is marked inspected but nothing is added.</li>
+                    <li><strong>Units go back at the location the stock row already uses</strong>, so
+                        check the shelf matches what the system now claims.</li>
+                    <li><strong>Inspect honestly.</strong> Restocking damaged goods puts an unsellable
+                        unit into the next customer's order.</li>
+                </ul>
+            </section>
+        </div>

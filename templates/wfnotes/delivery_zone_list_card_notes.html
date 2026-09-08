@@ -1,0 +1,94 @@
+{% comment %}
+Purpose: "About this page" notes panel for zone_list.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "delivery_zone_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      Qatar is addressed by <strong>zone numbers</strong>, and this is the master list of them. Every row is
+      one zone: its number, its English and Arabic names, whether we have drawn a boundary for it, how many
+      named areas sit inside it, how many zones it borders, and which groups it belongs to. This table is
+      reference and repair work — the zone a delivery lands in is worked out from these records, so a gap
+      here shows up later as a driver who cannot find the address.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Search</dt>
+            <dd class="wfnote__def">Matches the zone number, the English or Arabic zone name, and the names
+              of the <strong>areas</strong> inside it — so typing a neighbourhood finds its parent zone. If
+              nothing matches exactly it retries with fuzzy matching, which forgives most typos and
+              spellings.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Group filter</dt>
+            <dd class="wfnote__def">Narrows to the zones in one group. Only active groups are listed.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Polygon filter</dt>
+            <dd class="wfnote__def">Shows only zones that have a boundary drawn, or only those that do not —
+              the fastest way to work through the gaps.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Edit polygon</dt>
+            <dd class="wfnote__def">The polygon icon at the end of a row opens the boundary editor for that
+              zone, where you draw or correct its outline on a map.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">View Map</dt>
+            <dd class="wfnote__def">Opens the same zones on an interactive map — better for judging whether
+              two boundaries actually meet.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What the columns mean</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Zone</dt>
+            <dd class="wfnote__def">Qatar's official zone number. It is the identifier everything else hangs
+              off, and it is unique.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Polygon</dt>
+            <dd class="wfnote__def">The zone's drawn boundary and how many points it has, or
+              <em>None</em>. A boundary needs at least three points to count.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Areas</dt>
+            <dd class="wfnote__def">How many named neighbourhoods sit inside the zone. These are what
+              customers actually write in an address.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Neighbours</dt>
+            <dd class="wfnote__def">How many zones border this one. The relationship works both ways — set
+              it on either side and both are linked.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Groups</dt>
+            <dd class="wfnote__def">The wider delivery areas the zone belongs to. Drivers choose groups, not
+              individual zones, to say where they want to work.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>Zone detection is <strong>polygon first</strong>: a coordinate is matched to the zone whose
+          boundary contains it. Only when no boundary contains it does the system fall back to the nearest
+          zone centre — which is a guess, and the usual reason an order lands in the wrong zone.</li>
+        <li>So the <strong>Without Polygon</strong> count is the real backlog on this page. Drawing those
+          boundaries is what makes zone assignment accurate.</li>
+        <li>Saving a polygon also moves the zone's centre point to the middle of the new shape.</li>
+        <li>Only <strong>active</strong> zones take part in zone detection, even though inactive ones are
+          still listed here.</li>
+        <li>The three counters at the top cover every zone in the system, not just what your filters are
+          showing.</li>
+      </ul>
+    </section>
+  

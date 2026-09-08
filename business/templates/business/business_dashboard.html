@@ -1,9 +1,10 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-dashboard-pro.css' %}?v=20260423a">
+<link rel="stylesheet" href="{% static 'business/css/business-dashboard-pro.css' %}?v=20260802a">
 <!-- Dashboard styles now in business-dashboard-pro.css for HTMX compatibility -->
 {% endblock extra_css %}
 
@@ -310,44 +311,51 @@
        ============================================ -->
   <div class="d-none d-md-block">
 
-    <!-- Cockpit Hero — identity + live gauge strip in one navy console -->
-    <div class="bcon__cockpit bcon__rise" id="client_dashboard_header_main">
-      <div class="bcon__cockpit-top">
-        <div class="bcon__cockpit-id">
-          <div class="bcon__eyebrow">
-            <span>Dispatch Console</span>
-            <span class="bcon__eyebrow-sep"></span>
-            <span class="bcon__eyebrow-live">{% now "D d M · H:i" %}</span>
-          </div>
-          <h1 class="bcon__cockpit-title" id="client_dashboard_title_business">{{ business.business_name }}</h1>
-          <p class="bcon__cockpit-sub">Live overview of orders, deliveries &amp; cash on delivery</p>
+    {% now "D d M · H:i" as now_stamp %}
+    <div id="client_dashboard_header_main">
+      {% bconheader eyebrow="Dispatch Console" live=now_stamp icon="fa-solid fa-gauge-high" title=business.business_name subtitle="Live overview of orders, deliveries &amp; cash on delivery." %}
+        <a href="{% url 'orders:add_order' %}" class="bcon__btn bcon__btn--primary">
+          <i class="fa-solid fa-plus"></i> New Order
+        </a>
+      {% endbconheader %}
+    </div>
+
+    <div class="bcon__plates">
+      <a class="bcon__plate bcon__plate--primary" href="{% url 'orders:orders_all_list' %}">
+        <div class="bcon__plate-top">
+          <p class="bcon__plate-label">Total Orders</p>
+          <span class="bcon__plate-icon bcon__plate-icon--primary"><i class="fa-solid fa-box"></i></span>
         </div>
-        <a href="{% url 'orders:add_order' %}" class="bcon__cockpit-cta">
-          <i class="fas fa-plus"></i> New Order
-        </a>
-      </div>
-      <div class="bcon__gauges">
-        <a class="bcon__gauge bcon__gauge--primary" href="{% url 'orders:orders_all_list' %}">
-          <p class="bcon__gauge-label"><i class="fa-solid fa-box"></i> Total Orders</p>
-          <p class="bcon__gauge-value">{{ total_orders|default:0 }}</p>
-        </a>
-        <a class="bcon__gauge bcon__gauge--success" href="{% url 'orders:orders_all_list' %}?cStatus=delivered">
-          <p class="bcon__gauge-label"><i class="fa-solid fa-check"></i> Delivered</p>
-          <p class="bcon__gauge-value">{{ delivered_count|default:0 }}</p>
-        </a>
-        <a class="bcon__gauge bcon__gauge--warning" href="{% url 'orders:orders_all_list' %}?cStatus=pending">
-          <p class="bcon__gauge-label"><i class="fa-solid fa-clock"></i> Pending</p>
-          <p class="bcon__gauge-value">{{ pending_count|default:0 }}</p>
-        </a>
-        <a class="bcon__gauge bcon__gauge--danger" href="{% url 'orders:orders_all_list' %}?dlStatus=failed">
-          <p class="bcon__gauge-label"><i class="fa-solid fa-triangle-exclamation"></i> Follow Up</p>
-          <p class="bcon__gauge-value">{{ followup_count|default:0 }}</p>
-        </a>
-        <a class="bcon__gauge bcon__gauge--money bcon__gauge--primary" href="{% url 'business:business_finance_dashboard' %}">
-          <p class="bcon__gauge-label"><i class="fa-solid fa-hand-holding-dollar"></i> COD Collected</p>
-          <p class="bcon__gauge-value">{{ cod_collected|default:0 }} <small>QAR</small></p>
-        </a>
-      </div>
+        <p class="bcon__plate-value">{{ total_orders|default:0 }}</p>
+      </a>
+      <a class="bcon__plate bcon__plate--success" href="{% url 'orders:orders_all_list' %}?cStatus=delivered">
+        <div class="bcon__plate-top">
+          <p class="bcon__plate-label">Delivered</p>
+          <span class="bcon__plate-icon bcon__plate-icon--success"><i class="fa-solid fa-check"></i></span>
+        </div>
+        <p class="bcon__plate-value">{{ delivered_count|default:0 }}</p>
+      </a>
+      <a class="bcon__plate bcon__plate--warning" href="{% url 'orders:orders_all_list' %}?cStatus=pending">
+        <div class="bcon__plate-top">
+          <p class="bcon__plate-label">Pending</p>
+          <span class="bcon__plate-icon bcon__plate-icon--warning"><i class="fa-solid fa-clock"></i></span>
+        </div>
+        <p class="bcon__plate-value">{{ pending_count|default:0 }}</p>
+      </a>
+      <a class="bcon__plate bcon__plate--danger" href="{% url 'orders:orders_all_list' %}?dlStatus=failed">
+        <div class="bcon__plate-top">
+          <p class="bcon__plate-label">Follow Up</p>
+          <span class="bcon__plate-icon bcon__plate-icon--danger"><i class="fa-solid fa-triangle-exclamation"></i></span>
+        </div>
+        <p class="bcon__plate-value">{{ followup_count|default:0 }}</p>
+      </a>
+      <a class="bcon__plate bcon__plate--navy" href="{% url 'business:business_finance_dashboard' %}">
+        <div class="bcon__plate-top">
+          <p class="bcon__plate-label">COD Collected</p>
+          <span class="bcon__plate-icon"><i class="fa-solid fa-hand-holding-dollar"></i></span>
+        </div>
+        <p class="bcon__plate-value">{{ cod_collected|default:0 }} <small>QAR</small></p>
+      </a>
     </div>
 
     <!-- Weekly trend -->

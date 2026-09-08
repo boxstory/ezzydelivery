@@ -1,5 +1,5 @@
 {% extends "business_dashboard_base.html" %}
-{% load static %}
+{% load static business_console %}
 
 {% block title %}Transactions{% endblock %}
 
@@ -74,6 +74,7 @@
       <p>No transactions found</p>
     </div>
     {% endfor %}
+    {% include "includes/components/_pagination.html" with page_obj=transactions_page per_page=per_page pagination_id="business_txn_mob" variant="compact" show_goto="false" %}
   </div>
 </div>
 
@@ -81,22 +82,10 @@
      Desktop View (visible >= 768px only)
      ========================================== -->
 <div class="d-none d-md-block" id="transactions_desktop_view">
-<div class="bcon__page pt-3">
-  <div class="bcon__header">
-    <div class="bcon__header-main">
-      <div class="bcon__eyebrow">
-        <span>{{ business.business_name|truncatechars:22 }}</span>
-        <span class="bcon__eyebrow-sep"></span>
-        <span>Finance</span>
-        <span class="bcon__eyebrow-sep"></span>
-        <span class="bcon__eyebrow-live">Ledger</span>
-      </div>
-      <h1 class="bcon__title"><i class="fa-solid fa-clock-rotate-left"></i> Transactions</h1>
-    </div>
-    <div class="bcon__actions">
-      <a href="{% url 'business:business_finance_dashboard' %}" class="bcon__btn bcon__btn--ghost"><i class="fas fa-arrow-left"></i> Back to Finance</a>
-    </div>
-  </div>
+<div class="bcon__page">
+  {% bconheader eyebrow="Finance" live="Ledger" icon="fa-solid fa-clock-rotate-left" title="Transactions" subtitle=business.business_name %}
+    <a href="{% url 'business:business_finance_dashboard' %}" class="bcon__btn bcon__btn--ghost"><i class="fas fa-arrow-left"></i> Back to Finance</a>
+  {% endbconheader %}
 </div>
 
 <!-- Filters -->
@@ -135,6 +124,7 @@
   <div class="bcon__panel">
     <div class="bcon__panel-head">
       <h5 class="bcon__panel-title"><i class="fa-solid fa-receipt"></i> Transactions</h5>
+      <span class="bcon__badge bcon__badge--muted">{{ transactions_total }}</span>
     </div>
     <div class="bcon__panel-body--flush bcon__ledger-wrap">
       <table class="bcon__ledger">
@@ -174,6 +164,7 @@
         </tbody>
       </table>
     </div>
+    {% include "includes/components/_pagination.html" with page_obj=transactions_page per_page=per_page pagination_id="business_txn" %}
   </div>
 </div>
 </div><!-- end desktop view -->

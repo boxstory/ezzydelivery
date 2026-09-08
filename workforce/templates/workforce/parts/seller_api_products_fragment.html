@@ -12,12 +12,15 @@
 {% endif %}
 
 {% if import_result %}
-<div class="alert {% if import_result.imported %}alert-success{% else %}alert-warning{% endif %} d-flex align-items-center mb-3">
-    <i class="fa-solid fa-{% if import_result.imported %}circle-check{% else %}circle-info{% endif %} me-2"></i>
+<div class="alert {% if import_result.imported or import_result.updated %}alert-success{% else %}alert-warning{% endif %} d-flex align-items-center mb-3">
+    <i class="fa-solid fa-{% if import_result.imported or import_result.updated %}circle-check{% else %}circle-info{% endif %} me-2"></i>
     <div class="flex-grow-1 small">
         <strong>{{ import_result.imported }}</strong> imported.
+        {% if import_result.updated %}<span class="ms-2"><strong>{{ import_result.updated }}</strong> updated.</span>{% endif %}
+        {% if import_result.skipped_unchanged %}<span class="ms-2"><strong>{{ import_result.skipped_unchanged }}</strong> already up to date.</span>{% endif %}
         {% if import_result.skipped_duplicate %}<span class="ms-2"><strong>{{ import_result.skipped_duplicate }}</strong> skipped (duplicate SKU).</span>{% endif %}
         {% if import_result.skipped_invalid %}<span class="ms-2"><strong>{{ import_result.skipped_invalid }}</strong> skipped (missing title/SKU).</span>{% endif %}
+        {% if import_result.images_saved %}<span class="ms-2"><strong>{{ import_result.images_saved }}</strong> photo{{ import_result.images_saved|pluralize }} saved.</span>{% endif %}
         <span class="ms-2 text-muted">Refresh the page to see them in <em>Local Products</em>.</span>
     </div>
 </div>
@@ -41,7 +44,13 @@
         <span id="sld_api_import_spinner" class="htmx-indicator text-muted small">
             <i class="fa-solid fa-spinner fa-spin me-1"></i> Importing...
         </span>
-        <span class="text-muted small ms-auto">Already-imported rows are skipped.</span>
+        <div class="form-check mb-0 ms-2">
+            <input class="form-check-input" type="checkbox" name="update_existing" value="1" id="sld_chk_update_existing">
+            <label class="form-check-label small" for="sld_chk_update_existing">
+                Update existing products
+            </label>
+        </div>
+        <span class="text-muted small ms-auto" id="sld_import_hint">Already-imported rows are skipped.</span>
     </div>
 
     <div class="table-responsive">
@@ -69,14 +78,12 @@
             </thead>
             <tbody>
                 {% for p in api_products %}
-                {% with already_imported=p.sku|yesno:"yes,no" %}
                 <tr>
                     <td>
-                        {% if p.sku and p.sku in imported_skus %}
-                        <input type="checkbox" class="form-check-input" disabled aria-label="Already imported">
-                        {% else %}
-                        <input type="checkbox" class="form-check-input sld-row-chk"
+                        {# Imported rows stay selectable — with "update existing" ticked they get refreshed. #}
+                        <input type="checkbox" class="form-check-input sld-row-chk{% if p.already_imported %} sld-row-chk--imported{% endif %}"
                                name="selected" value="{{ forloop.counter0 }}"
+                               {% if p.already_imported %}data-imported="1" disabled{% endif %}
                                aria-label="Select for import">
                         <input type="hidden" name="p_{{ forloop.counter0 }}_title" value="{{ p.title }}">
                         <input type="hidden" name="p_{{ forloop.counter0 }}_variant_title" value="{{ p.variant_title }}">
@@ -88,7 +95,7 @@
                         <input type="hidden" name="p_{{ forloop.counter0 }}_product_type" value="{{ p.product_type }}">
                         <input type="hidden" name="p_{{ forloop.counter0 }}_platform_id" value="{{ p.platform_id }}">
                         <input type="hidden" name="p_{{ forloop.counter0 }}_variant_id" value="{{ p.variant_id }}">
-                        {% endif %}
+                        <input type="hidden" name="p_{{ forloop.counter0 }}_image" value="{{ p.image }}">
                     </td>
                     <td class="text-muted small">{{ forloop.counter }}</td>
                     <td>
@@ -109,14 +116,13 @@
                     <td class="small">{{ p.vendor|default:"-" }}</td>
                     <td class="small">{{ p.product_type|default:"-" }}</td>
                     <td>
-                        {% if p.sku and p.sku in imported_skus %}
+                        {% if p.already_imported %}
                         <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Imported</span>
                         {% else %}
                         <span class="badge bg-light text-muted border">New</span>
                         {% endif %}
                     </td>
                 </tr>
-                {% endwith %}
                 {% endfor %}
             </tbody>
         </table>
@@ -132,26 +138,55 @@
     var btn = form.querySelector('#sld_btn_import_selected');
     var countEl = form.querySelector('#sld_import_count');
 
+    var updateChk = form.querySelector('#sld_chk_update_existing');
+    var hintEl = form.querySelector('#sld_import_hint');
+
+    /* Already-imported rows are locked until "update existing" is ticked —
+       without it, selecting one would only produce a duplicate-SKU skip. */
+    function selectable() {
+        return Array.prototype.filter.call(rowChks, function(cb) { return !cb.disabled; });
+    }
+
     function refreshCount() {
-        var n = 0;
-        rowChks.forEach(function(cb) { if (cb.checked) n++; });
+        var n = 0, pool = selectable();
+        rowChks.forEach(function(cb) { if (cb.checked && !cb.disabled) n++; });
         if (countEl) countEl.textContent = n;
         if (btn) btn.disabled = (n === 0);
         if (chkAll) {
-            chkAll.checked = (n > 0 && n === rowChks.length);
-            chkAll.indeterminate = (n > 0 && n < rowChks.length);
+            chkAll.checked = (n > 0 && n === pool.length);
+            chkAll.indeterminate = (n > 0 && n < pool.length);
         }
     }
+
+    if (updateChk) {
+        updateChk.addEventListener('change', function() {
+            rowChks.forEach(function(cb) {
+                if (cb.dataset.imported === '1') {
+                    cb.disabled = !updateChk.checked;
+                    if (cb.disabled) cb.checked = false;
+                }
+            });
+            if (hintEl) {
+                hintEl.textContent = updateChk.checked
+                    ? 'Already-imported rows will be refreshed from the store.'
+                    : 'Already-imported rows are skipped.';
+            }
+            refreshCount();
+        });
+    }
+
     if (chkAll) {
         chkAll.addEventListener('change', function() {
-            rowChks.forEach(function(cb) { cb.checked = chkAll.checked; });
+            rowChks.forEach(function(cb) {
+                if (!cb.disabled) cb.checked = chkAll.checked;
+            });
             refreshCount();
         });
     }
     rowChks.forEach(function(cb) { cb.addEventListener('change', refreshCount); });
     form.addEventListener('submit', function(e) {
         var anyChecked = false;
-        rowChks.forEach(function(cb) { if (cb.checked) anyChecked = true; });
+        rowChks.forEach(function(cb) { if (cb.checked && !cb.disabled) anyChecked = true; });
         if (!anyChecked) { e.preventDefault(); }
     });
     refreshCount();

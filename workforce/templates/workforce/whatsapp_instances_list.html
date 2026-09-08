@@ -1,91 +1,393 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Superuser console for the WhatsApp sending numbers the platform uses, across both transports (Evolution API + WAHA)
+Used by: workforce.views.whatsapp_instances_list at /workforce/auto-triggers/whatsapp-instances/
+Notes: Two SEPARATE tables, one per transport, because they are separate systems that merely carry the
+       same numbers: table 1 is our stored Evolution instances, table 2 is live WAHA session state we can
+       only read and command. Evolution rows auto-sync on load; WAHA sessions auto-link to an instance by
+       phone number. All writes are plain POSTs to the same URL (action=add|edit|delete|waha_*).
+       Design layer is the wai__ block at the end of workforce.css.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block content %}
 <header class="oli__hero">
     <div class="oli__hero__left">
         <h2><i class="fa-brands fa-whatsapp me-1"></i>WhatsApp Instances</h2>
-        <span class="oli__hero__subtitle">| Evolution API instances for sending messages — auto-synced from server</span>
+        <span class="oli__hero__subtitle">| The numbers the platform sends from, and whether each one can actually send</span>
     </div>
     <div class="oli__hero__right">
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addInstanceModal">
             <i class="fa-solid fa-plus me-1"></i>Add Instance
         </button>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_whatsapp_instances_list_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
 </header>
 
+<div class="wfnote" id="workforce_whatsapp_instances_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_whatsapp_instances_list_card_notes' %}" hidden></div>
+
 <div class="col-12 p-3">
+    {# ============ TABLE 1 — Evolution API ============ #}
+    <div class="wai__head">
+        <h3 class="wai__head__title"><span class="wai__tag">Evolution</span> External API instances</h3>
+        <p class="wai__head__sub">Stored here, one row per sending number. Auto-synced from Evolution on every page load — rows are created for instances found on the server, never deleted automatically.</p>
+    </div>
     {% if sync_error %}
     <div class="alert alert-warning py-2 mb-3">
         <i class="fa-solid fa-triangle-exclamation me-1"></i>
         Could not sync with Evolution API — live status unavailable: {{ sync_error }}
     </div>
     {% endif %}
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>Label</th>
+    <div class="table-responsive wai__wrap">
+        <table class="table table-hover align-middle wai__table">
+            <thead>
+                <tr class="wai__cols">
                     <th>Instance Name</th>
-                    <th>WAHA Session</th>
+                    <th>Label</th>
                     <th>Phone Number</th>
-                    <th>Default</th>
                     <th>Status</th>
+                    <th>WAHA session</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for inst in instances %}
                 <tr>
-                    <td class="fw-bold">{{ inst.label }}</td>
-                    <td><code>{{ inst.instance_name }}</code></td>
-                    <td>{% if inst.waha_session %}<code>{{ inst.waha_session }}</code>{% else %}<span class="text-muted">default</span>{% endif %}</td>
-                    <td>{{ inst.phone_number|default:"-" }}</td>
+                    {# Default is marked under the instance name, same as the WAHA table #}
+                    {# below marks its default session: exactly one row carries it, so a #}
+                    {# column of its own spent its whole width rendering dashes. #}
                     <td>
-                        {% if inst.is_default %}
-                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-star me-1"></i>Default</span>
-                        {% else %}
-                        <span class="text-muted">-</span>
-                        {% endif %}
+                        <span class="wai__id">{{ inst.instance_name }}</span>
+                        {% if inst.is_default %}<span class="wai__default d-block">Default sender</span>{% endif %}
                     </td>
+                    <td class="wai__name">{{ inst.label }}</td>
+                    <td class="wai__num">{{ inst.phone_number|default:"—" }}</td>
                     <td>
+                        {% comment %}
+                        A failed send outranks whatever Evolution reports. Its
+                        connectionState stays "open" after the socket dies, so
+                        showing only that badge told staff a dead number was
+                        healthy while every message silently failed.
+                        {% endcomment %}
+                        {% if inst.send_down %}
+                        <span class="wai__st wai__st--bad">Sending failed</span>
+                        <span class="wai__note">
+                            Last send failed{% if inst.send_down.at %} at {{ inst.send_down.at|slice:"11:16" }}{% endif %}:
+                            {{ inst.send_down.reason|default:"no response" }}
+                        </span>
                         {% if inst.live_state == 'connected' %}
-                        <span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i>Connected</span>
+                        <span class="wai__note">Evolution still reports this number as connected — re-link it.</span>
+                        {% endif %}
+                        {% elif inst.live_state == 'connected' %}
+                        <span class="wai__st wai__st--ok">Connected</span>
                         {% elif inst.live_state == 'disconnected' %}
-                        <span class="badge bg-warning text-dark">{{ inst.live_status|default:"Disconnected" }}</span>
+                        <span class="wai__st wai__st--warn">Disconnected</span>
+                        {% if inst.live_status %}<span class="wai__note">Reported: {{ inst.live_status }}</span>{% endif %}
                         {% elif inst.live_state == 'missing' %}
-                        <span class="badge bg-danger">Not Active</span>
+                        <span class="wai__st wai__st--bad">Not on server</span>
+                        <span class="wai__note">Evolution has no instance by this name.</span>
                         {% else %}
-                        <span class="badge bg-secondary">Unknown</span>
+                        <span class="wai__st wai__st--idle">Unverified</span>
                         {% endif %}
                         {% if not inst.is_active %}
-                        <span class="badge bg-secondary">Disabled</span>
+                        <span class="wai__note">Disabled — this number is not used for sending.</span>
                         {% endif %}
                     </td>
-                    <td class="text-end">
-                        <button class="btn btn-outline-primary btn-sm" onclick="editInstance({{ inst.id }}, '{{ inst.label|escapejs }}', '{{ inst.instance_name|escapejs }}', '{{ inst.waha_session|escapejs }}', '{{ inst.phone_number|escapejs }}', {{ inst.is_default|yesno:'true,false' }}, {{ inst.is_active|yesno:'true,false' }})">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
-                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this instance?')">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="delete">
-                            <input type="hidden" name="instance_id" value="{{ inst.id }}">
-                            <button type="submit" class="btn btn-outline-danger btn-sm">
-                                <i class="fa-solid fa-trash"></i>
+                    {% comment %}
+                    Only which session this number is attached to. The session's own
+                    health is the second table's job — repeating it here is what made
+                    a WAHA problem look like an Evolution problem.
+                    {% endcomment %}
+                    <td>
+                        {% if inst.waha_state == 'unset' %}
+                        <span class="wai__st wai__st--idle">Not linked</span>
+                        <span class="wai__note">Falls back to <span class="wai__id">{{ waha_default }}</span></span>
+                        {% else %}
+                        <span class="wai__id">{{ inst.waha_session }}</span>
+                        {% if inst.waha_state == 'missing' %}
+                        <span class="wai__note wai__note--bad">WAHA has no session by this name — sends will fail.</span>
+                        {% elif inst.waha_state == 'pending' %}
+                        <span class="wai__note">Session not connected — see the WAHA table below.</span>
+                        {% elif inst.waha_state == 'unknown' %}
+                        <span class="wai__note">WAHA unreachable, not checked.</span>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="wai__acts">
+                            {# Bootstrap collapse rather than custom JS: the panel is a plain #}
+                            {# row toggle, and the page already loads Bootstrap. #}
+                            <button type="button" class="wai__act" data-bs-toggle="collapse"
+                                    data-bs-target="#wai_logs_{{ inst.id }}"
+                                    aria-expanded="false" aria-controls="wai_logs_{{ inst.id }}"
+                                    title="Recent send attempts for {{ inst.label }}">
+                                <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                                <span class="visually-hidden">Logs for {{ inst.label }}</span>
                             </button>
-                        </form>
+                            <button type="button" class="wai__act" title="Edit {{ inst.label }}"
+                                    onclick="editInstance({{ inst.id }}, '{{ inst.label|escapejs }}', '{{ inst.instance_name|escapejs }}', '{{ inst.waha_session|escapejs }}', '{{ inst.phone_number|escapejs }}', {{ inst.is_default|yesno:'true,false' }}, {{ inst.is_active|yesno:'true,false' }})">
+                                <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                                <span class="visually-hidden">Edit {{ inst.label }}</span>
+                            </button>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Delete the instance &quot;{{ inst.label|escapejs }}&quot;? Anything routed to it falls back to the default sender.')">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="instance_id" value="{{ inst.id }}">
+                                <button type="submit" class="wai__act wai__act--danger" title="Delete {{ inst.label }}">
+                                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                    <span class="visually-hidden">Delete {{ inst.label }}</span>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% comment %}
+                The log panel is its own row spanning the table, so opening it
+                cannot squeeze the columns above. Collapsed until the Logs
+                button is pressed.
+                {% endcomment %}
+                <tr class="wai__logrow">
+                    <td colspan="6" class="p-0">
+                        <div class="collapse" id="wai_logs_{{ inst.id }}">
+                            <div class="wai__logs">
+                                <div class="wai__logs-head">
+                                    Last {{ inst.send_logs|length }} send attempt{{ inst.send_logs|length|pluralize }}
+                                    from <span class="wai__id">{{ inst.phone_number|default:inst.instance_name }}</span>
+                                </div>
+                                {% for log in inst.send_logs %}
+                                <div class="wai__log">
+                                    <span class="wai__log-time">{{ log.created_at|date:"d M H:i" }}</span>
+                                    {% if log.success %}
+                                    <span class="wai__log-res wai__log-res--ok">Sent</span>
+                                    {% else %}
+                                    <span class="wai__log-res wai__log-res--bad">Failed</span>
+                                    {% endif %}
+                                    <span class="wai__log-to">{{ log.phone_number|default:"—" }}</span>
+                                    <span class="wai__log-via">{{ log.get_channel_display }}</span>
+                                    <span class="wai__log-detail">
+                                        {% if log.detail %}{{ log.detail }}{% if log.status_code %} ({{ log.status_code }}){% endif %}
+                                        {% else %}—{% endif %}
+                                    </span>
+                                </div>
+                                {% empty %}
+                                <div class="wai__log wai__log--empty">
+                                    No sends recorded yet for this number.
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
-                        <i class="fa-brands fa-whatsapp fa-2x mb-2 d-block opacity-50"></i>
-                        No instances configured. Add one to get started.
+                    <td colspan="6" class="wai__empty">
+                        <i class="fa-brands fa-whatsapp mb-2 d-block" aria-hidden="true"></i>
+                        No sending numbers yet. Add one to start sending from your own WhatsApp.
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+
+    {# ============ TABLE 2 — WAHA sessions ============ #}
+    <div class="wai__head wai__head--waha">
+        <div>
+            <h3 class="wai__head__title"><span class="wai__tag wai__tag--waha">WAHA</span> Self-hosted bridge sessions</h3>
+            <p class="wai__head__sub">Live state read from the WAHA container, not stored here. A session is one linked phone; only <b>Working</b> can send. Sessions auto-link to an instance above when their number matches.</p>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#addSessionModal">
+            <i class="fa-solid fa-plus me-1"></i>New session
+        </button>
+    </div>
+
+    {% if waha_unreachable %}
+    <div class="alert alert-warning py-2 mb-3">
+        <i class="fa-solid fa-triangle-exclamation me-1"></i>
+        Could not reach WAHA — session list unavailable. Nothing below is being checked.
+    </div>
+    {% else %}
+    <div class="table-responsive wai__wrap">
+        <table class="table table-hover align-middle wai__table wai__table--waha">
+            <thead>
+                <tr class="wai__cols">
+                    <th>Session</th>
+                    <th>Number</th>
+                    <th>WhatsApp account</th>
+                    <th>Status</th>
+                    <th>Linked instance</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in waha_rows %}
+                <tr>
+                    <td>
+                        <span class="wai__id">{{ s.name }}</span>
+                        {% if s.is_default %}<span class="wai__default d-block">Default session</span>{% endif %}
+                    </td>
+                    <td class="wai__num">{% if s.phone %}+{{ s.phone }}{% else %}<span class="wai__dash">—</span>{% endif %}</td>
+                    <td>{{ s.push_name|default:"—" }}</td>
+                    <td>
+                        {% if s.state == 'working' %}
+                        <span class="wai__st wai__st--ok">Working</span>
+                        {% elif s.state == 'qr' %}
+                        <span class="wai__st wai__st--warn">Waiting for QR scan</span>
+                        <span class="wai__note"><a href="/waha/wa-dashboard/?session={{ s.name|urlencode }}" target="_blank" rel="noopener">Open the dashboard to scan <span aria-hidden="true">&#8599;</span></a></span>
+                        {% elif s.state == 'starting' %}
+                        <span class="wai__st wai__st--warn">Starting</span>
+                        {% elif s.state == 'stopped' %}
+                        <span class="wai__st wai__st--idle">Stopped</span>
+                        {% else %}
+                        <span class="wai__st wai__st--bad">{{ s.status|title }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% comment %}
+                        The link picker: this is how a session that WAHA has but no
+                        instance claims stops being invisible to the sender routes.
+                        {% endcomment %}
+                        <form method="post" class="wai__link">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="waha_link">
+                            <input type="hidden" name="session" value="{{ s.name }}">
+                            <select name="link_instance_id" class="form-select form-select-sm wai__link__sel"
+                                    aria-label="Instance linked to session {{ s.name }}"
+                                    onchange="this.form.submit()">
+                                <option value="">— not linked —</option>
+                                {% for t in waha_link_targets %}
+                                <option value="{{ t.id }}" {% if s.linked and s.linked.id == t.id %}selected{% endif %}>
+                                    {{ t.label }}{% if t.phone %} · {{ t.phone }}{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <noscript><button type="submit" class="wai__act">Save</button></noscript>
+                        </form>
+                        {% if not s.linked %}
+                        <span class="wai__note">Nothing sends from this session except the default fallback.</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="wai__acts">
+                            {% if s.can_start %}
+                            <form method="post" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="waha_start">
+                                <input type="hidden" name="session" value="{{ s.name }}">
+                                <button type="submit" class="wai__act" title="Start {{ s.name }}">
+                                    <i class="fa-solid fa-play" aria-hidden="true"></i>
+                                    <span class="visually-hidden">Start {{ s.name }}</span>
+                                </button>
+                            </form>
+                            {% endif %}
+                            <form method="post" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="waha_restart">
+                                <input type="hidden" name="session" value="{{ s.name }}">
+                                <button type="submit" class="wai__act" title="Restart {{ s.name }}">
+                                    <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                                    <span class="visually-hidden">Restart {{ s.name }}</span>
+                                </button>
+                            </form>
+                            {% if s.can_stop %}
+                            <form method="post" class="d-inline"
+                                  onsubmit="return confirm('Stop the session &quot;{{ s.name|escapejs }}&quot;? It stops sending and receiving until started again. The phone stays linked.')">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="waha_stop">
+                                <input type="hidden" name="session" value="{{ s.name }}">
+                                <button type="submit" class="wai__act" title="Stop {{ s.name }}">
+                                    <i class="fa-solid fa-stop" aria-hidden="true"></i>
+                                    <span class="visually-hidden">Stop {{ s.name }}</span>
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% if s.can_logout %}
+                            <form method="post" class="d-inline"
+                                  onsubmit="return confirm('Log out &quot;{{ s.name|escapejs }}&quot;? This unlinks the phone from WhatsApp Web. The session stays and can be re-linked by scanning a new QR code.')">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="waha_logout">
+                                <input type="hidden" name="session" value="{{ s.name }}">
+                                <button type="submit" class="wai__act" title="Log out (unlink the phone from {{ s.name }})">
+                                    <i class="fa-solid fa-link-slash" aria-hidden="true"></i>
+                                    <span class="visually-hidden">Log out {{ s.name }}</span>
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% if s.is_default %}
+                            {# Not merely hidden: every unrouted send falls back here. #}
+                            <button type="button" class="wai__act" disabled
+                                    title="The default session cannot be deleted — unrouted sends fall back to it. Point WAHA_DEFAULT_SESSION elsewhere first.">
+                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                <span class="visually-hidden">Delete disabled for the default session</span>
+                            </button>
+                            {% else %}
+                            <form method="post" class="d-inline"
+                                  onsubmit="return confirm('Delete the session &quot;{{ s.name|escapejs }}&quot;?\n\nThis removes it from WAHA entirely, along with its stored WhatsApp Web login.{% if s.linked %} The instance {{ s.linked.label|escapejs }} is linked to it and will fall back to the default sender.{% endif %}\n\nThis cannot be undone — re-adding it needs a fresh QR scan.')">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="waha_delete">
+                                <input type="hidden" name="session" value="{{ s.name }}">
+                                <button type="submit" class="wai__act wai__act--danger" title="Delete the session {{ s.name }}">
+                                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                    <span class="visually-hidden">Delete {{ s.name }}</span>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="wai__empty">
+                        <i class="fa-solid fa-mobile-screen mb-2 d-block" aria-hidden="true"></i>
+                        WAHA has no sessions. Create one, then scan its QR code with the phone you want to send from.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<!-- New WAHA Session Modal -->
+<div class="modal fade" id="addSessionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="waha_create">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-plus me-2"></i>New WAHA Session</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="wai__help">
+                        <div class="wai__help__hd">What this does</div>
+                        Creates an empty session on the WAHA container and starts it. It will sit on
+                        <b>Waiting for QR scan</b> until you open the WAHA dashboard and scan the code
+                        with the phone that should send from it. Afterwards, link it to an instance in
+                        the table so the platform actually routes sends through it.
+                    </div>
+                    <label class="form-label fw-bold" for="newSessionName">Session name</label>
+                    <input type="text" class="form-control" name="new_session" id="newSessionName"
+                           pattern="[A-Za-z0-9_-]{1,64}" required
+                           placeholder="e.g. EzzySupport5566">
+                    <small class="wai__hint">Letters, numbers, hyphen and underscore only. This is WAHA's own handle for the number — it cannot be renamed later.</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-check me-1"></i>Create</button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -101,28 +403,43 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Label</label>
-                        <input type="text" class="form-control" name="label" placeholder="e.g. Main, Support, Sales" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Instance Name</label>
-                        <input type="text" class="form-control" name="instance_name" placeholder="Evolution API instance name" required>
-                        <small class="text-muted">Must match the instance name in Evolution API</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">WAHA Session</label>
-                        <input type="text" class="form-control" name="waha_session" placeholder="e.g. default">
-                        <small class="text-muted">WAHA session for this same number (blank = default session)</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Phone Number</label>
-                        <input type="text" class="form-control" name="phone_number" placeholder="+974 XXXX XXXX">
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="is_default" value="1" id="addDefault">
-                        <label class="form-check-label" for="addDefault">Set as default instance</label>
-                    </div>
+                    {% include "workforce/parts/_waha_instance_help.html" %}
+
+                    <fieldset class="wai__sec">
+                        <legend class="wai__sec__hd"><b>The number</b></legend>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="addLabel">Label</label>
+                            <input type="text" class="form-control" name="label" id="addLabel" placeholder="e.g. Main, Support, Sales" required>
+                            <small class="wai__hint">Your name for this number — the only part staff see when picking a sender.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="addPhone">Phone Number</label>
+                            <input type="text" class="form-control" name="phone_number" id="addPhone" placeholder="+974 XXXX XXXX">
+                            <small class="wai__hint">The actual WhatsApp number, for display and to avoid saving it twice.</small>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_default" value="1" id="addDefault">
+                            <label class="form-check-label" for="addDefault">Set as default instance</label>
+                        </div>
+                        <small class="wai__hint wai__hint--check">Used when a message doesn't specify a sender. Only one number can hold this.</small>
+                    </fieldset>
+
+                    <fieldset class="wai__sec wai__sec--evo">
+                        <legend class="wai__sec__hd"><span class="wai__tag">Evolution</span> <b>External API</b></legend>
+                        <div>
+                            <label class="form-label fw-bold" for="addInstanceName">Instance Name</label>
+                            <input type="text" class="form-control" name="instance_name" id="addInstanceName" placeholder="Evolution API instance name" required>
+                            <small class="wai__hint">This number's handle on the external Evolution API. Must match exactly, or Evolution sends fail.</small>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="wai__sec wai__sec--waha">
+                        <legend class="wai__sec__hd"><span class="wai__tag wai__tag--waha">WAHA</span> <b>Self-hosted bridge</b></legend>
+                        <div>
+                            <label class="form-label fw-bold" for="addWahaSession">Session</label>
+                            {% include "workforce/parts/_waha_session_options.html" with field_id="addWahaSession" %}
+                        </div>
+                    </fieldset>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
@@ -146,31 +463,47 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Label</label>
-                        <input type="text" class="form-control" name="label" id="editLabel" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Instance Name</label>
-                        <input type="text" class="form-control" name="instance_name" id="editInstanceName" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">WAHA Session</label>
-                        <input type="text" class="form-control" name="waha_session" id="editWahaSession" placeholder="e.g. default">
-                        <small class="text-muted">WAHA session for this same number (blank = default session)</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Phone Number</label>
-                        <input type="text" class="form-control" name="phone_number" id="editPhone">
-                    </div>
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" name="is_default" value="1" id="editDefault">
-                        <label class="form-check-label" for="editDefault">Set as default instance</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="is_active" value="1" id="editActive">
-                        <label class="form-check-label" for="editActive">Active</label>
-                    </div>
+                    {% include "workforce/parts/_waha_instance_help.html" %}
+
+                    <fieldset class="wai__sec">
+                        <legend class="wai__sec__hd"><b>The number</b></legend>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="editLabel">Label</label>
+                            <input type="text" class="form-control" name="label" id="editLabel" required>
+                            <small class="wai__hint">Your name for this number — the only part staff see when picking a sender.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="editPhone">Phone Number</label>
+                            <input type="text" class="form-control" name="phone_number" id="editPhone">
+                            <small class="wai__hint">The actual WhatsApp number, for display and to avoid saving it twice.</small>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_default" value="1" id="editDefault">
+                            <label class="form-check-label" for="editDefault">Set as default instance</label>
+                        </div>
+                        <small class="wai__hint wai__hint--check mb-2 d-block">Used when a message doesn't specify a sender. Only one number can hold this.</small>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_active" value="1" id="editActive">
+                            <label class="form-check-label" for="editActive">Active</label>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="wai__sec wai__sec--evo">
+                        <legend class="wai__sec__hd"><span class="wai__tag">Evolution</span> <b>External API</b></legend>
+                        <div>
+                            <label class="form-label fw-bold" for="editInstanceName">Instance Name</label>
+                            <input type="text" class="form-control" name="instance_name" id="editInstanceName" required>
+                            <small class="wai__hint">This number's handle on the external Evolution API. Must match exactly, or Evolution sends fail.</small>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="wai__sec wai__sec--waha">
+                        <legend class="wai__sec__hd"><span class="wai__tag wai__tag--waha">WAHA</span> <b>Self-hosted bridge</b></legend>
+                        <div>
+                            <label class="form-label fw-bold" for="editWahaSession">Session</label>
+                            {% include "workforce/parts/_waha_session_options.html" with field_id="editWahaSession" %}
+                        </div>
+                    </fieldset>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
@@ -186,7 +519,18 @@ function editInstance(id, label, instanceName, wahaSession, phone, isDefault, is
     document.getElementById('editId').value = id;
     document.getElementById('editLabel').value = label;
     document.getElementById('editInstanceName').value = instanceName;
-    document.getElementById('editWahaSession').value = wahaSession;
+    // Now a <select>. Assigning a value with no matching <option> silently
+    // selects nothing, which would save a blank and quietly unlink the number —
+    // so add the stray value as an option rather than dropping it.
+    var sessEl = document.getElementById('editWahaSession');
+    sessEl.value = wahaSession || '';
+    if ((wahaSession || '') !== '' && sessEl.value !== wahaSession) {
+        var opt = document.createElement('option');
+        opt.value = wahaSession;
+        opt.textContent = wahaSession + ' — no such session';
+        sessEl.appendChild(opt);
+        sessEl.value = wahaSession;
+    }
     document.getElementById('editPhone').value = phone;
     document.getElementById('editDefault').checked = isDefault;
     document.getElementById('editActive').checked = isActive;

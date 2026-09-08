@@ -1,0 +1,148 @@
+{% comment %}
+Purpose: "About this page" notes panel for dl_list_all.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_parts_lists_dl_list_all_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Every row here is a <strong>delivery task</strong> — the last-mile leg of one order, the thing a
+            driver actually accepts and completes. This same table is used for several different task views:
+            all tasks, fulfilled and non-fulfilled clients, incomplete tasks, tasks already published to the
+            fleet, and reported (rejected/cancelled) tasks. <strong>The title at the top of the page tells
+            you which slice you are looking at</strong> — the controls and the status words below are the
+            same everywhere. Orders live one step earlier, on the Orders pages; a task only exists once its
+            order has been published.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">The <em>Filters</em> bar opens a panel for task/order/reference
+                            code, customer name or mobile, driver name, date range, client, client status and
+                            task status. It only appears on the slices that support it, and it opens by itself
+                            when a filter is already applied. <em>Apply</em> reloads the list, <em>Reset</em>
+                            clears everything.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Quick presets</dt>
+                        <dd class="wfnote__def">One-click shortcuts for Today, Yesterday, and the common task
+                            statuses. They fill the filter fields and submit immediately.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Zone / accuracy</dt>
+                        <dd class="wfnote__def">Only on the all-tasks list: narrow to deliveries with no zone,
+                            or by how the coordinates were obtained. Arriving from the dashboard's location
+                            card also shows a yellow banner for the combined "location issues" filter.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sorting</dt>
+                        <dd class="wfnote__def">Click a column heading — seller, task number, order, date,
+                            last updated, customer, COD, status or driver. Sorting is applied to the whole
+                            filtered result, not just the page you are on.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Open a task</dt>
+                        <dd class="wfnote__def">Clicking anywhere on a row (or the eye icon) opens the full
+                            delivery-task page.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Bulk actions</dt>
+                        <dd class="wfnote__def">Tick rows to reveal the action bar: assign a driver, print,
+                            publish to fleets, publish to the app, set a status on all of them, or export the
+                            selection. The AI toolbar next to it can parse addresses out of free text for the
+                            selected rows.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Update status</dt>
+                        <dd class="wfnote__def">The small dot button beside the status badge opens the status
+                            modal for that one task, carrying the driver, customer and any failure reason.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Publish</dt>
+                        <dd class="wfnote__def">The paper-plane icon appears only on rows that are still
+                            <em>Not Published</em> and pushes that task to the fleet drivers.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Retry</dt>
+                        <dd class="wfnote__def">Shown only on failed tasks with fewer than three attempts;
+                            it puts the delivery back in play. After three it is replaced by
+                            <em>Max Retries</em> and the task cannot be retried again.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">WhatsApp</dt>
+                        <dd class="wfnote__def">Opens a pre-written message to the customer with their
+                            location-verification link already in it.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Task status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Before a driver</dt>
+                        <dd class="wfnote__def"><em>For Review</em> and <em>Pending</em> — the task exists but
+                            nobody owns it yet.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">With a driver</dt>
+                        <dd class="wfnote__def"><em>Assigned</em> (given to a driver), <em>Accepted</em>
+                            (the driver took it), <em>Picked Up</em>, <em>Start Ride</em>,
+                            <em>Out for Delivery</em> and <em>In Transit</em>.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Customer contact</dt>
+                        <dd class="wfnote__def"><em>Contacted &amp; Confirmed</em> means the customer is
+                            expecting it; <em>Non Reachable</em> means the driver could not get hold of them.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Closed</dt>
+                        <dd class="wfnote__def"><em>Delivered</em>, <em>Partial Delivery</em>,
+                            <em>Failed</em>, <em>Rejected</em>, <em>Cancelled</em> and
+                            <em>Drops Own Lost</em>.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Other columns</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Published</dt>
+                        <dd class="wfnote__def">Whether the task has been pushed out to the fleet. A task that
+                            is not published is invisible to drivers no matter what its status says.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Zone / address</dt>
+                        <dd class="wfnote__def">The pin is solid when the order has coordinates and hollow when
+                            it does not. Below it, the zone/street/building numbers and the accuracy label —
+                            who or what set the point: client, staff, driver, exact building, street, landmark,
+                            zone centre or an AI estimate.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">COD / verify</dt>
+                        <dd class="wfnote__def">The cash to collect, plus where that cash currently is:
+                            <em>Not Collected</em>, <em>Collected</em>, <em>With Driver</em>,
+                            <em>With EZZY</em> or <em>Settled</em> with the client.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Publishing and task status are two separate things. A task can read
+                    <strong>Assigned</strong> and still be <strong>Not Published</strong> — nobody in the
+                    fleet can see it.</li>
+                <li>The <strong>Unpublished</strong> button in the header is the shortcut to everything still
+                    waiting to go out to the fleet; the number on it is a live count, not a filter of this list.</li>
+                <li>Most of these lists only show tasks for clients whose account is <strong>active</strong>,
+                    so a task can be missing here simply because its client was deactivated.</li>
+                <li>Bulk status changes apply to every ticked row at once and are not undone by refreshing —
+                    check the selection count before you confirm.</li>
+                <li>A row with no zone or a landmark/zone-centre coordinate is one a driver will struggle to
+                    find. Fix it on the task page rather than leaving it for the driver.</li>
+            </ul>
+        </section>
+    

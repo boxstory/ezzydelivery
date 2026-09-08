@@ -8,6 +8,8 @@
 {% url 'workforce:business_licenses_list' as u_business_licenses_list %}
 {% url 'workforce:wf_export_page' as u_wf_export_page %}
 {% url 'workforce:dl_tasks_export_page' as u_dl_tasks_export_page %}
+{# Mixed desk: reports/documents/exports are Operations, receipt templates Finance. #}
+{% if wf_dept_ops or wf_dept_fin %}
 {% with active="staff_reports,fleet_task_sheet,fleet_task_sheets_list,receipt_templates_list,receipt_template_create,receipt_template_edit,receipt_template_preview,driver_documents_list,driver_document_detail,vehicle_documents_list,vehicle_document_detail,store_documents_list,store_document_detail,business_licenses_list,business_license_detail,wf_export_page,dl_tasks_export_page" %}
 <li id="workforce_sidebar_menu_reports" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_reports" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-reports" data-title="Reports">
@@ -17,16 +19,23 @@
   </div>
   <div id="submenu-reports" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
     <ul class="nav flex-column">
+      {% if wf_dept_ops %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_staff_reports" url=u_staff_reports icon="fa-solid fa-chart-line" label="Dashboard" active_names="staff_reports" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_task_sheets" url=u_fleet_task_sheets_list icon="fa-solid fa-file-pdf" label="Fleet Task Sheets" active_names="fleet_task_sheets_list,fleet_task_sheet" %}
+      {% endif %}
+      {% if wf_dept_fin %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_receipt_templates" url=u_receipt_templates_list icon="fa-solid fa-file-invoice" label="Receipt Templates" active_names="receipt_templates_list,receipt_template_create,receipt_template_edit,receipt_template_preview" %}
+      {% endif %}
+      {% if wf_dept_ops %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_driver_documents" url=u_driver_documents_list icon="fa-solid fa-id-card" label="Driver IDs" active_names="driver_documents_list,driver_document_detail" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_vehicle_documents" url=u_vehicle_documents_list icon="fa-solid fa-car" label="Vehicle Docs" active_names="vehicle_documents_list,vehicle_document_detail" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_store_documents" url=u_store_documents_list icon="fa-solid fa-store" label="Store Docs" active_names="store_documents_list,store_document_detail" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_business_licenses" url=u_business_licenses_list icon="fa-solid fa-certificate" label="Business Licenses" active_names="business_licenses_list,business_license_detail" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_export_page" url=u_wf_export_page icon="fa-solid fa-file-arrow-down" label="Export Orders" active_names="wf_export_page" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_dl_tasks_export" url=u_dl_tasks_export_page icon="fa-solid fa-truck-fast" label="Export DL Tasks" active_names="dl_tasks_export_page" %}
+      {% endif %}
     </ul>
   </div>
 </li>
 {% endwith %}
+{% endif %}

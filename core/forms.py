@@ -44,6 +44,7 @@ from django_recaptcha.widgets import ReCaptchaV2Checkbox
 
 from webpages import models as webpages_models
 from fleet import models as fleet_models
+from core.forms_base import SanitizedForm, SanitizedFormMixin, SanitizedModelForm
 
 # Local aliases for commonly used models
 Profile = core_models.Profile
@@ -70,7 +71,7 @@ NATIONALITY_CHOICES = [
 # =============================================================================
 
 
-class CustomSignupForm(SignupForm):
+class CustomSignupForm(SanitizedFormMixin, SignupForm):
     """
     Extended signup form with first and last name fields and username validation.
 
@@ -127,7 +128,7 @@ class CustomSignupForm(SignupForm):
 # =============================================================================
 
 
-class ProfileForm(forms.ModelForm):
+class ProfileForm(SanitizedModelForm):
     """
     Initial profile creation form.
 
@@ -208,7 +209,7 @@ class ProfileForm(forms.ModelForm):
         return whatsapp
 
 
-class DriverApplyProfileForm(forms.ModelForm):
+class DriverApplyProfileForm(SanitizedModelForm):
     """
     Section 1 of the public driver application (core:join_driver).
 
@@ -278,7 +279,7 @@ class DriverApplyProfileForm(forms.ModelForm):
         return phone
 
 
-class ProfileUpdateForm(forms.ModelForm):
+class ProfileUpdateForm(SanitizedModelForm):
     """
     Full profile editing form with all fields.
 
@@ -378,7 +379,7 @@ class ProfileUpdateForm(forms.ModelForm):
 
 
 
-class ProfilePictureForm(forms.ModelForm):
+class ProfilePictureForm(SanitizedModelForm):
     """
     Profile picture upload form.
 
@@ -415,7 +416,7 @@ class ProfilePictureForm(forms.ModelForm):
         return picture
 
 
-class JoinUsForm(forms.ModelForm):
+class JoinUsForm(SanitizedModelForm):
     """
     Role selection form for new users.
 
@@ -477,7 +478,7 @@ JOB_TYPE_CHOICES = [
 ]
 
 
-class DriverVacancyAplicationForm(forms.ModelForm):
+class DriverVacancyAplicationForm(SanitizedModelForm):
     """
     Driver job application form.
 

@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff edit form for one order — customer, QNAS address, package, money, statuses
+Used by: workforce_views.order_edit at /workforce/orders/<id>/edit/
+Notes: Product item rows save on their own over AJAX; every save writes a diff into the order timeline.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Edit Order {{ order.order_number }} - Workforce{% endblock %}
 
@@ -58,8 +65,17 @@
                hx-push-url="true">
                 <i class="fa-solid fa-times me-1"></i> Cancel
             </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_order_edit_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_order_edit_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_order_edit_card_notes' %}" hidden></div>
 
     <form method="post" id="orderEditForm" novalidate>
         {% csrf_token %}

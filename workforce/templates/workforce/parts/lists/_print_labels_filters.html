@@ -1,0 +1,17 @@
+{% comment %}
+Purpose: Print Labels' own filters — printed state, order status, sort — slotted into the shared bar.
+Used by: _page_filter.html via `extra_filters_template`, from workforce.views.print_labels.
+Notes: Printed state is the one this bench reaches for daily; status is what stops a cancelled parcel getting a label.
+{% endcomment %}
+<span class="pg-filter__label">Label</span>
+{% include "workforce/parts/components/_multiselect_filter.html" with field_name="printed" label="Printed state" icon="print" choices=printed_choices selected=filters.printed all_text="Any" %}
+
+<span class="pg-filter__label">Status</span>
+{% include "workforce/parts/components/_multiselect_filter.html" with field_name="status" label="Order Status" icon="circle-check" choices=status_choices selected=filters.status all_text="All" %}
+
+<span class="pg-filter__label">Sort</span>
+<select class="form-select form-select-sm pg-filter__input-sm" name="sort" id="pgf_sort" aria-label="Sort orders">
+    {% for val, label in sort_choices %}
+    <option value="{{ val }}" {% if filters.sort == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+</select>

@@ -163,7 +163,7 @@ class ConversationAPIView(APIView):
 
     def get(self, request, conversation_id):
         agent_service = get_agent_service()
-        result = agent_service.get_conversation_history(conversation_id)
+        result = agent_service.get_conversation_history(conversation_id, user=request.user)
 
         if result.get('success'):
             return Response(result)

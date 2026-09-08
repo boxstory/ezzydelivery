@@ -1,0 +1,251 @@
+/* Purpose: Pick-list detail — "pick route worklist" layer (console strip, progress ring, bin-tag rows)
+   Used by: warehouse/templates/warehouse/pick_list_detail.html
+   Notes: Loads after warehouse.css so same-specificity rules here win. Reuses --wh-* tokens.
+          Preserves all pkl__* JS hooks (pkl_progress_text, pkl__grp-item-check--done, etc.). */
+
+/* ── Page frame: fill the available width, matching sibling warehouse pages ── */
+
+/* ═══════════════════════════════════════════════════════════
+   PICK CONSOLE STRIP  (pks__) — replaces the Details/Actions cards
+   ═══════════════════════════════════════════════════════════ */
+.pks {
+    display: flex;
+    align-items: stretch;
+    gap: 0.375rem;
+    margin: 0 0.375rem 0.375rem;
+    flex-wrap: wrap;
+}
+
+/* Meta rail — labelled facts, hairline-separated, no card chrome.
+   Grid auto-fit fits the columns to width; align-content:start keeps the
+   single row content-height (never stretched to fill a tall flex container). */
+.pks__meta {
+    flex: 1 1 300px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 0 1px;
+    background: var(--wh-border-light);
+    border: 1px solid var(--wh-border);
+    border-radius: var(--wh-radius);
+    overflow: hidden;
+}
+.pks__meta-item {
+    background: var(--wh-surface);
+    padding: 0.375rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+}
+.pks__meta-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--wh-dim);
+}
+.pks__meta-val {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--wh-navy);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pks__meta-val--done { color: var(--wh-green); }
+
+/* Action / progress zone */
+.pks__action {
+    flex: 1 1 300px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--wh-surface);
+    border: 1px solid var(--wh-border);
+    border-radius: var(--wh-radius);
+    padding: 0.5rem 0.75rem;
+}
+
+/* Prompt text for pending/assigned */
+.pks__prompt {
+    font-size: 0.75rem;
+    color: var(--wh-slate);
+    line-height: 1.35;
+}
+.pks__prompt b { color: var(--wh-navy); font-weight: 600; }
+
+/* Contextual CTA — navy authority button, single yellow stays on Scan */
+.pks__cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    padding: 0.5rem 1rem;
+    background: var(--wh-navy);
+    color: #fff;
+    border: none;
+    border-bottom: 2px solid var(--wh-accent);
+    border-radius: var(--wh-radius);
+    font-family: var(--wh-font);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--wh-transition), transform var(--wh-transition);
+}
+.pks__cta:hover { background: var(--wh-navy-mid); color: #fff; transform: translateY(-1px); }
+.pks__cta i { font-size: 0.7rem; }
+
+/* ── Progress ring (in_progress) — the signature element ── */
+.pks__progress {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+}
+.pks__ring {
+    --pct: 0%;
+    position: relative;
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: conic-gradient(var(--wh-green) var(--pct), var(--wh-border-light) 0);
+    transition: background 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pks__ring::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    background: var(--wh-surface);
+    border-radius: 50%;
+}
+.pks__ring-center {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1;
+}
+.pks__ring-count {
+    font-family: var(--wh-mono);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--wh-navy);
+    letter-spacing: -0.02em;
+}
+.pks__ring-label {
+    font-size: 0.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--wh-dim);
+    margin-top: 0.15rem;
+}
+.pks__progress-body { min-width: 0; }
+.pks__progress-title {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--wh-navy);
+}
+.pks__progress-title i { color: var(--wh-blue); font-size: 0.75rem; }
+.pks__progress-hint {
+    font-size: 0.6875rem;
+    color: var(--wh-muted);
+    margin-top: 0.125rem;
+}
+
+/* Done / packed states */
+.pks__done {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--wh-green);
+    width: 100%;
+}
+.pks__done i { font-size: 1.05rem; }
+.pks__done--sealed { color: var(--wh-navy); }
+.pks__done--sealed i { color: var(--wh-navy); }
+
+/* ═══════════════════════════════════════════════════════════
+   WORKLIST — bin-tag rows (the pick route)
+   ═══════════════════════════════════════════════════════════ */
+
+/* Worklist card sits flush under the console strip */
+.pkl-detail .wh__card { margin-left: 0.375rem; margin-right: 0.375rem; }
+
+/* Tighten the group header to brand padding; give the route anchor room */
+.pkl-detail .pkl__group-header {
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+}
+
+/* Bin / location tag — monospace shelf label, the route anchor */
+.pkl__grp-bin {
+    flex-shrink: 0;
+    min-width: 4rem;
+    text-align: center;
+    font-family: var(--wh-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--wh-navy);
+    background: var(--wh-surface-alt);
+    border: 1px solid var(--wh-border);
+    border-left: 3px solid var(--wh-navy);   /* navy route anchor — yellow stays on Scan */
+    border-radius: 4px;
+    padding: 0.25rem 0.375rem;
+    line-height: 1.2;
+}
+.pkl__grp-bin--none {
+    color: var(--wh-faint);
+    background: transparent;
+    border: 1px dashed var(--wh-border);
+    font-weight: 600;
+}
+.pkl__group--done .pkl__grp-bin {
+    border-left-color: var(--wh-green);
+    color: var(--wh-green);
+}
+
+/* Quiet the product name/meta ink; SKU in mono for scan-matching */
+.pkl-detail .pkl__grp-name { color: var(--wh-navy); }
+.pkl-detail .pkl__grp-meta { gap: 0.75rem; }
+.pkl__grp-sku { font-family: var(--wh-mono); font-weight: 600; letter-spacing: -0.01em; }
+
+/* Order links: quiet navy, not loud blue (yellow/blue reserved) */
+.pkl-detail .pkl__grp-order-num,
+.pkl-detail .pkl__grp-item-order {
+    color: var(--wh-slate);
+    font-family: var(--wh-mono);
+}
+.pkl-detail .pkl__grp-order-num:hover,
+.pkl-detail .pkl__grp-item-order:hover { color: var(--wh-navy); }
+
+/* Shared done tick colour (replaces inline style="color:#15803d") */
+.pkl__done-ic { color: var(--wh-green); }
+
+/* Count badge: keep as-is but ensure the products card header reads calm */
+.pkl-detail .wh__card-header { padding: 0.5rem 0.75rem; }
+
+/* ── Mobile ── */
+@media (max-width: 767.98px) {
+    /* Plain block stacking: flexbox in a column gave the children a phantom
+       300px flex-basis height; block boxes are simply content-height. */
+    .pks { display: block; }
+    .pks__meta { margin-bottom: 0.375rem; }
+    .pks__action { padding: 0.625rem 0.75rem; }
+    .pks__cta { padding: 0.6rem 1rem; }
+    .pkl__grp-bin { min-width: 3.5rem; font-size: 0.65rem; }
+}

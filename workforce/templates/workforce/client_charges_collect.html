@@ -1,0 +1,483 @@
+{# Purpose: Charges to Collect — bill a client for delivery fees that no COD payout will ever recover. #}
+{# Used by: workforce.views.client_charges_collect (URL workforce:client_charges_collect) #}
+{# Notes: Same teller vocabulary as the payout desk (bcp__), read in the opposite direction — money in, not out. #}
+{#        Prepaid and COD deliveries sit on one list; the COD column is context only and is never billed. #}
+{% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
+{% load static humanize %}
+
+{% block title %}Charges to Collect{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260808a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260808a" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="bcp">
+  <div class="bcp__wrap">
+
+    <!-- Masthead -->
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Receivable · Business ▸ Ezzy</span>
+        <h1 class="wfhero__title">Charges to Collect</h1>
+        <span class="wfhero__sub">
+          {% if date_from or date_to %}{{ date_from|default:"…" }} → {{ date_to|default:"…" }}{% else %}All completed deliveries{% endif %}
+          <span class="wfhero__sep">·</span> delivery fees the client still owes us
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <nav class="wfhero__actions">
+          <a href="{% url 'workforce:client_charge_verification' %}" class="wfhero__ghost">Verify charges</a>
+          <a href="{% url 'workforce:client_charge_invoices' %}" class="wfhero__ghost">Invoices</a>
+          <a href="{% url 'workforce:cod_business_settlement_report' %}" class="wfhero__ghost">COD payout ▸</a>
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_client_charges_collect_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wfnote" id="workforce_client_charges_collect_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_client_charges_collect_card_notes' %}" hidden></div>
+
+    {% comment %}
+    The whole board before an account is picked. "To bill" is what no COD payout
+    will recover — a fee withheld at payout never reaches this screen.
+    {% endcomment %}
+    <section class="wfstat" aria-label="Charges awaiting billing">
+      <div class="wfstat__card wfstat__card--here">
+        <span class="wfstat__label">To bill</span>
+        <span class="wfstat__value">{{ board_total|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">earned, not yet invoiced</span>
+      </div>
+      <div class="wfstat__card">
+        <span class="wfstat__label">Deliveries</span>
+        <span class="wfstat__value">{{ board_count|intcomma }}</span>
+        <span class="wfstat__sub">completed job{{ board_count|pluralize }} awaiting an invoice</span>
+      </div>
+      <div class="wfstat__card">
+        <span class="wfstat__label">Accounts</span>
+        <span class="wfstat__value">{{ board_accounts|intcomma }}</span>
+        <span class="wfstat__sub">business{{ board_accounts|pluralize:",es" }} with charges due</span>
+      </div>
+      <div class="wfstat__card {% if not outstanding %}wfstat__card--null{% endif %}">
+        <span class="wfstat__label">Invoiced, unpaid</span>
+        <span class="wfstat__value">{{ outstanding|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">already billed and still outstanding</span>
+      </div>
+    </section>
+
+    <!-- Teller window: pick an account -->
+    <form method="GET" class="bcp__window" id="workforce_charges_collect_form_filter">
+      <div class="bcp__field bcp__field--account">
+        <label class="bcp__field-label" for="workforce_charges_collect_select_business">Account</label>
+        <select name="business_id" id="workforce_charges_collect_select_business" class="bcp__select">
+          <option value="">Choose a business…</option>
+          {% for biz in all_businesses|code_last %}
+          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}{% if biz.pending_count %} — {{ biz.pending_total|floatformat:0|intcomma }} QR to bill{% else %} — nothing to bill{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_charges_collect_input_from">From</label>
+        <input type="date" name="date_from" id="workforce_charges_collect_input_from" class="bcp__input" value="{{ date_from }}">
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_charges_collect_input_to">To</label>
+        <input type="date" name="date_to" id="workforce_charges_collect_input_to" class="bcp__input" value="{{ date_to }}">
+      </div>
+      <div class="bcp__window-actions">
+        <label class="ccc__toggle" for="workforce_charges_collect_check_verified">
+          <input type="checkbox" name="verified_only" value="1" id="workforce_charges_collect_check_verified"
+                 {% if verified_only %}checked{% endif %}>
+          <span>Verified only</span>
+        </label>
+        <button type="submit" class="bcp__primary">Open</button>
+        <a href="{% url 'workforce:client_charges_collect' %}" class="bcp__ghost">Clear</a>
+      </div>
+    </form>
+
+    {% if tasks %}
+    <!-- Money strip: the whole bill, live off the selection -->
+    <section class="bcp__summary" id="workforce_charges_collect_summary_strip">
+      <div class="bcp__sum-cell bcp__sum-cell--lead">
+        <span class="bcp__sum-label">Invoice total</span>
+        <span class="bcp__sum-value">QAR <span id="ccc_sum_total">0.00</span></span>
+      </div>
+      <div class="bcp__sum-cell">
+        <span class="bcp__sum-label">Delivery charges</span>
+        <span class="bcp__sum-value">
+          <span id="ccc_sum_fee">0.00</span>
+          <span class="bcp__sum-unit"><span id="ccc_sum_count">0</span> of {{ sel_count }}</span>
+        </span>
+      </div>
+      <div class="bcp__sum-cell">
+        <span class="bcp__sum-label">Other charges</span>
+        <span class="bcp__sum-value">+ <span id="ccc_sum_extra">0.00</span></span>
+      </div>
+      <div class="bcp__sum-cell">
+        <span class="bcp__sum-label">On the desk</span>
+        <span class="bcp__sum-value">{{ sel_total|floatformat:2|intcomma }}<span class="bcp__sum-unit">to bill</span></span>
+      </div>
+      <div class="bcp__sum-cell">
+        <span class="bcp__sum-label">Already invoiced</span>
+        <span class="bcp__sum-value">{{ sel_outstanding|floatformat:2|intcomma }}<span class="bcp__sum-unit">unpaid</span></span>
+      </div>
+    </section>
+
+    <p class="bcp__note">
+      <i class="fa-solid fa-circle-info"></i>
+      Prepaid and COD deliveries are billed the same way here. A fee already withheld from a COD
+      payout never appears on this desk, so nothing can be charged twice. The COD column is context only.
+    </p>
+
+    <section class="bcp__panel">
+      <div class="bcp__panel-head">
+        <h2 class="bcp__panel-title">{{ selected_business.business_name }}</h2>
+        <span class="bcp__count">
+          {{ sel_total|floatformat:2|intcomma }} to bill
+          <span class="bcp__sep">·</span> {{ sel_count }} deliver{{ sel_count|pluralize:"y,ies" }}
+          <span class="bcp__sep">·</span> {{ sel_prepaid }} prepaid
+        </span>
+      </div>
+
+      <div class="bcp__bar">
+        <label class="bcp__check-label" for="workforce_charges_collect_check_all">
+          <input type="checkbox" class="ccc__all-check" id="workforce_charges_collect_check_all">
+          <span>Bill all</span>
+        </label>
+        <span class="bcp__bar-count"><span id="ccc_bar_selected">0</span> selected</span>
+      </div>
+
+      <div class="bcp__table-wrap">
+        <table class="bcp__table" id="workforce_charges_collect_table_view">
+          <thead>
+            <tr>
+              <th class="bcp__col-check"></th>
+              <th>Order</th>
+              <th>Customer</th>
+              <th class="bcp__date">Delivered</th>
+              <th>Payment</th>
+              <th class="bcp__num">COD</th>
+              <th class="bcp__num">Delivery charge</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tasks %}
+            <tr>
+              <td class="bcp__col-check">
+                <input type="checkbox" class="ccc__task-check" value="{{ t.id }}"
+                       data-fee="{{ t.fee|floatformat:2 }}"
+                       data-order="{% if t.order %}{{ t.order.order_number|default:t.order_id }}{% else %}{{ t.id }}{% endif %}">
+              </td>
+              <td class="bcp__order">
+                {% if t.order %}#{{ t.order.order_number|default:t.order_id }}{% else %}—{% endif %}
+                {% if t.dl_task_number %}<span class="bcp__sub-line">{{ t.dl_task_number }}</span>{% endif %}
+              </td>
+              <td class="bcp__truncate" title="{% if t.order %}{{ t.order.customer_name|default:'' }}{% endif %}">
+                {% if t.order %}{{ t.order.customer_name|default:"—" }}{% else %}—{% endif %}
+              </td>
+              <td class="bcp__date">{{ t.completed_at|date:"d M Y"|default:"—" }}</td>
+              <td>
+                {% comment %} Swatch + word, never colour alone — the two payment modes bill identically
+                   and the column exists so staff can see the mix, not to grade the rows. {% endcomment %}
+                {% if t.cod_collected %}
+                <span class="ccc__mode ccc__mode--cod"><span class="ccc__swatch"></span>COD</span>
+                {% else %}
+                <span class="ccc__mode ccc__mode--prepaid"><span class="ccc__swatch"></span>Prepaid</span>
+                {% endif %}
+              </td>
+              <td class="bcp__num ccc__num--context">
+                {% if t.cod_collected_amount %}{{ t.cod_collected_amount|floatformat:2|intcomma }}{% else %}—{% endif %}
+              </td>
+              <td class="bcp__num bcp__num--fee">
+                {{ t.fee|floatformat:2|intcomma }}
+                <span class="bcp__status bcp__status--{{ t.charge_verification_status|default:'pending' }}"
+                      title="Client delivery-charge verification">{{ t.charge_verification_status|default:"pending"|title }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Extra charges: what else goes on this invoice -->
+    <section class="bcp__panel" id="workforce_charges_collect_panel_extras">
+      <div class="bcp__panel-head">
+        <h2 class="bcp__panel-title">Other charges</h2>
+        <span class="bcp__count">Added to the current selection</span>
+      </div>
+
+      <div class="bcp__ladder">
+        <div class="bcp__ladder-line bcp__ladder-line--head">
+          <span>Delivery charges selected</span>
+          <span class="bcp__ladder-val" id="ccc_line_fee">0.00</span>
+        </div>
+
+        <div class="bcp__deducts" id="ccc_extra_rows"></div>
+        <button type="button" class="bcp__add-deduct" id="ccc_add_extra">+ Add charge</button>
+
+        <div class="bcp__ladder-line bcp__ladder-line--net">
+          <span>Invoice total</span>
+          <span class="bcp__ladder-val" id="ccc_line_total">0.00</span>
+        </div>
+      </div>
+    </section>
+
+    {% elif business_filter %}
+    <div class="bcp__empty">
+      <div class="bcp__empty-mark">✓ Nothing to bill</div>
+      <p class="bcp__empty-text">
+        Every completed delivery for this account is either invoiced already or had its charge
+        withheld at a COD payout.
+        <a href="{% url 'workforce:client_charge_invoices' %}?business_id={{ business_filter }}">See their invoices ▸</a>
+      </p>
+    </div>
+    {% else %}
+    <div class="bcp__empty">
+      <div class="bcp__empty-mark">▸</div>
+      <p class="bcp__empty-text">Choose an account above to see what it owes.</p>
+    </div>
+    {% endif %}
+
+  </div>
+
+  {% if tasks %}
+  <!-- Sticky teller tape -->
+  <div class="bcp__tape" id="ccc_actionbar">
+    <div class="bcp__tape-inner">
+      <div class="bcp__tape-readout">
+        <span class="bcp__tape-count">Billing <strong id="ccc_sel_count">0</strong></span>
+        <span class="bcp__tape-total bcp__tape-total--sub">
+          <span class="bcp__tape-total-label">Delivery</span>
+          <span class="bcp__tape-sub-value" id="ccc_sel_fee">0.00</span>
+        </span>
+        <span class="bcp__tape-total bcp__tape-total--sub">
+          <span class="bcp__tape-total-label">Other</span>
+          <span class="bcp__tape-sub-value" id="ccc_sel_extra">0.00</span>
+        </span>
+        <span class="bcp__tape-total">
+          <span class="bcp__tape-total-label">Invoice</span>
+          <span class="bcp__tape-total-value" id="ccc_tape_value"><span id="ccc_sel_total">0.00</span><span class="bcp__qr">QAR</span></span>
+        </span>
+      </div>
+      <button type="button" class="bcp__primary" id="ccc_issue_btn" disabled>Issue invoice ▸</button>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Confirm: issue the invoice -->
+<div class="modal fade" id="cccIssueModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bcp__receipt">
+      <div class="modal-header">
+        <h5 class="modal-title bcp__receipt-title">Issue invoice</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="bcp__receipt-head">
+          <span>Order</span>
+          <span class="bcp__receipt-head-num"></span>
+          <span class="bcp__receipt-head-num">Charge</span>
+        </div>
+        <div class="bcp__receipt-lines" id="ccc_receipt_lines"></div>
+
+        <div class="bcp__receipt-sub">
+          <span>Delivery charges · <span id="ccc_modal_count">0</span> orders</span>
+          <span id="ccc_modal_fee">0.00</span>
+        </div>
+        <div class="bcp__receipt-sub">
+          <span>Other charges</span>
+          <span id="ccc_modal_extra">0.00</span>
+        </div>
+
+        <div class="bcp__receipt-total">
+          <span>Invoice total</span>
+          <span><span class="bcp__brass">QAR <span id="ccc_modal_total">0.00</span></span></span>
+        </div>
+        <hr>
+        <div class="mb-2">
+          <label class="bcp__field-label" for="ccc_due_date">Due by (optional)</label>
+          <input type="date" id="ccc_due_date" class="bcp__input">
+        </div>
+        <div>
+          <label class="bcp__field-label" for="ccc_notes">Note on the invoice (optional)</label>
+          <input type="text" id="ccc_notes" class="bcp__input" placeholder="e.g. July deliveries">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="bcp__ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="bcp__primary" id="ccc_confirm_issue">Issue invoice</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const csrftoken = '{{ csrf_token }}';
+  const businessId = '{{ business_filter|escapejs }}';
+  const el = (id) => document.getElementById(id);
+  const taskChecks = () => Array.from(document.querySelectorAll('.ccc__task-check'));
+  const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const put = (id, value) => { const node = el(id); if (node) node.textContent = value; };
+
+  const EXTRA_KINDS = [
+    ['fulfillment_charge', 'Fulfilment charge'],
+    ['inventory_handling', 'Cargo / handling charge'],
+    ['other_charge', 'Other charge'],
+  ];
+
+  function extraRows() { return Array.from(document.querySelectorAll('.bcp__deduct-row')); }
+
+  function extraTotal() {
+    return extraRows().reduce((sum, r) => {
+      const v = parseFloat(r.querySelector('.bcp__deduct-amount').value || '0');
+      return sum + (isNaN(v) ? 0 : v);
+    }, 0);
+  }
+
+  // One source of truth for the arithmetic — the strip, the ladder, the tape and
+  // the confirmation all read it, so what staff see is what posts.
+  function totals() {
+    let count = 0, fee = 0;
+    taskChecks().forEach(c => {
+      if (c.checked) { count++; fee += parseFloat(c.dataset.fee || '0'); }
+    });
+    const extras = extraTotal();
+    return { count, fee, extras, total: fee + extras };
+  }
+
+  function recompute() {
+    const t = totals();
+
+    put('ccc_sum_total', fmt(t.total));
+    put('ccc_sum_fee', fmt(t.fee));
+    put('ccc_sum_extra', fmt(t.extras));
+    put('ccc_sum_count', t.count);
+
+    put('ccc_sel_count', t.count);
+    put('ccc_sel_fee', fmt(t.fee));
+    put('ccc_sel_extra', fmt(t.extras));
+    put('ccc_sel_total', fmt(t.total));
+
+    put('ccc_line_fee', fmt(t.fee));
+    put('ccc_line_total', fmt(t.total));
+
+    put('ccc_modal_count', t.count);
+    put('ccc_modal_fee', fmt(t.fee));
+    put('ccc_modal_extra', fmt(t.extras));
+    put('ccc_modal_total', fmt(t.total));
+
+    const rows = taskChecks();
+    const on = rows.filter(c => c.checked).length;
+    put('ccc_bar_selected', on);
+    const master = document.querySelector('.ccc__all-check');
+    if (master) {
+      master.checked = on > 0 && on === rows.length;
+      master.indeterminate = on > 0 && on < rows.length;
+    }
+    rows.forEach(c => {
+      const row = c.closest('tr');
+      if (row) row.classList.toggle('bcp__row--on', c.checked);
+    });
+
+    const btn = el('ccc_issue_btn');
+    if (btn) btn.disabled = t.total <= 0;
+
+    const val = el('ccc_tape_value');
+    if (val) { val.classList.remove('bcp__tick'); void val.offsetWidth; val.classList.add('bcp__tick'); }
+    return t;
+  }
+
+  function addExtraRow() {
+    const wrap = el('ccc_extra_rows');
+    if (!wrap) return;
+    const row = document.createElement('div');
+    row.className = 'bcp__deduct-row';
+    row.innerHTML = `
+      <select class="bcp__select bcp__deduct-kind">
+        ${EXTRA_KINDS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+      </select>
+      <input type="text" class="bcp__input bcp__deduct-label" placeholder="Description (optional)">
+      <input type="number" class="bcp__input bcp__deduct-amount" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+      <button type="button" class="bcp__deduct-remove" aria-label="Remove line">×</button>`;
+    wrap.appendChild(row);
+    row.querySelector('.bcp__deduct-amount').addEventListener('input', recompute);
+    row.querySelector('.bcp__deduct-remove').addEventListener('click', () => { row.remove(); recompute(); });
+    row.querySelector('.bcp__deduct-amount').focus();
+  }
+
+  document.querySelector('.ccc__all-check')?.addEventListener('change', function () {
+    taskChecks().forEach(c => { c.checked = this.checked; });
+    recompute();
+  });
+  taskChecks().forEach(c => c.addEventListener('change', recompute));
+  el('ccc_add_extra')?.addEventListener('click', addExtraRow);
+
+  el('ccc_issue_btn')?.addEventListener('click', () => {
+    const t = recompute();
+    if (t.total <= 0) return;
+    const lines = el('ccc_receipt_lines');
+    lines.innerHTML = '';
+    taskChecks().filter(c => c.checked).forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'bcp__receipt-line';
+      row.innerHTML = `<span>#${c.dataset.order}</span><span></span>`
+        + `<span class="bcp__receipt-fee">${fmt(parseFloat(c.dataset.fee || '0'))}</span>`;
+      lines.appendChild(row);
+    });
+    new bootstrap.Modal(el('cccIssueModal')).show();
+  });
+
+  el('ccc_confirm_issue')?.addEventListener('click', async function () {
+    this.disabled = true;
+    const body = new URLSearchParams();
+    body.append('business_id', businessId);
+    taskChecks().filter(c => c.checked).forEach(c => body.append('task_ids[]', c.value));
+    body.append('due_date', el('ccc_due_date').value);
+    body.append('notes', el('ccc_notes').value);
+    extraRows().forEach(r => {
+      const amount = (r.querySelector('.bcp__deduct-amount').value || '').trim();
+      if (!amount || parseFloat(amount) === 0) return;
+      body.append('charge_kind[]', r.querySelector('.bcp__deduct-kind').value);
+      body.append('charge_label[]', r.querySelector('.bcp__deduct-label').value);
+      body.append('charge_amount[]', amount);
+    });
+    try {
+      const resp = await fetch('{% url "workforce:client_charge_invoice_create" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        // Land on the document — an invoice that has not been produced is not issued.
+        if (data.skipped) {
+          alert(data.skipped + ' deliver' + (data.skipped === 1 ? 'y was' : 'ies were')
+                + ' left off — already invoiced or recovered at a COD payout.');
+        }
+        window.location.href = data.invoice_url;
+      } else {
+        alert(data.error || 'Could not issue the invoice');
+        this.disabled = false;
+      }
+    } catch (e) { alert('Network error'); this.disabled = false; }
+  });
+
+  recompute();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% comment %}
+Purpose: "About this page" notes panel for whatsapp_inbox.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_crm_whatsapp_inbox_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+      <p class="wfnote__lede">
+        The triage queue for people who message our business WhatsApp and are not yet anybody we know.
+        One row per sender, showing their latest message and how many they have sent. Numbers that
+        already belong to a client account, to an open lead, or to a staff or driver profile are
+        filtered out, as is anything previously dismissed — so what is left is genuinely new. Working
+        this list means opening each conversation and deciding one of three things: it is a prospect
+        (promote it to a lead), it is someone wanting to drive for us (promote it as a driver lead), or
+        it is noise (dismiss it).
+      </p>
+
+      <div class="wfnote__cols">
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">What you can do here</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Session banner</dt>
+              <dd class="wfnote__def">Shows which WhatsApp number the bridge is logged in as, and
+                whether it is connected. If it is not, nothing new is arriving.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Search</dt>
+              <dd class="wfnote__def">Filters the queue by phone number.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Conversation</dt>
+              <dd class="wfnote__def">Opens the recent thread with that sender, both directions,
+                including photos, voice notes and attachments. All the decisions are made from
+                inside it.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Promote</dt>
+              <dd class="wfnote__def">Creates a business lead from the number, carrying over the
+                contact's name and their last few messages as notes. You stay on the inbox and the
+                row picks up a lead reference.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Driver Lead</dt>
+              <dd class="wfnote__def">The same thing, but filed on the driver recruitment board
+                instead of the sales board.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Not a lead</dt>
+              <dd class="wfnote__def">Dismisses the sender. The row disappears and that number never
+                shows up in this queue again.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Resync</dt>
+              <dd class="wfnote__def">Pulls recent chats straight from WhatsApp for senders whose
+                messages never reached us, then refreshes the contact directory and reloads the page.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Contacts</dt>
+              <dd class="wfnote__def">The synced directory of names, numbers and lid aliases — use it
+                when a sender shows as a long unrecognisable number.</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">Reading a row</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Number</dt>
+              <dd class="wfnote__def">The contact's name when we have one, their real number, and
+                underneath it the WhatsApp alias the message actually arrived under.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Last message</dt>
+              <dd class="wfnote__def">The most recent text. When the message had no text you get a
+                label instead — Photo, Voice note, Document, Location and so on.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Msgs</dt>
+              <dd class="wfnote__def">How many messages this sender has sent in total. A single
+                message is usually a wrong number; a long thread rarely is.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Lead #</dt>
+              <dd class="wfnote__def">This sender already has an open lead. Open the conversation and
+                use the link through to it rather than promoting again.</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+
+      <section class="wfnote__sec wfnote__sec--note">
+        <h2 class="wfnote__h">Worth knowing</h2>
+        <ul class="wfnote__notes">
+          <li><strong>Dismissing is permanent from this page.</strong> It is recorded against every
+            form of the number, so the sender cannot resurface under a variant — reversing it needs the
+            Django admin.</li>
+          <li>Promoting a number that already has an open lead reuses that lead instead of creating a
+            second one, so you cannot accidentally split one prospect in two.</li>
+          <li>Group chats and status broadcasts are filtered out of this queue — it only ever lists
+            direct senders.</li>
+          <li>When the notice about the bridge being switched off is showing, no new inbound messages
+            are being captured and everything below is history.</li>
+          <li>Resync works to a time limit and can finish only part way through; run it again if the
+            sender you expected is still missing.</li>
+          <li>WhatsApp deletes its own copies of media within minutes, so older photos and files in a
+            preview may no longer open.</li>
+        </ul>
+      </section>
+    

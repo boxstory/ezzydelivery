@@ -10,6 +10,7 @@ urlpatterns = [
     # Inventory
     path('inventory/', warehouse_views.inventory_list, name='inventory_list'),
     path('inventory/<int:stock_id>/detail/', warehouse_views.stock_level_detail_modal, name='stock_level_detail_modal'),
+    path('products/add/', warehouse_views.staff_product_add, name='staff_product_add'),
     path('products/<int:product_id>/edit/', warehouse_views.staff_product_edit, name='staff_product_edit'),
     path('inventory/<int:product_id>/', warehouse_views.stock_card, name='stock_card'),
     path('transactions/', warehouse_views.transaction_list, name='transaction_list'),
@@ -17,6 +18,9 @@ urlpatterns = [
     # Receiving
     path('receive/', warehouse_views.receive_stock, name='receive_stock'),
     path('receive/confirm/', warehouse_views.confirm_receive, name='confirm_receive'),
+
+    # Stock adjustment
+    path('adjust/', warehouse_views.stock_adjust, name='stock_adjust'),
 
     # Picking
     path('pick-lists/', warehouse_views.pick_list_list, name='pick_list_list'),
@@ -101,4 +105,5 @@ urlpatterns = [
     path('api/warehouses/<int:warehouse_id>/storage-locations/', warehouse_views.api_storage_locations, name='api_storage_locations'),
     path('api/business/<int:business_id>/products/', warehouse_views.api_business_products, name='api_business_products'),
     path('api/inbound-request/<int:request_id>/items/', warehouse_views.api_inbound_request_items, name='api_inbound_request_items'),
+    path('api/stock-levels/', warehouse_views.api_stock_levels, name='api_stock_levels'),
 ]

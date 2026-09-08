@@ -10,6 +10,7 @@ import os
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from django.db import models
+from core.validators import media_validators
 
 
 def _private_media_storage():
@@ -40,11 +41,19 @@ class WhatsAppMessage(models.Model):
         ('location', 'Location'),
         ('sticker', 'Sticker'),
         ('contact', 'Contact'),
+        # Protocol chatter (encryption notices, hosted-account banners, group
+        # membership changes). Nobody sent these; ingest drops them now, and
+        # the label exists so the ones already stored can be told apart from a
+        # real message we merely failed to classify ('unknown').
+        ('system', 'System notification'),
         ('unknown', 'Unknown'),
     ]
 
-    waha_message_id = models.CharField(max_length=255, unique=True, db_index=True)
-    session = models.CharField(max_length=64, default='default')
+    # NOT globally unique: WAHA message ids are unique per chat, not per
+    # session, so the same id can legitimately arrive on two sessions. The
+    # uniqueness that matters is (session, waha_message_id) — see Meta below.
+    waha_message_id = models.CharField(max_length=255, db_index=True)
+    session = models.CharField(max_length=64, default='default', db_index=True)
     direction = models.CharField(max_length=8, choices=DIRECTION_CHOICES)
 
     from_number = models.CharField(max_length=64, db_index=True, blank=True, default='')
@@ -59,7 +68,7 @@ class WhatsAppMessage(models.Model):
     # minutes, so the archive_wa_media cron downloads it into private storage.
     media_file = models.FileField(
         upload_to='whatsapp/media/', storage=_private_media_storage,
-        blank=True, default='',
+        blank=True, default='', validators=media_validators(max_mb=25),
     )
 
     # Populated when message_type='location' — extracted from payload.location.*
@@ -103,6 +112,13 @@ class WhatsAppMessage(models.Model):
             models.Index(fields=['from_number', 'received_at']),
             models.Index(fields=['business', 'received_at']),
             models.Index(fields=['direction', 'received_at']),
+            models.Index(fields=['session', 'received_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['session', 'waha_message_id'],
+                name='waha_msg_unique_per_session',
+            ),
         ]
 
     def __str__(self):
@@ -115,8 +131,14 @@ class WhatsAppContact(models.Model):
     Persists the lid→phone mapping and names so the CRM inbox (and anything
     else) resolves senders from the DB instead of hitting WAHA per page load.
     Upserted by whatsapp.contacts.sync_contacts(); phone/lid are bare digits.
+
+    Scoped per WAHA session: a lid identifies a contact *relative to the linked
+    device*, so the same customer has a different lid on each of our numbers.
+    One row per (session, phone) keeps the two syncs from overwriting each
+    other's lid on every cron pass.
     """
-    phone = models.CharField(max_length=32, unique=True, db_index=True)
+    session = models.CharField(max_length=64, default='default', db_index=True)
+    phone = models.CharField(max_length=32, db_index=True)
     lid = models.CharField(max_length=32, blank=True, default='', db_index=True)
     saved_name = models.CharField(max_length=255, blank=True, default='')
     push_name = models.CharField(max_length=255, blank=True, default='')
@@ -131,6 +153,12 @@ class WhatsAppContact(models.Model):
         verbose_name = 'WhatsApp Contact'
         verbose_name_plural = 'WhatsApp Contacts'
         ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['session', 'phone'],
+                name='waha_contact_unique_per_session',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.phone} ({self.saved_name or self.push_name or "unnamed"})'

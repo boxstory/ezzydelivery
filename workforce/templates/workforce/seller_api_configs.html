@@ -1,6 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Staff console for every client's store/API integration — review, test, approve, link a Google Sheet
+Used by: workforce_views.wf_seller_api_configs at /workforce/sellers/api-configs/
+Notes: Carries the shared page-notes card (wfnote__) under the hero, hidden on load; the hero help
+       button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block title %}Seller API Configs — Staff Dashboard{% endblock %}
 
@@ -11,7 +17,16 @@
             <h1 class="woa__hero-title"><i class="fa-solid fa-plug me-2"></i>Seller API Configurations</h1>
             <p class="woa__hero-sub">Review, test, and approve API integrations for all sellers</p>
         </div>
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_seller_api_configs_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
+
+    <div class="wfnote" id="workforce_seller_api_configs_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_seller_api_configs_card_notes' %}" hidden></div>
 
     <div class="p-3">
         <!-- Stats -->

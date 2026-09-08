@@ -1,0 +1,138 @@
+{% comment %}
+Purpose: "About this page" notes panel for mapping_manager.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_mapping_manager_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Incoming orders arrive with whatever column names the client's own system uses. This page is
+            where you tell EzzyDelivery <strong>which of their columns means which of our fields</strong>,
+            for one business at a time. Each connection type gets its own tab and its own mapping, so a
+            client sending orders from both Shopify and a spreadsheet can have two different sets of rules.
+            The mapping is what the importer reads every time an order comes in, so a wrong line here shows
+            up as a customer name in the phone field, not as an error.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Business</dt>
+                        <dd class="wfnote__def">Pick whose mapping you are editing. The page reloads on
+                            change. Only active businesses are listed.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Platform tabs</dt>
+                        <dd class="wfnote__def">One tab per connection type. Switching tabs does not lose
+                            your edits — every tab is held until you save.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Source badge</dt>
+                        <dd class="wfnote__def">Shows which connected source the tab is reading. Where a
+                            client has several, <em>Set Default</em> chooses the one used from now on.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Fetch Headers</dt>
+                        <dd class="wfnote__def">Pulls the live column names out of the connected source and
+                            fills the dropdowns with them. Do this first — mapping against stale headers is
+                            the usual cause of blank fields.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Upload Sample</dt>
+                        <dd class="wfnote__def">Reads headers from an Excel or CSV file you supply, for when
+                            the source cannot be reached but you have a specimen file.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sheet picker</dt>
+                        <dd class="wfnote__def">On Google Sheet, chooses which worksheet tab inside the
+                            workbook the headers come from.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Auto-fill</dt>
+                        <dd class="wfnote__def">Guesses the mapping by matching header names, and applies
+                            the built-in defaults on Shopify and WooCommerce. Always review what it did.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Clear</dt>
+                        <dd class="wfnote__def">Empties the mapping on the tab you are looking at. Nothing
+                            is written until you save.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Formula button</dt>
+                        <dd class="wfnote__def">Switches a row from one column to a pattern, so several
+                            columns can be joined into one field using <em>{column}</em> placeholders —
+                            first and last name into one customer name, for instance.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Run Test</dt>
+                        <dd class="wfnote__def">Fetches the client's most recent real order and shows what
+                            each field would resolve to under the current mapping. The fastest way to catch
+                            a mistake before it reaches an order.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Raw Data</dt>
+                        <dd class="wfnote__def">Shows the untouched payload the source sent back, so you can
+                            see the real column names and copy the JSON.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Save All</dt>
+                        <dd class="wfnote__def">Writes the mappings for <strong>every platform at once</strong>,
+                            not just the open tab. <em>Discard</em> reloads the page and throws the lot away.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The tabs</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Shopify</dt>
+                        <dd class="wfnote__def">Fixed column list from the Shopify order payload, with a
+                            default mapping already worked out — usually only needs Auto-fill.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">WooCommerce</dt>
+                        <dd class="wfnote__def">Same idea, against the WooCommerce order payload.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">CSV / Excel</dt>
+                        <dd class="wfnote__def">Column names are typed by hand, because the file is not
+                            known in advance. Also where a legacy mapping made before tabs existed appears.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Google Sheet</dt>
+                        <dd class="wfnote__def">Headers come from a connected sheet; the mapping is stored
+                            against that sheet, not just the business.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">OneDrive</dt>
+                        <dd class="wfnote__def">Headers come from the workbook of a connected OneDrive
+                            source, and are remembered between visits so the page does not re-download it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Public Link</dt>
+                        <dd class="wfnote__def">A shared spreadsheet link. The tab only appears once the
+                            client has at least one active public link source.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Four fields are required — <strong>customer name, phone, address and COD amount</strong>.
+                    They carry a <em>req</em> badge and are marked red until mapped; the counter at the top
+                    tells you how many are still missing.</li>
+                <li>A tab with no columns in its dropdowns has not had its headers loaded yet. Fetch them or
+                    upload a sample rather than assuming the source is empty.</li>
+                <li>Mapping changes apply to <strong>orders imported from now on</strong>. Orders already
+                    brought in keep whatever they were given.</li>
+                <li>For OneDrive, Google Sheet and Public Link the mapping is saved against the selected
+                    source, so a client with two sheets can map each of them differently — check the source
+                    badge before you edit.</li>
+                <li>Nothing is written until <em>Save All</em>. Leaving the page, switching business or
+                    hitting Discard loses every unsaved change on every tab.</li>
+            </ul>
+        </section>
+    

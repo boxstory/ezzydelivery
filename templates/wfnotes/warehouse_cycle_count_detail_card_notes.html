@@ -1,0 +1,75 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/cycle_count_detail.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_cycle_count_detail_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The <strong>count sheet</strong> for one cycle count. Each line is a product at a location
+            with the quantity the system believes is there; you enter what you actually find. Nothing in
+            stock moves while counting — the differences are applied in one go when a staff member
+            approves the count at the end.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The four steps</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Start</dt>
+                        <dd class="wfnote__def">Moves the count to in progress. Quantities cannot be
+                            entered before this.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Count</dt>
+                        <dd class="wfnote__def">Enter the physical quantity per line. The variance is
+                            worked out for you: counted minus system.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Submit</dt>
+                        <dd class="wfnote__def">Only accepted once every line has a number. The count
+                            goes to pending review; stock is still untouched.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Approve (staff)</dt>
+                        <dd class="wfnote__def">Writes the counted figure into stock for every line
+                            that differs, each as an adjustment carrying the count number and your
+                            reason. This is the only step that changes inventory.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the sheet</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">System quantity</dt>
+                        <dd class="wfnote__def">What was on the books when the count was created — not
+                            live, deliberately.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Variance</dt>
+                        <dd class="wfnote__def">Positive means you found more than expected, negative
+                            means less. Zero-variance lines are left alone at approval.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Variance reason</dt>
+                        <dd class="wfnote__def">Free text saved on the line and copied into the
+                            adjustment. It is the only explanation anyone will see later — use it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sorted by location</dt>
+                        <dd class="wfnote__def">So the sheet reads as a walk through the bins.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Count what is there, not what should be there.</strong> Copying the
+                        system figure defeats the exercise.</li>
+                    <li><strong>Zero is a valid count</strong> and is the honest entry when a bin is
+                        empty.</li>
+                    <li><strong>A line with no matching stock row is skipped at approval</strong>, so
+                        it makes no adjustment.</li>
+                </ul>
+            </section>
+        </div>

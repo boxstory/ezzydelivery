@@ -12,7 +12,7 @@ body {
 .biz-dash__content {
   background: #f5f5f5;
   min-height: calc(100vh - 3.5rem);
-  padding: 1.5rem;
+  padding: 0.325rem;
   width: 100%;
   flex: 1 1 0%;
   min-width: 0;
@@ -48,6 +48,71 @@ body {
   }
 }
 
+/* ==================== PAGE CONTAINER PADDING ====================
+   Every client-dashboard page root carries the same 0.375rem Brand Kit gutter,
+   so no page sits looser or tighter against the sidebar than its neighbours.
+   `.bcon__page` is the target for new pages; the rest are the legacy roots that
+   still exist while pages migrate onto it — do not add more.
+   Scoped to .business-dashboard so shared containers (.form-container) keep
+   their own padding on the fleet / workforce / warehouse dashboards.
+   Desktop only - the mobile PWA paddings below are left as-is. */
+@media (min-width: 768px) {
+  .business-dashboard .bcon__page,
+  .business-dashboard .biz-dash__page,
+  .business-dashboard .form-container,
+  .business-dashboard .bapi__page,
+  .business-dashboard .bir,
+  .business-dashboard .bwg,
+  .business-dashboard .bsl,
+  .business-dashboard .bor,
+  .business-dashboard .bta,
+  .business-dashboard .btl,
+  .business-dashboard .btp,
+  .business-dashboard .bset,
+  .business-dashboard .bdd,
+  .business-dashboard .bwh,
+  .business-dashboard .bjr,
+  .business-dashboard .bwt,
+  .business-dashboard .bpi,
+  .business-dashboard .bpl-form,
+  .business-dashboard .bpl-list,
+  .business-dashboard .bpl-choose,
+  .business-dashboard .olv,
+  .business-dashboard .osl,
+  .business-dashboard .oul,
+  .business-dashboard .our,
+  .business-dashboard .owp,
+  .business-dashboard .uop,
+  .business-dashboard .oag,
+  .business-dashboard .oap,
+  .business-dashboard .ofu,
+  .business-dashboard .ou,
+  .business-dashboard .opa,
+  .business-dashboard .bim,
+  .business-dashboard .bulk-entry-container,
+  .business-dashboard .ivl,
+  .business-dashboard .pct,
+  .business-dashboard .piv,
+  .business-dashboard .psa,
+  .business-dashboard .pu,
+  .business-dashboard .pdl,
+  .business-dashboard .pci,
+  .business-dashboard .skc,
+  .business-dashboard .txl,
+  .business-dashboard .pco__container,
+  .business-dashboard .pco__form-container,
+  .business-dashboard .pal__container {
+    padding: 0.375rem;
+  }
+}
+
+/* Shared page-root class for pages that had no BEM container of their own
+   (returns, reports, branded tracking, driver add, team remove).
+   Keeps the old 1rem gutter on mobile; the rule above tightens it on desktop. */
+.biz-dash__page {
+  padding: 1rem;
+}
+
 /* Mobile fixes - ensure content displays */
 /* Using .business-dashboard parent selector for increased specificity to override Bootstrap */
 @media (max-width: 767.98px) {
@@ -59,7 +124,7 @@ body {
 
   /* Dashboard content area mobile styles - specificity increased via parent selector */
   .business-dashboard .biz-dash__content {
-    padding: 0.75rem;
+    padding: 0.325rem;
     min-height: auto;
     width: 100%;
     display: block;
@@ -92,3 +157,4 @@ body {
     min-height: 0;
   }
 }
+

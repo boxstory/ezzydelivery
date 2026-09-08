@@ -1,0 +1,81 @@
+{% comment %}
+Purpose: "About this page" notes panel for workforce/delivery_location_reviews.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "workforce_delivery_location_reviews_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Deliveries marked complete a <strong>long way from the customer's saved location</strong>.
+            One of the two points is wrong and the system cannot tell which: either the driver pressed
+            delivered somewhere other than the drop, or the customer's coordinates are in the wrong
+            place. Nothing is corrected on a guess — staff look at both points and say which is right,
+            and that answer is what moves the record. Widest gaps come first.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">The four verdicts</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Driver GPS correct</dt>
+                        <dd class="wfnote__def"><strong>The only one that changes data.</strong> The
+                            order's coordinates are rewritten to where the driver actually stood, marked
+                            as set by the driver, and the road distance is recalculated.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Customer pin correct</dt>
+                        <dd class="wfnote__def">The saved address was right and the driver was away
+                            from the drop. It records a fact about the delivery; the order is not
+                            touched.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Both wrong</dt>
+                        <dd class="wfnote__def">Neither point can be trusted — the address needs
+                            re-verifying with the customer. Recorded, not corrected.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Not a real discrepancy</dt>
+                        <dd class="wfnote__def">A large building, a compound, a loose GPS fix. Closes
+                            the row without implying anyone was wrong.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Working the queue</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Gap</dt>
+                        <dd class="wfnote__def">Straight-line kilometres between the driver's fix and
+                            the customer's pin. Only deliveries past the flag threshold appear.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">GPS accuracy</dt>
+                        <dd class="wfnote__def">How tight the driver's fix was, in metres. A loose fix
+                            weakens the evidence — read the gap against it before deciding.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Driver filter</dt>
+                        <dd class="wfnote__def">Only drivers who actually have flagged deliveries, with
+                            their counts. A driver appearing repeatedly is the pattern worth chasing.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Bulk decisions</dt>
+                        <dd class="wfnote__def">Tick several rows and give one verdict, up to 200 at a
+                            time. Rows already reviewed are skipped rather than overwritten.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Notes</dt>
+                        <dd class="wfnote__def">Saved against every row in the batch, along with your
+                            name and the time.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>A verdict is final for that row</strong> — it leaves the pending queue
+                        and is not re-decided by a later batch.</li>
+                    <li><strong>Bulk-accepting driver GPS moves real addresses.</strong> It is the one
+                        verdict worth deciding row by row.</li>
+                </ul>
+            </section>
+        </div>

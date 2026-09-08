@@ -1,0 +1,158 @@
+{# Purpose: The seller's own charge invoices — what EzzyDelivery has billed them for delivery and what is still due. #}
+{# Used by: business.views.business_charge_invoices (URL business:business_charge_invoices) #}
+{# Notes: Mobile PWA list + desktop bcon__ console, same split as the COD statement. Read-only: payments are #}
+{#        recorded by staff, and each row links to the seller's copy of the invoice document. #}
+{% extends "business_dashboard_base.html" %}
+{% load static business_console humanize %}
+
+{% block title %}Invoices{% endblock %}
+
+{% block content %}
+<!-- ==========================================
+     Mobile PWA View (visible < 768px only)
+     ========================================== -->
+<div class="d-md-none" id="invoices_mobile_pwa_view">
+  <div class="pwa-section-header">
+    <h2 class="pwa-section-header__title">Invoices</h2>
+    <a href="{% url 'business:business_finance_dashboard' %}" class="pwa-section-header__link">
+      <i class="fas fa-arrow-left"></i> Finance
+    </a>
+  </div>
+
+  <div class="pwa-stats-grid">
+    <div class="pwa-finance-stat">
+      <p class="pwa-finance-stat__value">{{ total_billed|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Billed (QR)</p>
+    </div>
+    <div class="pwa-finance-stat">
+      <p class="pwa-finance-stat__value">{{ total_paid|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Paid (QR)</p>
+    </div>
+    <div class="pwa-finance-stat">
+      <p class="pwa-finance-stat__value">{{ total_outstanding|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Due (QR)</p>
+    </div>
+    <div class="pwa-finance-stat">
+      <p class="pwa-finance-stat__value">{{ unpaid_count }}</p>
+      <p class="pwa-finance-stat__label">Unpaid</p>
+    </div>
+  </div>
+
+  <div class="pwa-txn-list">
+    {% for inv in invoices %}
+    <a href="{% url 'business:business_charge_invoice' inv.invoice_code %}" class="pwa-txn-item pwa-txn-item--link">
+      <div class="pwa-txn-item__icon pwa-txn-item__icon--charge">
+        <i class="fas fa-file-invoice"></i>
+      </div>
+      <div class="pwa-txn-item__info">
+        <p class="pwa-txn-item__type">{{ inv.invoice_code }}</p>
+        <p class="pwa-txn-item__desc">{{ inv.issued_at|date:"d M Y" }} &middot; {{ inv.get_status_display }}</p>
+      </div>
+      <div class="pwa-txn-item__right">
+        <p class="pwa-txn-item__amount {% if inv.is_void or not inv.amount_due %}pwa-txn-item__amount--positive{% else %}pwa-txn-item__amount--negative{% endif %}">
+          {{ inv.total_amount|floatformat:0 }} QR
+        </p>
+        <p class="pwa-txn-item__date">
+          {% if not inv.is_void and inv.amount_due > 0 %}{{ inv.amount_due|floatformat:0 }} due{% else %}—{% endif %}
+          <i class="fas fa-chevron-right ms-1"></i>
+        </p>
+      </div>
+    </a>
+    {% empty %}
+    <div class="pwa-empty-state">
+      <i class="fas fa-file-invoice"></i>
+      <p>No invoices yet</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ==========================================
+     Desktop console (visible ≥ 768px)
+     ========================================== -->
+<div class="d-none d-md-block" id="invoices_desktop_view">
+<div class="bcon__page">
+  {% bconheader eyebrow="Finance" icon="fa-solid fa-file-invoice" title="Delivery Charge Invoices" subtitle=business.business_name %}
+  {% endbconheader %}
+</div>
+
+<div class="bcon__plates">
+  <div class="bcon__plate bcon__plate--primary bcon__rise bcon__rise--1">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Total Billed</p>
+      <span class="bcon__plate-icon bcon__plate-icon--primary"><i class="fa-solid fa-file-invoice"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ total_billed|floatformat:0 }} <small>QAR</small></p>
+  </div>
+  <div class="bcon__plate bcon__plate--success bcon__rise bcon__rise--2">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Paid</p>
+      <span class="bcon__plate-icon bcon__plate-icon--success"><i class="fa-solid fa-circle-check"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ total_paid|floatformat:0 }} <small>QAR</small></p>
+  </div>
+  <div class="bcon__plate bcon__plate--warning bcon__rise bcon__rise--3">
+    <div class="bcon__plate-top">
+      <p class="bcon__plate-label">Outstanding</p>
+      <span class="bcon__plate-icon bcon__plate-icon--warning"><i class="fa-solid fa-hourglass-half"></i></span>
+    </div>
+    <p class="bcon__plate-value">{{ total_outstanding|floatformat:0 }} <small>QAR</small></p>
+    <p class="bcon__plate-foot">{{ unpaid_count }} invoice{{ unpaid_count|pluralize }} unpaid</p>
+  </div>
+</div>
+
+<div class="px-2 bcon__rise bcon__rise--4">
+  <div class="bcon__panel">
+    <div class="bcon__panel-head">
+      <h5 class="bcon__panel-title"><i class="fa-solid fa-receipt"></i> Invoices</h5>
+      <span class="bcon__badge bcon__badge--primary">{{ invoices|length }} items</span>
+    </div>
+    <div class="bcon__panel-body--flush bcon__ledger-wrap">
+      <table class="bcon__ledger">
+        <thead>
+          <tr>
+            <th>Issued</th>
+            <th>Invoice</th>
+            <th>Period</th>
+            <th>Status</th>
+            <th class="bcon__td--right">Billed</th>
+            <th class="bcon__td--right">Paid</th>
+            <th class="bcon__td--right">Due</th>
+            <th>Document</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in invoices %}
+          <tr>
+            <td data-label="Issued" class="bcon__num">{{ inv.issued_at|date:"d M Y" }}</td>
+            <td data-label="Invoice"><span class="bcon__chip">{{ inv.invoice_code }}</span></td>
+            <td data-label="Period">{% if inv.period_from %}{{ inv.period_from|date:"d M" }} – {{ inv.period_to|date:"d M" }}{% else %}—{% endif %}</td>
+            <td data-label="Status">{{ inv.get_status_display }}</td>
+            <td data-label="Billed" class="bcon__num bcon__td--right">{{ inv.total_amount|floatformat:2 }}</td>
+            <td data-label="Paid" class="bcon__num bcon__td--right">{% if inv.amount_paid %}{{ inv.amount_paid|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td data-label="Due" class="bcon__amount {% if inv.amount_due > 0 and not inv.is_void %}bcon__amount--danger{% else %}bcon__amount--success{% endif %}">
+              {% if inv.is_void %}Void{% else %}{{ inv.amount_due|floatformat:2 }} <small>QAR</small>{% endif %}
+            </td>
+            <td data-label="Document">
+              <a href="{% url 'business:business_charge_invoice' inv.invoice_code %}" class="bcon__chip">View</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8">No invoices yet.</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4">Total (excludes voided)</td>
+            <td class="bcon__num bcon__td--right">{{ total_billed|floatformat:2 }}</td>
+            <td class="bcon__num bcon__td--right">{{ total_paid|floatformat:2 }}</td>
+            <td class="bcon__amount bcon__amount--danger">{{ total_outstanding|floatformat:2 }} <small>QAR</small></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}

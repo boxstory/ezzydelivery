@@ -41,6 +41,8 @@ from django.conf import settings
 from django.db import models
 from core import models as core_models
 from fleet import models as fleet_models
+from core.email_normalize import EmailNormalizedModel
+from core.validators import image_validators
 
 
 def upload_path_handler(instance, filename):
@@ -66,7 +68,7 @@ def upload_path_handler(instance, filename):
 # =============================================================================
 
 
-class Business(models.Model):
+class Business(EmailNormalizedModel, models.Model):
     """
     Main business entity model.
 
@@ -99,6 +101,8 @@ class Business(models.Model):
         >>> business = Business.objects.get(business_code='SHOP001')
         >>> orders = business.orders.filter(order_status='pending')
     """
+    EMAIL_FIELDS = ('business_email',)
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True, related_name='user_business')
     
@@ -203,7 +207,9 @@ class Business(models.Model):
         return self.business_name or f"Business ID: {self.business_id}"
 
 
-class BusinessProfile(models.Model):
+class BusinessProfile(EmailNormalizedModel, models.Model):
+    EMAIL_FIELDS = ('business_email',)
+
     business = models.OneToOneField(
         Business, on_delete=models.CASCADE, related_name='business_profile')
     business_description = models.TextField(max_length=225, blank=True, 
@@ -326,6 +332,10 @@ class BusinessApiSettings(models.Model):
         help_text='Google Sheet column mapping: {"customer_name": "Col Header", "phone": "Col Header", ...}')
     last_headers = models.JSONField(blank=True, default=list,
         help_text='Last-seen header row from the source sheet, used to map raw_row positions to db fields.')
+    last_sync_at = models.DateTimeField(blank=True, null=True,
+        help_text='Last successful sync fetch from this source (Google Sheet / Shopify / WooCommerce).')
+    last_sync_count = models.PositiveIntegerField(default=0,
+        help_text='Rows/orders seen during the last sync fetch.')
 
     is_verify_api = models.BooleanField(default=False)
     is_default = models.BooleanField(default=False)
@@ -350,7 +360,8 @@ class BusinessLogo(models.Model):
     business = models.ForeignKey(
         Business, on_delete=models.CASCADE, blank=True, null=True, related_name='business_logo')
     business_logo = models.ImageField(
-        upload_to=upload_path_handler, default="business/avatar.png", blank=True, null=True)
+        upload_to=upload_path_handler, default="business/avatar.png", blank=True, null=True,
+        validators=image_validators(max_mb=5))
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -368,6 +379,7 @@ class BusinessPoster(models.Model):
         Business, on_delete=models.CASCADE, related_name='business_posters')
     poster_image = models.ImageField(
         upload_to=upload_path_handler, blank=True, null=True,
+        validators=image_validators(max_mb=8),
         help_text='Upload promotional poster/banner image')
     poster_title = models.CharField(max_length=200, blank=True, null=True,
                                      help_text='Optional title for the poster')
@@ -394,7 +406,7 @@ class BusinessPoster(models.Model):
 # =============================================================================
 
 
-class BusinessTeamProfile(models.Model):
+class BusinessTeamProfile(EmailNormalizedModel, models.Model):
     """
     Business team member profile.
 
@@ -420,6 +432,8 @@ class BusinessTeamProfile(models.Model):
         - Use get_effective_permissions() to get final permission set
         - Use has_permission() to check specific permission
     """
+    EMAIL_FIELDS = ('team_email',)
+
     ROLE_CHOICES = [
         ('manager', 'Manager'),
         ('staff', 'Staff'),
@@ -460,6 +474,7 @@ class BusinessTeamProfile(models.Model):
     team_logo = models.ImageField(
         upload_to='business/team_logos/',
         default="business/avatar.png",
+        validators=image_validators(max_mb=5),
         blank=True, null=True
     )
 
@@ -755,6 +770,13 @@ class PickupLocation(models.Model):
 
     def __str__(self):
         return self.pickup_location_title
+
+    @property
+    def google_maps_link(self):
+        """Maps URL for the exact stored pin, or None when no pin is set."""
+        if self.pickup_lat is None or self.pickup_lon is None:
+            return None
+        return f"https://www.google.com/maps?q={self.pickup_lat},{self.pickup_lon}"
 
     class Meta:
         verbose_name_plural = "Pickup Location"

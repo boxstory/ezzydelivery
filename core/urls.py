@@ -1,6 +1,8 @@
 from django.urls import path
+from django.views.generic.base import RedirectView
 from core import views as core_views
 from core import password_reset_views
+from core import views_password_warning
 from webpages import views as webpages_views
 from delivery import views as delivery_views
 from orders import views as orders_views
@@ -35,6 +37,13 @@ urlpatterns = [
          core_views.join_driver, name='join_driver'),
     path('join_us/driver/start/',
          core_views.join_driver_start, name='join_driver_start'),
+    # Arabic hreflang pair of the driver landing page
+    path('ar/join_us/driver/start/',
+         core_views.join_driver_start_ar, name='join_driver_start_ar'),
+    # Short URL: /driver/start/ -> /join_us/driver/start/
+    path('driver/start/',
+         RedirectView.as_view(pattern_name='core:join_driver_start', permanent=True),
+         name='join_driver_start_short'),
     path('join_us/business/update/',
          core_views.business_profile_update, name='business_profile_update'),
     path('join_us/driver/update/',
@@ -50,6 +59,9 @@ urlpatterns = [
     path('password/reset/request/', password_reset_views.password_reset_request, name='password_reset_request'),
     path('password/reset/verify/', password_reset_views.password_reset_verify, name='password_reset_verify'),
     path('password/reset/confirm/', password_reset_views.password_reset_confirm, name='password_reset_confirm'),
+
+    # Weak-password nudge for existing accounts
+    path('password/weak/', views_password_warning.weak_password_warning, name='weak_password_warning'),
 
     # Temporary staff setup (remove after use)
     path('make-staff/', core_views.make_staff, name='make_staff'),

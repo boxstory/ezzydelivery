@@ -1,0 +1,80 @@
+{% comment %}
+Purpose: "About this page" notes panel for inventory_reports.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_inventory_reports_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      A read-only picture of what stock our sellers are holding. It opens on one card per active
+      client that has products on file; clicking a card drills into that client's full product list
+      with the quantity we currently hold for each item. Nothing on this page changes stock — it is
+      a reporting view over the inventory records that warehouse and product staff maintain. When
+      you want the shortlist of items that actually need ordering, use
+      <strong>Restock&nbsp;List</strong> instead.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Seller filter</dt>
+            <dd class="wfnote__def">Types-as-you-go and hides any seller card that does not match the
+              text. It filters the cards on the opening screen only — it does not search inside a
+              seller's product table once you have drilled in.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Open a seller</dt>
+            <dd class="wfnote__def">Click anywhere on the card to load that client's products: name,
+              SKU, category, stock on hand, reorder level, status and the date the stock figure was
+              last touched.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Back to all</dt>
+            <dd class="wfnote__def"><em>Back to All Sellers</em> returns to the card grid and clears
+              the selected seller.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Total products</dt>
+            <dd class="wfnote__def">On each card, how many distinct products that client has on file —
+              not how many units are in stock.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">Stock status</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">In stock</dt>
+            <dd class="wfnote__def">Quantity on hand is above the reorder level. Nothing to do.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Low stock</dt>
+            <dd class="wfnote__def">Quantity has fallen to the reorder level or below but is not zero.
+              These are the items that show up on the Restock List.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Out of stock</dt>
+            <dd class="wfnote__def">Quantity is zero — either genuinely empty, or the product has no
+              inventory record at all, which reads the same way here.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>Stock is the <strong>sum of every inventory row</strong> for that product, across
+          locations. There is no per-warehouse breakdown on this page.</li>
+        <li>The reorder level is a single fixed threshold applied to every product — it is not a
+          per-product setting you can tune from here.</li>
+        <li>Only clients that are <strong>active and have at least one product</strong> appear in the
+          card grid. A client with no products is simply absent, not shown as empty.</li>
+        <li><em>Last Settled</em> on the seller cards is not fed by this report and will read
+          <em>Never</em>.</li>
+        <li>This page is read-only. Corrections to quantities happen in the product and warehouse
+          screens, not here.</li>
+      </ul>
+    </section>
+  

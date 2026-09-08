@@ -1,0 +1,111 @@
+{% comment %}
+Purpose: "About this page" notes panel for temp_orders_browse.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_temp_orders_browse_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Every row here is a <strong>raw order line we pulled from a client's own system</strong> — their
+            Shopify or WooCommerce shop, a OneDrive or Google spreadsheet, or a public order link. It is not a
+            real order yet. This page is the full history for <strong>one client at a time</strong>: pick a
+            business and you get all of their rows, oldest to newest, so you can hunt down a specific line, see
+            why it never became an order, and push it through. Nothing appears until a business is selected.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Business</dt>
+                        <dd class="wfnote__def">Required. Choosing one reloads the page straight away; the counts beside
+                            the Status and Source options are that client's totals.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Narrow by status, by source, and by sort order. Search matches order code,
+                            customer name, phone, address and the platform's own order id.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Row click</dt>
+                        <dd class="wfnote__def">Clicking anywhere on a row except a control opens the detail popup with
+                            the full record, including the raw data exactly as the source sent it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Resync</dt>
+                        <dd class="wfnote__def">Re-fetches the selected rows from their original source and re-applies the
+                            current column mapping. Rows that actually changed flash yellow.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Resync filtered</dt>
+                        <dd class="wfnote__def">The same thing for every row matching the filter, not just the ticked ones.
+                            Capped at 500 rows and can take a while.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Mark Imported</dt>
+                        <dd class="wfnote__def">Flags the ticked rows as done <strong>without creating anything</strong> —
+                            purely to clear them out of the New queue when they were handled elsewhere.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Auto-Import</dt>
+                        <dd class="wfnote__def">Runs the full pipeline on the ticked rows: refresh from source, read the
+                            address, match products, raise the pickup, place the pin, set status, message the customer,
+                            publish to drivers. A report shows what each row did.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Row status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">New</dt>
+                        <dd class="wfnote__def">Collected, not yet turned into anything. This is the working queue.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Imported</dt>
+                        <dd class="wfnote__def">Dealt with. When a real order was created its number is shown next to the
+                            badge; when the row was only marked imported, there is no number.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Skipped</dt>
+                        <dd class="wfnote__def">Deliberately passed over — the row is kept for the record but is not
+                            waiting on anyone.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Auto-import outcomes</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Fully automated</dt>
+                        <dd class="wfnote__def">Every enabled stage passed; the order exists and went out to drivers.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Needs review</dt>
+                        <dd class="wfnote__def">The order was created but something needs a human — usually the address or
+                            the pin. Read the warnings on the row.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Failed</dt>
+                        <dd class="wfnote__def">No order was created. The row stays as it was, so it can be fixed and
+                            retried.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li><strong>Mark Imported creates nothing.</strong> Used by mistake it silently buries real orders that
+                    were never delivered — the customer never hears from anyone.</li>
+                <li>Auto-import takes at most <strong>25 rows per run</strong>, and it creates real orders that can go
+                    straight to drivers. Which stages actually run is set per client on <em>Auto-Import Stages</em>.</li>
+                <li>Resync overwrites the row with what the source says <strong>now</strong>. If the client edited their
+                    sheet after we collected it, the older values are lost.</li>
+                <li>Resync depends on that client having a column mapping; rows with no mapping come back reported as
+                    skipped rather than updated.</li>
+                <li>The auto-import report deliberately stays open when anything needs reviewing. Read it before closing
+                    — closing is what refreshes the list.</li>
+            </ul>
+        </section>
+    

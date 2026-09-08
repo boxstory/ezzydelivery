@@ -1,5 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Staff config — which businesses are switched on for temp-order sync, plus their source counts
+Used by: workforce_views.temp_order_config at /workforce/temp-orders/config/
+Notes: The Temp Sync switch POSTs back to this same URL and saves instantly (no Save button).
+       Carries the shared page-notes card (wfnote__) under the hero, hidden on load; the hero help
+       button toggles it via the delegated handler in workforce.js.
+{% endcomment %}
 
 {% block content %}
 <div style="min-width:0;max-width:100%">
@@ -15,8 +22,17 @@
             <a href="{% url 'workforce:temp_orders' %}" class="btn btn-outline-dark btn-sm">
                 <i class="fa-solid fa-arrow-left me-1"></i>Back to Temp Orders
             </a>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_temp_order_config_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </header>
+
+    <div class="wfnote" id="workforce_temp_order_config_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_temp_order_config_card_notes' %}" hidden></div>
 
     <div class="d-flex justify-content-between align-items-center px-2 mb-2">
         <div class="text-muted" style="font-size:0.85rem;">

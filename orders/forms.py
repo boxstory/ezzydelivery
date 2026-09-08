@@ -39,6 +39,7 @@ from requests import request
 from orders import models as orders_models
 from business import models as business_models
 from product import models as product_models
+from core.forms_base import SanitizedForm, SanitizedFormMixin, SanitizedModelForm
 
 # Local aliases for commonly used models
 Order = orders_models.Order
@@ -66,7 +67,7 @@ COD_STATUS_BY_CLIENT = orders_models.COD_STATUS_BY_CLIENT
 # =============================================================================
 
 
-class AddOrderForm(forms.ModelForm):
+class AddOrderForm(SanitizedModelForm):
     """
     Order creation form.
 
@@ -121,7 +122,8 @@ class AddOrderForm(forms.ModelForm):
     class Meta:
         model = Order
         fields = ['pickup_location', 'client_order_code', 'customer_name', 'customer_phone', 'customer_whatsapp',   'cod_status_by_client', 'cod_amount',
-                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'order_notes', 'order_status', 'order_source_text', 'preferred_time_slot', 'delivery_speed']
+                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'order_notes', 'order_status', 'order_source_text', 'preferred_time_slot', 'delivery_speed',
+                  'scheduled_delivery', 'scheduled_date', 'scheduled_time', 'scheduled_occasion', 'scheduled_note']
         exclude = ['order_number', 'business', 'delivery_task', 'deadline_date', 'cod_status_by_staff',
                    'updated_at', 'created_at']
         widgets = {
@@ -133,6 +135,16 @@ class AddOrderForm(forms.ModelForm):
             'longitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
             'coords_accuracy': forms.HiddenInput(),
             'order_source_text': forms.HiddenInput(),
+            'scheduled_delivery': forms.CheckboxInput(attrs={
+                'class': 'form-check-input', 'id': 'id_scheduled_delivery'}),
+            'scheduled_date': forms.DateInput(format='%Y-%m-%d', attrs={
+                'class': 'form-control', 'type': 'date', 'id': 'id_scheduled_date'}),
+            'scheduled_time': forms.TimeInput(format='%H:%M', attrs={
+                'class': 'form-control', 'type': 'time', 'id': 'id_scheduled_time'}),
+            'scheduled_occasion': forms.Select(attrs={'class': 'form-control'}),
+            'scheduled_note': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g. Birthday gift — do not deliver a day early'}),
         }
         labels = {
             'order_notes': _('Order Short description'),
@@ -142,6 +154,11 @@ class AddOrderForm(forms.ModelForm):
             'dl_street': 'Customer Street No',
             'dl_zone': 'Customer Zone No',
             'delivery_speed': _('Delivery Speed'),
+            'scheduled_delivery': _('Deliver on a specific date'),
+            'scheduled_date': _('Delivery Date'),
+            'scheduled_time': _('Preferred Hour'),
+            'scheduled_occasion': _('Occasion'),
+            'scheduled_note': _('Instruction'),
         }
 
     def __init__(self,  *args, **kwargs):
@@ -192,8 +209,11 @@ class AddOrderForm(forms.ModelForm):
                 default_location = pickup_locations.first()
             if default_location:
                 self.fields['pickup_location'].initial = default_location.id
-            
-        
+
+        # The blanket .form-control above also hits the scheduled-delivery
+        # checkbox, which Bootstrap styles as .form-check-input instead.
+        self.fields['scheduled_delivery'].widget.attrs['class'] = 'form-check-input'
+        self.fields['scheduled_delivery'].required = False
 
     def clean_customer_phone(self):
         phone = self.cleaned_data.get('customer_phone', '').strip()
@@ -243,6 +263,22 @@ class AddOrderForm(forms.ModelForm):
             cleaned_data['cod_status_by_client'] = 'unpaid'
         elif cod_amount == 0 and cod_status in ('unpaid', 'pending', ''):
             cleaned_data['cod_status_by_client'] = 'online_paid'
+
+        # A scheduled delivery is a promise — it needs a real, future date.
+        if cleaned_data.get('scheduled_delivery'):
+            import datetime as _dt
+            sched_date = cleaned_data.get('scheduled_date')
+            if not sched_date:
+                self.add_error('scheduled_date',
+                               'Pick the delivery date, or untick "Deliver on a specific date".')
+            elif sched_date < _dt.date.today():
+                self.add_error('scheduled_date', 'The delivery date cannot be in the past.')
+        else:
+            # Unticked wins over leftover values so nothing is scheduled by accident
+            cleaned_data['scheduled_date'] = None
+            cleaned_data['scheduled_time'] = None
+            cleaned_data['scheduled_occasion'] = ''
+            cleaned_data['scheduled_note'] = ''
         return cleaned_data
 
     def save(self, commit=True):
@@ -253,7 +289,7 @@ class AddOrderForm(forms.ModelForm):
         return order
 
 
-class AddOrderProductsForm(forms.ModelForm):
+class AddOrderProductsForm(SanitizedModelForm):
     """
     Order product/item form.
 
@@ -354,7 +390,7 @@ class AddOrderProductsForm(forms.ModelForm):
 
 
 
-class OrderFileUploadForm(forms.Form):
+class OrderFileUploadForm(SanitizedForm):
     """
     CSV file upload form for bulk order import.
 
@@ -411,7 +447,7 @@ class OrderFileUploadForm(forms.Form):
         return uploaded_file
 
 
-class OrderLookupForm(forms.Form):
+class OrderLookupForm(SanitizedForm):
     """Form for customers to look up their order by order number + phone verification."""
     order_number = forms.CharField(
         max_length=64,
@@ -441,7 +477,7 @@ class OrderLookupForm(forms.Form):
         return value
 
 
-class CustomerLocationUpdateForm(forms.Form):
+class CustomerLocationUpdateForm(SanitizedForm):
     """Form for customers to update their delivery location."""
     verified_address = forms.CharField(
         widget=forms.Textarea(attrs={
@@ -502,7 +538,7 @@ class CustomerLocationUpdateForm(forms.Form):
     phone_last4 = forms.CharField(widget=forms.HiddenInput())
 
 
-class UpdateOrderForm(forms.ModelForm):
+class UpdateOrderForm(SanitizedModelForm):
     """
     Order update form.
 
@@ -530,7 +566,8 @@ class UpdateOrderForm(forms.ModelForm):
     class Meta:
         model = Order
         fields = [ 'customer_name', 'customer_phone', 'customer_whatsapp',  'task_created', 'cod_status_by_client', 'cod_amount',
-                  'dl_zone', 'dl_street', 'dl_building', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'pickup_location', 'order_notes', ]
+                  'dl_zone', 'dl_street', 'dl_building', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'pickup_location', 'order_notes',
+                  'scheduled_delivery', 'scheduled_date', 'scheduled_time', 'scheduled_occasion', 'scheduled_note', ]
 
         exclude = ['order_number','client_order_code', 'business', 'delivery_task', 'order_date',
                    'pickup_location_id', 'updated_at', 'created_at']
@@ -546,6 +583,16 @@ class UpdateOrderForm(forms.ModelForm):
             'latitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
             'longitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
             'coords_accuracy': forms.HiddenInput(),
+            'scheduled_delivery': forms.CheckboxInput(attrs={
+                'class': 'form-check-input', 'id': 'id_scheduled_delivery'}),
+            'scheduled_date': forms.DateInput(format='%Y-%m-%d', attrs={
+                'class': 'form-control', 'type': 'date', 'id': 'id_scheduled_date'}),
+            'scheduled_time': forms.TimeInput(format='%H:%M', attrs={
+                'class': 'form-control', 'type': 'time', 'id': 'id_scheduled_time'}),
+            'scheduled_occasion': forms.Select(attrs={'class': 'form-control'}),
+            'scheduled_note': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g. Birthday gift — do not deliver a day early'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -576,9 +623,29 @@ class UpdateOrderForm(forms.ModelForm):
                 business_id=business_id
             ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
+        # The blanket .form-control above also hits the scheduled-delivery
+        # checkbox, which Bootstrap styles as .form-check-input instead.
+        self.fields['scheduled_delivery'].widget.attrs['class'] = 'form-check-input'
+        self.fields['scheduled_delivery'].required = False
+
     def clean(self):
         cleaned = super().clean()
         cod_status = cleaned.get('cod_status_by_client')
         if cod_status == 'online_paid':
             cleaned['cod_amount'] = 0
+
+        # A scheduled delivery is a promise — it needs a real, future date.
+        if cleaned.get('scheduled_delivery'):
+            import datetime as _dt
+            sched_date = cleaned.get('scheduled_date')
+            if not sched_date:
+                self.add_error('scheduled_date',
+                               'Pick the delivery date, or untick "Deliver on a specific date".')
+            elif sched_date < _dt.date.today():
+                self.add_error('scheduled_date', 'The delivery date cannot be in the past.')
+        else:
+            cleaned['scheduled_date'] = None
+            cleaned['scheduled_time'] = None
+            cleaned['scheduled_occasion'] = ''
+            cleaned['scheduled_note'] = ''
         return cleaned

@@ -7,12 +7,14 @@ Usage:
     python manage.py qa_evaluate --check-templates
     python manage.py qa_evaluate --update-todos
 
-For Claude Code agent usage:
-    The agent should review pages manually and update docs/qa_todos.md
+--update-todos runs scripts/qa_scan.py, which regenerates
+.claude/docs/12-testing-qa/qa_todos.md from a fresh scan of the codebase while
+preserving any human triage marks already in the file.
 """
 
 import os
-from datetime import datetime
+import subprocess
+import sys
 from django.core.management.base import BaseCommand
 from django.urls import get_resolver, URLPattern, URLResolver
 from django.conf import settings
@@ -35,7 +37,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--update-todos',
             action='store_true',
-            help='Update the qa_todos.md with timestamp',
+            help='Re-scan the codebase and regenerate qa_todos.md (preserves triage marks)',
         )
         parser.add_argument(
             '--app',
@@ -182,32 +184,30 @@ class Command(BaseCommand):
         return issues
 
     def update_todos(self):
-        """Update the qa_todos.md with current timestamp"""
-        todos_path = os.path.join(settings.BASE_DIR, 'docs', 'qa_todos.md')
+        """Regenerate qa_todos.md by running the scanner.
 
-        if not os.path.exists(todos_path):
-            self.stdout.write(self.style.ERROR(f'QA todos file not found: {todos_path}'))
+        This used to only rewrite a `Last Updated:` line, and pointed at docs/qa_todos.md —
+        a path that stopped existing when docs moved under .claude/docs/. The result was a
+        file that looked maintained and was not. Now it re-scans for real.
+        """
+        scanner = os.path.join(settings.BASE_DIR, 'scripts', 'qa_scan.py')
+
+        if not os.path.exists(scanner):
+            self.stdout.write(self.style.ERROR(f'Scanner not found: {scanner}'))
             return
 
-        try:
-            with open(todos_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+        result = subprocess.run(
+            [sys.executable, scanner],
+            capture_output=True, text=True, cwd=settings.BASE_DIR,
+        )
 
-            # Update last updated timestamp
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+        if result.stdout:
+            self.stdout.write(result.stdout.rstrip())
 
-            if 'Last Updated:' in content:
-                import re
-                content = re.sub(
-                    r'Last Updated: .*',
-                    f'Last Updated: {timestamp}',
-                    content
-                )
+        if result.returncode != 0:
+            self.stdout.write(self.style.ERROR(
+                f'qa_scan.py failed (exit {result.returncode}):\n{result.stderr.rstrip()}'
+            ))
+            return
 
-            with open(todos_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-
-            self.stdout.write(self.style.SUCCESS(f'Updated qa_todos.md timestamp to {timestamp}'))
-
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f'Error updating todos: {e}'))
+        self.stdout.write(self.style.SUCCESS('qa_todos.md regenerated — triage marks preserved.'))

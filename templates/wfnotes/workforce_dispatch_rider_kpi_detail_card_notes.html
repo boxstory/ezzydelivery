@@ -1,0 +1,92 @@
+{% comment %}
+Purpose: "About this page" notes panel for rider_kpi_detail.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_dispatch_rider_kpi_detail_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            One rider's dispatch record over the <strong>last 30 days</strong>. The left column is the summary —
+            totals and averages across the whole period; the table is the day-by-day detail those averages come
+            from, one row per date and store worked. Use it to tell a bad day from a pattern before you act on
+            what the daily KPI dashboard showed. It is a read-only view; nothing about the rider can be changed
+            from here.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What is on the page</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Rider info</dt>
+                        <dd class="wfnote__def">Driver code, name and the login email the app account uses.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">30-day totals</dt>
+                        <dd class="wfnote__def">Every order in the batches this rider completed in the period,
+                            and how many of those travelled in a batch of two or more.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Averages</dt>
+                        <dd class="wfnote__def">The mean of the daily figures, one vote per day — <strong>not</strong>
+                            a recalculation over the whole period. A quiet day counts as much as a busy one.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Daily rows</dt>
+                        <dd class="wfnote__def">Newest date first. A rider who worked two stores on one day gets
+                            a row for each, because KPIs are kept per store.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Colours</dt>
+                        <dd class="wfnote__def">Batching turns green at 50%. SLA is green from 90%, amber from
+                            70% and red below that.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">How each number is worked out</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Total</dt>
+                        <dd class="wfnote__def">Orders in the batches <strong>completed</strong> that day.
+                            Batches still out, or cancelled, count for nothing.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Batched</dt>
+                        <dd class="wfnote__def">Orders that shared a trip with at least one other. <em>Single</em>
+                            is the remainder — trips where no partner order was found in time.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Batching %</dt>
+                        <dd class="wfnote__def">Batched orders over total orders for that day.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">SLA %</dt>
+                        <dd class="wfnote__def">Orders delivered on time over orders judged. An order is on time
+                            when its whole <strong>batch</strong> finished on or before that order's deadline,
+                            which is its creation time plus the store's SLA target.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Orders/hr</dt>
+                        <dd class="wfnote__def">Orders divided by hours actually worked — clock-in to clock-out
+                            on that day's completed shifts, less break time.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Missing days are not the same as bad days. A date only appears once the nightly run has
+                    scored it, and it is only scored if the rider's shift for that day is <strong>Completed</strong>.</li>
+                <li>Batching percentage is mostly outside the rider's control — it depends on order flow and the
+                    hold window set for their store, not on how they drive. Check the store's config before
+                    treating a low number as performance.</li>
+                <li>SLA is judged on the batch, so a single slow drop can breach every order on the same trip.</li>
+                <li>A day with orders but zero orders per hour means the rider worked without clocking in, so
+                    the system recorded no hours.</li>
+                <li>Nothing here is about pay. Driver earnings and COD are settled on the payout pages, not from
+                    these figures.</li>
+            </ul>
+        </section>
+    

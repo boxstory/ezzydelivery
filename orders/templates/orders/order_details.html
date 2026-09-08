@@ -3,6 +3,7 @@
 {% load static %}
 {% load business_pwa_tags %}
 {% load custom_filters %}
+{% load business_console %}
 {% block head_title %}Order #{{ order.order_number }}{% endblock %}
 {% block extra_css %}
   <link href="{% static 'orders/css/orders.css' %}?v=20260423y"
@@ -344,62 +345,58 @@
     <div class="odt__page">
 
       <!-- Page Header -->
-      <div class="odt__page-header" id="order_details_header">
-        <div class="odt__page-header__left">
-          <a href="{% url 'orders:orders_all_list' %}" class="odt__back-btn" id="order_details_btn_back">
-            <i class="fa-solid fa-arrow-left"></i>
-          </a>
-          <div class="odt__page-header__title-group">
-            <h1 class="odt__page-header__title">#{{ order.order_number }}</h1>
-            {% if order.client_order_code %}
-            <span class="odt__page-header__ref">Ref: {{ order.client_order_code }}</span>
-            {% endif %}
-          </div>
-          <span class="ob__ ob__--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
-          {% with delivery=delivery_task %}
-          {% if delivery %}
-          <span class="ob__ ob__--dl-{{ delivery.dl_task_status }}">
-            <i class="fa-solid {% if delivery.dl_task_status == 'delivered' %}fa-check{% elif delivery.dl_task_status == 'assigned' %}fa-user{% elif delivery.dl_task_status == 'accepted' %}fa-user-check{% elif delivery.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}fa-truck{% elif delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}fa-times{% elif delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}fa-ban{% else %}fa-clock{% endif %}"></i>
-            {{ delivery.get_dl_task_status_display }}
-          </span>
-          {% endif %}
-          {% endwith %}
-        </div>
-        <div class="odt__page-header__actions" id="order_details_nav_actions">
-          <a class="odt__header-btn odt__header-btn--secondary" href="{% url 'delivery:all_delivery_tasks' %}" id="order_details_btn_go_tasks">
-            <i class="fa-solid fa-truck"></i> Go to Tasks
-          </a>
-          {% if can_edit_order %}
-          {% if order.order_status == 'publish' %}
-          <span class="odt__header-btn odt__header-btn--secondary odt__header-btn--disabled" id="order_details_btn_edit" title="Cannot edit a published order">
-            <i class="fa-solid fa-pen"></i> Edit Order
-          </span>
-          {% else %}
-          <a class="odt__header-btn odt__header-btn--secondary" href="{% url 'orders:order_update' order.id %}" id="order_details_btn_edit">
-            <i class="fa-solid fa-pen"></i> Edit Order
-          </a>
-          {% endif %}
-          {% endif %}
-          {% if order.customer_whatsapp %}
-          <a class="odt__header-btn odt__header-btn--whatsapp" href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" hx-boost="false">
-            <i class="fa-brands fa-whatsapp"></i> WhatsApp
-          </a>
-          {% endif %}
-          {% if delivery_task and delivery_task.tracking_token %}
-          <a class="odt__header-btn odt__header-btn--secondary"
-             href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number|default:order.customer_phone }}?text=Track%20your%20order%20%23{{ order.order_number|urlencode }}%20here:%20https://ezzydelivery.qa/track/{{ delivery_task.tracking_token }}/"
-             target="_blank" hx-boost="false"
-             title="Share tracking link via WhatsApp">
-            <i class="fa-solid fa-location-arrow"></i> Share Tracking
-          </a>
-          {% endif %}
-          {% if order.order_status == 'delivered' or order.order_status == 'fulfilled' %}
-          <a class="odt__header-btn odt__header-btn--secondary" href="{% url 'business:return_create' order.id %}" id="order_details_btn_return">
-            <i class="fa-solid fa-rotate-left"></i> Request Return
-          </a>
-          {% endif %}
-        </div>
-      </div>
+      {# Status chips ride in the actions slot: the eyebrow is plain text only. #}
+      {% with odt_title="#"|add:order.order_number %}
+      {% bconheader header_id="order_details_header" eyebrow="Orders" live=order.get_order_status_display icon="fa-solid fa-box" title=odt_title subtitle=order.customer_name %}
+        <span class="ob__ ob__--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
+        {% with delivery=delivery_task %}
+        {% if delivery %}
+        <span class="ob__ ob__--dl-{{ delivery.dl_task_status }}">
+          <i class="fa-solid {% if delivery.dl_task_status == 'delivered' %}fa-check{% elif delivery.dl_task_status == 'assigned' %}fa-user{% elif delivery.dl_task_status == 'accepted' %}fa-user-check{% elif delivery.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}fa-truck{% elif delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}fa-times{% elif delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}fa-ban{% else %}fa-clock{% endif %}"></i>
+          {{ delivery.get_dl_task_status_display }}
+        </span>
+        {% endif %}
+        {% endwith %}
+        {% if order.client_order_code %}
+        <span class="bcon__badge bcon__badge--muted">Ref: {{ order.client_order_code }}</span>
+        {% endif %}
+        <a class="bcon__btn bcon__btn--secondary" href="{% url 'delivery:all_delivery_tasks' %}" id="order_details_btn_go_tasks">
+          <i class="fa-solid fa-truck"></i> Go to Tasks
+        </a>
+        {% if can_edit_order %}
+        {% if order.order_status == 'publish' %}
+        <span class="bcon__btn bcon__btn--ghost odt__header-btn--disabled" id="order_details_btn_edit" title="Cannot edit a published order">
+          <i class="fa-solid fa-pen"></i> Edit Order
+        </span>
+        {% else %}
+        <a class="bcon__btn bcon__btn--secondary" href="{% url 'orders:order_update' order.id %}" id="order_details_btn_edit">
+          <i class="fa-solid fa-pen"></i> Edit Order
+        </a>
+        {% endif %}
+        {% endif %}
+        {% if order.customer_whatsapp %}
+        <a class="bcon__btn odt__header-btn--whatsapp" href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" hx-boost="false">
+          <i class="fa-brands fa-whatsapp"></i> WhatsApp
+        </a>
+        {% endif %}
+        {% if delivery_task and delivery_task.tracking_token %}
+        <a class="bcon__btn bcon__btn--secondary"
+           href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number|default:order.customer_phone }}?text=Track%20your%20order%20%23{{ order.order_number|urlencode }}%20here:%20https://ezzydelivery.qa/track/{{ delivery_task.tracking_token }}/"
+           target="_blank" hx-boost="false"
+           title="Share tracking link via WhatsApp">
+          <i class="fa-solid fa-location-arrow"></i> Share Tracking
+        </a>
+        {% endif %}
+        {% if order.order_status == 'delivered' or order.order_status == 'fulfilled' %}
+        <a class="bcon__btn bcon__btn--secondary" href="{% url 'business:return_create' order.id %}" id="order_details_btn_return">
+          <i class="fa-solid fa-rotate-left"></i> Request Return
+        </a>
+        {% endif %}
+        <a href="{% url 'orders:orders_all_list' %}" class="bcon__btn bcon__btn--ghost" id="order_details_btn_back">
+          <i class="fa-solid fa-arrow-left"></i> Back
+        </a>
+      {% endbconheader %}
+      {% endwith %}
 
       <!-- Main Content Grid -->
       <div class="row g-3">
@@ -458,9 +455,7 @@
                   <span class="odt__route__addr">{{ order.pickup_location.locality }}</span>
                   {% endif %}
                   {% if order.pickup_location.pickup_lat and order.pickup_location.pickup_lon %}
-                  <a href="https://www.google.com/maps?q={{ order.pickup_location.pickup_lat }},{{ order.pickup_location.pickup_lon }}" target="_blank" class="odt__route__map-link" hx-boost="false">
-                    <i class="fa-solid fa-location-pin"></i> Pin
-                  </a>
+                  {% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-pick" lat=order.pickup_location.pickup_lat lon=order.pickup_location.pickup_lon label="Pickup location" btn_label="Pin" size="sm" %}
                   {% elif order.pickup_location.locality %}
                   <a href="https://maps.google.com/?q={{ order.pickup_location.locality|urlencode }}" target="_blank" class="odt__route__map-link" hx-boost="false">
                     <i class="fa-solid fa-location-pin"></i> Pin
@@ -480,14 +475,11 @@
                     <div class="flex-fill">
                       <span class="odt__field__label d-block">Address</span>
                       <span class="odt__field__value">{% if order.customer_address %}{{ order.customer_address }}{% else %}-{% endif %}</span>
+                      {% include "includes/components/_route_distance.html" with order=order label="from pickup" %}
                     </div>
                     <div class="d-flex flex-column gap-1 flex-shrink-0">
                       {% include "includes/components/_ai_parse_button.html" with address=order.customer_address zone=order.dl_zone street=order.dl_street building=order.dl_building order_id=order.id order_number=order.order_number show_map="true" title="Drop-off Location" %}
-                      {% if order.latitude and order.longitude %}
-                      <a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="odt__route__map-link" title="Open in Google Maps">
-                        <i class="fa-solid fa-map-location-dot"></i> Map
-                      </a>
-                      {% endif %}
+                      {% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-drop" lat=order.latitude lon=order.longitude label="Delivery location" btn_label="Map" size="sm" %}
                     </div>
                   </div>
 

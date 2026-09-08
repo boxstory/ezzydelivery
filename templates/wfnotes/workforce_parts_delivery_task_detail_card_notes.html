@@ -1,0 +1,115 @@
+{% comment %}
+Purpose: "About this page" notes panel for delivery_task_detail.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_parts_delivery_task_detail_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            This is the whole record of one <strong>last-mile delivery task</strong> — the leg that carries a
+            parcel from the seller's pickup point (or our hub) to the customer's door. Everything the client,
+            the driver app and staff have done to it is gathered on one screen: address and coordinates, COD,
+            driver, status timeline, uploaded proof, and the first-mile pickup leg if the order had one. Rows
+            on <strong>Delivery Tasks</strong> open here; <em>Edit Task</em> opens the editable version of the
+            same record.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit task</dt>
+                        <dd class="wfnote__def">Opens the edit form — driver, status, time slot, pickup location,
+                            customer details, address, package and money.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Publish to fleets</dt>
+                        <dd class="wfnote__def">Makes the task visible to drivers so it can be claimed. Once
+                            published the button turns into a static <em>Published to Fleets</em> marker.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assign driver</dt>
+                        <dd class="wfnote__def">Picks from approved drivers. When one is already on the task the
+                            same modal offers <em>Change</em> and <em>Unassign</em>.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Update status</dt>
+                        <dd class="wfnote__def">Sets the task's stage by hand, along with a delivered date and a
+                            COD amount.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Fix address</dt>
+                        <dd class="wfnote__def"><em>AI Parse</em> splits the free-text address into
+                            Zone&nbsp;/&nbsp;Street&nbsp;/&nbsp;Building; <em>Verify</em> checks that plate against
+                            Qatar's national address service and writes coordinates back to the order.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Shared pin</dt>
+                        <dd class="wfnote__def">Paste a WhatsApp or Google Maps link — or drop the shared location
+                            onto the strip — and Save stores the coordinates on the order.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">WhatsApp</dt>
+                        <dd class="wfnote__def">Sends a message to the customer through the chosen sending number.
+                            <em>Last Message</em> pulls the most recent message on that thread.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Refund COD</dt>
+                        <dd class="wfnote__def">Hands collected cash back to the customer and posts the matching
+                            return so the driver stops carrying it.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the record</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">COD state</dt>
+                        <dd class="wfnote__def">Collected or pending, with the time it was taken. A delivered
+                            zero-COD task counts as collected — there was simply nothing to take.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Accuracy</dt>
+                        <dd class="wfnote__def">How the coordinates were obtained — by the client, by staff, an
+                            exact building pin, street level, a landmark, the zone centre, or an AI estimate.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Completion GPS</dt>
+                        <dd class="wfnote__def">Where the driver's phone was when the task was closed. Only shown
+                            for delivered, failed and cancelled tasks, and only when the phone gave a fix.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pick list</dt>
+                        <dd class="wfnote__def">Appears only when the order is picked from a warehouse, with the
+                            picker, bin locations and how many lines are done.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pickup leg</dt>
+                        <dd class="wfnote__def">The first-mile job that brought the goods in. Absent for orders
+                            collected by hand or already sitting in our warehouse.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Payment split</dt>
+                        <dd class="wfnote__def">Cash, POS, Fawran or card — worked out from the driver's actual
+                            transactions, not from a field someone typed.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Changing the status <strong>does not clear the COD</strong>. Move a task off Delivered while
+                    cash is still marked collected and it keeps showing in COD Collection and in the driver's
+                    wallet until you fix it in <strong>Fleet &rsaquo; Transactions &rsaquo; Correct COD</strong>.</li>
+                <li>The refund button only appears while the cash is still the driver's liability — a driver is on
+                    the task, nothing has been refunded yet, and the business has not been paid for it. Once the
+                    client has been settled, the refund belongs on their side.</li>
+                <li>Publishing to fleets cannot be undone from this page.</li>
+                <li>Seller comments come from the client's own dashboard — they are visible to the client, so keep
+                    internal remarks out of them.</li>
+                <li>The page reloads itself once an hour, so a form left half-filled can be wiped.</li>
+            </ul>
+        </section>
+    

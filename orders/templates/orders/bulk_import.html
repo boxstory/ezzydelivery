@@ -1,6 +1,7 @@
 {% extends "business_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% load business_console %}
 
 {% block title %}Bulk Import Orders - Client Dashboard{% endblock title %}
 
@@ -14,27 +15,18 @@
       <span class="pwa-detail-topbar__title">Bulk Import</span>
     </div>
 
-    <!-- Hero Header (desktop only) -->
-    <div class="bim__hero d-none d-md-block">
-        <div class="bim__hero-content">
-            <div class="bim__hero-left">
-                <h1 class="bim__title">
-                    <i class="fa-solid fa-file-import"></i>
-                    Bulk Import Orders
-                </h1>
-                <p class="bim__subtitle">Upload and import multiple orders at once</p>
-            </div>
-            <div class="bim__hero-right">
-                <a href="{% url 'orders:orders_all_list' %}" class="btn btn-outline-light btn-sm">
-                    <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
-                </a>
-                {% if request.user.is_staff %}
-                <a href="{% url 'workforce:import_history' %}?source=csv_upload" class="btn btn-outline-light btn-sm">
-                    <i class="fa-solid fa-clock-rotate-left me-1"></i>Import History
-                </a>
-                {% endif %}
-            </div>
-        </div>
+    <!-- Page header (desktop only — the mobile PWA uses the top bar above) -->
+    <div class="d-none d-md-block">
+        {% bconheader eyebrow="Orders" live="Bulk Import" icon="fa-solid fa-file-import" title="Bulk Import Orders" subtitle="Upload and import multiple orders at once." %}
+            <a href="{% url 'orders:orders_all_list' %}" class="bcon__btn bcon__btn--secondary">
+                <i class="fa-solid fa-basket-shopping"></i> Go to Orders
+            </a>
+            {% if request.user.is_staff %}
+            <a href="{% url 'workforce:import_history' %}?source=csv_upload" class="bcon__btn bcon__btn--secondary">
+                <i class="fa-solid fa-clock-rotate-left"></i> Import History
+            </a>
+            {% endif %}
+        {% endbconheader %}
     </div>
 
     <!-- Wizard Steps -->

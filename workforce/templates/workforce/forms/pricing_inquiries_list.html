@@ -4,10 +4,12 @@
 {# Purpose: Pricing Inquiries triage console — scan, filter and expand inbound 3PL leads. #}
 {# Used by: workforce.views.pricing_inquiries_list #}
 {# Notes: pil__ namespace; expandable rows reveal a requirements drawer per lead. #}
+{#        Carries the shared wfnote__ page-notes card under the header bar, hidden on load; #}
+{#        the header help button toggles it via the delegated handler in workforce.js. #}
 
 {% block extra_css %}
 {# workforce.css already loaded in wf_dashboard_base.html #}
-<link href="{% static 'workforce/css/pricing_inquiries_list.css' %}?v=20260711e" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/pricing_inquiries_list.css' %}?v=20260807b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -35,7 +37,16 @@
           <span class="pil__metric-value">{{ fulfillment_count }}</span>
         </div>
       </div>
+      <button type="button" class="wfnote__btn wfnote__btn--ink align-self-center ms-3" data-wfnote-toggle
+              aria-expanded="false" aria-controls="workforce_forms_pricing_inquiries_list_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
     </div>
+
+    <div class="wfnote" id="workforce_forms_pricing_inquiries_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_forms_pricing_inquiries_list_card_notes' %}" hidden></div>
 
     <!-- TOOLBAR / FACETED SEARCH -->
     <div class="pil__toolbar">
@@ -150,12 +161,29 @@
             <td>
               <div class="pil__biz-name">{{ inq.business_name }}</div>
               <div class="pil__biz-person">{{ inq.full_name }}</div>
-              {% if inq.website_url %}
-              <a href="{{ inq.website_url }}" target="_blank" rel="noopener" class="pil__biz-link"
-                 onclick="event.stopPropagation()">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> Website
-              </a>
-              {% endif %}
+              {# Online presence — website / Facebook / Instagram always occupy their #}
+              {# slot so every row reads the same way. A channel with nothing openable #}
+              {# on file is a dimmed placeholder, not a missing icon; the tooltip still #}
+              {# carries whatever text was typed. Channels come from the model, which #}
+              {# is where a bare handle, a filler value and a mis-filed URL get sorted. #}
+              <div class="pil__links">
+                {% for channel in inq.online_presence %}
+                  {% if channel.url %}
+                <a href="{{ channel.url }}" target="_blank" rel="noopener noreferrer"
+                   onclick="event.stopPropagation()"
+                   class="pil__link pil__link--{{ channel.key }}"
+                   title="{{ channel.label }}: {{ channel.raw }}" aria-label="{{ channel.label }}">
+                  <i class="{{ channel.icon }}" aria-hidden="true"></i>
+                </a>
+                  {% else %}
+                <span class="pil__link pil__link--off" aria-disabled="true"
+                      title="{% if channel.raw %}{{ channel.label }}: “{{ channel.raw }}” — not a usable link{% else %}No {{ channel.label|lower }} on file{% endif %}"
+                      aria-label="{{ channel.label }} — {% if channel.raw %}not a usable link{% else %}none on file{% endif %}">
+                  <i class="{{ channel.icon }}" aria-hidden="true"></i>
+                </span>
+                  {% endif %}
+                {% endfor %}
+              </div>
             </td>
             <td>
               <div class="pil__contact">{{ inq.business_contact_number }}</div>
@@ -324,29 +352,8 @@
       </table>
     </div>
 
-    <!-- PAGINATION -->
-    {% if page_obj.has_other_pages %}
-    <div class="pil__foot">
-      <div class="pil__foot-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
-      <nav>
-        <ul class="pil__pager">
-          {% if page_obj.has_previous %}
-          <li><a href="?page={{ page_obj.previous_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}"><i class="fa-solid fa-chevron-left"></i></a></li>
-          {% endif %}
-          {% for num in page_obj.paginator.page_range %}
-            {% if page_obj.number == num %}
-            <li class="is-active"><span>{{ num }}</span></li>
-            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-            <li><a href="?page={{ num }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}">{{ num }}</a></li>
-            {% endif %}
-          {% endfor %}
-          {% if page_obj.has_next %}
-          <li><a href="?page={{ page_obj.next_page_number }}&search={{ search }}&cod={{ cod_filter }}&fulfillment={{ fulfillment_filter }}&status={{ status_filter }}"><i class="fa-solid fa-chevron-right"></i></a></li>
-          {% endif %}
-        </ul>
-      </nav>
-    </div>
-    {% endif %}
+    <!-- PAGINATION (shared brand component) -->
+    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="pricing_inquiries" %}
 
   </div>
 </div>

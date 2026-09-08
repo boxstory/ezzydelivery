@@ -1,0 +1,111 @@
+{% comment %}
+Purpose: "About this page" notes panel for temp_orders.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_temp_orders_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            This is the <strong>staging area</strong> between a client's own system and ours. Each row is
+            one line pulled from an external source — a OneDrive spreadsheet, a Google Sheet, a Shopify or
+            WooCommerce store, or a public order-entry link — and nothing here is a real order yet. Staff
+            check the rows, then import the good ones, which is what creates the actual order records.
+            Rows are grouped by business, ten at a time. Only businesses with temp orders switched on
+            appear here.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sync now</dt>
+                        <dd class="wfnote__def">Pulls fresh rows from every configured source straight away
+                            instead of waiting for the scheduled sync. New rows land as <em>New</em>; rows
+                            already staged are updated in place.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Narrow by source, status or business. The counts in each
+                            dropdown are the totals across all enabled businesses, not the filtered view.
+                            <em>Clear</em> appears once a filter is on.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Sorting</dt>
+                        <dd class="wfnote__def">Date, business and status column headers sort the whole
+                            list. The default is newest date first.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Eye button</dt>
+                        <dd class="wfnote__def">Opens the full detail of that row, including the raw source
+                            line it came from and, once imported, a link to the order it became.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Preview &amp; import</dt>
+                        <dd class="wfnote__def">Tick rows, then step through the mapping preview and the
+                            field check before transferring them into real orders.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Auto-import</dt>
+                        <dd class="wfnote__def">Imports the ticked rows without the field-by-field check.
+                            You first pick which pipeline stages to run; the defaults come from each
+                            business's own settings, and mixed selections are flagged.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Delete</dt>
+                        <dd class="wfnote__def">Removes staged rows — one from its row button, or all
+                            ticked ones from the bulk bar. Only rows that are not yet imported can be
+                            deleted.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Next 10</dt>
+                        <dd class="wfnote__def">Pages within one business only, so working through one
+                            client's backlog does not move everyone else's rows.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Shortcuts</dt>
+                        <dd class="wfnote__def"><strong>Browse</strong> is the flat searchable list,
+                            <strong>Config</strong> is the per-business temp-order settings, and the
+                            Pipeline Queue tiles jump to the publish and address-verification queues.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Row status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">New</dt>
+                        <dd class="wfnote__def">Staged and waiting. These are the rows the New Orders tile
+                            and the sidebar badge count.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Imported</dt>
+                        <dd class="wfnote__def">Already turned into an order. The badge links to that order
+                            where the link was recorded.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Skipped</dt>
+                        <dd class="wfnote__def">Deliberately passed over — a duplicate, a test line or an
+                            unusable row. It stays visible but is not queued for import.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Source badges</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">OD / GS</dt>
+                        <dd class="wfnote__def">OneDrive workbook or Google Sheet — spreadsheet rows read
+                            through a saved column mapping.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">SP / WC</dt>
+                        <dd class="wfnote__def">Shopify or WooCommerce store orders pulled over the store's
+                            API.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">PL</dt>
+                        <dd class="wfnote__def">Public link — a row someone typed into the client's shared
+                            order-entry form.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>

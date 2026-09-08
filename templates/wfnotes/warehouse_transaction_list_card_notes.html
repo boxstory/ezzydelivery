@@ -1,0 +1,74 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/transaction_list.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_transaction_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The <strong>ledger of every stock movement</strong> in the warehouse, newest first. Each row
+            is one change to one product at one location, with the quantity before and after it. Nothing
+            here can be edited — that is the point: this is the audit trail you check when a stock figure
+            is disputed.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading a row</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Transaction #</dt>
+                        <dd class="wfnote__def">The reference the system gave this movement. Quote it
+                            when asking someone to look into a discrepancy.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Type</dt>
+                        <dd class="wfnote__def">What caused the movement — receiving, picking,
+                            put-away, a count adjustment, a return to shelf, and so on.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Quantity</dt>
+                        <dd class="wfnote__def">How many units moved. Whether that added or removed
+                            stock is clear from the before and after columns.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Before / after</dt>
+                        <dd class="wfnote__def">The balance at that location either side of the change.
+                            If after minus before does not match the quantity, something else touched
+                            the row in between.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Notes</dt>
+                        <dd class="wfnote__def">Free text captured at the time — typically the receipt
+                            reference, the received date, or whatever the operator typed.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Filters</dt>
+                        <dd class="wfnote__def">Narrow by movement type and by warehouse. They combine,
+                            so you can isolate, say, every count adjustment in one building.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Per page</dt>
+                        <dd class="wfnote__def">Fifty rows by default. Raise it when scanning a long
+                            run of movements rather than hunting one.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">One product only</dt>
+                        <dd class="wfnote__def">To follow a single item, open its stock card from
+                            Inventory instead — same data, scoped to that product.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>Rows are never deleted or amended.</strong> A wrong movement is fixed
+                        by a new, opposite movement, so both stay visible.</li>
+                    <li><strong>A seller account sees only its linked warehouses</strong>, so its view
+                        of the same period is a subset of the staff view.</li>
+                </ul>
+            </section>
+        </div>

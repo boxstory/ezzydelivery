@@ -3,7 +3,9 @@
 {% comment %}
 Purpose: Staff config — per-business first-mile pickup automation (enabled, pool mode, disposition)
 Used by: workforce_views.pickup_automation_list at /workforce/pickup-automation/
-Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are audit-logged
+Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are audit-logged.
+       The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
+       help button toggles it via the delegated handler in workforce.js.
 {% endcomment %}
 
 {% block title %}Pickup Automation - Staff Dashboard{% endblock title %}
@@ -16,10 +18,6 @@ Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are au
         <div>
             <span class="pau__hero-eyebrow">First-mile &middot; Dispatch rules</span>
             <h1 class="pau__hero-title">Pickup Automation</h1>
-            <span class="pau__hero-sub">
-                Each new order of an enabled business creates a pickup job automatically —
-                the rule per row decides who sees it and what the driver does after collecting.
-            </span>
         </div>
         <div class="d-flex align-items-center flex-wrap gap-3">
             <div class="pau__tally">
@@ -31,8 +29,17 @@ Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are au
                        placeholder="Search business…">
                 <button class="btn btn-sm pau__search-btn" type="submit">Search</button>
             </form>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_pickup_automation_list_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_pickup_automation_list_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_pickup_automation_list_card_notes' %}" hidden></div>
 
     <div class="pau__card table-responsive">
         <table class="pau__table" id="workforce_pickup_automation_table_view">
@@ -106,6 +113,7 @@ Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are au
             </tbody>
         </table>
     </div>
+    {% include "includes/components/_pagination.html" with page_obj=businesses_page per_page=per_page pagination_id="pickup_automation" %}
 </div>
 
 <script>

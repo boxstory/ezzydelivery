@@ -1,0 +1,59 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouse/staff_product_add.html
+Used by: workforce.views.page_notes via webpages/js/wfnote.js on first help-button click
+Notes: Fetched by panel id "warehouse_staff_product_add_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Puts a product <strong>in a seller's catalogue</strong> without waiting for the seller to
+            add it themselves. It creates the item only — no stock. Units reach the shelf through
+            Receive Stock, which is also what writes the movement into the ledger.
+        </p>
+
+        <ol class="wfnote__notes wfnote__flow">
+            <li>Choose the business the product belongs to.</li>
+            <li>Fill in the details — name is the one that matters, the rest can follow later.</li>
+            <li>Save. The product id is generated for you, scoped to that seller.</li>
+            <li>Receive stock against it to put units on the shelf.</li>
+        </ol>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Fields worth care</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Business</dt>
+                        <dd class="wfnote__def">Cannot be changed afterwards from here — a product
+                            created against the wrong seller has to be fixed in the product admin.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">SKU and barcode</dt>
+                        <dd class="wfnote__def">Optional, but they are how the item is found on the
+                            receiving and picking screens. Worth entering now.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Photo</dt>
+                        <dd class="wfnote__def">Shows on the receiving sheet and the stock list, so
+                            whoever handles the box can match it to the row.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Product id</dt>
+                        <dd class="wfnote__def">Generated on save as
+                            <em>&lt;business&gt;-&lt;counter&gt;</em>. Not something you set.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Good to know</h2>
+                <ul class="wfnote__notes">
+                    <li><strong>It starts at zero.</strong> A new product holds no stock anywhere until
+                        it is received into a warehouse.</li>
+                    <li><strong>Save &amp; Add Another</strong> keeps the business selected, for typing
+                        a delivery note's worth of new items in one go.</li>
+                    <li><strong>The seller sees it too.</strong> This is their catalogue, not a
+                        warehouse-only list — it appears in their own product pages.</li>
+                    <li><strong>Staff only.</strong> The page can write to any seller's catalogue, which
+                        is why it is not open to seller accounts.</li>
+                </ul>
+            </section>
+        </div>

@@ -443,9 +443,16 @@ class AgentService:
     def get_conversation_history(
         self,
         conversation_id: str,
-        limit: int = 50
+        limit: int = 50,
+        user=None,
     ) -> Dict[str, Any]:
-        """Get conversation history for display."""
+        """Get conversation history for display.
+
+        ``user`` scopes the lookup. A conversation id is a UUID, but an
+        unguessable id is not authorization — ids are handed back in chat and
+        webhook responses, so without an owner filter anyone holding one could
+        read another tenant's conversation. Staff are exempt.
+        """
         try:
             conversation = Conversation.objects.get(conversation_id=conversation_id)
         except Conversation.DoesNotExist:
@@ -453,6 +460,12 @@ class AgentService:
                 'success': False,
                 'error': 'Conversation not found'
             }
+
+        if user is not None and not getattr(user, 'is_staff', False):
+            owner_id = getattr(conversation, 'user_id', None)
+            if owner_id is not None and owner_id != user.pk:
+                # Same shape as "not found" — never confirm the id exists.
+                return {'success': False, 'error': 'Conversation not found'}
 
         messages = conversation.messages.order_by('created_at')[:limit]
 

@@ -1,0 +1,106 @@
+{% comment %}
+Purpose: "About this page" notes panel for hub_batch_detail.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_hub_batch_detail_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            One <strong>hub pickup batch</strong> — the driver ride that collects this client's orders from a
+            single pickup point and drops them at a hub warehouse. The left column is the controls: who is
+            driving, what they are paid, and where the ride has got to. The right column lists the orders on
+            board and, once the goods reach the hub, the last-mile delivery task raised for each of them.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pickup route</dt>
+                        <dd class="wfnote__def">The collection point and the receiving hub, each with a
+                            <em>Maps</em> link when coordinates are on file — handy for talking a driver in.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assign</dt>
+                        <dd class="wfnote__def">Puts an approved driver on the ride, or swaps the one already on
+                            it. A batch sitting at <em>Pending</em> moves to <em>Assigned</em> when you do.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Driver earnings</dt>
+                        <dd class="wfnote__def">The flat amount for the whole ride. It is saved together with the
+                            driver — see the note below.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Update status</dt>
+                        <dd class="wfnote__def">Moves the batch by hand when the driver's own app updates have not
+                            come through — for example marking it collected or delivered to the hub yourself.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Cancel batch</dt>
+                        <dd class="wfnote__def">Calls the ride off. You are asked to confirm, and it cannot be
+                            undone.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Orders in batch</dt>
+                        <dd class="wfnote__def">Order number, client, customer, the COD due on it, and the
+                            last-mile task once one exists.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Batch status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pending</dt>
+                        <dd class="wfnote__def">No driver yet — nobody is going to collect it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Assigned</dt>
+                        <dd class="wfnote__def">A driver is on it but has not accepted.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Accepted</dt>
+                        <dd class="wfnote__def">The driver has taken the ride.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">In Progress</dt>
+                        <dd class="wfnote__def">On the way to the pickup point.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Arrived</dt>
+                        <dd class="wfnote__def">Driver is at the client's counter.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Collected</dt>
+                        <dd class="wfnote__def">All packages are with the driver.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">At Hub</dt>
+                        <dd class="wfnote__def">Handed over at the warehouse — this is what raises the last-mile
+                            tasks. Final state.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Cancelled</dt>
+                        <dd class="wfnote__def">Ride called off. Final state.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>Editing the earnings box on its own saves nothing — the figure is only written when you press
+                    <strong>Assign</strong>, so change the amount and reassign the same driver to correct it.</li>
+                <li>Reaching <strong>At Hub</strong> creates one last-mile delivery task per order and flips those
+                    orders to ready-to-pickup. The tasks arrive <em>for review</em> and unpublished — you still
+                    have to publish and dispatch each one.</li>
+                <li><strong>At Hub and Cancelled are terminal.</strong> The driver, earnings and status controls
+                    disappear once the batch is in either state.</li>
+                <li>The COD shown against an order is what the last-mile driver will collect. Nothing is collected
+                    on this pickup leg.</li>
+                <li>Orders cannot be added to or removed from a batch here — build the ride correctly on
+                    <em>New Batch</em>, or cancel and rebuild it.</li>
+            </ul>
+        </section>
+    

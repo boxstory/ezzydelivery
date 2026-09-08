@@ -53,7 +53,7 @@ SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 # Permissions Policy (formerly Feature-Policy)
 PERMISSIONS_POLICY = {
     'geolocation': ['self'],
-    'camera': [],
+    'camera': ['self'],
     'microphone': [],
     'payment': ['self'],
 }
@@ -183,6 +183,8 @@ ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_FORMS = {
     'signup': 'core.forms.CustomSignupForm',
 }
+# Prefill username from the e-mail local part on social (Google/Facebook) signup
+SOCIALACCOUNT_ADAPTER = 'core.adapters.SocialAccountAdapter'
 
 # Session Configuration - Auto logout after 1 day of inactivity
 SESSION_COOKIE_AGE = 86400  # 1 day in seconds (86400 seconds = 24 hours)
@@ -192,6 +194,9 @@ SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
 SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
 SESSION_COOKIE_NAME = 'ezzy_sessionid'  # Custom session cookie name for added security
+
+# Weak-password nudge — set False to switch the interstitial off without a deploy
+WEAK_PASSWORD_WARNING_ENABLED = config('WEAK_PASSWORD_WARNING_ENABLED', default=True, cast=bool)
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -210,8 +215,14 @@ MIDDLEWARE = [
     'core.middleware.NoCacheAuthMiddleware',
     # Fix 18: Force logout deactivated drivers accessing fleet pages
     'core.middleware.DriverStatusCheckMiddleware',
+    # Staff department sub-roles — gates /workforce/ by ops/finance/marketing
+    'core.middleware.StaffDepartmentMiddleware',
+    # Remember how anonymous visitors arrived (driver link / pricing / website)
+    'core.middleware.SignupOriginMiddleware',
     # SQL query inspector - disabled (high CPU overhead per request in DEBUG mode)
     # 'core.middleware.QueryInspectorMiddleware',
+    # Nudge accounts whose password failed the strength rules (3 skips, then required)
+    'core.middleware.WeakPasswordWarningMiddleware',
     # Security headers for SEO (CSP + Permissions-Policy)
     'core.middleware.SecurityHeadersMiddleware',
 ]
@@ -260,6 +271,8 @@ TEMPLATES = [
                 'business.decorators.business_permissions_context',
                 # Workforce dashboard sidebar counts
                 'workforce.context_processors.workforce_sidebar_counts',
+                # Staff department sub-roles for sidebar section gating
+                'workforce.context_processors.workforce_departments',
                 # Fleet driver wallet status for COD warnings
                 'fleet.context_processors.driver_wallet_status',
                 # Fleet PWA bottom nav: pending tasks badge count
@@ -267,6 +280,8 @@ TEMPLATES = [
                 'core.context_processors.dl_task_status_choices',
                 # Google One Tap: exposes client_id to public templates
                 'core.context_processors.google_one_tap',
+                # Keeps the shared pagination component's page size sticky
+                'core.context_processors.pagination_defaults',
             ],
         },
     },
@@ -389,8 +404,27 @@ CACHES = {
         'LOCATION': config('CACHE_LOCATION', default='unique-snowflake'),
         'TIMEOUT': 300,  # 5 minutes default
         'OPTIONS': _CACHE_OPTIONS,
-    }
+    },
+    # Rate-limit counters need a store that is SHARED between gunicorn workers and
+    # SURVIVES a reload. The default cache is LocMemCache here, which is neither:
+    # counters live per-process (so a 5/h limit really allows 5 x worker_count) and
+    # the `kill -HUP` this project runs after every code change wipes them entirely.
+    # Redis is not running on this host, so this uses the PostgreSQL that already
+    # is. Volume is tiny — a couple of writes per public form submission.
+    # Point RATELIMIT_CACHE_BACKEND/LOCATION at Redis if it is ever introduced.
+    'ratelimit': {
+        'BACKEND': config(
+            'RATELIMIT_CACHE_BACKEND',
+            default='django.core.cache.backends.db.DatabaseCache',
+        ),
+        'LOCATION': config('RATELIMIT_CACHE_LOCATION', default='ezzy_ratelimit_cache'),
+        'TIMEOUT': 3600,
+    },
 }
+
+# django-ratelimit reads getattr(settings, 'RATELIMIT_USE_CACHE', 'default');
+# without this it silently used the per-worker LocMemCache above.
+RATELIMIT_USE_CACHE = 'ratelimit'
 
 # For Redis cache in production, add to .env:
 # CACHE_BACKEND=django.core.cache.backends.redis.RedisCache
@@ -835,6 +869,17 @@ try:
 except Exception:
     GLM_API_KEY = ''
 
+# Shared 9Router AI gateway (OpenAI-compatible). AI_BASE_URL includes the /v1
+# path, e.g. https://docker.yellowkey.qa/v1 — models list from {base}/models.
+try:
+    AI_BASE_URL = config('AI_BASE_URL') or ''
+except Exception:
+    AI_BASE_URL = ''
+try:
+    AI_API_KEY = config('AI_API_KEY') or ''
+except Exception:
+    AI_API_KEY = ''
+
 # Provider selection per use-case
 AI_CHAT_PROVIDER          = config('AI_CHAT_PROVIDER', default='anthropic')
 AI_CHAT_MODEL             = config('AI_CHAT_MODEL',    default='claude-sonnet-4-6')
@@ -879,6 +924,13 @@ N8N_AI_AGENT_WEBHOOK_URL = config('N8N_AI_AGENT_WEBHOOK_URL', default='')
 N8N_WHATSAPP_WEBHOOK_URL = config('N8N_WHATSAPP_WEBHOOK_URL', default='')
 N8N_WEBHOOK_SECRET_KEY = config('N8N_WEBHOOK_SECRET_KEY', default='')
 
+# Shared service token external clients (n8n, etc.) send to call the AI agent
+# conversation API (header: X-AIAgent-Token or Authorization: Bearer <token>).
+# Empty = API disabled.
+AIAGENT_API_TOKEN = config('AIAGENT_API_TOKEN', default='')
+# Requests/minute per token for the AI agent conversation API
+AIAGENT_API_RATE_LIMIT = config('AIAGENT_API_RATE_LIMIT', default='120/min')
+
 # Evolution API (WhatsApp)
 EVOLUTION_URL = config('EVOLUTION_URL', default='')
 EVOLUTION_API_KEY = config('EVOLUTION_API_KEY', default='')
@@ -890,6 +942,29 @@ EVOLUTION_INSTANCE = config('EVOLUTION_INSTANCE', default='')
 
 
 # ==========================================
+# OSRM (self-hosted road-distance routing)
+# ==========================================
+# Container `ezzy-osrm`, Qatar extract, MLD car profile, bound to localhost only.
+# When off — or unreachable — order distances fall back to straight-line, which
+# reads about 25-40% short of the road distance.
+OSRM_ENABLED = config('OSRM_ENABLED', default=True, cast=bool)
+OSRM_BASE_URL = config('OSRM_BASE_URL', default='http://127.0.0.1:5001')
+OSRM_TIMEOUT = config('OSRM_TIMEOUT', default=3, cast=int)
+
+# How far the driver's delivery GPS may sit from the customer's marked location
+# before the delivery is flagged for staff to judge which point is right.
+# 3 km, not 1 — at 1 km the queue filled with 563 flags nobody could work through,
+# and a 1-2 km gap in Doha is usually just a tower fix or a compound entrance,
+# not a wrong pin. Raising it costs the marginal cases and buys an actionable queue.
+DELIVERY_GPS_FLAG_KM = config('DELIVERY_GPS_FLAG_KM', default=3.0, cast=float)
+
+# Server-side Google key for the web-service APIs (Geocoding). Deliberately not the
+# same key as the browser one above: that is referer-restricted, and Google rejects
+# referer-restricted keys for web services outright. This one is IP-restricted to
+# this host, which also means outbound calls must be forced to IPv4 — the box
+# prefers IPv6 and only its IPv4 address is on the allow-list.
+GOOGLE_MAPS_SERVER_KEY = config('GOOGLE_MAPS_SERVER_KEY', default='')
+
 # WAHA (self-hosted WhatsApp HTTP API)
 # ==========================================
 # Feature flag — when True, core/order_notifications.py routes outbound
@@ -926,4 +1001,18 @@ WAHA_VERIFY_MATCH_WINDOW_HOURS = config('WAHA_VERIFY_MATCH_WINDOW_HOURS', defaul
 # this window to auto-cancel the pending recovery job.
 WAHA_DELIVERY_RECOVERY_DELAY_MINUTES = config('WAHA_DELIVERY_RECOVERY_DELAY_MINUTES', default=10, cast=int)
 # ==========================================
+
+# ==========================================
+# SHOPIFY OAUTH
+# ==========================================
+# Shopify compares the redirect_uri we send against the app's "Allowed
+# redirection URL(s)" byte-for-byte. Deriving it from the incoming request
+# (build_absolute_uri) makes it vary by host — a merchant browsing
+# www.ezzydelivery.qa would send a www redirect_uri that no longer matches an
+# apex whitelist entry, and Shopify rejects the whole flow. Pin it so the value
+# is identical on every request and can be published verbatim in the setup guide.
+SHOPIFY_OAUTH_REDIRECT_URI = config(
+    'SHOPIFY_OAUTH_REDIRECT_URI',
+    default='https://ezzydelivery.qa/business/shopify/oauth/callback/',
+)
 

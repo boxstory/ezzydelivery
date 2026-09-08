@@ -1,0 +1,97 @@
+{% comment %}
+Purpose: "About this page" notes panel for qnas_lookup_tool.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_qnas_lookup_tool_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+            <p class="wfnote__lede">
+                Qatar has no street names, so addresses are written as a <strong>zone, street and building
+                number</strong> — the national QNAS scheme. This tool asks QNAS where such an address
+                actually is and hands back a map coordinate. Use it to sanity-check an address a customer
+                gave, to find a pin for a delivery whose location looks wrong, or to settle an argument
+                about which zone a street belongs to. It is a scratch tool: it reads, it never writes.
+            </p>
+
+            <div class="wfnote__cols">
+                <section class="wfnote__sec">
+                    <h2 class="wfnote__h">What you can do here</h2>
+                    <dl class="wfnote__list">
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Zone</dt>
+                            <dd class="wfnote__def">Required. The QNAS zone number, not an area name.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Street</dt>
+                            <dd class="wfnote__def">Required. The street number within that zone. The lookup
+                                is done on the zone and street pair alone.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Building</dt>
+                            <dd class="wfnote__def">Optional. If you give one and QNAS knows it, you get that
+                                building's own coordinate. If you leave it out, or it is not on the street,
+                                you get the first building QNAS returns instead.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Lookup</dt>
+                            <dd class="wfnote__def">Queries QNAS live and shows the coordinate, the building
+                                it matched and how many buildings that street has.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Google Maps</dt>
+                            <dd class="wfnote__def">Opens the coordinate on a map in a new tab, so you can
+                                see whether the pin lands where the customer says they are.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Copy</dt>
+                            <dd class="wfnote__def">Puts the latitude and longitude on the clipboard, ready to
+                                paste into an order or send to a driver.</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="wfnote__sec">
+                    <h2 class="wfnote__h">What the result says</h2>
+                    <dl class="wfnote__list">
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Exact match</dt>
+                            <dd class="wfnote__def">The building number you typed was found. The coordinate
+                                is that building's own.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Street level</dt>
+                            <dd class="wfnote__def">No building number was given, or the one given is not on
+                                that street. The pin is the street's first building — near, not exact.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">No results</dt>
+                            <dd class="wfnote__def">QNAS holds no buildings for that zone and street. Almost
+                                always a wrong zone or a mistyped street, not a fault.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Invalid coordinates</dt>
+                            <dd class="wfnote__def">A building was found but its coordinate is missing or
+                                unreadable in the QNAS record. Try a neighbouring building number.</dd>
+                        </div>
+                        <div class="wfnote__item">
+                            <dt class="wfnote__term">Lookup failed</dt>
+                            <dd class="wfnote__def">The QNAS service itself did not answer. Nothing is wrong
+                                with the address — try again shortly.</dd>
+                        </div>
+                    </dl>
+                </section>
+            </div>
+
+            <section class="wfnote__sec wfnote__sec--note">
+                <h2 class="wfnote__h">Worth knowing</h2>
+                <ul class="wfnote__notes">
+                    <li>Nothing here is saved. Looking an address up <strong>does not change any order,
+                        address record or delivery task</strong> — copy the coordinate across yourself if you
+                        want it used.</li>
+                    <li>A <em>Street level</em> result is not a delivery address. Sending a driver to one
+                        without checking the building is how a job ends up at the wrong gate.</li>
+                    <li>Buildings Found tells you how big the street is. A high number with a street-level
+                        match means the pin could be a long way from the door.</li>
+                    <li>QNAS is the same source order address verification uses, so a zone and street that
+                        fail here will fail there too.</li>
+                </ul>
+            </section>
+        

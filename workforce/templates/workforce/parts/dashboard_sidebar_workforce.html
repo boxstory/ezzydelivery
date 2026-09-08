@@ -14,37 +14,71 @@
     <div id="workforce_sidebar_nav">
       <ul id="workforce_sidebar_menu_main" class="navbar-nav">
 
-        {% include "workforce/parts/sidebar/temp_orders.html" %}
-        {% include "workforce/parts/sidebar/orders.html" %}
-        {% include "workforce/parts/sidebar/tasks.html" %}
-        {% include "workforce/parts/sidebar/pickup.html" %}
+        {% comment %}
+        Sections are gated by staff department (core/departments.py). Sections
+        that mix departments — fleet_accounts, sellers, onboarding, import,
+        reports — gate themselves per link.
+        {% endcomment %}
+        {% if wf_dept_ops %}
+          {% include "workforce/parts/sidebar/temp_orders.html" %}
+          {% include "workforce/parts/sidebar/orders.html" %}
+          {% include "workforce/parts/sidebar/tasks.html" %}
+          {% include "workforce/parts/sidebar/pickup.html" %}
+        {% endif %}
         {% include "workforce/parts/sidebar/fleet_accounts.html" %}
         {% include "workforce/parts/sidebar/sellers.html" %}
 
-        <p class="dsb-section">Finance &amp; Fulfillment</p>
-        {% include "workforce/parts/sidebar/finance.html" %}
-        {% include "workforce/parts/sidebar/inventory.html" %}
-        {% include "workforce/parts/sidebar/warehouse.html" %}
+        {% if wf_dept_fin or wf_dept_ops %}
+          <p class="dsb-section">Finance &amp; Fulfillment</p>
+          {% if wf_dept_fin %}
+            {% include "workforce/parts/sidebar/finance.html" %}
+          {% endif %}
+          {% if wf_dept_ops %}
+            {% include "workforce/parts/sidebar/inventory.html" %}
+            {% include "workforce/parts/sidebar/warehouse.html" %}
+          {% endif %}
+        {% endif %}
 
-        <p class="dsb-section">Marketing</p>
-        {% include "workforce/parts/sidebar/crm.html" %}
-        {% include "workforce/parts/sidebar/whatsapp.html" %}
-        {% include "workforce/parts/sidebar/onboarding.html" %}
+        {% if wf_dept_mkt or wf_dept_ops %}
+          <p class="dsb-section">Marketing</p>
+          {% if wf_dept_mkt %}
+            {% include "workforce/parts/sidebar/crm.html" %}
+            {% include "workforce/parts/sidebar/whatsapp.html" %}
+          {% endif %}
+          {% include "workforce/parts/sidebar/onboarding.html" %}
+        {% endif %}
 
-        <p class="dsb-section">Operations</p>
-        {% include "workforce/parts/sidebar/dispatch.html" %}
-        {% if user.profile.is_superadmin %}
+        {% if wf_dept_ops or wf_dept_admin %}
+          <p class="dsb-section">Operations</p>
+          {% if wf_dept_ops %}
+            {% include "workforce/parts/sidebar/dispatch.html" %}
+          {% endif %}
+          {% comment %}
+          Auto Triggers is multi-desk: the catalogue link is open to every
+          department (it shows only that desk's rows); the automation plumbing
+          inside the submenu stays admin-only.
+          {% endcomment %}
+          {% include "workforce/parts/sidebar/triggers.html" %}
+          {% if wf_dept_ops %}
+            {% include "workforce/parts/sidebar/zones.html" %}
+          {% endif %}
+        {% elif wf_dept_fin or wf_dept_mkt %}
+          <p class="dsb-section">Automation</p>
           {% include "workforce/parts/sidebar/triggers.html" %}
         {% endif %}
-        {% include "workforce/parts/sidebar/zones.html" %}
 
         {% include "workforce/parts/sidebar/import.html" %}
 
-        <p class="dsb-section">Reports &amp; Tools</p>
-        {% include "workforce/parts/sidebar/reports.html" %}
+        {% if wf_dept_ops or wf_dept_fin %}
+          <p class="dsb-section">Reports &amp; Tools</p>
+          {% include "workforce/parts/sidebar/reports.html" %}
+        {% endif %}
 
-        <p class="dsb-section">Admin</p>
-        {% include "workforce/parts/sidebar/profile_admin.html" %}
+        {% if wf_dept_admin %}
+          <p class="dsb-section">Admin</p>
+          {% include "workforce/parts/sidebar/staff_roles.html" %}
+          {% include "workforce/parts/sidebar/profile_admin.html" %}
+        {% endif %}
 
       </ul>
     </div>

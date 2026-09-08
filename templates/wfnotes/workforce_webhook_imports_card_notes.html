@@ -1,0 +1,97 @@
+{% comment %}
+Purpose: "About this page" notes panel for webhook_imports.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_webhook_imports_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Some clients push their orders to us automatically instead of typing them in or letting us pull
+            them from a store. This page is how that door is opened and watched. Each active client can be
+            given a private webhook address; anything posted to that address arrives as an order in the normal
+            queues. The upper table is one row per active client and the key they hold; the lower table is a
+            live record of the last hundred calls that actually came in, including the exact data sent. When a
+            client says "we sent it and it never showed up", this is where you find out what really happened.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Generate</dt>
+                        <dd class="wfnote__def">Creates the client's webhook address for the first time. The new
+                            URL is shown and copied to your clipboard so you can hand it over.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Regenerate</dt>
+                        <dd class="wfnote__def">Issues a brand new address for a client who already has one.
+                            Use it when a key has leaked or a client asks for a reset.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Copy URL</dt>
+                        <dd class="wfnote__def">Puts the full address on your clipboard without changing
+                            anything. This is the safe way to re-send an address someone has mislaid.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Received</dt>
+                        <dd class="wfnote__def">A running count of every call that key has ever taken, with the
+                            last time it was used beside it. A key with no last-used date has never been tried.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">View payload</dt>
+                        <dd class="wfnote__def">Opens the exact data the client sent, plus the headers and any
+                            error message. This settles most arguments about missing fields on its own.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Log status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Received</dt>
+                        <dd class="wfnote__def">The call arrived and was recorded, but no order came out of it
+                            yet. Open the payload — usually the data was not in a shape we recognise.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Processed</dt>
+                        <dd class="wfnote__def">The call was accepted and turned into orders. The Orders column
+                            says how many.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Error</dt>
+                        <dd class="wfnote__def">Something failed while handling it. The reason is shown in red
+                            under the payload.</dd>
+                    </div>
+                </dl>
+
+                <h2 class="wfnote__h">Key status</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Active</dt>
+                        <dd class="wfnote__def">A key exists and the address will accept posts.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">None</dt>
+                        <dd class="wfnote__def">No key was ever made for this client. Nothing they send can be
+                            accepted until you generate one.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li><strong>Regenerating breaks the old address immediately.</strong> Anything the client is
+                    still posting to it stops arriving until they update their end — warn them first.</li>
+                <li>The address is a <strong>password in a URL</strong>. Anyone holding it can create orders on
+                    that client's account, so send it privately and never paste it into a shared thread.</li>
+                <li>Only clients whose account is <strong>active</strong> are listed. If a client is missing,
+                    activate the account first.</li>
+                <li>The log holds the <strong>most recent hundred calls only</strong>, across all clients. On a
+                    busy day evidence of a morning problem can be gone by the afternoon — grab the payload while it is there.</li>
+                <li>A row logged here means the call reached us. Delivery of the resulting orders, and anything
+                    that happens to them afterwards, is tracked on the Orders pages.</li>
+            </ul>
+        </section>
+    

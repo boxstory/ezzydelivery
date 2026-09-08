@@ -1,9 +1,9 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
+{% load business_console %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business.css' %}?v=20260217a">
+<link rel="stylesheet" href="{% static 'business/css/business.css' %}?v=20260801c">
 {% endblock extra_css %}
 
 {% block content %}
@@ -18,19 +18,12 @@
     </div>
 
     <!-- Hero Banner (desktop only) -->
-    <div class="bpl-form__hero d-none d-md-flex" id="client_location_update_section_header">
-        <div class="bpl-form__hero-left">
-            <div class="bpl-form__hero-icon">
-                <i class="fa-solid fa-pen-to-square"></i>
-            </div>
-            <div>
-                <h1 class="bpl-form__hero-title" id="client_location_update_title_form">Update Store Location</h1>
-                <p class="bpl-form__hero-sub">Edit pickup point details</p>
-            </div>
-        </div>
-        <a href="{% url 'business:pickup_location_list' %}" class="bpl-form__hero-back">
-            <i class="fa-solid fa-arrow-left"></i> Back to Stores
-        </a>
+    <div class="d-none d-md-block" id="client_location_update_section_header">
+        {% bconheader eyebrow="Stores" live="Edit" icon="fa-solid fa-pen-to-square" title="Update Store Location" subtitle="Edit pickup point details." %}
+            <a href="{% url 'business:pickup_location_list' %}" class="bcon__btn bcon__btn--ghost">
+                <i class="fa-solid fa-arrow-left"></i> Back to Stores
+            </a>
+        {% endbconheader %}
     </div>
 
     <!-- Form Card -->
@@ -62,7 +55,7 @@
             </div>
             {% endif %}
             <div class="bpl-form__card__body">
-                {{ form | crispy }}
+                {% include "business/parts/_pickup_location_form_fields.html" %}
             </div>
             <div class="bpl-form__card__foot">
                 <a href="{% url 'business:pickup_location_list' %}" class="bpl-form__btn bpl-form__btn--cancel" id="client_location_update_btn_cancel">

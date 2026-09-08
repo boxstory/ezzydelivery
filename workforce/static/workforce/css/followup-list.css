@@ -1,0 +1,299 @@
+/* Purpose: Follow-Up Tasks console — page-scoped design layer (navy hero, backlog-shape
+   strip, per-row staleness gutter, restrained filter chips).
+   Used by: workforce/parts/lists/dl_list_followup.html (wrapper class .wfl).
+   Notes: Scoped under .wfl so the shared dl-table / oli__hero components are untouched.
+          Tokens only (brandkit.css). Yellow appears once — the hero kicker. */
+
+/* ── Navy hero (authority surface; replaces the shared solid-yellow bar here) ── */
+.wfl__hero {
+  background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #082b53 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 0.375rem 0.75rem;
+  margin: 0 0.375rem 0.375rem;
+  border-radius: 12px;
+  border-bottom: 3px solid var(--brand-primary, #f7c000);
+  box-shadow: 0 4px 14px rgba(0, 31, 63, 0.18);
+}
+
+/* Icon chip + title — mirrors the Temp Orders hero for a consistent look */
+.wfl__hero__lead {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+.wfl__hero__icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(247, 192, 0, 0.18);
+  color: var(--brand-primary, #f7c000);
+  border-radius: 9px;
+  font-size: 1.05rem;
+}
+.wfl__hero__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #fff;
+}
+.wfl__hero__sub {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Backlog-shape strip — the page thesis: queue broken down by how stale each task is */
+.wfl__hero__shape {
+  display: flex;
+  align-items: stretch;
+  gap: 1.1rem;
+}
+.wfl__tier {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 3.25rem;
+}
+.wfl__tier__num {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+}
+.wfl__tier__lbl {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+/* Each tier's number carries a small leading swatch, matching the row gutter colours */
+.wfl__tier--fresh .wfl__tier__num,
+.wfl__tier--aging .wfl__tier__num,
+.wfl__tier--stale .wfl__tier__num {
+  padding-left: 0.5rem;
+  border-left: 3px solid;
+}
+.wfl__tier--fresh .wfl__tier__num { border-left-color: rgba(255, 255, 255, 0.35); }
+.wfl__tier--aging .wfl__tier__num { border-left-color: #fbbf24; }
+.wfl__tier--stale .wfl__tier__num { border-left-color: #f87171; }
+.wfl__hero__div {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Right-hand cluster: backlog shape, driver filter and the notes button read as one group */
+.wfl__hero__aside {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  /* Takes the room the title leaves rather than sizing to its own content —
+     otherwise the cluster shrink-wraps and breaks the picker onto a second line. */
+  flex: 1 1 auto;
+  margin-left: auto;
+}
+
+/* Driver picker on the navy surface — brand kit dark-surface field treatment */
+.wfl .wfl__hero__select {
+  width: auto;
+  max-width: 11rem;
+  padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.08);
+  /* Longhands only — a background shorthand would wipe the arrow tile */
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 12px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+}
+.wfl .wfl__hero__select:hover { background-color: rgba(255, 255, 255, 0.14); }
+.wfl .wfl__hero__select:focus {
+  border-color: var(--brand-primary, #f7c000);
+  background-color: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+  color: #fff;
+}
+.wfl .wfl__hero__select option { color: #1a1a2e; background: #fff; }
+
+/* The staff dashboard turns every filter select into a Select2, which hides the
+   native control and inserts a sibling container — so the rules above only apply
+   if Select2 fails to load. The picker the user actually sees is this container,
+   sized to the hero's own metrics (1.75rem, matching the notes button) and given
+   the same dark-surface treatment. Select2 writes width inline, hence !important. */
+.wfl__hero__aside > .select2-container.ez-filter-select {
+  width: auto !important;
+  flex: 0 1 11rem;
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--single {
+  height: 1.75rem;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.wfl__hero__aside .select2-container.ez-filter-select:hover .select2-selection--single {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--single .select2-selection__rendered {
+  height: 1.625rem;
+  line-height: 1.625rem;
+  padding-left: 0.5rem;
+  padding-right: 1.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--single .select2-selection__arrow {
+  height: 1.625rem;
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection__arrow b {
+  border-top-color: rgba(255, 255, 255, 0.7);
+}
+.wfl__hero__aside .select2-container--open .select2-selection--single,
+.wfl__hero__aside .select2-container--focus .select2-selection--single {
+  border-color: var(--brand-primary, #f7c000);
+  background-color: rgba(255, 255, 255, 0.14);
+}
+.wfl__hero__aside .select2-container--open .select2-selection__arrow b {
+  border-bottom-color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── Filter chips — restrained ink/navy, replaces the white-on-yellow candy pill ── */
+.wfl .followup-filter-pill {
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  color: var(--brand-grey-700, #333);
+  background: #fff;
+  font-weight: 500;
+  border-radius: 0.375rem;
+}
+.wfl .followup-filter-pill:hover {
+  border-color: var(--brand-grey-500, #6c757d);
+  color: var(--brand-navy, #001f3f);
+}
+.wfl .followup-filter-pill--active {
+  background: var(--brand-navy, #001f3f);
+  border-color: var(--brand-navy, #001f3f);
+  color: #fff;
+  font-weight: 600;
+}
+.wfl .followup-filter-pill--active:hover { color: #fff; }
+
+/* ── Per-row staleness gutter (the signature) — a 3px rail keyed to update age ── */
+.wfl .dl-table__row--fresh td:first-child { box-shadow: inset 3px 0 0 var(--brand-grey-300, #dcdcdc); }
+.wfl .dl-table__row--aging td:first-child { box-shadow: inset 3px 0 0 #fbbf24; }
+.wfl .dl-table__row--stale td:first-child { box-shadow: inset 3px 0 0 #f87171; }
+
+/* "X ago" timestamp with a leading tier dot; stale reads in danger ink */
+.wfl__age {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-grey-700, #333);
+}
+.wfl__age::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--brand-grey-400, #b0b0b0);
+}
+.wfl__age--aging { color: #92400e; }
+.wfl__age--aging::before { background: #f59e0b; }
+.wfl__age--stale { color: var(--brand-danger, #dc2626); }
+.wfl__age--stale::before { background: #ef4444; }
+
+/* ── First-mile pickup column (sits left of DL Status) ──
+   Ledger treatment: ink text + a single leading swatch keyed to the leg stage,
+   so it never competes with the coloured DL status badge beside it. */
+.wfl .wfl__th-pickup,
+.wfl .wfl__pk-cell {
+  width: 6.5rem;
+  max-width: 6.5rem;
+  white-space: nowrap;
+}
+
+.wfl__pk {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  padding-left: 0.4rem;
+  border-left: 3px solid var(--brand-grey-300, #dcdcdc);
+}
+.wfl__pk__status,
+.wfl__pk__plan {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wfl__pk__status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-grey-700, #333);
+  line-height: 1.2;
+}
+.wfl__pk__plan {
+  font-size: 0.62rem;
+  color: var(--brand-grey-500, #6c757d);
+  line-height: 1.2;
+}
+
+/* Stage swatches: waiting → grey, in flight → amber, custody taken → navy,
+   closed → success, cancelled → danger */
+.wfl__pk--accepted,
+.wfl__pk--in_progress,
+.wfl__pk--arrived { border-left-color: #f59e0b; }
+.wfl__pk--accepted .wfl__pk__status,
+.wfl__pk--in_progress .wfl__pk__status,
+.wfl__pk--arrived .wfl__pk__status { color: #92400e; }
+
+.wfl__pk--collected { border-left-color: var(--brand-navy, #001f3f); }
+.wfl__pk--collected .wfl__pk__status { color: var(--brand-navy, #001f3f); }
+
+.wfl__pk--dropped,
+.wfl__pk--handed_off { border-left-color: var(--brand-success, #15803d); }
+.wfl__pk--dropped .wfl__pk__status,
+.wfl__pk--handed_off .wfl__pk__status { color: var(--brand-success, #15803d); }
+
+.wfl__pk--cancelled { border-left-color: var(--brand-danger, #dc2626); }
+.wfl__pk--cancelled .wfl__pk__status { color: var(--brand-danger, #dc2626); }
+
+.wfl__pk-none {
+  font-size: 0.75rem;
+  color: var(--brand-grey-400, #b0b0b0);
+}
+
+@media (max-width: 575.98px) {
+  .wfl__hero { align-items: flex-start; }
+  .wfl__hero__aside { margin-left: 0; width: 100%; gap: 0.5rem; }
+  .wfl__hero__aside > .wfl__hero__div { display: none; }
+  .wfl__hero__shape { gap: 0.75rem; }
+  .wfl__tier { min-width: 2.75rem; }
+  .wfl__tier__num { font-size: 1.15rem; }
+  .wfl .wfl__hero__select { flex: 1 1 auto; max-width: none; }
+  .wfl__hero__aside > .select2-container.ez-filter-select { flex: 1 1 auto; }
+}

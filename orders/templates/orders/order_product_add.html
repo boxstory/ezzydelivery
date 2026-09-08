@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'orders/css/order-product-add.css' %}">
@@ -8,29 +9,19 @@
 {% block content %}
 <div class="opa" id="orders_add_product_container_main">
 
-  <!-- Hero -->
-  <div class="opa__hero">
-    <div class="opa__hero-inner">
-      <div class="opa__hero-icon">
-        <i class="fa-solid fa-boxes-stacked"></i>
-      </div>
-      <div class="opa__hero-text">
-        <h1 class="opa__hero-title">Add Products</h1>
-        <p class="opa__hero-sub">Order <span class="opa__hero-code">#{{ order.client_order_code }}</span> &mdash; {{ order.customer_name }}</p>
-      </div>
-    </div>
-    <div class="opa__hero-actions">
-      <a href="{% url 'delivery:all_delivery_tasks' %}" class="opa__action-btn opa__action-btn--ghost">
-        <i class="fa-solid fa-truck"></i> Go to Tasks
-      </a>
-      <a href="{% url 'orders:order_update' order.id %}" class="opa__action-btn opa__action-btn--ghost">
-        <i class="fa-solid fa-pen-to-square"></i> Edit Order
-      </a>
-      <a href="{% url 'orders:orders_all_list' %}" class="opa__action-btn opa__action-btn--ghost">
-        <i class="fa-solid fa-arrow-left"></i> Back
-      </a>
-    </div>
-  </div>
+  {% with code=order.client_order_code %}
+  {% bconheader eyebrow="Orders" live=code icon="fa-solid fa-boxes-stacked" title="Add Products" subtitle=order.customer_name %}
+    <a href="{% url 'delivery:all_delivery_tasks' %}" class="bcon__btn bcon__btn--secondary">
+      <i class="fa-solid fa-truck"></i> Go to Tasks
+    </a>
+    <a href="{% url 'orders:order_update' order.id %}" class="bcon__btn bcon__btn--secondary">
+      <i class="fa-solid fa-pen-to-square"></i> Edit Order
+    </a>
+    <a href="{% url 'orders:orders_all_list' %}" class="bcon__btn bcon__btn--ghost">
+      <i class="fa-solid fa-arrow-left"></i> Back
+    </a>
+  {% endbconheader %}
+  {% endwith %}
 
   <div class="opa__layout">
 

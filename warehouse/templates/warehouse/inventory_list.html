@@ -30,6 +30,17 @@
         <p class="wh__subtitle">View and manage stock levels across warehouses</p>
       </div>
     </div>
+    <div class="d-flex align-items-center gap-2">
+    {% if is_staff %}
+    <a href="{% url 'warehouse:staff_product_add' %}" class="wh__btn wh__btn--secondary"
+       hx-get="{% url 'warehouse:staff_product_add' %}"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      <i class="fas fa-box-open"></i> Add Product
+    </a>
+    {% endif %}
     <a href="{% url 'warehouse:receive_stock' %}" class="wh__btn wh__btn--primary"
        hx-get="{% url 'warehouse:receive_stock' %}"
        hx-target="#main-content"
@@ -38,7 +49,17 @@
        hx-push-url="true">
       <i class="fas fa-plus"></i> Receive Stock
     </a>
+      <button type="button" class="wfnote__btn" data-wfnote-toggle
+              aria-expanded="false" aria-controls="warehouse_inventory_list_card_notes"
+              title="About this page">
+        <i class="fa-solid fa-question" aria-hidden="true"></i>
+        <span class="visually-hidden">Show notes</span>
+      </button>
+    </div>
   </div>
+
+  <div class="wfnote wfnote--inset" id="warehouse_inventory_list_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_inventory_list_card_notes' %}" hidden></div>
 
   <!-- Stats -->
   <div class="wh__stats">
@@ -93,7 +114,7 @@
         </select>
       </div>
       {% if is_staff and businesses %}
-      <div class="wh__filter-group">
+      <div class="wh__filter-group wh__filter-group--wide">
         <label class="wh__filter-label">Business</label>
         <select name="business" id="business" class="wh__filter-select">
           <option value="">All Businesses</option>

@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
@@ -9,23 +10,11 @@
 {% block content %}
 <div class="ofu" id="orders_upload_file_container_main">
 
-  <!-- Page Header -->
-  <div class="ofu__header">
-    <div class="ofu__header-left">
-      <a href="{% url 'orders:orders_all_list' %}" class="ofu__back" title="Back to Orders">
-        <i class="fa-solid fa-arrow-left"></i>
-      </a>
-      <h1 class="ofu__title">
-        <i class="fa-solid fa-file-import"></i>
-        Bulk Import Orders
-      </h1>
-    </div>
-    <div class="ofu__header-right">
-      <a href="{% url 'orders:orders_all_list' %}" class="btn btn-outline-primary btn-sm">
-        <i class="fa-solid fa-basket-shopping me-1"></i>Go to Orders
-      </a>
-    </div>
-  </div>
+  {% bconheader eyebrow="Orders" live="Bulk Import" icon="fa-solid fa-file-import" title="Bulk Import Orders" subtitle="Upload a spreadsheet to create many orders at once." %}
+    <a href="{% url 'orders:orders_all_list' %}" class="bcon__btn bcon__btn--secondary">
+      <i class="fa-solid fa-basket-shopping"></i> Go to Orders
+    </a>
+  {% endbconheader %}
 
   <div class="ofu__body">
     <!-- Upload Card -->

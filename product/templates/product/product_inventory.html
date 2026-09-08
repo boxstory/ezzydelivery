@@ -1,8 +1,9 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260319d1">
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260801a">
 Inventory
 {% endblock extra_head %}
 
@@ -11,30 +12,22 @@ Inventory
 {% block content %}
 <div class="piv" id="product_inventory_container">
 
-  <!-- Hero Header -->
-  <div class="piv__hero" id="product_inventory_section_header">
-    <div class="d-flex align-items-center gap-3">
-      <div class="piv__hero-icon">
-        <i class="fas fa-boxes-stacked"></i>
-      </div>
-      <div>
-        <h1 class="piv__hero-title">Inventory</h1>
-        <p class="piv__hero-sub">Stock levels for your product catalogue</p>
-      </div>
+  <div id="product_inventory_section_header">
+    {% bconheader eyebrow="Catalogue" live="Inventory" icon="fa-solid fa-boxes-stacked" title="Inventory" subtitle="Stock levels for your product catalogue." %}{% endbconheader %}
+  </div>
+
+  <div class="bcon__plates">
+    <div class="bcon__plate bcon__plate--primary">
+      <div class="bcon__plate-top"><p class="bcon__plate-label">Products</p></div>
+      <p class="bcon__plate-value">{{ total_products }}</p>
     </div>
-    <div class="piv__hero-stats">
-      <div class="piv__hero-stat">
-        <span class="piv__hero-stat__num">{{ total_products }}</span>
-        <span class="piv__hero-stat__label">Products</span>
-      </div>
-      <div class="piv__hero-stat piv__hero-stat--ok">
-        <span class="piv__hero-stat__num">{{ total_in_stock }}</span>
-        <span class="piv__hero-stat__label">In Stock</span>
-      </div>
-      <div class="piv__hero-stat piv__hero-stat--warn">
-        <span class="piv__hero-stat__num">{{ low_stock_count }}</span>
-        <span class="piv__hero-stat__label">Low / No Stock</span>
-      </div>
+    <div class="bcon__plate bcon__plate--success">
+      <div class="bcon__plate-top"><p class="bcon__plate-label">In Stock</p></div>
+      <p class="bcon__plate-value">{{ total_in_stock }}</p>
+    </div>
+    <div class="bcon__plate bcon__plate--warning">
+      <div class="bcon__plate-top"><p class="bcon__plate-label">Low / No Stock</p></div>
+      <p class="bcon__plate-value">{{ low_stock_count }}</p>
     </div>
   </div>
 
@@ -186,26 +179,8 @@ Inventory
     {% endfor %}
   </div>
 
-  <!-- Pagination -->
-  {% if page_obj.has_other_pages %}
-  <div class="piv__pagination" id="product_inventory_pagination">
-    {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}{% if show_low %}&low_stock=1{% endif %}"
-       class="piv__page-btn" id="product_inventory_btn_prev">
-      <i class="fas fa-chevron-left"></i> Prev
-    </a>
-    {% endif %}
-    <span class="piv__page-info">
-      Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-    </span>
-    {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}{% if show_low %}&low_stock=1{% endif %}"
-       class="piv__page-btn" id="product_inventory_btn_next">
-      Next <i class="fas fa-chevron-right"></i>
-    </a>
-    {% endif %}
-  </div>
-  {% endif %}
+  <!-- Pagination (shared brand component) — filter_params carries q / low_stock -->
+  {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params per_page=per_page pagination_id="product_inventory" %}
 
   {% else %}
   <!-- Empty state -->

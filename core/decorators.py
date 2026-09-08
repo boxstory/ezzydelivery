@@ -111,6 +111,47 @@ def superadmin_required(view_func):
 superuser_required = superadmin_required
 
 
+def department_required(*departments):
+    """
+    Require the user to hold at least one of the given staff departments.
+
+    The /workforce/ tree is already gated wholesale by
+    core.middleware.StaffDepartmentMiddleware, so this is for views that live
+    outside it (or for stating the requirement explicitly on a sensitive view).
+
+    Usage:
+        from core.departments import FIN
+
+        @staff_required
+        @department_required(FIN)
+        def payout_run(request):
+            ...
+
+    Super admins always pass.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            from core.departments import user_departments
+
+            if not request.user.is_authenticated:
+                messages.error(request, "Please log in to access this page.")
+                return redirect('account_login')
+
+            if user_departments(request.user) & set(departments):
+                return view_func(request, *args, **kwargs)
+
+            logger.warning(
+                "User %s lacks departments %s for %s",
+                request.user.id, departments, view_func.__name__,
+            )
+            messages.error(request, "You don't have access to that section.")
+            return redirect('workforce:wf_dashboard')
+
+        return wrapper
+    return decorator
+
+
 def api_staff_required(view_func):
     """
     Decorator for API endpoints that returns JSON responses.

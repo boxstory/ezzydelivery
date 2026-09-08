@@ -1,0 +1,94 @@
+{% comment %}
+Purpose: "About this page" notes panel for shift_list.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_dispatch_shift_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            The rota for dispatch. A <strong>shift</strong> locks one rider to one pickup location for a block of
+            time, and that lock is what makes them eligible for batches: when a batch is released, only riders on
+            an <em>Active</em> shift at that same location are considered. Each row is one shift with its planned
+            hours, the hours actually worked, and how much the rider got through. Batches themselves are on the
+            dispatch dashboard; the scoring of all this lands on the KPI dashboard.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">New shift</dt>
+                        <dd class="wfnote__def">Schedules a rider at a location between two times. Only approved
+                            drivers and active locations can be picked.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Status</dt>
+                        <dd class="wfnote__def">Filters to Scheduled, Active, On Break or Completed. Cancelled
+                            and no-show shifts exist but are not in this dropdown.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Location</dt>
+                        <dd class="wfnote__def">The store the rider is tied to for the shift.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Date</dt>
+                        <dd class="wfnote__def">Matches the <strong>scheduled start</strong> day. Leave it empty
+                            and the list shows today and everything upcoming — that is why past shifts seem to be
+                            missing until you pick their date.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Edit</dt>
+                        <dd class="wfnote__def">Only offered while the shift is still <em>Scheduled</em>. Once a
+                            rider has clocked in, times can no longer be changed from the list.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Shift code</dt>
+                        <dd class="wfnote__def">Opens the shift: rider details, actual hours and every batch
+                            carried during it.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Shift statuses</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Scheduled</dt>
+                        <dd class="wfnote__def">Planned but not started. The rider is <strong>not</strong> yet
+                            eligible for batches at this store.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Active</dt>
+                        <dd class="wfnote__def">The rider clocked in from the app, which stamps the actual start
+                            time. This is the only status that lets batches be handed to them.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">On break</dt>
+                        <dd class="wfnote__def">Paused. Break minutes are deducted from the working time used to
+                            calculate orders per hour.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Completed</dt>
+                        <dd class="wfnote__def">Clocked out, or auto-closed after the scheduled end. Only
+                            completed shifts are picked up by the nightly KPI run.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>A shift does not start itself. It stays <em>Scheduled</em> until the rider clocks in from the
+                    app, so a store with a full rota can still have <strong>no one eligible</strong> for its
+                    batches.</li>
+                <li>An Active shift left running past its scheduled end is closed automatically by a background
+                    check a few minutes later, with the actual end set to that moment.</li>
+                <li>The Batches and Orders columns only move when a rider <strong>completes</strong> a batch —
+                    an in-progress trip is not counted yet.</li>
+                <li>The rider is locked to the one location on the shift. Batches from any other store are never
+                    offered to them, however idle they are.</li>
+                <li>Nothing here prevents two overlapping shifts for the same rider; that is a rota discipline
+                    thing, not a system check.</li>
+            </ul>
+        </section>
+    

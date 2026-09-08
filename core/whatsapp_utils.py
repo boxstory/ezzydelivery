@@ -2,6 +2,7 @@
 WhatsApp Verification Utilities
 Handles sending verification codes via n8n webhook to WhatsApp
 """
+import logging
 import random
 import string
 import secrets
@@ -13,6 +14,8 @@ from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
 from .models import WhatsAppVerification
+
+logger = logging.getLogger(__name__)
 
 
 def generate_verification_code(length=6):
@@ -169,7 +172,12 @@ Best regards,
     # If the n8n webhook is not configured, fall back to the Evolution API
     # (the channel already used for other transactional WhatsApp messages).
     if not n8n_webhook_url:
-        api_result = send_whatsapp_message_api(phone_number, message.strip())
+        # Failover: a verification code is useless if it does not arrive, so try
+        # another connected number rather than dropping it on a dead session.
+        api_result = send_whatsapp_message_failover(phone_number, message.strip())
+        if not api_result.get('success'):
+            logger.error('WhatsApp %s code to %s not delivered: %s',
+                         verification_type, phone_number, api_result)
         return {
             'success': api_result.get('success', False),
             'code': verification_code,
@@ -475,6 +483,301 @@ def get_route_instance(section):
     return inst if (inst and inst.is_active) else None
 
 
+def get_route(section):
+    """The enabled WhatsAppSenderRoute row for a section, or None."""
+    from core.models import WhatsAppSenderRoute
+    return (WhatsAppSenderRoute.objects
+            .select_related('instance')
+            .filter(section=section, is_enabled=True).first())
+
+
+def get_instance_for_session(session):
+    """The active WhatsAppInstance whose WAHA session this is, or None.
+
+    The reverse of ``whatsapp.sessions.for_instance`` — used when the number is
+    picked directly (a staff member choosing which line a conversation runs on)
+    rather than derived from a section route, so the composer can still name the
+    sender and an Evolution fallback still lands on the same number.
+    """
+    from core.models import WhatsAppInstance
+    if not session:
+        return None
+    return WhatsAppInstance.objects.filter(waha_session=session, is_active=True).first()
+
+
+def resolve_send_target(section, session=''):
+    """Which instance and channel a send will actually use → (instance, channel).
+
+    ``session`` is an explicit staff override of the section's number. Because a
+    session name only means anything to WAHA, choosing one also forces the WAHA
+    channel — otherwise the message would leave on the section's Evolution
+    instance and arrive from a different number than the one that was picked.
+    """
+    from core.models import WhatsAppSenderRoute
+
+    route = get_route(section)
+    inst = route.instance if (route and route.instance and route.instance.is_active) else None
+    channel = (route.channel if route else '') or WhatsAppSenderRoute.CHANNEL_EVOLUTION
+
+    if session:
+        override = get_instance_for_session(session)
+        if override is not None:
+            inst = override
+        channel = WhatsAppSenderRoute.CHANNEL_WAHA
+    return inst, channel
+
+
+def send_routed_message(section, phone_number, message, session=''):
+    """Send one message through a section's configured number AND channel.
+
+    The Auto Triggers page owns both halves of that choice, and they are
+    genuinely independent: the same number is reachable through Evolution (by
+    ``instance_name``) or through WAHA (by ``waha_session``), so business leads
+    can stay on Evolution while driver leads run on WAHA.
+
+    ``session`` overrides the number for this one send — the caller has already
+    validated it (see workforce.views.whatsapp_send_routed); an invalid name
+    must never reach here, because it would silently fall back to the default
+    session and send from the wrong line.
+
+    Returns the same ``{'success': bool, ...}`` shape as
+    ``send_whatsapp_message_api`` whichever channel carries it.
+    """
+    from core.models import WhatsAppSenderRoute
+
+    inst, channel = resolve_send_target(section, session)
+
+    if channel != WhatsAppSenderRoute.CHANNEL_WAHA:
+        return send_whatsapp_message_api(phone_number, message, instance_obj=inst)
+
+    try:
+        from whatsapp import sessions as wa_sessions
+        from whatsapp.waha_views import send_waha_text
+
+        ok, info = send_waha_text(
+            str(phone_number), message,
+            session=session or wa_sessions.for_instance(inst))
+        if ok:
+            return {'success': True, 'channel': 'waha', 'message_id': info.get('message_id', '')}
+        return {'success': False, 'channel': 'waha',
+                'error': info.get('error') or 'WAHA send failed'}
+    except Exception as exc:
+        logger.exception('WAHA send failed for section %s — falling back to Evolution', section)
+        result = send_whatsapp_message_api(phone_number, message, instance_obj=inst)
+        result.setdefault('waha_error', str(exc))
+        return result
+
+
+# A dead Evolution session keeps reporting connectionState "open" long after its
+# WhatsApp socket is gone, so health can only be learned from real send results.
+# Short TTL so an instance recovers on its own once it starts working again.
+INSTANCE_DOWN_TTL = 300
+
+
+def _health_cache():
+    """The cache instance health is shared through.
+
+    Must be a cross-process cache: the default cache is LocMemCache, which is
+    private to one gunicorn worker, so a dead session learned by one worker
+    would stay invisible to the others. The 'ratelimit' cache is the configured
+    database-backed one every worker can see.
+    """
+    from django.core.cache import caches
+    try:
+        return caches['ratelimit']
+    except Exception:
+        from django.core.cache import cache
+        return cache
+
+
+def _instance_down_key(instance_name):
+    return f'wa:instance_down:{instance_name}'
+
+
+def _looks_like_dead_socket(status_code, body):
+    """True when a failed send means "this session has no live WhatsApp socket".
+
+    Evolution answers 500 {"response":{"message":"Connection Closed"}} on sends
+    and 428 Precondition Required on reads once the socket dies. A 400 for a bad
+    recipient must NOT count — that is the number's fault, not the sender's.
+    """
+    if status_code in (428, 500):
+        return True
+    return 'connection closed' in str(body).lower()
+
+
+def _failure_reason(body):
+    """The human-readable bit of an Evolution error, for the ops console."""
+    if isinstance(body, dict):
+        nested = body.get('response')
+        if isinstance(nested, dict) and nested.get('message'):
+            return str(nested['message'])
+        payload = (body.get('output') or {}).get('payload') or {}
+        if payload.get('message'):
+            return str(payload['message'])
+        if body.get('error'):
+            return str(body['error'])
+    return str(body)[:200]
+
+
+# Rows kept per instance. The console shows 5; the rest are headroom for
+# working out when a number started failing. Busy numbers run a few hundred
+# messages a day, so this is a few hours of history — enough to answer "since
+# when", without letting the table grow without bound.
+SEND_LOG_KEEP_PER_INSTANCE = 200
+
+
+def mask_phone(phone_number):
+    """Recipient with the middle digits hidden, for the ops log."""
+    digits = ''.join(c for c in str(phone_number or '') if c.isdigit())
+    if len(digits) <= 6:
+        return digits
+    return f'{digits[:4]}****{digits[-3:]}'
+
+
+def log_send_attempt(instance_name, phone_number, ok, detail='', status_code=None, channel='waha'):
+    """Record a send made outside the Evolution client (currently WAHA).
+
+    The console lists attempts per number, and most traffic leaves over WAHA —
+    logging only the Evolution path made healthy numbers look idle.
+    """
+    _record_send_log(instance_name, phone_number, ok,
+                     {'error': detail} if detail else {}, status_code, channel)
+
+
+def _record_send_log(instance_name, phone_number, ok, body, status_code=None, channel='evolution'):
+    """Append this send attempt to the instance's log, then trim the tail.
+
+    Never stores the message: these rows include OTP and password-reset sends,
+    and the console that reads them is a staff page.
+    """
+    from core.models import WhatsAppSendLog
+
+    if not instance_name:
+        return
+    try:
+        WhatsAppSendLog.objects.create(
+            instance_name=instance_name,
+            channel=channel,
+            phone_number=mask_phone(phone_number),
+            success=bool(ok),
+            status_code=status_code if isinstance(status_code, int) else None,
+            detail='' if ok else _failure_reason(body)[:255],
+        )
+        keep = list(WhatsAppSendLog.objects.filter(instance_name=instance_name)
+                    .values_list('id', flat=True)[:SEND_LOG_KEEP_PER_INSTANCE])
+        if len(keep) >= SEND_LOG_KEEP_PER_INSTANCE:
+            (WhatsAppSendLog.objects
+             .filter(instance_name=instance_name).exclude(id__in=keep).delete())
+    except Exception:
+        # A logging failure must never take down the send it is describing.
+        logger.exception('Could not write WhatsApp send log for %s', instance_name)
+
+
+def _record_instance_health(instance_name, ok, body, status_code=None):
+    """Remember whether this instance's socket is usable, for failover.
+
+    Stores why and when as well as the bare fact, because the WhatsApp instances
+    console shows this to staff — "Connected" from Evolution plus "last send
+    failed: Connection Closed" from here is what makes a zombie session obvious.
+    """
+    if not instance_name:
+        return
+    cache = _health_cache()
+    key = _instance_down_key(instance_name)
+    if ok:
+        cache.delete(key)
+    elif _looks_like_dead_socket(status_code, body):
+        reason = _failure_reason(body)
+        cache.set(key, {
+            'at': timezone.now().isoformat(),
+            'reason': reason,
+            'status_code': status_code,
+        }, INSTANCE_DOWN_TTL)
+        logger.error('WhatsApp instance %s looks disconnected: %s', instance_name, body)
+
+
+def instance_down_info(instance_name):
+    """Details of this instance's last failed send, or None when it looks fine.
+
+    Returns a dict with 'at' (ISO timestamp), 'reason' and 'status_code'.
+    """
+    if not instance_name:
+        return None
+    info = _health_cache().get(_instance_down_key(instance_name))
+    return info if isinstance(info, dict) else ({'at': '', 'reason': '', 'status_code': None} if info else None)
+
+
+def instance_is_down(instance_name):
+    """True when a recent send proved this instance's socket is dead."""
+    return instance_down_info(instance_name) is not None
+
+
+def get_auth_instance():
+    """The instance auth codes (OTP / password reset) should send from, or None.
+
+    Order of preference:
+      1. The configured default (``settings.EVOLUTION_INSTANCE``) when it is not
+         known to be disconnected — auth codes should come from the main number
+         so recipients recognise the sender.
+      2. Any other active instance that is not known to be disconnected, so a
+         password reset still lands while the main number is being re-linked.
+    """
+    from core.models import WhatsAppInstance
+
+    default_name = (getattr(settings, 'EVOLUTION_INSTANCE', '') or '').strip()
+    if default_name and not instance_is_down(default_name):
+        return WhatsAppInstance.objects.filter(
+            instance_name=default_name, is_active=True).first()
+
+    for inst in WhatsAppInstance.objects.filter(is_active=True).order_by('-is_default', 'id'):
+        if not instance_is_down(inst.instance_name):
+            return inst
+    return None
+
+
+def whatsapp_auth_channel_down():
+    """True when no active instance can currently deliver an auth code.
+
+    Checked before a password-reset lookup so an outage is reported to everyone
+    identically — the answer does not depend on the phone number typed in, so it
+    cannot be used to probe which numbers have accounts.
+    """
+    from core.models import WhatsAppInstance
+
+    names = list(WhatsAppInstance.objects.filter(
+        is_active=True).values_list('instance_name', flat=True))
+    if not names:
+        return True
+    return all(instance_is_down(n) for n in names)
+
+
+def send_whatsapp_message_failover(phone_number, message):
+    """Send a message, retrying on another number if the first session is dead.
+
+    Only used for auth codes, where delivery matters more than which number the
+    message arrives from. Ordinary notifications keep their routed sender.
+    """
+    from core.models import WhatsAppInstance
+
+    preferred = get_auth_instance()
+    result = send_whatsapp_message_api(phone_number, message, instance_obj=preferred)
+    if result.get('success'):
+        return result
+
+    tried = {result.get('instance')}
+    for inst in WhatsAppInstance.objects.filter(is_active=True).order_by('-is_default', 'id'):
+        if inst.instance_name in tried or instance_is_down(inst.instance_name):
+            continue
+        logger.warning('WhatsApp auth send failing over from %s to %s',
+                       result.get('instance'), inst.instance_name)
+        result = send_whatsapp_message_api(phone_number, message, instance_obj=inst)
+        tried.add(inst.instance_name)
+        if result.get('success'):
+            return result
+    return result
+
+
 def send_whatsapp_message_api(phone_number, message, instance_obj=None):
     """
     Send WhatsApp message via Evolution API
@@ -526,22 +829,48 @@ def send_whatsapp_message_api(phone_number, message, instance_obj=None):
             verify=True
         )
 
+        ok = response.status_code in [200, 201]
+        body = response.json() if response.text else {}
+        _record_instance_health(instance, ok, body, response.status_code)
+        _record_send_log(instance, phone, ok, body, response.status_code)
+
         return {
-            'success': response.status_code in [200, 201],
+            'success': ok,
             'status_code': response.status_code,
-            'response': response.json() if response.text else {}
+            'instance': instance,
+            'response': body
         }
 
     except requests.exceptions.RequestException as e:
+        _record_instance_health(instance, False, None)
+        _record_send_log(instance, phone, False, {'error': str(e)})
         return {
             'success': False,
+            'instance': instance,
             'error': f'Failed to send WhatsApp message: {str(e)}'
         }
+
+
+def trigger_enabled(trigger_key):
+    """False when staff switched this automatic message off on Auto Triggers.
+
+    An unregistered key defaults to on, so a send is never silently lost just
+    because its AutoTriggerConfig row has not been created yet.
+    """
+    from core.models import AutoTriggerConfig
+    try:
+        return AutoTriggerConfig.is_trigger_enabled(trigger_key)
+    except Exception:
+        logger.exception('Trigger lookup failed for %s — sending anyway', trigger_key)
+        return True
 
 
 def send_inquiry_thank_you_message(phone_number, business_name):
     """
     Send thank you message to customer after 3PL inquiry submission via WhatsApp API
+
+    Switched off with the ``wa_quote_thank_you`` trigger; sends from the CRM &
+    Leads number so the prospect's reply lands in the sales inbox.
 
     Args:
         phone_number: Customer phone number
@@ -550,6 +879,9 @@ def send_inquiry_thank_you_message(phone_number, business_name):
     Returns:
         dict: Response with success status
     """
+    if not trigger_enabled('wa_quote_thank_you'):
+        return {'success': False, 'disabled': True, 'error': 'Trigger is switched off'}
+
     message = f"""✅ *Thank You for Your 3PL Inquiry!*
 
 Hi {business_name},
@@ -563,12 +895,75 @@ In the meantime, feel free to reach out to us if you have any questions.
 Best regards,
 *EZZY Delivery Team* 🚚
 """
-    return send_whatsapp_message_api(phone_number, message)
+    return send_routed_message('crm_leads', phone_number, message)
+
+
+FLEET_WHATSAPP_NUMBER = '97466124545'
+
+
+def get_fleet_instance():
+    """Return the WhatsApp instance driver-applicant messages send from, or None.
+
+    Order of preference:
+      1. The ``driver_onboarding`` sender route, when staff configured one on
+         the Auto Triggers page — that page is the one place this is set.
+      2. The fleet admin number (97466124545), the historical default.
+      3. The orders/tasks route, so a send still goes out from a real number.
+    """
+    from core.models import WhatsAppInstance
+    routed = get_route_instance('driver_onboarding')
+    if routed:
+        return routed
+    inst = WhatsAppInstance.objects.filter(
+        phone_number=FLEET_WHATSAPP_NUMBER, is_active=True).first()
+    return inst or get_route_instance('orders_tasks')
+
+
+def send_driver_application_thank_you(phone_number, first_name=''):
+    """Thank-you + we'll-reach-back message to a driver applicant.
+
+    Sent from the driver-onboarding number so the applicant's replies reach the
+    team that reviews the application. Two independent switches: the
+    ``wa_driver_application_thanks`` trigger (Auto Triggers page) and the
+    message body itself (AI Config → Messages).
+
+    Args:
+        phone_number: Applicant WhatsApp/phone number (local or with 974)
+        first_name: Applicant first name for the greeting (optional)
+
+    Returns:
+        dict: Response with success status
+    """
+    from core.message_templates import DRIVER_APPLICATION_THANKS, render_template
+
+    if not trigger_enabled('wa_driver_application_thanks'):
+        return {'success': False, 'disabled': True, 'error': 'Trigger is switched off'}
+
+    is_valid, phone, error = validate_input_phone(phone_number)
+    if not is_valid:
+        return {'success': False, 'error': error or 'Invalid phone number'}
+
+    message = render_template(
+        DRIVER_APPLICATION_THANKS,
+        first_name=(first_name or '').strip() or 'there',
+    )
+    if message is None:
+        return {'success': False, 'disabled': True, 'error': 'Template is switched off'}
+
+    # Routed: the driver_onboarding route decides both the number and whether
+    # this goes out over WAHA or Evolution. get_fleet_instance() still supplies
+    # the historical fleet-number fallback when no route is configured.
+    if get_route('driver_onboarding'):
+        return send_routed_message('driver_onboarding', phone, message)
+    return send_whatsapp_message_api(phone, message, instance_obj=get_fleet_instance())
 
 
 def send_admin_inquiry_notification(inquiry):
     """
     Send notification to admin about new 3PL inquiry submission via WhatsApp API
+
+    Switched off with the ``wa_quote_admin_alert`` trigger; sends from the CRM &
+    Leads number so the alert sits in the same thread the sales desk works in.
 
     Args:
         inquiry: PricingEnquiry object
@@ -576,6 +971,9 @@ def send_admin_inquiry_notification(inquiry):
     Returns:
         dict: Response with success status
     """
+    if not trigger_enabled('wa_quote_admin_alert'):
+        return {'success': False, 'disabled': True, 'error': 'Trigger is switched off'}
+
     inquiry_url = f"https://ezzydelivery.qa/3pl/inquiry/{inquiry.id}/preview/"
 
     message = f"""📩 *NEW 3PL INQUIRY RECEIVED*
@@ -601,7 +999,7 @@ def send_admin_inquiry_notification(inquiry):
 {inquiry_url}
 """
 
-    return send_whatsapp_message_api('97466451589', message)
+    return send_routed_message('crm_leads', '97466451589', message)
 
 
 def verify_code(phone_number, code, verification_type):

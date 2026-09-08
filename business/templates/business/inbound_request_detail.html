@@ -1,5 +1,6 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+{% load business_console %}
 
 {% block title %}{{ inbound_request.request_number }}{% endblock %}
 
@@ -9,43 +10,22 @@
 
 {% block content %}
 <div class="bir">
-  <!-- Breadcrumb -->
-  <nav class="bir__breadcrumb">
-    <a href="{% url 'business:inbound_requests_list' %}">Inbound Requests</a>
-    <span class="bir__breadcrumb-sep">/</span>
-    <span>{{ inbound_request.request_number }}</span>
-  </nav>
-
-  <!-- Hero Header -->
-  <div class="bir__detail-hero">
-    <div class="d-flex align-items-center gap-3 flex-wrap">
-      <div>
-        <h1 class="bir__detail-title">
-          <code>{{ inbound_request.request_number }}</code>
-        </h1>
-        <p class="bir__detail-subtitle">
-          <i class="fa-solid fa-warehouse"></i> {{ inbound_request.warehouse.name }}
-          {% if inbound_request.expected_delivery_date %}
-          <span class="mx-2">|</span>
-          <i class="fa-solid fa-calendar"></i> Expected: {{ inbound_request.expected_delivery_date|date:"d M Y" }}
-          {% endif %}
-        </p>
-      </div>
-      <div class="ms-auto">
-        {% if inbound_request.status == 'pending' %}
-        <span class="bir__badge bir__badge--warning"><i class="fa-solid fa-clock"></i> Pending</span>
-        {% elif inbound_request.status == 'approved' %}
-        <span class="bir__badge bir__badge--info"><i class="fa-solid fa-circle-check"></i> Approved</span>
-        {% elif inbound_request.status == 'completed' %}
-        <span class="bir__badge bir__badge--success"><i class="fa-solid fa-check"></i> Completed</span>
-        {% elif inbound_request.status == 'cancelled' %}
-        <span class="bir__badge bir__badge--danger"><i class="fa-solid fa-circle-xmark"></i> Cancelled</span>
-        {% else %}
-        <span class="bir__badge bir__badge--neutral">{{ inbound_request.status|title }}</span>
-        {% endif %}
-      </div>
-    </div>
-  </div>
+  {% bconheader eyebrow="Inbound Requests" live=inbound_request.request_number icon="fa-solid fa-arrow-right-to-bracket" title=inbound_request.request_number subtitle=inbound_request.warehouse.name %}
+    {% if inbound_request.status == 'pending' %}
+    <span class="bir__badge bir__badge--warning"><i class="fa-solid fa-clock"></i> Pending</span>
+    {% elif inbound_request.status == 'approved' %}
+    <span class="bir__badge bir__badge--info"><i class="fa-solid fa-circle-check"></i> Approved</span>
+    {% elif inbound_request.status == 'completed' %}
+    <span class="bir__badge bir__badge--success"><i class="fa-solid fa-check"></i> Completed</span>
+    {% elif inbound_request.status == 'cancelled' %}
+    <span class="bir__badge bir__badge--danger"><i class="fa-solid fa-circle-xmark"></i> Cancelled</span>
+    {% else %}
+    <span class="bir__badge bir__badge--neutral">{{ inbound_request.status|title }}</span>
+    {% endif %}
+    <a href="{% url 'business:inbound_requests_list' %}" class="bcon__btn bcon__btn--ghost">
+      <i class="fa-solid fa-arrow-left"></i> Back to Requests
+    </a>
+  {% endbconheader %}
 
   <div class="row g-3 mt-1">
     <!-- Request Info Card -->

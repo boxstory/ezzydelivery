@@ -1,0 +1,112 @@
+{% comment %}
+Purpose: "About this page" notes panel for orders_api.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_orders_api_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            A window onto a client's own shop. Pick a client and the page calls their connected platform —
+            Shopify, WooCommerce or a Google Sheet — and shows the orders sitting there right now, next to
+            whether we have already pulled each one into our system. Nothing here is our data until you
+            import it. Only clients with an approved, verified integration are listed; what happened on
+            previous runs is on <strong>Import&nbsp;History</strong>.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Pick a client</dt>
+                        <dd class="wfnote__def">The row of buttons at the top. Each carries a tag for the
+                            platform it is connected to. Nothing loads until you choose one.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Show filter</dt>
+                        <dd class="wfnote__def">All, <em>Not Imported</em> (your work queue) or
+                            <em>Imported</em> (what we already took).</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Select rows</dt>
+                        <dd class="wfnote__def">Tick the orders you want. Already-imported rows have no
+                            checkbox — they carry a green link to our order instead. <em>Select all</em>
+                            takes everything tickable on the page.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Import</dt>
+                        <dd class="wfnote__def">Opens the wizard for the selection: review what you picked,
+                            check the field mapping, preview exactly what will be written, then confirm.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Verify step</dt>
+                        <dd class="wfnote__def">Shows each order as our own database fields, with the source
+                            column it came from. You can correct a value inline before importing.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Column mapping</dt>
+                        <dd class="wfnote__def">Sheets only. Wires each sheet column to an order field and
+                            saves it for that client, so every later import reads the same way.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Go to row</dt>
+                        <dd class="wfnote__def">Sheets only. Jumps to a row number. The page opens itself
+                            near the last row you imported, which is usually where the new orders start.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Open our order</dt>
+                        <dd class="wfnote__def">The green badge on an imported row links straight to the
+                            order it became.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading a row</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Imported</dt>
+                        <dd class="wfnote__def">We already hold this order. Matched by the platform's own
+                            order id, or for sheets by row number.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Paid</dt>
+                        <dd class="wfnote__def">The customer has already paid the shop, so the driver
+                            collects nothing. The ledger shows COD as zero.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">COD due</dt>
+                        <dd class="wfnote__def">Not paid at the shop — this is the cash the driver has to
+                            collect at the door.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Shipping line</dt>
+                        <dd class="wfnote__def">The delivery option the customer chose at checkout. Useful
+                            for spotting express or scheduled requests.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">API Error</dt>
+                        <dd class="wfnote__def">The platform did not answer. Nothing is wrong with our
+                            records — the shop's credentials, sheet sharing or the platform itself is at
+                            fault.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>This list is <strong>fetched live on every page load</strong>. It can be slow, and a
+                    row can disappear or change because someone edited it on the shop's side.</li>
+                <li>Importing pulls the order in <strong>one direction only</strong>. Inline corrections in
+                    the verify step are saved on our order and never written back to the shop or sheet.</li>
+                <li>Orders already imported are skipped by the wizard, so a re-run is safe — but for sheets
+                    the match is by row number, so reordering or deleting sheet rows can make an old order
+                    look new.</li>
+                <li>With no saved mapping, sheet columns are guessed. It usually works and sometimes puts a
+                    phone number in the wrong field — save a mapping for any client you import regularly.</li>
+                <li>Products are matched by name, and a close match is remembered as an alias for next
+                    time. Check the matching preview the first time you import for a client.</li>
+                <li>Imported orders land as normal orders needing review — importing is not dispatching.</li>
+            </ul>
+        </section>
+    

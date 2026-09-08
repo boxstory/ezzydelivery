@@ -1,0 +1,93 @@
+{% comment %}
+Purpose: "About this page" notes panel for public_link_sources.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_public_link_sources_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Some clients keep their orders on a web page rather than sending them to us — a published
+            Google Sheet, a shared report, any page with a plain table on it. Each row here is one such
+            link that we read on a schedule. The sync fetches the page, reads the <strong>first table</strong>
+            on it, and drops the rows into <strong>Temp&nbsp;Orders</strong> as drafts for a human to
+            review and import. Nothing here creates a real order on its own — that still happens on the
+            Temp Orders screen.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Add source</dt>
+                        <dd class="wfnote__def">Opens the form: pick the client, give it a label you will
+                            recognise, paste the public URL. Saving runs a sync straight away and tells
+                            you how many rows came in — or why it failed. Leaving the label blank
+                            auto-names it after the client.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Active switch</dt>
+                        <dd class="wfnote__def">Saves the moment you flip it, no page reload. Off means the
+                            scheduled sync skips the link entirely while keeping the row and its history.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Delete</dt>
+                        <dd class="wfnote__def">The bin icon, behind a confirm. Removes the link and its
+                            stored headers and mapping.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Open URL</dt>
+                        <dd class="wfnote__def">The link in the URL column opens the client's page in a new
+                            tab — the quickest way to check a source is still reachable and still has a
+                            table on it.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Temp Orders</dt>
+                        <dd class="wfnote__def">Where the synced rows land for review and import.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Reading the columns</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Headers</dt>
+                        <dd class="wfnote__def">How many column headings we saw the last time we read the
+                            page. A dash means we have never successfully read a table there.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Mapping</dt>
+                        <dd class="wfnote__def">How many of the client's columns are wired to our order
+                            fields. <em>Not set</em> means the link cannot import anything yet — fix it in
+                            Mapping Manager, on the client's public-link tab.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Last Sync</dt>
+                        <dd class="wfnote__def">How long ago we last read the page. A dash on an active
+                            source that has been around a while is a warning sign.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Orders</dt>
+                        <dd class="wfnote__def">How many rows the last sync brought in — not a running
+                            total of orders ever imported from this link.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>A source with <strong>no mapping does nothing quietly</strong> — the sync runs, finds no
+                    mapping and returns zero rows without an error. If a client says orders are not coming
+                    through, check the Mapping column first.</li>
+                <li>Customer name, phone and address must all be mapped. If any of the three is missing the
+                    sync refuses to run for that source and reports the failure.</li>
+                <li>Only the <strong>first table</strong> on the page is read, and the URL must be reachable
+                    without a login. A page that needs sign-in returns the login HTML, not the data.</li>
+                <li>Rows arrive as drafts. An order that already exists with the same client order code is
+                    marked imported and left alone, so re-syncing does not create duplicates.</li>
+                <li>Deleting a source does not touch orders or drafts already created from it — those stay
+                    where they are.</li>
+            </ul>
+        </section>
+    

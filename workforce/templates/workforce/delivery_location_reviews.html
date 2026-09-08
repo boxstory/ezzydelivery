@@ -1,0 +1,306 @@
+{# Purpose: Staff queue for deliveries completed far from the customer's marked location — decide which point is right. #}
+{# Used by: workforce.views.delivery_location_reviews (URL workforce:delivery_location_reviews) #}
+{# Notes: Only "Driver GPS correct" moves data — it rewrites the order coordinates. The other verdicts are records, not corrections. #}
+{#        Uses the shared staff furniture: wfhero masthead, wfstat cards, wfnote page-notes card. #}
+{% extends "wf_dashboard_base.html" %}
+{% load static humanize %}
+
+{% block title %}Location Review{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/delivery_location_reviews.css' %}?v=20260730c" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="dgr">
+
+  <!-- Masthead -->
+  <header class="wfhero">
+    <div class="wfhero__ident">
+      <span class="wfhero__eyebrow">Fleet A/Cs · GPS evidence</span>
+      <h1 class="wfhero__title">Location Review</h1>
+      <span class="wfhero__sub">
+        Deliveries marked complete {{ flag_threshold|floatformat:1 }} km or more from the customer's
+        saved location <span class="wfhero__sep">·</span> one of the two points is wrong, decide which
+      </span>
+    </div>
+    <div class="wfhero__side">
+      <div class="wfhero__tallies">
+        <div class="wfhero__tally">
+          <span class="wfhero__tally-num">{{ stats.pending|intcomma }}</span>
+          <span class="wfhero__tally-lbl">Awaiting review</span>
+        </div>
+      </div>
+      <nav class="wfhero__actions">
+        <button type="button" class="wfnote__btn" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_delivery_location_reviews_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wfnote" id="workforce_delivery_location_reviews_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'workforce_delivery_location_reviews_card_notes' %}" hidden></div>
+
+  {% comment %}
+  The queue figure is also the queue filter — clicking "Awaiting review" is the
+  same as picking it in the Status dropdown. The two gap figures are read-only:
+  they describe the open queue, they are not ways into it.
+  {% endcomment %}
+  <section class="wfstat" aria-label="Location review totals">
+    <a href="?status=pending{% if selected_driver %}&amp;driver_id={{ selected_driver }}{% endif %}"
+       class="wfstat__card wfstat__card--here {% if selected_status == 'pending' %}wfstat__card--on{% endif %}">
+      <span class="wfstat__label">Awaiting review</span>
+      <span class="wfstat__value">{{ stats.pending|intcomma }}</span>
+      <span class="wfstat__sub">flagged deliver{{ stats.pending|pluralize:"y,ies" }} with no verdict</span>
+    </a>
+    <div class="wfstat__card wfstat__card--done">
+      <span class="wfstat__label">Reviewed</span>
+      <span class="wfstat__value">{{ stats.resolved|intcomma }}</span>
+      <span class="wfstat__sub">decided — the verdict is on the record</span>
+    </div>
+    <div class="wfstat__card">
+      <span class="wfstat__label">Average gap</span>
+      <span class="wfstat__value">{{ stats.avg_gap|floatformat:1 }}<span class="wfstat__unit">KM</span></span>
+      <span class="wfstat__sub">across the open queue</span>
+    </div>
+    <div class="wfstat__card {% if not stats.worst %}wfstat__card--null{% endif %}">
+      <span class="wfstat__label">Widest open gap</span>
+      <span class="wfstat__value">{{ stats.worst.gap_km|floatformat:1|default:"—" }}<span class="wfstat__unit">KM</span></span>
+      <span class="wfstat__sub">{{ stats.worst.order.order_number|default:"nothing waiting" }}</span>
+    </div>
+  </section>
+
+  <!-- Filters -->
+  <form method="GET" class="dgr__filters" id="workforce_location_reviews_form_filter">
+    <div class="dgr__field">
+      <label class="dgr__label" for="workforce_location_reviews_select_status">Status</label>
+      <select name="status" id="workforce_location_reviews_select_status" class="form-select form-select-sm">
+        <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Awaiting review</option>
+        <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All</option>
+        {% for value, label in status_choices %}{% if value != 'pending' %}
+        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endif %}{% endfor %}
+      </select>
+    </div>
+    <div class="dgr__field">
+      <label class="dgr__label" for="workforce_location_reviews_select_driver">Driver</label>
+      <select name="driver_id" id="workforce_location_reviews_select_driver" class="form-select form-select-sm">
+        <option value="">All drivers</option>
+        {% for d in review_drivers %}
+        <option value="{{ d.driver_id }}" {% if selected_driver == d.driver_id|stringformat:"s" %}selected{% endif %}>
+          {{ d.driver_name }} — {{ d.review_count }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="dgr__field">
+      <label class="dgr__label" for="workforce_location_reviews_input_gap">Gap at least (km)</label>
+      <input type="number" step="0.5" min="0" name="min_gap" id="workforce_location_reviews_input_gap"
+             class="form-control form-control-sm" value="{{ min_gap }}" placeholder="any">
+    </div>
+    <div class="dgr__field dgr__field--actions">
+      <button type="submit" class="btn btn-sm dgr__btn-apply">Apply</button>
+      <a href="{% url 'workforce:delivery_location_reviews' %}" class="btn btn-sm dgr__btn-clear">Clear</a>
+    </div>
+  </form>
+
+  {% if reviews %}
+  <!-- Decision bar -->
+  <div class="dgr__bar" id="workforce_location_reviews_bar_decide" hidden>
+    {% comment %} The decision buttons POST by fetch, and CSRF_COOKIE_HTTPONLY hides the
+       cookie from JS — so the token has to be in the DOM or every verdict 403s. {% endcomment %}
+    {% csrf_token %}
+    <span class="dgr__bar-count"><strong id="dgr_selected_count">0</strong> selected</span>
+    <input type="text" class="form-control form-control-sm dgr__bar-notes" id="dgr_notes"
+           placeholder="Reason / note (optional)">
+    <div class="dgr__bar-actions">
+      <button type="button" class="btn btn-sm dgr__btn-driver" data-decision="driver_correct">
+        <i class="fa-solid fa-motorcycle"></i> Driver GPS correct — move the pin
+      </button>
+      <button type="button" class="btn btn-sm dgr__btn-customer" data-decision="customer_correct">
+        <i class="fa-solid fa-user"></i> Customer pin correct
+      </button>
+      <button type="button" class="btn btn-sm dgr__btn-neutral" data-decision="both_wrong">Both wrong</button>
+      <button type="button" class="btn btn-sm dgr__btn-neutral" data-decision="dismissed">Dismiss</button>
+    </div>
+  </div>
+
+  <!-- Queue -->
+  <div class="dgr__table-wrap">
+    <table class="dgr__table" id="workforce_location_reviews_table_view">
+      <thead>
+        <tr>
+          <th class="dgr__col-check"><input type="checkbox" class="form-check-input" id="dgr_check_all"></th>
+          <th>Order</th>
+          <th>Seller</th>
+          <th>Driver</th>
+          {% comment %} Delivered sits this early on purpose: it used to be the 8th column
+             and fell off the right edge of the scrolling wrapper, so nobody saw it. {% endcomment %}
+          <th>Delivered</th>
+          <th class="dgr__num">Gap</th>
+          <th>Where the driver was</th>
+          <th>Where the customer is</th>
+          <th>Outcome</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reviews %}
+        <tr class="{% if not r.is_open %}dgr__row--done{% endif %}">
+          <td class="dgr__col-check">
+            {% if r.is_open %}
+            <input type="checkbox" class="form-check-input dgr__check" value="{{ r.id }}">
+            {% endif %}
+          </td>
+          <td class="dgr__order">
+            <a href="{% url 'workforce:order_detail' r.order.id %}">{{ r.order.order_number|default:"—" }}</a>
+            <span class="dgr__sub">{{ r.task.dl_task_number|default:"" }}</span>
+            {% comment %} The trip length, for context against the gap in the next columns —
+               a 2 km gap on a 3 km delivery means something different to a 2 km
+               gap on a 40 km one. {% endcomment %}
+            {% include "includes/components/_route_distance.html" with order=r.order %}
+          </td>
+          <td class="dgr__truncate">{{ r.order.business.business_name|default:"—" }}</td>
+          <td class="dgr__truncate">{{ r.driver.driver_name|default:"—" }}</td>
+          <td class="dgr__date">
+            {{ r.task.completed_at|date:"d M Y"|default:"—" }}
+            {% comment %} The clock time matters as much as the day — a delivery marked at
+               02:00 reads differently from one marked mid-round. {% endcomment %}
+            {% if r.task.completed_at %}<span class="dgr__sub">{{ r.task.completed_at|date:"H:i" }}</span>{% endif %}
+          </td>
+          {# The gap is the whole point of the row, so it carries the weight. #}
+          <td class="dgr__num">
+            <span class="dgr__gap {% if r.gap_km >= 20 %}dgr__gap--severe{% elif r.gap_km >= 5 %}dgr__gap--wide{% endif %}">
+              {{ r.gap_km|floatformat:1 }} <small>km</small>
+            </span>
+          </td>
+          <td class="dgr__pin-cell">
+            {% if r.driver_latitude %}
+            <span class="dgr__pin"><i class="fa-solid fa-motorcycle dgr__pin-i--driver"></i>
+              {{ r.driver_latitude|floatformat:5 }}, {{ r.driver_longitude|floatformat:5 }}</span>
+            {% comment %} The zone the point sits in. "≈" means no polygon covers it and this
+               is the nearest zone centre — a coverage gap on our side, not a claim about
+               where the driver was, so it is never shown as if it were exact. {% endcomment %}
+            {% if r.driver_zone and r.driver_zone_exact %}
+            <span class="dgr__zone">Z{{ r.driver_zone.zone_number }} · {{ r.driver_zone.zone_name }}</span>
+            {% elif r.driver_zone %}
+            <span class="dgr__zone dgr__zone--approx"
+                  title="No zone polygon covers this point — this is the nearest zone centre">≈ {{ r.driver_zone.zone_name }}</span>
+            {% else %}
+            <span class="dgr__zone dgr__zone--none">no zone within 10 km</span>
+            {% endif %}
+            {% if r.gps_accuracy %}<span class="dgr__acc">±{{ r.gps_accuracy|floatformat:0 }} m fix</span>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td class="dgr__pin-cell">
+            {% if r.customer_latitude %}
+            <span class="dgr__pin"><i class="fa-solid fa-location-dot dgr__pin-i--customer"></i>
+              {{ r.customer_latitude|floatformat:5 }}, {{ r.customer_longitude|floatformat:5 }}</span>
+            <span class="dgr__sub">{{ r.order.customer_address|default:""|truncatechars:28 }}</span>
+            {% else %}—{% endif %}
+            {% comment %} Both points on one map — the comparison is the job, and two separate
+               map tabs make it harder, not easier. It sits with the second point because
+               that is what it compares against. Uses the shared component so this page
+               and every other coordinate on the site behave the same. {% endcomment %}
+            {% include "includes/components/_map_point.html" with uid=r.id|stringformat:"s"|add:"-rev" lat=r.driver_latitude lon=r.driver_longitude lat2=r.customer_latitude lon2=r.customer_longitude label="Driver delivered here" label2="Customer's saved location" colour="#2f6f4f" colour2="#b4532a" btn_label="Compare" %}
+          </td>
+          <td>
+            {% if r.is_open %}
+            <span class="dgr__verdict dgr__verdict--open">Awaiting review</span>
+            {% else %}
+            <span class="dgr__verdict dgr__verdict--{{ r.status }}">{{ r.get_status_display }}</span>
+            <span class="dgr__sub">
+              {{ r.reviewed_by.first_name|default:r.reviewed_by.username|default:"—" }} · {{ r.reviewed_at|date:"d M" }}
+              {% if r.coords_updated %}· pin moved{% endif %}
+            </span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/components/_pagination.html" with page_obj=reviews filter_params=filter_params %}
+
+  {% else %}
+  <div class="dgr__empty">
+    <p class="dgr__empty-title">Nothing to review</p>
+    <p class="dgr__empty-note">
+      No delivery is sitting {{ flag_threshold|floatformat:1 }} km or more from its customer's location
+      under this filter.
+    </p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  // Straight from the hidden input in the decision bar. There is no cookie
+  // fallback on purpose: CSRF_COOKIE_HTTPONLY is on, so document.cookie never
+  // has it, and pretending otherwise is what made every verdict 403 silently.
+  const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+  const checks = () => Array.from(document.querySelectorAll('.dgr__check'));
+  const selected = () => checks().filter(c => c.checked).map(c => c.value);
+  const bar = document.getElementById('workforce_location_reviews_bar_decide');
+
+  function sync() {
+    const n = selected().length;
+    document.getElementById('dgr_selected_count').textContent = n;
+    bar.hidden = n === 0;
+  }
+
+  document.getElementById('dgr_check_all')?.addEventListener('change', function () {
+    checks().forEach(c => { c.checked = this.checked; });
+    sync();
+  });
+  checks().forEach(c => c.addEventListener('change', sync));
+
+  bar?.querySelectorAll('[data-decision]').forEach(btn => {
+    btn.addEventListener('click', async function () {
+      const ids = selected();
+      if (!ids.length) return;
+      const decision = this.dataset.decision;
+      // Moving the pin rewrites the order's coordinates, so it is confirmed.
+      if (decision === 'driver_correct' &&
+          !confirm('Accept the driver GPS as correct for ' + ids.length +
+                   ' delivery(ies)? This overwrites the customer location on those orders.')) return;
+
+      this.disabled = true;
+      const body = new URLSearchParams();
+      ids.forEach(id => body.append('review_ids[]', id));
+      body.append('decision', decision);
+      body.append('notes', document.getElementById('dgr_notes').value || '');
+      try {
+        const resp = await fetch('{% url "workforce:delivery_location_review_action" %}', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        });
+        // A rejected POST comes back as an HTML error page, so parsing it as JSON
+        // throws and the real cause (403, 500, a login redirect) gets lost. Read
+        // the status first and say what actually happened.
+        if (!resp.ok) {
+          alert(resp.status === 403
+            ? 'Rejected: your session expired or the security token is stale. Reload the page and try again.'
+            : 'The server refused this (HTTP ' + resp.status + '). Nothing was changed.');
+          this.disabled = false;
+          return;
+        }
+        const data = await resp.json();
+        if (data.success) { window.location.reload(); }
+        else { alert(data.error || (data.errors || []).join('\n') || 'Nothing was updated'); this.disabled = false; }
+      } catch (e) {
+        alert('Could not reach the server — nothing was changed. ' + e);
+        this.disabled = false;
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

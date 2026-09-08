@@ -1,11 +1,22 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% comment %}
+Purpose: Live operations map — delivery task pins and driver GPS positions across Qatar.
+Used by: workforce_views.tasks_live_map at /workforce/tasks/live-map/
+Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay, so the page-notes card
+       (wfnote__, shared) sits above the map in normal flow and its help button rides in the filter toolbar.
+{% endcomment %}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/live-map.css' %}?v=20260503-2" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/live-map.css' %}?v=20260729a" rel="stylesheet" type="text/css" />
 {% endblock %}
 
 {% block content %}
+
+{% comment %} Notes card sits above the map in normal flow — every map control is an absolute overlay,
+   so putting it inside the map wrapper would be covered by the toolbars. {% endcomment %}
+<div class="wfnote" id="workforce_tasks_live_map_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_tasks_live_map_card_notes' %}" hidden></div>
 
 <div style="position: relative;">
     <!-- Date range filter -->
@@ -67,6 +78,12 @@
         </button>
         <button class="map-filters__btn active" data-filter="drivers" onclick="toggleLayer('drivers', this)">
             <i class="fa-solid fa-car me-1"></i>Drivers
+        </button>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_tasks_live_map_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
         </button>
     </div>
 
@@ -285,6 +302,15 @@
                 else if (d.minutes_ago < 60) h += 'GPS: ' + d.minutes_ago + ' min ago';
                 else h += 'GPS: ' + Math.floor(d.minutes_ago / 60) + 'h ' + (d.minutes_ago % 60) + 'm ago';
                 h += '</div>';
+                // A fix noticeably older than the report means the driver is
+                // parked and the phone is handing back a cached position — say
+                // so, instead of leaving the pin looking wrong.
+                if (d.fix_minutes_ago >= d.minutes_ago + 3) {
+                    h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-thumbtack me-1"></i>Not moved for ' + d.fix_minutes_ago + ' min</div>';
+                }
+                if (d.coarse) {
+                    h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-circle-notch me-1"></i>Approximate position (±' + Math.round(d.accuracy) + 'm)</div>';
+                }
                 if (d.speed !== null && d.speed > 0) {
                     h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-gauge me-1"></i>' + Math.round(d.speed * 3.6) + ' km/h</div>';
                 }

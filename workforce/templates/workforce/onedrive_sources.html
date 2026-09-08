@@ -1,6 +1,12 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static %}
+{% comment %}
+Purpose: Staff console for OneDrive Excel import sources — browse a workbook, map columns, import rows
+Used by: workforce.views.onedrive_sources at /workforce/onedrive-sources/
+Notes: Browse/preview/import all run inline against the source's own endpoints. Carries the shared
+       wfnote__ page-notes card under the title row, hidden on load; the help button toggles it.
+{% endcomment %}
 
 {% block title %}OneDrive Import Sources{% endblock title %}
 
@@ -18,8 +24,17 @@
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSourceModal">
                 <i class="fa-solid fa-plus me-1"></i> Add Source
             </button>
+            <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_onedrive_sources_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
     </div>
+
+    <div class="wfnote" id="workforce_onedrive_sources_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_onedrive_sources_card_notes' %}" hidden></div>
 
     {% if sources %}
     <div class="table-responsive">
@@ -86,6 +101,7 @@
         <div id="sheets-panel-{{ source.id }}" class="bg-light border rounded p-3 mb-3"></div>
     </div>
     {% endfor %}
+    {% include "includes/components/_pagination.html" with page_obj=sources_page per_page=per_page pagination_id="onedrive_sources" %}
     {% else %}
     <div class="text-center text-muted py-5">
         <i class="fa-solid fa-cloud fa-3x mb-3 d-block"></i>

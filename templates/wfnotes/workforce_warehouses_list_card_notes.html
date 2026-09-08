@@ -1,0 +1,92 @@
+{% comment %}
+Purpose: "About this page" notes panel for warehouses_list.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_warehouses_list_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+    <p class="wfnote__lede">
+      This page decides <strong>which clients can store goods in which warehouse</strong>. Each card is one
+      warehouse; the businesses listed inside it are the ones allowed to hold stock there. Linking a client
+      is what gives them a collection point in that building, so their orders can be picked from our shelves
+      instead of collected from their own shop. Only clients with the fulfilment service switched on can be
+      linked at all.
+    </p>
+
+    <div class="wfnote__cols">
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What you can do here</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Search</dt>
+            <dd class="wfnote__def">Matches a warehouse's name, code or city. The dropdown next to it narrows
+              to active or inactive warehouses; the cross clears both.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Expand</dt>
+            <dd class="wfnote__def">Clicking a warehouse card opens the list of clients linked to it. The
+              count on the right shows how many links it has before you open it.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Link</dt>
+            <dd class="wfnote__def">Opens a picker of fulfilment-enabled, active clients. Choosing one and
+              submitting creates the link straight away and reloads the page.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Unlink</dt>
+            <dd class="wfnote__def">Removes a client from that warehouse after a confirmation. The link row
+              is deleted, not just switched off.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">View client</dt>
+            <dd class="wfnote__def">The eye icon opens that client's record, for checking their fulfilment
+              setup before you change anything.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wfnote__sec">
+        <h2 class="wfnote__h">What the labels mean</h2>
+        <dl class="wfnote__list">
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Active</dt>
+            <dd class="wfnote__def">On a warehouse: the building is in use. On a link row: that client may
+              use the warehouse right now.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Inactive</dt>
+            <dd class="wfnote__def">Kept for the record but not in play — no new work should be routed there.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Star</dt>
+            <dd class="wfnote__def">The default warehouse — where goods land when nothing else is specified,
+              including drop-at-hub pickups.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Default</dt>
+            <dd class="wfnote__def">On a link row: this is that client's main warehouse when they are linked
+              to more than one.</dd>
+          </div>
+          <div class="wfnote__item">
+            <dt class="wfnote__term">Linked date</dt>
+            <dd class="wfnote__def">When the link was created, so you can tell a long-standing arrangement
+              from something set up this morning.</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="wfnote__sec wfnote__sec--note">
+      <h2 class="wfnote__h">Worth knowing</h2>
+      <ul class="wfnote__notes">
+        <li>Linking a client does more than draw a line on this page — it creates their
+          <strong>collection point</strong> at that warehouse, which is what orders and pickup jobs are
+          routed against.</li>
+        <li>Unlinking is a delete, and it takes that collection point out of service. Existing orders already
+          pointing at it will not tidy themselves up — check before you unlink a busy client.</li>
+        <li>A client missing from the picker almost always means fulfilment is not enabled on their account,
+          or the account is not active. Fix that on the client record, not here.</li>
+        <li>The same client can be linked to several warehouses; one of them carries the
+          <strong>Default</strong> tag.</li>
+        <li>Every link and unlink is recorded against your username.</li>
+      </ul>
+    </section>
+  

@@ -33,7 +33,16 @@
                 {% endif %}
             </div>
         </div>
+        <button type="button" class="wfnote__btn wfnote__btn--end" data-wfnote-toggle
+                aria-expanded="false" aria-controls="warehouse_seller_warehouse_link_detail_card_notes"
+                title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+        </button>
     </div>
+
+    <div class="wfnote wfnote--inset" id="warehouse_seller_warehouse_link_detail_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_seller_warehouse_link_detail_card_notes' %}" hidden></div>
 
     <!-- Link Information -->
     <div class="wh__card">
@@ -59,7 +68,7 @@
                 </div>
                 <div class="swld__info-item">
                     <div class="swld__info-label">Linked By</div>
-                    <div class="swld__info-value">{{ link.linked_by.get_full_name|default:link.linked_by.username }}</div>
+                    <div class="swld__info-value">{% if link.linked_by %}{{ link.linked_by.get_full_name|default:link.linked_by.username }}{% else %}&mdash;{% endif %}</div>
                 </div>
             </div>
             {% if link.notes %}
