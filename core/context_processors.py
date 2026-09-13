@@ -253,17 +253,22 @@ DRIVER_PENDING_STATUSES = ['assigned', 'accepted', 'contacted', 'non_reachable']
 
 def driver_pending_tasks(request):
     """
-    Inject pending_tasks_count for the fleet PWA bottom nav badge, and
-    driver_on_duty for the GPS module's power profile.
-    Only queries for authenticated users on /fleet/ paths.
+    Inject pending_tasks_count for the fleet PWA bottom nav badge, plus
+    driver_on_duty for the GPS module's power profile and is_fleet_driver for
+    deciding whether to load that module at all.
+
+    Runs on the driver surfaces only — /fleet/ (the PWA) and /delivery/ (the
+    older task pages, which load the same tracking module). Everywhere else it
+    is a no-op, so no other page pays for the query, and no non-driver is ever
+    asked for their location.
     """
-    empty = {'pending_tasks_count': 0, 'driver_on_duty': False}
+    empty = {'pending_tasks_count': 0, 'driver_on_duty': False, 'is_fleet_driver': False}
     if not hasattr(request, 'user') or not request.user.is_authenticated:
         return empty
 
-    # Only run on fleet URLs to avoid overhead on every page
+    # Only run on the driver surfaces, to avoid overhead on every page
     path = request.path
-    if not path.startswith('/fleet/'):
+    if not (path.startswith('/fleet/') or path.startswith('/delivery/')):
         return empty
 
     # Check request cache to avoid duplicate queries per request
@@ -283,6 +288,10 @@ def driver_pending_tasks(request):
         ctx = {
             'pending_tasks_count': len(statuses),
             'driver_on_duty': any(s in DRIVER_ON_DUTY_STATUSES for s in statuses),
+            # The older driver pages share a base template with a few staff
+            # screens, so the GPS module is loaded on the strength of this
+            # rather than the URL: only someone with a driver row is tracked.
+            'is_fleet_driver': True,
         }
         request._driver_pending_tasks = ctx
         return ctx
@@ -342,3 +351,41 @@ def pagination_defaults(request):
     params.pop('per_page', None)
 
     return {'per_page': per_page, 'filter_params': params.urlencode()}
+
+
+#: Client dashboard prefixes that render the business sidebar. The Live Tracking
+#: badge query only runs here, so no other surface pays for it.
+CLIENT_DASHBOARD_PREFIXES = ('/business/', '/orders/', '/product/')
+
+
+def business_live_rides(request):
+    """
+    Inject live_rides_count for the client sidebar's Live Tracking badge, so the
+    link visibly lights up the moment a driver taps Start Ride.
+
+    Only asked for when the client actually has tracking switched on, and cached
+    for 20s per business: a click-heavy session would otherwise re-count on every
+    page, and a number that is a few seconds old is fine for a badge.
+    """
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
+        return {}
+    if not request.path.startswith(CLIENT_DASHBOARD_PREFIXES):
+        return {}
+
+    business = get_cached_business(request)
+    if not business or not business.live_tracking_enabled:
+        return {}
+
+    from django.core.cache import cache
+    key = f'live_rides:{business.pk}'
+    count = cache.get(key)
+    if count is None:
+        try:
+            from business.views import live_tracking_tasks
+            count = live_tracking_tasks(business).count()
+        except Exception:
+            count = 0
+        cache.set(key, count, 20)
+    # default:"0" in the template is not enough on its own — a sidebar badge has to
+    # be given a number or it renders blank. See the form-control CSS notes.
+    return {'live_rides_count': count}

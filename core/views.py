@@ -832,6 +832,98 @@ def join_driver(request):
         ),
     }
 
+    # What is still missing from the file — shown on the "under review" status
+    # page so an applicant sees exactly what to fix instead of only "pending".
+    # Required = the review team cannot approve without it; optional = it only
+    # speeds the review up.
+    PROFILE_FIELD_LABELS = {
+        'first_name': 'First name',
+        'last_name': 'Last name',
+        'phone': 'Phone number',
+        'whatsapp': 'WhatsApp number',
+        'nationlity': 'Nationality',
+        'zone_name': 'Zone / area you live in',
+        'address': 'Home address',
+        'date_of_birth': 'Date of birth',
+    }
+    missing_required = []
+    missing_optional = []
+
+    for field in PROFILE_PROGRESS_FIELDS:
+        if not (profile and getattr(profile, field, None)):
+            missing_required.append({
+                'step': 1, 'section': 'Profile',
+                'label': PROFILE_FIELD_LABELS[field],
+            })
+
+    if not sec2_complete:
+        missing_required.append({
+            'step': 2, 'section': 'Vehicle',
+            'label': 'Vehicle type',
+            'hint': 'Tell us what you can deliver with.',
+        })
+    else:
+        if not primary_vehicle.vehicle_no:
+            missing_optional.append({
+                'step': 2, 'section': 'Vehicle', 'label': 'Plate number'})
+        if not primary_vehicle.vehicle_model:
+            missing_optional.append({
+                'step': 2, 'section': 'Vehicle', 'label': 'Vehicle model'})
+    if driver and driver.has_driver_license and not driver.driver_license_number:
+        missing_optional.append({
+            'step': 2, 'section': 'Vehicle', 'label': 'Driving license number'})
+
+    if not (driver and driver.job_type):
+        missing_required.append({
+            'step': 3, 'section': 'Zones & Hours',
+            'label': 'Work preference',
+            'hint': 'Full time, part time or both.',
+        })
+    if zone_groups and not driver_zone_group_ids:
+        missing_required.append({
+            'step': 3, 'section': 'Zones & Hours',
+            'label': 'Preferred delivery zones',
+            'hint': 'Pick at least one area you want to work in.',
+        })
+    if not (driver and driver.work_time_slab_list):
+        missing_optional.append({
+            'step': 3, 'section': 'Zones & Hours',
+            'label': 'Preferred working hours'})
+
+    if not sec4_selfie:
+        missing_required.append({
+            'step': 4, 'section': 'Documents',
+            'label': 'Selfie photo',
+            'hint': 'A clear photo of your face.',
+        })
+    if sec4_ids < 2:
+        need = 2 - sec4_ids
+        missing_required.append({
+            'step': 4, 'section': 'Documents',
+            'label': f"{need} more ID document{'s' if need > 1 else ''}",
+            'hint': 'QID, Passport, Driving License or Istimara.',
+        })
+    else:
+        for doc_type in ID_DOC_TYPES:
+            if doc_type not in docs_uploaded:
+                missing_optional.append({
+                    'step': 4, 'section': 'Documents',
+                    'label': f'{doc_type} photo'})
+    # One row for all un-typed document numbers — four separate lines for the
+    # same 10-second task reads as a much longer list than it is.
+    missing_doc_nos = [
+        dt for dt in ID_DOC_TYPES
+        if dt in docs_uploaded and not (all_docs.get(dt) and all_docs[dt].document_no)
+    ]
+    if missing_doc_nos:
+        missing_optional.append({
+            'step': 4, 'section': 'Documents',
+            'label': 'Document numbers',
+            'hint': ', '.join(missing_doc_nos),
+        })
+
+    first_missing_step = (missing_required or missing_optional or [{}])[0].get('step', 1)
+
     context = {
         'pform': pform,
         'vform': vform,
@@ -854,6 +946,9 @@ def join_driver(request):
         'already_business': already_business,
         'progress': sections_progress,
         'needs_location': needs_location,
+        'missing_required': missing_required,
+        'missing_optional': missing_optional,
+        'first_missing_step': first_missing_step,
         'user_email': request.user.email if request.user.is_authenticated else '',
     }
     return render(request, 'core/join_us_driver.html', context)
@@ -940,12 +1035,20 @@ def business_profile_update(request):
 
     if request.method == 'POST' and form.is_valid():
         business = form.save(commit=False)
-        business.user = request.user
-        business.profile = request.user.profile
+        # get_cached_business() falls back to team membership, so a team member
+        # reaching this form would otherwise reassign the owner's business to
+        # themselves. Only a real owner may (re)stamp user/profile.
+        from business.decorators import get_user_business_access
+        _, access_type, _ = get_user_business_access(request.user, request)
+        if access_type == 'owner':
+            business.user = request.user
+            business.profile = request.user.profile
         business.save()
         logger.info(f"Business profile updated for user {request.user.id}")
         messages.success(request, 'Your business details have been updated!')
-        return redirect('business:business_profile', business_id=business_profile.business_id)
+        # business:business_profile takes no arguments — passing business_id here
+        # raised NoReverseMatch on every successful save.
+        return redirect('business:business_profile')
     elif request.method == 'POST':
         logger.warning(f"Invalid business update form for user {request.user.id}")
         messages.error(request, "Please correct the errors below.")
@@ -1153,7 +1256,17 @@ def main_dashboard(request):
     if request.user.is_staff:
         return redirect('workforce:wf_dashboard')
 
+    # A personal P2P sender is neither a business nor a driver, so every branch below
+    # would push them into role registration or profile completion they have no reason
+    # to finish. Gated on having actual P2P orders rather than on Profile.is_customer,
+    # so someone who later registers a business keeps reaching their old deliveries by
+    # URL while /dashboard/ correctly starts routing them to the business console.
     profile = get_cached_profile(request)
+    if not (profile and (profile.is_business or profile.is_driver)):
+        from orders.models import Order
+        if Order.objects.filter(p2p_customer=request.user).exists():
+            return redirect('p2p:my_deliveries')
+
     if profile:
 
         # Check if profile is completed (only for non-staff users)
@@ -1917,6 +2030,18 @@ def make_staff(request):
         return redirect('core:profile_add')
 
 
+# -----------------------------------------------------------------------------
+# Account-uniqueness lookups. Both callers (profile_add.html,
+# profile_complete_update.html) are already behind @login_required, so gating
+# these the same way costs nothing and removes an anonymous oracle that could
+# confirm whether any given Qatar number was registered. The IP throttle bounds
+# an authenticated account being used to enumerate the same way.
+# -----------------------------------------------------------------------------
+ACCOUNT_LOOKUP_RATE = '60/h'
+
+
+@login_required(login_url='/accounts/login/')
+@ratelimit(key='ip', rate=ACCOUNT_LOOKUP_RATE, method='GET', block=True)
 def check_whatsapp_availability(request):
     """Check if WhatsApp number is available and valid"""
     from django.http import JsonResponse
@@ -1988,6 +2113,8 @@ def check_whatsapp_availability(request):
     })
 
 
+@login_required(login_url='/accounts/login/')
+@ratelimit(key='ip', rate=ACCOUNT_LOOKUP_RATE, method='GET', block=True)
 def check_phone_availability(request):
     """Check if phone number is available and unique"""
     from django.http import JsonResponse

@@ -24,8 +24,8 @@
                 {% trans "Your changes were not saved. Please go back, refresh the page, and try again." %}
             </div>
             <div class="d-flex flex-column gap-2 mt-3">
-                {% if back_url %}
-                <a href="{{ back_url }}" class="auth__btn--login" id="core_csrf_btn_back">
+                {% if retry_url %}
+                <a href="{{ retry_url }}" class="auth__btn--login" id="core_csrf_btn_back">
                     <i class="fa-solid fa-arrow-left me-1"></i>{% trans "Go Back & Retry" %}
                 </a>
                 {% endif %}
@@ -38,4 +38,27 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// A missing CSRF cookie almost always means this form came from a cache — the
+// PWA service worker's page store, or the browser's own. The 403 that rendered
+// this page already planted a fresh cookie; drop the stale HTML copies so the
+// retry loads a live page instead of the same dead one.
+(function () {
+    if (!{{ cookie_missing|yesno:"true,false" }}) { return; }
+    if (window.caches && caches.keys) {
+        caches.keys().then(function (keys) {
+            keys.filter(function (k) { return k.indexOf('ezzydriver-dynamic') === 0; })
+                .forEach(function (k) { caches.delete(k); });
+        }).catch(function () { /* storage blocked — the retry URL still busts it */ });
+    }
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+        navigator.serviceWorker.getRegistration().then(function (reg) {
+            if (reg) { reg.update(); }
+        }).catch(function () {});
+    }
+})();
+</script>
 {% endblock %}

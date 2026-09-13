@@ -3,6 +3,7 @@ from django.views.generic.base import RedirectView
 from core import views as core_views
 from core import password_reset_views
 from core import views_password_warning
+from core import views_location
 from webpages import views as webpages_views
 from delivery import views as delivery_views
 from orders import views as orders_views
@@ -18,6 +19,8 @@ urlpatterns = [
     path('profile/complete/', core_views.profile_complete_update, name='profile_complete_update'),
     path('api/check-whatsapp/', core_views.check_whatsapp_availability, name='check_whatsapp_availability'),
     path('api/check-phone/', core_views.check_phone_availability, name='check_phone_availability'),
+    # Shared by staff + client dashboards: turn a pasted Maps short link into lat/lng
+    path('api/resolve-location/', views_location.resolve_location, name='resolve_location'),
     # Wildcard profile paths
     path('profile/<str:user_number>/', core_views.profile, name='profile'),
     path('profile/<str:user_number>/review/', core_views.profile_completion_test,

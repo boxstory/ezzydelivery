@@ -225,8 +225,12 @@ def business_required(view_func=None, redirect_url=None):
                 messages.error(request, "Profile not found.")
                 return redirect(redirect_url or 'core:main_dashboard')
 
-            # Resolve business access (owner or team member)
-            from business.decorators import get_user_business_access
+            # Resolve business access (owner or team member). A URL that names
+            # one of the caller's own businesses selects it first — without that
+            # an owner of two businesses is refused on whichever one `.first()`
+            # did not pick.
+            from business.decorators import get_user_business_access, adopt_url_business
+            adopt_url_business(request, kwargs.get('business_id'))
             business, access_type, team_profile = get_user_business_access(request.user, request)
 
             if business and access_type == 'owner':

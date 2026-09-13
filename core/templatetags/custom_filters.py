@@ -106,15 +106,51 @@ def whatsapp_number(value):
     Clean phone number for wa.me links.
     Strips +, spaces, dashes. Prepends 974 for local Qatar numbers (8 digits).
     Usage: {{ order.customer_whatsapp|whatsapp_number }}
+
+    Numbers reach us in every shape ('70204440', '97470204440', '+974 7020 4440',
+    '0097470204440'), so the country code is normalised here rather than glued on
+    in the template — writing `wa.me/974{{ number }}` is what produced links like
+    wa.me/97497470204440 for the ~80% of rows that already carry the code.
     """
     if not value:
         return ''
     # Remove +, spaces, dashes, parentheses
     cleaned = re.sub(r'[\s+\-()]+', '', str(value))
+    # 00 is the international dial-out prefix — drop it so 0097470204440 reads
+    # as a country-coded number and not as an 13-digit local one.
+    if cleaned.startswith('00'):
+        cleaned = cleaned[2:]
     # If 8 digits (Qatar local number), prepend 974
     if len(cleaned) == 8 and cleaned.isdigit():
         cleaned = '974' + cleaned
     return cleaned
+
+
+@register.filter
+def mask_phone(value, keep=3):
+    """
+    Mask a phone number down to its last few digits: '+974 7020 4440' -> 'xxxx440'.
+
+    Enough for staff to match a number against a customer they already have on
+    screen, without printing the full contact detail on a settlement ledger that
+    gets exported and shared. Country code and separators are stripped first, so
+    the same number masks identically however it was entered.
+    Usage: {{ order.customer_phone|mask_phone }}
+    """
+    if not value:
+        return ''
+    digits = re.sub(r'\D+', '', str(value))
+    if not digits:
+        return ''
+    try:
+        keep = int(keep)
+    except (TypeError, ValueError):
+        keep = 3
+    # A number shorter than the tail we would reveal is masked whole rather
+    # than shown in full — the point of the filter is that it never leaks one.
+    if len(digits) <= keep:
+        return 'x' * len(digits)
+    return 'xxxx' + digits[-keep:]
 
 
 @register.filter(is_safe=True)

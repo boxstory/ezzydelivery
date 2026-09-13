@@ -209,19 +209,23 @@ class SessionWarningMiddleware:
 
 class NoCacheAuthMiddleware:
     """
-    Prevents browser bfcache from storing auth pages (login, logout, signup).
-    Without this, navigating to /accounts/login/ can serve a stale cached page
-    that was rendered before CSS changes take effect.
+    Prevents browser bfcache from storing auth pages (login, logout, signup,
+    password reset). Without this, navigating to /accounts/login/ can serve a
+    stale cached page that was rendered before CSS changes take effect — and a
+    replayed page carries a dead csrfmiddlewaretoken with no Set-Cookie, which
+    the user meets as "Page Expired" with no way out. no-store also tells the
+    PWA service worker not to keep a copy.
     """
 
     AUTH_PATHS = ('/accounts/login/', '/accounts/logout/', '/accounts/signup/')
+    AUTH_PREFIXES = ('/password/',)
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         response = self.get_response(request)
-        if request.path in self.AUTH_PATHS:
+        if request.path in self.AUTH_PATHS or request.path.startswith(self.AUTH_PREFIXES):
             response['Cache-Control'] = 'no-store'
         return response
 
@@ -357,6 +361,21 @@ class DriverDeviceMiddleware:
     def _auth_path(self, path):
         return path.startswith(self.AUTH_PREFIXES)
 
+    @staticmethod
+    def _no_store(response):
+        """A gate redirect must never be replayed from the browser cache.
+
+        The gate and the dashboard point at each other: /fleet/dashboard/ sends a
+        pending driver to /fleet/device/verify/, and once the device is confirmed
+        or released the verify page sends them back. Both are plain 302s, so a
+        browser is free to cache them — and then it can bounce between the two
+        without ever reaching the server, which the driver meets as
+        ERR_TOO_MANY_REDIRECTS long after the server state is correct, and which
+        leaves no trace in the logs because no request arrives.
+        """
+        response['Cache-Control'] = 'no-store'
+        return response
+
     def __call__(self, request):
         if not request.user.is_authenticated:
             return self.get_response(request)
@@ -381,11 +400,11 @@ class DriverDeviceMiddleware:
                 'You were signed out because your account was signed in on another device. '
                 'If that was not you, change your password and tell operations.'
             )
-            return redirect(reverse('account_login'))
+            return self._no_store(redirect(reverse('account_login')))
 
         # 2. Unconfirmed device — hold it at the gate.
         if request.session.get(SESSION_PENDING_DEVICE) and not self._pending_allowed(request.path):
-            return redirect(reverse('fleet:device_verify'))
+            return self._no_store(redirect(reverse('fleet:device_verify')))
 
         response = self.get_response(request)
 
@@ -583,11 +602,31 @@ class SecurityHeadersMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
 
-        # Content-Security-Policy (report-only to avoid breaking things)
+        # Content-Security-Policy.
+        #
+        # 'unsafe-inline' stays for now: several hundred templates carry inline
+        # <script> blocks, and dropping it needs a per-response nonce threaded
+        # through every one of them. 'unsafe-eval' is gone — nothing in this
+        # project calls eval() or new Function(), and neither do the pinned CDN
+        # libraries, so it only widened the blast radius of an injected string.
+        #
+        # api.mapbox.com was never on this list, so the customer address-confirmation
+        # page (the only template that loads mapbox-gl) had its map blocked from
+        # the day this header shipped. mapbox-gl v2 needs script+style+connect and
+        # a blob: worker, but not unsafe-eval.
+        #
+        # object-src/base-uri/form-action are the three directives that do NOT
+        # fall back to default-src in older engines, so they are stated outright:
+        # they block Flash/PDF plugin embeds, <base href> hijacking of every
+        # relative URL on the page, and form exfiltration to an attacker's host.
         if 'Content-Security-Policy' not in response:
             response['Content-Security-Policy'] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
+                "object-src 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'; "
+                "script-src 'self' 'unsafe-inline' "
+                "https://api.mapbox.com "
                 "https://cdn.jsdelivr.net https://code.jquery.com "
                 "https://cdn.lordicon.com https://unpkg.com "
                 "https://cdn.sheetjs.com https://cdnjs.cloudflare.com "
@@ -597,13 +636,16 @@ class SecurityHeadersMiddleware:
                 "https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ "
                 "https://accounts.google.com/gsi/client; "
                 "style-src 'self' 'unsafe-inline' "
+                "https://api.mapbox.com "
                 "https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com "
                 "https://cdn.sheetjs.com https://cdnjs.cloudflare.com "
                 "https://cdn.datatables.net https://accounts.google.com; "
                 "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
                 "img-src 'self' data: blob: https:; "
                 "media-src 'self' data: blob: mediastream:; "
-                "connect-src 'self' https://www.google-analytics.com https://unpkg.com "
+                "worker-src 'self' blob:; "
+                "connect-src 'self' https://api.mapbox.com https://events.mapbox.com "
+                "https://www.google-analytics.com https://unpkg.com "
                 "https://*.basemaps.cartocdn.com https://www.google.com/recaptcha/ "
                 "https://cdn.jsdelivr.net https://cdn.datatables.net "
                 "https://accounts.google.com; "

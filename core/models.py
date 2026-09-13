@@ -87,6 +87,14 @@ class Profile(EmailNormalizedModel, models.Model):
     is_business = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     is_driver = models.BooleanField(default=False)
+    # A personal sender who books a one-off delivery from the public P2P page.
+    # Not a business and not a driver: they never register a Business row, so the
+    # ten-field completion bar below does not apply to them — see
+    # is_customer_profile_complete. Held alongside the others, never instead of
+    # them, so a customer can later register a business without unwinding anything.
+    is_customer = models.BooleanField(
+        default=False, db_index=True,
+        help_text='Personal sender — books one-off deliveries, has no Business')
     is_superadmin = models.BooleanField(default=False, help_text='Super admin — can approve driver status changes and other sensitive actions')
 
     # Staff departments — sub-roles that only matter when is_staff is True.
@@ -104,6 +112,13 @@ class Profile(EmailNormalizedModel, models.Model):
     is_profile_completed = models.BooleanField(default=False)
     is_business_profile_completed = models.BooleanField(default=False)
     is_driver_profile_completed = models.BooleanField(default=False)
+
+    # WhatsApp number ownership, proved by an OTP at signup. Kept separate from
+    # is_profile_completed because it is the one fact a P2P booking depends on:
+    # the order confirmation link is sent to this number, so an unproved number
+    # means a booking that can never be confirmed.
+    whatsapp_verified = models.BooleanField(default=False)
+    whatsapp_verified_at = models.DateTimeField(blank=True, null=True)
 
     # Password strength nudge — set at login, since that is the only moment the
     # plaintext is available. The reasons are deliberately NOT stored: knowing why
@@ -207,6 +222,25 @@ class Profile(EmailNormalizedModel, models.Model):
 
         held = self.staff_departments
         return [label for code, label in DEPARTMENT_CHOICES if code in held]
+
+    @property
+    def is_customer_profile_complete(self):
+        """Is this personal sender's profile good enough to book a delivery?
+
+        Deliberately NOT get_profile_completion_percentage(): that one demands ten
+        fields including nationality and date of birth, which every business and
+        driver profile is already measured against. Someone posting one parcel will
+        never fill it, and widening or lowering that helper would silently move the
+        completion state of every existing profile.
+
+        A sender needs three things: a name to put on the pickup, a number to reach
+        them on, and proof that number is theirs.
+        """
+        return bool(
+            (self.first_name or '').strip()
+            and ((self.whatsapp or '').strip() or (self.phone or '').strip())
+            and self.whatsapp_verified
+        )
 
     def get_profile_completion_percentage(self):
         """Calculate profile completion percentage"""

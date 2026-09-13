@@ -4,6 +4,7 @@ Handles sending verification codes via n8n webhook to WhatsApp
 """
 import logging
 import random
+import re
 import string
 import secrets
 import hashlib
@@ -166,18 +167,6 @@ This code will expire in 10 minutes.
 
 If this was not you, do NOT share this code — change your password and tell operations right away.
         """,
-        'inquiry_thanks': f"""
-✅ *Thank You for Your 3PL Inquiry!*
-
-We've received your inquiry and appreciate your interest in EZZY Delivery.
-
-Our team will review your business requirements and contact you within 24 hours with a customized quote.
-
-In the meantime, feel free to reach out to us if you have any questions.
-
-Best regards,
-*EZZY Delivery Team* 🚚
-        """
     }
 
     message = message_templates.get(verification_type, f"Your EZZY verification code is: {verification_code}")
@@ -590,6 +579,50 @@ def resolve_send_target(section, session=''):
     return inst, channel
 
 
+def normalize_msisdn(raw):
+    """Digits-only WhatsApp number with the Qatar country code restored.
+
+    Staff type — and the public forms store — the local 8-digit form ('55397661').
+    Evolution and WAHA both address a recipient by full JID, so an 8-digit number
+    is probed as '55397661@s.whatsapp.net', which does not exist, and the send
+    comes back 400 ``exists: False``. That was every "WhatsApp send failed" on a
+    CRM lead: the number was fine, the country code was missing.
+
+    Deliberately lenient about everything else: only a bare 8-digit local number
+    gets 974 glued on. An overseas prospect's number is passed through as typed
+    rather than mangled into a Qatar one.
+    """
+    digits = re.sub(r'\D', '', str(raw or ''))
+    # 00 is the international dial-out prefix — drop it so 0097455397661 reads as
+    # a country-coded number rather than a 13-digit local one.
+    if digits.startswith('00') and len(digits) > 10:
+        digits = digits[2:]
+    if len(digits) == 8:
+        digits = '974' + digits
+    return digits
+
+
+def _send_error_text(body, status_code=None):
+    """A staff-readable reason for a failed send, or '' when there is none.
+
+    Evolution reports an unreachable recipient as a LIST of jid probes rather
+    than the {'response': {'message': …}} dict ``_failure_reason`` knows, so that
+    one is spelled out here — it is the failure staff actually hit, and "WhatsApp
+    send failed" told them nothing about what to fix.
+    """
+    if isinstance(body, list):
+        missing = [str(e.get('number') or '').strip() for e in body
+                   if isinstance(e, dict) and e.get('exists') is False]
+        missing = [n for n in missing if n]
+        if missing:
+            return (f'{", ".join(missing)} is not on WhatsApp — check the number '
+                    f'and that it carries the country code.')
+    reason = _failure_reason(body) if body else ''
+    if reason and reason not in ('{}', 'None'):
+        return reason
+    return f'WhatsApp refused the message (HTTP {status_code}).' if status_code else ''
+
+
 def send_routed_message(section, phone_number, message, session=''):
     """Send one message through a section's configured number AND channel.
 
@@ -609,6 +642,10 @@ def send_routed_message(section, phone_number, message, session=''):
     from core.models import WhatsAppSenderRoute
 
     inst, channel = resolve_send_target(section, session)
+    # Every routed send normalises here rather than in each calling page: the
+    # composer is shared, and one page forgetting the country code should not be
+    # able to produce a 400 from WhatsApp.
+    phone_number = normalize_msisdn(phone_number) or phone_number
 
     if channel != WhatsAppSenderRoute.CHANNEL_WAHA:
         return send_whatsapp_message_api(phone_number, message, instance_obj=inst)
@@ -897,12 +934,17 @@ def send_whatsapp_message_api(phone_number, message, instance_obj=None):
         _record_instance_health(instance, ok, body, response.status_code)
         _record_send_log(instance, phone, ok, body, response.status_code)
 
-        return {
+        result = {
             'success': ok,
             'status_code': response.status_code,
             'instance': instance,
             'response': body
         }
+        if not ok:
+            # Without this the caller only had the HTTP code, and every composer
+            # fell back to a generic "WhatsApp send failed".
+            result['error'] = _send_error_text(body, response.status_code)
+        return result
 
     except requests.exceptions.RequestException as e:
         _record_instance_health(instance, False, None)
@@ -928,7 +970,7 @@ def trigger_enabled(trigger_key):
         return True
 
 
-def send_inquiry_thank_you_message(phone_number, business_name):
+def send_inquiry_thank_you_message(phone_number, business_name, contact_name=''):
     """
     Send thank you message to customer after 3PL inquiry submission via WhatsApp API
 
@@ -942,22 +984,19 @@ def send_inquiry_thank_you_message(phone_number, business_name):
     Returns:
         dict: Response with success status
     """
+    from core.message_templates import PRICING_INQUIRY_THANKS, get_body
+
     if not trigger_enabled('wa_quote_thank_you'):
         return {'success': False, 'disabled': True, 'error': 'Trigger is switched off'}
 
-    message = f"""✅ *Thank You for Your 3PL Inquiry!*
-
-Hi {business_name},
-
-We've received your inquiry and appreciate your interest in EZZY Delivery.
-
-Our team will review your business requirements and contact you within 24 hours with a customized quote.
-
-In the meantime, feel free to reach out to us if you have any questions.
-
-Best regards,
-*EZZY Delivery Team* 🚚
-"""
+    # get_body, not render_template: the on/off for this wording belongs to the
+    # trigger checked above, so a template switch must not be a second, silent
+    # one that leaves a finished form with no acknowledgement.
+    message = get_body(
+        PRICING_INQUIRY_THANKS,
+        business_name=(business_name or '').strip() or 'there',
+        contact_name=(contact_name or '').strip(),
+    )
     return send_routed_message('crm_leads', phone_number, message)
 
 
@@ -971,25 +1010,16 @@ def send_inquiry_resume_nudge(phone_number, business_name, resume_url):
     The link carries their own quote token, so they resume where they stopped
     instead of retyping the answers they already gave.
     """
+    from core.message_templates import PRICING_INQUIRY_RESUME_NUDGE, get_body
+
     if not trigger_enabled('wa_inquiry_resume_nudge'):
         return {'success': False, 'disabled': True, 'error': 'Trigger is switched off'}
 
-    greeting = f"Hi {business_name}," if business_name else "Hi,"
-    message = f"""*Your EZZY Delivery quote is half-finished*
-
-{greeting}
-
-You started a delivery pricing request with us yesterday but did not get to the end of it.
-
-Your answers are saved. Pick up where you left off here:
-{resume_url}
-
-It takes about two minutes, and you will see your rate straight away.
-
-If you would rather just talk it through, reply to this message and someone from the team will help.
-
-*EZZY Delivery* 🚚
-"""
+    message = get_body(
+        PRICING_INQUIRY_RESUME_NUDGE,
+        business_name=(business_name or '').strip(),
+        resume_url=resume_url,
+    )
     return send_routed_message('crm_leads', phone_number, message)
 
 
@@ -1064,33 +1094,29 @@ def send_admin_inquiry_notification(inquiry):
     Returns:
         dict: Response with success status
     """
+    from core.message_templates import QUOTE_ADMIN_ALERT, get_body
+
     if not trigger_enabled('wa_quote_admin_alert'):
         return {'success': False, 'disabled': True, 'error': 'Trigger is switched off'}
 
-    inquiry_url = f"https://ezzydelivery.qa/3pl/inquiry/{inquiry.id}/preview/"
-
-    message = f"""📩 *NEW 3PL INQUIRY RECEIVED*
-
-*Company:* {inquiry.business_name}
-*Contact:* {inquiry.full_name}
-*Phone:* {inquiry.business_contact_number}
-*Email:* {inquiry.email or '—'}
-
-*Product Category:* {inquiry.product_category}
-*Order Volume (Last Month):* {inquiry.avarage_number_of_order_done_last_month}
-*Preferred Start:* {inquiry.preferred_start_date}
-
-*Services Required:*
-• COD: {'Yes' if inquiry.is_required_COD_service else 'No'}
-• Fulfillment (Outside QA): {'Yes' if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar else 'No'}
-• Return Logistics: {'Yes' if inquiry.is_return_logistics_required else 'No'}
-
-*Submitted:* {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
-*Inquiry ID:* {inquiry.id}
-
-👉 View inquiry details:
-{inquiry_url}
-"""
+    message = get_body(
+        QUOTE_ADMIN_ALERT,
+        business_name=inquiry.business_name or '—',
+        contact_name=inquiry.full_name or '—',
+        phone=inquiry.business_contact_number or '—',
+        email=inquiry.email or '—',
+        product_category=inquiry.product_category or '—',
+        orders_last_month=inquiry.avarage_number_of_order_done_last_month or '—',
+        preferred_start=inquiry.preferred_start_date or '—',
+        cod='Yes' if inquiry.is_required_COD_service else 'No',
+        fulfillment_outside=(
+            'Yes' if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar
+            else 'No'),
+        returns='Yes' if inquiry.is_return_logistics_required else 'No',
+        submitted_at=timezone.localtime(timezone.now()).strftime('%Y-%m-%d %H:%M'),
+        inquiry_id=inquiry.id,
+        inquiry_url=f"https://ezzydelivery.qa/3pl/inquiry/{inquiry.id}/preview/",
+    )
 
     to_number = alert_recipient('wa_quote_admin_alert')
     if not to_number:
@@ -1113,38 +1139,29 @@ def send_quote_agreement_notification(inquiry):
     Returns:
         dict: Response with success status
     """
+    from core.message_templates import QUOTE_AGREED_ALERT, get_body
+
     if not trigger_enabled('wa_quote_agreed_alert'):
         return {'success': False, 'disabled': True, 'error': 'Trigger is switched off'}
 
-    inquiry_url = f"https://ezzydelivery.qa/3pl/inquiry/{inquiry.id}/preview/"
     plan = inquiry.selected_plan
+    # A custom-quote pick is a callback request, not an agreed rate. The body
+    # says which with {if wants_call}, so the two shapes stay one editable text.
     wants_call = bool(plan and plan.is_custom_quote)
-
-    headline = ('🗣️ *QUOTE — CUSTOMER WANTS TO TALK*' if wants_call
-                else '🤝 *QUOTE ACCEPTED BY CUSTOMER*')
-    price_line = ('*Requested:* Custom plan — call back to agree a rate' if wants_call
-                  else f"*Agreed Price:* {inquiry.agreed_price_label}")
-
-    message = f"""{headline}
-
-*Company:* {inquiry.business_name}
-*Contact:* {inquiry.full_name}
-*Phone:* {inquiry.business_contact_number}
-
-*Plan:* {inquiry.agreed_plan_name or '—'}
-{price_line}
-*Confirmed:* {timezone.localtime(inquiry.plan_agreed_at).strftime('%Y-%m-%d %H:%M') if inquiry.plan_agreed_at else '—'}
-"""
-
-    if inquiry.plan_agreement_note:
-        message += f"\n*Customer note:* {inquiry.plan_agreement_note[:400]}\n"
-
-    message += f"""
-*Inquiry ID:* {inquiry.id}
-
-👉 View inquiry details:
-{inquiry_url}
-"""
+    message = get_body(
+        QUOTE_AGREED_ALERT,
+        wants_call='yes' if wants_call else '',
+        business_name=inquiry.business_name or '—',
+        contact_name=inquiry.full_name or '—',
+        phone=inquiry.business_contact_number or '—',
+        plan_name=inquiry.agreed_plan_name or '—',
+        agreed_price=inquiry.agreed_price_label or '—',
+        confirmed_at=(timezone.localtime(inquiry.plan_agreed_at).strftime('%Y-%m-%d %H:%M')
+                      if inquiry.plan_agreed_at else '—'),
+        note=(inquiry.plan_agreement_note or '')[:400],
+        inquiry_id=inquiry.id,
+        inquiry_url=f"https://ezzydelivery.qa/3pl/inquiry/{inquiry.id}/preview/",
+    )
 
     to_number = alert_recipient('wa_quote_agreed_alert')
     if not to_number:

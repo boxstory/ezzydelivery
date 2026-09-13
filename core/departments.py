@@ -49,6 +49,10 @@ _SHARED = [
 _OPS = [
     # Orders
     'wf_orders_add', 'wf_orders_all', 'wf_orders_by_seller', 'wf_orders_to_publish',
+    # The P2P desk. The middleware fails closed, so an unclassified URL name is
+    # unreachable by everyone — including super admins — and looks like a permissions
+    # bug rather than a missing entry.
+    'wf_orders_p2p', 'wf_p2p_new', 'wf_p2p_quote', 'wf_p2p_set_price', 'wf_p2p_rate_card',
     'wf_orders_published', 'wf_orders_reported', 'wf_orders_fulfilled_clients',
     'wf_orders_non_fulfilled_clients', 'orders_pending_verification', 'verify_order_address',
     'order_detail', 'order_edit', 'order_item_add', 'order_item_update', 'order_item_delete',
@@ -67,16 +71,20 @@ _OPS = [
     'delivery_task_detail', 'delivery_task_edit',
     'publish_task_to_fleets', 'unpublish_task_from_fleets',
     'assign_driver_to_task', 'unassign_driver_from_task', 'update_task_status',
+    'pass_note_to_driver',
     'bulk_print_tasks', 'bulk_print_waybills', 'bulk_publish_fleets', 'bulk_publish_app',
     'bulk_update_status', 'bulk_export_tasks', 'bulk_assign_driver', 'dl_tasks_export_page',
     'export_dl_tasks_sheet_csv', 'dl_tasks_print_sheet',
 
     # First-mile pickup + hub
     'pickup_pool_status', 'pickup_staff_assign', 'pickup_staff_unassign',
-    'pickup_staff_cancel', 'pickup_staff_delete', 'pickup_staff_create',
+    'pickup_staff_cancel', 'pickup_staff_close', 'pickup_staff_delete',
+    'pickup_staff_create',
     'pickup_staff_relocate',
     'pickup_timeline_card',
     'pickup_automation_list', 'pickup_automation_save',
+    'delivery_app_control', 'delivery_app_control_save',
+    'delivery_app_control_save_all',
     'pickup_fleet_list', 'pickup_fleet_driver_search', 'pickup_fleet_update',
     'hub_batch_list', 'hub_batch_create', 'hub_batch_detail',
     'hub_batch_assign_driver', 'hub_batch_update_status',
@@ -90,6 +98,7 @@ _OPS = [
 
     # Drivers
     'drivers_list', 'drivers_pending', 'drivers_active', 'drivers_inactive', 'driver_detail',
+    'driver_timeline',
     'driver_toggle_status', 'driver_set_status', 'driver_set_work_pref',
     'driver_vehicle_add', 'driver_vehicle_edit', 'driver_vehicle_delete',
     'driver_document_add', 'driver_document_edit', 'driver_document_delete',
@@ -101,6 +110,8 @@ _OPS = [
     'sellers_list', 'sellers_active', 'sellers_inactive', 'seller_detail',
     'seller_doc_field_update', 'seller_api_products', 'seller_api_products_import',
     'seller_api_orders', 'seller_team_member_detail', 'seller_team_member_update',
+    # Handing an account to a different person is a super-admin call, not a
+    # day-to-day seller edit — see _ADMIN for 'seller_transfer_ownership'.
     'wf_pickup_location_add', 'wf_pickup_location_update', 'wf_pickup_location_delete',
 
     # Verification & documents
@@ -155,9 +166,20 @@ _FIN = [
     'mark_prepaid_settled',
     # Driver leg
     'fleet_drivers_earnings', 'earnings_verification', 'earnings_verification_action',
-    'driver_payout_worksheet', 'driver_payout_create', 'driver_payout_invoice',
+    'driver_payout_worksheet', 'driver_payout_overview', 'driver_payout_create', 'driver_payout_invoice',
+    # Driver salary leg — agreements, monthly runs, slips
+    'salary_register', 'salary_structure_save', 'salary_structure_end',
+    'salary_runs', 'salary_run_create', 'salary_run_detail',
+    'salary_slip', 'salary_slip_pay', 'salary_deduction_add', 'salary_deduction_remove',
+    'salary_addition_add', 'salary_addition_remove',
+    # Per-delivery rate cards, and the manual bonus/deduction lines that make
+    # the incentive leg payable without the Django admin.
+    'pay_rate_register', 'pay_rate_save', 'pay_rate_end', 'pay_rate_delete',
+    'driver_adjustment_add', 'driver_adjustment_remove',
     # Client leg
     'client_charge_verification', 'client_charge_verification_action',
+    # The client account itself — every other finance screen posts into it.
+    'client_ledger', 'client_ledger_open_account',
     # Business -> Ezzy receivable (charges to collect)
     'client_charges_collect', 'client_charge_invoice_create',
     'client_charge_invoices', 'client_charge_invoice_detail',
@@ -168,6 +190,10 @@ _FIN = [
     # their own page's controls.
     'client_charge_invoice_line_add', 'client_charge_invoice_line_remove',
     'client_charge_invoice_columns',
+    # Amending a billed amount is super-admin-only in the view itself; it is
+    # classified here so the middleware routes it with the rest of the console
+    # instead of bouncing it as unclassified.
+    'client_charge_invoice_line_amend',
     # Driver -> Ezzy settlement
     'cod_settlement_report', 'cod_settlement_action', 'cod_settlement_pdf',
     # Ezzy -> Business payout (Leg 3)
@@ -194,6 +220,7 @@ _MKT = [
     'crm_whatsapp_inbox', 'crm_wa_chat_preview', 'crm_wa_media',
     'crm_wa_promote', 'crm_wa_dismiss', 'crm_wa_resync',
     'crm_contacts', 'crm_reports', 'crm_driver_reports', 'crm_leads_export_google',
+    'crm_driver_map',
     # CRM board column configuration
     'crm_stages_manage', 'crm_driver_stages_manage',
     'crm_stage_save', 'crm_stage_delete', 'crm_stage_reorder',
@@ -219,7 +246,10 @@ _ADMIN = [
     # WhatsApp infrastructure (the sender routes are per-desk — see _MULTI)
     'whatsapp_instances_list', 'whatsapp_get_instances',
     # Seller integrations & secrets
+    # Ownership transfer: changes who controls a seller account
+    'seller_transfer_ownership',
     'wf_seller_api_configs', 'wf_approve_api_config', 'wf_get_api_config',
+    'wf_create_api_config',
     'wf_update_api_config', 'wf_delete_api_config', 'wf_test_api_config',
     'wf_test_api_config_result', 'wf_save_google_sheet',
     'google_sheets_auth_start', 'google_sheets_auth_callback',
@@ -228,6 +258,7 @@ _ADMIN = [
     'wf_mapping_manager', 'wf_mapping_manager_save', 'wf_mapping_manager_test',
     'wf_sheet_headers', 'wf_sheet_worksheets', 'wf_sheet_save_tab',
     'wf_source_headers', 'wf_upload_sample_headers', 'wf_save_column_mapping',
+    'wf_detect_json_fields',
     # Import sources
     'onedrive_sources', 'onedrive_fetch_sheets', 'onedrive_sheet_preview', 'onedrive_save_mapping',
     'google_sheet_sources',
@@ -262,6 +293,9 @@ _MULTI = {
     # driver pages, marketing from lead and quote pages, so it belongs to both;
     # the number and channel come from the section route either way.
     'whatsapp_send_routed': [OPS, MKT, ADMIN],
+    # Read-only list of the bodies that composer offers for one section — same
+    # desks, since it is the picker on the same modal.
+    'whatsapp_composer_templates': [OPS, MKT, ADMIN],
 
     # The driver recruitment board is both desks' work: marketing sources and chases
     # applicants, operations makes the verification decision. Leaving these MKT-only
@@ -286,6 +320,7 @@ _MULTI = {
     # The driver funnel is co-owned with operations, like its board and list —
     # so its scorecard opens for ops too. The business one stays marketing-only.
     'crm_driver_reports': [OPS, MKT, ADMIN],
+    'crm_driver_map': [OPS, MKT, ADMIN],
 }
 
 

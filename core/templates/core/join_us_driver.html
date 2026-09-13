@@ -10,7 +10,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
 {% block title %}Join as Driver - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/driver-apply.css' %}?v=20260817a" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260903a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -85,7 +85,56 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                         <span class="cja__stepper-label">Approved</span>
                     </li>
                 </ol>
+                {% if missing_required or missing_optional %}
+                <div class="cja__gap-panel text-start p-3 mb-4">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="fas fa-clipboard-list cja__pick-ico" aria-hidden="true"></i>
+                        <span class="fw-bold small">Still missing from your application</span>
+                    </div>
+                    {% if missing_required %}
+                    <p class="cja__gap-lead small mb-2">These are needed before we can approve you:</p>
+                    <ul class="cja__gap-list list-unstyled mb-3">
+                        {% for item in missing_required %}
+                        <li class="cja__gap-item cja__gap-item--required d-flex align-items-start gap-2">
+                            <i class="fas fa-circle-exclamation cja__gap-ico" aria-hidden="true"></i>
+                            <span>
+                                <span class="d-block fw-bold small">{{ item.label }}</span>
+                                <span class="d-block cja__gap-sub">Step {{ item.step }} &middot; {{ item.section }}{% if item.hint %} &mdash; {{ item.hint }}{% endif %}</span>
+                            </span>
+                            <a href="{% url 'core:join_driver' %}?edit=1&amp;step={{ item.step }}"
+                               class="btn btn-sm btn-outline-dark ms-auto flex-shrink-0">Add</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% if missing_optional %}
+                    <p class="cja__gap-lead small mb-2">Optional &mdash; adding these speeds up your review:</p>
+                    <ul class="cja__gap-list list-unstyled mb-0">
+                        {% for item in missing_optional %}
+                        <li class="cja__gap-item d-flex align-items-start gap-2">
+                            <i class="fas fa-circle-plus cja__gap-ico" aria-hidden="true"></i>
+                            <span>
+                                <span class="d-block fw-bold small">{{ item.label }}</span>
+                                <span class="d-block cja__gap-sub">Step {{ item.step }} &middot; {{ item.section }}{% if item.hint %} &mdash; {{ item.hint }}{% endif %}</span>
+                            </span>
+                            <a href="{% url 'core:join_driver' %}?edit=1&amp;step={{ item.step }}"
+                               class="btn btn-sm btn-outline-dark ms-auto flex-shrink-0">Add</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+                <a href="{% url 'core:join_driver' %}?edit=1&amp;step={{ first_missing_step }}"
+                   class="btn cja__btn-navy px-4">
+                    <i class="fas fa-pen-to-square me-1" aria-hidden="true"></i>Update application
+                </a>
+                {% else %}
+                <p class="cja__gap-lead small mb-3">
+                    <i class="fas fa-circle-check text-success me-1" aria-hidden="true"></i>
+                    Your application is complete &mdash; nothing else is needed from you.
+                </p>
                 <a href="{% url 'core:join_driver' %}?edit=1" class="btn btn-outline-dark btn-sm">Edit application</a>
+                {% endif %}
             {% endif %}
         </div>
 
