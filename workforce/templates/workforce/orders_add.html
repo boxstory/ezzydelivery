@@ -666,6 +666,11 @@ document.addEventListener('DOMContentLoaded', function() {
 function _initInlineProducts() {
     const productSearchUrl = '{% url "orders:product_search_api" %}';
     const container = document.getElementById('woa_inline_rows');
+    // The form — this container with it — only renders once a seller is chosen
+    // ({% templatetag openblock %} if selected_business {% templatetag closeblock %} wraps it), but this initialiser runs on every
+    // load. On the empty landing state it threw "Cannot read properties of null"
+    // and took the rest of this jQuery ready handler down with it.
+    if (!container) { return; }
     const badge = document.getElementById('woa_inline_product_badge');
     const totalBar = document.getElementById('woa_inline_total_bar');
     const totalDisplay = document.getElementById('woa_inline_total_display');

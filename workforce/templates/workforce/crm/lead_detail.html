@@ -1,5 +1,6 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% load custom_filters %}
 
 {# Purpose: CRM lead detail — source summary, stage/assignee/follow-up editors, activity timeline, WA chat snippet. Linking to a Business happens on the Business Verification page. #}
 {# Used by: workforce.crm_views.crm_lead_detail #}
@@ -7,7 +8,7 @@
 {#        Carries the shared wfnote__ page-notes card under the hero, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260825c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260827c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -46,16 +47,18 @@
     <div class="crmd__hero-actions">
       {% if lead.phone %}
       <a href="tel:{{ lead.phone }}" class="crm__btn"><i class="fa-solid fa-phone"></i> Call</a>
-      <a href="https://wa.me/{{ lead.phone }}" target="_blank" rel="noopener" class="crm__btn">
-        <i class="fa-brands fa-whatsapp"></i> WhatsApp
-      </a>
-      {# Same number, but sent from the platform line this conversation runs on: #}
-      {# the number picked on the chat panel, else the board's routed default. #}
-      <button type="button" class="crm__btn"
+      {# One WhatsApp button, and it opens the composer: the message leaves from the #}
+      {# platform line this conversation runs on (the number picked on the chat panel, #}
+      {# else the board's routed default), so the reply comes back to the team. The #}
+      {# old wa.me deep link is not lost — it is the composer's "Open on my own phone" #}
+      {# footer link, for the cases the platform number is the wrong sender. #}
+      <button type="button" class="crm__btn crm__btn--primary"
               data-wasend-open
-              data-wasend-to="{{ lead.phone }}"
+              {# whatsapp_number, not the raw field: leads are stored in the local #}
+              {# 8-digit form, and WhatsApp resolves 55397661@s.whatsapp.net to nothing. #}
+              data-wasend-to="{{ lead.phone|whatsapp_number }}"
               data-wasend-name="{{ lead_wa_name|escape }}">
-        <i class="fa-solid fa-paper-plane"></i> Send from EZZY
+        <i class="fa-brands fa-whatsapp"></i> WhatsApp
       </button>
       {% endif %}
       {# Back goes to the board this lead actually lives on — the two pipelines are #}
@@ -158,6 +161,219 @@
           </div>
         </div>
       </div>
+
+      {% comment %} Requirement-by-requirement check of what the rate card read off
+         this inquiry. The load-bearing column is "Charged": an answer the engine
+         normalises but no rule matches prices at zero, and that stays invisible
+         unless it sits next to the requirement that asked for it. {% endcomment %}
+      {% if pricing_check %}
+      <!-- PRICING CHECK -->
+      <div class="crm__panel">
+        <div class="crm__panel-hd">
+          <i class="fa-solid fa-list-check"></i><h3>Pricing Check</h3>
+          {% if pricing_check.suggestion %}
+          <span class="crmd__count{% if pricing_check.suggestion.missing %} crmd__count--warn{% endif %}">
+            {% if pricing_check.suggestion.missing %}{{ pricing_check.suggestion.missing|length }} unanswered{% else %}All answered{% endif %}
+          </span>
+          {% endif %}
+        </div>
+        <div class="crm__panel-body">
+          {% if pricing_check.error %}
+          <div class="crmd__quote crmd__quote--empty">
+            <i class="fa-solid fa-circle-info"></i><span>{{ pricing_check.error }}</span>
+          </div>
+          {% else %}
+          {% with sg=pricing_check.suggestion %}
+
+          {# The three numbers the call turns on: the floor, the card, the customer. #}
+          <div class="crmd__val-spread">
+            <div class="crmd__val-cell">
+              <span class="crmd__val-lbl">Floor</span>
+              <span class="crmd__val-num">{{ sg.floor_value|floatformat:2 }}</span>
+            </div>
+            <div class="crmd__val-cell crmd__val-cell--lead">
+              <span class="crmd__val-lbl">Suggested</span>
+              <span class="crmd__val-num">{{ sg.suggested_price|floatformat:2 }}</span>
+            </div>
+            <div class="crmd__val-cell">
+              <span class="crmd__val-lbl">Agreed</span>
+              {% if lead.pricing_enquiry.agreed_price_value is not None %}
+              <span class="crmd__val-num">{{ lead.pricing_enquiry.agreed_price_value|floatformat:2 }}</span>
+              {% if pricing_check.agreed_gap is not None %}
+              <span class="crmd__val-gap">{% if pricing_check.agreed_gap > 0 %}+{% endif %}{{ pricing_check.agreed_gap|floatformat:2 }} vs card</span>
+              {% endif %}
+              {% else %}
+              <span class="crmd__val-none">Not chosen</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="crmd__val-unit">QR per delivery · {{ sg.ruleset.name }}</div>
+
+          {% if 'outside_rate_card' in sg.flags %}
+          <div class="crmd__val-warn"><i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Outside the rate card — price this one manually.</span></div>
+          {% endif %}
+          {% if 'base_defaulted' in sg.flags %}
+          <div class="crmd__val-warn"><i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Volume or distance unanswered — the base is a flat default, not a matrix rate.</span></div>
+          {% endif %}
+          {% if 'clamped_uplift' in sg.flags %}
+          <div class="crmd__val-warn"><i class="fa-solid fa-triangle-exclamation"></i>
+            <span>{{ sg.clamped_reason }} — the cap is setting this price, not the rules.</span></div>
+          {% endif %}
+
+          {# What they asked for, against what it cost them. #}
+          {% regroup pricing_check.rows by group as requirement_groups %}
+          {% for group in requirement_groups %}
+          <div class="crmd__val-group">
+            <div class="crmd__section-lbl">{{ group.grouper }}</div>
+            <table class="crmd__val-table">
+              <thead>
+                <tr><th scope="col">Requirement</th><th scope="col">Answer</th>
+                    <th scope="col" class="crmd__val-num-col">Charged</th></tr>
+              </thead>
+              <tbody>
+                {% for r in group.list %}
+                <tr>
+                  <td class="crmd__val-req">{{ r.label }}
+                    {% if r.note %}<span class="crmd__val-note">{{ r.note }}</span>{% endif %}</td>
+                  <td class="crmd__val-ans crmd__val-ans--{{ r.state }}">
+                    <span class="crmd__val-swatch crmd__val-swatch--{{ r.state }}"></span>{{ r.value }}
+                  </td>
+                  <td class="crmd__val-num-col">
+                    {% if not r.priced %}<span class="crmd__val-zero">not priced</span>
+                    {% elif r.sets_base %}<span class="crmd__val-zero">sets the base</span>
+                    {% elif r.in_base %}<span class="crmd__val-zero" title="This card prices it into the base rate">in the base</span>
+                    {% elif r.charged is None %}<span class="crmd__val-zero">no charge</span>
+                    {% else %}<span class="crmd__val-charge">{% if r.charged > 0 %}+{% endif %}{{ r.charged|floatformat:2 }}</span>{% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endfor %}
+
+          {# The arithmetic itself, so the number can be defended line by line. #}
+          <div class="crmd__val-group">
+            <div class="crmd__section-lbl">How the price was built</div>
+            <table class="crmd__val-table">
+              <thead>
+                <tr><th scope="col">Step</th><th scope="col" class="crmd__val-num-col">Change</th>
+                    <th scope="col" class="crmd__val-num-col">Running</th></tr>
+              </thead>
+              <tbody>
+                {% for line in sg.breakdown %}
+                <tr>
+                  <td class="crmd__val-req">{{ line.label }}</td>
+                  <td class="crmd__val-num-col">
+                    {% if line.effect == 'set_base' %}{{ line.running_total|floatformat:2 }}
+                    {% else %}{% if line.delta|floatformat:2|slice:":1" != "-" %}+{% endif %}{{ line.delta|floatformat:2 }}{% endif %}
+                  </td>
+                  <td class="crmd__val-num-col crmd__val-run">{{ line.running_total|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          {% if sg.missing %}
+          <div class="crmd__val-group">
+            <div class="crmd__section-lbl">Ask on the call</div>
+            <div class="crmd__val-chips">
+              {% for label in sg.missing_labels %}<span class="crmd__val-chip">{{ label }}</span>{% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="crmd__val-group">
+            <div class="crmd__section-lbl">Reality check</div>
+            {% if sg.comparables.thin %}
+            <div class="crmd__val-note-row">Too few comparable deliveries to be meaningful (n={{ sg.comparables.count|default:0 }}).</div>
+            {% elif sg.comparables.count %}
+            <div class="crmd__val-note-row">
+              We have actually billed <strong>{{ sg.comparables.distinct_values|join:" or " }} QR</strong>
+              across {{ sg.comparables.count }} verified deliveries{% if sg.comparables.distance_bucket %} at this distance{% endif %}.
+            </div>
+            {% endif %}
+            {# benchmark_mid, not the raw band — "Not sure" is not a price. #}
+            {% if sg.inputs.benchmark_mid %}
+            <div class="crmd__val-note-row">They pay <strong>{{ sg.inputs.benchmark_band }}</strong> today{% if 'above_benchmark' in sg.flags %} — we are higher{% elif 'below_benchmark' in sg.flags %} — we are lower{% endif %}.</div>
+            {% endif %}
+            <div class="crmd__val-note-row crmd__val-note-row--floor">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              Floor {{ sg.floor_value|floatformat:2 }} QR is <strong>configured, not a measured cost</strong> — no margin is shown.
+            </div>
+          </div>
+          {% endwith %}
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% comment %} What this lead is actually being sold: the plan the customer
+         picked on the rate sheet, plus whatever staff quoted back. Sourced from
+         the pricing inquiry so the page never has to be left to see the number. {% endcomment %}
+      {% if lead.pricing_enquiry %}{% with inq=lead.pricing_enquiry %}
+      <!-- QUOTE -->
+      <div class="crm__panel">
+        <div class="crm__panel-hd">
+          <i class="fa-solid fa-file-invoice-dollar"></i><h3>Quote</h3>
+          {% if inq.has_agreed_plan %}<span class="crmd__count">Plan picked</span>{% endif %}
+        </div>
+        <div class="crm__panel-body">
+          {% if inq.has_agreed_plan %}
+          <div class="crmd__quote">
+            <div class="crmd__quote-plan">{{ inq.agreed_plan_name|default:"Plan selected" }}</div>
+            <div class="crmd__quote-price">
+              {% if inq.selected_plan.is_custom_quote %}<i class="fa-solid fa-headset"></i> Wants to discuss with sales
+              {% else %}{{ inq.agreed_price_label }}{% endif %}
+            </div>
+            <div class="crmd__quote-meta">Chosen by customer {{ inq.plan_agreed_at|date:"d M Y, H:i" }}</div>
+          </div>
+          {% if inq.plan_agreement_note %}
+          <div class="crmd__quote-note">
+            <span class="crmd__section-lbl">Customer note</span>{{ inq.plan_agreement_note }}
+          </div>
+          {% endif %}
+          {% else %}
+          <div class="crmd__quote crmd__quote--empty">
+            <i class="fa-solid fa-hourglass-half"></i>
+            <span>No plan picked yet — send the rate sheet link below.</span>
+          </div>
+          {% endif %}
+
+          <div class="crmd__field"><span class="crmd__field-lbl">Staff quote</span>
+            <span class="crmd__field-val">{% if inq.quoted_price_value is not None %}{{ inq.quoted_price_value|floatformat:2 }} QR{% if inq.quoted_price_unit %} {{ inq.quoted_price_unit }}{% endif %}{% else %}not quoted yet{% endif %}</span></div>
+          {% if inq.quoted_at %}
+          <div class="crmd__field"><span class="crmd__field-lbl">Quoted by</span>
+            <span class="crmd__field-val">{{ inq.quoted_by.get_full_name|default:inq.quoted_by.username|default:"—" }} · {{ inq.quoted_at|date:"d M Y, H:i" }}</span></div>
+          {% endif %}
+          {% if inq.quoted_note %}
+          <div class="crmd__field"><span class="crmd__field-lbl">Quote note</span>
+            <span class="crmd__field-val">{{ inq.quoted_note }}</span></div>
+          {% endif %}
+          <div class="crmd__field"><span class="crmd__field-lbl">Suggested rate</span>
+            <span class="crmd__field-val">{% if inq.suggested_price_value is not None %}{{ inq.suggested_price_value|floatformat:2 }} QR{% if inq.suggested_price_at %} · {{ inq.suggested_price_at|date:"d M Y" }}{% endif %}{% else %}not calculated{% endif %}</span></div>
+          <div class="crmd__field"><span class="crmd__field-lbl">Pays now</span>
+            <span class="crmd__field-val">{{ inq.current_delivery_cost|default:"—" }}</span></div>
+          <div class="crmd__field"><span class="crmd__field-lbl">Avg order value</span>
+            <span class="crmd__field-val">{{ inq.average_order_value_qar|default:"—" }}</span></div>
+          <div class="crmd__quote-links">
+            {% if inq.get_quote_url %}
+            <a class="crm__view" href="{{ inq.get_quote_url }}" target="_blank" rel="noopener">
+              <i class="fa-solid fa-up-right-from-square"></i> Rate sheet link
+            </a>
+            {% endif %}
+            <a class="crm__view" href="{% url 'workforce:pricing_inquiry_detail' inq.pk %}#quote-panel"
+               hx-get="{% url 'workforce:pricing_inquiry_detail' inq.pk %}"
+               hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+              <i class="fa-solid fa-arrow-right"></i> Quote workspace
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endwith %}{% endif %}
 
       <!-- AI SUMMARY -->
       {% if ai_available %}
@@ -472,10 +688,14 @@
 {# which is not a line anything can be sent from — keeps the section's route. #}
 {# wa_send_message is the starter body from this lead's MessageTemplate, already #}
 {# rendered with the lead's details — staff edit it before sending. #}
+{# wa_reminder_message is the second offered body: everything this lead has NOT #}
+{# given us yet, listed for them — the driver's unfinished application sections, #}
+{# or the quote answers still open. Blank when there is nothing outstanding, and #}
+{# the composer then simply does not offer the option. #}
 {% if lead.category == 'driver' %}
-{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="driver_onboarding" wa_session=wa_send_session wa_message=wa_send_message %}
+{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="driver_onboarding" wa_session=wa_send_session wa_message=wa_send_message wa_reminder=wa_reminder_message wa_reminder_label=wa_reminder_label %}
 {% else %}
-{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="crm_leads" wa_session=wa_send_session wa_message=wa_send_message %}
+{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="crm_leads" wa_session=wa_send_session wa_message=wa_send_message wa_reminder=wa_reminder_message wa_reminder_label=wa_reminder_label %}
 {% endif %}
 
 <!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->

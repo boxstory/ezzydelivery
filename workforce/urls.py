@@ -1,6 +1,8 @@
 from django.urls import path
 from webpages import views as webpages_views
 from workforce import views as workforce_views
+from payroll import views as payroll_views
+from fleet import views_pay as fleet_pay_views
 from workforce import dispatch_views
 from workforce import crm_views
 from workforce import device_views
@@ -37,6 +39,8 @@ urlpatterns = [
     path('sellers/active/', workforce_views.sellers_active, name='sellers_active'),
     path('sellers/inactive/', workforce_views.sellers_inactive, name='sellers_inactive'),
     path('sellers/api-configs/', workforce_views.wf_seller_api_configs, name='wf_seller_api_configs'),
+    path('sellers/<int:business_id>/api-configs/add/', workforce_views.wf_create_api_config,
+         name='wf_create_api_config'),
     path('sellers/api-configs/<int:api_id>/approve/', workforce_views.wf_approve_api_config, name='wf_approve_api_config'),
     path('sellers/api-configs/<int:api_id>/get/', workforce_views.wf_get_api_config, name='wf_get_api_config'),
     path('sellers/api-configs/<int:api_id>/update/', workforce_views.wf_update_api_config, name='wf_update_api_config'),
@@ -53,6 +57,8 @@ urlpatterns = [
     path('sellers/<int:business_id>/doc-field/', workforce_views.seller_doc_field_update, name='seller_doc_field_update'),
     path('sellers/<int:business_id>/team/<int:member_id>/', workforce_views.seller_team_member_detail, name='seller_team_member_detail'),
     path('sellers/<int:business_id>/team/<int:member_id>/update/', workforce_views.seller_team_member_update, name='seller_team_member_update'),
+    path('sellers/<int:business_id>/team/<int:member_id>/make-owner/',
+         workforce_views.seller_transfer_ownership, name='seller_transfer_ownership'),
     path('sellers/<int:business_id>/pickup-location/add/', workforce_views.wf_pickup_location_add, name='wf_pickup_location_add'),
     path('sellers/<int:business_id>/pickup-location/<int:location_id>/update/', workforce_views.wf_pickup_location_update, name='wf_pickup_location_update'),
     path('sellers/<int:business_id>/pickup-location/<int:location_id>/delete/', workforce_views.wf_pickup_location_delete, name='wf_pickup_location_delete'),
@@ -63,6 +69,7 @@ urlpatterns = [
     path('drivers/active/', workforce_views.drivers_active, name='drivers_active'),
     path('drivers/inactive/', workforce_views.drivers_inactive, name='drivers_inactive'),
     path('drivers/<int:driver_id>/', workforce_views.driver_detail, name='driver_detail'),
+    path('drivers/<int:driver_id>/timeline/', workforce_views.driver_timeline, name='driver_timeline'),
     path('drivers/<int:driver_id>/toggle-status/', workforce_views.driver_toggle_status, name='driver_toggle_status'),
     path('drivers/<int:driver_id>/work-pref/', workforce_views.driver_set_work_pref, name='driver_set_work_pref'),
     path('drivers/<int:driver_id>/set-status/', workforce_views.driver_set_status, name='driver_set_status'),
@@ -88,6 +95,7 @@ urlpatterns = [
     path('import-wizard/preview/', workforce_views.import_wizard_preview, name='import_wizard_preview'),
     path('import-wizard/confirm/', workforce_views.import_wizard_confirm, name='import_wizard_confirm'),
     path('import-wizard/save-mapping/', workforce_views.import_wizard_save_mapping, name='import_wizard_save_mapping'),
+    path('import-wizard/mapping-manager/detect-json/', workforce_views.wf_detect_json_fields, name='wf_detect_json_fields'),
     path('import-wizard/mapping-manager/', workforce_views.wf_mapping_manager, name='wf_mapping_manager'),
     path('import-wizard/mapping-manager/save/', workforce_views.wf_mapping_manager_save, name='wf_mapping_manager_save'),
     path('import-wizard/mapping-manager/test/', workforce_views.wf_mapping_manager_test, name='wf_mapping_manager_test'),
@@ -108,6 +116,12 @@ urlpatterns = [
     path('webhook-imports/generate-key/<int:business_id>/', workforce_views.wf_webhook_generate_key, name='wf_webhook_generate_key'),
     path('orders/pickup-locations/<int:business_id>/', workforce_views.get_pickup_locations, name='get_pickup_locations'),
     path('orders/all/', workforce_views.all_orders, name='wf_orders_all'),
+    path('orders/p2p/', workforce_views.wf_orders_p2p, name='wf_orders_p2p'),
+    path('orders/p2p/new/', workforce_views.wf_p2p_new, name='wf_p2p_new'),
+    path('orders/p2p/quote/', workforce_views.wf_p2p_quote, name='wf_p2p_quote'),
+    path('orders/p2p/rate-card/', workforce_views.wf_p2p_rate_card, name='wf_p2p_rate_card'),
+    path('orders/p2p/<int:booking_id>/price/', workforce_views.wf_p2p_set_price,
+         name='wf_p2p_set_price'),
     path('orders/print-labels/', workforce_views.print_labels, name='wf_orders_print_labels'),
     path('orders/print-waybill/', workforce_views.wf_print_waybill, name='wf_print_waybill'),
     path('orders/fulfilled-clients/', workforce_views.fulfilled_clients_orders, name='wf_orders_fulfilled_clients'),
@@ -166,6 +180,7 @@ urlpatterns = [
     path('delivery-task/<int:task_id>/assign-driver/', workforce_views.assign_driver_to_task, name='assign_driver_to_task'),
     path('delivery-task/<int:task_id>/unassign-driver/', workforce_views.unassign_driver_from_task, name='unassign_driver_from_task'),
     path('delivery-task/<int:task_id>/update-status/', workforce_views.update_task_status, name='update_task_status'),
+    path('delivery-task/<int:task_id>/pass-note-to-driver/', workforce_views.pass_note_to_driver, name='pass_note_to_driver'),
     path('delivery-task/<int:task_id>/cod-return/', workforce_views.process_cod_return, name='process_cod_return'),
 
     # Bulk action endpoints for delivery tasks
@@ -182,6 +197,7 @@ urlpatterns = [
     path('pickups/assign/', workforce_views.pickup_staff_assign, name='pickup_staff_assign'),
     path('pickups/unassign/', workforce_views.pickup_staff_unassign, name='pickup_staff_unassign'),
     path('pickups/cancel/', workforce_views.pickup_staff_cancel, name='pickup_staff_cancel'),
+    path('pickups/close/', workforce_views.pickup_staff_close, name='pickup_staff_close'),
     path('pickups/delete/', workforce_views.pickup_staff_delete, name='pickup_staff_delete'),
     path('pickups/create/', workforce_views.pickup_staff_create, name='pickup_staff_create'),
     path('pickups/relocate/', workforce_views.pickup_staff_relocate, name='pickup_staff_relocate'),
@@ -191,6 +207,13 @@ urlpatterns = [
     path('pickup-automation/fleet/<int:business_id>/', workforce_views.pickup_fleet_list, name='pickup_fleet_list'),
     path('pickup-automation/fleet/search/', workforce_views.pickup_fleet_driver_search, name='pickup_fleet_driver_search'),
     path('pickup-automation/fleet/update/', workforce_views.pickup_fleet_update, name='pickup_fleet_update'),
+
+    # Delivery app control — per-client rules the driver app must satisfy
+    path('delivery-app-control/', workforce_views.delivery_app_control, name='delivery_app_control'),
+    path('delivery-app-control/save/', workforce_views.delivery_app_control_save,
+         name='delivery_app_control_save'),
+    path('delivery-app-control/save-all/', workforce_views.delivery_app_control_save_all,
+         name='delivery_app_control_save_all'),
 
     # User Verification URLs
     path('verification/business/', workforce_views.business_verification_list, name='business_verification_list'),
@@ -223,8 +246,36 @@ urlpatterns = [
     path('fleet/location-reviews/', workforce_views.delivery_location_reviews, name='delivery_location_reviews'),
     path('fleet/location-reviews/action/', workforce_views.delivery_location_review_action, name='delivery_location_review_action'),
     path('fleet/drivers-earnings/', workforce_views.fleet_drivers_earnings, name='fleet_drivers_earnings'),
+    # Fleet-wide payout desk — the merged replacement for Earnings Verification.
+    path('fleet/driver-payout/', workforce_views.driver_payout_worksheet, name='driver_payout_overview'),
     path('fleet/driver-payout/<int:driver_id>/', workforce_views.driver_payout_worksheet, name='driver_payout_worksheet'),
     path('fleet/driver-payout/<int:driver_id>/create/', workforce_views.driver_payout_create, name='driver_payout_create'),
+    # Driver salary — its own leg, separate from per-delivery earnings above.
+    path('fleet/salary/', payroll_views.salary_register, name='salary_register'),
+    path('fleet/salary/structure/save/', payroll_views.salary_structure_save, name='salary_structure_save'),
+    path('fleet/salary/structure/<int:structure_id>/end/', payroll_views.salary_structure_end, name='salary_structure_end'),
+    path('fleet/salary/runs/', payroll_views.salary_runs, name='salary_runs'),
+    path('fleet/salary/runs/create/', payroll_views.salary_run_create, name='salary_run_create'),
+    path('fleet/salary/run/<int:run_id>/', payroll_views.salary_run_detail, name='salary_run_detail'),
+    path('fleet/salary/slip/<int:slip_id>/', payroll_views.salary_slip, name='salary_slip'),
+    path('fleet/salary/slip/<int:slip_id>/pay/', payroll_views.salary_slip_pay, name='salary_slip_pay'),
+    path('fleet/salary/slip/<int:slip_id>/deduction/', payroll_views.salary_deduction_add, name='salary_deduction_add'),
+    path('fleet/salary/deduction/<int:deduction_id>/remove/', payroll_views.salary_deduction_remove, name='salary_deduction_remove'),
+    path('fleet/salary/slip/<int:slip_id>/bonus/', payroll_views.salary_addition_add, name='salary_addition_add'),
+    path('fleet/salary/bonus/<int:addition_id>/remove/', payroll_views.salary_addition_remove, name='salary_addition_remove'),
+
+    # Per-delivery pay rate cards — what a delivery pays before any salary
+    # absorbs it. Fleet-wide card plus per-driver overrides.
+    path('fleet/pay-rates/', fleet_pay_views.pay_rate_register, name='pay_rate_register'),
+    path('fleet/pay-rates/save/', fleet_pay_views.pay_rate_save, name='pay_rate_save'),
+    path('fleet/pay-rates/<int:rate_id>/end/', fleet_pay_views.pay_rate_end, name='pay_rate_end'),
+    path('fleet/pay-rates/<int:rate_id>/delete/', fleet_pay_views.pay_rate_delete, name='pay_rate_delete'),
+
+    # Manual bonus / deduction lines on the driver's payable ledger.
+    path('fleet/driver-payout/<int:driver_id>/adjustment/',
+         fleet_pay_views.driver_adjustment_add, name='driver_adjustment_add'),
+    path('fleet/adjustment/<int:txn_id>/remove/',
+         fleet_pay_views.driver_adjustment_remove, name='driver_adjustment_remove'),
     path('fleet/earnings-verification/', workforce_views.earnings_verification, name='earnings_verification'),
     path('fleet/earnings-verification/action/', workforce_views.earnings_verification_action, name='earnings_verification_action'),
 
@@ -259,6 +310,10 @@ urlpatterns = [
     path('fleet/cod-business-settlement/history/', workforce_views.cod_business_payout_history, name='cod_business_payout_history'),
     path('fleet/cod-business-settlement/invoice/<str:txn_code>/', workforce_views.cod_business_payout_invoice, name='cod_business_payout_invoice'),
 
+    # Client Ledger (the account every other finance screen posts into)
+    path('client-ledger/', workforce_views.client_ledger, name='client_ledger'),
+    path('client-ledger/open-account/', workforce_views.client_ledger_open_account, name='client_ledger_open_account'),
+
     # Charges to Collect (receivable leg — Business → EzzyDelivery)
     path('client-charges/collect/', workforce_views.client_charges_collect, name='client_charges_collect'),
     path('client-charges/collect/issue/', workforce_views.client_charge_invoice_create, name='client_charge_invoice_create'),
@@ -269,6 +324,7 @@ urlpatterns = [
     # These three must stay above the <invoice_code> catch-all below, or it swallows them.
     path('client-charges/invoices/line/add/', workforce_views.client_charge_invoice_line_add, name='client_charge_invoice_line_add'),
     path('client-charges/invoices/line/remove/', workforce_views.client_charge_invoice_line_remove, name='client_charge_invoice_line_remove'),
+    path('client-charges/invoices/line/amend/', workforce_views.client_charge_invoice_line_amend, name='client_charge_invoice_line_amend'),
     path('client-charges/invoices/columns/', workforce_views.client_charge_invoice_columns, name='client_charge_invoice_columns'),
     path('client-charges/invoices/<str:invoice_code>/', workforce_views.client_charge_invoice_detail, name='client_charge_invoice_detail'),
 
@@ -400,6 +456,7 @@ urlpatterns = [
     path('crm/whatsapp-inbox/resync/', crm_views.crm_wa_resync, name='crm_wa_resync'),
     path('crm/contacts/', crm_views.crm_contacts, name='crm_contacts'),
     path('crm/reports/', crm_views.crm_reports, name='crm_reports'),
+    path('crm/driver/map/', crm_views.crm_driver_map, name='crm_driver_map'),
     path('crm/driver/reports/', crm_views.crm_driver_reports, name='crm_driver_reports'),
     # Board columns — one page per board, so a business page never links into the
     # driver desk (and the two consoles can show different controls).
@@ -484,5 +541,6 @@ urlpatterns = [
     path('whatsapp/last-message/', workforce_views.whatsapp_last_message, name='whatsapp_last_message'),
     path('whatsapp/send-message/', workforce_views.whatsapp_send_message, name='whatsapp_send_message'),
     path('whatsapp/send-routed/', workforce_views.whatsapp_send_routed, name='whatsapp_send_routed'),
+    path('whatsapp/composer-templates/', workforce_views.whatsapp_composer_templates, name='whatsapp_composer_templates'),
 
 ]

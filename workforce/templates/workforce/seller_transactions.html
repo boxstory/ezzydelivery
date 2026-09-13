@@ -13,13 +13,37 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
 {% block title %}Seller Transactions - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/seller_roster.css' %}?v=20260728b" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/seller_roster.css' %}?v=20260831f" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
 <div class="ftr">
-    <!-- Hero Header -->
-    {% include "workforce/parts/components/_page_header.html" with title="Seller Transactions" icon="fa-store" subtitle="Track and manage seller COD collections and settlements" notes_id="workforce_seller_transactions_card_notes" %}
+    {% comment %}
+    Hero written out rather than included from _page_header.html: that component
+    takes no actions, and the settle button belongs up here beside the title (the
+    house pattern — see cod_ledger.html / earnings_verification.html). The notes
+    button is the same markup the component renders.
+    {% endcomment %}
+    <div class="wfd__hero">
+        <div class="wfd__hero-content">
+            <h1 class="wfd__hero-title"><i class="fa-solid fa-store"></i>Seller Transactions</h1>
+            <p class="wfd__hero-subtitle">Track and manage seller COD collections and settlements</p>
+        </div>
+        <div class="wfd__hero-actions">
+            {% if selected_seller %}
+            <a href="{% url 'workforce:cod_business_settlement_report' %}?business_id={{ selected_seller.business_id }}"
+               class="btn btn-sm btn-warning fw-semibold">
+                <i class="fa-solid fa-building-columns me-1"></i> Settle COD to Business
+            </a>
+            {% endif %}
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_seller_transactions_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
+        </div>
+    </div>
 
     <!-- Everything below the hero sits in one padded section -->
     <div class="ftr__body">
@@ -50,31 +74,50 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
         <ul class="sro__grid" id="workforce_seller_roster_list">
             {% for row in seller_roster %}
             <li class="sro__item" data-seller="{{ row.business.business_name|lower }} {{ row.business.business_code|lower }}">
-                <a href="?seller_id={{ row.business.business_id }}" class="sro__card{% if row.owed %} sro__card--owed{% endif %}">
+                <a href="?seller_id={{ row.business.business_id }}" class="sro__card{% if row.unsettled %} sro__card--owed{% endif %}">
                     <div class="sro__ident">
                         <span class="sro__code">{% if row.business.business_code %}{{ row.business.business_code }}{% else %}*{{ row.business.business_id }}{% endif %}</span>
                         <span class="sro__name">{{ row.business.business_name }}</span>
                     </div>
 
+                    {% comment %}
+                    The headline splits: money still owed on the left, the number
+                    of jobs behind it on the right. The right side prints its two
+                    addends — orders with unsettled COD plus prepaid orders whose
+                    fee was never charged — so the total is never a figure staff
+                    have to take on trust, and both are named again in the legs.
+
+                    No visible captions: the QAR unit reads the left half and the
+                    "n + n" working reads the right, and the legs underneath name
+                    both again. The captions survive as visually-hidden text so a
+                    screen reader still hears what each number is.
+                    {% endcomment %}
                     <div class="sro__figure">
-                        <span class="sro__figure-label">Held for this seller</span>
-                        <span class="sro__figure-value{% if not row.owed %} sro__figure-value--nil{% endif %}">
-                            {{ row.owed|floatformat:0|intcomma }}<span class="sro__figure-unit">QAR</span>
-                        </span>
+                        <div class="sro__figure-part">
+                            <span class="sro__figure-value{% if not row.unsettled %} sro__figure-value--nil{% endif %}">
+                                <span class="visually-hidden">Unsettled </span>{{ row.unsettled|floatformat:0|intcomma }}<span class="sro__figure-unit">QAR</span>
+                            </span>
+                        </div>
+                        <div class="sro__figure-part sro__figure-part--end">
+                            <span class="sro__figure-value{% if not row.pending_orders %} sro__figure-value--nil{% endif %}">
+                                <span class="sro__figure-sum">{{ row.unsettled_orders|intcomma }} + {{ row.zero_cod_uncharged|intcomma }}</span>{{ row.pending_orders|intcomma }}<span class="visually-hidden"> pending orders</span>
+                            </span>
+                        </div>
                     </div>
 
                     {% comment %}
-                    The rail is the signature: where this seller's collected COD
-                    currently sits across the three legs it moves through.
-                    Percentages are precomputed in the view and applied by
+                    The rail is the signature: where this seller's *open* COD sits
+                    right now — still with the driver, or already handed in and
+                    held by Ezzy. Paid-out money is closed and deliberately absent,
+                    so the two segments always add up to the Unsettled figure
+                    above. Percentages are precomputed in the view and applied by
                     seller-roster.js — data attributes rather than inline styles,
                     which the project forbids in templates.
                     {% endcomment %}
                     <div class="sro__rail" role="img"
-                         aria-label="COD split — {{ row.with_driver|floatformat:0 }} with driver, {{ row.owed|floatformat:0 }} held by Ezzy, {{ row.paid_out|floatformat:0 }} paid out">
+                         aria-label="Unsettled COD — {{ row.with_driver|floatformat:0 }} with driver, {{ row.owed|floatformat:0 }} in Ezzy">
                         <span class="sro__rail-seg sro__rail-seg--driver" data-seg="{{ row.pct_driver|floatformat:2 }}"></span>
                         <span class="sro__rail-seg sro__rail-seg--owed" data-seg="{{ row.pct_owed|floatformat:2 }}"></span>
-                        <span class="sro__rail-seg sro__rail-seg--paid" data-seg="{{ row.pct_paid|floatformat:2 }}"></span>
                     </div>
 
                     <dl class="sro__legs">
@@ -83,12 +126,29 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
                             <dd>{{ row.with_driver|floatformat:0|intcomma }}</dd>
                         </div>
                         <div class="sro__leg">
-                            <dt>Paid out</dt>
-                            <dd>{{ row.paid_out|floatformat:0|intcomma }}</dd>
+                            <dt>COD in Ezzy</dt>
+                            <dd>{{ row.owed|floatformat:0|intcomma }}</dd>
                         </div>
+                        {% comment %}
+                        Bottom row is the job count, split the same way the money
+                        is: orders that carry COD, and orders that carry none. Both
+                        read unqualified — the whole card is the pending position,
+                        so COD can only mean the unsettled ones. The qualifiers stay
+                        as visually-hidden text, since a screen reader hearing
+                        "COD 55" out of context would have no such cue.
+                        {% endcomment %}
                         <div class="sro__leg">
-                            <dt>Orders</dt>
-                            <dd>{{ row.order_count|intcomma }}</dd>
+                            <dt><span class="visually-hidden">Unsettled </span>COD<span class="visually-hidden"> orders</span></dt>
+                            <dd>{{ row.unsettled_orders|intcomma }}</dd>
+                        </div>
+                        {% comment %}
+                        Prepaid jobs whose delivery fee is still uncollected. They
+                        never appear in the COD legs — there was no cash to withhold
+                        — so without this count they are invisible on this page.
+                        {% endcomment %}
+                        <div class="sro__leg">
+                            <dt>Zero-COD<span class="visually-hidden"> uncharged orders</span></dt>
+                            <dd>{{ row.zero_cod_uncharged|intcomma }}</dd>
                         </div>
                     </dl>
                 </a>
@@ -115,18 +175,36 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
                     <i class="fa-solid fa-pen"></i>
                 </button>
             </div>
-            <p class="ftr__profile-meta">Business ID: {{ selected_seller.id }} | Contact: {{ selected_seller.user.email }}</p>
-            <div class="ftr__profile-balances">
-                <span class="ftr__balance ftr__balance--green">Total COD: <strong>QAR {{ total_cod|floatformat:2|default:"0.00" }}</strong></span>
-                <span class="ftr__balance ftr__balance--blue">Unsettled: <strong>QAR {{ cod_unsettled|floatformat:2|default:"0.00" }}</strong></span>
-            </div>
-            <div class="mt-2">
-                <a href="{% url 'workforce:cod_business_settlement_report' %}?business_id={{ selected_seller.business_id }}"
-                   class="ftr__btn ftr__btn--primary">
-                    <i class="fa-solid fa-building-columns me-1"></i> Settle COD to Business
-                </a>
-            </div>
+            {% comment %}
+            This line used to read `selected_seller.id` — Business has business_id as its
+            primary key and no `id` field, so the label printed "Business ID: |" with nothing
+            after it. It now carries the business code staff actually quote, falling back to
+            the numeric id the same way the roster card does.
+            {% endcomment %}
+            <p class="ftr__profile-meta">Business Code: {% if selected_seller.business_code %}{{ selected_seller.business_code }}{% else %}*{{ selected_seller.business_id }}{% endif %}</p>
+            <p class="ftr__profile-meta">Contact: {{ selected_seller.user.email }}</p>
         </div>
+
+        {% comment %}
+        Third column: the seller's whole COD position — the two open legs and their
+        sum. Already-paid-out COD is closed money and stays out of the panel. The
+        source is the DeliveryTask COD flags, the same ones the roster card reads,
+        so the two can never disagree.
+        {% endcomment %}
+        <dl class="ftr__profile-legs" aria-label="COD position">
+            <div class="ftr__leg">
+                <dt><span class="ftr__leg-dot ftr__leg-dot--driver" aria-hidden="true"></span>With driver</dt>
+                <dd>{{ cod_with_driver|floatformat:2|intcomma }}</dd>
+            </div>
+            <div class="ftr__leg">
+                <dt><span class="ftr__leg-dot ftr__leg-dot--owed" aria-hidden="true"></span>Held by Ezzy</dt>
+                <dd>{{ cod_with_ezzy|floatformat:2|intcomma }}</dd>
+            </div>
+            <div class="ftr__leg ftr__leg--total">
+                <dt>Unsettled</dt>
+                <dd>QAR {{ cod_unsettled|floatformat:2|intcomma }}</dd>
+            </div>
+        </dl>
     </div>
 
     <!-- Filter Panel -->
@@ -140,6 +218,12 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
                 <input type="hidden" name="seller_id" value="{{ selected_seller.business_id }}">
                 <input type="hidden" name="sort" value="{{ sort_by }}" id="sortInput">
                 <div class="ftr__filter-row">
+                    <div class="ftr__filter-group ftr__filter-group--search">
+                        <label class="ftr__filter-label" for="workforce_seller_txn_input_search"><i class="fa-solid fa-magnifying-glass me-1"></i>Search</label>
+                        <input type="search" name="q" value="{{ search }}" class="ftr__filter-input"
+                               id="workforce_seller_txn_input_search"
+                               placeholder="Order code, customer or phone" autocomplete="off">
+                    </div>
                     <div class="ftr__filter-group">
                         <label class="ftr__filter-label"><i class="fa-solid fa-calendar me-1"></i>Date Range</label>
                         <select name="date_preset" id="datePresetSelect" class="ftr__filter-select" onchange="toggleCustomDate(this.value)">
@@ -169,6 +253,10 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
                         </select>
                     </div>
                     <div class="ftr__filter-group">
+                        <label class="ftr__filter-label"><i class="fa-solid fa-sack-dollar me-1"></i>COD State</label>
+                        {% include "workforce/parts/components/_multiselect_filter.html" with field_name="cod_status" label="COD State" icon="sack-dollar" choices=cod_status_choices selected=selected_cod_statuses all_text="Any COD State" %}
+                    </div>
+                    <div class="ftr__filter-group">
                         <label class="ftr__filter-label"><i class="fa-solid fa-truck me-1"></i>Delivery Status</label>
                         {% include "workforce/parts/components/_multiselect_filter.html" with field_name="task_status" label="Delivery Status" icon="truck" choices=task_status_choices selected=selected_task_statuses all_text="All Statuses" %}
                     </div>
@@ -181,7 +269,7 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
                         <input type="number" step="0.01" name="max_amount" value="{{ max_amount }}" class="ftr__filter-input" placeholder="9999">
                     </div>
                     <div class="ftr__filter-actions">
-                        <button type="submit" class="ftr__btn ftr__btn--primary">
+                        <button type="submit" class="ftr__btn ftr__btn--navy">
                             <i class="fa-solid fa-filter me-1"></i>Apply
                         </button>
                         <a href="{% url 'workforce:seller_transactions' %}?seller_id={{ selected_seller.business_id }}" class="ftr__btn ftr__btn--outline">
@@ -193,16 +281,82 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
         </div>
     </div>
 
+    {% comment %}
+    What is currently narrowing the list, and how to undo one piece of it. Each
+    chip's link is this same page minus that one filter — built in the view, so a
+    chip can never drop a filter it does not name.
+    {% endcomment %}
+    {% if active_filters %}
+    <div class="ftr__applied" aria-label="Applied filters">
+        <span class="ftr__applied-label">Filtered by</span>
+        {% for chip in active_filters %}
+        <a class="ftr__applied-chip" href="?{{ chip.url }}" title="Remove this filter">
+            <span class="ftr__applied-key">{{ chip.label }}</span>
+            <span class="ftr__applied-val">{{ chip.value }}</span>
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </a>
+        {% endfor %}
+        <a class="ftr__applied-clear" href="{% url 'workforce:seller_transactions' %}?seller_id={{ selected_seller.business_id }}">Clear all</a>
+    </div>
+    {% endif %}
+
+    {% comment %}
+    Selection bar. This ledger is read-only — settlement runs through the COD
+    business settlement page — so selecting rows answers "what do these add up
+    to?" rather than driving a write. It appears only once something is ticked.
+    {% endcomment %}
+    <div class="ftr__bulk" id="workforce_seller_txn_bar_selection">
+        <span class="ftr__bulk-count"><span id="workforce_seller_txn_count_selected">0</span> selected</span>
+        {% comment %}
+        Reach past this page. The header tick only ever covers the 50 rows on
+        screen; this offers the rest of the filtered ledger, and says so plainly
+        once it is taken so nobody exports 800 orders thinking they picked 50.
+        {% endcomment %}
+        <span class="ftr__bulk-scope ftr__hidden" id="workforce_seller_txn_scope_selection">
+            <span id="workforce_seller_txn_scope_text"></span>
+            <button type="button" class="ftr__bulk-link" id="workforce_seller_txn_btn_all_pages"
+                    onclick="sellerSelectAllMatching(this)">
+                Select all {{ orders.paginator.count }} across every page
+            </button>
+        </span>
+        <span class="ftr__bulk-amount">COD: QAR <span id="workforce_seller_txn_amount_selected">0.00</span></span>
+        <div class="ftr__bulk-actions">
+            <button type="button" class="ftr__bulk-btn" onclick="sellerExportSelected()">
+                <i class="fa-solid fa-file-csv"></i> Export
+            </button>
+            <button type="button" class="ftr__bulk-btn" onclick="sellerPrintSelected()">
+                <i class="fa-solid fa-print"></i> Print
+            </button>
+            <button type="button" class="ftr__bulk-btn ftr__bulk-btn--cancel" onclick="sellerClearSelection()">
+                <i class="fa-solid fa-times"></i> Clear
+            </button>
+        </div>
+    </div>
+
     <!-- Action Buttons -->
     <div class="ftr__toolbar">
+        {% comment %}
+        The column headers sort too, but only on hover — this names every order
+        the table can be put in, in words, and posts through the same filter form
+        so the sort survives with the filters attached.
+        {% endcomment %}
+        <label class="ftr__sort" for="workforce_seller_txn_select_sort">
+            <span class="ftr__sort-label"><i class="fa-solid fa-arrow-down-short-wide"></i> Sort</span>
+            <select class="ftr__sort-select" id="workforce_seller_txn_select_sort"
+                    data-no-select2 onchange="updateSort(this.value)">
+                {% for value, label in sort_choices %}
+                <option value="{{ value }}" {% if sort_by == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
         <button type="button" class="ftr__btn ftr__btn--outline" onclick="window.print()">
             <i class="fa-solid fa-print"></i> Print Report
         </button>
-        <button type="button" class="ftr__btn ftr__btn--primary"
+        <button type="button" class="ftr__btn ftr__btn--outline"
                 data-bs-toggle="modal" data-bs-target="#wfExportModal">
             <i class="fa-solid fa-file-export"></i> Export CSV
         </button>
-        <a href="?{{ filter_params }}{% if filter_params %}&{% endif %}export=xlsx" class="ftr__btn ftr__btn--primary">
+        <a href="?{{ filter_params }}{% if filter_params %}&{% endif %}export=xlsx" class="ftr__btn ftr__btn--outline">
             <i class="fa-solid fa-file-excel"></i> Export Excel
         </a>
         <span class="ftr__toolbar-count">{{ orders.paginator.count }} order{{ orders.paginator.count|pluralize }}</span>
@@ -215,16 +369,36 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
             <table class="ftr__table" id="transactionsTable">
                 <thead>
                     <tr>
-                        <th>Order Code</th>
+                        {% comment %}
+                        Sorting is server-side through the filter form (updateSort writes the
+                        hidden sort input and submits), so it sorts the whole ledger rather
+                        than the 50 rows on screen and keeps every active filter.
+                        {% endcomment %}
+                        <th class="ftr__th--check">
+                            <input type="checkbox" class="ftr__checkbox" id="workforce_seller_txn_check_all"
+                                   onchange="sellerToggleAll(this)" title="Select all rows on this page"
+                                   aria-label="Select all rows on this page">
+                        </th>
+                        <th class="ftr__th--sort" onclick="updateSort('{% if sort_by == 'code_asc' %}code_desc{% else %}code_asc{% endif %}')">
+                            Order Code
+                            {% if sort_by == 'code_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
+                            {% elif sort_by == 'code_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
+                            {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
+                        </th>
                         <th class="ftr__th--sort" onclick="updateSort('{% if sort_by == 'date_asc' %}date_desc{% else %}date_asc{% endif %}')">
                             Order Date
                             {% if sort_by == 'date_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
                             {% elif sort_by == 'date_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
                             {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
                         </th>
-                        <th>Customer</th>
+                        <th class="ftr__th--sort" onclick="updateSort('{% if sort_by == 'customer_asc' %}customer_desc{% else %}customer_asc{% endif %}')">
+                            Customer
+                            {% if sort_by == 'customer_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
+                            {% elif sort_by == 'customer_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
+                            {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
+                        </th>
                         <th>From / To Location</th>
-                        <th class="ftr__th--dist" title="Driving distance from pickup to drop. A ~ marks a fallback estimate rather than a routed distance.">
+                        <th class="ftr__th--dist" title="Driving distance from pickup to drop. A ~ marks a fallback estimate rather than a routed distance. Not sortable — it is measured per page, so ordering on it would rank a page against itself.">
                             Distance
                         </th>
                         <th class="ftr__th--sort" onclick="updateSort('{% if sort_by == 'amount_asc' %}amount_desc{% else %}amount_asc{% endif %}')">
@@ -233,13 +407,43 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
                             {% elif sort_by == 'amount_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
                             {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
                         </th>
-                        <th>Status</th>
-                        <th>Order Status</th>
+                        <th class="ftr__th--sort" onclick="updateSort('{% if sort_by == 'status_asc' %}status_desc{% else %}status_asc{% endif %}')">
+                            Status
+                            {% if sort_by == 'status_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
+                            {% elif sort_by == 'status_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
+                            {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
+                        </th>
+                        <th class="ftr__th--sort" onclick="updateSort('{% if sort_by == 'ostatus_asc' %}ostatus_desc{% else %}ostatus_asc{% endif %}')">
+                            Order Status
+                            {% if sort_by == 'ostatus_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
+                            {% elif sort_by == 'ostatus_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
+                            {% else %}<i class="fa-solid fa-sort ms-1 ftr__sort-muted"></i>{% endif %}
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
+                    {% comment %}
+                    The row's left rule says where this order's cash sits — amber with
+                    the driver, navy held by Ezzy, plain once paid out — the same three
+                    colours as the roster rail and the position panel. It reads down the
+                    left edge at a glance; the Status column still spells it out.
+                    {% endcomment %}
                     {% for order in orders %}
-                    <tr>
+                    <tr class="ftr__row{% if order.cod_status_by_staff == 'cod_with_driver' %} ftr__row--driver{% elif order.cod_status_by_staff == 'cod_with_ezzy' %} ftr__row--held{% elif order.cod_status_by_staff == 'cod_settled_with_business' %} ftr__row--paid{% endif %}">
+                        <td class="ftr__td--check">
+                            <input type="checkbox" class="ftr__checkbox ftr__checkbox--row"
+                                   value="{{ order.order_number|default:order.pk }}"
+                                   data-amount="{{ order.cod_amount|default_if_none:0 }}"
+                                   data-code="{{ order.order_number|default:'' }}"
+                                   data-client-code="{{ order.client_order_code|default:'' }}"
+                                   data-date="{{ order.order_date|date:'Y-m-d' }}"
+                                   data-customer="{{ order.customer_name|default:'' }}"
+                                   data-zone="{{ order.dl_zone|default:'' }}"
+                                   data-status="{{ order.get_cod_status_by_staff_display|default:'' }}"
+                                   data-ostatus="{{ order.get_order_status_display|default:'' }}"
+                                   onchange="sellerPickRow(this)"
+                                   aria-label="Select order {{ order.order_number|default:order.pk }}">
+                        </td>
                         <td>
                             <code class="ftr__code">{{ order.order_number|default:"-" }}</code>
                             {% if order.client_order_code %}<span class="ftr__code-sub">{{ order.client_order_code }}</span>{% endif %}
@@ -288,8 +492,23 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
                             <span class="ftr__dist ftr__dist--none" title="Neither end could be located">—</span>
                             {% endif %}
                         </td>
-                        <td style="font-weight: 600; color: #059669;">
-                            QAR {{ order.cod_amount|floatformat:2|default:"0.00" }}
+                        {% comment %}
+                        The figure is what the order was billed. When the driver handed
+                        over less than that — usually because the order was edited after
+                        the cash was already collected — the collected amount and the
+                        shortfall print underneath, so the gap between this column's sum
+                        and the Unsettled card is explained on the row that causes it
+                        rather than left as an unexplained difference in the header.
+                        {% endcomment %}
+                        <td class="ftr__amount">
+                            <span class="ftr__amount-cur">QAR</span> {{ order.cod_amount|floatformat:2|intcomma }}
+                            {% if order.cod_short %}
+                            <span class="ftr__amount-short"
+                                  title="Driver handed over {{ order.cod_collected_amount|floatformat:2 }} against an invoiced {{ order.cod_amount|floatformat:2 }}. Use COD Correction to adjust the collected amount and the driver's wallet.">
+                                {{ order.cod_collected_amount|floatformat:2|intcomma }} collected
+                                · &minus;{{ order.cod_short|floatformat:2|intcomma }} short
+                            </span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if order.cod_status_by_staff == 'cod_settled_with_business' %}
@@ -297,27 +516,73 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
                             {% elif order.cod_status_by_staff == 'fully_paid' %}
                             <span class="ftr__txn-type ftr__txn-type--received"><i class="fa-solid fa-check me-1"></i>Collected</span>
                             {% elif order.cod_status_by_staff == 'cod_with_ezzy' %}
-                            <span class="ftr__txn-type ftr__txn-type--not-verified"><i class="fa-solid fa-hourglass-start me-1"></i>With Ezzy</span>
+                            <span class="ftr__txn-type ftr__txn-type--held"><i class="fa-solid fa-vault me-1"></i>With Ezzy</span>
                             {% elif order.cod_status_by_staff == 'cod_with_driver' %}
                             <span class="ftr__txn-type ftr__txn-type--not-verified"><i class="fa-solid fa-motorcycle me-1"></i>With Driver</span>
                             {% else %}
                             <span class="ftr__txn-type ftr__txn-type--pending"><i class="fa-solid fa-clock me-1"></i>Pending</span>
                             {% endif %}
+                            {% comment %} The badge says where the cash sits; this second line
+                               says who carried it, so "With Driver" names a person instead
+                               of sending staff into the order to find out. The view blanks
+                               the name once the cash is with Ezzy or settled — see the
+                               `closed` rule there. {% endcomment %}
+                            {% if order.task_driver_name %}
+                            <span class="ftr__txn-driver" title="Driver on this order{% if order.task_driver_code %} · {{ order.task_driver_code }}{% endif %}">
+                                <i class="fa-solid fa-user"></i> {{ order.task_driver_name }}
+                            </span>
+                            {% endif %}
+                            {% comment %} The documents this order closed on. A "Settled" badge
+                               used to be a dead end — the payout invoice that settled it was
+                               two pages away. Both legs can be present at once: the payout is
+                               money going out to the seller, the charge invoice is the
+                               delivery fee coming back. {% endcomment %}
+                            {% if order.payout_invoice_code %}
+                            <a class="ftr__txn-doc" target="_blank" rel="noopener"
+                               href="{% url 'workforce:cod_business_payout_invoice' order.payout_invoice_code %}"
+                               title="COD payout invoice {{ order.payout_invoice_code }} — the document this order's cash was paid out on">
+                                <i class="fa-solid fa-file-invoice-dollar"></i> {{ order.payout_invoice_code }}
+                            </a>
+                            {% endif %}
+                            {% if order.charge_invoice_code %}
+                            <a class="ftr__txn-doc{% if order.charge_invoice_void %} ftr__txn-doc--void{% endif %}"
+                               target="_blank" rel="noopener"
+                               href="{% url 'workforce:client_charge_invoice_detail' order.charge_invoice_code %}"
+                               title="Delivery charge billed on invoice {{ order.charge_invoice_code }} · {{ order.charge_invoice_status }}">
+                                <i class="fa-solid fa-file-invoice"></i> Invoiced {{ order.charge_invoice_code }}
+                                {% if order.charge_invoice_void %}<span class="ftr__txn-doc-flag">Void</span>{% endif %}
+                            </a>
+                            {% endif %}
                         </td>
+                        {% comment %}
+                        Branches follow ORDER_STATUS_BY_CLIENT exactly. The old cell
+                        tested for 'completed' and 'in_progress' — neither is a value
+                        of that field — so every delivered order printed as a yellow
+                        "pending" badge.
+                        {% endcomment %}
                         <td>
-                            {% if order.order_status == 'completed' %}
-                            <span class="badge bg-success"><i class="fa-solid fa-circle-check"></i> Delivered</span>
-                            {% elif order.order_status == 'in_progress' %}
-                            <span class="badge bg-info"><i class="fa-solid fa-spinner"></i> In Progress</span>
+                            {% if order.order_status == 'delivered' %}
+                            <span class="ftr__ostatus ftr__ostatus--done"><i class="fa-solid fa-circle-check"></i> Delivered</span>
+                            {% elif order.order_status == 'publish' %}
+                            <span class="ftr__ostatus ftr__ostatus--live"><i class="fa-solid fa-truck-fast"></i> Published</span>
+                            {% elif order.order_status == 'ready_to_pickup' %}
+                            <span class="ftr__ostatus ftr__ostatus--live"><i class="fa-solid fa-box"></i> Ready to pickup</span>
                             {% elif order.order_status == 'cancelled' %}
-                            <span class="badge bg-danger"><i class="fa-solid fa-circle-xmark"></i> Cancelled</span>
+                            <span class="ftr__ostatus ftr__ostatus--void"><i class="fa-solid fa-circle-xmark"></i> Cancelled</span>
                             {% else %}
-                            <span class="badge bg-warning"><i class="fa-solid fa-hourglass"></i> {{ order.order_status|title }}</span>
+                            <span class="ftr__ostatus ftr__ostatus--hold"><i class="fa-solid fa-hourglass"></i> {{ order.get_order_status_display|default:"—" }}</span>
                             {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
+                <tfoot>
+                    <tr class="ftr__foot">
+                        <td colspan="6">This page — {{ orders|length }} of {{ orders.paginator.count }} order{{ orders.paginator.count|pluralize }}</td>
+                        <td class="ftr__foot-amount">QAR {{ page_cod|floatformat:2|intcomma }}</td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
@@ -401,6 +666,246 @@ function initializeSellerModal() {
     }
 }
 document.addEventListener('DOMContentLoaded', initializeSellerModal);
+
+// Row selection. A tick is not a per-page thing here: staff pick rows, page on,
+// pick more, then export or print the lot — so the picked rows live in
+// sessionStorage keyed by the seller and the active filters. Changing a filter
+// starts a fresh selection, because the old one answered a different question.
+var SELLER_TXN_MATCHING = parseInt('{{ orders.paginator.count }}', 10) || 0;
+var SELLER_SEL_KEY = (function () {
+    var p = new URLSearchParams(window.location.search);
+    ['page', 'per_page', 'sort'].forEach(function (k) { p.delete(k); });
+    p.sort();
+    return 'wfSellerTxnSel:' + p.toString();
+})();
+
+function sellerSelRead() {
+    try { return JSON.parse(sessionStorage.getItem(SELLER_SEL_KEY)) || {}; }
+    catch (e) { return {}; }
+}
+
+var sellerSel = sellerSelRead();
+
+function sellerSelSave() {
+    // Private mode and a full quota both throw; the selection then simply lasts
+    // as long as this page rather than the visit.
+    try { sessionStorage.setItem(SELLER_SEL_KEY, JSON.stringify(sellerSel)); } catch (e) {}
+}
+
+// One picked row, in the shape both the export and the print sheet read. Rows
+// fetched for other pages arrive from the server already in this shape.
+function sellerRowRecord(cb) {
+    return {
+        key: cb.value,
+        code: cb.dataset.code || cb.value,
+        clientCode: cb.dataset.clientCode || '',
+        date: cb.dataset.date || '',
+        customer: cb.dataset.customer || '',
+        zone: cb.dataset.zone || '',
+        amount: cb.dataset.amount || '0',
+        status: cb.dataset.status || '',
+        ostatus: cb.dataset.ostatus || ''
+    };
+}
+
+function sellerPickRow(cb) {
+    if (cb.checked) { sellerSel[cb.value] = sellerRowRecord(cb); }
+    else { delete sellerSel[cb.value]; }
+    sellerSelSave();
+    sellerUpdateSelection();
+}
+
+function sellerToggleAll(box) {
+    document.querySelectorAll('.ftr__checkbox--row').forEach(function (cb) {
+        cb.checked = box.checked;
+        if (cb.checked) { sellerSel[cb.value] = sellerRowRecord(cb); }
+        else { delete sellerSel[cb.value]; }
+    });
+    sellerSelSave();
+    sellerUpdateSelection();
+}
+
+function sellerUpdateSelection() {
+    // The seller roster (no seller picked yet) renders no table and no bar.
+    var bar = document.getElementById('workforce_seller_txn_bar_selection');
+    if (!bar) return;
+    var rows = document.querySelectorAll('.ftr__checkbox--row');
+    var keys = Object.keys(sellerSel);
+    var total = 0;
+    keys.forEach(function (k) { total += parseFloat(sellerSel[k].amount) || 0; });
+
+    document.getElementById('workforce_seller_txn_count_selected').textContent = keys.length;
+    document.getElementById('workforce_seller_txn_amount_selected').textContent = total.toFixed(2);
+    bar.classList.toggle('ftr__bulk--show', keys.length > 0);
+
+    // Rows carry a tint while ticked, so a scrolled-away selection is still visible.
+    rows.forEach(function (cb) {
+        cb.closest('tr').classList.toggle('ftr__row--picked', cb.checked);
+    });
+
+    var pickedHere = document.querySelectorAll('.ftr__checkbox--row:checked').length;
+    var all = document.getElementById('workforce_seller_txn_check_all');
+    if (all) {
+        all.checked = rows.length > 0 && pickedHere === rows.length;
+        all.indeterminate = pickedHere > 0 && pickedHere < rows.length;
+    }
+
+    // The reach-past-this-page line: offer the rest of the ledger once this page
+    // is fully ticked, and confirm it plainly once the whole filter set is in.
+    var scope = document.getElementById('workforce_seller_txn_scope_selection');
+    var text = document.getElementById('workforce_seller_txn_scope_text');
+    var btn = document.getElementById('workforce_seller_txn_btn_all_pages');
+    if (scope && text && btn) {
+        var pageFull = rows.length > 0 && pickedHere === rows.length;
+        var haveAll = keys.length >= SELLER_TXN_MATCHING;
+        if (haveAll && SELLER_TXN_MATCHING > rows.length) {
+            text.textContent = 'All ' + SELLER_TXN_MATCHING + ' matching orders selected.';
+            btn.classList.add('ftr__hidden');
+            scope.classList.remove('ftr__hidden');
+        } else if (pageFull && SELLER_TXN_MATCHING > keys.length) {
+            text.textContent = keys.length + ' of ' + SELLER_TXN_MATCHING + ' selected.';
+            btn.classList.remove('ftr__hidden');
+            scope.classList.remove('ftr__hidden');
+        } else {
+            scope.classList.add('ftr__hidden');
+        }
+    }
+}
+
+// Select every order the current filter matches, not just the 50 rendered. The
+// server hands back the same row shape the checkboxes carry, so export and print
+// treat a fetched row exactly like a ticked one.
+function sellerSelectAllMatching(btn) {
+    var was = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Selecting…';
+    var p = new URLSearchParams(window.location.search);
+    p.delete('page');
+    p.set('rows', 'json');
+    fetch(window.location.pathname + '?' + p.toString(), {
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        credentials: 'same-origin'
+    })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (data) {
+            (data.rows || []).forEach(function (row) { sellerSel[row.key] = row; });
+            sellerSelSave();
+            document.querySelectorAll('.ftr__checkbox--row').forEach(function (cb) {
+                cb.checked = !!sellerSel[cb.value];
+            });
+            btn.innerHTML = was;
+            btn.disabled = false;
+            sellerUpdateSelection();
+            if (data.truncated) {
+                var text = document.getElementById('workforce_seller_txn_scope_text');
+                if (text) {
+                    text.textContent = 'First ' + data.cap + ' of ' + SELLER_TXN_MATCHING
+                        + ' selected — narrow the filter to reach the rest.';
+                }
+            }
+        })
+        .catch(function () {
+            btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Could not select all';
+            btn.disabled = false;
+            setTimeout(function () { btn.innerHTML = was; }, 2400);
+        });
+}
+
+function sellerPickedRecords() {
+    return Object.keys(sellerSel).map(function (k) { return sellerSel[k]; });
+}
+
+// The toolbar's Export CSV sends every filtered row from the server. This one is
+// the picked rows — including any picked on a page that is no longer on screen.
+function sellerExportSelected() {
+    var picked = sellerPickedRecords();
+    if (!picked.length) return;
+    var cell = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+    var rows = [['Order Code', 'Client Code', 'Order Date', 'Customer', 'Zone', 'COD Amount', 'COD Status']
+                .map(cell).join(',')];
+    picked.forEach(function (r) {
+        rows.push([r.code, r.clientCode, r.date, r.customer, r.zone, r.amount, r.status]
+                  .map(cell).join(','));
+    });
+    // BOM so Excel opens Arabic customer names in the right encoding.
+    var blob = new Blob(['\ufeff' + rows.join('\r\n')], {type: 'text/csv;charset=utf-8;'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'seller_cod_selected_' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+
+// A picked row that lives on another page has no <tr> to print, so it gets one:
+// print-only, same nine columns, blank where the page-only figures (distance)
+// were never measured for it.
+function sellerPrintRow(rec) {
+    var tr = document.createElement('tr');
+    tr.className = 'ftr__row ftr__row--printonly';
+    var amount = parseFloat(rec.amount) || 0;
+    var cells = ['', rec.code, rec.date, rec.customer, rec.zone ? 'Zone ' + rec.zone : '—',
+                 '—', 'QAR ' + amount.toFixed(2), rec.status, rec.ostatus];
+    cells.forEach(function (v, i) {
+        var td = document.createElement('td');
+        if (i === 0) td.className = 'ftr__td--check';
+        td.textContent = v;
+        tr.appendChild(td);
+    });
+    return tr;
+}
+
+// Print just the picked rows: hide the rest for the duration of the dialog, add
+// print-only rows for the picks made on other pages, and put the table back
+// afterwards so nothing about the live page is lost.
+function sellerPrintSelected() {
+    var picked = sellerPickedRecords();
+    if (!picked.length) return;
+    var tbody = document.querySelector('#transactionsTable tbody');
+    var rows = document.querySelectorAll('#transactionsTable tbody tr');
+    var onPage = {};
+    rows.forEach(function (tr) {
+        var box = tr.querySelector('.ftr__checkbox--row');
+        if (!box) return;
+        if (box.checked) { onPage[box.value] = true; }
+        else { tr.classList.add('ftr__row--unprinted'); }
+    });
+    var added = [];
+    if (tbody) {
+        picked.forEach(function (rec) {
+            if (onPage[rec.key]) return;
+            var tr = sellerPrintRow(rec);
+            tbody.appendChild(tr);
+            added.push(tr);
+        });
+    }
+    var restore = function () {
+        rows.forEach(function (tr) { tr.classList.remove('ftr__row--unprinted'); });
+        added.forEach(function (tr) { tr.remove(); });
+        added = [];
+        window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+    window.print();
+    setTimeout(restore, 1000);  // Safari/iOS never fire afterprint
+}
+
+function sellerClearSelection() {
+    document.querySelectorAll('.ftr__checkbox--row').forEach(function (cb) { cb.checked = false; });
+    var all = document.getElementById('workforce_seller_txn_check_all');
+    if (all) { all.checked = false; all.indeterminate = false; }
+    sellerSel = {};
+    sellerSelSave();
+    sellerUpdateSelection();
+}
+
+// Rows picked before a page change come back ticked.
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.ftr__checkbox--row').forEach(function (cb) {
+        if (sellerSel[cb.value]) cb.checked = true;
+    });
+    sellerUpdateSelection();
+});
 
 function updateSort(value) {
     document.getElementById('sortInput').value = value;

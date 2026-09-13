@@ -8,7 +8,7 @@
 {% block title %}Location Review{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/delivery_location_reviews.css' %}?v=20260730c" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/delivery_location_reviews.css' %}?v=20260909e" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -42,6 +42,10 @@
     </div>
   </header>
 
+  <!-- Everything below the hero sits in one padded section, the way every other
+       staff console is built — the hero itself runs flush to the edges. -->
+  <div class="dgr__body">
+
   <div class="wfnote" id="workforce_delivery_location_reviews_card_notes"
        data-wfnote-src="{% url 'workforce:page_notes' 'workforce_delivery_location_reviews_card_notes' %}" hidden></div>
 
@@ -51,7 +55,7 @@
   they describe the open queue, they are not ways into it.
   {% endcomment %}
   <section class="wfstat" aria-label="Location review totals">
-    <a href="?status=pending{% if selected_driver %}&amp;driver_id={{ selected_driver }}{% endif %}"
+    <a href="?status=pending{% if selected_driver %}&amp;driver_id={{ selected_driver }}{% endif %}{% if search %}&amp;q={{ search|urlencode }}{% endif %}"
        class="wfstat__card wfstat__card--here {% if selected_status == 'pending' %}wfstat__card--on{% endif %}">
       <span class="wfstat__label">Awaiting review</span>
       <span class="wfstat__value">{{ stats.pending|intcomma }}</span>
@@ -76,6 +80,17 @@
 
   <!-- Filters -->
   <form method="GET" class="dgr__filters" id="workforce_location_reviews_form_filter">
+    {% comment %} Staff look for an area by name ("Muaither Al Meshaf"), but a Qatari
+       address is numbers — so the view resolves the name through ZoneName to the
+       order's zone as well as matching the text fields. {% endcomment %}
+    <div class="dgr__field dgr__field--search">
+      <label class="dgr__label" for="workforce_location_reviews_input_search">Search</label>
+      <input type="search" name="q" id="workforce_location_reviews_input_search"
+             class="form-control form-control-sm" value="{{ search }}"
+             data-queue-total="{{ queue_total }}"
+             autocomplete="off"
+             placeholder="Area, order, customer, seller or driver — Enter searches all">
+    </div>
     <div class="dgr__field">
       <label class="dgr__label" for="workforce_location_reviews_select_status">Status</label>
       <select name="status" id="workforce_location_reviews_select_status" class="form-select form-select-sm">
@@ -107,6 +122,26 @@
       <a href="{% url 'workforce:delivery_location_reviews' %}" class="btn btn-sm dgr__btn-clear">Clear</a>
     </div>
   </form>
+
+  {% comment %} Typing filters the rows already on the page — the fastest answer, and the
+     only one that can match text the database never held, like the driver's zone.
+     It can only see the loaded page, so the line says so and Enter hands the same
+     term to the server, which searches the whole queue. {% endcomment %}
+  <p class="dgr__searchnote dgr__searchnote--live" id="dgr_live_note" hidden>
+    <i class="fa-solid fa-filter" aria-hidden="true"></i>
+    <span id="dgr_live_text"></span>
+    <span class="dgr__searchnote-hint">press <kbd>Enter</kbd> to search all <span id="dgr_live_total"></span></span>
+  </p>
+
+  {% if search %}
+  <p class="dgr__searchnote">
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <strong>{{ search_result_count|intcomma }}</strong> deliver{{ search_result_count|pluralize:"y,ies" }}
+    matching &ldquo;{{ search }}&rdquo;
+    <a href="?{% if selected_status %}status={{ selected_status }}{% endif %}{% if selected_driver %}&amp;driver_id={{ selected_driver }}{% endif %}{% if min_gap %}&amp;min_gap={{ min_gap }}{% endif %}"
+       class="dgr__searchnote-clear">clear search</a>
+  </p>
+  {% endif %}
 
   {% if reviews %}
   <!-- Decision bar -->
@@ -199,6 +234,17 @@
             {% if r.customer_latitude %}
             <span class="dgr__pin"><i class="fa-solid fa-location-dot dgr__pin-i--customer"></i>
               {{ r.customer_latitude|floatformat:5 }}, {{ r.customer_longitude|floatformat:5 }}</span>
+            {% comment %} The zone written on the order — not derived from the pin like the
+               driver's is. It is what an area search matches on, so it has to be on the
+               row: without it a search for "Muaither Al Meshaf" returns rows that never
+               say the words. {% endcomment %}
+            {% if r.customer_zone %}
+            <span class="dgr__zone">Z{{ r.customer_zone.zone_number }} · {{ r.customer_zone.zone_name }}</span>
+            {% elif r.order.dl_zone %}
+            <span class="dgr__zone dgr__zone--approx">Zone {{ r.order.dl_zone }}</span>
+            {% else %}
+            <span class="dgr__zone dgr__zone--none">no zone on the order</span>
+            {% endif %}
             <span class="dgr__sub">{{ r.order.customer_address|default:""|truncatechars:28 }}</span>
             {% else %}—{% endif %}
             {% comment %} Both points on one map — the comparison is the job, and two separate
@@ -230,11 +276,18 @@
   <div class="dgr__empty">
     <p class="dgr__empty-title">Nothing to review</p>
     <p class="dgr__empty-note">
+      {% if search %}
+      Nothing flagged matches &ldquo;{{ search }}&rdquo;. Area names are matched through the zone
+      list, so a spelling the zone list does not use will find nothing.
+      {% else %}
       No delivery is sitting {{ flag_threshold|floatformat:1 }} km or more from its customer's location
       under this filter.
+      {% endif %}
     </p>
   </div>
   {% endif %}
+
+  </div><!-- /.dgr__body -->
 </div>
 {% endblock %}
 
@@ -256,10 +309,66 @@
   }
 
   document.getElementById('dgr_check_all')?.addEventListener('change', function () {
-    checks().forEach(c => { c.checked = this.checked; });
+    // Only what is actually visible — after a filter, "all" means the rows on
+    // screen, never the ones the filter just hid.
+    checks().filter(c => !c.closest('tr').classList.contains('dgr__row--hidden'))
+            .forEach(c => { c.checked = this.checked; });
     sync();
   });
   checks().forEach(c => c.addEventListener('change', sync));
+
+  // ── Instant filter over the rows already on the page ──────────────
+  // Matches the row's rendered text, so it finds the zone names too — the
+  // driver's zone is computed at render time and exists nowhere else, which is
+  // why searching it needs the DOM and not a column.
+  const searchInput = document.getElementById('workforce_location_reviews_input_search');
+  const liveNote = document.getElementById('dgr_live_note');
+  const rows = () => Array.from(document.querySelectorAll('#workforce_location_reviews_table_view tbody tr'));
+  const applied = (searchInput?.value || '').trim().toLowerCase();
+
+  function filterLoaded() {
+    const raw = (searchInput.value || '').trim();
+    const terms = raw.toLowerCase().split(/\s+/).filter(Boolean);
+    const all = rows();
+    let shown = 0;
+
+    all.forEach(row => {
+      const hay = (row.dataset.hay || (row.dataset.hay = row.textContent.toLowerCase().replace(/\s+/g, ' ')));
+      const hit = terms.every(t => hay.includes(t));
+      row.classList.toggle('dgr__row--hidden', !hit);
+      if (hit) { shown++; }
+      // A hidden row must never ride along in a bulk verdict.
+      else {
+        const box = row.querySelector('.dgr__check');
+        if (box && box.checked) { box.checked = false; }
+      }
+    });
+    sync();
+
+    // "Showing 1-25 of 546" under a table filtered down to one row is a lie.
+    // The pager belongs to the server's result, so it steps aside while the
+    // browser is the one deciding what shows.
+    const pager = document.querySelector('.dgr .pgn');
+    if (pager) { pager.hidden = terms.length > 0 && raw.toLowerCase() !== applied; }
+
+    // Nothing typed, or the term is the one the server already applied — the
+    // page is showing its own result and a filter line would just be noise.
+    if (!terms.length || raw.toLowerCase() === applied) {
+      liveNote.hidden = true;
+      return;
+    }
+    document.getElementById('dgr_live_text').textContent =
+      'showing ' + shown + ' of ' + all.length + ' loaded row' + (all.length === 1 ? '' : 's');
+    document.getElementById('dgr_live_total').textContent =
+      (searchInput.dataset.queueTotal || '') + ' in the queue';
+    liveNote.hidden = false;
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', filterLoaded);
+    // A cleared search box should show the loaded page again, not an empty table.
+    searchInput.addEventListener('search', filterLoaded);
+  }
 
   bar?.querySelectorAll('[data-decision]').forEach(btn => {
     btn.addEventListener('click', async function () {

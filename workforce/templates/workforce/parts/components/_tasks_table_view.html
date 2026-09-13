@@ -137,7 +137,11 @@ Each task should have select_related: order, driver, business, pickup_location, 
                     <td class="dl-table__td-id">
                         <div class="dl-table__id-stack">
                             <span class="dl-table__seller-name" title="{{ dl.order.business.business_name }}">{{ dl.order.business.business_name|default:"—"|truncatechars:18 }}</span>
-                            <span class="dl-table__task-num">{{ dl.dl_task_number|default:"—" }}</span>
+                            <span class="dl-table__task-num">{{ dl.dl_task_number|default:"—" }}{% if dl.unread_seller_comments %}
+                                {# Seller wrote something no staff member has opened yet - see OrderComments.staff_read_at #}
+                                <span class="dl-table__comment-flag" title="{{ dl.unread_seller_comments }} unread seller comment{{ dl.unread_seller_comments|pluralize }}">
+                                    <i class="fa-solid fa-comment-dots"></i>{{ dl.unread_seller_comments }}
+                                </span>{% endif %}</span>
                             <span class="dl-table__order-num" title="{{ dl.order.client_order_code }}">{{ dl.order.client_order_code|default:"—"|truncatechars:14 }}</span>
                         </div>
                     </td>

@@ -162,6 +162,10 @@ def workforce_sidebar_counts(request):
         # Sync errors from last auto-sync (mapping mismatch, etc.)
         'temp_orders_sync_errors': sync_errors,
 
+        # P2P bookings that need somebody: ops to price them, or the customer to
+        # confirm. Both are states where the parcel is going nowhere until someone acts.
+        'p2p_pending_count': _p2p_pending_count(),
+
         # Orders awaiting publish (mirrors the /orders/to_publish/ list: keyed on
         # order_status, not the one-way task_created latch, so an order sent back
         # to "Hold for Review" is counted again).
@@ -198,3 +202,14 @@ def workforce_sidebar_counts(request):
     cache.set(cache_key, counts, 60)  # 60 second TTL
     request._cached_workforce_counts = counts
     return counts
+
+
+def _p2p_pending_count():
+    """Bookings stuck waiting on ops or on the customer. Never raises: a badge is not
+    worth a 500 on every staff page if the p2p app is mid-migration."""
+    try:
+        from p2p.models import P2PBooking
+        return P2PBooking.objects.filter(
+            status__in=['awaiting_price', 'awaiting_customer']).count()
+    except Exception:
+        return 0

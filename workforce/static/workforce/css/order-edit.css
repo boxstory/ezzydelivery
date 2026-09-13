@@ -106,3 +106,39 @@
 @media (prefers-reduced-motion: reduce) {
     .woe .woe__form-input, .woe .woe__btn { transition: none; }
 }
+
+/* COD locked notice — shown when the driver has already handed the cash in and
+   the amount can only move through the COD Correction flow (which also adjusts
+   the driver's wallet). Warning tone, not an error: the edit is legitimate, it
+   just belongs on a different screen. */
+.woe .woe__form-input[readonly],
+.woe .form-control[readonly] {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+}
+.woe .woe__cod-locked {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    margin: 0.4rem 0 0;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--brand-warning-alt);
+    border-left-width: 3px;
+    border-radius: 4px;
+    background: var(--brand-warning-bg);
+    color: var(--brand-warning-text);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+.woe .woe__cod-locked i { margin-top: 0.15rem; }
+.woe .woe__cod-locked strong,
+.woe .woe__cod-locked code {
+    font-family: var(--woe-mono);
+    color: var(--brand-warning-text);
+}
+.woe .woe__cod-locked code { background: none; padding: 0; }
+.woe .woe__cod-locked a {
+    color: var(--brand-warning-text);
+    font-weight: 700;
+    text-decoration: underline;
+}

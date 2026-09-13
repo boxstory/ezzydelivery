@@ -47,8 +47,20 @@
                 <a id="workforce_sidebar_mob_link_all_orders" href="{% url 'workforce:wf_orders_all' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Orders</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_wf_p2p_new" href="{% url 'workforce:wf_p2p_new' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-plus"></i><span>New P2P Booking</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_orders_print_labels" href="{% url 'workforce:wf_orders_print_labels' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-print"></i><span>Print Labels</span>
+                </a>
                 <a id="workforce_sidebar_mob_link_orders_by_seller" href="{% url 'workforce:wf_orders_by_seller' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-store"></i><span>By Seller</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_wf_orders_p2p" href="{% url 'workforce:wf_orders_p2p' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-route"></i><span>P2P Orders{% if p2p_pending_count %} ({{ p2p_pending_count }}){% endif %}</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_wf_p2p_rate_card" href="{% url 'workforce:wf_p2p_rate_card' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-tags"></i><span>P2P Rate Card</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_orders_to_publish" href="{% url 'workforce:wf_orders_to_publish' %}" class="wsm__nav-link d-flex align-items-center">
                     <i class="fa-solid fa-spinner"></i><span>Publish to Task</span>
@@ -84,6 +96,10 @@
                 <a id="workforce_sidebar_mob_link_all_tasks" href="{% url 'workforce:dl_list_all' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Tasks</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_tasks_upcoming" href="{% url 'workforce:tasks_upcoming_list' %}" class="wsm__nav-link d-flex align-items-center">
+                    <i class="fa-solid fa-calendar-days"></i><span>Upcoming</span>
+                    <span class="badge ms-auto" data-badge="upcoming_tasks">{{ upcoming_tasks_count|default:"0" }}</span>
+                </a>
                 <a id="workforce_sidebar_mob_link_tasks_followup" href="{% url 'workforce:tasks_followup_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-phone"></i><span>Follow-Up List</span>
                 </a>
@@ -112,6 +128,9 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_tasks_reported" href="{% url 'workforce:tasks_reported' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-flag"></i><span>Reported</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_tasks_app_control" href="{% url 'workforce:delivery_app_control' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-camera-retro"></i><span>Delivery App Control</span>
                 </a>
             </div>
         </div>
@@ -167,16 +186,16 @@
                 <a id="workforce_sidebar_mob_link_driver_tasks" href="{% url 'workforce:wf_driver_tasks' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list-check"></i><span>Driver Tasks</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_driver_devices" href="{% url 'workforce:driver_devices' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-mobile-screen-button"></i><span>Driver Devices</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_location_reviews" href="{% url 'workforce:delivery_location_reviews' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-location-crosshairs"></i><span>Location Review</span>
+                </a>
                 {% endif %}
                 {% if wf_dept_fin %}
                 <a id="workforce_sidebar_mob_link_fleet_cod" href="{% url 'workforce:fleet_cod_in_hand' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-sack-dollar"></i><span>COD with Fleet</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_fleet_earnings" href="{% url 'workforce:fleet_drivers_earnings' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-money-bill-wave"></i><span>DLs Earnings</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_earnings_verification" href="{% url 'workforce:earnings_verification' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-clipboard-check"></i><span>Earnings Verification</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_fleet_transactions" href="{% url 'workforce:fleet_transactions' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-money-bill-transfer"></i><span>Transactions</span>
@@ -313,14 +332,26 @@
                 <a id="workforce_sidebar_mob_link_cod_reconciliation" href="{% url 'workforce:cod_legacy_reconciliation' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-scale-balanced"></i><span>COD Reconciliation</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_finance_earnings_verification" href="{% url 'workforce:earnings_verification' %}" class="wsm__nav-link">
+                <a id="workforce_sidebar_mob_link_finance_earnings_verification" href="{% url 'workforce:driver_payout_overview' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-clipboard-check"></i><span>Earnings Verification</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_finance_driver_payouts" href="{% url 'workforce:fleet_drivers_earnings' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-money-bill-wave"></i><span>Driver Payouts</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_finance_driver_salaries" href="{% url 'workforce:salary_register' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-money-check-dollar"></i><span>Driver Salaries</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_finance_salary_runs" href="{% url 'workforce:salary_runs' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-calendar-check"></i><span>Salary Runs</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_finance_pay_rates" href="{% url 'workforce:pay_rate_register' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-tags"></i><span>Delivery Pay Rates</span>
+                </a>
 
                 <div class="wsm__nav-group-label"><i class="fa-solid fa-store"></i><span>Seller</span></div>
+                <a id="workforce_sidebar_mob_link_client_ledger" href="{% url 'workforce:client_ledger' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-scroll"></i><span>Client Ledger</span>
+                </a>
                 <a id="workforce_sidebar_mob_link_seller_transactions" href="{% url 'workforce:seller_transactions' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-right-left"></i><span>Seller Transactions</span>
                 </a>
@@ -398,6 +429,9 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_wa_instances" href="{% url 'workforce:whatsapp_instances_list' %}" class="wsm__nav-link">
                     <i class="fa-brands fa-whatsapp"></i><span>WA Instances</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_ai_config" href="{% url 'workforce:wf_ai_config' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-microchip"></i><span>AI Config</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_message_templates" href="{% url 'workforce:wf_message_templates' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-comment-dots"></i><span>Messages</span>
@@ -507,19 +541,85 @@
 
         <div class="wsm__nav-divider"></div>
 
-        <!-- Forms & CRM -->
+        <!-- CRM Business — the client sales pipeline -->
         {% if wf_dept_mkt %}
-        <div id="workforce_sidebar_mob_section_forms" class="wsm__nav-section">
-            <div class="wsm__nav-header" onclick="toggleMobileSection('forms')">
+        <div id="workforce_sidebar_mob_section_crm_business" class="wsm__nav-section">
+            <div class="wsm__nav-header" onclick="toggleMobileSection('crm_business')">
                 <div class="wsm__nav-header-title">
-                    <i class="fa-solid fa-comments-dollar"></i>
-                    <span>Forms & CRM</span>
+                    <i class="fa-solid fa-briefcase"></i>
+                    <span>CRM Business</span>
                 </div>
                 <i class="fa-solid fa-chevron-down"></i>
             </div>
-            <div class="wsm__nav-submenu" id="mobile-section-forms">
+            <div class="wsm__nav-submenu" id="mobile-section-crm_business">
+                <a id="workforce_sidebar_mob_link_crm_board" href="{% url 'workforce:crm_leads_board' %}" class="wsm__nav-link d-flex align-items-center">
+                    <i class="fa-solid fa-table-columns"></i><span>Leads Board</span>
+                    <span class="badge ms-auto" data-badge="crm_business_overdue">{{ crm_business_overdue_count|default:"0" }}</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_crm_list" href="{% url 'workforce:crm_leads_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-table-list"></i><span>Leads List</span>
+                </a>
                 <a id="workforce_sidebar_mob_link_pricing_inquiries" href="{% url 'workforce:pricing_inquiries_list' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-tag"></i><span>Pricing Inquiries</span>
+                    <i class="fa-solid fa-file-invoice"></i><span>Pricing Inquiries</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_crm_inbox" href="{% url 'workforce:crm_whatsapp_inbox' %}" class="wsm__nav-link">
+                    <i class="fa-brands fa-whatsapp"></i><span>WhatsApp Inbox</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_crm_contacts" href="{% url 'workforce:crm_contacts' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-address-book"></i><span>Contacts</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_crm_reports" href="{% url 'workforce:crm_reports' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-chart-column"></i><span>Reports</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_crm_stages" href="{% url 'workforce:crm_stages_manage' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-table-columns"></i><span>Board Columns</span>
+                </a>
+                {% if wf_dept_ops %}
+                <a id="workforce_sidebar_mob_link_crm_biz_verify" href="{% url 'workforce:business_verification_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-building-circle-check"></i><span>Business Verification</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- CRM Driver — driver recruitment, a separate board with its own stages -->
+        {% if wf_dept_mkt %}
+        <div id="workforce_sidebar_mob_section_crm_driver" class="wsm__nav-section">
+            <div class="wsm__nav-header" onclick="toggleMobileSection('crm_driver')">
+                <div class="wsm__nav-header-title">
+                    <i class="fa-solid fa-motorcycle"></i>
+                    <span>CRM Driver</span>
+                </div>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="wsm__nav-submenu" id="mobile-section-crm_driver">
+                <a id="workforce_sidebar_mob_link_crm_driver_board" href="{% url 'workforce:crm_driver_leads_board' %}" class="wsm__nav-link d-flex align-items-center">
+                    <i class="fa-solid fa-table-columns"></i><span>Driver Board</span>
+                    <span class="badge ms-auto" data-badge="crm_driver_overdue">{{ crm_driver_overdue_count|default:"0" }}</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_crm_driver_list" href="{% url 'workforce:crm_driver_leads_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-table-list"></i><span>Driver Leads</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_crm_driver_map" href="{% url 'workforce:crm_driver_map' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-map-location-dot"></i><span>Driver Map</span>
+                </a>
+                {% if wf_dept_ops %}
+                <a id="workforce_sidebar_mob_link_crm_drv_verify" href="{% url 'workforce:driver_verification_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-id-card"></i><span>Driver Verification</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_crm_drv_pending" href="{% url 'workforce:drivers_pending' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-clock"></i><span>Pending Drivers</span>
+                </a>
+                {% endif %}
+                <a id="workforce_sidebar_mob_link_crm_drv_inbox" href="{% url 'workforce:crm_whatsapp_inbox' %}" class="wsm__nav-link">
+                    <i class="fa-brands fa-whatsapp"></i><span>WhatsApp Inbox</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_crm_drv_reports" href="{% url 'workforce:crm_driver_reports' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-chart-column"></i><span>Reports</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_crm_drv_stages" href="{% url 'workforce:crm_driver_stages_manage' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-table-columns"></i><span>Board Columns</span>
                 </a>
             </div>
         </div>
@@ -578,6 +678,11 @@
                 <a id="workforce_sidebar_mob_link_api_orders" href="{% url 'workforce:wf_api_orders' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-plug"></i><span>API/Auto Trigger</span>
                 </a>
+                {% if wf_dept_admin %}
+                <a id="workforce_sidebar_mob_link_mapping_manager" href="{% url 'workforce:wf_mapping_manager' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-sliders"></i><span>Column Mapping</span>
+                </a>
+                {% endif %}
                 <a id="workforce_sidebar_mob_link_import_history" href="{% url 'workforce:import_history' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-clock-rotate-left"></i><span>Import History</span>
                 </a>
@@ -611,6 +716,11 @@
                 <a id="workforce_sidebar_mob_link_task_sheets" href="{% url 'workforce:fleet_task_sheets_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-pdf"></i><span>Fleet Task Sheets</span>
                 </a>
+                {% if wf_dept_ops %}
+                <a id="workforce_sidebar_mob_link_dl_tasks_export" href="{% url 'workforce:dl_tasks_export_page' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-truck-fast"></i><span>Export DL Tasks</span>
+                </a>
+                {% endif %}
                 <a id="workforce_sidebar_mob_link_receipt_templates" href="{% url 'workforce:receipt_templates_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-invoice"></i><span>Receipt Templates</span>
                 </a>
@@ -643,6 +753,14 @@
                 <a id="workforce_sidebar_mob_link_team_verification" href="{% url 'workforce:team_verification_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-users-line"></i><span>Team</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_sellers_pending" href="{% url 'workforce:sellers_pending' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-store-slash"></i><span>Pending Sellers</span>
+                </a>
+                {% if wf_dept_ops %}
+                <a id="workforce_sidebar_mob_link_drivers_pending" href="{% url 'workforce:drivers_pending' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-clock"></i><span>Pending Drivers</span>
+                </a>
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -745,6 +863,8 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/import-history\//,                  section: 'import',        link: 'workforce_sidebar_mob_link_import_history'},
         {re: /^\/workforce\/webhook-imports\//,                  section: 'triggers',      link: 'workforce_sidebar_mob_link_webhook_imports'},
         // Orders
+        {re: /^\/workforce\/orders\/p2p\/rate-card/,             section: 'orders',        link: 'workforce_sidebar_mob_link_wf_p2p_rate_card'},
+        {re: /^\/workforce\/orders\/p2p/,                       section: 'orders',        link: 'workforce_sidebar_mob_link_wf_orders_p2p'},
         {re: /^\/workforce\/orders\/pending-verification\//,    section: 'orders',        link: 'workforce_sidebar_mob_link_all_orders'},
         {re: /^\/workforce\/orders\/\d+/,                       section: 'orders',        link: 'workforce_sidebar_mob_link_all_orders'},
         {re: /^\/workforce\/order\//,                           section: 'orders',        link: 'workforce_sidebar_mob_link_all_orders'},
@@ -762,8 +882,6 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/fleet\/cod-legacy-reconciliation\//,section: 'finance',       link: 'workforce_sidebar_mob_link_cod_reconciliation'},
         {re: /^\/workforce\/fleet\/cod-settlement\//,           section: 'finance',       link: 'workforce_sidebar_mob_link_cod_settlement'},
         {re: /^\/workforce\/drivers\/\d+/,                      section: 'accounts',      link: 'workforce_sidebar_mob_link_all_drivers'},
-        {re: /^\/workforce\/drivers\//,                         section: 'accounts',      link: null},
-        {re: /^\/workforce\/fleet\//,                           section: 'accounts',      link: null},
         // Sellers
         {re: /^\/workforce\/sellers\/api-configs\/\d+/,         section: 'triggers',      link: 'workforce_sidebar_mob_link_seller_api_configs'},
         {re: /^\/workforce\/sellers\/\d+/,                      section: 'sellers',       link: 'workforce_sidebar_mob_link_all_sellers'},
@@ -798,9 +916,28 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/inventory\//,                       section: 'inventory',     link: null},
         // Warehouse
         {re: /^\/workforce\/product-requests\//,                section: 'warehouse',     link: 'workforce_sidebar_mob_link_product_requests'},
-        // Forms
-        {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     section: 'forms',         link: 'workforce_sidebar_mob_link_pricing_inquiries'},
-        {re: /^\/workforce\/forms\//,                           section: 'forms',         link: null},
+        // CRM — driver rules first, then the business catch-all (see the note on
+        // ordering above: /crm/leads/board/drivers/ lives under /crm/leads/board/).
+        {re: /^\/workforce\/crm\/leads\/board\/drivers\//,      section: 'crm_driver',    link: 'workforce_sidebar_mob_link_crm_driver_board'},
+        {re: /^\/workforce\/crm\/leads\/drivers\//,             section: 'crm_driver',    link: 'workforce_sidebar_mob_link_crm_driver_list'},
+        {re: /^\/workforce\/crm\/driver\/map\//,               section: 'crm_driver',    link: 'workforce_sidebar_mob_link_crm_driver_map'},
+        {re: /^\/workforce\/crm\/driver\/reports\//,            section: 'crm_driver',    link: 'workforce_sidebar_mob_link_crm_drv_reports'},
+        {re: /^\/workforce\/crm\/driver\/stages\//,             section: 'crm_driver',    link: 'workforce_sidebar_mob_link_crm_drv_stages'},
+        // A lead detail page is shared by both boards, so it defaults to Business.
+        {re: /^\/workforce\/crm\//,                             section: 'crm_business',  link: null},
+        // Pricing inquiries feed the business pipeline and now sit in that menu.
+        {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     section: 'crm_business',  link: 'workforce_sidebar_mob_link_pricing_inquiries'},
+        {re: /^\/workforce\/forms\//,                           section: 'crm_business',  link: null},
+        // Finance > Driver also lives under /workforce/fleet/, so each page claims
+        // itself before the Accounts catch-alls below sweep it up.
+        {re: /^\/workforce\/fleet\/drivers-earnings\//,         section: 'finance',       link: 'workforce_sidebar_mob_link_finance_driver_payouts'},
+        {re: /^\/workforce\/fleet\/driver-payout\//,            section: 'finance',       link: 'workforce_sidebar_mob_link_finance_driver_payouts'},
+        {re: /^\/workforce\/fleet\/earnings-verification\//,    section: 'finance',       link: null},
+        {re: /^\/workforce\/fleet\/salary\//,                   section: 'finance',       link: null},
+        {re: /^\/workforce\/fleet\/pay-rates\//,                section: 'finance',       link: null},
+        // Catch-alls last: every specific rule above has had its turn.
+        {re: /^\/workforce\/drivers\//,                         section: 'accounts',      link: null},
+        {re: /^\/workforce\/fleet\//,                           section: 'accounts',      link: null},
     ];
 
     // Find sub-page match and auto-expand its section
@@ -812,7 +949,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    if (subpageMatch) {
+    // An exact link match below is always right; the prefix map is only for
+    // sub-pages that have no entry of their own. Applying both is how two
+    // section headers ended up highlighted at once on the Finance > Driver
+    // pages, which sit under /workforce/fleet/ beside the Accounts desk.
+    var hasExactLink = Array.prototype.some.call(
+        document.querySelectorAll('.wsm__nav-link, .wsm__nav-single a'),
+        function(link) { return new URL(link.href, window.location.origin).pathname === currentPath; });
+
+    if (subpageMatch && !hasExactLink) {
         var sec = document.getElementById('mobile-section-' + subpageMatch.section);
         if (sec) {
             sec.classList.add('show');
@@ -834,23 +979,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    document.querySelectorAll('.wsm__nav-link, .wsm__nav-single a, .wsm__dashboard-btn').forEach(function(link) {
-        const linkPath = new URL(link.href, window.location.origin).pathname;
-        const isMatch = currentPath === linkPath;
-        if (isMatch) {
-            link.classList.add('active');
+    // A few pages are deliberately linked from two sections (Driver Transactions
+    // sits under both Fleet A/Cs and Finance). Only one of them may light up, or
+    // the menu claims the page lives in two desks at once — the prefix map says
+    // which section owns it, and the first match wins when it says nothing.
+    const allLinks = document.querySelectorAll('.wsm__nav-link, .wsm__nav-single a, .wsm__dashboard-btn');
+    const matches = Array.prototype.filter.call(allLinks, function(link) {
+        return new URL(link.href, window.location.origin).pathname === currentPath;
+    });
+    let owner = matches[0];
+    if (matches.length > 1 && subpageMatch && subpageMatch.section) {
+        const owned = matches.filter(function(link) {
+            const sub = link.closest('.wsm__nav-submenu');
+            return sub && sub.id === 'mobile-section-' + subpageMatch.section;
+        });
+        if (owned.length) { owner = owned[0]; }
+    }
 
-            // Auto-open parent submenu
-            const submenu = link.closest('.wsm__nav-submenu');
-            if (submenu) {
-                submenu.classList.add('show');
-                const header = submenu.previousElementSibling;
-                header.classList.add('active');
-                header.dataset.hasActivePage = '1'; // persist across accordion open/close
-            }
+    if (owner) {
+        owner.classList.add('active');
+
+        // Auto-open parent submenu
+        const submenu = owner.closest('.wsm__nav-submenu');
+        if (submenu) {
+            submenu.classList.add('show');
+            const header = submenu.previousElementSibling;
+            header.classList.add('active');
+            header.dataset.hasActivePage = '1'; // persist across accordion open/close
         }
+    }
 
-        // Close menu on tap for nav links (not section headers)
+    // Close menu on tap for nav links (not section headers)
+    allLinks.forEach(function(link) {
         if (link.tagName === 'A' && !link.classList.contains('wsm__dashboard-btn')) {
             link.addEventListener('click', closeMobileSidebarOnNav);
         }

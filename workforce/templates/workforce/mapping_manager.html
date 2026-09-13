@@ -12,7 +12,7 @@ Notes: Mappings live in Business.import_mapping, nested by platform key; OneDriv
 {% block title %}Mapping Manager — Import Wizard{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/mapping_manager.css' %}?v=20260514a">
+<link rel="stylesheet" href="{% static 'workforce/css/mapping_manager.css' %}?v=20260911a">
 {% endblock %}
 
 {% block content %}
@@ -125,6 +125,13 @@ Notes: Mappings live in Business.import_mapping, nested by platform key; OneDriv
                     <input type="file" accept=".xlsx,.xls,.csv" onchange="uploadSampleFile(this)" style="display:none">
                 </label>
             </span>
+            <!-- Custom API: nothing to fetch from, so the fields come from a pasted sample -->
+            <span id="mmap_json_actions" class="d-none align-items-center gap-2">
+                <button class="mmap__btn mmap__btn--outline" onclick="openJsonPaste()"
+                        title="Paste a sample order payload from the seller's website to load its field paths">
+                    <i class="fa-solid fa-paste fa-sm"></i> Paste Sample JSON
+                </button>
+            </span>
             <button class="mmap__btn mmap__btn--outline" onclick="autoDetectAll()" title="Fill in defaults / auto-detect">
                 <i class="fa-solid fa-wand-magic-sparkles fa-sm"></i> Auto-fill
             </button>
@@ -181,6 +188,34 @@ Notes: Mappings live in Business.import_mapping, nested by platform key; OneDriv
         </div>
     </div>
 
+    {# ── Paste Sample JSON (Custom API tab) ── #}
+    <div class="mmap__json-overlay" id="mmap_json_modal" aria-hidden="true">
+        <div class="mmap__json-box" role="dialog" aria-modal="true" aria-labelledby="mmap_json_title">
+            <div class="mmap__json-head">
+                <div>
+                    <div class="mmap__json-title" id="mmap_json_title">
+                        <i class="fa-solid fa-code fa-sm"></i> Paste a sample order payload
+                    </div>
+                    <div class="mmap__json-sub">
+                        One real order as the seller's website posts it. Every field found becomes
+                        a pickable column — nested keys read as <code>customer.name</code>, and a
+                        list reads as <code>items[].name</code> meaning every line in the basket.
+                    </div>
+                </div>
+                <button type="button" class="mmap__json-close" onclick="closeJsonPaste()" aria-label="Close">&times;</button>
+            </div>
+            <textarea id="mmap_json_input" class="mmap__json-input" spellcheck="false"
+                      placeholder='{&#10;  "orderNumber": "ORD-1001",&#10;  "customer": { "name": "...", "phone": "..." },&#10;  "items": [ { "name": "...", "qty": 1 } ],&#10;  "total": 90&#10;}'></textarea>
+            <div class="mmap__json-msg" id="mmap_json_msg"></div>
+            <div class="mmap__json-foot">
+                <button type="button" class="mmap__btn mmap__btn--ghost" onclick="closeJsonPaste()">Cancel</button>
+                <button type="button" class="mmap__btn mmap__btn--primary" id="mmap_json_btn" onclick="detectJsonFields()">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-sm"></i> Detect fields
+                </button>
+            </div>
+        </div>
+    </div>
+
     {# ── Toast ── #}
     <div class="mmap__toast" id="mmap_toast"></div>
 
@@ -202,11 +237,17 @@ const BIZ_ID       = '{{ selected_business_id|escapejs }}';
 const SAVE_URL     = '{% url "workforce:wf_mapping_manager_save" %}';
 const CSRF_TOKEN   = document.querySelector('meta[name="csrf-token"]')?.content || '';
 const SOURCE_LISTS = {{ source_lists_json|safe }};
+// Platforms wf_mapping_manager_test can pull a live row from. Kept in one place:
+// it used to be spelled out separately in Run Test and Raw Data, so adding a
+// platform to one silently left the other refusing it.
+const TESTABLE = ['shopify', 'woocommerce', 'google_sheet', 'onedrive', 'custom_api'];
+const TESTABLE_LABEL = 'Shopify, WooCommerce, Google Sheet, OneDrive and Custom API';
 // Track selected source per platform
 const selectedSources = {
     onedrive: (SOURCE_LISTS.onedrive.find(s => s.is_default) || SOURCE_LISTS.onedrive[0] || {}).id || null,
     google_sheet: (SOURCE_LISTS.google_sheet.find(s => s.is_default) || SOURCE_LISTS.google_sheet[0] || {}).id || null,
     public_link: ((SOURCE_LISTS.public_link || []).find(s => s.is_default) || (SOURCE_LISTS.public_link || [])[0] || {}).id || null,
+    custom_api: ((SOURCE_LISTS.custom_api || []).find(s => s.is_default) || (SOURCE_LISTS.custom_api || [])[0] || {}).id || null,
 };
 
 // ── Field lookup ─────────────────────────────────────────
@@ -308,6 +349,7 @@ document.addEventListener('DOMContentLoaded', function () {
         hdrActions?.classList.toggle('d-inline-flex', showHdr);
         const fetchBtn = document.getElementById('mmap_fetch_btn');
         if (fetchBtn) fetchBtn.style.display = activePlatform === 'csv' ? 'none' : '';
+        toggleJsonActions(activePlatform);
         // Headers are pre-loaded from server — "Fetch Headers" is manual only
     }
     updateStats();
@@ -354,6 +396,7 @@ function switchPlatform(key) {
     // Hide fetch btn for csv (no connected source)
     const fetchBtn = document.getElementById('mmap_fetch_btn');
     if (fetchBtn) fetchBtn.style.display = key === 'csv' ? 'none' : '';
+    toggleJsonActions(key);
     // Sheet-tab picker is Google Sheet only
     const tabWrap = document.getElementById('mmap_sheet_tab_wrap');
     if (tabWrap) {
@@ -752,6 +795,69 @@ function uploadSampleFile(input) {
         .catch(e => showToast('Upload error: ' + e.message, 'error'));
 }
 
+// ── Paste Sample JSON (Custom API) ───────────────────────
+function toggleJsonActions(key) {
+    const wrap = document.getElementById('mmap_json_actions');
+    if (!wrap) return;
+    const show = (key === 'custom_api');
+    wrap.classList.toggle('d-none', !show);
+    wrap.classList.toggle('d-inline-flex', show);
+}
+
+function openJsonPaste() {
+    document.getElementById('mmap_json_msg').textContent = '';
+    document.getElementById('mmap_json_modal').classList.add('mmap__json-overlay--open');
+    document.getElementById('mmap_json_input').focus();
+}
+
+function closeJsonPaste() {
+    document.getElementById('mmap_json_modal').classList.remove('mmap__json-overlay--open');
+}
+
+function detectJsonFields() {
+    const input = document.getElementById('mmap_json_input');
+    const msg   = document.getElementById('mmap_json_msg');
+    const btn   = document.getElementById('mmap_json_btn');
+    const sample = (input.value || '').trim();
+    if (!sample) {
+        msg.innerHTML = '<span class="mmap__json-msg--err">Paste a sample payload first.</span>';
+        return;
+    }
+
+    const body = new URLSearchParams();
+    body.append('csrfmiddlewaretoken', CSRF_TOKEN);
+    body.append('business_id', BIZ_ID);
+    body.append('sample', sample);
+    if (selectedSources.custom_api) body.append('api_id', selectedSources.custom_api);
+
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin fa-sm"></i> Reading…';
+
+    fetch('{% url "workforce:wf_detect_json_fields" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF_TOKEN, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (!data.success) {
+            msg.innerHTML = '<span class="mmap__json-msg--err">' + escHtml(data.error || 'Could not read that payload') + '</span>';
+            return;
+        }
+        applyNewHeaders(data.headers || []);
+        closeJsonPaste();
+        showToast(`Found ${data.count} fields — pick them in the dropdowns, then Save All`, 'success');
+    })
+    .catch(e => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        msg.innerHTML = '<span class="mmap__json-msg--err">' + escHtml(e.message) + '</span>';
+    });
+}
+
 // ── Apply new headers to current platform & re-render ────
 function applyNewHeaders(headers) {
     // Only commit DOM if headers were already loaded (selects have real options)
@@ -907,8 +1013,8 @@ function testLatestOrder() {
     const result  = document.getElementById('mmap_test_result');
 
     if (!activePlatform) { showToast('Select a platform first', 'error'); return; }
-    if (!['shopify','woocommerce','google_sheet','onedrive'].includes(activePlatform)) {
-        showToast('Test is only available for Shopify, WooCommerce, Google Sheet and OneDrive', 'error');
+    if (!TESTABLE.includes(activePlatform)) {
+        showToast('Test is only available for ' + TESTABLE_LABEL, 'error');
         return;
     }
 
@@ -917,8 +1023,8 @@ function testLatestOrder() {
     result.innerHTML = '<div class="mmap__test-loading"><span class="mmap__spin mmap__spin--lg"></span><span>Loading latest order…</span></div>';
 
     let url = `${TEST_URL}?business_id=${encodeURIComponent(BIZ_ID)}&platform=${encodeURIComponent(activePlatform)}`;
-    if (activePlatform === 'onedrive' && selectedSources.onedrive) {
-        url += `&source_id=${encodeURIComponent(selectedSources.onedrive)}`;
+    if (selectedSources[activePlatform]) {
+        url += `&source_id=${encodeURIComponent(selectedSources[activePlatform])}`;
     }
     fetch(url)
         .then(r => r.json())
@@ -941,8 +1047,8 @@ function testLatestOrder() {
 
 function showRawData() {
     if (!activePlatform) { showToast('Select a platform first', 'error'); return; }
-    if (!['shopify','woocommerce','google_sheet','onedrive'].includes(activePlatform)) {
-        showToast('Raw data only available for Shopify, WooCommerce, Google Sheet and OneDrive', 'error');
+    if (!TESTABLE.includes(activePlatform)) {
+        showToast('Raw data only available for ' + TESTABLE_LABEL, 'error');
         return;
     }
 
@@ -970,8 +1076,8 @@ function showRawData() {
     result.innerHTML = '<div class="mmap__test-loading"><span class="mmap__spin mmap__spin--lg"></span><span>Fetching raw data…</span></div>';
 
     let url = `${TEST_URL}?business_id=${encodeURIComponent(BIZ_ID)}&platform=${encodeURIComponent(activePlatform)}`;
-    if (activePlatform === 'onedrive' && selectedSources.onedrive) {
-        url += `&source_id=${encodeURIComponent(selectedSources.onedrive)}`;
+    if (selectedSources[activePlatform]) {
+        url += `&source_id=${encodeURIComponent(selectedSources[activePlatform])}`;
     }
     fetch(url)
         .then(r => r.json())

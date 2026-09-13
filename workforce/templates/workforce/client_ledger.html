@@ -1,0 +1,278 @@
+{# Purpose: The client account — every money event on one date axis with a running balance. #}
+{# Used by: workforce.views.client_ledger (URL workforce:client_ledger) #}
+{# Notes: One account at a time; a running balance across accounts would be meaningless. The Balance #}
+{#        column is the account's true balance at each row and does NOT restate under a filter. #}
+{% extends "wf_dashboard_base.html" %}
+{% load business_dropdown %}
+{% load static humanize custom_filters %}
+
+{% block title %}Client Ledger{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260909b" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_ledger.css' %}?v=20260907a" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="bcp">
+  <div class="bcp__wrap">
+
+    <!-- Masthead -->
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Account · Client ledger</span>
+        <h1 class="wfhero__title">Client Ledger</h1>
+        <span class="wfhero__sub">
+          {% if selected_business %}{{ selected_business.business_name }}{% else %}Every money event on one account{% endif %}
+          <span class="wfhero__sep">·</span> COD, charges, advances, payouts and payments
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <nav class="wfhero__actions">
+          <a href="{% url 'workforce:cod_business_settlement_report' %}" class="wfhero__ghost">Client payout ▸</a>
+          <a href="{% url 'workforce:client_charges_collect' %}" class="wfhero__ghost">Charges to collect ▸</a>
+          {% if selected_business %}
+          <a href="?{{ request.GET.urlencode }}&export=csv" class="wfhero__ghost">Export CSV</a>
+          {% endif %}
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_client_ledger_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <div class="bcp__body">
+
+    <div class="wfnote" id="workforce_client_ledger_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_client_ledger_card_notes' %}" hidden></div>
+
+    {% comment %}
+    The whole board before an account is picked. Balance means what EzzyDelivery
+    owes the client, so the two directions are counted separately — netting them
+    across accounts would hide both.
+    {% endcomment %}
+    <section class="wfstat" aria-label="Client account positions">
+      <div class="wfstat__card wfstat__card--here">
+        <span class="wfstat__label">We owe clients</span>
+        <span class="wfstat__value">{{ board_owed_to_clients|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">across every account in credit</span>
+      </div>
+      <div class="wfstat__card">
+        <span class="wfstat__label">Clients owe us</span>
+        <span class="wfstat__value">{{ board_owed_to_us|floatformat:2|intcomma }}<span class="wfstat__unit">QAR</span></span>
+        <span class="wfstat__sub">across every account in debit</span>
+      </div>
+      <div class="wfstat__card">
+        <span class="wfstat__label">Accounts open</span>
+        <span class="wfstat__value">{{ board_accounts|intcomma }}</span>
+        <span class="wfstat__sub">with a non-zero balance</span>
+      </div>
+    </section>
+
+    <!-- Pick an account, then narrow it -->
+    <form method="GET" class="bcp__window" id="workforce_client_ledger_form_filter">
+      <div class="bcp__field bcp__field--account">
+        <label class="bcp__field-label" for="workforce_client_ledger_select_business">Account</label>
+        <select name="business_id" id="workforce_client_ledger_select_business" class="bcp__select">
+          <option value="">Choose a business…</option>
+          {% for biz in all_businesses|code_last %}
+          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id|stringformat:"s" %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}{% if biz.ledger_balance > 0 %} — we owe {{ biz.ledger_balance|floatformat:0|intcomma }} QR{% elif biz.ledger_balance < 0 %} — owes us {{ biz.ledger_balance|floatformat:0|intcomma|cut:"-" }} QR{% else %} — square{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_client_ledger_select_segment">Segment</label>
+        <select name="segment" id="workforce_client_ledger_select_segment" class="bcp__select">
+          <option value="">All segments</option>
+          {% for val, label in segment_choices %}
+          <option value="{{ val }}" {% if segment == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_client_ledger_select_status">Status</label>
+        <select name="status" id="workforce_client_ledger_select_status" class="bcp__select">
+          <option value="">Any status</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_client_ledger_select_direction">Direction</label>
+        <select name="direction" id="workforce_client_ledger_select_direction" class="bcp__select">
+          <option value="">Both</option>
+          <option value="receivable" {% if direction == 'receivable' %}selected{% endif %}>Receivable (they owe us)</option>
+          <option value="payable" {% if direction == 'payable' %}selected{% endif %}>Payable (we owe them)</option>
+        </select>
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_client_ledger_input_from">From</label>
+        <input type="date" name="date_from" id="workforce_client_ledger_input_from" class="bcp__input" value="{{ date_from }}">
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_client_ledger_input_to">To</label>
+        <input type="date" name="date_to" id="workforce_client_ledger_input_to" class="bcp__input" value="{{ date_to }}">
+      </div>
+      <div class="bcp__field">
+        <label class="bcp__field-label" for="workforce_client_ledger_input_q">Find</label>
+        <input type="search" name="q" id="workforce_client_ledger_input_q" class="bcp__input" value="{{ q }}" placeholder="Order, task, code…">
+      </div>
+      <div class="bcp__window-actions">
+        <button type="submit" class="bcp__primary">Open</button>
+        <a href="{% url 'workforce:client_ledger' %}" class="bcp__ghost">Clear</a>
+      </div>
+    </form>
+
+    {% if selected_business %}
+
+    <!-- Where the account stands -->
+    <section class="clg__standing" aria-label="Account balance">
+      <div class="clg__balance {% if account_balance < 0 %}clg__balance--owed-to-us{% endif %}">
+        <span class="clg__balance-label">
+          {% if account_balance > 0 %}EzzyDelivery owes {{ selected_business.business_name }}
+          {% elif account_balance < 0 %}{{ selected_business.business_name }} owes EzzyDelivery
+          {% else %}Account is square{% endif %}
+        </span>
+        <span class="clg__balance-value">QAR {{ account_balance|floatformat:2|intcomma|cut:"-" }}</span>
+        <span class="clg__balance-sub">{{ entries_total|intcomma }} entr{{ entries_total|pluralize:"y,ies" }}{% if segment or status or direction or date_from or date_to or q %} matching the filter{% endif %}</span>
+      </div>
+      {% if not has_opening %}
+      <div class="clg__open-account">
+        <p class="clg__open-text">
+          This account has no opening balance, so its ledger starts at zero even
+          though the client may already be holding COD or owing invoices.
+        </p>
+        <button type="button" class="bcp__primary" id="workforce_client_ledger_btn_open_account"
+                data-business="{{ selected_business.business_id }}">Post opening balance</button>
+      </div>
+      {% endif %}
+    </section>
+
+    {% if summary %}
+    <!-- One card per segment: what it totals, and what has not cleared -->
+    <section class="clg__segments" aria-label="Totals by segment">
+      {% for s in summary %}
+      <div class="clg__seg clg__seg--{{ s.segment }}">
+        <span class="clg__seg-label">{{ s.label }}</span>
+        <span class="clg__seg-value {% if s.net < 0 %}clg__seg-value--dr{% else %}clg__seg-value--cr{% endif %}">
+          {{ s.net|floatformat:2|intcomma }}
+        </span>
+        <span class="clg__seg-sub">
+          {% if s.open_count %}{{ s.open_count }} open · {{ s.open_net|floatformat:2|intcomma }}{% else %}all cleared{% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    <!-- The account -->
+    <div class="clg__table-wrap">
+      <table class="clg__table" id="workforce_client_ledger_table_entries">
+        <thead>
+          <tr>
+            <th class="clg__th--date">Date</th>
+            <th>Entry</th>
+            <th>Segment</th>
+            <th>Order / Task</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th class="clg__th--num">Debit</th>
+            <th class="clg__th--num">Credit</th>
+            <th class="clg__th--num clg__th--bal">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in rows %}
+          <tr class="clg__row {% if e.status == 'void' %}clg__row--void{% endif %}">
+            <td class="clg__date" data-label="Date">{{ e.occurred_on|date:"d M y" }}</td>
+            <td class="clg__code" data-label="Entry">
+              {{ e.entry_code }}
+              {% if e.reference %}<span class="clg__ref">{{ e.reference }}</span>{% endif %}
+            </td>
+            <td data-label="Segment"><span class="clg__seg-chip clg__seg-chip--{{ e.segment }}">{{ e.get_segment_display }}</span></td>
+            <td class="clg__link" data-label="Order / Task">
+              {% if e.order_number %}<span class="clg__order">{{ e.order_number }}</span>{% endif %}
+              {% if e.task_number %}<span class="clg__task">{{ e.task_number }}</span>{% endif %}
+              {% if not e.order_number and not e.task_number %}<span class="clg__muted">—</span>{% endif %}
+            </td>
+            <td class="clg__desc" data-label="Description">{{ e.description }}</td>
+            <td data-label="Status"><span class="clg__status clg__status--{{ e.status }}">{{ e.get_status_display }}</span></td>
+            <td class="clg__num clg__num--dr" data-label="Debit">{% if e.debit %}{{ e.debit|floatformat:2|intcomma }}{% endif %}</td>
+            <td class="clg__num clg__num--cr" data-label="Credit">{% if e.credit %}{{ e.credit|floatformat:2|intcomma }}{% endif %}</td>
+            <td class="clg__num clg__num--bal" data-label="Balance">{{ e.balance_after|floatformat:2|intcomma }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="clg__empty">
+              {% if segment or status or direction or date_from or date_to or q %}
+                Nothing on this account matches that filter.
+              {% else %}
+                This account has no ledger entries yet.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% if rows %}
+        <tfoot>
+          <tr class="clg__totals">
+            <td colspan="6">Totals{% if segment or status or direction or date_from or date_to or q %} (filtered){% endif %}</td>
+            <td class="clg__num clg__num--dr">{{ total_debit|floatformat:2|intcomma }}</td>
+            <td class="clg__num clg__num--cr">{{ total_credit|floatformat:2|intcomma }}</td>
+            <td class="clg__num clg__num--bal">{{ account_balance|floatformat:2|intcomma }}</td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+
+    {% if rows %}
+    {% include "includes/components/_pagination.html" with page_obj=rows pagination_id="client_ledger" %}
+    {% endif %}
+
+    {% else %}
+    <div class="bcp__empty">
+      <div class="bcp__empty-mark">▸</div>
+      <p class="bcp__empty-text">Choose an account above to open its ledger.</p>
+    </div>
+    {% endif %}
+
+    </div><!-- /.bcp__body -->
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Seed an account with where it already stands. Kept to one button because the
+// service refuses a second call — an account gets exactly one opening balance.
+(function () {
+  const btn = document.getElementById('workforce_client_ledger_btn_open_account');
+  if (!btn) return;
+
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    const body = new FormData();
+    body.append('business_id', btn.dataset.business);
+    fetch("{% url 'workforce:client_ledger_open_account' %}", {
+      method: 'POST',
+      headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content},
+      body: body,
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { alert(data.error); btn.disabled = false; return; }
+        window.location.reload();
+      })
+      .catch(() => { alert('Could not post the opening balance.'); btn.disabled = false; });
+  });
+})();
+</script>
+{% endblock %}

@@ -5,7 +5,7 @@
 {#        Carries the shared page-notes card (wfnote__) under the masthead, hidden on load and toggled by the masthead help button. #}
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
-{% load static humanize %}
+{% load static humanize custom_filters %}
 
 {% block title %}Client Payout{% endblock %}
 
@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260816a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260909b" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -89,7 +89,7 @@
           {% for biz in all_businesses|code_last %}
           {% comment %} The outstanding figure rides on the option so staff can see which
              accounts are owed money without selecting each one in turn. {% endcomment %}
-          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}{% if biz.pending_count %} — {{ biz.pending_total|floatformat:0|intcomma }} QR held{% else %} — nothing held{% endif %}</option>
+          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id|stringformat:"s" %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}{% if biz.pending_count %} — {{ biz.pending_total|floatformat:0|intcomma }} QR held{% else %} — nothing held{% endif %}</option>
           {% endfor %}
         </select>
       </div>
@@ -164,14 +164,20 @@
       <div class="bcp__table-wrap">
         <table class="bcp__table" id="workforce_client_payout_table_{{ g.business.business_id }}">
           <thead>
+            {% comment %} Sorting is client-side on purpose: this list is unpaginated, so every
+               row is already on the page, and reordering the <tr> nodes keeps the ticked
+               boxes (and therefore the counted total) exactly as staff left them. A
+               server-side sort would reload and silently clear the selection mid-count.
+               Each cell carries data-sv — the raw sortable value — so the mono date and
+               comma'd money render for humans while the sort reads the real figure. {% endcomment %}
             <tr>
               <th class="bcp__col-check"></th>
-              <th>Order</th>
-              <th>Customer</th>
-              <th class="bcp__date">Delivered</th>
-              <th class="bcp__date">COD received</th>
-              <th class="bcp__num">Del. charge</th>
-              <th class="bcp__num">COD held</th>
+              <th class="bcp__th--sort"><button type="button" class="bcp__sort" data-sort="text">Order <i class="fa-solid fa-sort bcp__sort-icon"></i></button></th>
+              <th class="bcp__th--sort"><button type="button" class="bcp__sort" data-sort="text">Customer <i class="fa-solid fa-sort bcp__sort-icon"></i></button></th>
+              <th class="bcp__date bcp__th--sort"><button type="button" class="bcp__sort" data-sort="date">Ordered <i class="fa-solid fa-sort bcp__sort-icon"></i></button></th>
+              <th class="bcp__date bcp__th--sort"><button type="button" class="bcp__sort" data-sort="date">Delivered <i class="fa-solid fa-sort bcp__sort-icon"></i></button></th>
+              <th class="bcp__num bcp__th--sort"><button type="button" class="bcp__sort" data-sort="num">Del. charge <i class="fa-solid fa-sort bcp__sort-icon"></i></button></th>
+              <th class="bcp__num bcp__th--sort"><button type="button" class="bcp__sort" data-sort="num">COD held <i class="fa-solid fa-sort bcp__sort-icon"></i></button></th>
             </tr>
           </thead>
           <tbody>
@@ -186,18 +192,24 @@
                        data-fee="{% if t.billed_elsewhere %}0.00{% else %}{{ t.billable_charge|floatformat:2 }}{% endif %}"
                        data-order="{% if t.order %}{{ t.order.order_number|default:t.order_id }}{% else %}{{ t.id }}{% endif %}">
               </td>
-              <td class="bcp__order">
+              <td class="bcp__order" data-sv="{% if t.order %}{{ t.order.order_number|default:t.order_id }}{% endif %}">
                 {% if t.order %}#{{ t.order.order_number|default:t.order_id }}{% else %}—{% endif %}
                 {% if t.dl_task_number and t.dl_task_number != t.order.order_number %}
                 <span class="bcp__sub-line">{{ t.dl_task_number }}</span>
                 {% endif %}
               </td>
-              <td class="bcp__truncate" title="{% if t.order %}{{ t.order.customer_name|default:'' }}{% endif %}">
-                {% if t.order %}{{ t.order.customer_name|default:"—" }}{% else %}—{% endif %}
+              {% comment %} The phone rides under the name as a masked tail (xxxx440) — enough
+                 to tell two same-named customers apart when checking a payout, without
+                 printing a contact number on a ledger that gets exported and shared. {% endcomment %}
+              <td class="bcp__cust" data-sv="{% if t.order %}{{ t.order.customer_name|default:'' }}{% endif %}" title="{% if t.order %}{{ t.order.customer_name|default:'' }}{% endif %}">
+                <span class="bcp__cust-name">{% if t.order %}{{ t.order.customer_name|default:"—" }}{% else %}—{% endif %}</span>
+                {% if t.order.customer_phone %}
+                <span class="bcp__sub-line">{{ t.order.customer_phone|mask_phone }}</span>
+                {% endif %}
               </td>
-              <td class="bcp__date">{{ t.completed_at|date:"d M Y"|default:"—" }}</td>
-              <td class="bcp__date">{{ t.cod_settled_at|date:"d M Y"|default:"—" }}</td>
-              <td class="bcp__num bcp__num--fee">
+              <td class="bcp__date" data-sv="{{ t.order.order_date|date:"Y-m-d" }}">{{ t.order.order_date|date:"d M Y"|default:"—" }}</td>
+              <td class="bcp__date" data-sv="{{ t.completed_at|date:"Y-m-d H:i:s" }}">{{ t.completed_at|date:"d M Y"|default:"—" }}</td>
+              <td class="bcp__num bcp__num--fee" data-sv="{{ t.billable_charge|floatformat:2 }}">
                 {% comment %} One resolver, shared with the settle action and the invoice
                    (delivery/charges.py) — resolves on `is not None`, so a charge
                    verified at 0.00 stays 0.00 instead of falling back to dl_price. {% endcomment %}
@@ -210,7 +222,7 @@
                       title="Client delivery-charge verification">{{ t.charge_verification_status|default:"pending"|title }}</span>
                 {% endif %}
               </td>
-              <td class="bcp__num bcp__num--cod">{{ t.cod_collected_amount|floatformat:2|intcomma }}</td>
+              <td class="bcp__num bcp__num--cod" data-sv="{{ t.cod_collected_amount|floatformat:2 }}">{{ t.cod_collected_amount|floatformat:2|intcomma }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -356,9 +368,18 @@
             <option value="fawran">Fawran</option>
           </select>
         </div>
-        <div>
+        <div class="mb-2">
           <label class="bcp__field-label" for="bcp_reference">Reference</label>
           <input type="text" id="bcp_reference" class="bcp__input" placeholder="Transfer ref / cheque no.">
+        </div>
+        {% comment %} Date the cash actually changed hands. Defaults to today; set it
+           back when entering a handover that already happened, so the payout, its
+           invoice and the deliveries it closes all carry the real date. {% endcomment %}
+        <div>
+          <label class="bcp__field-label" for="bcp_payout_date">Payout date</label>
+          <input type="date" id="bcp_payout_date" class="bcp__input"
+                 value="{{ today_iso }}" max="{{ today_iso }}">
+          <span class="bcp__field-hint">Leave as today unless you are recording a payout made earlier.</span>
         </div>
       </div>
       <div class="modal-footer">
@@ -532,6 +553,7 @@
     ids.forEach(id => body.append('task_ids[]', id));
     body.append('payment_method', el('bcp_payment_method').value);
     body.append('reference', el('bcp_reference').value);
+    body.append('payout_date', el('bcp_payout_date')?.value || '');
     body.append('deduct_charges', el('bcp_deduct_charges')?.checked ? '1' : '0');
     deductRows().forEach(r => {
       const amount = (r.querySelector('.bcp__deduct-amount').value || '').trim();
@@ -562,6 +584,69 @@
         this.disabled = false;
       }
     } catch (e) { alert('Network error'); this.disabled = false; }
+  });
+
+  // ── Column sorting ────────────────────────────────────────────────
+  // Reorders the existing <tr> nodes in place. Rows carry their own checkbox,
+  // so a re-sort never touches the selection or the totals — nothing is
+  // re-rendered and recompute() is not needed here.
+  //
+  // Each sortable cell exposes data-sv (the raw value): the ISO timestamp
+  // behind "12 Aug 2026", the plain figure behind "1,250.00". Sorting the
+  // rendered text would order dates alphabetically and money by comma.
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+  function sortValue(row, index, kind) {
+    const cell = row.cells[index];
+    const raw = (cell ? (cell.dataset.sv ?? cell.textContent) : '').trim();
+    if (kind === 'num') return raw === '' ? null : (parseFloat(raw.replace(/,/g, '')) || 0);
+    return raw === '' ? null : raw;
+  }
+
+  document.querySelectorAll('.bcp__table').forEach(table => {
+    const body = table.tBodies[0];
+    if (!body) return;
+
+    table.querySelectorAll('th .bcp__sort').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const th = btn.closest('th');
+        const index = th.cellIndex;
+        const kind = btn.dataset.sort;
+        // Money and dates open on the largest / most recent — that is what
+        // staff are looking for. Names and order numbers open A→Z.
+        const opening = (kind === 'text') ? 'asc' : 'desc';
+        const dir = (th.getAttribute('aria-sort') === 'ascending') ? 'desc'
+                  : (th.getAttribute('aria-sort') === 'descending') ? 'asc'
+                  : opening;
+        const sign = dir === 'asc' ? 1 : -1;
+
+        const rows = Array.from(body.rows);
+        rows.sort((a, b) => {
+          const av = sortValue(a, index, kind);
+          const bv = sortValue(b, index, kind);
+          // Blanks always sink, whichever way the column is pointing.
+          if (av === null && bv === null) return 0;
+          if (av === null) return 1;
+          if (bv === null) return -1;
+          if (kind === 'num') return (av - bv) * sign;
+          return collator.compare(av, bv) * sign;
+        });
+        const frag = document.createDocumentFragment();
+        rows.forEach(r => frag.appendChild(r));
+        body.appendChild(frag);
+
+        table.querySelectorAll('thead th').forEach(other => {
+          other.removeAttribute('aria-sort');
+          const icon = other.querySelector('.bcp__sort-icon');
+          if (icon) icon.className = 'fa-solid fa-sort bcp__sort-icon';
+          other.querySelector('.bcp__sort')?.classList.remove('bcp__sort--on');
+        });
+        th.setAttribute('aria-sort', dir === 'asc' ? 'ascending' : 'descending');
+        btn.classList.add('bcp__sort--on');
+        const icon = btn.querySelector('.bcp__sort-icon');
+        if (icon) icon.className = 'fa-solid fa-sort-' + (dir === 'asc' ? 'up' : 'down') + ' bcp__sort-icon';
+      });
+    });
   });
 
   // Void a payout

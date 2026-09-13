@@ -5,6 +5,7 @@
 import logging
 import re
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib import messages
@@ -801,6 +802,234 @@ def _lead_wa_session_choice(lead, requested):
     return ('' if picked == Lead.WA_SESSION_ALL else picked), options, changed, explicit
 
 
+def _lead_pricing_check(inquiry, user=None):
+    """Everything the rate card read off this inquiry, and what it charged for it.
+
+    Returned as flat rows rather than left to the template because the useful
+    column is CHARGED: a requirement the engine normalises but no rule matches
+    prices at zero, and that only becomes visible when it sits beside the answer
+    that asked for it. `dimension=None` means the answer reaches no rule at all.
+
+    Best-effort like every other panel on this page — a pricing failure must
+    never take down a lead record staff are trying to read.
+    """
+    if inquiry is None:
+        return None
+
+    try:
+        from webpages.pricing.engine import get_or_create_suggestion
+        suggestion, _record = get_or_create_suggestion(inquiry, user=user)
+    except Exception:
+        logger.exception('crm: price suggestion failed for PricingEnquiry %s', inquiry.pk)
+        return {'error': 'Could not compute a suggestion — see the error log.'}
+    if not suggestion.available:
+        return {'error': suggestion.reason or 'No suggestion available.'}
+
+    inputs = suggestion.inputs or {}
+
+    # What each dimension actually moved the price by. Summed, because special
+    # handling and COD can both stack more than one line.
+    charged = {}
+    for line in suggestion.breakdown:
+        try:
+            charged[line['dimension']] = (charged.get(line['dimension'], Decimal('0'))
+                                          + Decimal(line['delta']))
+        except (InvalidOperation, TypeError, KeyError):
+            continue
+
+    # A dimension the active card carries no rule for is priced INTO the base by
+    # design (v2 does this for same-day, COD, returns, home pickup and pickup
+    # frequency). Read off the card rather than hardcoded, so adding a rule later
+    # flips the row to a real charge on its own.
+    carded = set(suggestion.ruleset.rules.filter(is_active=True)
+                 .values_list('dimension', flat=True)) if suggestion.ruleset else set()
+
+    def row(group, label, value, dimension, state='plain', note='', sets_base=False):
+        return {
+            'group': group, 'label': label, 'value': value or '—', 'state': state,
+            # Volume and distance share one rule, so charging both rows would
+            # print the base twice — they say "sets the base" and the breakdown
+            # table below shows the single amount.
+            'charged': None if sets_base else charged.get(dimension),
+            'sets_base': sets_base,
+            # "in the base" only answers "you asked for it, why is it free?" —
+            # for a No it would be answering a question nobody asked.
+            'in_base': (dimension is not None and dimension not in carded
+                        and state != 'no'),
+            'priced': dimension is not None,
+            'note': note,
+        }
+
+    def yes_no(flag):
+        return ('Yes', 'yes') if flag else ('No', 'no')
+
+    handling = ', '.join(inputs.get('special_handling') or [])
+    cod_value, cod_state = yes_no(inputs.get('cod_required'))
+    if inputs.get('cod_required') and inputs.get('cod_share_mid') is not None:
+        cod_value = f'Yes — {inquiry.cod_orders_share} of orders'
+    sameday_value, sameday_state = yes_no(inputs.get('same_day_required'))
+    returns_value, returns_state = yes_no(inputs.get('returns_required'))
+
+    volume = inputs.get('monthly_orders')
+    VOLUME_SOURCE = {
+        'last_month': 'from last month’s orders',
+        'expected_next_month': 'from what they EXPECT next month, not history',
+        'last_week_scaled': 'from last week, scaled ×4.33',
+    }
+
+    rows = [
+        row('Service required', 'Delivery speed promised',
+            inquiry.speed_delivery_offer_to_customers, 'speed',
+            'unknown' if inputs.get('speed_rank') is None else 'plain'),
+        row('Service required', 'Same-day pick & deliver', sameday_value,
+            'same_day_pickup', sameday_state),
+        row('Service required', 'Special handling',
+            handling or ('Yes — unspecified' if inquiry.is_special_handling_required else 'No'),
+            'special_handling', 'yes' if handling else 'no'),
+        row('Service required', 'Return logistics', returns_value, 'returns', returns_state),
+        row('Service required', 'Cash on delivery', cod_value, 'cod', cod_state),
+        row('Service required', 'Parcel size', inquiry.typical_package_size, 'size',
+            'unknown' if inputs.get('size_rank') is None else 'plain'),
+        row('Service required', 'Parcel weight', inquiry.average_package_weight, 'weight',
+            'unknown' if inputs.get('weight_mid_kg') is None else 'plain'),
+
+        row('Pickup', 'Where we collect from', inquiry.type_of_pickup_location, 'pickup_type',
+            'unknown' if inputs.get('pickup_type_rank') is None else 'plain'),
+        row('Pickup', 'Pickup area', inquiry.pickup_Location_area_name, None,
+            'unknown' if not inquiry.pickup_Location_area_name else 'plain',
+            'never reaches the rate card'),
+        row('Pickup', 'How many pickup points',
+            inquiry.number_of_pickup_locations or 'Single point', 'pickup_locations'),
+        row('Pickup', 'Pickups per day', inquiry.number_of_pickup_times_in_day,
+            'pickups_per_day'),
+        row('Pickup', 'Pickup slot → delivery window',
+            ' → '.join(p for p in (inquiry.pickup_location_time_slab,
+                                   inquiry.preferred_delivery_time_window) if p),
+            None, 'plain', 'never reaches the rate card'),
+
+        row('Sets the base rate', 'Orders per month',
+            f'{volume:.0f}' if volume is not None else '',
+            'volume_distance_base',
+            'unknown' if volume is None else 'plain',
+            VOLUME_SOURCE.get(inputs.get('volume_source'), ''), sets_base=True),
+        row('Sets the base rate', 'Typical delivery distance',
+            inquiry.typical_delivery_distance, 'volume_distance_base',
+            'unknown' if inputs.get('distance_km') is None else 'plain', sets_base=True),
+        row('Sets the base rate', 'Delivery coverage', inquiry.delivery_coverage, None,
+            'unknown' if inputs.get('coverage_rank') is None else 'plain',
+            'never reaches the rate card'),
+    ]
+
+    agreed_gap = None
+    if inquiry.agreed_price_value is not None:
+        try:
+            agreed_gap = (Decimal(str(inquiry.agreed_price_value))
+                          - Decimal(str(suggestion.suggested_price)))
+        except (InvalidOperation, TypeError, ValueError):
+            agreed_gap = None
+
+    return {
+        'suggestion': suggestion,
+        'rows': rows,
+        'agreed_gap': agreed_gap,
+        'unpriced': [r for r in rows if not r['priced']],
+        'error': '',
+    }
+
+
+def _lead_reminder(lead, driver):
+    """The "what is still missing" reminder the WhatsApp composer offers, or None.
+
+    Returns ``{'label': ..., 'body': ...}``. The label carries the count so the
+    picker reads "Reminder — 2 details missing" rather than a generic entry that
+    might hold nothing.
+
+    Two different questions, one chip:
+      • Driver lead — the applicant's own form. Reuses the exact body the driver
+        profile page sends (``_build_driver_reminder``), so a reminder chased
+        from the CRM and one chased from the application read identically.
+      • Business lead — the answers we still need before a quote can go out:
+        the lead's own blanks first, then the pricing form's, plus that form's
+        resume link when they abandoned it half-way.
+
+    Nothing missing → None, and the composer simply does not offer the option:
+    a "you still owe us" message with an empty list is worse than no chip.
+    """
+    # A closed card is not chased. Won/approved has nothing outstanding that a
+    # message can fix, and lost/rejected must never get a "we still need…" nudge.
+    # Read off LeadStage.is_closed, not the key: both boards name their own
+    # terminal columns.
+    if lead.stage in crm_services.closed_stage_keys(lead.category) or lead.converted_business_id:
+        return None
+
+    if lead.category == Lead.CATEGORY_DRIVER:
+        if not driver:
+            return None
+        from workforce.views import _build_driver_reminder
+        _phone, body, missing, error = _build_driver_reminder(driver)
+        if error or not body:
+            return None
+        # Short on purpose: this label is a chip in the composer's paste row, not
+        # a sentence.
+        return {'label': f'Reminder · {len(missing)} missing', 'body': body}
+
+    return _business_lead_reminder(lead)
+
+
+def _business_lead_reminder(lead):
+    """Reminder body for a business lead — the details a quote still waits on."""
+    missing = []
+    if not lead.company_name:
+        missing.append('your business / store name')
+    if not lead.contact_name:
+        missing.append('your name')
+    if not lead.product_category:
+        missing.append('what you sell (product category)')
+
+    pe = lead.pricing_enquiry
+    resume_url = ''
+    if pe:
+        if not (pe.email or '').strip():
+            missing.append('an email address to send the quotation to')
+        if not (pe.avarage_number_of_order_done_last_month
+                or pe.avarage_number_of_order_last_week):
+            missing.append('how many orders you ship in a month')
+        if not (pe.pickup_Location_area_name or '').strip():
+            missing.append('the area we would collect from')
+        if not (pe.delivery_coverage or '').strip():
+            missing.append('where you deliver — Doha only or all Qatar')
+        if not (pe.typical_package_size or '').strip():
+            missing.append('the size of a typical parcel')
+        if not pe.is_complete and pe.quote_token:
+            base = (getattr(settings, 'SITE_URL', '') or 'https://ezzydelivery.qa').rstrip('/')
+            resume_url = f'{base}/3pl/inquiry/resume/{pe.quote_token}/'
+    else:
+        # No pricing form behind this lead, so nothing was ever asked. These are
+        # the three answers sales cannot quote without.
+        missing.append('how many orders you ship in a week')
+        missing.append('the area we would collect from')
+        missing.append('whether you need Cash on Delivery')
+
+    if not missing:
+        return None
+
+    greeting = strip_tags(lead.contact_name) or lead.company_name or 'there'
+    lines = '\n'.join(f'• {item}' for item in missing)
+    tail = (
+        f'\nYour answers are saved — you can finish the form here:\n{resume_url}\n'
+        if resume_url else ''
+    )
+    body = (
+        f'Hello {greeting}, this is *EZZY Delivery* 👋\n\n'
+        f'To prepare your delivery pricing we still need a few details:\n'
+        f'{lines}\n'
+        f'{tail}\n'
+        f'Just reply here with the answers and we will send your rates on this chat.\n\n'
+        f'*EZZY Delivery* 🚚'
+    )
+    return {'label': f'Reminder · {len(missing)} missing', 'body': body}
+
+
 def _ai_summary_available():
     """True when the ai_agent unified provider stack has a usable provider."""
     try:
@@ -818,7 +1047,9 @@ def crm_lead_detail(request, lead_id):
     conversation, shared-media gallery, AI summary."""
     lead = get_object_or_404(
         Lead.objects.select_related(
-            'assigned_to', 'converted_business', 'pricing_enquiry', 'whatsapp_inquiry'
+            'assigned_to', 'converted_business', 'pricing_enquiry', 'whatsapp_inquiry',
+            # The Quote panel reads the agreed plan and who quoted it.
+            'pricing_enquiry__selected_plan', 'pricing_enquiry__quoted_by',
         ),
         pk=lead_id,
     )
@@ -870,6 +1101,15 @@ def crm_lead_detail(request, lead_id):
         staff_name=request.user.get_full_name() or request.user.username,
     ) or ''
 
+    # The second body the composer offers: what this record is still short of.
+    # Built here rather than in the modal because only the page knows whether it
+    # is looking at a driver application or a quote request.
+    wa_reminder = _lead_reminder(lead, driver)
+
+    # What the rate card makes of this inquiry — the requirement-by-requirement
+    # check, so the desk can see WHY the number is what it is before quoting.
+    pricing_check = _lead_pricing_check(lead.pricing_enquiry, user=request.user)
+
     context = {
         'page_title': f'Lead – {lead.company_name or lead.contact_name or lead.phone}',
         'lead': lead,
@@ -893,9 +1133,12 @@ def crm_lead_detail(request, lead_id):
         # route from the Auto Triggers page, i.e. exactly today's behaviour.
         'wa_send_session': wa_session if wa_session_explicit else '',
         'wa_send_message': wa_send_message,
+        'wa_reminder_message': wa_reminder['body'] if wa_reminder else '',
+        'wa_reminder_label': wa_reminder['label'] if wa_reminder else '',
         # Across every number — lets the empty state say "the thread is on
         # another line" instead of the flatly wrong "this lead never wrote".
         'wa_total_messages': wa_session_options[0]['count'] if wa_session_options else 0,
+        'pricing_check': pricing_check,
         'ai_summary': lead.ai_summary,
         'ai_available': _ai_summary_available(),
         'today': timezone.localdate(),
@@ -2204,6 +2447,117 @@ def crm_driver_reports(request):
     """Driver recruitment scorecard — its own page, its own numbers."""
     return _render_crm_reports(
         request, Lead.CATEGORY_DRIVER, 'workforce/crm/driver_reports.html')
+
+
+# ── Driver map ──────────────────────────────────────────────────────────────
+#: Where the pipeline actually is on the ground. The pin comes from the location the
+#: applicant's browser captured when they submitted at /join_us/driver/, which lives
+#: on the Driver row as driver_meta['registration_location'].
+QATAR_BBOX = (24.4, 50.6, 26.3, 51.8)   # lat_min, lng_min, lat_max, lng_max
+DRIVER_MAP_PIN_LIMIT = 800
+
+
+def _lead_map_point(lead, stage_labels, stage_outcomes):
+    """One pin, or None when this lead has no usable location.
+
+    Leads are bound to their Driver row by FK, never by phone — see the driver
+    identity notes. No driver bound means no registration capture to plot.
+    """
+    driver = lead.driver
+    if not driver:
+        return None
+    loc = (driver.driver_meta or {}).get('registration_location') or {}
+    try:
+        lat, lng = float(loc.get('lat')), float(loc.get('lng'))
+    except (TypeError, ValueError):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None
+
+    profile = getattr(driver, 'profile', None)
+    name = (strip_tags(lead.contact_name)
+            or (profile.user.get_full_name() if profile and profile.user else '')
+            or lead.phone or driver.driver_code or '—')
+    in_qatar = (QATAR_BBOX[0] <= lat <= QATAR_BBOX[2]
+                and QATAR_BBOX[1] <= lng <= QATAR_BBOX[3])
+
+    return {
+        'lat': lat,
+        'lng': lng,
+        'in_qatar': in_qatar,
+        'name': name,
+        'phone': lead.phone or '',
+        'code': driver.driver_code or '',
+        'stage': lead.stage,
+        'stage_label': stage_labels.get(lead.stage, lead.stage),
+        # Colour axis: still live, hired, or gone. The stage itself is in the popup.
+        'outcome': stage_outcomes.get(lead.stage, ''),
+        'account': driver.get_driver_status_display(),
+        'assigned': (lead.assigned_to.get_full_name() or lead.assigned_to.username)
+                    if lead.assigned_to else '',
+        'captured_at': (loc.get('captured_at') or '')[:10],
+        'accuracy_m': str(loc.get('accuracy_m') or ''),
+        'url': reverse('workforce:crm_lead_detail', args=[lead.id]),
+    }
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_driver_map(request):
+    """Live map of the driver pipeline — one pin per applicant, where they signed up.
+
+    Built from the whole filtered set rather than a page of it, so the map answers
+    "where are my applicants" instead of "where is page 1".
+    """
+    leads, search, source_filter, assigned_filter, _category = _filtered_leads(request)
+    leads = leads.filter(category=Lead.CATEGORY_DRIVER)
+
+    stages = list(crm_services.board_stages(Lead.CATEGORY_DRIVER))
+    stage_labels = {st.key: st.label for st in stages}
+    stage_outcomes = {st.key: (st.outcome or '') for st in stages}
+
+    # Applied whenever one is given, not only when it matches a configured column:
+    # validating against the board made an unrecognised stage fall through and show
+    # every lead, which reads as "the filter did nothing".
+    stage_filter = (request.GET.get('stage') or '').strip()
+    if stage_filter:
+        leads = leads.filter(stage=stage_filter)
+
+    # Only leads bound to a driver can carry a registration capture at all.
+    leads = (leads.select_related('driver', 'driver__profile', 'driver__profile__user')
+             .order_by('-created_at'))
+
+    total = leads.count()
+    points, no_driver, no_location = [], 0, 0
+    for lead in leads[:DRIVER_MAP_PIN_LIMIT]:
+        if not lead.driver_id:
+            no_driver += 1
+            continue
+        point = _lead_map_point(lead, stage_labels, stage_outcomes)
+        if point is None:
+            no_location += 1
+            continue
+        points.append(point)
+
+    outside = sum(1 for p in points if not p['in_qatar'])
+
+    context = {
+        'map_points': points,
+        'pin_count': len(points),
+        'lead_total': total,
+        'no_driver_count': no_driver,
+        'no_location_count': no_location,
+        'outside_count': outside,
+        'truncated': total > DRIVER_MAP_PIN_LIMIT,
+        'pin_limit': DRIVER_MAP_PIN_LIMIT,
+        'stages': stages,
+        'stage_filter': stage_filter,
+        'search': search,
+        'source_filter': source_filter,
+        'assigned_filter': assigned_filter,
+        'source_choices': Lead.SOURCE_CHOICES,
+    }
+    return render(request, 'workforce/crm/driver_map.html', context)
 
 
 # ── Board columns (LeadStage) — staff-managed pipeline configuration ─────────

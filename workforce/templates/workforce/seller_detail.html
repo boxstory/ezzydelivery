@@ -146,6 +146,7 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
         <button class="sld__tab active" data-tab="overview">Overview</button>
         <button class="sld__tab" data-tab="orders">Orders <span class="sld__tab-count">{{ order_stats.total_orders|default:0 }}</span></button>
         <button class="sld__tab" data-tab="details">Details</button>
+        <button class="sld__tab" data-tab="locations">Store Locations <span class="sld__tab-count">{{ pickup_locations|length }}</span></button>
         <button class="sld__tab" data-tab="documents">Documents <span class="sld__tab-count">{{ documents|length }}</span></button>
         <button class="sld__tab" data-tab="team">Team <span class="sld__tab-count">{{ team_members.count|default:0 }}</span></button>
         <button class="sld__tab" data-tab="products">Products <span class="sld__tab-count">{{ products_list.count|default:0 }}</span></button>
@@ -547,345 +548,432 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
 
     <!-- Tab: Details -->
     <div id="panel-details" class="sld__panel">
-        <div class="sld__two-col">
-            <div>
-                <!-- Business Info -->
-                <div class="sld__section">
-                    <h3 class="sld__section-title">
-                        <i class="fa-solid fa-building sld__section-icon"></i> Business Information
-                    </h3>
-                    <div class="sld__info-grid">
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Business Name</div>
-                            <div class="sld__info-val">{{ business.business_name|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Business Code</div>
-                            <div class="sld__info-val">{{ business.business_code|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">QID</div>
-                            <div class="sld__info-val">{{ business.business_qid|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Category</div>
-                            <div class="sld__info-val">{{ business.business_product_category|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Business Since</div>
-                            <div class="sld__info-val">{{ business.business_since|date:"d M Y"|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Created</div>
-                            <div class="sld__info-val">{{ business.created_at|date:"d M Y" }}</div>
-                        </div>
-                    </div>
+        <!-- Business Info -->
+        <div class="sld__section">
+            <h3 class="sld__section-title">
+                <i class="fa-solid fa-building sld__section-icon"></i> Business Information
+            </h3>
+            <div class="sld__info-grid">
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Business Name</div>
+                    <div class="sld__info-val">{{ business.business_name|default:"N/A" }}</div>
                 </div>
-
-                {% if business.user or business.profile %}
-                <!-- Owner Info -->
-                <div class="sld__section">
-                    <h3 class="sld__section-title">
-                        <i class="fa-solid fa-user-tie sld__section-icon"></i> Owner Information
-                    </h3>
-                    <div class="sld__info-grid">
-                        {% if business.user %}
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Name</div>
-                            <div class="sld__info-val">{{ business.user.first_name }} {{ business.user.last_name|default:"" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Username</div>
-                            <div class="sld__info-val">{{ business.user.username|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Email</div>
-                            <div class="sld__info-val">{{ business.user.email|default:"N/A" }}</div>
-                        </div>
-                        {% endif %}
-                        {% if business.profile %}
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Phone</div>
-                            <div class="sld__info-val">{{ business.profile.phone|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Verification</div>
-                            <div class="sld__info-val">
-                                <span class="sld__badge {% if business.profile.verification_status == 'verified' %}sld__badge--success{% elif business.profile.verification_status == 'pending' %}sld__badge--warning{% else %}sld__badge--danger{% endif %}">
-                                    {{ business.profile.verification_status|title }}
-                                </span>
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Business Code</div>
+                    <div class="sld__info-val">{{ business.business_code|default:"N/A" }}</div>
                 </div>
-                {% endif %}
-
-                {% if business_profile %}
-                <!-- Address -->
-                <div class="sld__section">
-                    <h3 class="sld__section-title">
-                        <i class="fa-solid fa-location-dot sld__section-icon"></i> Business Address
-                    </h3>
-                    <div class="sld__info-grid">
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Address</div>
-                            <div class="sld__info-val">{{ business_profile.business_address|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">City</div>
-                            <div class="sld__info-val">{{ business_profile.business_city|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">State</div>
-                            <div class="sld__info-val">{{ business_profile.business_state|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Zip Code</div>
-                            <div class="sld__info-val">{{ business_profile.business_zip_code|default:"N/A" }}</div>
-                        </div>
-                        <div class="sld__info-row">
-                            <div class="sld__info-lbl">Country</div>
-                            <div class="sld__info-val">{{ business_profile.business_country|default:"N/A" }}</div>
-                        </div>
-                    </div>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">QID</div>
+                    <div class="sld__info-val">{{ business.business_qid|default:"N/A" }}</div>
                 </div>
-                {% endif %}
-            </div>
-
-            <div>
-                <!-- Pickup Locations -->
-                <div class="sld__section">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <h3 class="sld__section-title mb-0">
-                            <i class="fa-solid fa-map-location-dot sld__section-icon"></i> Pickup Locations
-                        </h3>
-                        <button class="btn btn-sm btn-outline-primary" id="sld-loc-add-btn" data-bs-toggle="modal" data-bs-target="#pickupLocationModal">
-                            <i class="fa-solid fa-plus me-1"></i> Add Location
-                        </button>
-                    </div>
-                    <ul class="sld__location-list" id="sld-pickup-list">
-                        {% for loc in pickup_locations %}
-                        <li class="sld__location-item" id="sld-loc-{{ loc.id }}">
-                            <span class="sld__location-icon"><i class="fa-solid fa-location-dot"></i></span>
-                            <div class="sld__location-body">
-                                <div class="sld__location-title">{{ loc.pickup_location_title }}{% if loc.locality %} — {{ loc.locality }}{% endif %}</div>
-                                <div class="sld__location-addr">Zone {{ loc.pickup_zone_no|default:"N/A" }}, St {{ loc.pickup_street_no|default:"N/A" }}, Bldg {{ loc.pickup_building_no|default:"N/A" }}</div>
-                                {% if loc.pickup_lat and loc.pickup_lon %}
-                                {% include "includes/components/_map_point.html" with uid=loc.id|stringformat:"s"|add:"-pl" lat=loc.pickup_lat lon=loc.pickup_lon label=loc.pickup_location_title text=loc.pickup_lat|floatformat:5|add:", "|add:loc.pickup_lon|floatformat:5 size="sm" %}
-                                {% else %}
-                                <span class="sld__location-pin sld__location-pin--none"><i class="fa-solid fa-location-crosshairs"></i> No map pin</span>
-                                {% endif %}
-                            </div>
-                            <span class="sld__badge {% if loc.pickup_status == 'active' %}sld__badge--success{% else %}sld__badge--warning{% endif %}">{{ loc.pickup_status|title }}</span>
-                            <button class="btn btn-sm btn-link p-0 ms-2 sld-edit-loc-btn"
-                                    data-update-url="{% url 'workforce:wf_pickup_location_update' business.business_id loc.id %}"
-                                    data-title="{{ loc.pickup_location_title }}"
-                                    data-locality="{{ loc.locality }}"
-                                    data-zone="{{ loc.pickup_zone_no|default_if_none:'' }}"
-                                    data-street="{{ loc.pickup_street_no|default_if_none:'' }}"
-                                    data-building="{{ loc.pickup_building_no|default_if_none:'' }}"
-                                    data-lat="{{ loc.pickup_lat|default_if_none:'' }}"
-                                    data-lon="{{ loc.pickup_lon|default_if_none:'' }}"
-                                    data-status="{{ loc.pickup_status }}"
-                                    data-default="{{ loc.is_default|yesno:'1,0' }}"
-                                    data-fulfilment="{{ loc.is_fulfilment_center|yesno:'1,0' }}"
-                                    title="Edit location">
-                                <i class="fa-solid fa-pen"></i>
-                            </button>
-                            {% if loc.pickup_status != 'active' %}
-                            <button class="btn btn-sm btn-link text-danger p-0 ms-2 sld-del-loc-btn"
-                                    data-loc-id="{{ loc.id }}"
-                                    data-del-url="{% url 'workforce:wf_pickup_location_delete' business.business_id loc.id %}"
-                                    title="Delete location">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                            {% endif %}
-                        </li>
-                        {% empty %}
-                        <li class="sld__empty-msg" id="sld-loc-empty">
-                            <i class="fa-solid fa-map-marker-alt"></i>
-                            No pickup locations
-                        </li>
-                        {% endfor %}
-                    </ul>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Category</div>
+                    <div class="sld__info-val">{{ business.business_product_category|default:"N/A" }}</div>
                 </div>
-
-                <!-- Add Pickup Location Modal -->
-                <div class="modal fade" id="pickupLocationModal" tabindex="-1" aria-labelledby="pickupLocationModalLabel" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="pickupLocationModalLabel">
-                                    <i class="fa-solid fa-map-location-dot me-2"></i>Add Pickup Location
-                                </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <form id="sld-pickup-form">
-                                {% csrf_token %}
-                                <div class="modal-body">
-                                    <div id="sld-pickup-alert" class="alert d-none"></div>
-                                    <div class="row g-3">
-                                        <div class="col-12 col-md-6">
-                                            <label class="form-label fw-semibold">Location Title <span class="text-danger">*</span></label>
-                                            <input type="text" name="pickup_location_title" class="form-control" placeholder="e.g. Main Warehouse" required>
-                                        </div>
-                                        <div class="col-12 col-md-6">
-                                            <label class="form-label fw-semibold">Locality / Area</label>
-                                            <input type="text" name="locality" class="form-control" placeholder="e.g. Al Sadd">
-                                        </div>
-                                        <div class="col-4">
-                                            <label class="form-label fw-semibold">Zone No.</label>
-                                            <input type="number" name="pickup_zone_no" class="form-control" min="1" placeholder="e.g. 25">
-                                        </div>
-                                        <div class="col-4">
-                                            <label class="form-label fw-semibold">Street No.</label>
-                                            <input type="number" name="pickup_street_no" class="form-control" min="1" placeholder="e.g. 8">
-                                        </div>
-                                        <div class="col-4">
-                                            <label class="form-label fw-semibold">Building No.</label>
-                                            <input type="number" name="pickup_building_no" class="form-control" min="1" placeholder="e.g. 12">
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label fw-semibold">Latitude</label>
-                                            <input type="text" name="pickup_lat" class="form-control" placeholder="e.g. 25.2854">
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label fw-semibold">Longitude</label>
-                                            <input type="text" name="pickup_lon" class="form-control" placeholder="e.g. 51.5310">
-                                        </div>
-                                        <div class="col-12">
-                                            <small class="text-muted"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Leave latitude/longitude empty to auto-locate the pin from Zone + Street + Building via QNAS.</small>
-                                        </div>
-                                        <div class="col-12 col-md-4">
-                                            <label class="form-label fw-semibold">Status</label>
-                                            <select name="pickup_status" class="form-select">
-                                                <option value="active" selected>Active</option>
-                                                <option value="inactive">Inactive</option>
-                                                <option value="pending">Approval Pending</option>
-                                                <option value="suspended">Suspended</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-12 col-md-4 d-flex align-items-end">
-                                            <div class="form-check mb-2">
-                                                <input class="form-check-input" type="checkbox" name="is_default" id="sldPickupIsDefault">
-                                                <label class="form-check-label" for="sldPickupIsDefault">Default pickup location</label>
-                                            </div>
-                                        </div>
-                                        <div class="col-12 col-md-4 d-flex align-items-end">
-                                            <div class="form-check mb-2">
-                                                <input class="form-check-input" type="checkbox" name="is_fulfilment_center" id="sldPickupIsFulfilment">
-                                                <label class="form-check-label" for="sldPickupIsFulfilment">Fulfilment center</label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="submit" class="btn btn-primary" id="sld-pickup-submit">
-                                        <i class="fa-solid fa-floppy-disk me-1"></i> Save Location
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Business Since</div>
+                    <div class="sld__info-val">{{ business.business_since|date:"d M Y"|default:"N/A" }}</div>
                 </div>
-
-                <script>
-                (function () {
-                    var addUrl = "{% url 'workforce:wf_pickup_location_add' business.business_id %}";
-                    var updateUrl = null; // null = add mode, otherwise edit mode
-                    var form = document.getElementById('sld-pickup-form');
-                    var modalTitle = document.getElementById('pickupLocationModalLabel');
-
-                    document.getElementById('sld-loc-add-btn').addEventListener('click', function () {
-                        updateUrl = null;
-                        form.reset();
-                        document.getElementById('sld-pickup-alert').className = 'alert d-none';
-                        modalTitle.innerHTML = '<i class="fa-solid fa-map-location-dot me-2"></i>Add Pickup Location';
-                    });
-
-                    form.addEventListener('submit', function (e) {
-                        e.preventDefault();
-                        var btn = document.getElementById('sld-pickup-submit');
-                        var alertEl = document.getElementById('sld-pickup-alert');
-                        btn.disabled = true;
-                        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
-                        alertEl.className = 'alert d-none';
-
-                        var data = new FormData(this);
-                        fetch(updateUrl || addUrl, {method: 'POST', body: data, headers: {'X-CSRFToken': data.get('csrfmiddlewaretoken')}})
-                            .then(function (r) { return r.json(); })
-                            .then(function (json) {
-                                if (json.success) {
-                                    window.location.reload();
-                                } else {
-                                    alertEl.className = 'alert alert-danger';
-                                    alertEl.textContent = json.error || 'Failed to save location.';
-                                    btn.disabled = false;
-                                    btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Location';
-                                }
-                            })
-                            .catch(function () {
-                                alertEl.className = 'alert alert-danger';
-                                alertEl.textContent = 'Network error. Please try again.';
-                                btn.disabled = false;
-                                btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Location';
-                            });
-                    });
-
-                    document.getElementById('sld-pickup-list').addEventListener('click', function (e) {
-                        var editBtn = e.target.closest('.sld-edit-loc-btn');
-                        if (editBtn) {
-                            var d = editBtn.dataset;
-                            updateUrl = d.updateUrl;
-                            form.reset();
-                            document.getElementById('sld-pickup-alert').className = 'alert d-none';
-                            form.elements['pickup_location_title'].value = d.title || '';
-                            form.elements['locality'].value = d.locality || '';
-                            form.elements['pickup_zone_no'].value = d.zone || '';
-                            form.elements['pickup_street_no'].value = d.street || '';
-                            form.elements['pickup_building_no'].value = d.building || '';
-                            form.elements['pickup_lat'].value = d.lat || '';
-                            form.elements['pickup_lon'].value = d.lon || '';
-                            form.elements['pickup_status'].value = d.status || 'active';
-                            form.elements['is_default'].checked = d.default === '1';
-                            form.elements['is_fulfilment_center'].checked = d.fulfilment === '1';
-                            modalTitle.innerHTML = '<i class="fa-solid fa-pen me-2"></i>Edit Pickup Location';
-                            bootstrap.Modal.getOrCreateInstance(document.getElementById('pickupLocationModal')).show();
-                            return;
-                        }
-                        var btn = e.target.closest('.sld-del-loc-btn');
-                        if (!btn) return;
-                        if (!confirm('Delete this pickup location?')) return;
-                        var delUrl = btn.dataset.delUrl;
-                        var locId = btn.dataset.locId;
-                        var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
-                        fetch(delUrl, {method: 'POST', headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded'}, credentials: 'same-origin'})
-                            .then(function (r) { return r.json(); })
-                            .then(function (json) {
-                                if (json.success) {
-                                    var li = document.getElementById('sld-loc-' + locId);
-                                    if (li) li.remove();
-                                    if (!document.querySelector('#sld-pickup-list .sld__location-item')) {
-                                        var empty = document.createElement('li');
-                                        empty.className = 'sld__empty-msg';
-                                        empty.id = 'sld-loc-empty';
-                                        empty.innerHTML = '<i class="fa-solid fa-map-marker-alt"></i> No pickup locations';
-                                        document.getElementById('sld-pickup-list').appendChild(empty);
-                                    }
-                                } else {
-                                    alert(json.error || 'Failed to delete location.');
-                                }
-                            })
-                            .catch(function () {
-                                alert('Failed to delete location. Please try again.');
-                            });
-                    });
-                }());
-                </script>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Created</div>
+                    <div class="sld__info-val">{{ business.created_at|date:"d M Y" }}</div>
+                </div>
             </div>
         </div>
+
+        {% if business.user or business.profile %}
+        <!-- Owner Info -->
+        <div class="sld__section">
+            <h3 class="sld__section-title">
+                <i class="fa-solid fa-user-tie sld__section-icon"></i> Owner Information
+            </h3>
+            <div class="sld__info-grid">
+                {% if business.user %}
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Name</div>
+                    <div class="sld__info-val">{{ business.user.first_name }} {{ business.user.last_name|default:"" }}</div>
+                </div>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Username</div>
+                    <div class="sld__info-val">{{ business.user.username|default:"N/A" }}</div>
+                </div>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Email</div>
+                    <div class="sld__info-val">{{ business.user.email|default:"N/A" }}</div>
+                </div>
+                {% endif %}
+                {% if business.profile %}
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Phone</div>
+                    <div class="sld__info-val">{{ business.profile.phone|default:"N/A" }}</div>
+                </div>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Verification</div>
+                    <div class="sld__info-val">
+                        <span class="sld__badge {% if business.profile.verification_status == 'verified' %}sld__badge--success{% elif business.profile.verification_status == 'pending' %}sld__badge--warning{% else %}sld__badge--danger{% endif %}">
+                            {{ business.profile.verification_status|title }}
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if business_profile %}
+        <!-- Address -->
+        <div class="sld__section">
+            <h3 class="sld__section-title">
+                <i class="fa-solid fa-location-dot sld__section-icon"></i> Business Address
+            </h3>
+            <div class="sld__info-grid">
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Address</div>
+                    <div class="sld__info-val">{{ business_profile.business_address|default:"N/A" }}</div>
+                </div>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">City</div>
+                    <div class="sld__info-val">{{ business_profile.business_city|default:"N/A" }}</div>
+                </div>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">State</div>
+                    <div class="sld__info-val">{{ business_profile.business_state|default:"N/A" }}</div>
+                </div>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Zip Code</div>
+                    <div class="sld__info-val">{{ business_profile.business_zip_code|default:"N/A" }}</div>
+                </div>
+                <div class="sld__info-row">
+                    <div class="sld__info-lbl">Country</div>
+                    <div class="sld__info-val">{{ business_profile.business_country|default:"N/A" }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tab: Store Locations -->
+    <div id="panel-locations" class="sld__panel">
+        <!-- Pickup Locations -->
+        <div class="sld__section">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <h3 class="sld__section-title mb-0">
+                    <i class="fa-solid fa-map-location-dot sld__section-icon"></i> Pickup Locations
+                </h3>
+                <button class="btn btn-sm btn-outline-primary" id="sld-loc-add-btn" data-bs-toggle="modal" data-bs-target="#pickupLocationModal">
+                    <i class="fa-solid fa-plus me-1"></i> Add Location
+                </button>
+            </div>
+            <ul class="sld__location-list" id="sld-pickup-list">
+                {% for loc in pickup_locations %}
+                <li class="sld__location-item" id="sld-loc-{{ loc.id }}">
+                    <span class="sld__location-icon"><i class="fa-solid fa-location-dot"></i></span>
+                    <div class="sld__location-body">
+                        <div class="sld__location-title">{{ loc.pickup_location_title }}{% if loc.locality %} — {{ loc.locality }}{% endif %}</div>
+                        {# One line on the wide tab: address, pin, then the standing flags #}
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            <span class="sld__location-addr">Zone {{ loc.pickup_zone_no|default:"N/A" }}, St {{ loc.pickup_street_no|default:"N/A" }}, Bldg {{ loc.pickup_building_no|default:"N/A" }}</span>
+                            {% if loc.pickup_lat and loc.pickup_lon %}
+                            {% include "includes/components/_map_point.html" with uid=loc.id|stringformat:"s"|add:"-pl" lat=loc.pickup_lat lon=loc.pickup_lon label=loc.pickup_location_title text=loc.pickup_lat|floatformat:5|add:", "|add:loc.pickup_lon|floatformat:5 size="sm" %}
+                            {% else %}
+                            <span class="sld__location-pin sld__location-pin--none"><i class="fa-solid fa-location-crosshairs"></i> No map pin</span>
+                            {% endif %}
+                            {% if loc.is_default %}
+                            <span class="sld__badge sld__badge--muted"><i class="fa-solid fa-thumbtack"></i> Default</span>
+                            {% endif %}
+                            {% if loc.is_fulfilment_center %}
+                            <span class="sld__badge sld__badge--muted"><i class="fa-solid fa-warehouse"></i> Fulfilment</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <span class="sld__badge {% if loc.pickup_status == 'active' %}sld__badge--success{% else %}sld__badge--warning{% endif %}">{{ loc.pickup_status|title }}</span>
+                    <button class="btn btn-sm btn-link p-0 ms-2 sld-edit-loc-btn"
+                            data-update-url="{% url 'workforce:wf_pickup_location_update' business.business_id loc.id %}"
+                            data-title="{{ loc.pickup_location_title }}"
+                            data-locality="{{ loc.locality }}"
+                            data-zone="{{ loc.pickup_zone_no|default_if_none:'' }}"
+                            data-street="{{ loc.pickup_street_no|default_if_none:'' }}"
+                            data-building="{{ loc.pickup_building_no|default_if_none:'' }}"
+                            data-lat="{{ loc.pickup_lat|default_if_none:'' }}"
+                            data-lon="{{ loc.pickup_lon|default_if_none:'' }}"
+                            data-status="{{ loc.pickup_status }}"
+                            data-default="{{ loc.is_default|yesno:'1,0' }}"
+                            data-fulfilment="{{ loc.is_fulfilment_center|yesno:'1,0' }}"
+                            title="Edit location">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    {# Shown on every store; the handler warns about what a delete costs #}
+                    <button class="btn btn-sm btn-link text-danger p-0 ms-2 sld-del-loc-btn"
+                            data-loc-id="{{ loc.id }}"
+                            data-del-url="{% url 'workforce:wf_pickup_location_delete' business.business_id loc.id %}"
+                            data-title="{{ loc.pickup_location_title }}"
+                            data-status="{{ loc.pickup_status }}"
+                            data-orders="{{ loc.linked_orders|default:0 }}"
+                            data-tasks="{{ loc.linked_tasks|default:0 }}"
+                            title="Delete location">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </li>
+                {% empty %}
+                <li class="sld__empty-msg" id="sld-loc-empty">
+                    <i class="fa-solid fa-map-marker-alt"></i>
+                    No pickup locations
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Add Pickup Location Modal -->
+        <div class="modal fade" id="pickupLocationModal" tabindex="-1" aria-labelledby="pickupLocationModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="pickupLocationModalLabel">
+                            <i class="fa-solid fa-map-location-dot me-2"></i>Add Pickup Location
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form id="sld-pickup-form">
+                        {% csrf_token %}
+                        <div class="modal-body">
+                            <div id="sld-pickup-alert" class="alert d-none"></div>
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label fw-semibold">Location Title <span class="text-danger">*</span></label>
+                                    <input type="text" name="pickup_location_title" class="form-control" placeholder="e.g. Main Warehouse" required>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label fw-semibold">Locality / Area</label>
+                                    <input type="text" name="locality" class="form-control" placeholder="e.g. Al Sadd">
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label fw-semibold">Zone No.</label>
+                                    <input type="number" name="pickup_zone_no" id="sldPickupZone" class="form-control" min="1" placeholder="e.g. 25">
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label fw-semibold">Street No.</label>
+                                    <input type="number" name="pickup_street_no" id="sldPickupStreet" class="form-control" min="1" placeholder="e.g. 8">
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label fw-semibold">Building No.</label>
+                                    <input type="number" name="pickup_building_no" id="sldPickupBuilding" class="form-control" min="1" placeholder="e.g. 12">
+                                </div>
+                                <div class="col-12 col-md-auto d-flex align-items-end">
+                                    <button type="button" class="btn btn-sm btn-outline-warning" id="sld-pickup-qnas-btn"
+                                            onclick="qnasValidateAndFill({zoneId:'sldPickupZone', streetId:'sldPickupStreet', buildingId:'sldPickupBuilding', latId:'sldPickupLat', lngId:'sldPickupLon', resultId:'sld-pickup-qnas-result', btnId:'sld-pickup-qnas-btn', mapId:'sld-pickup-map-link'})">
+                                        <i class="fa-solid fa-satellite-dish me-1"></i>Verify QNAS &amp; Fill Coordinates
+                                    </button>
+                                </div>
+                                <div class="col-12">
+                                    <div id="sld-pickup-qnas-result"></div>
+                                </div>
+
+                                <!-- Paste / Drop shared (WhatsApp) location — same control as the task detail page -->
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold" for="sld-pickup-loc-paste">
+                                        <i class="fa-brands fa-whatsapp me-1 text-success"></i>Paste / Drop Shared Location
+                                    </label>
+                                    <div id="sld-pickup-loc-drop" class="oap__loc-drop oap__loc-drop--sm"
+                                         ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+                                         ondrop="locDropHandle(event, {latId:'sldPickupLat', lngId:'sldPickupLon', mapId:'sld-pickup-map-link', resultId:'sld-pickup-loc-result', inputId:'sld-pickup-loc-paste'})">
+                                        <i class="fa-solid fa-location-dot oap__loc-drop__icon"></i>
+                                        <input type="text" id="sld-pickup-loc-paste" inputmode="url" class="form-control form-control-sm oap__loc-drop__input"
+                                               placeholder="Paste WhatsApp/Google Maps link (e.g. https://maps.google.com/?q=25.247,51.427) or drop the shared location here"
+                                               onkeydown="if (event.key === 'Enter') { event.preventDefault(); whatsappLocationFill(this.value, {latId:'sldPickupLat', lngId:'sldPickupLon', mapId:'sld-pickup-map-link', resultId:'sld-pickup-loc-result'}); }"
+                                               oninput="whatsappLocationFill(this.value, {latId:'sldPickupLat', lngId:'sldPickupLon', mapId:'sld-pickup-map-link', resultId:'sld-pickup-loc-result'})">
+                                    </div>
+                                    <div id="sld-pickup-loc-result" class="mt-1"></div>
+                                </div>
+
+                                <div class="col-5">
+                                    <label class="form-label fw-semibold" for="sldPickupLat">Latitude</label>
+                                    <input type="text" name="pickup_lat" id="sldPickupLat" class="form-control" placeholder="e.g. 25.2854">
+                                </div>
+                                <div class="col-5">
+                                    <label class="form-label fw-semibold" for="sldPickupLon">Longitude</label>
+                                    <input type="text" name="pickup_lon" id="sldPickupLon" class="form-control" placeholder="e.g. 51.5310">
+                                </div>
+                                {# col-2 not col-12: "main .col-12.d-flex" is forced to full width by workforce CSS #}
+                                <div class="col-2 d-flex align-items-end">
+                                    <a id="sld-pickup-map-link" href="#" target="_blank" rel="noopener" hx-boost="false"
+                                       class="btn btn-outline-secondary disabled w-100" title="View pin on Google Maps">
+                                        <i class="fa-solid fa-map-location-dot"></i>
+                                    </a>
+                                </div>
+                                <div class="col-12">
+                                    <small class="text-muted"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Leave latitude/longitude empty to auto-locate the pin from Zone + Street + Building via QNAS.</small>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label fw-semibold">Status</label>
+                                    <select name="pickup_status" class="form-select">
+                                        <option value="active" selected>Active</option>
+                                        <option value="inactive">Inactive</option>
+                                        <option value="pending">Approval Pending</option>
+                                        <option value="suspended">Suspended</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-4 d-flex align-items-end">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" name="is_default" id="sldPickupIsDefault">
+                                        <label class="form-check-label" for="sldPickupIsDefault">Default pickup location</label>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-4 d-flex align-items-end">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" name="is_fulfilment_center" id="sldPickupIsFulfilment">
+                                        <label class="form-check-label" for="sldPickupIsFulfilment">Fulfilment center</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" id="sld-pickup-submit">
+                                <i class="fa-solid fa-floppy-disk me-1"></i> Save Location
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        (function () {
+            var addUrl = "{% url 'workforce:wf_pickup_location_add' business.business_id %}";
+            var updateUrl = null; // null = add mode, otherwise edit mode
+            var form = document.getElementById('sld-pickup-form');
+            var modalTitle = document.getElementById('pickupLocationModalLabel');
+
+            // The QNAS button and the shared-location paste box leave badges, a live map
+            // link and a "Verified" button behind — clear them whenever the modal reopens.
+            function resetLocHelpers(lat, lon) {
+                var paste = document.getElementById('sld-pickup-loc-paste');
+                if (paste) paste.value = '';
+                document.getElementById('sld-pickup-loc-result').innerHTML = '';
+                document.getElementById('sld-pickup-qnas-result').innerHTML = '';
+                var qnasBtn = document.getElementById('sld-pickup-qnas-btn');
+                qnasBtn.disabled = false;
+                qnasBtn.className = 'btn btn-sm btn-outline-warning';
+                qnasBtn.innerHTML = '<i class="fa-solid fa-satellite-dish me-1"></i>Verify QNAS &amp; Fill Coordinates';
+                var mapLink = document.getElementById('sld-pickup-map-link');
+                mapLink.className = 'btn btn-outline-secondary w-100';
+                if (lat && lon) {
+                    mapLink.href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
+                } else {
+                    mapLink.href = '#';
+                    mapLink.classList.add('disabled');
+                }
+            }
+
+            document.getElementById('sld-loc-add-btn').addEventListener('click', function () {
+                updateUrl = null;
+                form.reset();
+                resetLocHelpers(null, null);
+                document.getElementById('sld-pickup-alert').className = 'alert d-none';
+                modalTitle.innerHTML = '<i class="fa-solid fa-map-location-dot me-2"></i>Add Pickup Location';
+            });
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var btn = document.getElementById('sld-pickup-submit');
+                var alertEl = document.getElementById('sld-pickup-alert');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+                alertEl.className = 'alert d-none';
+
+                var data = new FormData(this);
+                fetch(updateUrl || addUrl, {method: 'POST', body: data, headers: {'X-CSRFToken': data.get('csrfmiddlewaretoken')}})
+                    .then(function (r) { return r.json(); })
+                    .then(function (json) {
+                        if (json.success) {
+                            window.location.reload();
+                        } else {
+                            alertEl.className = 'alert alert-danger';
+                            alertEl.textContent = json.error || 'Failed to save location.';
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Location';
+                        }
+                    })
+                    .catch(function () {
+                        alertEl.className = 'alert alert-danger';
+                        alertEl.textContent = 'Network error. Please try again.';
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Location';
+                    });
+            });
+
+            document.getElementById('sld-pickup-list').addEventListener('click', function (e) {
+                var editBtn = e.target.closest('.sld-edit-loc-btn');
+                if (editBtn) {
+                    var d = editBtn.dataset;
+                    updateUrl = d.updateUrl;
+                    form.reset();
+                    document.getElementById('sld-pickup-alert').className = 'alert d-none';
+                    form.elements['pickup_location_title'].value = d.title || '';
+                    form.elements['locality'].value = d.locality || '';
+                    form.elements['pickup_zone_no'].value = d.zone || '';
+                    form.elements['pickup_street_no'].value = d.street || '';
+                    form.elements['pickup_building_no'].value = d.building || '';
+                    form.elements['pickup_lat'].value = d.lat || '';
+                    form.elements['pickup_lon'].value = d.lon || '';
+                    form.elements['pickup_status'].value = d.status || 'active';
+                    form.elements['is_default'].checked = d.default === '1';
+                    form.elements['is_fulfilment_center'].checked = d.fulfilment === '1';
+                    resetLocHelpers(d.lat, d.lon);
+                    modalTitle.innerHTML = '<i class="fa-solid fa-pen me-2"></i>Edit Pickup Location';
+                    bootstrap.Modal.getOrCreateInstance(document.getElementById('pickupLocationModal')).show();
+                    return;
+                }
+                var btn = e.target.closest('.sld-del-loc-btn');
+                if (!btn) return;
+                var locId = btn.dataset.locId;
+                var name = btn.dataset.title || 'this pickup location';
+                var tasks = parseInt(btn.dataset.tasks || '0', 10);
+                var orders = parseInt(btn.dataset.orders || '0', 10);
+                var isActive = btn.dataset.status === 'active';
+
+                // A task still pointing at the store makes the delete impossible, not
+                // merely costly — say so here instead of spending a round trip on it.
+                if (tasks) {
+                    alert('Cannot delete "' + name + '".\n\n' + tasks + ' delivery task(s) still reference this store. '
+                          + 'Set it to Inactive instead so it stops being offered on new orders.');
+                    return;
+                }
+                var msg = 'Delete "' + name + '"?';
+                if (isActive) {
+                    msg += '\n\nThis store is ACTIVE — it is a live pickup point for this seller.';
+                }
+                if (orders) {
+                    msg += '\n\n' + orders + ' order(s) will lose their stored pickup address. This cannot be undone.';
+                }
+                if (!confirm(msg)) return;
+
+                var delUrl = btn.dataset.delUrl;
+                var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                var body = isActive ? 'force=1' : '';
+                fetch(delUrl, {method: 'POST', headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded'}, credentials: 'same-origin', body: body})
+                    .then(function (r) { return r.json(); })
+                    .then(function (json) {
+                        if (json.success) {
+                            var li = document.getElementById('sld-loc-' + locId);
+                            if (li) li.remove();
+                            if (!document.querySelector('#sld-pickup-list .sld__location-item')) {
+                                var empty = document.createElement('li');
+                                empty.className = 'sld__empty-msg';
+                                empty.id = 'sld-loc-empty';
+                                empty.innerHTML = '<i class="fa-solid fa-map-marker-alt"></i> No pickup locations';
+                                document.getElementById('sld-pickup-list').appendChild(empty);
+                            }
+                        } else {
+                            alert(json.error || 'Failed to delete location.');
+                        }
+                    })
+                    .catch(function () {
+                        alert('Failed to delete location. Please try again.');
+                    });
+            });
+        }());
+        </script>
     </div>
 
     <!-- Tab: Documents -->
@@ -1010,6 +1098,19 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
     <!-- Tab: Team -->
     <div id="panel-team" class="sld__panel">
         <h3 class="sld__section-title">
+            <i class="fa-solid fa-crown sld__section-icon"></i> Account owner
+        </h3>
+        {# The owner is Business.user, never a team row, so it has to be read off the business. #}
+        <div class="sld__owner-bar" id="seller_detail_owner_bar">
+            <div class="sld__owner-id">
+                <span class="sld__owner-name">{% if business.user %}{{ business.user.get_full_name|default:business.user.username }}{% else %}No owner on file{% endif %}</span>
+                {% if business.user %}<span class="sld__owner-meta">{{ business.user.username }} &middot; {{ business.user.email|lower|default:"no email" }}</span>{% endif %}
+            </div>
+            <span class="sld__badge sld__badge--info">Owner</span>
+        </div>
+        <p class="sld__panel-note">Ownership is the account itself, not a role &mdash; use <strong>Make owner</strong> on a team member to hand it over. The current owner stays on as a manager.</p>
+
+        <h3 class="sld__section-title mt-4">
             <i class="fa-solid fa-users sld__section-icon"></i> Team Members
         </h3>
         {% if team_members %}
@@ -1018,6 +1119,7 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                 <thead>
                     <tr>
                         <th>Name</th>
+                        <th>Username</th>
                         <th>Role</th>
                         <th>Status</th>
                         <th>Email</th>
@@ -1036,9 +1138,15 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                             {% endif %}
                         </td>
                         <td>
+                            <span class="sld__team-user">{{ member.user.username|default:"—" }}</span>
+                        </td>
+                        <td>
                             <span class="sld__badge {% if member.team_role == 'manager' %}sld__badge--info{% else %}sld__badge--muted{% endif %}">
                                 {{ member.team_role|title }}
                             </span>
+                            {% if member.user_id == business.user_id %}
+                            <span class="sld__badge sld__badge--warning">Owner</span>
+                            {% endif %}
                         </td>
                         <td>
                             <span class="sld__badge {% if member.team_status == 'active' %}sld__badge--success{% elif member.team_status == 'pending' %}sld__badge--warning{% elif member.team_status == 'suspended' or member.team_status == 'rejected' %}sld__badge--danger{% else %}sld__badge--muted{% endif %}"
@@ -1076,6 +1184,21 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                                     title="Edit member">
                                 <i class="fa-solid fa-pen"></i> Edit
                             </button>
+                            {% comment %}
+                            Only an active membership can be handed the account, and some
+                            businesses also carry a team row for the owner themselves —
+                            offering to make them owner again is noise. The view refuses
+                            both cases anyway.
+                            {% endcomment %}
+                            {% if member.team_status == 'active' and member.user_id != business.user_id %}
+                            <button type="button" class="btn btn-sm btn-outline-warning sld__tm-owner-btn"
+                                    id="workforce_seller_btn_team_make_owner_{{ member.id }}"
+                                    data-member-name="{{ member.team_name|default:member.user.username }}"
+                                    data-url="{% url 'workforce:seller_transfer_ownership' business.business_id member.id %}"
+                                    title="Make this member the account owner">
+                                <i class="fa-solid fa-crown"></i> Make owner
+                            </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -1092,9 +1215,19 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
 
     <!-- Tab: Integrations -->
     <div id="panel-integrations" class="sld__panel">
-        <h3 class="sld__section-title">
-            <i class="fa-solid fa-plug sld__section-icon"></i> API Integrations
-        </h3>
+        <div class="sld__panel-head">
+            <div class="sld__panel-head-main">
+                <h3 class="sld__section-title">
+                    <i class="fa-solid fa-plug sld__section-icon"></i> API Integrations
+                </h3>
+                <p class="sld__panel-note">Store connections held for this seller. A new connection starts Pending until it is tested and approved.</p>
+            </div>
+            <div class="sld__act-group">
+                <button type="button" class="sld__act sld__act--primary sld-api-add-btn" id="seller_detail_btn_add_api">
+                    <i class="fa-solid fa-plus"></i> Add integration
+                </button>
+            </div>
+        </div>
         {% if api_settings %}
         <div class="sld__table-wrap">
             <table class="sld__table sld__api-table">
@@ -1173,6 +1306,9 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
         <div class="sld__empty-msg">
             <i class="fa-solid fa-plug"></i>
             No API integrations
+            <button type="button" class="sld__act sld__act--primary mt-3 sld-api-add-btn">
+                <i class="fa-solid fa-plus"></i> Add integration
+            </button>
         </div>
         {% endif %}
     </div>
@@ -1181,7 +1317,7 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
     <div class="sld__modal-overlay sld__modal-overlay--wide" id="sldApiEditModal" aria-hidden="true">
         <div class="sld__modal sld__modal--api-edit">
             <div class="sld__modal-header">
-                <h4 class="sld__modal-title"><i class="fa-solid fa-pen-to-square me-2"></i>Edit API Integration</h4>
+                <h4 class="sld__modal-title" id="sldApiEditTitle"><i class="fa-solid fa-pen-to-square me-2"></i>Edit API Integration</h4>
                 <button type="button" class="sld__modal-close" id="sldApiEditClose" aria-label="Close">&times;</button>
             </div>
             <form id="sldApiEditForm" autocomplete="off">
@@ -1190,7 +1326,7 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                         <div class="row g-3">
                             <div class="col-12 col-md-6">
                                 <label class="form-label small fw-semibold">Platform</label>
-                                <select class="form-select form-select-sm" name="api_type" id="sldApiEditType">
+                                <select class="form-select form-select-sm" name="api_type" id="sldApiEditType" data-no-select2>
                                     <option value="shopify">Shopify</option>
                                     <option value="woocommerce">WooCommerce</option>
                                     <option value="tiktokshop">TikTok Shop</option>
@@ -1265,7 +1401,7 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                                 </div>
                             </div>
                         </div>
-                        <div class="sld__form-note small text-muted mt-3">
+                        <div class="sld__form-note small text-muted mt-3" id="sldApiEditNote">
                             <i class="fa-solid fa-circle-info me-1"></i>
                             Changing API credentials will reset verification status to <strong>Pending</strong>.
                         </div>
@@ -1761,7 +1897,7 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                 </div>
                 <div class="col-12 col-md-6">
                     <label class="form-label small fw-semibold" for="sldTeamEditRole">Role</label>
-                    <select class="form-select form-select-sm" id="sldTeamEditRole" name="team_role">
+                    <select class="form-select form-select-sm" id="sldTeamEditRole" name="team_role" data-no-select2>
                         {% for value, label in team_role_choices %}
                         <option value="{{ value }}">{{ label }}</option>
                         {% endfor %}
@@ -1769,7 +1905,7 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                 </div>
                 <div class="col-12 col-md-6">
                     <label class="form-label small fw-semibold" for="sldTeamEditStatus">Status</label>
-                    <select class="form-select form-select-sm" id="sldTeamEditStatus" name="team_status">
+                    <select class="form-select form-select-sm" id="sldTeamEditStatus" name="team_status" data-no-select2>
                         {% for value, label in team_status_choices %}
                         <option value="{{ value }}">{{ label }}</option>
                         {% endfor %}
@@ -2050,6 +2186,9 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
         tiktok_refresh_token: document.getElementById('sldApiEditTtRefresh'),
     };
     var defaultChk = document.getElementById('sldApiEditDefault');
+    var editTitle  = document.getElementById('sldApiEditTitle');
+    var editNote   = document.getElementById('sldApiEditNote');
+    var createUrl  = "{% url 'workforce:wf_create_api_config' business.business_id %}";
 
     var testModal     = document.getElementById('sldApiTestModal');
     var testBody      = document.getElementById('sldApiTestBody');
@@ -2066,11 +2205,43 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
     }
     editTypeSel.addEventListener('change', applyTypeVisibility);
 
+    // The modal does double duty. An empty editId means "create", which the
+    // submit handler reads to pick its endpoint — so every path that opens the
+    // modal has to set the mode, not just the add one.
+    function setMode(isAdd) {
+        editTitle.innerHTML = isAdd
+            ? '<i class="fa-solid fa-plus me-2"></i>Add API Integration'
+            : '<i class="fa-solid fa-pen-to-square me-2"></i>Edit API Integration';
+        // Nothing to test until the row exists, and the reset-to-Pending note
+        // only makes sense against saved credentials.
+        editTestBtn.hidden = isAdd;
+        editNote.hidden = isAdd;
+        editSaveBtn.innerHTML = isAdd
+            ? '<i class="fa-solid fa-plus me-1"></i>Create'
+            : '<i class="fa-solid fa-save me-1"></i>Save';
+    }
+
+    document.querySelectorAll('.sld-api-add-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            editMsg.textContent = '';
+            editId.value = '';
+            editForm.reset();
+            editTypeSel.value = 'shopify';
+            if (fields.site_contry) fields.site_contry.value = 'Qatar';
+            defaultChk.checked = false;
+            setMode(true);
+            applyTypeVisibility();
+            editSaveBtn.disabled = false;
+            openModal(editModal);
+        });
+    });
+
     document.querySelectorAll('.sld-api-edit-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var apiId = this.dataset.apiId;
             editMsg.textContent = '';
             editId.value = apiId;
+            setMode(false);
             fetch('/workforce/sellers/api-configs/' + apiId + '/get/', { credentials: 'same-origin' })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
@@ -2095,12 +2266,13 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
     editForm.addEventListener('submit', function(e) {
         e.preventDefault();
         var apiId = editId.value;
+        var isAdd = !apiId;
         var fd = new FormData(editForm);
         if (!defaultChk.checked) fd.set('is_default', '0');
         editSaveBtn.disabled = true;
-        editSaveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving';
+        editSaveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>' + (isAdd ? 'Creating' : 'Saving');
         editMsg.textContent = '';
-        fetch('/workforce/sellers/api-configs/' + apiId + '/update/', {
+        fetch(isAdd ? createUrl : ('/workforce/sellers/api-configs/' + apiId + '/update/'), {
             method: 'POST',
             body: fd,
             headers: { 'X-CSRFToken': csrf },
@@ -2109,18 +2281,19 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.success) {
-                editMsg.innerHTML = '<span class="text-success"><i class="fa-solid fa-check-circle me-1"></i>Saved</span>';
+                editMsg.innerHTML = '<span class="text-success"><i class="fa-solid fa-check-circle me-1"></i>'
+                    + (isAdd ? 'Integration added' : 'Saved') + '</span>';
                 setTimeout(function() { location.reload(); }, 700);
             } else {
                 editMsg.innerHTML = '<span class="text-danger">' + (data.error || 'Save failed') + '</span>';
                 editSaveBtn.disabled = false;
-                editSaveBtn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save';
+                setMode(isAdd);
             }
         })
         .catch(function() {
             editMsg.innerHTML = '<span class="text-danger">Network error</span>';
             editSaveBtn.disabled = false;
-            editSaveBtn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save';
+            setMode(isAdd);
         });
     });
 
@@ -2269,6 +2442,56 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
             })
             .catch(function () { sel.value = prev; alert('Network error. Status not changed.'); })
             .finally(function () { sel.disabled = false; });
+        });
+    });
+})();
+</script>
+
+<!-- Transfer ownership (workforce:seller_transfer_ownership) -->
+<script>
+(function () {
+    var btns = document.querySelectorAll('.sld__tm-owner-btn');
+    if (!btns.length) return;
+
+    var csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+    var csrf = csrfEl ? csrfEl.value : '';
+    var ownerName = document.querySelector('.sld__owner-name');
+    var current = ownerName ? ownerName.textContent.trim() : 'the current owner';
+
+    btns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var name = btn.getAttribute('data-member-name') || 'this member';
+            // Spelling out both halves of the swap: staff are signing an account
+            // over, and the demotion of the sitting owner is the surprising part.
+            if (!confirm('Make ' + name + ' the owner of this account?\n\n' +
+                         current + ' becomes a manager and keeps access. ' +
+                         'The new owner gains full control of the account.')) return;
+
+            var orig = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Transferring';
+            fetch(btn.getAttribute('data-url'), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'csrfmiddlewaretoken=' + encodeURIComponent(csrf)
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data && data.success) {
+                    alert(data.new_owner + ' now owns this account.' + (data.note ? '\n\n' + data.note : ''));
+                    location.reload();
+                } else {
+                    alert((data && data.error) || 'Could not transfer ownership.');
+                    btn.disabled = false;
+                    btn.innerHTML = orig;
+                }
+            })
+            .catch(function () {
+                alert('Network error. Ownership was not changed.');
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            });
         });
     });
 })();

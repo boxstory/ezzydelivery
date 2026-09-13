@@ -1,0 +1,141 @@
+/* Purpose: CRM Driver map — filter bar, map canvas, legend and pin popups.
+   Used by: workforce/templates/workforce/crm/driver_map.html
+   Notes:   crmm__ namespace. The page shell (.crm/.crm__console/.crm__head) comes from
+            crm.css; only the map surfaces are declared here. */
+
+.crmm__btn--go {
+  white-space: nowrap;
+  height: var(--crm-ctl-h);
+  display: inline-flex;
+  align-items: center;
+}
+
+.crmm__clear {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+  text-decoration: none;
+}
+
+.crmm__clear:hover { color: var(--brand-navy); text-decoration: underline; }
+
+.crmm__tally {
+  margin-inline-start: auto;
+  font-size: 0.78rem;
+  color: var(--brand-grey-500);
+  white-space: nowrap;
+}
+.crmm__tally strong { color: var(--brand-navy); }
+.crmm__dot { color: var(--brand-grey-400); margin: 0 0.25rem; }
+
+/* --- map ---------------------------------------------------------------- */
+.crmm__canvas {
+  height: 62vh;
+  min-height: 24rem;
+  border: 1px solid var(--brand-grey-250);
+  border-radius: var(--brand-radius-sm);
+  overflow: hidden;
+}
+
+.crmm__legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.5rem 0.125rem 0;
+  font-size: 0.75rem;
+  color: var(--brand-grey-600);
+}
+
+.crmm__key { display: inline-flex; align-items: center; gap: 0.375rem; }
+
+/* Swatch plus its word — the house status pattern, not a coloured pill. */
+.crmm__swatch {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  box-shadow: 0 0 0 1px var(--brand-grey-300);
+}
+
+.crmm__swatch--live { background: #1d4ed8; }
+.crmm__swatch--won { background: #15803d; }
+.crmm__swatch--lost { background: #b91c1c; }
+
+.crmm__fitall {
+  margin-inline-start: auto;
+  font-size: 0.78rem;
+  font-weight: 600;
+  min-height: 2.1rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--brand-grey-400);
+  background: var(--brand-grey-100);
+  color: var(--brand-grey-800);
+  white-space: nowrap;
+}
+
+.crmm__fitall:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+}
+
+.crmm__note {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  color: var(--brand-grey-500);
+}
+
+.crmm__note strong { color: var(--brand-grey-700); }
+
+/* --- pin popup ---------------------------------------------------------- */
+.crmm__pop { min-width: 13rem; font-size: 0.78rem; }
+
+.crmm__pop-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--brand-navy);
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.3rem;
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.crmm__pop-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.1rem 0;
+}
+
+.crmm__pop-row span { color: var(--brand-grey-500); }
+.crmm__pop-row strong { color: var(--brand-grey-800); font-weight: 600; }
+
+.crmm__pop-link {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-weight: 600;
+  color: var(--brand-navy);
+}
+
+/* --- empty state -------------------------------------------------------- */
+.crmm__empty {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--brand-grey-500);
+}
+
+.crmm__empty-icon { font-size: 2rem; color: var(--brand-grey-300); }
+
+.crmm__empty-title {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brand-grey-700);
+}
+
+.crmm__empty-body { font-size: 0.82rem; max-width: 34rem; margin: 0 auto; }
+
+@media (max-width: 575.98px) {
+  .crmm__canvas { height: 55vh; min-height: 18rem; }
+  .crmm__tally { margin-inline-start: 0; flex-basis: 100%; }
+}

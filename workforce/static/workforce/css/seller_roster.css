@@ -137,18 +137,23 @@
 }
 
 /* ── The figure staff came for ────────────────────────────── */
+/* Two halves on one baseline: money owed on the left, the count of jobs behind
+   it on the right. Neither carries a visible caption — the QAR unit and the
+   "n + n" working say what each number is, and the legs below name them again,
+   so a caption row here would only be a third telling. */
 .sro__figure {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+.sro__figure-part {
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
+    min-width: 0;
 }
-.sro__figure-label {
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--brand-grey-500, #6c757d);
-}
+.sro__figure-part--end { align-items: flex-end; text-align: right; }
 .sro__figure-value {
     font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
     font-size: 1.375rem;
@@ -167,10 +172,22 @@
     color: var(--brand-grey-500, #6c757d);
     margin-left: 0.375rem;
 }
+/* The addends, set small and quiet ahead of their total — "55 + 9  64". They
+   are working, not the answer, so they sit at unit weight and never compete
+   with the figure they add up to. */
+.sro__figure-sum {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--brand-grey-500, #6c757d);
+    margin-right: 0.375rem;
+    white-space: nowrap;
+}
 
 /* ── COD rail (signature) ─────────────────────────────────── */
-/* Three legs the cash moves through: driver → Ezzy → seller. Segment widths
-   come from the view as a --seg custom property. */
+/* The two open legs of unsettled cash: still with the driver, or already handed
+   in and held by Ezzy. Paid-out money is closed and is not drawn, so the rail
+   always reads as a split of the Unsettled headline. Segment widths come from
+   the view as a --seg custom property. */
 .sro__rail {
     display: flex;
     height: 4px;
@@ -184,14 +201,20 @@
 }
 .sro__rail-seg--driver { background: var(--brand-warning, #d97706); }
 .sro__rail-seg--owed { background: var(--brand-navy, #001f3f); }
-.sro__rail-seg--paid { background: var(--brand-grey-300, #dcdcdc); }
 
 /* ── Legs ─────────────────────────────────────────────────── */
+/* Four legs on a 2x2 grid rather than one row of four: at card width four
+   columns squeezed each label to a sliver, and the pairing is meaningful —
+   the cash legs on the top row, the two counts underneath. Equal columns keep
+   the figures on a shared reading line instead of letting the longest label
+   push the rest along. */
 .sro__legs {
-    display: flex;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 0.625rem 0.75rem;
     margin: 0;
-    padding-top: 0.375rem;
+    padding-top: 0.5rem;
     border-top: 1px solid var(--brand-grey-200, #f0f0f0);
 }
 .sro__leg { min-width: 0; }
@@ -225,6 +248,10 @@
 
 @media (max-width: 575.98px) {
     .sro__grid { grid-template-columns: 1fr; }
+    /* At this width the two halves crowd; the count drops under the money and
+       keeps its own left edge rather than shrinking the QAR figure. */
+    .sro__figure { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+    .sro__figure-part--end { align-items: flex-start; text-align: left; }
     .sro__search { margin-left: 0; width: 100%; }
     .sro__search-input { min-width: 0; flex: 1; }
 }

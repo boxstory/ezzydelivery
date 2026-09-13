@@ -87,6 +87,19 @@
               </div>
             </a>
 
+            <a href="{% url 'workforce:wf_orders_p2p' %}" class="wf-status-item {% if p2p_unpriced %}wf-status-item--warning{% else %}wf-status-item--success{% endif %}" id="wf_dashboard_link_p2p_orders">
+              <div class="wf-status-item__icon">
+                <i class="fa-solid fa-route"></i>
+              </div>
+              <div class="wf-status-item__content">
+                <span class="wf-status-item__label">P2P Orders{% if p2p_unpriced %} (need a price){% endif %}</span>
+                <span class="wf-status-item__value">{% if p2p_unpriced %}{{ p2p_unpriced }}{% else %}{{ p2p_total|default:0 }}{% endif %}</span>
+              </div>
+              <div class="wf-status-item__arrow">
+                <i class="fa-solid fa-chevron-right"></i>
+              </div>
+            </a>
+
             <a href="{% url 'workforce:wf_orders_to_publish' %}" class="wf-status-item {% if not_published %}wf-status-item--danger{% else %}wf-status-item--success{% endif %}" id="wf_dashboard_link_not_published">
               <div class="wf-status-item__icon">
                 <i class="fa-solid fa-hourglass-half"></i>
@@ -231,15 +244,19 @@
           </div>
         </div>
 
-        <!-- Active Drivers -->
+        {% comment %}The figure is who is on shift right now (availability), not the size
+        of the approved fleet — the chip says Online, so the number has to mean it. The
+        fleet total stays alongside it so the tile still answers "out of how many".{% endcomment %}
         <div class="wf-metric-card">
           <span class="wf-metric-card__label">Active Drivers</span>
           <div class="wf-metric-card__row2">
-            <span class="wf-metric-card__trend wf-metric-card__trend--up">
+            <span class="wf-metric-card__trend {% if online_drivers %}wf-metric-card__trend--up{% else %}wf-metric-card__trend--neutral{% endif %}">
               <i class="fa-solid fa-circle"></i>
               Online
             </span>
-            <div class="wf-metric-card__value">{{ active_drivers|default:0 }}</div>
+            <div class="wf-metric-card__value">
+              {{ online_drivers|default:0 }}<span class="wf-metric-card__of">of {{ active_drivers|default:0 }}</span>
+            </div>
           </div>
           <div class="wf-metric-card__footer">
             <a href="{% url 'workforce:drivers_active' %}" class="wf-metric-card__link">
@@ -274,7 +291,7 @@
         <div class="wf-card__header">
           <h2 class="wf-card__title">
             <i class="fa-solid fa-chart-line"></i>
-            Orders & Deliveries Trend (Last 7 Days)
+            Orders &amp; Deliveries Trend (Last 10 Days)
           </h2>
         </div>
         <div class="wf-card__body">
@@ -477,9 +494,12 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Prepare data from Django template
-    const categories = [{% for day in orders_trend %}'{{ day.date }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
+    // Each category is a two-line label: day name on top, date underneath
+    const categories = [{% for day in orders_trend %}['{{ day.date }}', '{{ day.day_label }}']{% if not forloop.last %}, {% endif %}{% endfor %}];
     const ordersData = [{% for day in orders_trend %}{{ day.orders }}{% if not forloop.last %}, {% endif %}{% endfor %}];
     const deliveriesData = [{% for day in orders_trend %}{{ day.deliveries }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+    // Failed + cancelled combined into a single line
+    const failedCancelledData = [{% for day in orders_trend %}{{ day.failed_cancelled }}{% if not forloop.last %}, {% endif %}{% endfor %}];
 
     // ApexCharts configuration
     const options = {
@@ -489,6 +509,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }, {
             name: 'Deliveries',
             data: deliveriesData
+        }, {
+            name: 'Failed & Cancelled',
+            data: failedCancelledData
         }],
         chart: {
             type: 'area',
@@ -518,12 +541,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 stops: [0, 90, 100]
             }
         },
-        colors: ['#3b82f6', '#10b981'],
+        colors: ['#3b82f6', '#10b981', '#ef4444'],
         xaxis: {
             categories: categories,
             labels: {
+                rotate: 0,
+                rotateAlways: false,
+                hideOverlappingLabels: false,
+                trim: false,
                 style: {
-                    fontSize: '12px',
+                    fontSize: '11px',
                     colors: '#6c757d'
                 }
             }

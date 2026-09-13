@@ -1,52 +1,28 @@
-/* ================================================
-   FLEET DRIVER EARNINGS - Premium Dashboard
-   BEM prefix: fde__
-   ================================================ */
+/* Purpose: Driver payouts landing — one card per approved driver, salaried drivers tinted. */
+/* Used by: workforce/templates/workforce/fleet_drivers_earnings.html */
+/* Notes: The hero comes from the shared staff shell (wfd__hero in staff-hero.css) — nothing
+   here re-declares the band. Salary blue is the same one the payout worksheet uses for rows
+   a salary absorbs, so the colour means one thing across the payout desk. */
 
-/* Container */
 .fde {
     /* Hero sits flush; .fde__body below it carries the page padding. */
     padding: 0;
-    background: #f8f9fa;
+    background: var(--brand-grey-50, #f8f9fa);
     min-height: 100vh;
+    /* Salary blue, named once and reused by the tile, the tag and the cards. */
+    --fde-salary: var(--brand-info, #2563eb);
+    --fde-salary-ink: var(--brand-info-dark, #1e40af);
+    --fde-salary-wash: var(--brand-info-bg, #eff6ff);
 }
 
 /* Everything below the hero — one padded section */
 .fde__body { padding: 0.325rem; }
 
-/* ================================================
-   HERO HEADER - Navy Gradient
-   ================================================ */
-.fde__hero {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, var(--brand-navy-light, #003366) 100%);
-    color: #fff;
-    padding: 1.25rem 1.5rem;
-    border-radius: var(--brand-radius-md, 0.75rem);
-    margin-bottom: 1.5rem;
-}
-
-.fde__hero-title {
-    font-size: 1.375rem;
-    font-weight: 700;
-    margin: 0 0 0.25rem;
-    display: flex;
-    align-items: center;
-    color: #fff;
-}
-
-.fde__hero-title i {
-    color: var(--brand-primary, #f7c000);
-}
-
-.fde__hero-subtitle {
-    font-size: 0.8125rem;
-    color: rgba(255,255,255,0.7);
-    margin: 0;
+/* Every figure on this page is a logistics number: tabular, so columns of
+   amounts line up down the grid. */
+.fde__num {
+    font-family: ui-monospace, 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ================================================
@@ -96,52 +72,35 @@
    ================================================ */
 .fde__stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 0.875rem;
-    margin-bottom: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
 .fde__stat {
-    background: #fff;
+    background: var(--brand-white, #fff);
     border-radius: var(--brand-radius-md, 0.75rem);
     border: 1px solid var(--brand-grey-200, #f0f0f0);
-    padding: 1rem 1.125rem;
-    position: relative;
-    overflow: hidden;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    border-left: 3px solid var(--brand-grey-300, #dcdcdc);
+    padding: 0.75rem 0.875rem;
 }
 
-.fde__stat::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--brand-grey-300, #dcdcdc);
-    border-radius: var(--brand-radius-md, 0.75rem) var(--brand-radius-md, 0.75rem) 0 0;
-}
-
-.fde__stat:hover {
-    box-shadow: var(--brand-shadow-md, 0 0.25rem 0.5rem rgba(0,0,0,0.1));
-    transform: translateY(-2px);
-}
-
-.fde__stat--green::before { background: #22c55e; }
-.fde__stat--blue::before  { background: #3b82f6; }
+/* The one tile carrying money wears the brand mark; the salary tile carries the
+   blue it is teaching. Everything else stays grey. */
+.fde__stat--money { border-left-color: var(--brand-primary, #f7c000); }
+.fde__stat--salary { border-left-color: var(--fde-salary); }
 
 .fde__stat-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.625rem;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
 }
 
 .fde__stat-label {
-    font-size: 0.65rem;
+    font-size: 0.72rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
     color: var(--brand-grey-500, #6c757d);
 }
 
@@ -150,20 +109,20 @@
     color: var(--brand-grey-400, #b0b0b0);
 }
 
-.fde__stat--green .fde__stat-icon { color: #22c55e; }
-.fde__stat--blue .fde__stat-icon  { color: #3b82f6; }
+.fde__stat--money .fde__stat-icon { color: var(--brand-primary-text, #8f6b00); }
+.fde__stat--salary .fde__stat-icon { color: var(--fde-salary); }
 
 .fde__stat-value {
     font-size: 1.375rem;
     font-weight: 700;
-    color: var(--brand-grey-800, #1f1f1f);
-    line-height: 1.2;
-    margin-bottom: 0.25rem;
+    color: var(--brand-navy, #001f3f);
+    line-height: 1.15;
+    margin-bottom: 0.125rem;
 }
 
 .fde__stat-desc {
-    font-size: 0.7rem;
-    color: var(--brand-grey-400, #b0b0b0);
+    font-size: 0.72rem;
+    color: var(--brand-grey-500, #6c757d);
 }
 
 /* ================================================
@@ -171,59 +130,72 @@
    ================================================ */
 .fde__filter {
     display: flex;
-    align-items: flex-end;
-    gap: 0.75rem;
-    margin-bottom: 1.25rem;
-    padding: 0.75rem 1rem;
-    background: #fff;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--brand-white, #fff);
     border-radius: var(--brand-radius-md, 0.75rem);
     border: 1px solid var(--brand-grey-200, #f0f0f0);
     flex-wrap: wrap;
 }
 
-.fde__filter-group {
-    flex: 1 1 240px;
-    min-width: 0;
-}
-
 .fde__filter-label {
-    display: block;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--brand-grey-500, #6c757d);
-    margin-bottom: 0.375rem;
+    color: var(--brand-grey-600, #555);
+    margin: 0;
+    white-space: nowrap;
 }
 
-.fde__filter-label i {
-    color: var(--brand-primary, #f7c000);
+/* The search box is a name lookup, not the page's subject — it gets a working
+   width, not the whole bar. */
+.fde__filter-field {
+    position: relative;
+    flex: 0 1 22rem;
+    min-width: 12rem;
 }
 
-input.fde__filter-input,
-select.fde__filter-input {
+.fde__filter-icon {
+    position: absolute;
+    left: 0.625rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    color: var(--brand-grey-400, #b0b0b0);
+    pointer-events: none;
+}
+
+input.fde__filter-input {
     width: 100%;
-    min-height: 36px; max-height: 36px;
-    padding: 0.5rem 0.75rem;
+    height: 2.25rem;
+    padding: 0 0.75rem 0 2rem;
     border: 1px solid var(--brand-grey-300, #dcdcdc);
     border-radius: var(--brand-radius-sm, 0.5rem);
-    font-size: 0.8125rem;
-    color: var(--brand-grey-700, #333);
-    background: #fff;
+    font-size: 0.85rem;
+    color: var(--brand-grey-800, #1f1f1f);
+    background-color: var(--brand-white, #fff);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-input.fde__filter-input:focus,
-select.fde__filter-input:focus {
+input.fde__filter-input:focus {
     outline: none;
     border-color: var(--brand-primary, #f7c000);
     box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.15);
+}
+
+.fde__count {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--brand-grey-500, #6c757d);
+    white-space: nowrap;
 }
 
 .fde__filter-actions {
     display: flex;
     gap: 0.5rem;
     flex-shrink: 0;
+    margin-left: auto;
 }
 
 /* ================================================
@@ -231,46 +203,47 @@ select.fde__filter-input:focus {
    ================================================ */
 .fde__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 0.875rem;
-    margin-bottom: 1.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
 .fde__card {
-    display: block;
-    background: #fff;
+    display: flex;
+    flex-direction: column;
+    background: var(--brand-white, #fff);
     border-radius: var(--brand-radius-md, 0.75rem);
     border: 1px solid var(--brand-grey-200, #f0f0f0);
-    padding: 1rem;
+    padding: 0.75rem 0.75rem 0;
     text-decoration: none;
     color: inherit;
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .fde__card:hover {
-    border-color: var(--brand-grey-300, #dcdcdc);
+    border-color: var(--brand-grey-400, #b0b0b0);
     box-shadow: var(--brand-shadow-md, 0 0.25rem 0.5rem rgba(0,0,0,0.1));
-    transform: translateY(-2px);
     color: inherit;
     text-decoration: none;
 }
 
-.fde__card:active {
-    transform: scale(0.98);
+.fde__card:focus-visible {
+    outline: 2px solid var(--brand-navy, #001f3f);
+    outline-offset: 2px;
 }
 
 .fde__card-top {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.875rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--brand-grey-100, #fafafa);
+    gap: 0.625rem;
+    padding-bottom: 0.625rem;
+    margin-bottom: 0.375rem;
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
 }
 
 .fde__avatar {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.25rem;
+    height: 2.25rem;
     border-radius: 50%;
     background: var(--brand-navy, #001f3f);
     color: var(--brand-primary, #f7c000);
@@ -287,7 +260,7 @@ select.fde__filter-input:focus {
 }
 
 .fde__card-name {
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     font-weight: 600;
     color: var(--brand-grey-800, #1f1f1f);
     margin: 0;
@@ -297,21 +270,21 @@ select.fde__filter-input:focus {
 }
 
 .fde__card-id {
-    font-size: 0.7rem;
-    color: var(--brand-grey-400, #b0b0b0);
-    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--brand-grey-500, #6c757d);
 }
 
 .fde__card-body {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    flex: 1 1 auto;
 }
 
 .fde__detail {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
+    gap: 0.5rem;
     padding: 0.3125rem 0;
 }
 
@@ -320,20 +293,102 @@ select.fde__filter-input:focus {
 }
 
 .fde__detail-label {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--brand-grey-500, #6c757d);
+    white-space: nowrap;
 }
 
 .fde__detail-value {
     font-size: 0.8125rem;
     font-weight: 600;
     color: var(--brand-grey-700, #333);
+    text-align: right;
 }
 
+/* The figure that decides what to do with this driver. */
 .fde__detail-value--highlight {
     color: var(--brand-navy, #001f3f);
     font-weight: 700;
     font-size: 0.875rem;
+}
+
+.fde__detail-value--salary { color: var(--fde-salary-ink); }
+
+/* A salary of 0/mo pays nothing for the deliveries it absorbs — argued with,
+   not read past. */
+.fde__detail-value--zero { color: var(--brand-danger, #dc2626); }
+
+.fde__detail-value--muted {
+    color: var(--brand-grey-500, #6c757d);
+    font-weight: 500;
+}
+
+/* The card is one big link — this strip is the part that looks clickable.
+   It fills from the card's own surface on hover, never with the brand yellow:
+   yellow is already spent on the Export action and the money tile, and a yellow
+   wash over a blue salaried card fights the tint that means "on a salary". */
+.fde__card-action {
+    display: block;
+    margin: 0.5rem -0.75rem 0;
+    padding: 0.5rem 0.75rem;
+    /* Follows the card's rounded bottom, so the fill never squares the corners. */
+    border-radius: 0 0 calc(var(--brand-radius-md, 0.75rem) - 1px) calc(var(--brand-radius-md, 0.75rem) - 1px);
+    border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--brand-grey-500, #6c757d);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.fde__card:hover .fde__card-action,
+.fde__card:focus-visible .fde__card-action {
+    background: var(--brand-grey-50, #f8f9fa);
+    color: var(--brand-navy, #001f3f);
+}
+
+/* ------------------------------------------------
+   Salaried drivers — the same blue the payout worksheet tints absorbed rows
+   with, so one colour means "a salary already pays for this" across the desk.
+   ------------------------------------------------ */
+.fde__card--salaried {
+    background: var(--fde-salary-wash);
+    border-color: rgba(37, 99, 235, 0.25);
+    box-shadow: inset 3px 0 0 var(--fde-salary);
+}
+
+.fde__card--salaried:hover {
+    border-color: var(--fde-salary);
+    box-shadow: inset 3px 0 0 var(--fde-salary), var(--brand-shadow-md, 0 0.25rem 0.5rem rgba(0,0,0,0.1));
+}
+
+/* Same move, one step deeper into the blue the card already carries. */
+.fde__card--salaried:hover .fde__card-action,
+.fde__card--salaried:focus-visible .fde__card-action {
+    background: rgba(37, 99, 235, 0.10);
+    color: var(--fde-salary-ink);
+}
+
+.fde__card--salaried .fde__card-top,
+.fde__card--salaried .fde__card-action,
+.fde__card--salaried .fde__detail:not(.fde__detail--last) {
+    border-color: rgba(37, 99, 235, 0.18);
+}
+
+/* Tag sits at the end of the card head, clear of a long name. */
+.fde__tag {
+    margin-left: auto;
+    align-self: flex-start;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.0625rem 0.375rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.fde__tag--salary {
+    color: var(--fde-salary-ink);
+    background: var(--brand-white, #fff);
+    border: 1px solid rgba(37, 99, 235, 0.4);
 }
 
 /* ================================================
@@ -341,21 +396,22 @@ select.fde__filter-input:focus {
    ================================================ */
 .fde__empty {
     text-align: center;
-    padding: 3rem 1.5rem;
-    background: #fff;
+    padding: 2.5rem 1rem;
+    background: var(--brand-white, #fff);
     border-radius: var(--brand-radius-md, 0.75rem);
     border: 1px solid var(--brand-grey-200, #f0f0f0);
+    margin-bottom: 0.75rem;
 }
 
 .fde__empty i {
-    font-size: 2.5rem;
+    font-size: 2rem;
     color: var(--brand-grey-300, #dcdcdc);
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     display: block;
 }
 
 .fde__empty h3 {
-    font-size: 1rem;
+    font-size: 0.9375rem;
     font-weight: 600;
     color: var(--brand-grey-700, #333);
     margin: 0 0 0.375rem;
@@ -363,7 +419,7 @@ select.fde__filter-input:focus {
 
 .fde__empty p {
     font-size: 0.8125rem;
-    color: var(--brand-grey-400, #b0b0b0);
+    color: var(--brand-grey-500, #6c757d);
     margin: 0;
 }
 
@@ -371,75 +427,50 @@ select.fde__filter-input:focus {
    RESPONSIVE
    ================================================ */
 @media (max-width: 768px) {
-    .fde {
-        padding: 1rem;
-    }
+    .fde__stats { grid-template-columns: repeat(2, 1fr); }
+    .fde__stat-value { font-size: 1.125rem; }
 
-    .fde__hero {
-        padding: 1rem 1.125rem;
-    }
+    .fde__filter { align-items: stretch; }
+    .fde__filter-field { flex: 1 1 100%; }
+    .fde__count { order: 3; }
+    .fde__filter-actions { order: 4; }
 
-    .fde__hero-title {
-        font-size: 1.125rem;
-    }
-
-    .fde__stats {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .fde__stat-value {
-        font-size: 1.125rem;
-    }
-
-    .fde__filter {
-        flex-direction: column;
-    }
-
-    .fde__grid {
-        grid-template-columns: 1fr;
-    }
+    .fde__grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
-    .fde__stats {
-        grid-template-columns: 1fr;
-    }
+    .fde__stats { grid-template-columns: 1fr; }
+    .fde__filter-actions { width: 100%; }
+    .fde__filter-actions .fde__btn { flex: 1; justify-content: center; }
+}
 
-    .fde__filter-actions {
-        width: 100%;
-    }
-
-    .fde__filter-actions .fde__btn {
-        flex: 1;
-        justify-content: center;
-    }
+@media (prefers-reduced-motion: reduce) {
+    .fde__card,
+    .fde__card-action,
+    .fde__btn { transition: none; }
 }
 
 /* ================================================
    PRINT STYLES
    ================================================ */
 @media print {
-    .fde__filter-actions,
-    .fde__btn {
-        display: none !important;
+    .fde__filter,
+    .fde__btn { display: none !important; }
+
+    .fde { padding: 0; background: #fff; }
+
+    .fde__grid { grid-template-columns: repeat(3, 1fr); }
+
+    .fde__card {
+        break-inside: avoid;
+        box-shadow: none;
     }
 
-    .fde {
-        padding: 0;
-        background: #fff;
-    }
-
-    .fde__hero {
-        background: #001f3f !important;
+    /* The tint is the only thing distinguishing a salaried driver on paper. */
+    .fde__card--salaried {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
 
-    .fde__grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    .fde__card {
-        break-inside: avoid;
-    }
+    .fde__card-action { display: none; }
 }

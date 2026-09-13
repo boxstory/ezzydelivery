@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/client_charge_verification.css' %}?v=20260824d" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_charge_verification.css' %}?v=20260831a" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -36,7 +36,7 @@
           </div>
         </div>
         <nav class="wfhero__actions">
-          <a href="{% url 'workforce:earnings_verification' %}" class="wfhero__ghost">Driver earnings</a>
+          <a href="{% url 'workforce:driver_payout_overview' %}" class="wfhero__ghost">Driver earnings</a>
           <a href="{% url 'workforce:cod_business_settlement_report' %}" class="wfhero__ghost">Business payout ▸</a>
           <button type="button" class="wfnote__btn" data-wfnote-toggle
                   aria-expanded="false" aria-controls="workforce_client_charge_verification_card_notes"
@@ -203,6 +203,9 @@
         <div class="ccv__filter">
           <label for="workforce_charges_filter_sort" class="ccv__field-label">Sort</label>
           <select name="sort" id="workforce_charges_filter_sort" class="form-select form-select-sm">
+            {% comment %} A column header can pick an order this list does not carry;
+               without this option the form would silently reset it. {% endcomment %}
+            {% if not sort_is_preset %}<option value="{{ selected_sort }}" selected>Column sort</option>{% endif %}
             <option value="recent" {% if selected_sort == 'recent' %}selected{% endif %}>Newest first</option>
             <option value="oldest" {% if selected_sort == 'oldest' %}selected{% endif %}>Oldest first</option>
             <option value="amount_desc" {% if selected_sort == 'amount_desc' %}selected{% endif %}>Amount high → low</option>
@@ -252,14 +255,39 @@
           <thead>
             <tr>
               <th class="ccv__col-check"></th>
-              <th>Task</th>
-              <th>Business</th>
+              <th class="ccv__th-sort">
+                <a class="ccv__sort{% if sort_columns.task.dir %} ccv__sort--{{ sort_columns.task.dir }}{% endif %}"
+                   href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.task.key }}">Task</a>
+              </th>
+              <th class="ccv__th-sort">
+                <a class="ccv__sort{% if sort_columns.business.dir %} ccv__sort--{{ sort_columns.business.dir }}{% endif %}"
+                   href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.business.key }}">Business</a>
+              </th>
               <th>Route</th>
-              <th>Date</th>
-              <th>Service</th>
-              <th class="ccv__num">Calculated</th>
-              <th class="ccv__num">Verified</th>
-              <th>Status</th>
+              <th class="ccv__th-sort">
+                <a class="ccv__sort{% if sort_columns.date.dir %} ccv__sort--{{ sort_columns.date.dir }}{% endif %}"
+                   href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.date.key }}">Task Date</a>
+              </th>
+              <th class="ccv__th-sort">
+                <a class="ccv__sort{% if sort_columns.delivered.dir %} ccv__sort--{{ sort_columns.delivered.dir }}{% endif %}"
+                   href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.delivered.key }}">Delivered</a>
+              </th>
+              <th class="ccv__th-sort">
+                <a class="ccv__sort{% if sort_columns.service.dir %} ccv__sort--{{ sort_columns.service.dir }}{% endif %}"
+                   href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.service.key }}">Service</a>
+              </th>
+              <th class="ccv__th-sort ccv__num">
+                <a class="ccv__sort{% if sort_columns.calculated.dir %} ccv__sort--{{ sort_columns.calculated.dir }}{% endif %}"
+                   href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.calculated.key }}">Calculated</a>
+              </th>
+              <th class="ccv__th-sort ccv__num">
+                <a class="ccv__sort{% if sort_columns.verified.dir %} ccv__sort--{{ sort_columns.verified.dir }}{% endif %}"
+                   href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.verified.key }}">Verified</a>
+              </th>
+              <th class="ccv__th-sort">
+                <a class="ccv__sort{% if sort_columns.status.dir %} ccv__sort--{{ sort_columns.status.dir }}{% endif %}"
+                   href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.status.key }}">Status</a>
+              </th>
               <th>By</th>
               <th>Log</th>
             </tr>
@@ -314,9 +342,16 @@
                   <span class="ccv__zone">Z{{ task.drop_zone|default:"–" }}</span>
                 </span>
               </td>
-              {% comment %} Pick the date first, format once. Formatting before `default`
-                 hands the second `date` filter a string, which yields ''. {% endcomment %}
-              <td class="ccv__mono">{{ task.completed_at|default:task.dl_task_date|date:"d M Y" }}</td>
+              {% comment %} Two distinct dates: the day the job was booked for, and the
+                 moment the driver actually completed it. They differ on re-attempts and
+                 carried-over jobs, and the charge is judged against the delivered one. {% endcomment %}
+              <td class="ccv__mono">{{ task.dl_task_date|date:"d M Y"|default:"—" }}</td>
+              <td class="ccv__mono">
+                {% if task.completed_at %}
+                {{ task.completed_at|date:"d M Y" }}
+                <div class="ccv__line-desc ccv__mono">{{ task.completed_at|date:"H:i" }}</div>
+                {% else %}<span class="ccv__muted">—</span>{% endif %}
+              </td>
               <td>
                 <span class="ccv__service">{{ task.dl_speed|default:"—" }}</span>
                 {% comment %} Second line carries the category plus the stored pickup→drop
@@ -363,7 +398,7 @@
             </tr>
             {% if task.activity_log %}
             <tr class="ccv__log-row" id="workforce_charges_log_{{ task.id }}" hidden>
-              <td colspan="11">
+              <td colspan="12">
                 <ol class="ccv__log-list">
                   {% for entry in task.activity_log %}
                   <li class="ccv__log-entry">

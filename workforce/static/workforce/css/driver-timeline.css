@@ -1,0 +1,164 @@
+/* Purpose: Driver timeline page — the day's trail on a map beside a chronological list of stops,
+ *          gaps and status changes.
+ * Used by: workforce/templates/workforce/driver_timeline.html
+ * Notes: Measured trail is maroon and solid; anything inferred is dashed and violet, so a reader can
+ *        never mistake the routing engine's guess for a position the device actually reported.
+ */
+
+.dtl__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.dtl__daynav { display: flex; align-items: center; gap: 0.375rem; }
+.dtl__daybtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.3rem;
+    color: var(--brand-navy, #001f3f);
+    text-decoration: none;
+    font-size: 0.75rem;
+}
+.dtl__daybtn:hover { background: #f9fafb; color: var(--brand-navy, #001f3f); }
+.dtl__daybtn--off { opacity: 0.35; pointer-events: none; }
+.dtl__date {
+    height: 30px;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.3rem;
+    padding: 0 0.5rem;
+    font-size: 0.78rem;
+    color: #111827;
+    background-color: #fff;
+}
+
+.dtl__stats { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 1.1rem; }
+.dtl__stat { display: flex; align-items: baseline; gap: 0.3rem; }
+.dtl__stat-num {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--brand-navy, #001f3f);
+}
+.dtl__stat-lbl {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+}
+/* Dark time is the one number staff are here to find. */
+.dtl__stat--dark .dtl__stat-num { color: #7c3aed; }
+
+.dtl__notice {
+    padding: 0.6rem 0.75rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-left: 3px solid var(--brand-primary, #f7c000);
+    border-radius: 0.3rem;
+    font-size: 0.78rem;
+    color: #4b5563;
+    margin-bottom: 0.75rem;
+}
+
+.dtl__layout { display: grid; grid-template-columns: 1fr 21rem; gap: 0.75rem; align-items: start; }
+.dtl__mapwrap { position: relative; }
+.dtl__map {
+    height: 68vh;
+    min-height: 26rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.4rem;
+}
+
+.dtl__legend {
+    position: absolute;
+    left: 0.6rem;
+    bottom: 0.6rem;
+    z-index: 500;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    padding: 0.4rem 0.6rem;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #e5e7eb;
+    border-radius: 0.3rem;
+    font-size: 0.68rem;
+    color: #4b5563;
+}
+.dtl__key { display: inline-flex; align-items: center; gap: 0.3rem; }
+.dtl__swatch { width: 16px; height: 0; border-top: 3px solid #800020; display: inline-block; }
+.dtl__swatch--gap { border-top-style: dashed; border-top-color: #7c3aed; }
+.dtl__swatch--stop,
+.dtl__swatch--event {
+    width: 9px;
+    height: 9px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: #f59e0b;
+    box-shadow: 0 0 0 1px #e5e7eb;
+}
+.dtl__swatch--event { background: #2563eb; }
+
+.dtl__side {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.4rem;
+    max-height: 68vh;
+    display: flex;
+    flex-direction: column;
+}
+.dtl__side-head {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.dtl__list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.dtl__row {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    font-size: 0.78rem;
+}
+.dtl__row:hover { background: #f9fafb; }
+.dtl__row--on { background: #f9fafb; border-left-color: var(--brand-primary, #f7c000); }
+.dtl__time {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.72rem;
+    color: #6b7280;
+    padding-top: 0.05rem;
+}
+.dtl__body { display: flex; flex-direction: column; min-width: 0; }
+.dtl__label { color: #111827; font-weight: 600; }
+.dtl__meta { font-size: 0.7rem; color: #6b7280; }
+
+/* The swatch beside each row is the only colour in the list: gaps violet,
+   stops amber, status changes blue — the same three the map uses. */
+.dtl__row--gap .dtl__label { color: #6d28d9; }
+.dtl__row--unexplained .dtl__label { color: #6b7280; }
+.dtl__row--stop .dtl__label { color: #92400e; }
+.dtl__row--status .dtl__label { color: #1d4ed8; }
+
+.dtl__empty { padding: 1.5rem 0.75rem; text-align: center; font-size: 0.78rem; color: #9ca3af; }
+
+@media (max-width: 991.98px) {
+    .dtl__layout { grid-template-columns: 1fr; }
+    .dtl__map { height: 52vh; }
+    .dtl__side { max-height: 22rem; }
+}

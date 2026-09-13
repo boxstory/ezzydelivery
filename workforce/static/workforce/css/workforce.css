@@ -8507,9 +8507,14 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 .odp__tl-card-inner--success{border-left:4px solid #16a34a;background:linear-gradient(90deg,#f0fdf4 0%,#fff 30%)}
 .odp__tl-card-inner--now{border:2px solid var(--brand-navy,#001f3f);background:linear-gradient(135deg,var(--brand-grey-100,#fafafa) 0%,var(--brand-grey-200,#f0f0f0) 100%);box-shadow:0 4px 16px rgba(0,31,63,0.1)}
 
-/* Row: title + time */
-.odp__tl-row{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.375rem}
-.odp__tl-title{font-size:0.75rem;font-weight:700;color:var(--brand-grey-800,#1f1f1f);letter-spacing:0.02em}
+/* Row: title + transition + time, all on one line */
+.odp__tl-row{display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:0.375rem}
+.odp__tl-title{font-size:0.75rem;font-weight:700;color:var(--brand-grey-800,#1f1f1f);letter-spacing:0.02em;flex:0 0 auto}
+/* Middle column: the old -> new pills sit between the title and the timestamp
+   instead of on their own line below. Takes the slack so the timestamp stays
+   pinned right; min-width:0 lets long driver/status labels wrap in place
+   rather than pushing the stamp off the card. */
+.odp__tl-row .odp__tl-transition{flex:1 1 auto;min-width:0;justify-content:center;margin:0}
 .odp__tl-timestamp{font-size:0.625rem;color:var(--brand-grey-400,#b0b0b0);white-space:nowrap;display:flex;align-items:center;gap:0.25rem}
 .odp__tl-timestamp i{font-size:0.5625rem}
 
@@ -8593,7 +8598,9 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 /* Responsive */
 @media(max-width:576px){
     .odp__tl-now-grid{grid-template-columns:1fr}
-    .odp__tl-row{flex-direction:column;align-items:flex-start;gap:0.125rem}
+    /* Narrow: fall back to stacking — title, pills, then stamp */
+    .odp__tl-row{flex-direction:column;align-items:flex-start;gap:0.25rem}
+    .odp__tl-row .odp__tl-transition{width:100%;justify-content:flex-start}
     .odp__tl-wrap{padding:1rem 0.75rem 0.5rem}
     .odp__tl-track{width:2.5rem}
     .odp__tl-icon{width:1.875rem;height:1.875rem;font-size:0.75rem}
@@ -8790,6 +8797,26 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     font-weight: 700;
     color: #1e293b;
 }
+
+/* Unread seller comment. Sits on the task number because that is the cell the
+   eye lands on first when scanning the list; red is reserved for this and for
+   failed status, so it stays a signal rather than decoration. */
+.dl-table__comment-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 4px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: #dc2626;
+    color: #fff;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1.5;
+    vertical-align: 1px;
+}
+.dl-table__comment-flag i { font-size: 0.6rem; }
 
 .dl-table__order-num {
     color: #64748b;
@@ -11344,8 +11371,30 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 }
 
 /* SLD Team extras */
+/* The account owner is Business.user, not a team row, so the Team tab leads
+   with this plate instead of listing them among the members. */
+.sld__owner-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--brand-grey-200, #e5e7eb);
+    border-left: 3px solid var(--brand-primary, #f7c000);
+    border-radius: 0.5rem;
+    background: var(--brand-white, #fff);
+}
+.sld__owner-id { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.sld__owner-name { font-weight: 600; color: #1a1a2e; font-size: 0.8125rem; }
+.sld__owner-meta {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: 0.7rem;
+    color: #6b7280;
+    overflow-wrap: anywhere;
+}
 .sld__team-name { font-weight: 600; color: #1a1a2e; font-size: 0.8125rem; }
 .sld__team-code { font-size: 0.7rem; color: #9ca3af; }
+.sld__team-user { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 0.7rem; color: #4b5563; }
 
 /* SLD Team member — info / edit modals.
    Read-only detail is a grid of white cards on the grey modal body; the edit
@@ -12385,6 +12434,13 @@ select.woe__form-input, select.woa__form-input {
 .woe__item-line-total { font-weight: 600; font-size: 0.8125rem; }
 .woe__item-col--actions { width: 70px; flex-shrink: 0; display: flex; gap: 0.25rem; }
 .woe__item-meta { margin-top: 2px; }
+
+/* Save button only appears once the row actually changed (or is a brand-new row) */
+.woe__item-row .woe__item-save { display: none; }
+.woe__item-row--dirty .woe__item-save,
+.woe__item-row--new .woe__item-save { display: inline-flex; align-items: center; justify-content: center; }
+.woe__item-row--dirty { background: rgba(255,193,7,0.10); }
+.woe__item-row--dirty:hover { background: rgba(255,193,7,0.14); }
 
 @media (max-width: 767.98px) {
     .woe__item-row {
@@ -19958,94 +20014,6 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     background: #fffdf4;
 }
 
-/* --- CRM pipeline strip: the second status axis, one segment per board column.
-       Quieter than the tally strip above it — this is a cross-reference, not the
-       page's primary filter, so it reads as a labelled ruled row. --- */
-.drl .drl__pipe {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-bottom: 0.9rem;
-    min-width: 0;
-}
-.drl .drl__pipe-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    flex: 0 0 auto;
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #6b7280;
-}
-.drl .drl__pipe-title i { color: #9ca3af; }
-/* Boards can carry ten-plus columns, so the strip wraps rather than scrolling —
-   a segment hidden off the right edge reads as "that stage does not exist". */
-.drl .drl__pipe-track {
-    display: flex;
-    flex-wrap: wrap;
-    flex: 1 1 auto;
-    min-width: 0;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-}
-.drl .drl__pipe-seg {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex: 0 0 auto;
-    cursor: pointer;
-    border: 0;
-    border-left: 1px solid #eef1f5;
-    border-radius: 0;
-    background: transparent;
-    padding: 0.4rem 0.75rem;
-    box-shadow: inset 0 3px 0 transparent;
-    transition: background 0.15s;
-    white-space: nowrap;
-}
-.drl .drl__pipe-seg:first-child { border-left: 0; }
-/* Wrapped rows get their own rule so the second row does not float unattached */
-.drl .drl__pipe-seg { border-top: 1px solid transparent; }
-.drl .drl__pipe-track { row-gap: 0; }
-.drl .drl__pipe-seg:hover { background: #f8f9fb; }
-.drl .drl__pipe-seg:focus-visible { outline: 2px solid #f7c000; outline-offset: -2px; }
-.drl .drl__pipe-seg--active,
-.drl .drl__pipe-seg--active:hover {
-    box-shadow: inset 0 3px 0 #f7c000;
-    background: #fffdf4;
-}
-.drl .drl__pipe-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 2px;
-    background: #9ca3af;
-    flex-shrink: 0;
-}
-.drl .drl__pipe-label {
-    font-size: 0.66rem;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #4b5563;
-}
-.drl .drl__pipe-count {
-    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
-    font-variant-numeric: tabular-nums;
-    font-size: 0.8rem;
-    color: #001f3f;
-}
-.drl .drl__pipe-dot--sw-grey   { background: #9ca3af; }
-.drl .drl__pipe-dot--sw-slate  { background: #4b5563; }
-.drl .drl__pipe-dot--sw-blue   { background: #2a78d6; }
-.drl .drl__pipe-dot--sw-teal   { background: #0f8f8f; }
-.drl .drl__pipe-dot--sw-green  { background: #1baf7a; }
-.drl .drl__pipe-dot--sw-forest { background: #0a6e0a; }
-.drl .drl__pipe-dot--sw-violet { background: #4a3aa7; }
-.drl .drl__pipe-dot--sw-amber  { background: #eb6834; }
-.drl .drl__pipe-dot--sw-red    { background: #d64545; }
-
 /* --- Filter selects: same box as the text input and the multiselect toggle ---
    All three controls sit on one row, so they have to agree on the box. The
    text input (input.drl__filter-input) and the multiselect toggle
@@ -22074,6 +22042,10 @@ body .select2-container--default.ppl__pick-menu .select2-results__option[aria-se
     color: #6c757d;
     white-space: nowrap;
 }
+/* Closed leg: the age is how long it took, not a running clock — read it back */
+.ppl__age--done {
+    color: #adb5bd;
+}
 
 /* Actions: ink buttons, sharp corners (shared by row actions and the bulk bar) */
 .ppl__card .btn.ppl__btn,
@@ -23754,63 +23726,365 @@ a.wfstat__card:hover {
    Used by: workforce/parts/components/_wa_send_modal.html (driver, lead,
    pricing-inquiry pages). Bootstrap supplies the modal, the button and the
    form control; everything here is only the ink this console uses.
+
+   The design: a dispatch slip. This modal exists because a send is ROUTED — it
+   leaves from a line the staffer can choose and arrives at one number — so the
+   navy plate at the top draws that path and gets the page's single yellow rule.
+   Everything under it is white, hairline and grey ink, and the send result takes
+   the whole panel because it is the one irreversible thing here.
    ========================================================================== */
 .wasend__panel {
-    border: 1px solid var(--brand-grey-300, #d9d9d9);
-    border-radius: 0.375rem;
+    position: relative;              /* the result screen covers this box */
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: var(--brand-radius-sm, 0.5rem);
 }
+
+/* ── Header: one identity tile, matching the staff card-header idiom ──────── */
 .wasend__header {
-    background: var(--brand-grey-100, #fafafa);
-    border-bottom: 1px solid var(--brand-grey-300, #d9d9d9);
+    position: relative;
+    z-index: 4;                      /* stays above the result cover, so the
+                                        title and ✕ never disappear mid-send */
+    padding: 0.75rem;
+    background: #fff;
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
 }
 .wasend__title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 0.95rem;
     font-weight: 700;
-    color: var(--brand-grey-900, #14181f);
+    color: var(--brand-navy, #001f3f);
 }
-.wasend__title i { color: #25d366; }
+/* The green belongs to WhatsApp, not to us — it appears once, as the channel
+   mark, and once more on Send. Nowhere else. */
+.wasend__mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    background: rgba(37, 211, 102, 0.12);
+    color: #128c40;
+    font-size: 0.85rem;
+}
 
-/* Sender/recipient plate: the two facts that decide whether this message is
-   safe to send, stated before the textarea rather than under it. */
-.wasend__meta {
-    border: 1px solid var(--brand-grey-300, #d9d9d9);
-    border-radius: 0.375rem;
-    padding: 0.5rem 0.625rem;
-    background: var(--brand-grey-100, #fafafa);
+.wasend__body { padding: 0.75rem; }
+
+/* ── Routing plate: FROM → TO, the modal's signature ──────────────────────── */
+.wasend__route {
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    background: var(--brand-gradient-navy, linear-gradient(135deg, #001f3f, #003366));
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    border-bottom: 2px solid var(--brand-primary, #f7c000);
 }
-.wasend__meta-label {
-    font-size: 0.68rem;
+/* Grid, not flex: the sender value and its select swap in and out depending on
+   how many numbers we own, and flex wrapped the channel chip onto the To row,
+   where it read as the recipient's channel. Columns hold regardless. */
+.wasend__route-row {
+    display: grid;
+    grid-template-columns: 3rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+}
+.wasend__route-label {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+.wasend__route-value {
+    min-width: 0;
+    font-size: 0.85rem;
+    color: #fff;
+    overflow-wrap: anywhere;
+}
+.wasend__route-num {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+.wasend__route-who {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+.wasend__route-who::before {
+    content: "·";
+    margin: 0 0.375rem;
+    color: rgba(255, 255, 255, 0.4);
+}
+/* The tie is the routing itself — a hairline dropping out of the From row into
+   the To row, in the label column so it lines up with both. It carries an
+   arrowhead: at 12px a bare stroke reads as a rendering artifact, not a path. */
+.wasend__route-tie {
+    position: relative;
+    height: 1rem;
+    margin-left: 1.4rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.35);
+}
+.wasend__route-tie::after {
+    content: "";
+    position: absolute;
+    left: -3.5px;
+    bottom: 0;
+    border-left: 3.5px solid transparent;
+    border-right: 3.5px solid transparent;
+    border-top: 4px solid rgba(255, 255, 255, 0.35);
+}
+.wasend__route-chip {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    white-space: nowrap;
+}
+.wasend__route-chip:empty { display: none; }
+
+/* Field on a navy surface — brandkit form recipe for hero filter bars. */
+.wasend__sender-select {
+    width: 100%;
+    min-height: 2.1rem;
+    padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-size: 0.82rem;
+    background-position: right 0.5rem center;
+    background-size: 12px 9px;
+}
+.wasend__sender-select:focus {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: none;
+    color: #fff;
+}
+.wasend__sender-select option { color: #1a1a2e; background: #fff; }
+
+/* ── Compose head: the label and the three ways to fill the box ───────────── */
+.wasend__compose-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+}
+.wasend__label {
+    margin: 0;
+    font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--brand-grey-600, #6b7280);
-    min-width: 2.5rem;
+    color: var(--brand-grey-550, #6b7280);
 }
-.wasend__meta-value {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.8rem;
-    color: var(--brand-grey-900, #14181f);
+.wasend__fills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
 }
-.wasend__meta-chip {
-    font-size: 0.68rem;
-    font-weight: 600;
-    color: var(--brand-grey-600, #6b7280);
-    border: 1px solid var(--brand-grey-300, #d9d9d9);
-    border-radius: 0.25rem;
-    padding: 0 0.375rem;
-}
-.wasend__meta-chip:empty { display: none; }
-
-.wasend__textarea { font-size: 0.85rem; }
-
-.wasend__status {
+.wasend__fill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.1rem;
+    padding: 0.25rem 0.625rem;
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: 0.375rem;
+    background: var(--brand-grey-100, #fafafa);
+    color: var(--brand-grey-700, #333);
+    font-family: inherit;
     font-size: 0.78rem;
     font-weight: 600;
-    min-height: 1.1rem;
-    color: var(--brand-grey-600, #6b7280);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
-.wasend__status--ok { color: #15803d; }
-.wasend__status--error { color: #dc2626; }
+.wasend__fill i { font-size: 0.72rem; color: var(--brand-grey-500, #6c757d); }
+.wasend__fill:hover {
+    background: var(--brand-secondary, #fff7d6);
+    border-color: var(--brand-primary, #f7c000);
+}
+.wasend__fill:focus-visible {
+    outline: 2px solid var(--brand-navy, #001f3f);
+    outline-offset: 1px;
+}
+/* The "what is still missing" chip. Same furniture as the other pastes — it is
+   still just a paste — but the icon carries the brand ink so the eye finds the
+   one body written from this record rather than from a template. */
+.wasend__fill--remind {
+    border-color: var(--brand-primary, #f7c000);
+    background: var(--brand-secondary, #fff7d6);
+}
+.wasend__fill--remind i { color: var(--brand-navy, #001f3f); }
+.wasend__fill--remind:hover {
+    background: var(--brand-primary, #f7c000);
+    border-color: var(--brand-primary, #f7c000);
+}
+
+/* The template picker is one more control in that row, sized to match the chips
+   beside it rather than stretching like a form field. */
+.wasend__template-select {
+    width: auto;
+    max-width: 11rem;
+    min-height: 2.1rem;
+    padding: 0.25rem 1.75rem 0.25rem 0.625rem;
+    border-color: var(--brand-grey-300, #dcdcdc);
+    color: var(--brand-grey-700, #333);
+    font-size: 0.82rem;
+    font-weight: 600;
+    background-position: right 0.5rem center;
+    background-size: 12px 9px;
+}
+.wasend__template-select:focus {
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: none;
+}
+
+.wasend__textarea {
+    font-size: 0.875rem;
+    line-height: 1.55;
+    border-color: var(--brand-grey-300, #dcdcdc);
+}
+.wasend__textarea:focus {
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: none;
+}
+
+.wasend__meter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--brand-grey-500, #6c757d);
+}
+.wasend__count {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Pre-flight problems only — "you cannot send this yet", never a send result. */
+.wasend__status {
+    margin-top: 0.375rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-height: 1.2rem;
+    color: var(--brand-grey-600, #555);
+}
+.wasend__status--ok { color: var(--brand-success, #15803d); }
+.wasend__status--error { color: var(--brand-danger, #dc2626); }
+
+/* ── Footer controls ─────────────────────────────────────────────────────── */
+.wasend__btn {
+    min-height: 2.1rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-400, #b0b0b0);
+    color: var(--brand-grey-800, #1f1f1f);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.wasend__btn:hover {
+    background: var(--brand-secondary, #fff7d6);
+    border-color: var(--brand-primary, #f7c000);
+    color: var(--brand-grey-800, #1f1f1f);
+}
+/* The primary action wears the channel's colour, because what it does is put a
+   message on WhatsApp — the one place a non-brand hue earns its keep. */
+.wasend__btn--send {
+    background: #128c40;
+    border-color: #128c40;
+    color: #fff;
+}
+.wasend__btn--send:hover {
+    background: #0f7535;
+    border-color: #0f7535;
+    color: #fff;
+}
+.wasend__btn--send:disabled { background: #128c40; border-color: #128c40; opacity: 0.55; }
+.wasend__link {
+    padding: 0.25rem 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--brand-grey-600, #555);
+    text-decoration: underline;
+    text-underline-offset: 0.15rem;
+}
+.wasend__link:hover { color: var(--brand-navy, #001f3f); }
+
+/* ── Send result: the outcome takes the whole panel ───────────────────────── */
+.wasend__result {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 1.5rem 1.125rem;
+    text-align: center;
+    background: #fff;
+    border-radius: 0 0 var(--brand-radius-sm, 0.5rem) var(--brand-radius-sm, 0.5rem);
+}
+.wasend__result[hidden] { display: none; }
+.wasend__result-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-bottom: 0.375rem;
+    border-radius: 50%;
+    font-size: 1.1rem;
+}
+.wasend__result-icon--sending { color: var(--brand-grey-500, #6c757d); }
+.wasend__result-icon--sending .spinner-border { width: 1.75rem; height: 1.75rem; border-width: 2px; }
+.wasend__result-icon--ok { background: rgba(37, 211, 102, 0.12); color: #128c40; }
+.wasend__result-icon--fail { background: var(--brand-danger-bg, #fef2f2); color: var(--brand-danger, #dc2626); }
+.wasend__result-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--brand-navy, #001f3f);
+}
+.wasend__result-text {
+    margin: 0;
+    max-width: 24rem;
+    font-size: 0.82rem;
+    color: var(--brand-grey-600, #555);
+    overflow-wrap: anywhere;
+}
+.wasend__result-acts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+.wasend__result-acts[hidden] { display: none; }
+
+@media (max-width: 575.98px) {
+    /* Phone: the label column costs more than it buys, so From/To stack and the
+       tie drops to the left edge. */
+    .wasend__route-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .wasend__route-label { grid-column: 1 / -1; }
+    .wasend__route-tie { margin-left: 0.5rem; }
+    .wasend__template-select { max-width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wasend__fill { transition: none; }
+}
 
 /* The shared staff hero band (.wfhero signature applied to every *__hero block)
    lives in webpages/css/staff-hero.css — kept out of this file so the warehouse
@@ -23858,13 +24132,6 @@ a.wfstat__card:hover {
     align-items: center;
     flex-wrap: wrap;
     gap: 0.45rem;
-}
-.wdd__ctrl__cell--grow { flex: 1 1 auto; }
-.wdd__ctrl__drawer {
-    flex: 1 0 100%;
-    margin-top: 0.15rem;
-    padding-top: 0.6rem;
-    border-top: 1px solid #eef1f5;
 }
 .wdd__ctrl .wdd__status-row__label {
     min-width: 0;
@@ -24289,4 +24556,261 @@ a.wfstat__card:hover {
     /* With the hairlines gone, the group name is the only boundary left, so it
        needs air in front of it. */
     .wfdesk__group + .wfdesk__group { margin-left: 0.25rem; }
+}
+
+
+/* =============================================================================
+   DRIVER DETAIL — WORK PREFERENCE + COVERAGE ZONES (Overview tab)
+   Purpose: Two ledger cards under Delivery Summary: the driver's declared job
+            type / preferred hour slabs (with the inline staff edit form), and
+            the zone groups they picked.
+   Used by: workforce/templates/workforce/driver_detail.html
+   Notes:   Same navy-ink + hairline language as the rest of the wdd__ layer —
+            picked slabs are inked, unpicked ones stay grey; the yellow accent
+            is spent once, on the slab the clock is in right now.
+============================================================================= */
+
+.wdd__pref__row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid #eef1f5;
+}
+.wdd__pref__row:last-of-type { border-bottom: none; }
+.wdd__pref__row--stack { flex-direction: column; align-items: stretch; gap: 0.4rem; }
+
+.wdd__pref__label {
+    flex: 0 0 auto;
+    min-width: 6.5rem;
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.wdd__pref__value {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--brand-navy, #001f3f);
+}
+.wdd__pref__value--muted { color: #9ca3af; }
+.wdd__pref__note {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.66rem;
+    line-height: 1.4;
+    color: #9ca3af;
+}
+.wdd__pref__note code {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.62rem;
+    background: #eef1f5;
+    color: #6b7280;
+    padding: 0 0.2rem;
+    border-radius: 0.2rem;
+}
+
+/* Edit affordance in the card header — a link, not a button chrome */
+.wdd__pref__edit {
+    margin-left: auto;
+    padding: 0;
+    background: none;
+    border: none;
+    font-size: 0.68rem;
+    color: var(--brand-navy, #001f3f);
+}
+.wdd__pref__edit:hover { text-decoration: underline; }
+.wdd__pref__edit i { font-size: 0.6rem; }
+
+/* --- Hour slabs: picked = inked, unpicked = grey, current hour = yellow rail */
+.wdd__slabs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.wdd__slab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.22rem 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: #9ca3af;
+    background: #fff;
+}
+.wdd__slab i { font-size: 0.5rem; }
+.wdd__slab--on {
+    border-color: #cbd5e1;
+    background: #f8f9fa;
+    color: var(--brand-navy, #001f3f);
+    font-weight: 600;
+}
+.wdd__slab--now { box-shadow: inset 3px 0 0 var(--brand-primary, #f7c000); }
+
+.wdd__pref__flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #9ca3af;
+}
+.wdd__pref__flag i { font-size: 0.6rem; }
+.wdd__pref__flag--on { color: #15803d; }
+
+/* Inline staff edit form, hidden until the header "Edit" is clicked */
+.wdd__pref__drawer {
+    margin-top: 0.6rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid #eef1f5;
+}
+.wdd__pref__drawer .form-select-sm { max-width: 16rem; font-size: 0.75rem; }
+.wdd__pref__drawer .form-check-label { cursor: pointer; }
+/* The Details-tab cards run edge-to-edge info tables (--no-pad body), so their
+   inline edit drawer has to carry the horizontal padding the body doesn't. */
+.wdd__pref__drawer--inset {
+    margin-top: 0;
+    padding: 0.7rem 0.8rem 0.8rem;
+}
+.wdd__pref__drawer .wdd__form-label { margin-bottom: 0.2rem; }
+.wdd__pref__drawer .wdd__toast { margin-top: 0.6rem; }
+
+/* --- Bio card ------------------------------------------------------------- */
+.wdd__bio__text {
+    margin: 0;
+    color: var(--brand-grey-600);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+}
+.wdd__bio__text--muted { color: var(--brand-grey-400); font-style: italic; }
+
+/* --- Coverage zones: one hairline row per picked group -------------------- */
+.wdd__zones { display: flex; flex-direction: column; }
+.wdd__zone {
+    padding: 0.45rem 0;
+    border-bottom: 1px solid #eef1f5;
+}
+.wdd__zone:first-child { padding-top: 0; }
+.wdd__zone:last-child { border-bottom: none; padding-bottom: 0; }
+.wdd__zone__head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.wdd__zone__name {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--brand-navy, #001f3f);
+}
+.wdd__zone__count {
+    margin-left: auto;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+    background: #eef1f5;
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+}
+.wdd__zone__nums {
+    display: block;
+    margin-top: 0.15rem;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.66rem;
+    line-height: 1.5;
+    color: #6b7280;
+    word-break: break-word;
+}
+
+@media (max-width: 575.98px) {
+    .wdd__pref__row { flex-direction: column; align-items: stretch; gap: 0.2rem; }
+    .wdd__pref__label { min-width: 0; }
+    .wdd__pref__drawer .form-select-sm { max-width: 100%; }
+}
+
+
+/* =============================================================================
+   DRIVER DETAIL — QUICK ACTIONS RAIL (Overview, right column)
+   Purpose: The per-driver jump list — deliveries, task sheet, payout, docs,
+            devices, contact — grouped by intent, two tiles per row.
+   Used by: workforce/templates/workforce/driver_detail.html
+   Notes:   Colour lives in the icon tile only (same tinted-tile language as the
+            .wdd__stats rail); the label stays navy ink on paper so a dozen
+            actions still read as one list rather than a box of sweets.
+============================================================================= */
+
+.wdd__qa__group {
+    display: block;
+    margin: 0.7rem 0 0.4rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #9ca3af;
+}
+.wdd__qa__group:first-child { margin-top: 0; }
+
+.wdd__qa {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 0.35rem;
+}
+
+.wdd__qa__btn {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.4rem;
+    background: #fff;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.wdd__qa__btn:hover {
+    border-color: var(--brand-navy, #001f3f);
+    background: #f8f9fa;
+    box-shadow: 0 1px 3px rgba(0, 31, 63, 0.12);
+    text-decoration: none;
+}
+.wdd__qa__btn:focus-visible {
+    outline: none;
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.28);
+}
+
+.wdd__qa__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.55rem;
+    height: 1.55rem;
+    border-radius: 0.35rem;
+    font-size: 0.68rem;
+}
+.wdd__qa__icon--blue   { background: #dbeafe; color: #1d4ed8; }
+.wdd__qa__icon--indigo { background: #e0e7ff; color: #4338ca; }
+.wdd__qa__icon--purple { background: #ede9fe; color: #6d28d9; }
+.wdd__qa__icon--green  { background: #dcfce7; color: #15803d; }
+.wdd__qa__icon--teal   { background: #ccfbf1; color: #0f766e; }
+.wdd__qa__icon--amber  { background: #fef3c7; color: #b45309; }
+.wdd__qa__icon--orange { background: #ffedd5; color: #c2410c; }
+.wdd__qa__icon--red    { background: #fee2e2; color: #b91c1c; }
+.wdd__qa__icon--navy   { background: #eef1f5; color: var(--brand-navy, #001f3f); }
+.wdd__qa__icon--wa     { background: #dcfce7; color: #128c7e; }
+
+.wdd__qa__label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--brand-navy, #001f3f);
+}
+
+@media (max-width: 575.98px) {
+    .wdd__qa { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .wdd__qa__label { font-size: 0.66rem; }
 }

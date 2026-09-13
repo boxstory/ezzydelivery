@@ -113,9 +113,8 @@ document.addEventListener('DOMContentLoaded', function () {
     {re: /^\/workforce\/fleet\/cod-business-settlement\//,  menu: 'submenu-finance-seller', link: 'workforce_sidebar_link_business_cod_payout'},
     {re: /^\/workforce\/client-charges\/invoices/,           menu: 'submenu-finance-seller', link: 'workforce_sidebar_link_finance_charge_invoices'},
     {re: /^\/workforce\/client-charges\/collect/,            menu: 'submenu-finance-seller', link: 'workforce_sidebar_link_finance_charges_collect'},
+    {re: /^\/workforce\/client-ledger/,                     menu: 'submenu-finance-seller', link: 'workforce_sidebar_link_client_ledger'},
     {re: /^\/workforce\/drivers\/\d+/,                      menu: 'submenu-accounts',      link: 'workforce_sidebar_link_all_drivers'},
-    {re: /^\/workforce\/drivers\//,                         menu: 'submenu-accounts',      link: null},
-    {re: /^\/workforce\/fleet\//,                           menu: 'submenu-accounts',      link: null},
     {re: /^\/workforce\/sellers\/api-configs\/\d+/,         menu: 'submenu-triggers',      link: 'workforce_sidebar_link_seller_api_configs'},
     {re: /^\/workforce\/sellers\/\d+/,                      menu: 'submenu-sellers',       link: 'workforce_sidebar_link_all_sellers'},
     {re: /^\/workforce\/sellers\//,                         menu: 'submenu-sellers',       link: null},
@@ -146,10 +145,27 @@ document.addEventListener('DOMContentLoaded', function () {
     {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     menu: 'submenu-verifications', link: 'workforce_sidebar_link_pricing_inquiries'},
     {re: /^\/workforce\/forms\//,                           menu: 'submenu-verifications', link: null},
     {re: /^\/workforce\/crm\/leads\/\d+/,                   menu: 'submenu-crm',           link: 'workforce_sidebar_link_crm_board'},
-    {re: /^\/workforce\/crm\//,                             menu: 'submenu-crm',           link: null}
+    {re: /^\/workforce\/crm\//,                             menu: 'submenu-crm',           link: null},
+    // Finance > Driver also lives under /workforce/fleet/, so each of its pages
+    // has to claim itself before the Fleet A/Cs catch-all below sweeps it up.
+    {re: /^\/workforce\/fleet\/drivers-earnings\//,         menu: 'submenu-finance-driver', link: 'workforce_sidebar_link_finance_driver_earnings'},
+    {re: /^\/workforce\/fleet\/driver-payout\/\d+/,         menu: 'submenu-finance-driver', link: 'workforce_sidebar_link_finance_driver_earnings'},
+    {re: /^\/workforce\/fleet\/driver-payout\//,            menu: 'submenu-finance-driver', link: 'workforce_sidebar_link_finance_earnings_verification'},
+    {re: /^\/workforce\/fleet\/earnings-verification\//,    menu: 'submenu-finance-driver', link: 'workforce_sidebar_link_finance_earnings_verification'},
+    {re: /^\/workforce\/fleet\/salary\//,                   menu: 'submenu-finance-driver', link: 'workforce_sidebar_link_finance_driver_salaries'},
+    {re: /^\/workforce\/fleet\/pay-rates\//,                menu: 'submenu-finance-driver', link: 'workforce_sidebar_link_finance_pay_rates'},
+    // Catch-alls last: every specific rule above has had its turn.
+    {re: /^\/workforce\/drivers\//,                         menu: 'submenu-accounts',      link: null},
+    {re: /^\/workforce\/fleet\//,                           menu: 'submenu-accounts',      link: null}
   ];
 
-  for (var i = 0; i < subpageMap.length; i++) {
+  // The server already resolves the menu by url_name for every page with a
+  // sidebar entry. When it has, this map must not open a second one — that is
+  // how two top-level buttons ended up lit at once on the Finance > Driver
+  // pages, which live under /workforce/fleet/ alongside the Fleet A/Cs desk.
+  var serverActive = document.querySelector('#workforce_sidebar_nav .nav-item.active, #workforce_sidebar_nav a.nav-link.active');
+
+  for (var i = 0; !serverActive && i < subpageMap.length; i++) {
     if (subpageMap[i].re.test(path)) {
       var submenu = subpageMap[i].menu ? document.getElementById(subpageMap[i].menu) : null;
       if (submenu && !submenu.classList.contains('show')) {

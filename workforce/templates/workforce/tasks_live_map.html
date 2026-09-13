@@ -8,7 +8,7 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
 {% endcomment %}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/live-map.css' %}?v=20260729a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/live-map.css' %}?v=20260903a" rel="stylesheet" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -148,7 +148,7 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
             attributionControl: false
         });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19
         }).addTo(map);
 
@@ -288,12 +288,26 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
 
         function driverPopup(d) {
             var noGps = !d.has_gps;
-            var stale = d.has_gps && d.minutes_ago > 10;
+            var inNav = !!d.nav && d.has_gps;
+            var stale = d.has_gps && !inNav && d.minutes_ago > 10;
             var h = '<div class="wf-dpopup">';
             h += '<div class="wf-dpopup__name"><i class="fa-solid fa-car me-1"></i>' + escHtml(d.driver_name) + '</div>';
+            if (inNav) {
+                // Say what the silence is before saying how old the fix is —
+                // the age is expected here, not a fault.
+                h += '<div class="wf-dpopup__meta wf-dpopup__meta--nav"><i class="fa-solid fa-diamond-turn-right me-1"></i>'
+                    + escHtml(d.nav.status) + ' since ' + escHtml(d.nav.since)
+                    + ' (' + d.nav.minutes + ' min)</div>';
+                h += '<div class="wf-dpopup__meta" style="color:#9ca3af;font-size:11px;"><i class="fa-solid fa-thumbtack me-1"></i>Position frozen where they left — the phone cannot fix while another app is open</div>';
+            }
             if (noGps) {
                 h += '<div class="wf-dpopup__meta wf-dpopup__meta--stale"><i class="fa-solid fa-triangle-exclamation me-1"></i>No GPS pings received' + (d.updated ? ' — ' + d.updated : '') + '</div>';
                 h += '<div class="wf-dpopup__meta" style="color:#9ca3af;font-size:11px;"><i class="fa-solid fa-location-dot me-1"></i>Shown at task location (fallback)</div>';
+                if (d.nav) {
+                    h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-diamond-turn-right me-1"></i>'
+                        + escHtml(d.nav.status) + ' since ' + escHtml(d.nav.since)
+                        + ' — but this phone has never reported a position</div>';
+                }
                 if (d.updated) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-clock me-1"></i>Updated ' + d.updated + '</div>';
             } else {
                 h += '<div class="wf-dpopup__meta' + (stale ? ' wf-dpopup__meta--stale' : '') + '">';
@@ -339,8 +353,10 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
             }
             driverList.forEach(function(d) {
                 var noGps = !d.has_gps;
-                var stale = d.has_gps && d.minutes_ago > 10;
-                var dotClass = noGps ? ' map-driver-filter__dot--no-gps' : (stale ? ' map-driver-filter__dot--stale' : '');
+                var inNav = !!d.nav && d.has_gps;
+                var stale = d.has_gps && !inNav && d.minutes_ago > 10;
+                var dotClass = inNav ? ' map-driver-filter__dot--in-nav'
+                    : (noGps ? ' map-driver-filter__dot--no-gps' : (stale ? ' map-driver-filter__dot--stale' : ''));
                 var isChecked = activeDriverIds === null || activeDriverIds.indexOf(String(d.driver_id)) !== -1;
                 var label = document.createElement('label');
                 label.className = 'map-driver-filter__item';
@@ -488,8 +504,25 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
             toRender.forEach(function(d) {
                 if (!d.lat || !d.lng) return;
                 var noGps = !d.has_gps;
-                var stale = d.has_gps && d.minutes_ago > 10;
-                var cssClass = noGps ? ' wf-driver-marker--no-gps' : (stale ? ' wf-driver-marker--stale' : '');
+                // A driver inside Waze cannot report — the browser is not running.
+                // That is not a stale marker, and showing it as one is what sends
+                // dispatch chasing a driver who is simply driving. It only holds
+                // where there is a real position to freeze: a driver who has
+                // never pinged is a no-GPS marker at a task location, and
+                // painting that violet would claim a drive nobody measured.
+                var inNav = !!d.nav && d.has_gps;
+                var stale = d.has_gps && !inNav && d.minutes_ago > 10;
+                var cssClass = inNav ? ' wf-driver-marker--in-nav'
+                    : (noGps ? ' wf-driver-marker--no-gps' : (stale ? ' wf-driver-marker--stale' : ''));
+
+                // The leg they are presumed to be driving. Dashed, because it is
+                // a projection from a frozen position and not a measured trail.
+                if (inNav && d.nav.dest_lat && d.nav.dest_lng) {
+                    L.polyline([[d.lat, d.lng], [d.nav.dest_lat, d.nav.dest_lng]], {
+                        color: '#7c3aed', weight: 2, opacity: 0.65, dashArray: '6, 8'
+                    }).bindTooltip('Presumed route — ' + escHtml(d.nav.status), { sticky: true })
+                      .addTo(driverLayerGroup);
+                }
                 var icon = L.divIcon({
                     className: '',
                     html: '<div class="wf-driver-marker' + cssClass + '"><div class="wf-driver-marker__pulse"></div><div class="wf-driver-marker__dot"></div></div>',

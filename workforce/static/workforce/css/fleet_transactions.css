@@ -123,6 +123,18 @@
     box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
 }
 
+.ftr__btn--navy {
+    background: var(--brand-navy, #001f3f);
+    color: #fff;
+}
+
+.ftr__btn--navy:hover {
+    background: var(--brand-navy-light, #003366);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: var(--brand-shadow-sm, 0 2px 6px rgba(0, 31, 63, 0.2));
+}
+
 .ftr__btn--outline {
     background: transparent;
     color: var(--brand-grey-600, #555);
@@ -248,15 +260,16 @@
 }
 
 .ftr__profile-avatar {
-    width: 3rem;
-    height: 3rem;
+    width: 5rem;
+    height: 5rem;
     border-radius: 50%;
     background: var(--brand-navy, #001f3f);
     color: var(--brand-primary, #f7c000);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
+    font-size: 1.6rem;
+    letter-spacing: 0.02em;
     font-weight: 700;
     flex-shrink: 0;
 }
@@ -293,6 +306,12 @@
     color: var(--brand-grey-400, #b0b0b0);
     margin: 0 0 0.5rem;
     font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+}
+
+/* Code and contact stack as separate lines on the seller card — the second one
+   keeps the block's bottom gap, the first sits tight against it. */
+.ftr__profile-meta:not(:last-child) {
+    margin-bottom: 0.125rem;
 }
 
 .ftr__profile-balances {
@@ -336,6 +355,89 @@
 
 .ftr__balance--blue strong {
     color: #2563eb;
+}
+
+/* ── COD position — third column of the seller profile card ──
+   Where this seller's collected cash sits, in the same three legs and swatch
+   colours as the roster card (seller_roster.css). Ledger, not chips: labels
+   left, tabular figures right, hairline rules. */
+.ftr__profile-legs {
+    flex: 0 0 auto;
+    min-width: 13.5rem;
+    margin: 0;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    background: var(--brand-grey-100, #fafafa);
+}
+
+.ftr__leg {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.3rem 0;
+}
+
+.ftr__leg + .ftr__leg {
+    border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+
+.ftr__leg dt {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+    white-space: nowrap;
+}
+
+.ftr__leg dd {
+    margin: 0;
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+.ftr__leg-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.ftr__leg-dot--driver { background: var(--brand-warning, #d97706); }
+.ftr__leg-dot--owed { background: var(--brand-navy, #001f3f); }
+
+/* The sum of the open legs — ruled off and set in navy so it reads as the
+   bottom line of the panel rather than a third leg. */
+.ftr__leg--total {
+    margin-top: 0.125rem;
+    padding-top: 0.4rem;
+    border-top: 2px solid var(--brand-navy, #001f3f);
+}
+
+.ftr__leg--total dt {
+    color: var(--brand-navy, #001f3f);
+    font-weight: 700;
+    padding-left: 0.9rem;
+}
+
+.ftr__leg--total dd {
+    font-size: 0.9rem;
+    color: var(--brand-navy, #001f3f);
+}
+
+@media (max-width: 767.98px) {
+    .ftr__profile-legs {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
 }
 
 /* ================================================
@@ -506,12 +608,32 @@ input.ftr__filter-input:focus {
     align-items: center;
     gap: 0.25rem;
     padding: 0.375rem 0.75rem;
-    border: none;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: var(--brand-radius-sm, 0.5rem);
-    font-size: 0.7rem;
+    color: #fff;
+    font-size: 0.75rem;
     font-weight: 600;
+    white-space: nowrap;
     cursor: pointer;
     transition: all 0.15s ease;
+}
+
+.ftr__bulk-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.ftr__bulk-btn:focus-visible {
+    outline: 2px solid var(--brand-primary, #f7c000);
+    outline-offset: 2px;
+}
+
+/* Actions bank to the right of the count and the running total. */
+.ftr__bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-wrap: wrap;
 }
 
 .ftr__bulk-btn--settle {
@@ -539,6 +661,52 @@ input.ftr__filter-input:focus {
     font-size: 0.8125rem;
     font-weight: 700;
     color: var(--brand-primary, #f7c000);
+}
+
+/* Reach past the current page. Sits between the count and the running total as
+   one quiet line — the count states the fact, the link offers the rest of the
+   filtered ledger. Deliberately not a button surface: it is an offer, not a
+   fourth action competing with Export / Print / Clear. */
+.ftr__bulk-scope {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.ftr__bulk-link {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--brand-primary, #f7c000);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.ftr__bulk-link:hover {
+    color: #fff;
+}
+
+.ftr__bulk-link:focus-visible {
+    outline: 2px solid var(--brand-primary, #f7c000);
+    outline-offset: 2px;
+}
+
+/* A picked row that lives on another page has no row in this table, so print
+   builds one. It exists only for the print sheet — never on screen. */
+.ftr__row--printonly {
+    display: none;
+}
+
+@media print {
+    .ftr__row--printonly {
+        display: table-row;
+    }
 }
 
 /* ================================================
@@ -583,6 +751,129 @@ input.ftr__filter-input:focus {
 .ftr__th-check {
     width: 2.25rem;
     text-align: center;
+}
+
+/* ================================================
+   APPLIED-FILTER SUMMARY
+   Named .ftr__applied, not .ftr__chip — that name is already the filter-builder
+   chip on Fleet Transactions and is display:none until switched on.
+   ================================================ */
+/* What is narrowing the list, stated in words. Each chip is a link back to this
+   page without that one filter, so removing is one click and never ambiguous. */
+.ftr__applied {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin: 0 0 0.75rem;
+}
+
+.ftr__applied-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+.ftr__applied-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    background: #fff;
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: 2rem;
+    text-decoration: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ftr__applied-chip:hover {
+    border-color: var(--brand-danger, #dc2626);
+    background: var(--brand-danger-bg, #fef2f2);
+}
+
+.ftr__applied-key {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+.ftr__applied-val {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+.ftr__applied-chip i {
+    font-size: 0.7rem;
+    color: var(--brand-grey-400, #b0b0b0);
+}
+
+.ftr__applied-chip:hover i {
+    color: var(--brand-danger, #dc2626);
+}
+
+.ftr__applied-clear {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--brand-grey-500, #6c757d);
+    text-decoration: underline;
+}
+
+.ftr__applied-clear:hover {
+    color: var(--brand-navy, #001f3f);
+}
+
+/* ================================================
+   TOOLBAR SORT PICKER
+   ================================================ */
+/* The headers sort on click, but only reveal themselves on hover — this states
+   every available order in words, for the same server-side sort. */
+.ftr__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: 0;
+}
+
+.ftr__sort-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+    white-space: nowrap;
+}
+
+.ftr__sort-select {
+    height: 2.25rem;
+    padding: 0 1.75rem 0 0.625rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+    background-color: #fff;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%236c757d' d='M8 11 3.5 6h9z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 0.7rem;
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    appearance: none;
+    cursor: pointer;
+}
+
+.ftr__sort-select:focus {
+    border-color: var(--brand-primary, #f7c000);
+    outline: none;
+}
+
+/* The search field earns more room than a preset dropdown. */
+.ftr__filter-group--search {
+    min-width: 15rem;
+    flex: 1 1 15rem;
 }
 
 /* ================================================
@@ -633,6 +924,14 @@ input.ftr__filter-input:focus {
     opacity: 0.3;
 }
 
+/* orders.css ships `tbody, tbody td, tbody th { font-size: 0.75rem !important }`
+   and it loads on every staff page, so the ledger rendered at 12px — under the
+   0.8rem legibility floor. Matched with !important, the same way .wai__table in
+   workforce.css already answers this rule. */
+.ftr__table tbody td {
+    font-size: 0.8125rem !important;
+}
+
 .ftr__table td {
     padding: 0.5rem 0.75rem;
     color: var(--brand-grey-700, #333);
@@ -642,6 +941,127 @@ input.ftr__filter-input:focus {
 
 .ftr__table tbody tr {
     transition: background 0.15s ease;
+}
+
+/* ── Where the row's cash sits, read down the left edge ──
+   Same three colours as the roster rail and the COD position panel. The Status
+   column still says it in words; this is for scanning 50 rows at once. */
+.ftr__row--driver td:first-child { box-shadow: inset 3px 0 0 var(--brand-warning, #d97706); }
+.ftr__row--held td:first-child { box-shadow: inset 3px 0 0 var(--brand-navy, #001f3f); }
+.ftr__row--paid td:first-child { box-shadow: inset 3px 0 0 var(--brand-grey-300, #dcdcdc); }
+
+/* Ticked rows stay visible after the bar scrolls out of view. Navy wash, not
+   yellow: the hero's settle button is this view's one yellow. */
+.ftr__table tbody tr.ftr__row--picked,
+.ftr__table tbody tr.ftr__row--picked:hover {
+    background: rgba(0, 31, 63, 0.06);
+}
+
+.ftr__td--check {
+    text-align: center;
+    width: 2.5rem;
+}
+
+/* Page total — the sum of the rows actually on screen, under its own column. */
+.ftr__foot td {
+    padding: 0.5rem 0.75rem;
+    background: var(--brand-grey-100, #fafafa);
+    border-top: 2px solid var(--brand-navy, #001f3f);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+.ftr__foot-amount {
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--brand-navy, #001f3f);
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+/* Money reads as money: mono and tabular so the decimal points line up down
+   the column, in ink rather than a colour that implies a status. */
+.ftr__amount {
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--brand-grey-800, #1f1f1f);
+    white-space: nowrap;
+    text-align: right;
+}
+
+.ftr__amount-cur {
+    font-family: var(--brand-font-primary, "Inter", sans-serif);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+/* The driver handed over less than the order was billed — almost always an order
+   edited after the cash was already collected. Sits under the invoiced figure so
+   the row explains the gap between this column's sum and the Unsettled card.
+   Warning ink, no chip or pill: this is a note on a number, not a status. */
+.ftr__amount-short {
+    display: block;
+    margin-top: 0.15rem;
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    color: var(--brand-warning-text, #92400e);
+    cursor: help;
+}
+
+/* Order status — swatch and text, per the brand status system. */
+.ftr__ostatus {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ftr__ostatus i { font-size: 0.7rem; }
+.ftr__ostatus--done { color: var(--brand-success, #15803d); }
+.ftr__ostatus--live { color: var(--brand-info, #2563eb); }
+.ftr__ostatus--hold { color: var(--brand-warning, #d97706); }
+.ftr__ostatus--void { color: var(--brand-danger, #dc2626); }
+
+/* The destination cell carries four lines — give it room instead of letting a
+   zone name wrap mid-word against the distance column. */
+.ftr__loc-cell { min-width: 15rem; }
+.ftr__th--dist, .ftr__dist-cell { white-space: nowrap; }
+
+/* Controls on one line: the filter inputs measured 36px against 34px on the
+   multiselect and the buttons, which reads as a misaligned row. */
+.ftr .ftr__filter-input,
+.ftr .ftr__filter-select,
+.ftr .msf__toggle,
+.ftr .ftr__filter-actions .ftr__btn {
+    min-height: 2.25rem;
+}
+
+/* Hero action sat at 27px — under the 34px floor for a staff control. */
+.ftr .wfd__hero-actions .btn {
+    min-height: 2.1rem;
+    font-size: 0.78rem;
+}
+
+/* Off-screen clipboard shim for the http fallback in sellerCopyCodes. */
+.ftr__offscreen {
+    position: fixed;
+    left: -9999px;
+    opacity: 0;
 }
 
 .ftr__table tbody tr:hover {
@@ -936,6 +1356,67 @@ input.ftr__filter-input:focus {
     background: #fef3c7;
     color: #92400e;
     border: 1px solid #fde68a;
+}
+
+/* Driver carrying the order — second line under the status badge, so
+   "With Driver" names a person instead of just a state. */
+.ftr__txn-driver {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--brand-grey-600, #555);
+    cursor: help;
+}
+
+.ftr__txn-driver i {
+    font-size: 0.6rem;
+    color: var(--brand-grey-500, #777);
+}
+
+/* Document links under the badge — the payout invoice the cash went out on,
+   and the charge invoice the fee was billed on. Kept as quiet mono link lines,
+   not another pill: the badge above is the state, these are just references. */
+.ftr__txn-doc {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.2rem;
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 0.66rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    color: var(--brand-navy, #001f3f);
+    text-decoration: none;
+    border-bottom: 1px dotted rgba(0, 31, 63, 0.35);
+    width: fit-content;
+}
+
+.ftr__txn-doc:hover {
+    color: var(--brand-navy, #001f3f);
+    border-bottom-style: solid;
+}
+
+.ftr__txn-doc i {
+    font-size: 0.6rem;
+    color: var(--brand-grey-500, #777);
+}
+
+.ftr__txn-doc--void {
+    color: var(--brand-grey-500, #777);
+    border-bottom-color: var(--brand-grey-300, #dcdcdc);
+}
+
+.ftr__txn-doc-flag {
+    font-family: inherit;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--brand-danger, #dc2626);
 }
 
 .ftr__txn-type--deduction,
@@ -1635,6 +2116,15 @@ input.ftr__filter-input:focus {
     border: 1px solid #e2e8f0;
 }
 
+/* Cash handed in and sitting with Ezzy. Navy, the same colour its row rail
+   already uses, so the badge and the left edge tell one story — and so it
+   stops reading identically to the "With Driver" leg beside it. */
+.ftr__txn-type--held {
+    background: rgba(0, 31, 63, 0.08);
+    color: var(--brand-navy, #001f3f);
+    border: 1px solid rgba(0, 31, 63, 0.2);
+}
+
 /* Bank reconciliation cell — swatch + text, not another loud pill. The Status
    column already carries badges; this second state has to read as a quieter
    annotation beside them. */
@@ -1882,7 +2372,11 @@ input.ftr__filter-input:focus {
     .ftr__btn,
     .ftr__demo-form,
     .ftr__bulk,
+    .ftr__applied,
+    .ftr__sort,
+    .ftr__row--unprinted,
     .ftr__th--check,
+    .ftr__td--check,
     .ftr__th--sort i,
     .ftr__checkbox,
     .ftr__modal,
@@ -2582,3 +3076,300 @@ input.ftr__filter-input:focus {
 }
 .ftr .ftr__btn:focus-visible { outline: 2px solid var(--brand-primary, #f7c000); outline-offset: 2px; }
 .ftr__toolbar .ftr__btn i { font-size: 0.85rem; }
+
+/* ================================================
+   DRIVER PICKER TILES  (.ftr__drivers / .ftr__driver)
+   ================================================
+   Replaces the name dropdown. The picker is a finance control: each driver is a
+   tile carrying the money they are still holding, so staff pick the ledger they
+   need instead of opening seven to find it. Used twice from one partial — the
+   landing card and the change-driver modal. */
+
+/* The card frame is `display:flex` for the old label+dropdown row; the grid
+   needs the full width, so this card lays out as a block and its body fills it. */
+.ftr .ftr__card--driver { display: block; }
+
+.ftr__card-body--drivers {
+    display: block;
+    width: 100%;
+    padding: 0.75rem;
+}
+
+.ftr__drivers-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-bottom: 0.75rem;
+}
+
+.ftr__drivers-search {
+    position: relative;
+    flex: 1 1 18rem;
+    min-width: 0;
+}
+
+.ftr__drivers-search-icon {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    color: var(--brand-grey-400, #b0b0b0);
+    pointer-events: none;
+}
+
+.ftr__drivers .ftr__drivers-search-input {
+    width: 100%;
+    height: 2.25rem;
+    padding: 0 0.75rem 0 2.125rem;
+    font-size: 0.85rem;
+    color: var(--brand-grey-800, #1f1f1f);
+    background-color: #fff;
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.ftr__drivers .ftr__drivers-search-input::placeholder { color: var(--brand-grey-400, #b0b0b0); }
+
+.ftr__drivers .ftr__drivers-search-input:focus {
+    outline: none;
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: none;
+}
+
+/* The fleet's running total — what the picker adds up to, stated once. */
+.ftr__drivers-summary {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--brand-grey-500, #6c757d);
+    white-space: nowrap;
+}
+
+.ftr__drivers-count {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 700;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+.ftr__drivers-dot { margin: 0 0.375rem; color: var(--brand-grey-300, #dcdcdc); }
+
+.ftr__driver-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 0.375rem;
+}
+
+.ftr__driver {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #fff;
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-left: 3px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: var(--brand-radius-md, 0.75rem);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.ftr__driver:hover {
+    border-color: var(--brand-navy, #001f3f);
+    box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0,0,0,0.08));
+    transform: translateY(-1px);
+    color: inherit;
+}
+
+.ftr__driver:focus-visible {
+    outline: 2px solid var(--brand-primary, #f7c000);
+    outline-offset: 2px;
+}
+
+/* The one accent: a driver still carrying money is flagged, nobody else. */
+.ftr__driver--holding { border-left-color: var(--brand-primary, #f7c000); }
+
+.ftr__driver--current {
+    border-color: var(--brand-navy, #001f3f);
+    background: var(--brand-grey-100, #fafafa);
+}
+
+.ftr__driver-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.ftr__driver-avatar {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--brand-navy, #001f3f);
+    color: var(--brand-primary, #f7c000);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.ftr__driver-who {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+}
+
+.ftr__driver-name {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--brand-grey-800, #1f1f1f);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ftr__driver-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+    color: var(--brand-grey-500, #6c757d);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ftr__driver-dot { margin: 0 0.375rem; color: var(--brand-grey-300, #dcdcdc); }
+
+.ftr__driver-cod-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.375rem;
+    min-height: 1.125rem;
+}
+
+.ftr__driver-flags {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.ftr__driver-flag {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    white-space: nowrap;
+}
+
+.ftr__driver-flag--now {
+    color: #fff;
+    background: var(--brand-navy, #001f3f);
+}
+
+.ftr__driver-flag--blocked {
+    color: var(--brand-danger, #dc2626);
+    background: var(--brand-danger-bg, #fef2f2);
+}
+
+.ftr__driver-flag--pending,
+.ftr__driver-flag--processing {
+    color: #92400e;
+    background: var(--brand-warning-bg, #fef3c7);
+}
+
+/* The money line — the reason the tile exists. */
+.ftr__driver-cod {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+
+.ftr__driver-cod-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+.ftr__driver-cod-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 1.375rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--brand-grey-400, #b0b0b0);
+}
+
+.ftr__driver--holding .ftr__driver-cod-value { color: var(--brand-grey-800, #1f1f1f); }
+
+.ftr__driver-cod-cur {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+    margin-right: 0.375rem;
+}
+
+.ftr__driver-cod-meta {
+    font-size: 0.75rem;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+.ftr__drivers-none {
+    margin: 0;
+    grid-column: 1 / -1;
+    padding: 1.125rem 0.75rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+/* Change-driver modal reuses the same partial. */
+.ftr__driver-modal-body { padding: 0.75rem; }
+.ftr__driver-modal-body .ftr__driver-grid {
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+}
+
+/* The profile's change-driver control is a real bordered button, not an icon
+   floating next to the name — switching driver is the page's second action. */
+.ftr .ftr__profile-edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 2.1rem;
+    padding: 0 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-400, #b0b0b0);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.ftr .ftr__profile-edit-btn:hover {
+    color: var(--brand-grey-800, #1f1f1f);
+    background: var(--brand-secondary, #fff7d6);
+    border-color: var(--brand-primary, #f7c000);
+    transform: none;
+}
+
+@media (max-width: 575.98px) {
+    .ftr__driver-grid,
+    .ftr__driver-modal-body .ftr__driver-grid { grid-template-columns: 1fr; }
+    .ftr__drivers-summary { white-space: normal; }
+    .ftr__profile-edit-label { display: none; }
+}
+
+@media print {
+    .ftr__drivers { display: none; }
+}

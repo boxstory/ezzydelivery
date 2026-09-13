@@ -12,10 +12,25 @@ Notes: Columns and values come from the view's shared registry (dl_sheet_export_
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delivery Sheet — {{ printed_on|date:"d M Y" }}</title>
-    <link href="{% static 'workforce/css/dl-task-sheet.css' %}?v=20260818a" rel="stylesheet" type="text/css" />
+    <link href="{% static 'workforce/css/dl-task-sheet.css' %}?v=20260830c" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="dlsht">
+<body class="dlsht" data-col-widths="{{ col_widths }}">
+
+<script>
+// The printed column widths. They arrive as data, not as style: the stylesheet
+// reads each one through --w-<key>, whose fallback is that column's default, so
+// this only ever overrides what the panel has been told to change — and a sheet
+// with no JavaScript prints at the defaults rather than at no width at all.
+(function () {
+    (document.body.dataset.colWidths || '').split(',').forEach(function (pair) {
+        var bits = pair.split(':');
+        if (bits.length === 2 && bits[0]) {
+            document.documentElement.style.setProperty('--w-' + bits[0], bits[1] + '%');
+        }
+    });
+})();
+</script>
 
     <div class="dlsht__bar dlsht__no-print">
         <a href="javascript:history.back()" class="dlsht__btn">
@@ -35,23 +50,116 @@ Notes: Columns and values come from the view's shared registry (dl_sheet_export_
         </span>
     </div>
 
-    <!-- Column config: which columns this sheet prints. Screen only. -->
-    <section class="dlsht__cols dlsht__no-print" id="workforce_sheet_panel_columns" hidden>
+    {% comment %}
+    Column config: a working model of the two printed lines. Each column is a chip
+    carrying the value the first task would print in it, so the panel previews the
+    table below rather than just naming columns. Drag a chip inside a line to
+    reorder, between the lines to move it, or into the last tray to leave it off.
+    Screen only.
+    {% endcomment %}
+    <section class="dlsht__cols dlsht__no-print" id="workforce_sheet_panel_columns"
+             data-detail-default="{{ detail_default }}" hidden>
         <div class="dlsht__cols-head">
             <span class="dlsht__cols-title">Columns on this sheet</span>
+            <span class="dlsht__cols-hint">
+                <i class="fa-solid fa-arrows-up-down-left-right"></i>
+                Drag a column to reorder it, or drop it on another line
+            </span>
             <span class="dlsht__cols-tools">
                 <button type="button" class="dlsht__link" data-cols-all>Select all</button>
                 <button type="button" class="dlsht__link" data-cols-none>Clear</button>
+                <button type="button" class="dlsht__link" data-w-fit>Fit widths to 100%</button>
+                <button type="button" class="dlsht__link" data-cols-reset>Reset</button>
             </span>
         </div>
-        <div class="dlsht__cols-grid">
-            {% for col in all_columns %}
-            <label class="dlsht__cols-item">
-                <input type="checkbox" value="{{ col.key }}" {% if col.checked %}checked{% endif %}>
-                <span>{{ col.label }}</span>
-            </label>
-            {% endfor %}
+
+        <div class="dlsht__demo">
+            <p class="dlsht__demo-note">Preview — values are from the first task on the sheet.</p>
+
+            <div class="dlsht__lane">
+                <span class="dlsht__lane-tag">Line 1<small>table row</small>
+                    <small class="dlsht__lane-total" data-w-total></small></span>
+                <div class="dlsht__zone dlsht__zone--row" data-zone="1">
+                    <span class="dlsht__zone-num">#</span>
+                    {% for col in all_columns %}{% if col.line == '1' %}
+                    <div class="dlsht__chip" draggable="true" tabindex="0" role="button"
+                         data-key="{{ col.key }}" data-label="{{ col.label }}"
+                         aria-label="{{ col.label }} — on the table line">
+                        <span class="dlsht__chip-head"><i class="fa-solid fa-grip-vertical dlsht__chip-grip"></i>{{ col.label }}</span>
+                        <span class="dlsht__chip-val">{{ col.sample|default:"—"|truncatechars:26 }}</span>
+                        <button type="button" class="dlsht__chip-btn" data-chip-toggle
+                                title="Take off the sheet" aria-label="Toggle {{ col.label }}">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <label class="dlsht__chip-w">
+                            <input type="number" class="dlsht__w-input" data-w
+                                   min="2" max="45" step="0.5"
+                                   aria-label="{{ col.label }} width, percent of the sheet">
+                            <span class="dlsht__w-pct">%</span>
+                        </label>
+                        <span class="dlsht__chip-grab" data-w-drag role="separator"
+                              title="Drag to widen or narrow this column"></span>
+                    </div>
+                    {% endif %}{% endfor %}
+                    <span class="dlsht__zone-empty">Drop a column here</span>
+                </div>
+            </div>
+
+            <div class="dlsht__lane">
+                <span class="dlsht__lane-tag">Line 2<small>detail line</small></span>
+                <div class="dlsht__zone dlsht__zone--detail" data-zone="2">
+                    {% for col in all_columns %}{% if col.line == '2' %}
+                    <div class="dlsht__chip dlsht__chip--detail" draggable="true" tabindex="0" role="button"
+                         data-key="{{ col.key }}" data-label="{{ col.label }}"
+                         aria-label="{{ col.label }} — on the detail line">
+                        <span class="dlsht__chip-head"><i class="fa-solid fa-grip-vertical dlsht__chip-grip"></i>{{ col.label }}</span>
+                        <span class="dlsht__chip-val">{{ col.sample|default:"—"|truncatechars:26 }}</span>
+                        <button type="button" class="dlsht__chip-btn" data-chip-toggle
+                                title="Take off the sheet" aria-label="Toggle {{ col.label }}">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <label class="dlsht__chip-w">
+                            <input type="number" class="dlsht__w-input" data-w
+                                   min="2" max="45" step="0.5"
+                                   aria-label="{{ col.label }} width, percent of the sheet">
+                            <span class="dlsht__w-pct">%</span>
+                        </label>
+                        <span class="dlsht__chip-grab" data-w-drag role="separator"
+                              title="Drag to widen or narrow this column"></span>
+                    </div>
+                    {% endif %}{% endfor %}
+                    <span class="dlsht__zone-empty">Drop a column here</span>
+                </div>
+            </div>
+
+            <div class="dlsht__lane dlsht__lane--off">
+                <span class="dlsht__lane-tag">Off sheet<small>not printed</small></span>
+                <div class="dlsht__zone dlsht__zone--off" data-zone="off">
+                    {% for col in all_columns %}{% if col.line == 'off' %}
+                    <div class="dlsht__chip dlsht__chip--off" draggable="true" tabindex="0" role="button"
+                         data-key="{{ col.key }}" data-label="{{ col.label }}"
+                         aria-label="{{ col.label }} — off the sheet">
+                        <span class="dlsht__chip-head"><i class="fa-solid fa-grip-vertical dlsht__chip-grip"></i>{{ col.label }}</span>
+                        <span class="dlsht__chip-val">{{ col.sample|default:"—"|truncatechars:26 }}</span>
+                        <button type="button" class="dlsht__chip-btn" data-chip-toggle
+                                title="Take off the sheet" aria-label="Toggle {{ col.label }}">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <label class="dlsht__chip-w">
+                            <input type="number" class="dlsht__w-input" data-w
+                                   min="2" max="45" step="0.5"
+                                   aria-label="{{ col.label }} width, percent of the sheet">
+                            <span class="dlsht__w-pct">%</span>
+                        </label>
+                        <span class="dlsht__chip-grab" data-w-drag role="separator"
+                              title="Drag to widen or narrow this column"></span>
+                    </div>
+                    {% endif %}{% endfor %}
+                    <span class="dlsht__zone-empty">Every column is on the sheet</span>
+                </div>
+            </div>
         </div>
+
         <div class="dlsht__cols-foot">
             <label class="dlsht__cols-remember">
                 <input type="checkbox" data-cols-remember checked>
@@ -70,6 +178,12 @@ Notes: Columns and values come from the view's shared registry (dl_sheet_export_
     </div>
     {% endif %}
 
+    {% comment %}
+    One .dlsht__page per A4 sheet — {{ per_page }} tasks each, paginated in the view.
+    Each sheet repeats the masthead, the column headers and the signature block so a
+    page handed over on its own is still a complete document.
+    {% endcomment %}
+    {% for page in pages %}
     <div class="dlsht__page">
         <header class="dlsht__head">
             <div class="dlsht__brand">
@@ -82,11 +196,11 @@ Notes: Columns and values come from the view's shared registry (dl_sheet_export_
             <div class="dlsht__meta">
                 <div><span class="dlsht__meta-key">Printed</span> {{ printed_on|date:"d M Y H:i" }}</div>
                 <div><span class="dlsht__meta-key">Tasks</span> {{ row_count }}</div>
+                <div><span class="dlsht__meta-key">Page</span> {{ page.number }} of {{ page_count }}</div>
                 <div class="dlsht__sign"><span class="dlsht__meta-key">Received by</span> <span class="dlsht__rule"></span></div>
             </div>
         </header>
 
-        {% if rows %}
         <table class="dlsht__table">
             <thead>
                 <tr>
@@ -94,36 +208,381 @@ Notes: Columns and values come from the view's shared registry (dl_sheet_export_
                     {% for h in headers %}<th class="dlsht__c--{{ h.key }}">{{ h.label }}</th>{% endfor %}
                 </tr>
             </thead>
-            <tbody>
-                {% for row in rows %}
+            {% comment %}
+            One tbody per task, so its two lines never split across a page break.
+            The second line carries the free-text columns across the full width,
+            starting one column in — the row number spans both lines instead.
+            {% endcomment %}
+            {% for row in page.rows %}
+            <tbody class="dlsht__task">
                 <tr>
-                    <td class="dlsht__num">{{ forloop.counter }}</td>
-                    {% for cell in row %}<td class="dlsht__c--{{ cell.key }}">{{ cell.value }}</td>{% endfor %}
+                    <td class="dlsht__num"{% if row.detail %} rowspan="2"{% endif %}>{{ row.n }}</td>
+                    {% for cell in row.cells %}<td class="dlsht__c--{{ cell.key }}">{{ cell.value }}</td>{% endfor %}
                 </tr>
-                {% endfor %}
+                {% if row.detail %}
+                <tr>
+                    <td class="dlsht__detail-cell" colspan="{{ detail_span }}">
+                        <div class="dlsht__detail">
+                            {% for d in row.detail %}<span class="dlsht__d dlsht__d--{{ d.key }}"><span class="dlsht__d-key">{{ d.label }}</span>{{ d.value }}</span>{% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
             </tbody>
+            {% endfor %}
         </table>
-        {% else %}
-        <p class="dlsht__empty">No tasks match the current filters.</p>
-        {% endif %}
 
         <footer class="dlsht__foot">
             <div class="dlsht__sign"><span class="dlsht__meta-key">Fleet signature</span> <span class="dlsht__rule"></span></div>
             <div class="dlsht__sign"><span class="dlsht__meta-key">Staff signature</span> <span class="dlsht__rule"></span></div>
         </footer>
     </div>
+    {% empty %}
+    <div class="dlsht__page">
+        <header class="dlsht__head">
+            <div class="dlsht__brand">
+                <img src="{% static 'webpages/img/ezzy-logo-512-512.png' %}" alt="Ezzy Delivery" class="dlsht__logo">
+                <div>
+                    <h1 class="dlsht__title">EZZY Delivery Qatar</h1>
+                    <p class="dlsht__sub">Delivery Sheet</p>
+                </div>
+            </div>
+            <div class="dlsht__meta">
+                <div><span class="dlsht__meta-key">Printed</span> {{ printed_on|date:"d M Y H:i" }}</div>
+            </div>
+        </header>
+        <p class="dlsht__empty">No tasks match the current filters.</p>
+    </div>
+    {% endfor %}
 
 <script>
-// Columns panel: rebuilds the sheet URL with ?columns=. The pick is stored under
-// the same localStorage key the list page's CSV picker uses, so choosing columns
-// in either place carries over to the other.
+// Columns panel. The three zones ARE the state: line 1, line 2 and the off-sheet
+// tray, each holding chips in print order. Apply reads the DOM back out and
+// rebuilds the sheet URL — ?columns= carries the pick and its order, ?detail=
+// says which of them print on the second line. The pick is also stored under the
+// same localStorage key the list page's CSV picker uses, so choosing columns in
+// either place carries over to the other (the CSV has one line, so it takes the
+// flat list only).
 (function () {
     var panel = document.getElementById('workforce_sheet_panel_columns');
     if (!panel) return;
     var STORAGE_KEY = '{{ export_storage_key }}';
+    var DETAIL_DEFAULT = (panel.dataset.detailDefault || '').split(',').filter(Boolean);
 
-    function boxes() {
-        return Array.prototype.slice.call(panel.querySelectorAll('.dlsht__cols-item input'));
+    var zones = {};
+    panel.querySelectorAll('[data-zone]').forEach(function (z) { zones[z.dataset.zone] = z; });
+
+    function chipsIn(zone) {
+        return Array.prototype.slice.call(zone.querySelectorAll('.dlsht__chip'));
+    }
+
+    /* --- Widths ------------------------------------------------------------ */
+
+    var WIDTH_MIN = 2, WIDTH_MAX = 45, WIDTH_FALLBACK = 6;
+
+    // Starting widths are read off the printed table below rather than kept as a
+    // second copy of the numbers in the stylesheet: whatever that table is
+    // actually laid out at — default or already overridden by ?widths= — is what
+    // the panel opens showing.
+    var measured = (function () {
+        var out = {}, table = document.querySelector('.dlsht__table');
+        if (!table) return out;
+        var cells = {}, sum = 0;
+        table.querySelectorAll('thead th').forEach(function (th) {
+            var m = /dlsht__c--([a-z_]+)/.exec(th.className);
+            var key = m ? m[1] : (th.classList.contains('dlsht__num') ? 'num' : null);
+            if (!key) return;
+            cells[key] = th.getBoundingClientRect().width;
+            sum += cells[key];
+        });
+        // Shares of the row, not of the table box: measuring against the table's
+        // own width loses a percent or two to collapsed borders, and the total
+        // readout would then never sit on 100 even before anything is touched.
+        Object.keys(cells).forEach(function (k) {
+            out[k] = Math.round(cells[k] / sum * 1000) / 10;
+        });
+        return out;
+    })();
+
+    // The row-number column is always printed and is not adjustable, so it counts
+    // towards the row's width without being one of the chips.
+    var NUM_SHARE = measured.num || 3;
+
+    function widthInput(chip) { return chip.querySelector('[data-w]'); }
+    function widthOf(chip) { return parseFloat(widthInput(chip).value) || 0; }
+
+    // Returns what was actually set — the caller needs it, since the clamp can
+    // give back less than it was asked for.
+    function setWidth(chip, pct) {
+        pct = Math.max(WIDTH_MIN, Math.min(WIDTH_MAX, Math.round(pct * 10) / 10));
+        widthInput(chip).value = pct;
+        // Line 1 chips are sized to their share of the sheet, so the lane is a
+        // scale model of the printed row.
+        chip.style.setProperty('--chip-w', pct);
+        return pct;
+    }
+
+    function syncTotal() {
+        var sum = chipsIn(zones['1']).reduce(function (a, c) { return a + widthOf(c); }, NUM_SHARE);
+        var el = panel.querySelector('[data-w-total]');
+        el.textContent = Math.round(sum) + '% wide';
+        // Off 100 still prints — table-layout:fixed shares the difference out —
+        // so this is a nudge, not an error.
+        el.classList.toggle('is-off', Math.abs(sum - 100) > 1);
+    }
+
+    function keysIn(zone) {
+        return chipsIn(zone).map(function (c) { return c.dataset.key; });
+    }
+
+    // A chip carries its zone in its own classes (border, colour, whether the
+    // sample value shows), so re-style it wherever it lands.
+    function syncChip(chip) {
+        var zone = chip.closest('[data-zone]').dataset.zone;
+        chip.classList.toggle('dlsht__chip--detail', zone === '2');
+        chip.classList.toggle('dlsht__chip--off', zone === 'off');
+        var off = zone === 'off';
+        var btn = chip.querySelector('[data-chip-toggle]');
+        btn.title = off ? 'Put back on the sheet' : 'Take off the sheet';
+        btn.firstElementChild.className = 'fa-solid ' + (off ? 'fa-plus' : 'fa-xmark');
+        var where = zone === '1' ? 'on the table line'
+                  : zone === '2' ? 'on the detail line' : 'off the sheet';
+        chip.setAttribute('aria-label', chip.dataset.label + ' — ' + where);
+    }
+
+    function syncAll() {
+        Object.keys(zones).forEach(function (z) {
+            var zone = zones[z];
+            chipsIn(zone).forEach(syncChip);
+            // The "drop a column here" placeholder only shows on an empty zone.
+            zone.classList.toggle('dlsht__zone--vacant', chipsIn(zone).length === 0);
+        });
+        // A column landing on the table line needs a width; one that has been
+        // there keeps the one it had, even after a trip through the off tray.
+        chipsIn(zones['1']).forEach(function (c) {
+            if (!widthInput(c).value) {
+                setWidth(c, measured[c.dataset.key] || WIDTH_FALLBACK);
+            }
+        });
+        syncTotal();
+    }
+
+    // Move a chip into a zone, before `before` (or at the end). The zone's
+    // trailing placeholder must stay last, so append before it.
+    function place(chip, zone, before) {
+        if (before && before.parentElement === zone) zone.insertBefore(chip, before);
+        else zone.insertBefore(chip, zone.querySelector('.dlsht__zone-empty'));
+        syncAll();
+    }
+
+    /* --- Drag ------------------------------------------------------------- */
+
+    var dragged = null;
+
+    // Where the pointer falls among the chips already in the zone: the first chip
+    // on the pointer's own visual row whose centre sits to its right. Rows are
+    // checked because the off-sheet tray wraps onto several lines.
+    function insertBefore(zone, x, y) {
+        var best = null, bestOffset = -Infinity;
+        chipsIn(zone).forEach(function (c) {
+            if (c === dragged) return;
+            var r = c.getBoundingClientRect();
+            if (y < r.top || y > r.bottom) return;
+            var offset = x - (r.left + r.width / 2);
+            if (offset < 0 && offset > bestOffset) { bestOffset = offset; best = c; }
+        });
+        return best;
+    }
+
+    panel.addEventListener('dragstart', function (e) {
+        var chip = e.target.closest('.dlsht__chip');
+        if (!chip) return;
+        dragged = chip;
+        chip.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        // Firefox will not start a drag without payload.
+        e.dataTransfer.setData('text/plain', chip.dataset.key);
+    });
+
+    panel.addEventListener('dragend', function () {
+        if (!dragged) return;
+        dragged.classList.remove('is-dragging');
+        Object.keys(zones).forEach(function (z) { zones[z].classList.remove('is-over'); });
+        dragged = null;
+        syncAll();
+    });
+
+    Object.keys(zones).forEach(function (z) {
+        var zone = zones[z];
+        zone.addEventListener('dragover', function (e) {
+            if (!dragged) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            zone.classList.add('is-over');
+            // Moved live rather than on drop, so the row shows the result while
+            // the chip is still in hand.
+            place(dragged, zone, insertBefore(zone, e.clientX, e.clientY));
+        });
+        zone.addEventListener('dragleave', function (e) {
+            if (!zone.contains(e.relatedTarget)) zone.classList.remove('is-over');
+        });
+        zone.addEventListener('drop', function (e) { e.preventDefault(); });
+    });
+
+    // Drag the right edge of a chip: the column takes its extra width from the
+    // next one along, the way a spreadsheet column divider behaves, so the row
+    // still adds up to what it did before.
+    panel.addEventListener('pointerdown', function (e) {
+        var grab = e.target.closest('[data-w-drag]');
+        if (!grab) return;
+        var chip = grab.closest('.dlsht__chip');
+        if (chip.closest('[data-zone]') !== zones['1']) return;
+        e.preventDefault();
+
+        var lane = zones['1'].clientWidth || 1;
+        var startX = e.clientX;
+        var start = widthOf(chip);
+        var sibs = chipsIn(zones['1']);
+        var next = sibs[sibs.indexOf(chip) + 1] || null;
+        var startNext = next ? widthOf(next) : 0;
+        grab.setPointerCapture(e.pointerId);
+
+        function move(ev) {
+            var delta = (ev.clientX - startX) / lane * 100;
+            if (next) {
+                delta = Math.max(WIDTH_MIN - start, Math.min(startNext - WIDTH_MIN, delta));
+            }
+            var applied = setWidth(chip, start + delta) - start;
+            if (next) setWidth(next, startNext - applied);
+            syncTotal();
+        }
+        function up() {
+            grab.releasePointerCapture(e.pointerId);
+            grab.removeEventListener('pointermove', move);
+            grab.removeEventListener('pointerup', up);
+        }
+        grab.addEventListener('pointermove', move);
+        grab.addEventListener('pointerup', up);
+    });
+
+    // Typed width. Unlike the drag this takes nothing from the neighbour — the
+    // total readout says where that leaves the row.
+    panel.addEventListener('input', function (e) {
+        var input = e.target.closest('[data-w]');
+        if (!input) return;
+        var chip = input.closest('.dlsht__chip');
+        chip.style.setProperty('--chip-w', parseFloat(input.value) || WIDTH_FALLBACK);
+        syncTotal();
+    });
+
+    panel.addEventListener('change', function (e) {
+        if (!e.target.closest('[data-w]')) return;
+        var chip = e.target.closest('.dlsht__chip');
+        setWidth(chip, widthOf(chip) || WIDTH_FALLBACK);
+        syncTotal();
+    });
+
+    /* --- Click and keyboard ----------------------------------------------- */
+
+    // A chip's default home when it goes back on the sheet: the line the sheet
+    // would have printed it on.
+    function homeZone(key) {
+        return DETAIL_DEFAULT.indexOf(key) !== -1 ? zones['2'] : zones['1'];
+    }
+
+    panel.addEventListener('click', function (e) {
+        var toggle = e.target.closest('[data-chip-toggle]');
+        if (toggle) {
+            var chip = toggle.closest('.dlsht__chip');
+            var off = chip.closest('[data-zone]') === zones.off;
+            place(chip, off ? homeZone(chip.dataset.key) : zones.off, null);
+            return;
+        }
+        var t = e.target.closest('[data-cols-all],[data-cols-none],[data-cols-reset],[data-cols-apply],[data-w-fit]');
+        if (!t) return;
+        if (t.hasAttribute('data-w-fit')) {
+            // Scale the row back to a full sheet width, keeping each column's
+            // share of it.
+            var chips = chipsIn(zones['1']);
+            var sum = chips.reduce(function (a, c) { return a + widthOf(c); }, 0);
+            var room = 100 - NUM_SHARE;
+            if (sum > 0) chips.forEach(function (c) { setWidth(c, widthOf(c) * room / sum); });
+            syncTotal();
+            return;
+        }
+        if (t.hasAttribute('data-cols-all')) {
+            chipsIn(zones.off).forEach(function (c) { place(c, homeZone(c.dataset.key), null); });
+        } else if (t.hasAttribute('data-cols-none')) {
+            ['1', '2'].forEach(function (z) {
+                chipsIn(zones[z]).forEach(function (c) { place(c, zones.off, null); });
+            });
+        } else if (t.hasAttribute('data-cols-reset')) {
+            // Back to the sheet's own defaults: every column on, in registry
+            // order, split the way the sheet splits them.
+            window.location.href = window.location.pathname + stripped(['columns', 'detail', 'widths']);
+        } else {
+            apply();
+        }
+    });
+
+    // Keyboard equivalent of the drag: Alt+left/right reorders inside a line,
+    // Alt+up/down moves the chip between the lines and the tray.
+    var ORDER = ['1', '2', 'off'];
+    panel.addEventListener('keydown', function (e) {
+        var chip = e.target.closest('.dlsht__chip');
+        if (!chip || !e.altKey) return;
+        var zone = chip.closest('[data-zone]');
+        var sibs = chipsIn(zone);
+        var i = sibs.indexOf(chip);
+        if (e.key === 'ArrowLeft' && i > 0) {
+            place(chip, zone, sibs[i - 1]);
+        } else if (e.key === 'ArrowRight' && i < sibs.length - 1) {
+            place(chip, zone, sibs[i + 2] || null);
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            var next = ORDER.indexOf(zone.dataset.zone) + (e.key === 'ArrowDown' ? 1 : -1);
+            if (next < 0 || next >= ORDER.length) return;
+            place(chip, zones[ORDER[next]], null);
+        } else {
+            return;
+        }
+        e.preventDefault();
+        chip.focus();
+    });
+
+    /* --- Apply ------------------------------------------------------------- */
+
+    // The current URL's query minus the parameters named — the filters and ?ids=
+    // must survive, only the column ones are rewritten.
+    function stripped(drop) {
+        var u = new URL(window.location.href);
+        drop.forEach(function (k) { u.searchParams.delete(k); });
+        var q = u.searchParams.toString();
+        return q ? '?' + q : '';
+    }
+
+    function apply() {
+        var line1 = keysIn(zones['1']);
+        var line2 = keysIn(zones['2']);
+        if (!line1.length && !line2.length) {
+            alert('Keep at least one column on the sheet.');
+            return;
+        }
+        var picked = line1.concat(line2);
+        var remember = panel.querySelector('[data-cols-remember]');
+        try {
+            if (remember && remember.checked) localStorage.setItem(STORAGE_KEY, JSON.stringify(picked));
+            else localStorage.removeItem(STORAGE_KEY);
+        } catch (err) { /* storage may be unavailable */ }
+
+        var widths = chipsIn(zones['1']).map(function (c) {
+            return c.dataset.key + ':' + widthOf(c);
+        });
+
+        var q = stripped(['columns', 'detail', 'widths']);
+        q = (q ? q + '&' : '?') + 'columns=' + encodeURIComponent(picked.join(','))
+                                + '&detail=' + encodeURIComponent(line2.join(','))
+                                + '&widths=' + encodeURIComponent(widths.join(','));
+        window.location.href = window.location.pathname + q;
     }
 
     document.querySelector('[data-cols-toggle]').addEventListener('click', function (e) {
@@ -131,36 +590,7 @@ Notes: Columns and values come from the view's shared registry (dl_sheet_export_
         e.currentTarget.setAttribute('aria-expanded', String(!panel.hidden));
     });
 
-    panel.addEventListener('click', function (e) {
-        var t = e.target.closest('[data-cols-all],[data-cols-none],[data-cols-apply]');
-        if (!t) return;
-        if (t.hasAttribute('data-cols-all')) {
-            boxes().forEach(function (b) { b.checked = true; });
-        } else if (t.hasAttribute('data-cols-none')) {
-            boxes().forEach(function (b) { b.checked = false; });
-        } else {
-            apply();
-        }
-    });
-
-    function apply() {
-        var picked = boxes().filter(function (b) { return b.checked; })
-                            .map(function (b) { return b.value; });
-        if (!picked.length) {
-            alert('Pick at least one column.');
-            return;
-        }
-        var remember = panel.querySelector('[data-cols-remember]');
-        try {
-            if (remember && remember.checked) localStorage.setItem(STORAGE_KEY, JSON.stringify(picked));
-            else localStorage.removeItem(STORAGE_KEY);
-        } catch (err) { /* storage may be unavailable */ }
-
-        // Keep the filters/ids already on the URL — only the columns change.
-        var u = new URL(window.location.href);
-        u.searchParams.set('columns', picked.join(','));
-        window.location.href = u.pathname + '?' + u.searchParams.toString();
-    }
+    syncAll();
 })();
 </script>
 </body>

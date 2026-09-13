@@ -11,7 +11,7 @@ Notes: Product item rows save on their own over AJAX; every save writes a diff i
 {% block title %}Edit Order {{ order.order_number }} - Workforce{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/order-edit.css' %}?v=20260701b" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/order-edit.css' %}?v=20260831a" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -237,6 +237,33 @@ Notes: Product item rows save on their own over AJAX; every save writes a diff i
                             </div>
                         </div>
 
+                        <!-- Paste / Drop shared (WhatsApp) location — same control as the task detail page -->
+                        <div class="row g-2 mb-2">
+                            <div class="col-12">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-1 mb-1">
+                                    <label class="woe__form-label mb-0" for="woeLocPaste">
+                                        <i class="fa-brands fa-whatsapp text-success me-1"></i>Paste / Drop Shared Location
+                                    </label>
+                                    <span class="oap__loc-drop__hint"><i class="fa-solid fa-hand-pointer me-1"></i>Drop the shared pin here or paste a link, then Save the order</span>
+                                </div>
+                                <div id="woeLocDrop" class="oap__loc-drop oap__loc-drop--sm"
+                                     ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+                                     ondrop="locDropHandle(event, {latId:'woe_latitude', lngId:'woe_longitude', accuracyId:'woe_accuracy', mapId:'woeLocMapLink', resultId:'woeLocResult', inputId:'woeLocPaste'})">
+                                    <i class="fa-solid fa-location-dot oap__loc-drop__icon"></i>
+                                    <input type="text" id="woeLocPaste" class="form-control form-control-sm oap__loc-drop__input"
+                                           placeholder="Paste WhatsApp/Google Maps link (e.g. https://maps.google.com/?q=25.247,51.427) or drop the shared location here"
+                                           oninput="whatsappLocationFill(this.value, {latId:'woe_latitude', lngId:'woe_longitude', accuracyId:'woe_accuracy', mapId:'woeLocMapLink', resultId:'woeLocResult'})">
+                                    <a id="woeLocMapLink" target="_blank" rel="noopener" hx-boost="false"
+                                       class="btn btn-sm flex-shrink-0 {% if order.latitude and order.longitude %}btn-success{% else %}btn-outline-secondary disabled{% endif %}"
+                                       href="{% if order.latitude and order.longitude %}https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}{% else %}#{% endif %}"
+                                       title="View this pin on Google Maps">
+                                        <i class="fa-solid fa-map-location-dot"></i>
+                                    </a>
+                                </div>
+                                <div id="woeLocResult" class="mt-1"></div>
+                            </div>
+                        </div>
+
                         <!-- Row 3: Lat, Long, Accuracy (read-only) -->
                         <div class="row g-2">
                             <div class="col-md-4">
@@ -251,7 +278,7 @@ Notes: Product item rows save on their own over AJAX; every save writes a diff i
                             </div>
                             <div class="col-md-4">
                                 <label class="woe__form-label">Accuracy</label>
-                                <input type="text" class="woe__form-input bg-light" id="woe_accuracy"
+                                <input type="text" class="woe__form-input bg-light" id="woe_accuracy" name="coords_accuracy"
                                        value="{{ order.coords_accuracy|default:'' }}" readonly tabindex="-1">
                             </div>
                         </div>
@@ -304,7 +331,9 @@ Notes: Product item rows save on their own over AJAX; every save writes a diff i
                                 <label class="woe__pkg-tag mb-0" for="woe_pkg_cod">COD</label>
                                 <div class="input-group input-group-sm">
                                     <input type="number" class="form-control form-control-sm" id="woe_pkg_cod" name="cod_amount"
-                                           value="{{ order.cod_amount|default:'' }}" step="0.01" min="0" placeholder="0.00">
+                                           value="{{ order.cod_amount|default:'' }}" step="0.01" min="0" placeholder="0.00"
+                                           {% if cod_locked %}readonly aria-describedby="woe_cod_locked_note"
+                                           title="COD is locked — {{ cod_locked_task.cod_collected_amount|floatformat:2 }} QAR already collected"{% endif %}>
                                     <span class="input-group-text">QR</span>
                                 </div>
                             </div>
@@ -391,7 +420,26 @@ Notes: Product item rows save on their own over AJAX; every save writes a diff i
                         <div class="mb-3">
                             <label for="cod_amount" class="woe__form-label">COD Amount (QAR)</label>
                             <input type="number" class="woe__form-input" id="cod_amount" name="cod_amount"
-                                   value="{{ order.cod_amount }}" min="0">
+                                   value="{{ order.cod_amount }}" min="0"
+                                   {% if cod_locked %}readonly aria-describedby="woe_cod_locked_note"{% endif %}>
+                            {% comment %}
+                            The cash is already in. Moving the invoice here would leave
+                            DeliveryTask.cod_collected_amount and the driver's wallet behind,
+                            so the field is read-only and points at the flow that adjusts both.
+                            {% endcomment %}
+                            {% if cod_locked %}
+                            <p class="woe__cod-locked" id="woe_cod_locked_note">
+                                <i class="fa-solid fa-lock"></i>
+                                <span>
+                                    <strong>{{ cod_locked_task.cod_collected_amount|floatformat:2 }} QAR</strong>
+                                    already collected on task
+                                    <code>{{ cod_locked_task.dl_task_number }}</code>.
+                                    To change it, use
+                                    <a href="{{ cod_locked_url }}">COD Correction</a> —
+                                    it adjusts the driver's wallet by the difference.
+                                </span>
+                            </p>
+                            {% endif %}
                         </div>
                         <div class="mb-3">
                             <label for="dl_amount" class="woe__form-label">Delivery Fee (QAR)</label>
@@ -595,7 +643,39 @@ $(document).ready(function() {
             var priceInput = $(this).closest('.woe__item-row').find('.woe__item-price');
             if (!priceInput.val()) priceInput.val(d.price || '');
             updateRowTotal($(this).closest('.woe__item-row')[0]);
+            markRowDirtyState($(this).closest('.woe__item-row')[0]);
         });
+        sel.on('select2:clear change', function() {
+            markRowDirtyState($(this).closest('.woe__item-row')[0]);
+        });
+    }
+
+    // ---- Dirty tracking: the save button only shows when a row actually changed ----
+    function normVal(v) {
+        v = (v === null || v === undefined) ? '' : String(v).trim();
+        if (v === '') return '';
+        var f = parseFloat(v);
+        return isNaN(f) ? v : String(f);
+    }
+
+    function rowSignature(row) {
+        return [
+            $(row).find('.woe__item-product-sel').val() || '',
+            normVal($(row).find('.woe__item-qty').val()),
+            normVal($(row).find('.woe__item-price').val())
+        ].join('|');
+    }
+
+    function setRowBaseline(row) {
+        row.dataset.baseline = rowSignature(row);
+        row.classList.remove('woe__item-row--dirty');
+    }
+
+    function markRowDirtyState(row) {
+        if (!row) return;
+        // Unsaved rows always keep the save button visible
+        if (!row.dataset.itemId) return;
+        row.classList.toggle('woe__item-row--dirty', rowSignature(row) !== (row.dataset.baseline || ''));
     }
 
     function updateRowTotal(row) {
@@ -647,12 +727,14 @@ $(document).ready(function() {
     // Init existing rows
     container.querySelectorAll('.woe__item-row').forEach(function(row) {
         initSelect2(row);
+        setRowBaseline(row);
     });
 
     // Qty/price change → update total
     container.addEventListener('input', function(e) {
         if (e.target.matches('.woe__item-qty, .woe__item-price')) {
             updateRowTotal(e.target.closest('.woe__item-row'));
+            markRowDirtyState(e.target.closest('.woe__item-row'));
         }
     });
 
@@ -692,6 +774,7 @@ $(document).ready(function() {
                 if (d.success) {
                     row.dataset.itemId = d.item.id;
                     row.classList.remove('woe__item-row--new');
+                    setRowBaseline(row);
                     $(row).find('.woe__item-line-total').text(parseFloat(d.item.total_price).toFixed(2));
                     // Flash green
                     row.style.background = 'rgba(25,135,84,0.08)';

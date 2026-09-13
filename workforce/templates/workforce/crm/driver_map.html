@@ -1,0 +1,218 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: CRM Driver map — one pin per driver applicant, placed where they were when they signed up.
+Used by: workforce.crm_views.crm_driver_map at /workforce/crm/driver/map/
+Notes: crmm__ namespace. Leaflet ships with wf_dashboard_base. Pins are coloured by the
+       stage's outcome (live / hired / lost), not by stage, so the map stays readable
+       however many columns the board has; the stage itself is in the popup and filter.
+{% endcomment %}
+
+{% block title %}Driver Map - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260827c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm-driver-map.css' %}?v=20260913c" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="crm crmm col-12">
+  <div class="crm__console">
+
+    <div class="crm__head">
+      <div class="crm__head-title">
+        <div class="crm__eyebrow">Recruitment Pipeline</div>
+        <h1 class="crm__title">Driver Map</h1>
+        <p class="crm__subtitle">Where each applicant was when they applied</p>
+      </div>
+      <div class="crm__head-actions">
+        <a href="{% url 'workforce:crm_driver_leads_board' %}" class="crm__btn">
+          <i class="fa-solid fa-table-columns"></i> Board
+        </a>
+        <a href="{% url 'workforce:crm_driver_leads_list' %}" class="crm__btn">
+          <i class="fa-solid fa-table-list"></i> Driver Leads
+        </a>
+        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
+                aria-expanded="false" aria-controls="workforce_crm_driver_map_card_notes"
+                title="About this page">
+          <i class="fa-solid fa-question" aria-hidden="true"></i>
+          <span class="visually-hidden">Show notes</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="crm__body">
+
+    {% include "workforce/parts/_marketing_desk_rail.html" %}
+
+    <div class="wfnote" id="workforce_crm_driver_map_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_driver_map_card_notes' %}" hidden></div>
+
+    {% comment %}The CRM toolbar, not a hand-rolled one: main_dashboard_scripts hands every
+    filter select to Select2, which absolutely-positions the real <select> and renders a
+    sibling in its place — so a select styled any other way collapses to nothing.{% endcomment %}
+    <div class="crm__toolbar">
+      <form method="get" id="workforce_crm_driver_map_form_filter" class="crm__filters">
+
+        <div class="crm__search {% if search %}is-filled{% endif %}">
+          <i class="fa-solid fa-magnifying-glass crm__search-icon"></i>
+          <input type="text" name="search" value="{{ search }}"
+                 id="workforce_crm_driver_map_input_search"
+                 class="crm__search-input" autocomplete="off"
+                 placeholder="Search name or phone…">
+        </div>
+
+        <div class="crm__facets">
+          <select name="stage" class="crm__facet-select {% if stage_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_driver_map_select_stage" aria-label="Filter by stage">
+            <option value="">All stages</option>
+            {% for st in stages %}
+            <option value="{{ st.key }}" {% if stage_filter == st.key %}selected{% endif %}>{{ st.label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="source" class="crm__facet-select {% if source_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_driver_map_select_source" aria-label="Filter by source">
+            <option value="">All sources</option>
+            {% for value, label in source_choices %}
+            <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="assigned" class="crm__facet-select {% if assigned_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_driver_map_select_assigned" aria-label="Filter by assignee">
+            <option value="">All assignees</option>
+            <option value="me" {% if assigned_filter == 'me' %}selected{% endif %}>Assigned to me</option>
+            <option value="none" {% if assigned_filter == 'none' %}selected{% endif %}>Unassigned</option>
+          </select>
+
+          <button type="submit" class="crm__btn crmm__btn--go">Apply</button>
+          {% if search or stage_filter or source_filter or assigned_filter %}
+            <a href="{% url 'workforce:crm_driver_map' %}" class="crmm__clear">Clear</a>
+          {% endif %}
+        </div>
+
+        <span class="crmm__tally">
+          <strong class="wfmono">{{ pin_count }}</strong> on the map
+          <span class="crmm__dot">·</span>
+          <strong class="wfmono">{{ lead_total }}</strong> in this filter
+        </span>
+      </form>
+    </div>
+
+    {% if map_points %}
+      <div class="crmm__canvas" id="workforce_crm_driver_map_canvas"></div>
+
+      <div class="crmm__legend">
+        <span class="crmm__key"><span class="crmm__swatch crmm__swatch--live"></span>In the pipeline</span>
+        <span class="crmm__key"><span class="crmm__swatch crmm__swatch--won"></span>Approved</span>
+        <span class="crmm__key"><span class="crmm__swatch crmm__swatch--lost"></span>Rejected / lost</span>
+        <button type="button" class="crmm__fitall" id="workforce_crm_driver_map_fitall">
+          <i class="fa-solid fa-expand"></i> Fit every pin
+        </button>
+      </div>
+
+      <p class="crmm__note">
+        {% if no_location_count or no_driver_count %}
+          Not shown:
+          {% if no_location_count %}<strong>{{ no_location_count }}</strong> with no location captured{% if no_driver_count %},{% endif %}{% endif %}
+          {% if no_driver_count %}<strong>{{ no_driver_count }}</strong> not yet linked to an application{% endif %}.
+        {% endif %}
+        {% if outside_count %}
+          <strong>{{ outside_count }}</strong> applied from outside Qatar — the view frames Qatar,
+          use <em>Fit every pin</em> to see them.
+        {% endif %}
+        {% if truncated %}
+          Showing the {{ pin_limit }} most recent of {{ lead_total }} — narrow the filter to see the rest.
+        {% endif %}
+      </p>
+    {% else %}
+      <div class="crmm__empty">
+        <i class="fa-solid fa-map-location-dot crmm__empty-icon" aria-hidden="true"></i>
+        <h3 class="crmm__empty-title">Nothing to plot</h3>
+        <p class="crmm__empty-body">
+          {% if lead_total %}
+            {{ lead_total }} driver lead{{ lead_total|pluralize }} match this filter, but none carries a
+            sign-up location. A pin only exists once an applicant has submitted at
+            <em>/join_us/driver/</em> and allowed their browser to share a location.
+          {% else %}
+            No driver lead matches this filter.
+          {% endif %}
+        </p>
+      </div>
+    {% endif %}
+
+    </div><!-- /.crm__body -->
+  </div>
+</div>
+
+{{ map_points|json_script:"workforce_crm_driver_map_data" }}
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var holder = document.getElementById('workforce_crm_driver_map_data');
+    var canvas = document.getElementById('workforce_crm_driver_map_canvas');
+    if (!holder || !canvas || !window.L) return;
+
+    var points = JSON.parse(holder.textContent || '[]');
+    if (!points.length) return;
+
+    // Colour carries the only thing that changes a recruiter's next action: is this
+    // one still live, hired, or gone. The stage name itself is in the popup.
+    var OUTCOME_COLOUR = { '': '#1d4ed8', won: '#15803d', lost: '#b91c1c' };
+
+    function esc(value) {
+        var div = document.createElement('div');
+        div.textContent = value == null ? '' : String(value);
+        return div.innerHTML;
+    }
+
+    function popupHtml(p) {
+        var rows = [
+            ['Stage', p.stage_label],
+            ['Phone', p.phone],
+            ['Account', p.account],
+            ['Code', p.code],
+            ['Owner', p.assigned],
+            ['Applied', p.captured_at + (p.accuracy_m ? ' (±' + p.accuracy_m + ' m)' : '')]
+        ];
+        var body = rows.filter(function (r) { return r[1]; }).map(function (r) {
+            return '<div class="crmm__pop-row"><span>' + r[0] + '</span><strong>' +
+                esc(r[1]) + '</strong></div>';
+        }).join('');
+        return '<div class="crmm__pop"><div class="crmm__pop-name">' + esc(p.name) + '</div>' +
+            body + '<a class="crmm__pop-link" href="' + p.url + '">Open lead</a></div>';
+    }
+
+    var map = L.map('workforce_crm_driver_map_canvas', { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+    }).addTo(map);
+
+    var all = [], local = [];
+    points.forEach(function (p) {
+        L.circleMarker([p.lat, p.lng], {
+            radius: 7, weight: 2, color: '#fff',
+            fillColor: OUTCOME_COLOUR[p.outcome] || OUTCOME_COLOUR[''], fillOpacity: 0.95
+        }).addTo(map).bindPopup(popupHtml(p));
+        all.push([p.lat, p.lng]);
+        if (p.in_qatar) local.push([p.lat, p.lng]);
+    });
+
+    // Frame Qatar by default — one applicant who applied from abroad would otherwise
+    // zoom the whole Doha cluster down to an unreadable dot.
+    function fit(coords) {
+        if (coords.length === 1) map.setView(coords[0], 13);
+        else map.fitBounds(coords, { padding: [30, 30] });
+    }
+    fit(local.length ? local : all);
+
+    var fitAll = document.getElementById('workforce_crm_driver_map_fitall');
+    if (fitAll) fitAll.addEventListener('click', function () { fit(all); });
+
+    setTimeout(function () { map.invalidateSize(); }, 200);
+});
+</script>
+{% endblock extra_js %}

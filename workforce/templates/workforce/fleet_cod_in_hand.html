@@ -169,7 +169,7 @@ Notes: With no date filter the amount is collected-but-unsettled COD and the age
         <div class="fch__controls-tail">
             <span class="fch__count">{{ drivers.paginator.count }} driver{{ drivers.paginator.count|pluralize }}</span>
             <button type="button" class="fch__btn" onclick="window.print()">Print</button>
-            <button type="button" class="fch__btn" onclick="exportToCSV()">Export CSV</button>
+            <button type="button" class="fch__btn" onclick="fchExportCSV()">Export CSV</button>
         </div>
     </form>
 
@@ -301,7 +301,9 @@ Notes: With no date filter the amount is collected-but-unsettled COD and the age
             window.location.href = row.dataset.href;
         });
     }
-    function exportToCSV() {
+    // Page-scoped name: dashboard-utils.js defines a global exportToCSV(tableId)
+// and loads after this block, so a plain exportToCSV here is silently replaced.
+function fchExportCSV() {
         var head = ['Driver', 'Driver ID', 'Phone', 'COD in hand', 'Days held', 'Deliveries', 'Wallet balance', 'Last hand-in'];
         var rows = [head];
         document.querySelectorAll('#workforce_cod_in_hand_table_ledger tbody tr').forEach(function (row) {
@@ -338,7 +340,7 @@ Notes: With no date filter the amount is collected-but-unsettled COD and the age
         window.URL.revokeObjectURL(url);
     }
     document.addEventListener('keydown', function (e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); exportToCSV(); }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); fchExportCSV(); }
     });
 </script>
 {% endblock extra_js %}

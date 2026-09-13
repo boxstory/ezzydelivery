@@ -9,7 +9,8 @@
 {% url 'workforce:driver_verification_list' as u_driver_verification_list %}
 {% url 'workforce:drivers_pending' as u_drivers_pending %}
 {% url 'workforce:crm_driver_stages_manage' as u_crm_driver_stages %}
-{% with active="crm_driver_leads_board,crm_driver_leads_list,crm_driver_stages_manage,crm_driver_reports" %}
+{% url 'workforce:crm_driver_map' as u_crm_driver_map %}
+{% with active="crm_driver_leads_board,crm_driver_leads_list,crm_driver_stages_manage,crm_driver_reports,crm_driver_map" %}
 <li id="workforce_sidebar_menu_crm_driver" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_crm_driver" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-crm-driver" data-title="CRM Driver">
     <i class="fa-solid fa-motorcycle me-2"></i>
@@ -20,6 +21,7 @@
     <ul class="nav flex-column">
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_driver_board" url=u_crm_driver_board icon="fa-solid fa-table-columns" label="Driver Board" active_names="crm_driver_leads_board" badge_var=crm_driver_overdue_count badge_key="crm_driver_overdue" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_driver_list" url=u_crm_driver_list icon="fa-solid fa-table-list" label="Driver Leads" active_names="crm_driver_leads_list" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_driver_map" url=u_crm_driver_map icon="fa-solid fa-map-location-dot" label="Driver Map" active_names="crm_driver_map" %}
       {# Where the recruitment funnel is actually decided. Operations owns both #}
       {# pages, so they only appear for staff who can open them. #}
       {% if wf_dept_ops %}

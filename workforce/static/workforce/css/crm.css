@@ -337,8 +337,8 @@
 .crm__id { color: var(--crm-muted); font-variant-numeric: tabular-nums; }
 .crm__num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .crm__date { color: var(--crm-muted); white-space: nowrap; }
-.crm__lead-name { font-weight: 600; color: var(--crm-ink); }
-.crm__lead-person { font-size: 0.74rem; color: var(--crm-muted); }
+.crm__lead-company { font-weight: 600; color: var(--crm-ink); }
+.crm__lead-contact { font-size: 0.74rem; color: var(--crm-muted); }
 .crm__view {
   display: inline-flex;
   align-items: center;
@@ -1578,3 +1578,149 @@
 .crmd__mergecand-stage { color: var(--crm-ink-2); }
 .crmd__mergecand button { margin-left: auto; }
 .crm__source--driver_application { background: #eef2ff; color: #3730a3; }
+
+/* ── DETAIL: QUOTE PANEL ──────────────────────────────────────────────────── */
+/* The plan the customer accepted on the rate sheet. Reads as one plate so the
+   agreed price is the first thing the eye lands on, hairline rows below it. */
+.crmd__quote {
+  border: 1px solid var(--crm-line-2);
+  border-left: 3px solid var(--crm-ink);
+  border-radius: 6px;
+  background: var(--crm-canvas);
+  padding: 0.6rem 0.7rem;
+  margin-bottom: 0.7rem;
+}
+.crmd__quote-plan {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--crm-muted);
+}
+.crmd__quote-price {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--crm-ink);
+  margin-top: 0.1rem;
+}
+.crmd__quote-price i { font-size: 0.82rem; color: var(--crm-ink-2); margin-right: 0.3rem; }
+.crmd__quote-meta { font-size: 0.72rem; color: var(--crm-ink-2); margin-top: 0.2rem; }
+.crmd__quote--empty {
+  border-left-color: var(--crm-line-2);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--crm-ink-2);
+}
+.crmd__quote-note {
+  font-size: 0.78rem;
+  color: var(--crm-ink);
+  background: var(--crm-well);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 0.7rem;
+}
+.crmd__quote-links { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.6rem; }
+
+/* ── DETAIL: PRICING CHECK ────────────────────────────────────────────────── */
+/* Requirement → answer → what it cost, as a ledger. Monochrome ink and hairline
+   rules; the only colour is the swatch that says answered / unanswered. */
+.crmd__val-spread {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--crm-line-2);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--brand-white);
+}
+.crmd__val-cell {
+  padding: 0.5rem 0.6rem;
+  border-right: 1px solid var(--crm-line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.crmd__val-cell:last-child { border-right: 0; }
+.crmd__val-cell--lead { background: var(--crm-canvas); }
+.crmd__val-lbl {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--crm-muted);
+}
+.crmd__val-num { font-size: 1.05rem; font-weight: 700; color: var(--crm-ink); font-variant-numeric: tabular-nums; }
+.crmd__val-cell--lead .crmd__val-num { font-size: 1.25rem; }
+.crmd__val-gap, .crmd__val-none { font-size: 0.68rem; color: var(--crm-ink-2); }
+.crmd__val-unit { font-size: 0.7rem; color: var(--crm-muted); margin: 0.3rem 0 0.7rem; }
+
+.crmd__val-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--crm-alert);
+  background: var(--crm-well);
+  border-left: 3px solid var(--crm-alert);
+  border-radius: 0 6px 6px 0;
+  padding: 0.45rem 0.6rem;
+  margin-bottom: 0.5rem;
+}
+.crmd__val-warn i { margin-top: 0.1rem; }
+
+.crmd__val-group { margin-top: 0.9rem; }
+.crmd__val-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+.crmd__val-table th {
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--crm-muted);
+  text-align: left;
+  padding: 0.25rem 0.4rem;
+  border-bottom: 1px solid var(--crm-line-2);
+}
+.crmd__val-table td { padding: 0.35rem 0.4rem; border-bottom: 1px solid var(--crm-line); vertical-align: top; }
+.crmd__val-table tr:last-child td { border-bottom: 0; }
+.crmd__val-num-col { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.crmd__val-req { color: var(--crm-ink-2); }
+.crmd__val-note { display: block; font-size: 0.66rem; color: var(--crm-muted); font-style: italic; }
+.crmd__val-ans { color: var(--crm-ink); }
+.crmd__val-ans--unknown { color: var(--crm-muted); font-style: italic; }
+.crmd__val-swatch {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  margin-right: 0.4rem;
+  vertical-align: 1px;
+  background: var(--crm-line-2);
+}
+.crmd__val-swatch--yes { background: var(--crm-ink); }
+.crmd__val-swatch--no { background: transparent; border: 1px solid var(--crm-line-2); }
+.crmd__val-swatch--unknown { background: var(--crm-alert); }
+.crmd__val-charge { font-weight: 700; color: var(--crm-ink); }
+.crmd__val-run { font-weight: 700; color: var(--crm-ink); }
+.crmd__val-zero { color: var(--crm-muted); }
+
+.crmd__val-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.crmd__val-chip {
+  font-size: 0.7rem;
+  color: var(--crm-alert);
+  border: 1px solid var(--crm-line-2);
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  background: var(--brand-white);
+}
+.crmd__val-note-row { font-size: 0.74rem; color: var(--crm-ink-2); padding: 0.2rem 0; }
+.crmd__val-note-row--floor { color: var(--crm-muted); }
+.crmd__val-note-row--floor i { margin-right: 0.3rem; }
+.crmd__count--warn { background: var(--crm-alert); color: var(--brand-white); }
+/* Three stacked tables have to line up as one ledger, so the columns are fixed
+   rather than auto-sized per table. */
+.crmd__val-table { table-layout: fixed; }
+.crmd__val-table th:first-child, .crmd__val-table td:first-child { width: 40%; }
+.crmd__val-table th:nth-child(2), .crmd__val-table td:nth-child(2) { width: 38%; }
+.crmd__val-table th:last-child, .crmd__val-table td:last-child { width: 22%; }
+.crmd__val-ans { overflow-wrap: anywhere; }

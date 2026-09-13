@@ -238,7 +238,8 @@ class WfDashboardTest(WorkforceTestMixin, TestCase):
         self.staff_login()
         resp = self.client.get(reverse('workforce:wf_dashboard'))
         self.assertIn('orders_trend', resp.context)
-        self.assertEqual(len(resp.context['orders_trend']), 7)
+        self.assertEqual(len(resp.context['orders_trend']), 10)
+        self.assertIn('day_label', resp.context['orders_trend'][0])
 
     def test_dashboard_zero_stats(self):
         """#9: Dashboard with no data shows zero stats"""
@@ -1557,3 +1558,332 @@ class WfAccessControlTest(WorkforceTestMixin, TestCase):
         self.client.login(username='staffuser', password='Staff@123')
         resp = self.client.get(reverse('workforce:staff_reports'))
         self.assertEqual(resp.status_code, 200)
+
+
+class DeliveryAppControlTests(WorkforceTestMixin, TestCase):
+    """The staff console that turns per-client proof of delivery on."""
+
+    def setUp(self):
+        self.client = Client()
+        self.create_staff_user()
+        self.business = self.create_business(bid=9500, code='DAC1', name='Proof Co')
+        self.client.login(username='staffuser', password='Staff@123')
+        self.url = reverse('workforce:delivery_app_control')
+        self.save_url = reverse('workforce:delivery_app_control_save')
+
+    def test_page_lists_active_clients(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Proof Co')
+
+    def test_save_persists_the_rule(self):
+        resp = self.client.post(self.save_url, {
+            'business_id': self.business.business_id,
+            'delivered': '1', 'failed': '1', 'kind': 'both', 'tracking': '1',
+        })
+        self.assertTrue(resp.json()['success'])
+        self.business.refresh_from_db()
+        self.assertTrue(self.business.pod_required_delivered)
+        self.assertTrue(self.business.pod_required_failed)
+        self.assertEqual(self.business.pod_kind, 'both')
+        self.assertTrue(self.business.live_tracking_enabled)
+
+    def test_save_toggles_live_tracking_on_its_own(self):
+        # The tracking switch is independent of the proof rules.
+        self.client.post(self.save_url, {
+            'business_id': self.business.business_id,
+            'delivered': '0', 'failed': '0', 'kind': 'photo', 'tracking': '1',
+        })
+        self.business.refresh_from_db()
+        self.assertTrue(self.business.live_tracking_enabled)
+        self.assertFalse(self.business.pod_required_delivered)
+
+        self.client.post(self.save_url, {
+            'business_id': self.business.business_id,
+            'delivered': '0', 'failed': '0', 'kind': 'photo', 'tracking': '0',
+        })
+        self.business.refresh_from_db()
+        self.assertFalse(self.business.live_tracking_enabled)
+
+    def test_save_turns_the_rule_back_off(self):
+        self.business.pod_required_delivered = True
+        self.business.save(update_fields=['pod_required_delivered'])
+        self.client.post(self.save_url, {
+            'business_id': self.business.business_id,
+            'delivered': '0', 'failed': '0', 'kind': 'photo',
+        })
+        self.business.refresh_from_db()
+        self.assertFalse(self.business.pod_required_delivered)
+
+    def test_save_rejects_an_unknown_proof_type(self):
+        resp = self.client.post(self.save_url, {
+            'business_id': self.business.business_id,
+            'delivered': '1', 'failed': '0', 'kind': 'fingerprint',
+        })
+        self.assertFalse(resp.json()['success'])
+        self.business.refresh_from_db()
+        self.assertFalse(self.business.pod_required_delivered)
+
+    def test_only_filter_shows_clients_with_a_rule(self):
+        quiet = self.create_business(bid=9501, code='DAC2', name='No Rule Co')
+        quiet.live_tracking_enabled = False
+        quiet.save(update_fields=['live_tracking_enabled'])
+        self.business.pod_required_failed = True
+        self.business.live_tracking_enabled = False
+        self.business.save(update_fields=['pod_required_failed', 'live_tracking_enabled'])
+        resp = self.client.get(self.url, {'only': 'on'})
+        self.assertContains(resp, 'Proof Co')
+        self.assertNotContains(resp, quiet.business_name)
+
+    def test_only_filter_also_catches_a_tracking_only_client(self):
+        quiet = self.create_business(bid=9502, code='DAC3', name='No Rule Co')
+        quiet.live_tracking_enabled = False
+        quiet.save(update_fields=['live_tracking_enabled'])
+        self.business.live_tracking_enabled = True
+        self.business.save(update_fields=['live_tracking_enabled'])
+        resp = self.client.get(self.url, {'only': 'on'})
+        self.assertContains(resp, 'Proof Co')
+        self.assertNotContains(resp, quiet.business_name)
+
+    def test_non_staff_cannot_reach_the_console(self):
+        self.client.logout()
+        self.create_non_staff_user()
+        self.client.login(username='regularuser', password='Regular@123')
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        self.assertEqual(self.client.post(self.save_url, {}).status_code, 302)
+
+
+class DeliveryAppControlSaveAllTests(WorkforceTestMixin, TestCase):
+    """One Save for the page — but only for the rows the user actually edited."""
+
+    def setUp(self):
+        self.client = Client()
+        self.create_staff_user()
+        self.a = self.create_business(bid=9600, code='SA1', name='Alpha Co')
+        self.b = self.create_business(bid=9601, code='SA2', name='Beta Co')
+        self.client.login(username='staffuser', password='Staff@123')
+        self.url = reverse('workforce:delivery_app_control_save_all')
+
+    def _post(self, rows):
+        return self.client.post(
+            self.url, data=json.dumps({'rows': rows}), content_type='application/json')
+
+    @staticmethod
+    def _row(biz, delivered=False, failed=False, kind='photo', tracking=False):
+        return {'business_id': biz.business_id, 'delivered': delivered,
+                'failed': failed, 'kind': kind, 'tracking': tracking}
+
+    def test_saves_several_rows_at_once(self):
+        resp = self._post([
+            self._row(self.a, delivered=True, kind='both'),
+            self._row(self.b, failed=True, tracking=True),
+        ])
+        payload = resp.json()
+        self.assertTrue(payload['success'])
+        self.assertEqual(payload['saved'], 2)
+        self.a.refresh_from_db(); self.b.refresh_from_db()
+        self.assertTrue(self.a.pod_required_delivered)
+        self.assertEqual(self.a.pod_kind, 'both')
+        self.assertTrue(self.b.pod_required_failed)
+        self.assertTrue(self.b.live_tracking_enabled)
+
+    def test_untouched_clients_are_never_rewritten(self):
+        # The whole reason the page sends only dirty rows: a client left alone keeps
+        # the rule it had, even while its neighbour on the same page is edited.
+        self.b.pod_required_delivered = True
+        self.b.pod_kind = 'signature'
+        self.b.save(update_fields=['pod_required_delivered', 'pod_kind'])
+
+        self._post([self._row(self.a, tracking=True)])
+
+        self.b.refresh_from_db()
+        self.assertTrue(self.b.pod_required_delivered)
+        self.assertEqual(self.b.pod_kind, 'signature')
+
+    def test_unchanged_row_reports_as_not_saved(self):
+        resp = self._post([self._row(self.a)])   # all defaults — nothing differs
+        self.assertEqual(resp.json()['saved'], 0)
+        self.assertEqual(resp.json()['submitted'], 1)
+
+    def test_turning_a_rule_back_off_counts_as_a_change(self):
+        self.a.live_tracking_enabled = True
+        self.a.save(update_fields=['live_tracking_enabled'])
+        self.assertEqual(self._post([self._row(self.a)]).json()['saved'], 1)
+        self.a.refresh_from_db()
+        self.assertFalse(self.a.live_tracking_enabled)
+
+    def test_a_bad_proof_type_rejects_the_whole_batch(self):
+        resp = self._post([
+            self._row(self.a, delivered=True),
+            self._row(self.b, delivered=True, kind='fingerprint'),
+        ])
+        self.assertFalse(resp.json()['success'])
+        self.a.refresh_from_db()
+        self.assertFalse(self.a.pod_required_delivered)   # nothing written
+
+    def test_an_unknown_client_rejects_the_whole_batch(self):
+        resp = self._post([
+            self._row(self.a, delivered=True),
+            {'business_id': 999999, 'delivered': True, 'failed': False,
+             'kind': 'photo', 'tracking': False},
+        ])
+        self.assertFalse(resp.json()['success'])
+        self.a.refresh_from_db()
+        self.assertFalse(self.a.pod_required_delivered)
+
+    def test_empty_and_malformed_payloads(self):
+        self.assertFalse(self._post([]).json()['success'])
+        self.assertFalse(self.client.post(
+            self.url, data='not json', content_type='application/json').json()['success'])
+        self.assertFalse(self._post([self._row(self.a)] * 101).json()['success'])
+
+    def test_get_is_rejected(self):
+        self.assertFalse(self.client.get(self.url).json()['success'])
+
+    def test_non_staff_cannot_bulk_save(self):
+        self.client.logout()
+        self.create_non_staff_user()
+        self.client.login(username='regularuser', password='Regular@123')
+        self.assertEqual(self._post([self._row(self.a, delivered=True)]).status_code, 302)
+        self.a.refresh_from_db()
+        self.assertFalse(self.a.pod_required_delivered)
+
+
+class DashboardOnlineDriversTests(WorkforceTestMixin, TestCase):
+    """The dashboard tile says "Online", so it must count availability, not approval.
+
+    It used to read driver_status='approved', which made a fleet of five approved
+    drivers show as five online while one was actually working.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.create_staff_user()
+        self.client.login(username='staffuser', password='Staff@123')
+        self.url = reverse('workforce:wf_dashboard')
+
+    def _driver(self, did, availability, status='approved'):
+        driver = self.create_driver(did=did, status=status, code=f'ONL{did}')
+        # .update() so the availability signals do not rewrite what the test set up
+        fleet_models.Driver.objects.filter(pk=driver.pk).update(
+            driver_availability=availability)
+        return driver
+
+    def _ctx(self):
+        return self.client.get(self.url).context
+
+    def test_offline_drivers_are_not_counted_as_online(self):
+        self._driver(7801, 'available')
+        self._driver(7802, 'offline')
+        self._driver(7803, 'offline')
+        ctx = self._ctx()
+        self.assertEqual(ctx['active_drivers'], 3)     # approved fleet size
+        self.assertEqual(ctx['online_drivers'], 1)     # actually on shift
+
+    def test_on_break_and_returning_still_count_as_online(self):
+        # A driver on a break or driving back from a drop is still working.
+        self._driver(7811, 'on_break')
+        self._driver(7812, 'returning')
+        self._driver(7813, 'on_delivery')
+        self._driver(7814, 'offline')
+        self.assertEqual(self._ctx()['online_drivers'], 3)
+
+    def test_unapproved_drivers_never_count(self):
+        # A pending applicant with a stale availability row is not part of the fleet.
+        self._driver(7821, 'available', status='pending')
+        self._driver(7822, 'available', status='suspended')
+        ctx = self._ctx()
+        self.assertEqual(ctx['online_drivers'], 0)
+        self.assertEqual(ctx['active_drivers'], 0)
+
+    def test_tile_renders_the_online_figure(self):
+        self._driver(7831, 'available')
+        self._driver(7832, 'offline')
+        resp = self.client.get(self.url)
+        self.assertContains(resp, 'of 2')          # fleet size kept beside it
+        self.assertEqual(resp.context['online_drivers'], 1)
+
+
+class CrmDriverMapTests(WorkforceTestMixin, TestCase):
+    """The recruitment map — one pin per applicant, at the spot they applied from."""
+
+    def setUp(self):
+        from crm.models import Lead
+        self.Lead = Lead
+        self.client = Client()
+        self.create_staff_user()
+        self.client.login(username='staffuser', password='Staff@123')
+        self.url = reverse('workforce:crm_driver_map')
+
+    def _driver(self, did, lat=None, lng=None):
+        driver = self.create_driver(did=did, code=f'MAP{did}')
+        if lat is not None:
+            driver.driver_meta = {'registration_location': {
+                'lat': lat, 'lng': lng, 'accuracy_m': 20,
+                'captured_at': '2026-08-18T09:00:00Z'}}
+            driver.save(update_fields=['driver_meta'])
+        return driver
+
+    def _lead(self, name, driver=None, category=None, stage='new_app'):
+        return self.Lead.objects.create(
+            source=self.Lead.SOURCE_MANUAL,
+            category=category or self.Lead.CATEGORY_DRIVER,
+            contact_name=name, phone='50000000', stage=stage, driver=driver)
+
+    def test_pins_only_for_leads_with_a_captured_location(self):
+        self._lead('Has location', self._driver(7901, 25.28, 51.53))
+        self._lead('No location', self._driver(7902))
+        self._lead('No application at all')            # no driver FK
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        points = resp.context['map_points']
+        self.assertEqual(len(points), 1)
+        self.assertEqual(points[0]['name'], 'Has location')
+        self.assertEqual(resp.context['no_location_count'], 1)
+        self.assertEqual(resp.context['no_driver_count'], 1)
+
+    def test_business_leads_never_appear(self):
+        self._lead('A driver', self._driver(7911, 25.28, 51.53))
+        self._lead('A client', self._driver(7912, 25.29, 51.54),
+                   category=self.Lead.CATEGORY_BUSINESS)
+        self.assertEqual(len(self.client.get(self.url).context['map_points']), 1)
+
+    def test_stage_filter_narrows_the_pins(self):
+        self._lead('Stage A', self._driver(7921, 25.28, 51.53), stage='new_app')
+        self._lead('Stage B', self._driver(7922, 25.29, 51.54), stage='contacted')
+        self.assertEqual(len(self.client.get(self.url).context['map_points']), 2)
+        filtered = self.client.get(self.url, {'stage': 'new_app'}).context['map_points']
+        self.assertEqual([p['name'] for p in filtered], ['Stage A'])
+
+    def test_a_pin_outside_qatar_is_kept_but_flagged(self):
+        # Applicants do apply from abroad; they stay on the map, the framing excludes them.
+        self._lead('Abroad', self._driver(7931, 19.07, 72.87))     # Mumbai
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.context['outside_count'], 1)
+        self.assertFalse(resp.context['map_points'][0]['in_qatar'])
+
+    def test_a_broken_coordinate_is_dropped_not_plotted(self):
+        driver = self.create_driver(did=7941, code='MAP7941')
+        driver.driver_meta = {'registration_location': {'lat': 'north', 'lng': None}}
+        driver.save(update_fields=['driver_meta'])
+        self._lead('Junk coords', driver)
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.context['map_points'], [])
+        self.assertEqual(resp.context['no_location_count'], 1)
+
+    def test_search_filters_the_map(self):
+        self._lead('Findable', self._driver(7951, 25.28, 51.53))
+        self._lead('Other', self._driver(7952, 25.29, 51.54))
+        points = self.client.get(self.url, {'search': 'Findable'}).context['map_points']
+        self.assertEqual([p['name'] for p in points], ['Findable'])
+
+    def test_pin_links_to_its_lead(self):
+        lead = self._lead('Linked', self._driver(7961, 25.28, 51.53))
+        point = self.client.get(self.url).context['map_points'][0]
+        self.assertEqual(point['url'], reverse('workforce:crm_lead_detail', args=[lead.id]))
+
+    def test_non_staff_cannot_open_the_map(self):
+        self.client.logout()
+        self.create_non_staff_user()
+        self.client.login(username='regularuser', password='Regular@123')
+        self.assertEqual(self.client.get(self.url).status_code, 302)

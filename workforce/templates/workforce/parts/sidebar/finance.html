@@ -14,9 +14,13 @@ Notes: Flat, one level deep. The two links that span the whole money model
 {% url 'workforce:fleet_transactions' as u_fleet_transactions %}
 {% url 'workforce:cod_settlement_report' as u_cod_settlement_report %}
 {% url 'workforce:cod_legacy_reconciliation' as u_cod_legacy_reconciliation %}
-{% url 'workforce:earnings_verification' as u_earnings_verification %}
+{% url 'workforce:driver_payout_overview' as u_earnings_verification %}
 {% url 'workforce:fleet_drivers_earnings' as u_fleet_drivers_earnings %}
+{% url 'workforce:salary_register' as u_salary_register %}
+{% url 'workforce:salary_runs' as u_salary_runs %}
+{% url 'workforce:pay_rate_register' as u_pay_rate_register %}
 {% url 'workforce:seller_transactions' as u_seller_transactions %}
+{% url 'workforce:client_ledger' as u_client_ledger %}
 {% url 'workforce:cod_business_settlement_report' as u_cod_business_settlement_report %}
 {% url 'workforce:cod_business_payout_history' as u_cod_business_payout_history %}
 {% url 'workforce:client_charge_verification' as u_client_charge_verification %}
@@ -28,7 +32,7 @@ Notes: Flat, one level deep. The two links that span the whole money model
 {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_cod_ledger" url=u_cod_ledger icon="fa-solid fa-book" label="COD Ledger" active_names="cod_ledger" %}
 
 {# --- Driver leg --- #}
-{% with active="fleet_transactions,cod_settlement_report,cod_legacy_reconciliation,earnings_verification,fleet_drivers_earnings,driver_payout_invoice,driver_payout_worksheet" %}
+{% with active="fleet_transactions,cod_settlement_report,cod_legacy_reconciliation,driver_payout_overview,fleet_drivers_earnings,driver_payout_invoice,driver_payout_worksheet,salary_register,salary_runs,salary_run_detail,salary_slip,pay_rate_register" %}
 <li id="workforce_sidebar_menu_finance_driver" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_finance_driver" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-finance-driver" data-title="Driver">
     <i class="fa-solid fa-motorcycle me-2"></i>
@@ -38,17 +42,21 @@ Notes: Flat, one level deep. The two links that span the whole money model
   <div id="submenu-finance-driver" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
     <ul class="nav flex-column">
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_transactions" url=u_fleet_transactions icon="fa-solid fa-right-left" label="Driver Transactions" active_names="fleet_transactions" %}
-      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_cod_settlement" url=u_cod_settlement_report icon="fa-solid fa-file-invoice-dollar" label="COD Settlement Requests" active_names="cod_settlement_report" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_cod_settlement" url=u_cod_settlement_report icon="fa-solid fa-file-invoice-dollar" label="COD Settle Req" active_names="cod_settlement_report" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_cod_reconciliation" url=u_cod_legacy_reconciliation icon="fa-solid fa-scale-balanced" label="COD Reconciliation" active_names="cod_legacy_reconciliation" %}
-      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_earnings_verification" url=u_earnings_verification icon="fa-solid fa-clipboard-check" label="Earnings Verification" active_names="earnings_verification" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_earnings_verification" url=u_earnings_verification icon="fa-solid fa-clipboard-check" label="Earnings Verification" active_names="driver_payout_overview,earnings_verification" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_driver_earnings" url=u_fleet_drivers_earnings icon="fa-solid fa-money-bill-wave" label="Driver Payouts" active_names="fleet_drivers_earnings,driver_payout_invoice,driver_payout_worksheet" %}
+      {% comment %}Two salary pages, two entries: the register is the standing agreements, the runs are the months being paid. One link left the run you were working in with nothing highlighted.{% endcomment %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_driver_salaries" url=u_salary_register icon="fa-solid fa-money-check-dollar" label="Driver Salaries" active_names="salary_register" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_salary_runs" url=u_salary_runs icon="fa-solid fa-calendar-check" label="Salary Runs" active_names="salary_runs,salary_run_detail,salary_slip" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_pay_rates" url=u_pay_rate_register icon="fa-solid fa-tags" label="Delivery Pay Rates" active_names="pay_rate_register" %}
     </ul>
   </div>
 </li>
 {% endwith %}
 
 {# --- Seller leg --- #}
-{% with active="seller_transactions,cod_business_settlement_report,cod_business_payout_invoice,cod_business_payout_history,client_charge_verification,client_charges_collect,client_charge_invoices,client_charge_invoice_detail" %}
+{% with active="seller_transactions,client_ledger,cod_business_settlement_report,cod_business_payout_invoice,cod_business_payout_history,client_charge_verification,client_charges_collect,client_charge_invoices,client_charge_invoice_detail" %}
 <li id="workforce_sidebar_menu_finance_seller" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_finance_seller" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-finance-seller" data-title="Seller">
     <i class="fa-solid fa-store me-2"></i>
@@ -57,6 +65,7 @@ Notes: Flat, one level deep. The two links that span the whole money model
   </div>
   <div id="submenu-finance-seller" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
     <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_client_ledger" url=u_client_ledger icon="fa-solid fa-scroll" label="Client Ledger" active_names="client_ledger" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_seller_transactions" url=u_seller_transactions icon="fa-solid fa-right-left" label="Seller Transactions" active_names="seller_transactions" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_business_cod_payout" url=u_cod_business_settlement_report icon="fa-solid fa-building-columns" label="Business COD Payout" active_names="cod_business_settlement_report" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_business_payout_history" url=u_cod_business_payout_history icon="fa-solid fa-receipt" label="Payout History" active_names="cod_business_payout_history,cod_business_payout_invoice" %}

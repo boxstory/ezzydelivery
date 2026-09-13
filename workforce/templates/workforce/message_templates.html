@@ -138,6 +138,12 @@
               <div class="wmt__help mt-1">
                 WhatsApp formatting: <code>*bold*</code>, <code>_italic_</code>, <code>```mono```</code>.
               </div>
+              <div class="wmt__help mt-1">
+                Optional lines: <code>&#123;if cod_amount&#125;</code> … <code>&#123;endif&#125;</code> keeps the part between
+                them only when the order has a value — a zero COD counts as no value, so that
+                condition reads as “COD is more than 0”. <code>&#123;else&#125;</code> is optional, a tag on its
+                own line takes that line with it, and conditions cannot be nested.
+              </div>
             </div>
 
             <aside class="wmt__editor-side">
@@ -145,12 +151,12 @@
               <p class="wmt__side-title">Placeholders</p>
               <div class="wmt__chips">
                 {% for ph in tpl.placeholder_list %}
-                <button type="button" class="wmt__chip" data-insert="&#123;{{ ph }}&#125;"
+                <button type="button" class="wmt__chip" data-insert="&#123;{{ ph.name }}&#125;"
                         data-target="#wmt_tpl_{{ tpl.key }}"
-                        title="Insert at the cursor">&#123;{{ ph }}&#125;</button>
+                        title="{{ ph.hint }}">&#123;{{ ph.name }}&#125;</button>
                 {% endfor %}
               </div>
-              <div class="wmt__help mb-3">Filled in at send time. Click one to drop it at the cursor.</div>
+              <div class="wmt__help mb-3">Filled in at send time. Click one to drop it at the cursor — hover for what it puts in the message. A <code>…_line</code> placeholder is a whole line and disappears when the order has no value for it.</div>
               {% endif %}
 
               {% if tpl.used_by %}
@@ -271,7 +277,15 @@
   const SAMPLES = {
     first_name: 'Ahmed', lead_name: 'Ahmed', contact_name: 'Ahmed', customer_name: 'Ahmed',
     staff_name: 'Fatima', company: 'Doha Boutique', business_name: 'Doha Boutique',
-    order_number: 'EZ-10428', items_line: '📦 2 × Abaya (Black, M)\n',
+    business_phone: '+974 5000 1234',
+    seller_line: '🏬 Order from: Doha Boutique\n',
+    order_number: 'EZ-10428', client_order_code: '#1042',
+    items_line: '🛒 Items: Abaya (Black, M) & Scarf\n',
+    customer_phone: '+974 3312 8890',
+    customer_address: 'Zone 26, Street 850, Building 14',
+    delivery_area: 'Al Sadd',
+    cod_amount: '250.00',
+    cod_line: '💵 Cash on delivery: QAR 250.00\n',
     verify_url: 'https://ezzydelivery.qa/v/8f3a2c',
   };
   function escapeHtml(s) {
@@ -279,7 +293,26 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
   }
+  // Same rules as core.message_templates.apply_conditionals — a preview that
+  // showed the raw {if} tags would be no preview at all. Every sample value is
+  // filled in, so the preview always takes the true branch.
+  function hasValue(v) {
+    if (v === undefined || v === null) return false;
+    const t = String(v).trim();
+    if (!t || ['0', 'false', 'none', 'no'].indexOf(t.toLowerCase()) !== -1) return false;
+    const n = parseFloat(t.replace(/,/g, ''));
+    return isNaN(n) ? true : n !== 0;
+  }
+  function applyConditionals(body) {
+    return body
+      .replace(/^[ \t]*(\{(?:if\s+\w+|else|endif)\})[ \t]*\r?\n/gm, '$1')
+      .replace(/\{if\s+(\w+)\}([\s\S]*?)(?:\{else\}([\s\S]*?))?\{endif\}/g,
+        function (m, name, yes, no) {
+          return hasValue(SAMPLES[name]) ? yes : (no || '');
+        });
+  }
   function renderWa(body) {
+    body = applyConditionals(body);
     let out = escapeHtml(body.replace(/\{(\w+)\}/g, function (m, k) {
       return Object.prototype.hasOwnProperty.call(SAMPLES, k) ? SAMPLES[k] : m;
     }));
@@ -298,7 +331,7 @@
       const box = form.querySelector('[data-preview]');
       if (!ta || !box) return;
       if (!box.hidden) { box.hidden = true; return; }
-      box.innerHTML = '<span class="wmt__preview-kicker">Preview · sample values</span>'
+      box.innerHTML = '<span class="wmt__preview-kicker">Preview · sample values, every optional line shown</span>'
                     + '<div class="wmt__bubble">' + renderWa(ta.value) + '</div>';
       box.hidden = false;
     });

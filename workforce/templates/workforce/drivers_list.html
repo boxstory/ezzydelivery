@@ -95,31 +95,6 @@ Notes: Filters and tally segments swap #main-content over HTMX and push the URL;
             </button>
         </div>
 
-        {# CRM pipeline: second status axis, counted over the whole pool so segments hold still #}
-        {% if crm_stage_tallies %}
-        <div class="drl__pipe" role="group" aria-label="CRM pipeline stages">
-            <span class="drl__pipe-title">
-                <i class="fa-solid fa-diagram-project" aria-hidden="true"></i> CRM Pipeline
-            </span>
-            <div class="drl__pipe-track">
-                {% for tally in crm_stage_tallies %}
-                <button type="button"
-                        class="drl__pipe-seg {% if tally.key in selected_crm_stages %}drl__pipe-seg--active{% endif %}"
-                        hx-get="{% url 'workforce:drivers_list' %}?all=1&amp;crm_stage={{ tally.key }}"
-                        hx-target="#main-content"
-                        hx-select="#main-content"
-                        hx-swap="outerHTML"
-                        hx-push-url="true"
-                        title="Show drivers in the {{ tally.label }} column">
-                    <span class="drl__pipe-dot drl__pipe-dot--sw-{{ tally.swatch }}" aria-hidden="true"></span>
-                    <span class="drl__pipe-label">{{ tally.label }}</span>
-                    <span class="drl__pipe-count">{{ tally.count }}</span>
-                </button>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
         <!-- Filter -->
         <div class="drl__filter">
             <div class="drl__filter-header">
@@ -230,7 +205,7 @@ Notes: Filters and tally segments swap #main-content over HTMX and push the URL;
                     </button>
                     <button type="button" class="drl__btn drl__btn--export" title="Export to CSV"
                             data-bs-toggle="modal" data-bs-target="#wfExportModal">
-                        <i class="fa-solid fa-file-csv"></i>
+                        <i class="fa-solid fa-file-csv"></i> Export
                     </button>
                     {# Only shown once rows are ticked; the export then covers just those #}
                     <span class="wfsel__count" data-export-count hidden></span>

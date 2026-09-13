@@ -30,6 +30,16 @@
         {% if api_stats.wc_version %}
         <span class="badge bg-light text-dark border">WC {{ api_stats.wc_version }}</span>
         {% endif %}
+    {% elif api.api_type == 'custom' %}
+        {% if api_stats.key_prefix %}
+        <span class="badge bg-light text-dark border"><i class="fa-solid fa-key me-1 text-muted"></i>{{ api_stats.key_prefix }}…</span>
+        {% endif %}
+        {% if api_stats.key_scope %}
+        <span class="badge bg-light text-dark border"><i class="fa-solid fa-shield-halved me-1 text-muted"></i>{{ api_stats.key_scope }}</span>
+        {% endif %}
+        {% if api_stats.key_last_used %}
+        <span class="badge bg-light text-dark border"><i class="fa-solid fa-clock-rotate-left me-1 text-muted"></i>Key used: {{ api_stats.key_last_used }}</span>
+        {% endif %}
     {% elif api.api_type == 'google_sheet' %}
         {% if api_stats.sheet_title %}
         <span class="badge bg-light text-dark border"><i class="fa-brands fa-google me-1 text-muted"></i>{{ api_stats.sheet_title }}</span>
@@ -55,6 +65,14 @@
 <div class="alert alert-danger small">
     <i class="fa-solid fa-exclamation-triangle me-1"></i>
     <strong>Error:</strong> {{ error_message }}
+</div>
+{% endif %}
+
+{% if api_stats.endpoint %}
+<div class="alert alert-info py-2 small mb-3">
+    <i class="fa-solid fa-arrow-right-to-bracket me-1"></i>
+    Inbound integration — the seller's website pushes orders to
+    <strong>{{ api_stats.endpoint }}</strong>. Nothing is fetched from their site.
 </div>
 {% endif %}
 
@@ -112,6 +130,24 @@
             <td><span class="badge bg-light text-dark border">{{ o.status }}</span></td>
             <td>{{ o.total }}</td>
             <td class="text-muted">{{ o.currency }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% elif api.api_type == 'custom' %}
+    <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr><th>Order No</th><th>Seller Ref</th><th>Customer</th><th>COD</th><th>Status</th><th>Received</th></tr></thead>
+        <tbody>
+        {% for o in order_response %}
+        <tr>
+            <td class="fw-semibold">{{ o.order_number }}</td>
+            <td class="text-muted small">{{ o.client_order_code|default:'—' }}</td>
+            <td>{{ o.customer_name|default:'—' }}</td>
+            <td>{{ o.cod_amount }}</td>
+            <td><span class="badge bg-light text-dark border">{{ o.order_status }}</span></td>
+            <td class="text-muted small">{{ o.created_at|default:'—' }}</td>
         </tr>
         {% endfor %}
         </tbody>

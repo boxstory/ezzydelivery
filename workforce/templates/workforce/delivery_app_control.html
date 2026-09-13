@@ -1,0 +1,258 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff console for per-client driver-app rules — proof of delivery on a delivered / failed close-out.
+Used by: workforce_views.delivery_app_control at /workforce/delivery-app-control/
+Notes: Per-row save (a bulk submit would clear every unticked box on the page). The rule is
+       enforced server-side in delivery/pod.py, so turning it on here binds the API too.
+{% endcomment %}
+{% block title %}Delivery App Control - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'workforce/css/delivery-app-control.css' %}?v=20260913d">
+{% endblock extra_css %}
+
+{% block content %}
+{% csrf_token %}
+<div class="wfpage">
+
+  {% include "workforce/parts/components/_page_header.html" with title="Delivery App Control" icon="fa-camera-retro" subtitle="Per-client driver-app rules — proof of delivery, and live tracking for the client" notes_id="workforce_delivery_app_control_card_notes" %}
+
+  <div class="wfnote" id="workforce_delivery_app_control_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'workforce_delivery_app_control_card_notes' %}" hidden></div>
+
+  <div class="wfpage__body">
+    <div class="wfcard">
+
+      <div class="dac__toolbar d-flex flex-wrap align-items-center justify-content-between gap-2 p-2">
+        <div class="d-flex flex-wrap align-items-center gap-1">
+          <a href="?{% if search %}search={{ search }}{% endif %}"
+             class="dac__tab{% if not only %} dac__tab--on{% endif %}">All clients</a>
+          <a href="?only=on{% if search %}&search={{ search }}{% endif %}"
+             class="dac__tab{% if only == 'on' %} dac__tab--on{% endif %}">Any rule on</a>
+          <span class="dac__tally">
+            <strong class="wfmono">{{ delivered_count }}</strong> proof on delivered
+            <span class="dac__dot">·</span>
+            <strong class="wfmono">{{ failed_count }}</strong> on failed
+            <span class="dac__dot">·</span>
+            <strong class="wfmono">{{ tracking_count }}</strong> tracking
+          </span>
+        </div>
+
+        <form method="get" class="d-flex align-items-center gap-2"
+              id="workforce_delivery_app_control_form_filter">
+          {% if only %}<input type="hidden" name="only" value="{{ only }}">{% endif %}
+          <input type="search" name="search" value="{{ search }}"
+                 class="form-control form-control-sm dac__search"
+                 id="workforce_delivery_app_control_input_search"
+                 placeholder="Client name or code…">
+          <button type="submit" class="dac__btn" id="workforce_delivery_app_control_btn_search">Search</button>
+        </form>
+      </div>
+
+      {% comment %}One Save for the page, and it only appears once a row is actually
+      edited. It submits the changed rows only — never the whole table.{% endcomment %}
+      <div class="dac__savebar" id="workforce_delivery_app_control_savebar" hidden>
+        <span class="dac__savebar-note">
+          <i class="fa-solid fa-pen" aria-hidden="true"></i>
+          <strong class="wfmono" id="workforce_delivery_app_control_dirty_count">0</strong>
+          <span id="workforce_delivery_app_control_dirty_word">client</span> edited
+        </span>
+        <button type="button" class="dac__btn dac__btn--save" id="workforce_delivery_app_control_btn_saveall">
+          Save changes
+        </button>
+        <button type="button" class="dac__btn" id="workforce_delivery_app_control_btn_discard">
+          Discard
+        </button>
+      </div>
+
+      <div class="wfcard__body wfcard__body--flush table-responsive">
+        {% if businesses %}
+        <table class="dac__table" id="workforce_delivery_app_control_table_list">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th class="text-center">Proof on delivered</th>
+              <th class="text-center">Proof on failed</th>
+              <th>Counts as proof</th>
+              <th class="text-center">Live tracking</th>
+              <th>Driver sees</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for biz in businesses %}
+            <tr class="dac__row{% if not biz.pod_required_delivered and not biz.pod_required_failed and not biz.live_tracking_enabled %} dac__row--off{% endif %}"
+                data-business-id="{{ biz.business_id }}">
+              <td>
+                <div class="dac__biz">{{ biz.business_name|default:biz.business_code }}</div>
+                <div class="dac__meta wfmono">{{ biz.business_code }}</div>
+              </td>
+              <td class="text-center">
+                <input type="checkbox" role="switch" class="dac__switch dac-delivered"
+                       aria-label="Require proof when marking delivered"
+                       {% if biz.pod_required_delivered %}checked{% endif %}>
+              </td>
+              <td class="text-center">
+                <input type="checkbox" role="switch" class="dac__switch dac-failed"
+                       aria-label="Require proof when marking failed"
+                       {% if biz.pod_required_failed %}checked{% endif %}>
+              </td>
+              <td>
+                <select class="form-select form-select-sm dac__select dac-kind"
+                        aria-label="What counts as proof on a successful delivery">
+                  {% for value, label in pod_kind_choices %}
+                    <option value="{{ value }}" {% if biz.pod_kind == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td class="text-center">
+                <input type="checkbox" role="switch" class="dac__switch dac-tracking"
+                       aria-label="Show this client the Live Tracking map"
+                       {% if biz.live_tracking_enabled %}checked{% endif %}>
+              </td>
+              <td class="dac__meta dac-summary"></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="dac__empty">
+          {% if only == 'on' %}
+            No client has a driver-app rule switched on yet.
+          {% else %}
+            No active clients match this search.
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      {% include "includes/components/_pagination.html" with page_obj=businesses_page filter_params=filter_params pagination_id="delivery_app_control" %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+    const table = document.getElementById('workforce_delivery_app_control_table_list');
+    if (!table) return;
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const SAVE_ALL_URL = "{% url 'workforce:delivery_app_control_save_all' %}";
+
+    const bar = document.getElementById('workforce_delivery_app_control_savebar');
+    const countEl = document.getElementById('workforce_delivery_app_control_dirty_count');
+    const wordEl = document.getElementById('workforce_delivery_app_control_dirty_word');
+    const saveBtn = document.getElementById('workforce_delivery_app_control_btn_saveall');
+    const discardBtn = document.getElementById('workforce_delivery_app_control_btn_discard');
+    const rows = Array.prototype.slice.call(table.querySelectorAll('.dac__row'));
+
+    const state = row => ({
+        delivered: row.querySelector('.dac-delivered').checked,
+        failed: row.querySelector('.dac-failed').checked,
+        tracking: row.querySelector('.dac-tracking').checked,
+        kind: row.querySelector('.dac-kind').value,
+    });
+
+    // What the server currently holds for each row. Everything else is compared
+    // against this, so only genuinely edited rows are ever submitted.
+    const saved = new Map(rows.map(row => [row, state(row)]));
+
+    const isDirty = row => {
+        const was = saved.get(row), now = state(row);
+        return was.delivered !== now.delivered || was.failed !== now.failed
+            || was.tracking !== now.tracking || was.kind !== now.kind;
+    };
+
+    // Spell out what the rule actually does to the driver's screen, so nobody has to
+    // guess what "both" means for a failed attempt (it means a photo — see delivery/pod.py).
+    function describe(row) {
+        const now = state(row);
+        const words = { photo: 'photo', signature: 'signature', both: 'photo + signature' };
+        const parts = [];
+        if (now.delivered) parts.push('Delivered: ' + words[now.kind]);
+        if (now.failed) parts.push('Failed: photo');
+        if (now.tracking) parts.push('Client can watch the driver');
+        return parts.length ? parts.join(' \u00b7 ') : 'Nothing required \u2014 proof stays optional';
+    }
+
+    function refreshRow(row) {
+        row.querySelector('.dac-summary').textContent = describe(row);
+        const now = state(row);
+        row.classList.toggle('dac__row--off', !(now.delivered || now.failed || now.tracking));
+        row.querySelector('.dac-kind').disabled = !now.delivered;
+        row.classList.toggle('dac__row--dirty', isDirty(row));
+    }
+
+    function refreshBar() {
+        const n = rows.filter(isDirty).length;
+        bar.hidden = n === 0;
+        countEl.textContent = n;
+        wordEl.textContent = n === 1 ? 'client' : 'clients';
+        saveBtn.disabled = false;
+        saveBtn.classList.remove('dac__btn--done', 'dac__btn--fail');
+        saveBtn.textContent = 'Save changes';
+    }
+
+    rows.forEach(row => {
+        refreshRow(row);
+        row.querySelectorAll('.dac-delivered, .dac-failed, .dac-kind, .dac-tracking').forEach(el =>
+            el.addEventListener('change', () => { refreshRow(row); refreshBar(); }));
+    });
+    refreshBar();
+
+    // Paging or searching away with edits pending would lose them silently — the rules
+    // are only in the DOM until Save is pressed.
+    window.addEventListener('beforeunload', e => {
+        if (rows.some(isDirty)) { e.preventDefault(); e.returnValue = ''; }
+    });
+
+    discardBtn.addEventListener('click', () => {
+        rows.forEach(row => {
+            const was = saved.get(row);
+            row.querySelector('.dac-delivered').checked = was.delivered;
+            row.querySelector('.dac-failed').checked = was.failed;
+            row.querySelector('.dac-tracking').checked = was.tracking;
+            row.querySelector('.dac-kind').value = was.kind;
+            refreshRow(row);
+        });
+        refreshBar();
+    });
+
+    saveBtn.addEventListener('click', () => {
+        const dirty = rows.filter(isDirty);
+        if (!dirty.length) return;
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving\u2026';
+        fetch(SAVE_ALL_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify({
+                rows: dirty.map(row => Object.assign(
+                    { business_id: row.dataset.businessId }, state(row))),
+            }),
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success) {
+                saveBtn.disabled = false;
+                saveBtn.classList.add('dac__btn--fail');
+                saveBtn.textContent = res.error || 'Failed';
+                return;
+            }
+            // Only now is the DOM the truth: rebase each saved row so it reads clean.
+            dirty.forEach(row => { saved.set(row, state(row)); refreshRow(row); });
+            saveBtn.classList.add('dac__btn--done');
+            saveBtn.textContent = 'Saved';
+            setTimeout(refreshBar, 1400);
+        })
+        .catch(() => {
+            saveBtn.disabled = false;
+            saveBtn.classList.add('dac__btn--fail');
+            saveBtn.textContent = 'Failed';
+        });
+    });
+})();
+</script>
+{% endblock content %}

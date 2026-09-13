@@ -1,0 +1,214 @@
+/* Purpose: Staff console for per-client driver-app rules (proof of delivery on delivered / failed).
+   Used by: workforce/templates/workforce/delivery_app_control.html
+   Notes:   Page shell (.wfpage/.wfcard/.wfmono) and the navy hero come from staff-hero.css —
+            only the toolbar, the rules table and the row actions are declared here. */
+
+.dac__toolbar {
+  border-bottom: 1px solid var(--brand-grey-150);
+  background: var(--brand-white);
+}
+
+.dac__tab {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brand-grey-500);
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.35rem;
+  border: 1px solid transparent;
+}
+
+.dac__tab:hover { color: var(--brand-navy); background: var(--brand-grey-100); }
+
+.dac__tab--on {
+  color: var(--brand-navy);
+  background: var(--brand-grey-150);
+  border-color: var(--brand-grey-250);
+}
+
+.dac__tally {
+  font-size: 0.72rem;
+  color: var(--brand-grey-500);
+  margin-left: 0.6rem;
+}
+
+.dac__tally strong { color: var(--brand-navy); }
+.dac__dot { color: var(--brand-grey-400); margin: 0 0.2rem; }
+
+.dac__search {
+  font-size: 0.82rem;
+  max-width: 18rem;
+}
+
+/* Save bar — appears under the toolbar only once a row is edited, so the page is a
+   read-only register until you actually change something. */
+.dac__savebar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--brand-grey-250);
+  background: var(--brand-accent);
+}
+
+.dac__savebar-note {
+  font-size: 0.8rem;
+  color: var(--brand-grey-700);
+  margin-inline-end: auto;
+}
+
+.dac__savebar-note i {
+  margin-inline-end: 0.35rem;
+  color: var(--brand-primary-text);
+}
+
+.dac__savebar-note strong { color: var(--brand-navy); }
+
+/* An edited row is marked while it is still only in the browser. */
+.dac__row--dirty > td:first-child {
+  box-shadow: inset 3px 0 0 var(--brand-primary);
+}
+
+/* --- rules table --------------------------------------------------------- */
+.dac__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.dac__table th {
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-grey-500);
+  border-bottom: 1px solid var(--brand-grey-250);
+  white-space: nowrap;
+}
+
+.dac__table td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--brand-grey-150);
+  color: var(--brand-grey-700);
+  vertical-align: middle;
+}
+
+.dac__table tbody tr:last-child td { border-bottom: 0; }
+.dac__table tbody tr:hover { background: var(--brand-grey-50); }
+
+.dac__biz { font-weight: 600; color: var(--brand-navy); }
+.dac__meta { font-size: 0.74rem; color: var(--brand-grey-500); }
+
+/* A client with no rule set is still worth reading, just quieter — the page is a
+   register of every client, not only the ones with a requirement. */
+.dac__row--off .dac__biz { color: var(--brand-grey-600); }
+.dac__row--off .dac-summary { color: var(--brand-grey-400); }
+
+.dac__table input.dac__switch {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 2.1rem;
+  height: 1.15rem;
+  margin: 0;
+  border: 1px solid var(--brand-grey-300);
+  border-radius: 1rem;
+  background: var(--brand-grey-150);
+  position: relative;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.dac__table input.dac__switch::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: var(--brand-white);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: left 0.15s ease;
+}
+
+.dac__table input.dac__switch:checked {
+  background: var(--brand-navy);
+  border-color: var(--brand-navy);
+}
+
+.dac__table input.dac__switch:checked::after { left: calc(100% - 1.05rem); }
+
+.dac__table input.dac__switch:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.dac__select {
+  font-size: 0.82rem;
+  min-height: 2.1rem;
+  max-width: 12rem;
+}
+
+.dac__select:focus {
+  border-color: var(--brand-primary);
+  box-shadow: none;
+}
+
+.dac__select:disabled {
+  color: var(--brand-grey-450);
+  background-color: var(--brand-grey-100);
+}
+
+.dac__btn {
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-height: 2.1rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--brand-grey-400);
+  background: var(--brand-grey-100);
+  color: var(--brand-grey-800);
+  white-space: nowrap;
+}
+
+.dac__btn:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+}
+
+.dac__btn--save {
+  border-color: var(--brand-navy);
+  background: var(--brand-navy);
+  color: var(--brand-white);
+  min-width: 5rem;
+}
+
+.dac__btn--save:hover {
+  background: var(--brand-navy-light);
+  border-color: var(--brand-navy-light);
+  color: var(--brand-white);
+}
+
+.dac__btn--done {
+  background: var(--brand-success-bg);
+  border-color: var(--brand-success);
+  color: var(--brand-success);
+}
+
+.dac__btn--fail {
+  background: var(--brand-danger-bg);
+  border-color: var(--brand-danger);
+  color: var(--brand-danger);
+}
+
+.dac__empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--brand-grey-500);
+  font-size: 0.85rem;
+}

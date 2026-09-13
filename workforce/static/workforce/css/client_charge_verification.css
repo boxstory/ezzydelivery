@@ -201,6 +201,36 @@
   border-bottom: 1px solid var(--tlr-rule-strong);
   white-space: nowrap;
 }
+/* Sortable headers. The whole label is the link; the glyph carries the state —
+   faint double arrow when the column is idle, a solid single arrow when it is
+   the active order. No colour is spent on it: the brass accent stays reserved
+   for the money column. */
+.ccv__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: inherit;
+  text-decoration: none;
+}
+.ccv__sort::after {
+  content: "\2195";
+  font-size: 0.72rem;
+  line-height: 1;
+  opacity: 0.3;
+}
+.ccv__sort:hover { color: var(--tlr-ink); }
+.ccv__sort:hover::after { opacity: 0.7; }
+.ccv__sort:focus-visible {
+  outline: 1px solid var(--tlr-brass);
+  outline-offset: 2px;
+}
+.ccv__sort--asc,
+.ccv__sort--desc { color: var(--tlr-ink); }
+.ccv__sort--asc::after { content: "\2191"; opacity: 1; }
+.ccv__sort--desc::after { content: "\2193"; opacity: 1; }
+/* Right-aligned money headers keep the glyph outside the number edge. */
+.ccv__table thead th.ccv__num .ccv__sort { flex-direction: row-reverse; }
+
 .ccv__table tbody td {
   padding: 0.55rem 0.7rem;
   border-bottom: 1px solid var(--tlr-rule);

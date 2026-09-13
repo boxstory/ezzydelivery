@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'workforce/css/cod_payout_invoice.css' %}?v=20260824b" type="text/css" />
-<link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260824a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260909a" type="text/css" />
 <link rel="stylesheet" href="{% static 'workforce/css/invoice_preview.css' %}?v=20260815a" type="text/css" />
 {% endblock %}
 
@@ -261,6 +261,34 @@
   </section>
   {% endif %}
 
+  {% if can_amend_lines and not invoice.is_void %}
+  <!-- Amend a billed delivery: super admin only, screen-only, corrects a keyed figure -->
+  <section class="ccc__chargelog ccc__amendlog">
+    <h2 class="ccc__paylog-title">Correct a billed amount</h2>
+    <p class="ccc__charge-note ccc__amend-lede">
+      A delivery's charge is frozen when the invoice is issued, so the Charges to Collect
+      desk leaves these rows alone. Saving here restates the invoice total, the ledger
+      entry it was booked on, and the delivery's own verified charge — and keeps a record
+      of what the line used to say.
+    </p>
+
+    {% for l in delivery_lines %}
+    <div class="ccc__charge-row ccc__amend-row" data-amend-line="{{ l.id }}">
+      <span class="ccc__amend-idx">{{ forloop.counter }}</span>
+      <span class="ccc__charge-label">{{ l.label }}</span>
+      {% if l.was_amended %}
+      <span class="ccc__amend-was" title="{{ l.amend_reason|default:'No reason given' }}">was {{ l.original_amount|floatformat:2 }}</span>
+      {% endif %}
+      <input type="number" class="ccc__input ccc__amend-in" value="{{ l.amount|floatformat:2 }}"
+             step="0.01" min="0" inputmode="decimal" aria-label="Charge for {{ l.label }}">
+      <button type="button" class="ccc__amend-save" data-amend-save="{{ l.id }}">Save</button>
+    </div>
+    {% empty %}
+    <p class="ccc__charge-empty">No deliveries on this invoice.</p>
+    {% endfor %}
+  </section>
+  {% endif %}
+
   {% if not seller_view and payments %}
   <!-- Payment ledger: screen-only, the sheet above already itemises them -->
   <section class="ccc__paylog">
@@ -465,6 +493,30 @@
       post('{% url "workforce:client_charge_invoice_line_remove" %}', body, this);
     });
   });
+
+  {% if can_amend_lines %}
+  document.querySelectorAll('[data-amend-save]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const row = this.closest('[data-amend-line]');
+      const input = row.querySelector('.ccc__amend-in');
+      const amount = (input.value || '').trim();
+      if (amount === '' || isNaN(parseFloat(amount)) || parseFloat(amount) < 0) {
+        alert('Enter the corrected amount'); return;
+      }
+      const name = row.querySelector('.ccc__charge-label').textContent.trim();
+      const reason = prompt('Change ' + name + ' to ' + amount + ' QAR on ' + code +
+                            '?\n\nThe invoice total, the ledger entry and the delivery\'s ' +
+                            'verified charge are all restated.\n\nReason:');
+      if (reason === null) return;
+      const body = new URLSearchParams();
+      body.append('invoice_code', code);
+      body.append('line_id', this.getAttribute('data-amend-save'));
+      body.append('amount', amount);
+      body.append('reason', reason);
+      post('{% url "workforce:client_charge_invoice_line_amend" %}', body, this);
+    });
+  });
+  {% endif %}
 
   el('ccc_cols_save')?.addEventListener('click', function () {
     const picked = Array.from(document.querySelectorAll('.ccc__cols-box'))

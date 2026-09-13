@@ -733,6 +733,11 @@ The console link survives as a secondary action for those who can use it.
                 <div class="form-text">
                     WhatsApp formatting: <code>*bold*</code>, <code>_italic_</code>, <code>```mono```</code>.
                 </div>
+                <div class="form-text">
+                    Optional lines: <code>&#123;if cod_amount&#125;</code> … <code>&#123;endif&#125;</code> keeps the part
+                    between them only when the order has a value — a zero COD counts as no value.
+                    <code>&#123;else&#125;</code> is optional; conditions cannot be nested.
+                </div>
 
                 <div class="mt-3 d-none" id="editMsgChipsBlock">
                     <span class="form-label fw-bold d-block mb-1">Placeholders</span>
@@ -1195,9 +1200,9 @@ function openMessageModal(key) {
             var b = document.createElement('button');
             b.type = 'button';
             b.className = 'atl__msg-chip';
-            b.textContent = '{' + ph + '}';
-            b.title = 'Insert at the cursor';
-            b.addEventListener('click', function () { insertPlaceholder('{' + ph + '}'); });
+            b.textContent = '{' + ph.name + '}';
+            b.title = ph.hint || 'Insert at the cursor';
+            b.addEventListener('click', function () { insertPlaceholder('{' + ph.name + '}'); });
             chips.appendChild(b);
         });
         chipsBlock.classList.remove('d-none');

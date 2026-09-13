@@ -3,8 +3,9 @@
 {% comment %}
 Purpose: Staff pickup pool — every first-mile pickup task, filters, assign/reassign, return-to-pool, cancel, delete, bulk actions
 Used by: workforce_views.pickup_pool_status at /workforce/pickups/
-Notes: The status filter defaults to "open", which hides handed_off rows (finished first-mile legs);
-       "All statuses" brings them back. The date window defaults to the last 7 days (?days=7); a From/To pair
+Notes: The status filter defaults to "open", which hides dropped and handed_off rows (both are finished
+       first-mile legs); "All statuses" brings them back. Cancelled stays in the default view. The Age
+       column freezes on a closed leg (created_at -> closed_at) instead of running forever. The date window defaults to the last 7 days (?days=7); a From/To pair
        (?date_from/?date_to) overrides the preset and shows as "Custom range"; the two boxes are hidden
        under every other preset and revealed by picking it. When the window hides a pickup
        that is still active, ppl__windownote says how many and links to all-time — the window must never bury live work.
@@ -73,7 +74,7 @@ Notes: The status filter defaults to "open", which hides handed_off rows (finish
             <form method="GET" class="ppl__filters">
                 <select name="status" class="form-select form-select-sm w-auto ppl__ffield" data-no-select2
                         onchange="this.form.submit()">
-                    <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open (hide handed off)</option>
+                    <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open (hide completed)</option>
                     <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All statuses</option>
                     <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active only</option>
                     {% for value, label in status_choices %}
@@ -243,12 +244,27 @@ Notes: The status filter defaults to "open", which hides handed_off rows (finish
                         {% if p.transfer_to_driver and p.status == 'collected' %}
                         <span class="ppl__sub">→ {{ p.transfer_to_driver }} (awaiting confirm)</span>
                         {% endif %}
+                        {% comment %}
+                        A collected leg whose delivery someone is already running looks
+                        identical in the pool otherwise — name the driver who has it.
+                        {% endcomment %}
+                        {% if p.status == 'collected' and p.task_driver %}
+                        <span class="ppl__sub">Delivering: {{ p.task_driver }} ({{ p.task_status_display }})</span>
+                        {% endif %}
                     </td>
                     <td class="ppl__td">
                         {% if p.driver %}{{ p.driver }} <span class="ppl__code">{{ p.driver.driver_code }}</span>
                         {% else %}<span class="text-muted">—</span>{% endif %}
                     </td>
-                    <td class="ppl__td"><span class="ppl__age">{{ p.created_at|timesince }}</span></td>
+                    <td class="ppl__td">
+                        {# A closed leg reports how long it took; a live one keeps counting. #}
+                        {% if p.closed_at %}
+                        <span class="ppl__age ppl__age--done"
+                              title="First-mile leg took this long">{{ p.created_at|timesince:p.closed_at }}</span>
+                        {% else %}
+                        <span class="ppl__age">{{ p.created_at|timesince }}</span>
+                        {% endif %}
+                    </td>
                     <td class="ppl__td text-end">
                         {# Same stage rail the task detail page shows — loaded on demand. #}
                         <button type="button" class="btn btn-sm ppl__btn ppl__btn--quiet pp-timeline"
@@ -262,6 +278,12 @@ Notes: The status filter defaults to "open", which hides handed_off rows (finish
                         <button type="button" class="btn btn-sm ppl__btn pp-assign-open">Reassign</button>
                         <button type="button" class="btn btn-sm ppl__btn ppl__btn--quiet pp-unassign"
                                 data-order="{{ p.order.order_number }}">Back to pool</button>
+                        {% endif %}
+                        {% if p.status == 'collected' %}
+                        <button type="button" class="btn btn-sm ppl__btn ppl__btn--primary pp-close"
+                                data-order="{{ p.order.order_number }}"
+                                data-driver="{% if p.task_driver %}{{ p.task_driver }}{% endif %}"
+                                title="Close this leg as handed off — the goods were collected">Close leg</button>
                         {% endif %}
                         {% if p.status != 'cancelled' and p.status != 'dropped' and p.status != 'handed_off' %}
                         <button type="button" class="btn btn-sm ppl__btn ppl__btn--warn pp-cancel"
@@ -452,6 +474,23 @@ Notes: The status filter defaults to "open", which hides handed_off rows (finish
                 + 'The order and delivery task are not touched. Reason (optional):', '');
             if (reason === null) return;
             rowPost("{% url 'workforce:pickup_staff_cancel' %}", btn, { reason: reason });
+        });
+    });
+
+    // Close ends a collected leg as Handed off. Drivers take the delivery from the
+    // New pool instead of tapping through the Pickup tab, so a leg can still be
+    // left open when they never touched the app at all — this is that repair.
+    document.querySelectorAll('#workforce_pickup_pool_table_view .pp-close').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const order = btn.dataset.order || 'this pickup';
+            const driver = btn.dataset.driver;
+            const who = driver
+                ? `\n\nThe delivery is with ${driver} — the leg will be closed onto them.`
+                : '\n\nNo driver is on the delivery task yet, so the leg closes with a staff note.';
+            if (!confirm(
+                `Close the first-mile leg for ${order} as Handed off?${who}\n\n`
+                + 'The goods were collected, so the leg is recorded as done, not cancelled.')) return;
+            rowPost("{% url 'workforce:pickup_staff_close' %}", btn, null);
         });
     });
 

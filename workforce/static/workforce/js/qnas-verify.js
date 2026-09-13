@@ -498,6 +498,84 @@ function _applyCoords(opts, lat, lng, info) {
  * WhatsApp / Google Maps shared-location paste & drop
  * ============================================================ */
 
+/* A WhatsApp-shared Google Maps short link. Accepts it bare (no scheme) too,
+ * because pasting from WhatsApp Web often drops the https://. */
+var LOC_SHORTLINK_RE = /(?:https?:\/\/)?(?:maps\.app\.goo\.gl|goo\.gl\/maps)\/\S+/i;
+
+var _locResolveCache = {};    // short url -> [lat, lng, inQatar]
+var _locResolveTimers = {};   // debounce key -> timer id
+var _locResolveToken = {};    // debounce key -> latest request number
+
+/**
+ * Resolve a Google Maps short link to coordinates via the backend.
+ *
+ * The browser cannot follow the goo.gl redirect itself — Google sends no
+ * Access-Control-Allow-Origin on that host — so the redirect chain is only
+ * readable server-side. Debounced because every caller is an oninput handler,
+ * and results are cached so re-pasting the same pin costs nothing.
+ *
+ * @param {string} text      - pasted text containing a short link
+ * @param {string} key       - debounce/race key, unique per input (use resultId)
+ * @param {HTMLElement} resultDiv - badge container, may be null
+ * @param {function} done    - called with (lat, lng, inQatar) on success
+ * @param {function} [onFail] - called with a message instead of writing a badge
+ * @returns {boolean} true if a resolve was started or served from cache
+ */
+function resolveShortLink(text, key, resultDiv, done, onFail) {
+    var m = String(text).match(LOC_SHORTLINK_RE);
+    if (!m) return false;
+    var url = m[0];
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+    var hit = _locResolveCache[url];
+    if (hit) { done(hit[0], hit[1], hit[2]); return true; }
+
+    clearTimeout(_locResolveTimers[key]);
+    if (resultDiv) {
+        resultDiv.innerHTML = '<span class="badge bg-secondary"><i class="fa-solid fa-spinner fa-spin me-1"></i>Resolving short link...</span>';
+    }
+    var token = _locResolveToken[key] = (_locResolveToken[key] || 0) + 1;
+
+    _locResolveTimers[key] = setTimeout(function() {
+        fetch(window.location.origin + '/api/resolve-location/', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _getCsrfToken() },
+            body: JSON.stringify({ text: url })
+        }).then(function(resp) {
+            return resp.json().then(function(d) { return { ok: resp.ok, data: d }; });
+        }).then(function(r) {
+            if (token !== _locResolveToken[key]) return;   // a newer paste superseded this one
+            if (!r.ok || typeof r.data.lat !== 'number') {
+                var msg = r.data.error || 'Could not resolve that link';
+                if (onFail) { onFail(msg); }
+                else if (resultDiv) {
+                    resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>' + msg + '</span>';
+                }
+                return;
+            }
+            var inQatar = r.data.in_qatar !== false;
+            _locResolveCache[url] = [r.data.lat, r.data.lng, inQatar];
+            done(r.data.lat, r.data.lng, inQatar);
+        }).catch(function(err) {
+            if (token !== _locResolveToken[key]) return;
+            console.error('[LOC] resolve error:', err);
+            if (onFail) { onFail('Network error resolving link'); }
+            else if (resultDiv) {
+                resultDiv.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Network error resolving link</span>';
+            }
+        });
+    }, 400);
+    return true;
+}
+
+/** Append an "outside Qatar" warning to a result badge — advisory, the pin is still applied. */
+function _warnIfOutsideQatar(resultDiv, inQatar) {
+    if (resultDiv && !inQatar) {
+        resultDiv.innerHTML += ' <span class="badge bg-warning text-dark"><i class="fa-solid fa-earth-americas me-1"></i>Pin is outside Qatar</span>';
+    }
+}
+
 /**
  * Extract [lat, lng] from a Google Maps / WhatsApp shared-location link
  * or plain "lat, lng" text. Returns null if nothing valid is found.
@@ -550,12 +628,19 @@ function whatsappLocationFill(text, opts) {
     var coords = parseLatLngFromText(text);
 
     if (!coords) {
-        if (resultDiv && String(text).trim()) {
-            if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(text)) {
-                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>Short link — open it once, then paste the full https://maps.google.com/?q=... link</span>';
-            } else {
-                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No coordinates found in that link</span>';
+        // A short link carries no coordinates in the URL — resolve it server-side,
+        // then re-enter with the plain "lat, lng" the parser above understands.
+        if (String(text).trim() && LOC_SHORTLINK_RE.test(text)) {
+            var fillKey = opts.resultId || opts.latId || 'loc';
+            if (resolveShortLink(text, fillKey, resultDiv, function(lat, lng, inQatar) {
+                    whatsappLocationFill(lat + ', ' + lng, opts);
+                    _warnIfOutsideQatar(resultDiv, inQatar);
+                })) {
+                return false;
             }
+        }
+        if (resultDiv && String(text).trim()) {
+            resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No coordinates found in that link</span>';
         } else if (resultDiv) {
             resultDiv.innerHTML = '';
         }
@@ -616,12 +701,18 @@ function whatsappLocationSave(text, orderId, opts) {
     var coords = parseLatLngFromText(text);
 
     if (!coords) {
-        if (resultDiv && String(text).trim()) {
-            if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(text)) {
-                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>Short link — open it once, then paste the full https://maps.google.com/?q=... link</span>';
-            } else {
-                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No coordinates found in that link</span>';
+        // Short link: resolve server-side first, then re-enter to save the pin.
+        if (String(text).trim() && LOC_SHORTLINK_RE.test(text)) {
+            var saveKey = opts.resultId || ('order' + orderId);
+            if (resolveShortLink(text, saveKey, resultDiv, function(lat, lng, inQatar) {
+                    whatsappLocationSave(lat + ', ' + lng, orderId, opts);
+                    if (!inQatar) console.warn('[LOC] resolved pin is outside Qatar:', lat, lng);
+                })) {
+                return false;
             }
+        }
+        if (resultDiv && String(text).trim()) {
+            resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No coordinates found in that link</span>';
         } else if (resultDiv) {
             resultDiv.innerHTML = '';
         }

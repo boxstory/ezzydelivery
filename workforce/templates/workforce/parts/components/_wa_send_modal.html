@@ -4,47 +4,127 @@ Used by: workforce driver_detail.html, crm/lead_detail.html, forms/pricing_inqui
 Notes: Sends through workforce:whatsapp_send_routed, so the number AND the channel come from the section's
        sender route on the Auto Triggers page — never from the staff member's own phone. Pass the optional
        wa_session to pin one conversation to a specific number (the CRM lead page does; the endpoint checks
-       it against the numbers we own). Pass wa_message to open with a starter body already typed — the
+       it against the numbers we own). Pass wa_message to offer a starter body as a paste chip — the
        calling view renders it from a core.message_templates key, editable on the AI Config Messages tab.
+       Pass wa_reminder (+ wa_reminder_label) to add a SECOND page body to the picker: everything this
+       record has not given us yet, written out for the recipient — the driver application sections still
+       open, or the quote answers still missing. It sits first in the list because it is the one body only
+       this record can produce; pass '' and the option is simply absent, which is what "nothing missing"
+       must look like. Per-button data-wasend-reminder overrides it, the way data-wasend-message does.
        Trigger it from any button carrying data-wasend-open plus data-wasend-to / data-wasend-name.
+       The box opens EMPTY on purpose: a pre-filled template is the one people send by accident.
+       Above it sits a paste row instead: the clipboard, the last message this staffer actually sent
+       (localStorage, per section, this browser only), and a template picker fed by
+       workforce:whatsapp_composer_templates — every enabled body registered for this section,
+       rendered with the recipient's and staffer's names. Placeholders that endpoint cannot know are
+       left as {placeholder} and Send refuses a body still carrying one.
+       From is a dropdown: it defaults to the section's route (or wa_session when the page pins one)
+       and lists every number we own that has a WAHA session, so a staffer can send one message from
+       another line without changing the route. Picking a number forces the WAHA channel — see
+       core.whatsapp_utils.resolve_send_target — and the endpoint re-validates the choice.
+       The footer keeps a wa.me deep link for the same number, so replacing a page's old deep-link
+       button with this composer never costs anyone the "open it on my own phone" route.
+       Design: the navy routing plate at the top is the point of the modal — this send is routed, and
+       which line it leaves from is a decision, so From → To is drawn as one routed path rather than
+       two label/value rows. It is a CSS grid, not flex: the sender value and the select swap places
+       depending on how many numbers we own, and flex wrapped that into the channel chip reading as
+       part of To. Everything below the plate stays white, hairline and grey — see the wasend block
+       in workforce.css. Both selects carry data-no-select2: the dashboard-wide Select2 enhancer
+       otherwise swallows them (it hides the real control at width:1px and its change event never
+       reaches a plain addEventListener, so picking another sender silently did nothing).
+       Send result: pressing Send covers the panel with wasend__result. A send that lands shows
+       "Sent" and closes the window on its own; a send that fails stays put with the reason and two
+       ways out — Back to message (the typed body is still there) or Close. The inline status line
+       under the box is for pre-flight problems only (empty body, unfilled {placeholder}, clipboard
+       refused), so "you cannot send this yet" never looks like "this did not send".
 {% endcomment %}
 <div class="modal fade wasend" id="workforce_wa_send_modal" tabindex="-1" aria-hidden="true"
      data-wasend-section="{{ wa_section }}"
      data-wasend-session="{{ wa_session|default:'' }}"
      data-wasend-message="{{ wa_message|default:'' }}"
-     data-wasend-url="{% url 'workforce:whatsapp_send_routed' %}">
+     data-wasend-reminder="{{ wa_reminder|default:'' }}"
+     data-wasend-reminder-label="{{ wa_reminder_label|default:'' }}"
+     data-wasend-url="{% url 'workforce:whatsapp_send_routed' %}"
+     data-wasend-templates-url="{% url 'workforce:whatsapp_composer_templates' %}">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content wasend__panel">
       <div class="modal-header wasend__header">
         <h5 class="modal-title wasend__title">
-          <i class="fa-brands fa-whatsapp me-2" aria-hidden="true"></i>Send WhatsApp
+          <span class="wasend__mark" aria-hidden="true"><i class="fa-brands fa-whatsapp"></i></span>
+          Send WhatsApp
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body">
-        <div class="wasend__meta mb-3">
-          <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="wasend__meta-label">From</span>
-            <span class="wasend__meta-value" data-wasend-sender>checking…</span>
-            <span class="wasend__meta-chip" data-wasend-channel></span>
+      <div class="modal-body wasend__body">
+        <div class="wasend__route">
+          <div class="wasend__route-row">
+            <label class="wasend__route-label" for="workforce_wa_send_select_sender">From</label>
+            <span class="wasend__route-value" data-wasend-sender>checking…</span>
+            <select class="form-select wasend__sender-select" data-no-select2
+                    id="workforce_wa_send_select_sender" data-wasend-sender-select hidden
+                    aria-label="Number this message is sent from"></select>
+            <span class="wasend__route-chip" data-wasend-channel></span>
           </div>
-          <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
-            <span class="wasend__meta-label">To</span>
-            <span class="wasend__meta-value" data-wasend-recipient></span>
+          <div class="wasend__route-tie" aria-hidden="true"></div>
+          <div class="wasend__route-row">
+            <span class="wasend__route-label">To</span>
+            <span class="wasend__route-value" data-wasend-recipient></span>
           </div>
         </div>
-        <label class="form-label fw-bold" for="workforce_wa_send_input_message">Message</label>
+        <div class="wasend__compose-head">
+          <label class="wasend__label" for="workforce_wa_send_input_message">Message</label>
+          <div class="wasend__fills">
+            {# The reminder is also the first entry in the picker below, on purpose: #}
+            {# the picker is the full list, this chip is the one body a staffer opening #}
+            {# an unfinished lead almost always wants, and a collapsed select hides it. #}
+            <button type="button" class="wasend__fill wasend__fill--remind"
+                    data-wasend-fill="reminder" hidden>
+              <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+              <span data-wasend-reminder-text>Reminder</span>
+            </button>
+            <button type="button" class="wasend__fill" data-wasend-fill="clipboard"
+                    title="Paste what you copied">
+              <i class="fa-regular fa-clipboard" aria-hidden="true"></i>
+              <span>Clipboard</span>
+            </button>
+            <button type="button" class="wasend__fill" data-wasend-fill="last" hidden>
+              <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+              <span>Last sent</span>
+            </button>
+            <select class="form-select wasend__template-select" data-no-select2
+                    data-wasend-template-select hidden
+                    aria-label="Paste a message template">
+              <option value="">Template…</option>
+            </select>
+          </div>
+        </div>
         <textarea class="form-control wasend__textarea" id="workforce_wa_send_input_message"
                   rows="6" maxlength="4000" placeholder="Type the message…"></textarea>
-        <div class="form-text d-flex justify-content-between">
-          <span>Goes out from the platform number, so replies come back to the team.</span>
-          <span data-wasend-count>0 / 4000</span>
+        <div class="wasend__meter">
+          <span>Replies come back to the team, not to your phone.</span>
+          <span class="wasend__count" data-wasend-count>0 / 4000</span>
         </div>
-        <div class="wasend__status mt-2" data-wasend-status role="status" aria-live="polite"></div>
+        <div class="wasend__status" data-wasend-status role="status" aria-live="polite"></div>
       </div>
+      <div class="wasend__result" data-wasend-result hidden aria-live="assertive">
+        <div class="wasend__result-icon" data-wasend-result-icon aria-hidden="true"></div>
+        <p class="wasend__result-title" data-wasend-result-title></p>
+        <p class="wasend__result-text" data-wasend-result-text></p>
+        <div class="wasend__result-acts" data-wasend-result-acts hidden>
+          <button type="button" class="btn wasend__btn" data-wasend-result-back>
+            <i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Back to message
+          </button>
+          <button type="button" class="btn wasend__btn" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-success btn-sm" data-wasend-submit>
+        <a class="btn btn-link wasend__link me-auto" data-wasend-deeplink
+           href="#" target="_blank" rel="noopener" hidden>
+          Open on my own phone
+        </a>
+        <button type="button" class="btn wasend__btn" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn wasend__btn wasend__btn--send" data-wasend-submit>
           <i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Send
         </button>
       </div>
@@ -64,6 +144,9 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
   var session = modalEl.dataset.wasendSession || '';
   // Starter body from the page's MessageTemplate; '' when the template is off.
   var starter = modalEl.dataset.wasendMessage || '';
+  // "Here is what you still owe us" for this record; '' when nothing is missing.
+  var pageReminder = modalEl.dataset.wasendReminder || '';
+  var pageReminderLabel = modalEl.dataset.wasendReminderLabel || 'Reminder — what is still missing';
   var endpoint = modalEl.dataset.wasendUrl;
   var textarea = modalEl.querySelector('#workforce_wa_send_input_message');
   var statusEl = modalEl.querySelector('[data-wasend-status]');
@@ -72,7 +155,34 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
   var channelEl = modalEl.querySelector('[data-wasend-channel]');
   var recipientEl = modalEl.querySelector('[data-wasend-recipient]');
   var sendBtn = modalEl.querySelector('[data-wasend-submit]');
+  var deepLinkEl = modalEl.querySelector('[data-wasend-deeplink]');
+  var resultEl = modalEl.querySelector('[data-wasend-result]');
+  var resultIcon = modalEl.querySelector('[data-wasend-result-icon]');
+  var resultTitle = modalEl.querySelector('[data-wasend-result-title]');
+  var resultText = modalEl.querySelector('[data-wasend-result-text]');
+  var resultActs = modalEl.querySelector('[data-wasend-result-acts]');
+  var resultBack = modalEl.querySelector('[data-wasend-result-back]');
+  var closeTimer = null;
+  var senderSelect = modalEl.querySelector('[data-wasend-sender-select]');
+  var fillLastBtn = modalEl.querySelector('[data-wasend-fill="last"]');
+  var fillRemindBtn = modalEl.querySelector('[data-wasend-fill="reminder"]');
+  var fillRemindText = modalEl.querySelector('[data-wasend-reminder-text]');
+  var fillClipboardBtn = modalEl.querySelector('[data-wasend-fill="clipboard"]');
+  var templateSelect = modalEl.querySelector('[data-wasend-template-select]');
+  var templatesUrl = modalEl.dataset.wasendTemplatesUrl || '';
+  var templatesLoaded = false;
+  // Bodies behind the paste row for the composer currently open.
+  var lastText = '';
+  var templateText = '';
+  var reminderText = '';
+  var reminderLabel = '';
+  // A body still carrying {placeholder} is half-written — see PLACEHOLDER_RE use in send().
+  var PLACEHOLDER_RE = /\{[a-z_]+\}/i;
+  // Per-section so the driver pitch never shows up as "last sent" on a business
+  // lead. Browser-local by design — this is a typing shortcut, not shared state.
+  var LAST_KEY = 'wasend:last:' + (section || 'default');
   var to = '';
+  var recipientName = '';
   var senderLoaded = false;
 
   function csrf() {
@@ -82,9 +192,215 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
     return input ? input.value : '';
   }
 
+  // Every storage access is wrapped: private windows and locked-down browsers
+  // throw on read as well as write, and a paste shortcut must never break Send.
+  function readLast() {
+    try { return window.localStorage.getItem(LAST_KEY) || ''; } catch (err) { return ''; }
+  }
+
+  function writeLast(text) {
+    try { window.localStorage.setItem(LAST_KEY, text); } catch (err) { /* nothing to do */ }
+  }
+
+  function countChars() {
+    countEl.textContent = textarea.value.length + ' / 4000';
+  }
+
+  function syncDeepLink() {
+    if (!deepLinkEl) return;
+    deepLinkEl.hidden = !to;
+    deepLinkEl.href = to
+      ? 'https://wa.me/' + encodeURIComponent(to)
+        + (textarea.value ? '?text=' + encodeURIComponent(textarea.value) : '')
+      : '#';
+  }
+
+  // A chip is only worth showing when there is something behind it; its tooltip
+  // carries the full body so nobody has to paste to find out what they get.
+  function showChip(btn, text) {
+    if (!btn) return;
+    btn.hidden = !text;
+    btn.title = text ? text.slice(0, 300) : '';
+  }
+
+  function refreshChips() {
+    lastText = readLast();
+    showChip(fillLastBtn, lastText);
+    showChip(fillRemindBtn, reminderText);
+    // The count belongs on the chip — "Reminder" alone does not say whether there
+    // is one thing outstanding or seven.
+    if (fillRemindText && reminderText) fillRemindText.textContent = reminderLabel;
+  }
+
+  // The picker carries the page's own starter first (it is rendered server-side
+  // with this record's details, so it beats the generic copy) and then every
+  // other body registered for the section.
+  function buildTemplateSelect(templates) {
+    if (!templateSelect) return;
+    templateSelect.innerHTML = '';
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Template…';
+    templateSelect.appendChild(placeholder);
+
+    var bodies = [];
+    // Reminder first: it is the only body written from THIS record's gaps, so it
+    // is what a staffer opening the picker on an unfinished lead came for.
+    if (reminderText) bodies.push({label: reminderLabel, body: reminderText});
+    if (templateText) bodies.push({label: 'This page\u2019s starter', body: templateText});
+    (templates || []).forEach(function (t) {
+      if (t.body && t.body !== templateText) bodies.push({label: t.label, body: t.body});
+    });
+    bodies.forEach(function (b, i) {
+      var opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = b.label;
+      opt.title = b.body.slice(0, 300);
+      templateSelect.appendChild(opt);
+    });
+    templateSelect.bodies = bodies;
+    templateSelect.hidden = !bodies.length;
+  }
+
+  // Fetched once per page, then re-rendered per open because the page starter
+  // changes with whichever button was clicked.
+  function loadTemplates() {
+    if (!templatesUrl || !templateSelect) return;
+    if (templatesLoaded) { buildTemplateSelect(templateSelect.fetched || []); return; }
+    fetch(templatesUrl + '?section=' + encodeURIComponent(section)
+                       + '&name=' + encodeURIComponent(recipientName), {
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        templatesLoaded = true;
+        templateSelect.fetched = (data && data.success && data.templates) || [];
+        buildTemplateSelect(templateSelect.fetched);
+      })
+      .catch(function () { buildTemplateSelect([]); });
+  }
+
+  function paste(text) {
+    if (!text) return;
+    textarea.value = text;
+    countChars();
+    syncDeepLink();
+    var gap = text.match(PLACEHOLDER_RE);
+    setStatus(gap ? 'Fill in ' + gap[0] + ' before sending.' : '', gap ? 'error' : '');
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    // Caret at the end to keep typing, but show the opening line — a template
+    // that lands scrolled to its signature looks like the wrong template.
+    textarea.scrollTop = 0;
+  }
+
+  if (fillLastBtn) fillLastBtn.addEventListener('click', function () { paste(lastText); });
+  if (fillRemindBtn) fillRemindBtn.addEventListener('click', function () { paste(reminderText); });
+
+  if (templateSelect) {
+    templateSelect.addEventListener('change', function () {
+      var bodies = templateSelect.bodies || [];
+      var picked = bodies[parseInt(templateSelect.value, 10)];
+      // Back to "Template…" so the same one can be picked again after an edit.
+      templateSelect.value = '';
+      if (picked) paste(picked.body);
+    });
+  }
+
+  // Reading the clipboard needs a user gesture and a permission the browser may
+  // simply refuse (Firefox has no readText for pages at all). Say so and point
+  // at Ctrl+V rather than failing silently — the box is right there.
+  if (fillClipboardBtn) {
+    fillClipboardBtn.addEventListener('click', function () {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        setStatus('This browser will not hand over the clipboard — click the box and press Ctrl+V.', 'error');
+        textarea.focus();
+        return;
+      }
+      navigator.clipboard.readText()
+        .then(function (text) {
+          if (!text) { setStatus('Clipboard is empty.', 'error'); return; }
+          paste(text);
+          setStatus('');
+        })
+        .catch(function () {
+          setStatus('Clipboard access was blocked — click the box and press Ctrl+V.', 'error');
+          textarea.focus();
+        });
+    });
+  }
+
+  // The send result covers the whole panel: a send is the one irreversible thing
+  // this modal does, so its outcome gets the panel rather than a line of text.
+  function showResult(state, title, text) {
+    if (!resultEl) return;
+    resultEl.className = 'wasend__result wasend__result--' + state;
+    resultIcon.className = 'wasend__result-icon wasend__result-icon--' + state;
+    resultIcon.innerHTML = state === 'sending'
+      ? '<span class="spinner-border" role="status"></span>'
+      : (state === 'ok'
+          ? '<i class="fa-solid fa-check"></i>'
+          : '<i class="fa-solid fa-triangle-exclamation"></i>');
+    resultTitle.textContent = title;
+    resultText.textContent = text || '';
+    // Nothing to click while it is in flight, and nothing to click on success —
+    // that one closes itself.
+    resultActs.hidden = state !== 'fail';
+    resultEl.hidden = false;
+  }
+
+  function hideResult() {
+    if (closeTimer) { window.clearTimeout(closeTimer); closeTimer = null; }
+    if (resultEl) resultEl.hidden = true;
+  }
+
+  if (resultBack) resultBack.addEventListener('click', function () {
+    hideResult();
+    textarea.focus();
+  });
+
+  // A dismissed modal must not reopen mid-result, whichever way it was closed.
+  modalEl.addEventListener('hidden.bs.modal', hideResult);
+
   function setStatus(text, kind) {
     statusEl.textContent = text || '';
-    statusEl.className = 'wasend__status mt-2' + (kind ? ' wasend__status--' + kind : '');
+    statusEl.className = 'wasend__status' + (kind ? ' wasend__status--' + kind : '');
+  }
+
+  function senderText(number, label) {
+    if (!number) return label || 'platform default number';
+    // Most instances are labelled with their own number, so appending it reads
+    // as "97466124545 · 97466124545" and eats the width the option needs.
+    if (!label || number.indexOf(label) !== -1) return number;
+    return number + ' · ' + label;
+  }
+
+  // Fills the From dropdown. One option means there is nothing to choose, so the
+  // number stays plain text rather than a select that cannot do anything.
+  function buildSenderSelect(senders, current) {
+    if (!senderSelect) return;
+    if (!senders || senders.length < 2) { senderSelect.hidden = true; return; }
+    senderSelect.innerHTML = '';
+    var matched = false;
+    senders.forEach(function (s) {
+      var opt = document.createElement('option');
+      opt.value = s.session || '';
+      opt.textContent = senderText(s.number, s.label) + (s.is_default ? ' (route default)' : '');
+      opt.dataset.channelLabel = s.channel_label || '';
+      if (opt.value === current) { opt.selected = true; matched = true; }
+      senderSelect.appendChild(opt);
+    });
+    // A page-pinned session we do not recognise must not silently become the
+    // route default — keep it selectable and labelled for what it is.
+    if (!matched && current) {
+      var pinned = document.createElement('option');
+      pinned.value = current;
+      pinned.textContent = current + ' (pinned)';
+      pinned.selected = true;
+      senderSelect.appendChild(pinned);
+    }
+    senderSelect.hidden = false;
+    senderEl.hidden = true;
   }
 
   // Which of our numbers this will arrive from — fetched once, then cached, so
@@ -99,12 +415,22 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
       .then(function (data) {
         if (!data.success) { senderEl.textContent = 'default number'; return; }
         senderLoaded = true;
-        senderEl.textContent = data.sender_number
-          ? (data.sender_number + (data.sender_label ? ' · ' + data.sender_label : ''))
-          : 'platform default number';
+        senderEl.textContent = senderText(data.sender_number, data.sender_label);
         channelEl.textContent = data.channel_label || '';
+        buildSenderSelect(data.senders, session);
       })
       .catch(function () { senderEl.textContent = 'default number'; });
+  }
+
+  if (senderSelect) {
+    senderSelect.addEventListener('change', function () {
+      // The picked line carries this send only — the section's route on Auto
+      // Triggers is untouched, and the server re-checks the name either way.
+      session = senderSelect.value || '';
+      var opt = senderSelect.options[senderSelect.selectedIndex];
+      channelEl.textContent = (opt && opt.dataset.channelLabel) || '';
+      setStatus('');
+    });
   }
 
   document.addEventListener('click', function (e) {
@@ -112,28 +438,57 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
     if (!opener) return;
     e.preventDefault();
     to = (opener.dataset.wasendTo || '').trim();
-    recipientEl.textContent = to
-      ? (to + (opener.dataset.wasendName ? ' · ' + opener.dataset.wasendName : ''))
-      : 'no number on file';
-    // Per-button text wins; otherwise the page's starter template, already
-    // rendered server-side with this lead's/driver's details filled in.
-    textarea.value = opener.dataset.wasendMessage || starter;
-    countEl.textContent = textarea.value.length + ' / 4000';
+    // Built as nodes rather than a string: the name is staff-entered text, and
+    // the number wants the tabular treatment while the name does not.
+    recipientEl.textContent = '';
+    if (!to) {
+      recipientEl.textContent = 'no number on file';
+    } else {
+      var num = document.createElement('span');
+      num.className = 'wasend__route-num';
+      num.textContent = to;
+      recipientEl.appendChild(num);
+      if (opener.dataset.wasendName) {
+        var who = document.createElement('span');
+        who.className = 'wasend__route-who';
+        who.textContent = opener.dataset.wasendName;
+        recipientEl.appendChild(who);
+      }
+    }
+    // Opens blank. Per-button text wins over the page's starter template (already
+    // rendered server-side with this lead's/driver's details filled in); whichever
+    // it is sits behind the Template chip, one click from the box.
+    hideResult();
+    recipientName = (opener.dataset.wasendName || '').trim();
+    templateText = opener.dataset.wasendMessage || starter;
+    reminderText = opener.dataset.wasendReminder || pageReminder;
+    reminderLabel = opener.dataset.wasendReminderLabel || pageReminderLabel;
+    textarea.value = '';
+    countChars();
+    refreshChips();
+    loadTemplates();
     setStatus('');
     sendBtn.disabled = !to;
+    // The deep link is the same number opened on the staffer's own WhatsApp —
+    // kept for the cases the platform number is the wrong sender.
+    syncDeepLink();
     loadSender();
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
   });
 
   textarea.addEventListener('input', function () {
-    countEl.textContent = textarea.value.length + ' / 4000';
+    countChars();
+    syncDeepLink();
   });
 
   sendBtn.addEventListener('click', function () {
     var message = textarea.value.trim();
     if (!message) { setStatus('Type a message first.', 'error'); return; }
+    var gap = message.match(PLACEHOLDER_RE);
+    if (gap) { setStatus('Fill in ' + gap[0] + ' before sending.', 'error'); textarea.focus(); return; }
     sendBtn.disabled = true;
-    setStatus('Sending…');
+    setStatus('');
+    showResult('sending', 'Sending…', to);
     fetch(endpoint, {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
@@ -142,14 +497,30 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
       .then(function (r) { return r.json(); })
       .then(function (data) {
         sendBtn.disabled = false;
-        if (!data.success) { setStatus(data.error || 'Send failed.', 'error'); return; }
-        setStatus('Sent.', 'ok');
+        if (!data.success) {
+          // Stays on screen with the body intact — the staffer decides whether to
+          // fix and retry or walk away.
+          showResult('fail', 'Not sent', data.error || 'WhatsApp did not accept the message.');
+          return;
+        }
+        // Only a message that left the building becomes "last sent".
+        writeLast(message);
+        // "Sent", not "Delivered" — the API accepting it is not proof it landed
+        // on a handset, and staff act on the difference.
+        showResult('ok', 'Sent', 'On its way to ' + to + ' from the platform number.');
         textarea.value = '';
-        countEl.textContent = '0 / 4000';
+        countChars();
+        syncDeepLink();
+        refreshChips();
+        // Long enough to read, short enough that nobody waits on it.
+        closeTimer = window.setTimeout(function () {
+          closeTimer = null;
+          bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }, 1100);
       })
       .catch(function () {
         sendBtn.disabled = false;
-        setStatus('Network error — nothing was sent.', 'error');
+        showResult('fail', 'Not sent', 'The request never reached the server. Nothing was sent.');
       });
   });
 })();

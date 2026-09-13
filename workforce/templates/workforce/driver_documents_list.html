@@ -11,7 +11,7 @@ Notes: Search and the view toggle both reload with query params (no client-side 
 {% block title %}Driver ID Documents - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/driver-documents.css' %}?v=20260817a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/driver-documents.css' %}?v=20260826a" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -75,6 +75,21 @@ Notes: Search and the view toggle both reload with query params (no client-side 
 
     <div class="wfnote" id="workforce_driver_documents_list_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_driver_documents_list_card_notes' %}" hidden></div>
+
+    {% if filter_driver %}
+    <!-- Scope banner: this list is narrowed to one driver's documents -->
+    <div class="ddc__scope d-flex flex-wrap align-items-center gap-2">
+      <i class="fa-solid fa-filter" aria-hidden="true"></i>
+      <span class="ddc__scope__label">Showing documents for</span>
+      <a href="{% url 'workforce:driver_detail' filter_driver.driver_id %}" class="ddc__scope__name">
+        {{ filter_driver.user.get_full_name|default:filter_driver.user.username }}{% if filter_driver.driver_code %} · {{ filter_driver.driver_code }}{% endif %}
+      </a>
+      <a href="{% url 'workforce:driver_documents_list' %}{% if search_query %}?search={{ search_query|urlencode }}{% endif %}"
+         class="ddc__scope__clear">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i> Clear
+      </a>
+    </div>
+    {% endif %}
 
     <!-- Filter bar -->
     <div class="ddc__filter">
@@ -143,7 +158,7 @@ Notes: Search and the view toggle both reload with query params (no client-side 
         <div class="ddc__empty">
           <i class="fa-solid fa-id-card" aria-hidden="true"></i>
           <h3>No documents found</h3>
-          <p>{% if search_query %}Nothing matches “{{ search_query }}”. Try a driver code or document number.{% else %}No driver documents have been uploaded yet.{% endif %}</p>
+          <p>{% if search_query and filter_driver %}Nothing matches “{{ search_query }}” among this driver’s documents.{% elif search_query %}Nothing matches “{{ search_query }}”. Try a driver code or document number.{% elif filter_driver %}This driver has no ID documents on file yet.{% else %}No driver documents have been uploaded yet.{% endif %}</p>
         </div>
       {% endif %}
     </div>
@@ -206,7 +221,7 @@ Notes: Search and the view toggle both reload with query params (no client-side 
       <div class="ddc__empty">
         <i class="fa-solid fa-id-card" aria-hidden="true"></i>
         <h3>No documents found</h3>
-        <p>{% if search_query %}Nothing matches “{{ search_query }}”. Try a driver code or document number.{% else %}No driver documents have been uploaded yet.{% endif %}</p>
+        <p>{% if search_query and filter_driver %}Nothing matches “{{ search_query }}” among this driver’s documents.{% elif search_query %}Nothing matches “{{ search_query }}”. Try a driver code or document number.{% elif filter_driver %}This driver has no ID documents on file yet.{% else %}No driver documents have been uploaded yet.{% endif %}</p>
       </div>
       {% endif %}
     </div>

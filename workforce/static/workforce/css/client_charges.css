@@ -170,7 +170,10 @@
 .ccc__primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
 @media print {
-  .ccc__paylog { display: none; }
+  /* Every working desk under the sheet is screen-only — the document above
+     already itemises what they edit. */
+  .ccc__paylog,
+  .ccc__chargelog { display: none; }
 }
 
 /* ── Other-charges editor ────────────────────────────────────────────────────
@@ -236,6 +239,51 @@
   font-size: 0.75rem;
   color: #6B7468;
 }
+
+/* ── Amend a billed amount (super admin) ─────────────────────────────────────
+   Same slab as the other-charges desk. One row per billed delivery so a keyed
+   figure can be corrected without voiding and reissuing the document. */
+.ccc__amendlog { margin-top: 1.25rem; }
+.ccc__amend-lede { margin: 0 0 0.75rem; }
+.ccc__amend-row { gap: 0.6rem; }
+.ccc__amend-idx {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: #6B7468;
+  flex: 0 0 1.75rem;
+  text-align: right;
+}
+.ccc__amend-was {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9E3B2B;
+  white-space: nowrap;
+  cursor: help;
+}
+.ccc__amend-in {
+  flex: 0 0 7rem;
+  width: 7rem;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding: 0.3rem 0.45rem;
+}
+.ccc__amend-save {
+  flex: 0 0 auto;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #16221D;
+  background: transparent;
+  border: 1px solid #B9C0B1;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
+.ccc__amend-save:hover:not(:disabled) { border-color: #16221D; background: #EEF1EA; }
+.ccc__amend-save:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ── Column picker ───────────────────────────────────────────────────────── */
 .ccc__cols-help { font-size: 0.8rem; color: #6B7468; margin: 0 0 0.85rem; }

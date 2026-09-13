@@ -1,7 +1,7 @@
 /*
- * Purpose: Styling for the read-only legacy electronic-COD reconciliation report.
+ * Purpose: Styling for the legacy electronic-COD reconciliation report.
  * Used by: workforce/templates/workforce/cod_legacy_reconciliation.html
- * Notes: Bootstrap covers layout/table base — this only adds brand surfaces, ledger ink and the status swatches.
+ * Notes: Bootstrap covers layout/table base — this only adds brand surfaces, ledger ink, the status swatches and the bank-match tick.
  */
 
 .clr__hero {
@@ -257,3 +257,58 @@
 /* Hero sits flush; .clr__body below it carries the page padding. */
 .clr.container-fluid { padding-left: 0; padding-right: 0; }
 .clr__body { padding: 0.325rem; }
+
+/* ── BANK MATCH ───────────────────────────────────────────────────────────── */
+/* Swatch + text, same grammar as the COD status chips above. */
+.clr__status--done::before { background: var(--brand-success); }
+.clr__status--pending::before { background: var(--brand-warning); }
+.clr__status--pending { color: #92400e; }
+
+/* Per-leg tick: an empty box until finance confirms the statement line. */
+.clr__tick {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    background: #fff;
+    color: var(--brand-grey-300);
+    font-size: 0.75rem;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.clr__tick:hover:not(:disabled) {
+    border-color: var(--brand-success);
+    color: var(--brand-success);
+}
+
+.clr__tick--on {
+    border-color: var(--brand-success);
+    background: var(--brand-success);
+    color: #fff;
+}
+
+.clr__tick:disabled { opacity: 0.5; cursor: progress; }
+
+.clr__tick-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.1875rem 0.5rem;
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    background: #fff;
+    color: var(--brand-grey-700);
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.clr__tick-all:hover:not(:disabled) {
+    border-color: var(--brand-success);
+    color: var(--brand-success);
+}
+
+.clr__tick-all:disabled { opacity: 0.6; cursor: progress; }

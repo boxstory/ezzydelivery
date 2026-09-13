@@ -17,7 +17,7 @@
 
 .dlsht {
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 8.5px;
+    font-size: 11px;
     line-height: 1.3;
     color: #111;
     background: #f1f3f5;
@@ -120,17 +120,296 @@
     cursor: pointer;
 }
 
-.dlsht__cols-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 0.35rem 1rem;
+.dlsht__cols-hint {
+    flex: 1 1 auto;
+    color: #5a6472;
+    font-size: 11px;
 }
 
-.dlsht__cols-item {
+.dlsht__cols-hint i {
+    margin-right: 0.35rem;
+    opacity: 0.7;
+}
+
+/* --- Column chips: a working model of the two printed lines ---------------- */
+
+/* The three zones stack the way the sheet reads — table line, detail line, then
+   what is left off — so dragging a chip down the panel is the same gesture as
+   moving the column down the sheet. */
+.dlsht__demo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.dlsht__demo-note {
+    color: #7a8494;
+    font-size: 11px;
+}
+
+.dlsht__lane {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+
+.dlsht__lane-tag {
+    flex: 0 0 74px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 2px;
+    color: #0f2547;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.dlsht__lane-tag small {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #8b94a3;
+}
+
+.dlsht__zone {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    min-height: 46px;
+    padding: 5px;
+    border: 1px solid #d7dce3;
+    border-radius: 4px;
+    background: #fbfcfd;
+    overflow-x: auto;
+}
+
+/* The two printed lines are single rows, like the sheet; only the off-sheet tray
+   wraps. */
+.dlsht__zone--off {
+    flex-wrap: wrap;
+    border-style: dashed;
+    background: #f4f6f8;
+    overflow-x: visible;
+}
+
+.dlsht__zone.is-over {
+    border-color: #0f2547;
+    background: #eef2f7;
+}
+
+/* Stands in for the sheet's row-number column, so line 1 lines up with the print
+   below. Not draggable — the number is always there. */
+.dlsht__zone-num {
+    flex: 0 0 22px;
     display: flex;
     align-items: center;
-    gap: 0.45rem;
+    justify-content: center;
+    border: 1px solid #c9d0d9;
+    border-radius: 3px;
+    background: #eef1f5;
+    color: #8b94a3;
+    font-size: 10px;
+}
+
+.dlsht__zone-empty {
+    display: none;
+    align-self: center;
+    padding: 0 0.5rem;
+    color: #9aa3b1;
+    font-size: 11px;
+    font-style: italic;
+}
+
+.dlsht__zone--vacant .dlsht__zone-empty {
+    display: block;
+}
+
+.dlsht__chip {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    padding: 4px 20px 4px 6px;
+    border: 1px solid #99a2ae;
+    border-radius: 3px;
+    background: #e9edf3;
+    cursor: grab;
+    user-select: none;
+}
+
+.dlsht__chip:focus-visible {
+    outline: 2px solid #0f2547;
+    outline-offset: 1px;
+}
+
+.dlsht__chip.is-dragging {
+    opacity: 0.45;
+}
+
+.dlsht__chip-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #0f2547;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.dlsht__chip-grip {
+    color: #97a0ad;
+    font-size: 9px;
+}
+
+/* The value the first task would print here — this is what makes the panel a
+   preview rather than a list of names. */
+.dlsht__chip-val {
+    max-width: 150px;
+    overflow: hidden;
+    color: #43506a;
+    font-size: 10px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Line 2 prints as label + value inline on a white band, so its chips say so. */
+.dlsht__chip--detail {
+    background: #fff;
+}
+
+/* Off the sheet: no value, since nothing prints. */
+.dlsht__chip--off {
+    border-style: dashed;
+    border-color: #c2c9d3;
+    background: #fff;
+    opacity: 0.75;
+}
+
+.dlsht__chip--off .dlsht__chip-val {
+    display: none;
+}
+
+.dlsht__chip--off .dlsht__chip-head {
+    color: #5a6472;
+    font-weight: 400;
+}
+
+.dlsht__chip-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 15px;
+    height: 15px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: none;
+    color: #7a8494;
+    font-size: 9px;
+    line-height: 1;
     cursor: pointer;
+}
+
+.dlsht__chip-btn:hover {
+    background: #0f2547;
+    color: #fff;
+}
+
+/* --- Width control (table line only) --------------------------------------- */
+
+/* Line 1 chips are sized to their share of the printed row, so the lane reads as
+   a scale model of it. The floor keeps a 3% column wide enough to still grab and
+   drag; when the floors push the row past the lane it scrolls rather than lying
+   about the proportions. */
+.dlsht__zone--row .dlsht__chip {
+    flex: 0 0 calc(var(--chip-w, 8) * 1%);
+    min-width: 72px;
+    padding-right: 26px;
+    overflow: hidden;
+}
+
+.dlsht__zone--row .dlsht__chip-head,
+.dlsht__zone--row .dlsht__chip-val {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Off the table line a column has no printed width, so the control goes away —
+   but stays in the DOM, holding the width for a return trip. */
+.dlsht__chip-w,
+.dlsht__chip-grab {
+    display: none;
+}
+
+.dlsht__zone--row .dlsht__chip-w {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    margin-top: 2px;
+    color: #7a8494;
+    font-size: 9px;
+}
+
+.dlsht__w-input {
+    width: 36px;
+    padding: 0 2px;
+    border: 1px solid #c9d0d9;
+    border-radius: 2px;
+    background: #fff;
+    color: #0f2547;
+    font-family: inherit;
+    font-size: 9px;
+    text-align: right;
+}
+
+/* The spinners eat a third of a field this narrow, and the value is the point. */
+.dlsht__w-input::-webkit-outer-spin-button,
+.dlsht__w-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.dlsht__w-input {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.dlsht__w-input:focus {
+    outline: 1px solid #0f2547;
+    border-color: #0f2547;
+}
+
+/* The column divider: same gesture as dragging a spreadsheet column edge. */
+.dlsht__zone--row .dlsht__chip-grab {
+    display: block;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 7px;
+    height: 100%;
+    border-left: 1px solid #c2c9d3;
+    background: #dfe4ea;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+.dlsht__zone--row .dlsht__chip-grab:hover {
+    background: #0f2547;
+}
+
+.dlsht__lane-total {
+    color: #7a8494;
+}
+
+.dlsht__lane-total.is-off {
+    color: #a4620a;
+    font-weight: 700;
 }
 
 .dlsht__cols-foot {
@@ -164,6 +443,8 @@
 
 /* --- Sheet ---------------------------------------------------------------- */
 
+/* One physical A4 landscape sheet (297 x 210mm). min-height, not height: content
+   must never be clipped, so an overlong sheet grows rather than hiding a task. */
 .dlsht__page {
     width: 297mm;
     min-height: 210mm;
@@ -171,6 +452,8 @@
     padding: 6mm;
     background: #fff;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+    display: flex;
+    flex-direction: column;
 }
 
 .dlsht__head {
@@ -252,23 +535,72 @@
     overflow-wrap: break-word;
 }
 
-/* The three free-text columns are the only ones allowed to break mid-word. */
-.dlsht__table td.dlsht__c--sku,
-.dlsht__table td.dlsht__c--package,
-.dlsht__table td.dlsht__c--address {
+/* --- Second line: the free-text columns ----------------------------------- */
+
+/* Address, package and SKU sit here rather than in the table, so they get the
+   whole sheet width instead of a ~20mm slice. Borderless on top so the two lines
+   read as one task. */
+.dlsht__detail-cell {
+    border-top: 0;
+    padding-top: 3px;
+    padding-bottom: 9px;
+}
+
+/* Taller than the text needs: the extra band gives the fleet room to scribble on
+   the line and keeps one task visibly apart from the next. There is slack on the
+   sheet for it — 10 tasks a page against ~660px of table area. */
+.dlsht__detail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    min-height: 26px;
+    line-height: 1.45;
+    gap: 2px 14px;
+}
+
+/* Only the address is allowed to break mid-word, and it takes whatever room the
+   shorter segments leave. */
+.dlsht__d--address {
+    flex: 1 1 40%;
     overflow-wrap: anywhere;
+}
+
+.dlsht__d--customer_name {
+    font-weight: 700;
+}
+
+.dlsht__d-key {
+    margin-right: 4px;
+    color: #666;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
 }
 
 .dlsht__table th {
     background: #e9edf3;
-    font-size: 8px;
+    font-size: 10px;
+    /* The widths above hold each header's longest word, so headers wrap between
+       words. Without this they inherit break-word and split as "DELIVER / Y". */
+    overflow-wrap: normal;
+    word-break: keep-all;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     white-space: normal;
 }
 
-.dlsht__table tbody tr:nth-child(even) td {
+.dlsht__table tbody:nth-of-type(even) td {
     background: #fafbfc;
+}
+
+/* Each task closes with a heavier rule, so where one order ends and the next
+   begins reads at a glance on a printed sheet crowded with 1px cell borders.
+   Targets the LAST row of the tbody — the detail line when there is one. */
+.dlsht__task > tr:last-child > td,
+/* The number cell spans both lines, so it sits in the FIRST row and would leave
+   a gap in the rule below the task without this. */
+.dlsht__task > tr:first-child > td[rowspan] {
+    border-bottom: 2px solid #111;
 }
 
 .dlsht__num {
@@ -279,28 +611,36 @@
    Columns panel can drop any of them, and nth-child rules would then land on the
    wrong column. The table is table-layout:fixed, so these percentages hold and
    any slack left by a dropped column is shared out proportionally.
-   Full set (# included) sums to 100%. */
-.dlsht__num                { width: 2%; }
-.dlsht__c--seller_code     { width: 5%; }
-.dlsht__c--dl_no           { width: 6%; }
-.dlsht__c--order_no        { width: 6%; }
-.dlsht__c--client_order_no { width: 4%; }
-.dlsht__c--date            { width: 4%; }
-.dlsht__c--mobile_no       { width: 5%; }
-.dlsht__c--customer_name   { width: 6%; }
-.dlsht__c--sku             { width: 5%; }
-.dlsht__c--package         { width: 7%; }
-.dlsht__c--address         { width: 7%; }
-.dlsht__c--locality        { width: 5%; }
-.dlsht__c--amount          { width: 4%; }
-.dlsht__c--delivery_charge { width: 4%; }
-.dlsht__c--delivery_status { width: 5%; }
-.dlsht__c--cod_collected   { width: 3%; }
-.dlsht__c--fleet_code      { width: 4%; }
-.dlsht__c--assigned_date   { width: 5%; }
-.dlsht__c--delivered_date  { width: 5%; }
-.dlsht__c--fleet_charge    { width: 4%; }
-.dlsht__c--fleet_status    { width: 4%; }
+
+   The figure in each var() is the DEFAULT: the width its longest ordinary value
+   needs on ONE line at the 11px body size — measured, not guessed — so nothing in
+   the table wraps. The atomic set sums to 100%. A --w-<key> set on :root by the
+   Columns panel's width control overrides it; the defaults stay here as literal
+   fallbacks, so a sheet still prints correctly with no JavaScript at all.
+
+   The five detail-line columns carry a default too — the panel can drag any of
+   them up onto the table line. */
+.dlsht__num                { width: var(--w-num, 3%); }
+.dlsht__c--seller_code     { width: var(--w-seller_code, 5%); }
+.dlsht__c--dl_no           { width: var(--w-dl_no, 11%); }
+.dlsht__c--order_no        { width: var(--w-order_no, 6%); }
+.dlsht__c--client_order_no { width: var(--w-client_order_no, 7%); }
+.dlsht__c--date            { width: var(--w-date, 7%); }
+.dlsht__c--mobile_no       { width: var(--w-mobile_no, 6%); }
+.dlsht__c--amount          { width: var(--w-amount, 5%); }
+.dlsht__c--delivery_charge { width: var(--w-delivery_charge, 5%); }
+.dlsht__c--delivery_status { width: var(--w-delivery_status, 6%); }
+.dlsht__c--cod_collected   { width: var(--w-cod_collected, 6%); }
+.dlsht__c--fleet_code      { width: var(--w-fleet_code, 6%); }
+.dlsht__c--assigned_date   { width: var(--w-assigned_date, 9%); }
+.dlsht__c--delivered_date  { width: var(--w-delivered_date, 8%); }
+.dlsht__c--fleet_charge    { width: var(--w-fleet_charge, 5%); }
+.dlsht__c--fleet_status    { width: var(--w-fleet_status, 5%); }
+.dlsht__c--customer_name   { width: var(--w-customer_name, 9%); }
+.dlsht__c--locality        { width: var(--w-locality, 7%); }
+.dlsht__c--sku             { width: var(--w-sku, 8%); }
+.dlsht__c--package         { width: var(--w-package, 8%); }
+.dlsht__c--address         { width: var(--w-address, 14%); }
 
 .dlsht__empty {
     padding: 2rem 0;
@@ -313,7 +653,7 @@
     display: flex;
     justify-content: flex-end;
     gap: 40px;
-    margin-top: 14px;
+    margin-top: auto;
     padding-top: 8px;
     border-top: 1px solid #999;
     font-size: 9px;
@@ -324,7 +664,7 @@
 @media print {
     .dlsht {
         background: #fff;
-        font-size: 7.5px;
+        font-size: 11px;
     }
 
     .dlsht__no-print {
@@ -337,17 +677,33 @@
         margin: 0;
         padding: 0;
         box-shadow: none;
+        /* block, not flex: a flex container breaks unpredictably across pages. */
+        display: block;
+    }
+
+    /* Each sheet after the first starts a new piece of paper. Breaking *before*
+       rather than after the last one means no trailing blank page. */
+    .dlsht__page + .dlsht__page {
+        page-break-before: always;
+        break-before: page;
+    }
+
+    .dlsht__foot {
+        margin-top: 14px;
     }
 
     .dlsht__table thead {
         display: table-header-group;
     }
 
-    .dlsht__table tr {
+    /* A task keeps its two lines together. */
+    .dlsht__task {
         page-break-inside: avoid;
+        break-inside: avoid;
     }
 
-    .dlsht__table tbody tr:nth-child(even) td {
+
+    .dlsht__table tbody:nth-of-type(even) td {
         background: transparent;
     }
 

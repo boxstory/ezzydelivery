@@ -1,8 +1,8 @@
 {% extends "wf_dashboard_base.html" %}
 {% comment %}
-Purpose: Read-only reconciliation of electronic COD (Fawran/POS) that was swept into cash hand-ins before the electronic-methods exclusion existed.
+Purpose: Reconciliation of electronic COD (Fawran/POS) that was swept into cash hand-ins before the electronic-methods exclusion existed.
 Used by: workforce.views.cod_legacy_reconciliation at /workforce/fleet/cod-legacy-reconciliation/
-Notes: Deliberately has no write action — the deposits are historical and correcting them would restate settled figures.
+Notes: The only write is the bank-match tick per electronic leg (workforce:fleet_task_cod_reconcile, the same cod_reconciled flag the transactions page sets). No money figure is ever restated here.
        Carries the shared wfnote__ page-notes card under the hero, hidden on load; the hero help button toggles it via workforce.js.
 {% endcomment %}
 {% load static %}
@@ -10,7 +10,7 @@ Notes: Deliberately has no write action — the deposits are historical and corr
 {% block title %}Legacy Electronic COD Reconciliation{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_legacy_reconciliation.css' %}?v=20260816a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_legacy_reconciliation.css' %}?v=20260831a" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -159,9 +159,11 @@ Notes: Deliberately has no write action — the deposits are historical and corr
   <div class="clr__note mt-2">
     <i class="fa-solid fa-circle-info"></i>
     <div>
-      <strong>This page changes nothing.</strong> Driver balances are already correct — the
+      <strong>No money moves here.</strong> Driver balances are already correct — the
       electronic legs were never counted as cash-in-hand. What is overstated is the
       recorded size of each hand-in, which is a cash-desk and bank matching problem.
+      Tick a leg once you have found it on a statement: that records the bank match
+      (the same confirmation as the transactions page) and restates no figure.
       The set cannot grow: submissions now exclude electronic collections.
       Filters choose which deposits and legs are printed; every figure still covers
       the deposit's full leg set, because a hand-in only reconciles as a whole.
@@ -171,6 +173,17 @@ Notes: Deliberately has no write action — the deposits are historical and corr
       {% endif %}
     </div>
   </div>
+
+  {% if totals.elec_legs %}
+  <div class="clr__flags mt-2">
+    <span class="clr__flags-label">Bank match on the electronic legs</span>
+    <span class="clr__status clr__status--done">Confirmed — {{ totals.recon_done }}</span>
+    <span class="clr__status clr__status--pending">Awaiting statement — {{ totals.recon_pending }}</span>
+    {% if totals.recon_pending %}
+    <span class="clr__meta num">QAR {{ totals.recon_pending_amount|floatformat:2 }} unmatched</span>
+    {% endif %}
+  </div>
+  {% endif %}
 
   {% if payout_flags.with_driver or payout_flags.with_ezzy or payout_flags.with_business or payout_flags.other %}
   <div class="clr__flags mt-2">
@@ -199,6 +212,17 @@ Notes: Deliberately has no write action — the deposits are historical and corr
       </div>
       <div class="d-flex flex-wrap align-items-center gap-3">
         <span class="clr__meta">{{ d.shown_count }} of {{ d.leg_count }} leg{{ d.leg_count|pluralize }} listed</span>
+        {% if d.elec_legs %}
+        <span class="clr__status {% if d.fully_reconciled %}clr__status--done{% else %}clr__status--pending{% endif %}">
+          {% if d.fully_reconciled %}Bank matched{% else %}{{ d.recon_done }} of {{ d.elec_legs }} matched{% endif %}
+        </span>
+        {% if not d.fully_reconciled %}
+        <button type="button" class="clr__tick-all"
+                data-clr-tick-all="{% for tid in d.recon_pending_ids %}{{ tid }}{% if not forloop.last %},{% endif %}{% endfor %}">
+          <i class="fa-solid fa-check-double"></i> Tick all
+        </button>
+        {% endif %}
+        {% endif %}
         <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ d.txn.driver_id }}&view=cod_submit"
            class="clr__link"><i class="fa-solid fa-arrow-up-right-from-square"></i> Transactions</a>
       </div>
@@ -240,6 +264,7 @@ Notes: Deliberately has no write action — the deposits are historical and corr
             <th class="text-end">Amount</th>
             <th>Collected</th>
             <th>Reference</th>
+            <th class="text-center" title="Confirm this electronic leg was found on a bank/terminal statement">Bank match</th>
           </tr>
         </thead>
         <tbody>
@@ -262,6 +287,20 @@ Notes: Deliberately has no write action — the deposits are historical and corr
             <td class="text-end num">{{ r.amount|floatformat:2 }}</td>
             <td class="clr__meta">{{ r.task.cod_collected_at|date:"d M Y, H:i"|default:"—" }}</td>
             <td class="clr__meta">{{ r.task.cod_reference|default:"—" }}</td>
+            <td class="text-center">
+              {% if r.is_electronic %}
+              <button type="button"
+                      class="clr__tick{% if r.task.cod_reconciled %} clr__tick--on{% endif %}"
+                      data-clr-tick="{{ r.task.id }}"
+                      data-clr-state="{% if r.task.cod_reconciled %}1{% else %}0{% endif %}"
+                      title="{% if r.task.cod_reconciled %}Matched by {{ r.task.cod_reconciled_by.get_full_name|default:r.task.cod_reconciled_by.username|default:'staff' }} on {{ r.task.cod_reconciled_at|date:'d M Y, H:i' }} — click to revert{% else %}Mark this leg found on a statement{% endif %}">
+                <i class="fa-solid fa-check"></i>
+                <span class="visually-hidden">Toggle bank match</span>
+              </button>
+              {% else %}
+              <span class="clr__meta">—</span>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -286,4 +325,55 @@ Notes: Deliberately has no write action — the deposits are historical and corr
 </div>
 
 {% include "workforce/parts/components/_export_columns_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// The tick writes the same cod_reconciled flag the transactions page sets, one
+// task at a time through the existing endpoint — no money figure is touched.
+(function () {
+  var CSRF = '{{ csrf_token }}';
+
+  function reconcile(taskId, on) {
+    return fetch('/workforce/fleet/tasks/' + taskId + '/cod-reconcile/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+      body: new URLSearchParams({ value: on ? 'true' : 'false' })
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok || !d.success) { throw new Error(d.error || 'Could not save the bank match'); }
+        return d;
+      });
+    });
+  }
+
+  document.addEventListener('click', function (ev) {
+    var tick = ev.target.closest('[data-clr-tick]');
+    if (tick) {
+      if (tick.disabled) { return; }
+      var on = tick.dataset.clrState !== '1';
+      tick.disabled = true;
+      reconcile(tick.dataset.clrTick, on)
+        .then(function () { window.location.reload(); })
+        .catch(function (e) { tick.disabled = false; alert(e.message); });
+      return;
+    }
+
+    var all = ev.target.closest('[data-clr-tick-all]');
+    if (!all || all.disabled) { return; }
+    var ids = (all.dataset.clrTickAll || '').split(',').filter(Boolean);
+    if (!ids.length) { return; }
+    if (!confirm('Mark ' + ids.length + ' electronic leg(s) as found on a statement?')) { return; }
+    all.disabled = true;
+    all.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+    Promise.all(ids.map(function (id) { return reconcile(id, true); }))
+      .then(function () { window.location.reload(); })
+      .catch(function (e) {
+        all.disabled = false;
+        all.innerHTML = '<i class="fa-solid fa-check-double"></i> Tick all';
+        alert(e.message);
+      });
+  });
+})();
+</script>
 {% endblock %}

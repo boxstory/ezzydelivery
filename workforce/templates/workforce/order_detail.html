@@ -899,12 +899,19 @@ function wodLocSave(text, orderId) {
     var resultDiv = document.getElementById('wodLocResult' + orderId);
     var coords = parseLatLngFromText(text);
     if (!coords) {
-        if (resultDiv && String(text).trim()) {
-            if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(text)) {
-                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>Short link — open it once, then paste the full https://maps.google.com/?q=... link</span>';
-            } else {
-                resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No coordinates found in that link</span>';
+        // A short link has no coordinates in the URL and the browser cannot follow
+        // the goo.gl redirect, so resolve it server-side (resolveShortLink ships in
+        // qnas-verify.js) and re-enter with the plain "lat, lng" the parser reads.
+        if (String(text).trim() && typeof resolveShortLink === 'function' && LOC_SHORTLINK_RE.test(text)) {
+            if (resolveShortLink(text, 'wodLoc' + orderId, resultDiv, function(lat, lng, inQatar) {
+                    wodLocSave(lat + ', ' + lng, orderId);
+                    if (!inQatar) console.warn('[LOC] resolved pin is outside Qatar:', lat, lng);
+                })) {
+                return;
             }
+        }
+        if (resultDiv && String(text).trim()) {
+            resultDiv.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-exclamation-triangle me-1"></i>No coordinates found in that link</span>';
         } else if (resultDiv) {
             resultDiv.innerHTML = '';
         }

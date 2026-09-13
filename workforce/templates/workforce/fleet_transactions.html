@@ -36,19 +36,8 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
             <i class="fa-solid fa-user ftr__card-icon"></i>
             <span class="ftr__card-title">SELECT DRIVER</span>
         </div>
-        <div class="ftr__card-body">
-            <div class="ftr__select-row">
-                <div class="ftr__select-group">
-                    <select id="driverFilter" class="ftr__filter-select" onchange="ftrGo('driver_id', this.value)">
-                        <option value="">-- Select a Driver --</option>
-                        {% for driver in all_drivers %}
-                        <option value="{{ driver.driver_id }}">
-                            {{ driver.user.first_name }} {{ driver.user.last_name }} (ID: {{ driver.driver_id }}){% if driver.driver_status != 'approved' %} · {{ driver.driver_status }}{% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
+        <div class="ftr__card-body ftr__card-body--drivers">
+            {% include "workforce/parts/_driver_cod_tiles.html" %}
         </div>
     </div>
     {% endif %}
@@ -62,8 +51,8 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
         <div class="ftr__profile-info">
             <div class="d-flex align-items-center gap-2">
                 <h2 class="ftr__profile-name">{{ selected_driver.user.first_name }} {{ selected_driver.user.last_name }}</h2>
-                <button type="button" class="ftr__profile-edit-btn" data-bs-toggle="modal" data-bs-target="#driverChangeModal" title="Change Driver">
-                    <i class="fa-solid fa-pen"></i>
+                <button type="button" class="ftr__profile-edit-btn" data-bs-toggle="modal" data-bs-target="#ftrDriverModal" title="Change Driver">
+                    <i class="fa-solid fa-repeat"></i><span class="ftr__profile-edit-label">Change driver</span>
                 </button>
             </div>
             <p class="ftr__profile-meta">Driver ID: {{ selected_driver.driver_id }} | Phone: {{ selected_driver.driver_phone }}</p>
@@ -797,7 +786,7 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
     <div class="ftr__empty">
         <i class="fa-solid fa-user-check"></i>
         <h3>Select a Driver</h3>
-        <p>Please select a driver from the dropdown above to view their transactions.</p>
+        <p>Pick a driver above to open their COD and earnings ledger.</p>
     </div>
     {% endif %}
 
@@ -844,6 +833,28 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
         </div>
     </div>
 </div>
+
+{% comment %}
+Switch driver without leaving the ledger. Deliberately NOT the shared
+#driverChangeModal in wf_dashboard_base.html: that one is a plain name select,
+and on this page the point of the picker is seeing who is still holding money.
+Same tiles as the landing state, so switching driver looks like picking one.
+{% endcomment %}
+{% if selected_driver %}
+<div class="modal fade" id="ftrDriverModal" tabindex="-1" aria-labelledby="ftrDriverModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ftrDriverModalLabel"><i class="fa-solid fa-users me-2"></i>Change Driver</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body ftr__driver-modal-body">
+                {% include "workforce/parts/_driver_cod_tiles.html" %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- COD Correction Modal -->
 <div class="modal fade" id="codCorrectModal" tabindex="-1" aria-hidden="true">
@@ -1027,45 +1038,38 @@ function ftrGo(key, val) {
     p.delete('page');
     window.location.search = p.toString();
 }
-// Initialize driver change modal with driver list
-function initializeDriverModal() {
-    if (typeof bootstrap === 'undefined') {
-        setTimeout(initializeDriverModal, 100);
-        return;
-    }
+// ── Driver picker tiles ───────────────────────────────────────────────────
+// Each tile is a plain link to that driver's ledger, so the picker works with
+// JS off; this only narrows the grid as you type. Runs against every picker on
+// the page — the landing card and the change-driver modal share one partial.
+(function () {
+    document.querySelectorAll('[data-ftr-drivers]').forEach(function (root) {
+        var input = root.querySelector('[data-ftr-driver-search]');
+        var tiles = Array.prototype.slice.call(root.querySelectorAll('.ftr__driver'));
+        var none = root.querySelector('[data-ftr-driver-empty]');
+        if (!input || !tiles.length) return;
 
-    // Populate driver select options. Status rides along in the label because
-    // the list is no longer approved-only — staff need to see that the ledger
-    // they are about to open belongs to a blocked or pending driver.
-    var driverSelect = document.getElementById('driverChangeSelect');
-    if (driverSelect && driverSelect.children.length === 1) { // Only has placeholder option
-        {% for driver in all_drivers %}
-            var option = document.createElement('option');
-            option.value = '{{ driver.driver_id }}';
-            option.text = '{{ driver.user.first_name|escapejs }} {{ driver.user.last_name|escapejs }} (ID: {{ driver.driver_id }}){% if driver.driver_status != 'approved' %} · {{ driver.driver_status|escapejs }}{% endif %}';
-            {% if selected_driver and selected_driver.driver_id == driver.driver_id %}
-            option.selected = true;
-            {% endif %}
-            driverSelect.appendChild(option);
-        {% endfor %}
-    }
+        input.addEventListener('input', function () {
+            var q = (this.value || '').trim().toLowerCase();
+            var shown = 0;
+            tiles.forEach(function (tile) {
+                var hit = !q || (tile.dataset.ftrSearch || '').indexOf(q) !== -1;
+                tile.hidden = !hit;
+                if (hit) shown++;
+            });
+            if (none) none.hidden = shown !== 0;
+        });
+    });
 
-    if (driverSelect) {
-        driverSelect.addEventListener('change', function() {
-            if (!this.value) return;
-            var modalElement = document.getElementById('driverChangeModal');
-            if (modalElement) {
-                var modal = bootstrap.Modal.getInstance(modalElement);
-                if (modal) modal.hide();
-            }
-            setTimeout(() => ftrGo('driver_id', this.value), 300);
+    // The modal's search box is the first thing staff reach for once it opens.
+    var modal = document.getElementById('ftrDriverModal');
+    if (modal) {
+        modal.addEventListener('shown.bs.modal', function () {
+            var box = modal.querySelector('[data-ftr-driver-search]');
+            if (box) box.focus();
         });
     }
-
-    // Search comes from the shared Select2 enhancer, which also owns the
-    // dropdownParent fix that makes the search box typable inside a modal.
-}
-document.addEventListener('DOMContentLoaded', initializeDriverModal);
+})();
 
 // Page functions
 </script>
@@ -1416,7 +1420,9 @@ function printReceipt() {
 }
 document.getElementById('receiptModal').addEventListener('click', function(e) { if (e.target === this) closeReceiptModal(); });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeReceiptModal(); });
-function exportToCSV() {
+// Page-scoped name: dashboard-utils.js defines a global exportToCSV(tableId)
+// and loads after this block, so a plain exportToCSV here is silently replaced.
+function fxnExportCSV() {
     var csvData = [['TXN Code', 'Date & Time', 'Type', 'Description / Reference', 'Amount', 'Balance After', 'Status']];
     document.querySelectorAll('#transactionsTable tbody tr:not([style*="display: none"])').forEach(function(row) {
         var cells = row.querySelectorAll('td');
@@ -1433,7 +1439,7 @@ function exportToCSV() {
     window.URL.revokeObjectURL(url);
 }
 document.addEventListener('keydown', function(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); exportToCSV(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); fxnExportCSV(); }
     if (e.key === 'Escape') closeCodDrawer();
 });
 

@@ -1,5 +1,6 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% load custom_filters %}
 {% comment %}
 Purpose: Full CRM record for one 3PL pricing inquiry — read, edit, stage, assign and log activity
 Used by: workforce.views.pricing_inquiry_detail at /workforce/forms/pricing-inquiries/<id>/
@@ -86,7 +87,7 @@ pricing_inquiry_console.css loads last and is authoritative over the two above i
         {# Business lead: sends from the CRM — Business Leads number/channel. #}
         <button type="button" class="pid__hero__btn pid__hero__btn--wa"
                 data-wasend-open
-                data-wasend-to="{{ inquiry.business_contact_number|cut:'+' }}"
+                data-wasend-to="{{ inquiry.business_contact_number|whatsapp_number }}"
                 data-wasend-name="{{ inquiry.business_name|escape }}">
           <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>Send from EZZY
         </button>

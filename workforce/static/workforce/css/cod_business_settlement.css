@@ -217,6 +217,36 @@
   gap: 0.45rem;
 }
 
+/* ── Blocker notice ───────────────────────────────────────────
+   A condition staff must clear before they can bill, carrying the link that
+   clears it. Louder than .bcp__note, which is only context. */
+.bcp__warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: #FBF3E7;
+  border: 1px solid #C8963E;
+  border-left-width: 3px;
+  padding: 0.7rem 0.9rem;
+  margin: 0 0 1.25rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #5A4318;
+}
+.bcp__warn > i { margin-top: 0.15rem; color: #A9741B; }
+.bcp__warn-text { flex: 1 1 auto; }
+.bcp__warn-text em { font-style: normal; font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+.bcp__warn-link {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #5A4318;
+  text-decoration: underline;
+}
+.bcp__warn-link:hover { color: #16221D; }
+.bcp__warn-name { color: #5A4318; text-decoration: underline; }
+.bcp__warn-name:hover { color: #16221D; }
+
 /* ── Panels ───────────────────────────────────────────────── */
 .bcp__panel {
   background: var(--tlr-card);
@@ -327,6 +357,42 @@
   border-bottom: 1px solid var(--tlr-rule-strong);
   white-space: nowrap;
 }
+
+/* Sort control: the th keeps its own mono-caps type — the button is a
+   transparent hit area inside it, not a second style. The arrow sits muted
+   until the column is the one in force, then it goes brass with the label. */
+.bcp__table thead th.bcp__th--sort { padding: 0; }
+.bcp__sort {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  background: none;
+  border: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+.bcp__sort:hover { color: var(--tlr-ink); }
+.bcp__sort:focus-visible {
+  outline: 2px solid var(--tlr-brass);
+  outline-offset: -2px;
+}
+.bcp__sort-icon {
+  font-size: 0.62rem;
+  opacity: 0.4;
+  transition: opacity 0.12s ease;
+}
+.bcp__sort:hover .bcp__sort-icon { opacity: 0.75; }
+.bcp__sort--on,
+.bcp__sort--on:hover { color: var(--tlr-brass-deep); }
+.bcp__sort--on .bcp__sort-icon { opacity: 1; }
+
 .bcp__table tbody td {
   padding: 0.55rem 0.7rem;
   border-bottom: 1px solid var(--tlr-rule);
@@ -350,6 +416,10 @@
 .bcp__num--cod { font-weight: 600; }
 .bcp__num--fee { color: var(--tlr-muted); }
 .bcp__order { font-family: var(--tlr-mono); font-weight: 600; white-space: nowrap; }
+/* Invoice links take the base link design (ink text, no underline); only the
+   voided row needs a page-specific mute so it does not outshout the
+   strike-through. */
+.bcp__row--void .bcp__order a { color: var(--tlr-muted); }
 .bcp__date { font-family: var(--tlr-mono); font-size: 0.78rem; color: var(--tlr-muted); white-space: nowrap; }
 .bcp__sub-line {
   display: block;
@@ -359,6 +429,16 @@
   color: var(--tlr-muted);
   margin-top: 0.15rem;
 }
+/* Customer cell is two lines: the name ellipsises on its own row so the
+   masked phone underneath is never clipped with it. */
+.bcp__cust { max-width: 13rem; }
+.bcp__cust-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .bcp__truncate {
   max-width: 13rem;
   overflow: hidden;
@@ -580,6 +660,14 @@
   border-radius: 0;
 }
 .bcp__receipt .bcp__field-label { display: block; margin-bottom: 0.2rem; }
+/* Sits under the payout-date picker: says why you would ever change it. */
+.bcp__field-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--tlr-muted);
+}
 .bcp__receipt hr { border-color: var(--tlr-rule); opacity: 1; }
 .bcp__receipt .modal-header,
 .bcp__receipt .modal-footer { border-color: var(--tlr-rule); }

@@ -12,8 +12,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260816a" type="text/css" />
-<link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260808a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260909b" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260909a" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -85,7 +85,7 @@
         <select name="business_id" id="workforce_charges_collect_select_business" class="bcp__select">
           <option value="">Choose a business…</option>
           {% for biz in all_businesses|code_last %}
-          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}{% if biz.pending_count %} — {{ biz.pending_total|floatformat:0|intcomma }} QR to bill{% else %} — nothing to bill{% endif %}</option>
+          <option value="{{ biz.business_id }}" {% if business_filter == biz.business_id|stringformat:"s" %}selected{% endif %}>{% if biz.business_code %}{{ biz.business_code }}{% else %}*{{ biz.business_id }}{% endif %} - {{ biz.business_name }}{% if biz.pending_count %} — {{ biz.pending_total|floatformat:0|intcomma }} QR to bill{% else %} — nothing to bill{% endif %}</option>
           {% endfor %}
         </select>
       </div>
@@ -107,6 +107,34 @@
         <a href="{% url 'workforce:client_charges_collect' %}" class="bcp__ghost">Clear</a>
       </div>
     </form>
+
+    {% if selected_business and not selected_business.has_charge_code %}
+    <!-- No business code, no invoice number: say so before staff tick 40 rows -->
+    <div class="bcp__warn" role="alert">
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+      <span class="bcp__warn-text">
+        <strong>{{ selected_business.business_name }} has no business code.</strong>
+        Invoice numbers are built from it (INV-<em>CODE</em>-YYMM-0001), so this account
+        cannot be billed until one is set.
+      </span>
+      <a class="bcp__warn-link"
+         href="{% url 'workforce:seller_detail' selected_business.business_id %}">Set the code ▸</a>
+    </div>
+    {% endif %}
+
+    {% if codeless_businesses and not selected_business %}
+    <!-- Same warning across the board, so the desk shows who is blocked -->
+    <div class="bcp__warn" role="alert">
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+      <span class="bcp__warn-text">
+        <strong>{{ codeless_businesses|length }} account{{ codeless_businesses|length|pluralize }}
+        with charges on this desk ha{{ codeless_businesses|length|pluralize:"s,ve" }} no business
+        code</strong> and cannot be invoiced until one is set:
+        {% for b in codeless_businesses %}<a class="bcp__warn-name"
+           href="{% url 'workforce:seller_detail' b.business_id %}">{{ b.business_name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+      </span>
+    </div>
+    {% endif %}
 
     {% if tasks %}
     <!-- Money strip: the whole bill, live off the selection -->
@@ -332,6 +360,7 @@
 <script>
 (function () {
   const csrftoken = '{{ csrf_token }}';
+  const CAN_INVOICE = {% if selected_business and not selected_business.has_charge_code %}false{% else %}true{% endif %};  // no business code, no invoice number
   const businessId = '{{ business_filter|escapejs }}';
   const el = (id) => document.getElementById(id);
   const taskChecks = () => Array.from(document.querySelectorAll('.ccc__task-check'));
@@ -399,7 +428,7 @@
     });
 
     const btn = el('ccc_issue_btn');
-    if (btn) btn.disabled = t.total <= 0;
+    if (btn) btn.disabled = t.total <= 0 || !CAN_INVOICE;
 
     const val = el('ccc_tape_value');
     if (val) { val.classList.remove('bcp__tick'); void val.offsetWidth; val.classList.add('bcp__tick'); }
@@ -474,6 +503,13 @@
                 + ' left off — already invoiced or recovered at a COD payout.');
         }
         window.location.href = data.invoice_url;
+      } else if (data.fix_url) {
+        // A blocker staff can actually clear — offer the page that clears it.
+        if (confirm(data.error + '\n\nOpen the seller page to set it now?')) {
+          window.location.href = data.fix_url;
+          return;
+        }
+        this.disabled = false;
       } else {
         alert(data.error || 'Could not issue the invoice');
         this.disabled = false;

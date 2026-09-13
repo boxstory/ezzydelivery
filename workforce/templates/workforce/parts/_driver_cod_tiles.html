@@ -1,0 +1,78 @@
+{% load humanize %}
+{% comment %}
+Purpose: Driver picker for the fleet ledger — one tile per active driver, showing what they hold
+Used by: workforce/fleet_transactions.html (selection card + the change-driver modal)
+Notes: Needs `all_drivers` (each carrying .cod_live / .cod_task_count from the view), `view_type`
+       and optionally `selected_driver`. Filtering is client-side over data-ftr-search.
+{% endcomment %}
+<div class="ftr__drivers" data-ftr-drivers>
+    <div class="ftr__drivers-tools">
+        <div class="ftr__drivers-search">
+            <i class="fa-solid fa-magnifying-glass ftr__drivers-search-icon"></i>
+            <input type="search" class="ftr__drivers-search-input" data-ftr-driver-search
+                   placeholder="Filter by name, code or driver ID" aria-label="Filter drivers">
+        </div>
+        <p class="ftr__drivers-summary">
+            <span class="ftr__drivers-count">{{ all_drivers|length }}</span> active
+            {% if drivers_holding_cod %}
+            <span class="ftr__drivers-dot">·</span>
+            <span class="ftr__drivers-count">{{ drivers_holding_cod }}</span> holding
+            <span class="ftr__drivers-dot">·</span>
+            QAR <span class="ftr__drivers-count">{{ fleet_cod_total|floatformat:2|intcomma }}</span> with fleet
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="ftr__driver-grid" data-ftr-driver-grid>
+        {% for driver in all_drivers %}
+        <a class="ftr__driver{% if selected_driver and selected_driver.driver_id == driver.driver_id %} ftr__driver--current{% endif %}{% if driver.cod_live %} ftr__driver--holding{% endif %}"
+           href="?driver_id={{ driver.driver_id }}&amp;view={{ view_type|default:'cod' }}"
+           data-ftr-search="{{ driver.user.first_name|lower }} {{ driver.user.last_name|lower }} {{ driver.driver_code|lower }} {{ driver.driver_id }} {{ driver.driver_phone }}">
+
+            <span class="ftr__driver-head">
+                <span class="ftr__driver-avatar">{{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}</span>
+                <span class="ftr__driver-who">
+                    <span class="ftr__driver-name" title="{{ driver.user.first_name }} {{ driver.user.last_name }}">{{ driver.user.first_name }} {{ driver.user.last_name }}</span>
+                    <span class="ftr__driver-code">
+                        {% if driver.driver_code %}{{ driver.driver_code }}<span class="ftr__driver-dot">·</span>{% endif %}ID {{ driver.driver_id }}
+                    </span>
+                </span>
+            </span>
+
+            <span class="ftr__driver-cod">
+                <span class="ftr__driver-cod-top">
+                    <span class="ftr__driver-cod-label">COD with driver</span>
+                    {% comment %}
+                    Standing sits on the money line, not next to the name: the ID
+                    is what staff read off the tile and a chip beside it ate the
+                    last digits. A blocked driver still holding COD is exactly who
+                    this screen chases, so the flag stays on the tile.
+                    {% endcomment %}
+                    <span class="ftr__driver-flags">
+                        {% if selected_driver and selected_driver.driver_id == driver.driver_id %}
+                        <span class="ftr__driver-flag ftr__driver-flag--now">Viewing</span>
+                        {% endif %}
+                        {% if driver.driver_status != 'approved' %}
+                        <span class="ftr__driver-flag ftr__driver-flag--{{ driver.driver_status }}">{{ driver.get_driver_status_display|default:driver.driver_status }}</span>
+                        {% endif %}
+                    </span>
+                </span>
+                <span class="ftr__driver-cod-value">
+                    <span class="ftr__driver-cod-cur">QAR</span>{{ driver.cod_live|floatformat:2|intcomma }}
+                </span>
+                <span class="ftr__driver-cod-meta">
+                    {% if driver.cod_task_count %}
+                        {{ driver.cod_task_count }} unsettled deliver{{ driver.cod_task_count|pluralize:"y,ies" }}
+                    {% else %}
+                        Nothing outstanding
+                    {% endif %}
+                </span>
+            </span>
+        </a>
+        {% empty %}
+        <p class="ftr__drivers-none">No active drivers on the fleet yet.</p>
+        {% endfor %}
+    </div>
+
+    <p class="ftr__drivers-none" data-ftr-driver-empty hidden>No driver matches that search.</p>
+</div>

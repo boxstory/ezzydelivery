@@ -1,0 +1,196 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Driver Timeline{% endblock title %}
+{% comment %}
+Purpose: One driver's day drawn on a map — the measured trail, where they stopped, and every
+         stretch of trail that is missing, with the reason where we have one.
+Used by: workforce_views.driver_timeline at /workforce/drivers/<id>/timeline/
+Notes: Solid line = positions the device actually measured. Dashed violet = a gap the driver spent
+       in another app, drawn from the routing engine's guess — never a measurement, and labelled so.
+{% endcomment %}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/driver-timeline.css' %}?v=20260909a" rel="stylesheet" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="wfpage">
+
+  <div class="wfhero">
+    <div class="wfhero__ident">
+      <span class="wfhero__eyebrow">Driver timeline</span>
+      <h1 class="wfhero__title">{{ driver }}</h1>
+      <span class="wfhero__sub">
+        <span class="wfhero__code">{{ driver.driver_code }}</span>
+        <span class="wfhero__sep">·</span>{{ day|date:"D, d M Y" }}
+        {% if summary.first %}<span class="wfhero__sep">·</span>{{ summary.first }}–{{ summary.last }}{% endif %}
+      </span>
+    </div>
+    <div class="wfhero__side">
+      <div class="wfhero__actions">
+        <a href="{% url 'workforce:driver_detail' driver.driver_id %}" class="btn btn-sm wfhero__ghost">
+          <i class="fa-solid fa-id-card me-1"></i>Driver profile
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="dtl__bar">
+    <div class="dtl__daynav">
+      <a class="dtl__daybtn" href="?day={{ prev_day }}"><i class="fa-solid fa-chevron-left"></i></a>
+      <input type="date" class="dtl__date" value="{{ day|date:'Y-m-d' }}" max="{{ today }}"
+             onchange="location.search = '?day=' + this.value">
+      {% if next_day %}
+      <a class="dtl__daybtn" href="?day={{ next_day }}"><i class="fa-solid fa-chevron-right"></i></a>
+      {% else %}
+      <span class="dtl__daybtn dtl__daybtn--off"><i class="fa-solid fa-chevron-right"></i></span>
+      {% endif %}
+    </div>
+
+    <div class="dtl__stats">
+      <div class="dtl__stat"><span class="dtl__stat-num">{{ summary.distance_km }}</span><span class="dtl__stat-lbl">km</span></div>
+      <div class="dtl__stat"><span class="dtl__stat-num">{{ summary.moving_min }}</span><span class="dtl__stat-lbl">min moving</span></div>
+      <div class="dtl__stat"><span class="dtl__stat-num">{{ summary.stopped_min }}</span><span class="dtl__stat-lbl">min stopped</span></div>
+      <div class="dtl__stat dtl__stat--dark"><span class="dtl__stat-num">{{ summary.dark_min }}</span><span class="dtl__stat-lbl">min dark</span></div>
+      <div class="dtl__stat"><span class="dtl__stat-num">{{ summary.fixes }}</span><span class="dtl__stat-lbl">fixes</span></div>
+    </div>
+  </div>
+
+  {% if beyond_retention %}
+  <div class="dtl__notice">
+    <i class="fa-solid fa-circle-info me-2"></i>
+    Positions are kept for {{ retention_days }} days, so this day is beyond what the trail holds —
+    an empty map here means the data has been pruned, not that the driver stood still.
+  </div>
+  {% elif not summary.points %}
+  <div class="dtl__notice">
+    <i class="fa-solid fa-circle-info me-2"></i>
+    No positions recorded on this day.
+  </div>
+  {% endif %}
+
+  <div class="dtl__layout">
+    <div class="dtl__mapwrap">
+      <div id="workforce_driver_timeline_map_canvas" class="dtl__map"></div>
+      <div class="dtl__legend">
+        <span class="dtl__key"><i class="dtl__swatch dtl__swatch--trail"></i>Measured trail</span>
+        <span class="dtl__key"><i class="dtl__swatch dtl__swatch--gap"></i>Gap — estimated route</span>
+        <span class="dtl__key"><i class="dtl__swatch dtl__swatch--stop"></i>Stop</span>
+        <span class="dtl__key"><i class="dtl__swatch dtl__swatch--event"></i>Status change</span>
+      </div>
+    </div>
+
+    <div class="dtl__side">
+      <div class="dtl__side-head">Timeline</div>
+      {% if events %}
+      <ol class="dtl__list" id="workforce_driver_timeline_list_events">
+        {% for e in events %}
+        <li class="dtl__row dtl__row--{{ e.kind }}{% if e.kind == 'gap' and not e.explained %} dtl__row--unexplained{% endif %}"
+            data-index="{{ forloop.counter0 }}">
+          <span class="dtl__time">{{ e.at }}</span>
+          <span class="dtl__body">
+            {% if e.kind == 'stop' %}
+              <span class="dtl__label">Stopped</span>
+              <span class="dtl__meta">{{ e.minutes }} min</span>
+            {% elif e.kind == 'gap' %}
+              <span class="dtl__label">{{ e.reason }}</span>
+              <span class="dtl__meta">
+                {{ e.at }}–{{ e.until }} · {{ e.minutes }} min dark{% if e.route_km %} · {{ e.route_km }} km estimated{% endif %}
+              </span>
+            {% else %}
+              <span class="dtl__label">{{ e.label }}</span>
+              <span class="dtl__meta">{% if e.task %}#{{ e.task }}{% endif %}</span>
+            {% endif %}
+          </span>
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <div class="dtl__empty">Nothing recorded for this day.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// The base template loads Leaflet below this block, not above it, so L does not
+// exist yet while this script is being parsed — running now threw "L is not
+// defined" and took the map and the whole timeline interaction down with it.
+// DOMContentLoaded fires after the parser has run that script tag, so by here
+// Leaflet is real.
+document.addEventListener('DOMContentLoaded', function () {
+    var points = {{ points_json|safe }};
+    var events = {{ events_json|safe }};
+
+    var map = L.map('workforce_driver_timeline_map_canvas', { zoomControl: true, attributionControl: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    var bounds = L.latLngBounds();
+    var focusable = {};   // timeline row index → what to fly to
+
+    /* The measured trail. Solid, because every one of these positions came off
+       the device — nothing here is inferred. */
+    if (points.length > 1) {
+        var line = points.map(function (p) { return [p.lat, p.lng]; });
+        L.polyline(line, { color: '#800020', weight: 4, opacity: 0.85 }).addTo(map);
+        line.forEach(function (ll) { bounds.extend(ll); });
+
+        L.circleMarker(line[0], { radius: 7, color: '#fff', weight: 2, fillColor: '#059669', fillOpacity: 1 })
+            .bindTooltip('First fix · ' + points[0].at).addTo(map);
+        L.circleMarker(line[line.length - 1], { radius: 7, color: '#fff', weight: 2, fillColor: '#001f3f', fillOpacity: 1 })
+            .bindTooltip('Last fix · ' + points[points.length - 1].at).addTo(map);
+    }
+
+    events.forEach(function (e, i) {
+        if (e.kind === 'stop') {
+            var stop = L.circleMarker([e.lat, e.lng], {
+                radius: 6, color: '#fff', weight: 2, fillColor: '#f59e0b', fillOpacity: 1
+            }).bindTooltip('Stopped ' + e.minutes + ' min · from ' + e.at).addTo(map);
+            focusable[i] = stop.getLatLng();
+            bounds.extend(stop.getLatLng());
+
+        } else if (e.kind === 'gap') {
+            /* Dashed, always. The route is the routing engine's guess at where
+               the driver went while the phone could not fix a position — it is
+               never presented as something we measured. */
+            var path = (e.route && e.route.length > 1)
+                ? e.route
+                : [[e.from.lat, e.from.lng], [e.to.lat, e.to.lng]];
+            var colour = e.explained ? '#7c3aed' : '#9ca3af';
+            var gap = L.polyline(path, {
+                color: colour, weight: 3, opacity: 0.8, dashArray: '7, 9'
+            }).bindTooltip(e.reason + ' · ' + e.at + '–' + e.until + ' · ' + e.minutes + ' min'
+                + (e.route ? ' · estimated route' : ' · straight line, no route available')).addTo(map);
+            focusable[i] = gap.getBounds();
+            bounds.extend(gap.getBounds());
+
+        } else if (e.lat && e.lng) {
+            var ev = L.circleMarker([e.lat, e.lng], {
+                radius: 6, color: '#fff', weight: 2, fillColor: '#2563eb', fillOpacity: 1
+            }).bindTooltip(e.label + (e.task ? ' · #' + e.task : '')).addTo(map);
+            focusable[i] = ev.getLatLng();
+            bounds.extend(ev.getLatLng());
+        }
+    });
+
+    if (bounds.isValid()) { map.fitBounds(bounds, { padding: [30, 30] }); }
+    else { map.setView([25.2854, 51.5310], 11); }
+
+    var list = document.getElementById('workforce_driver_timeline_list_events');
+    if (list) {
+        list.addEventListener('click', function (ev) {
+            var row = ev.target.closest('.dtl__row');
+            if (!row) return;
+            var target = focusable[row.dataset.index];
+            if (!target) return;
+            if (target.getNorthEast) { map.fitBounds(target, { padding: [60, 60] }); }
+            else { map.flyTo(target, 16); }
+            list.querySelectorAll('.dtl__row--on').forEach(function (r) { r.classList.remove('dtl__row--on'); });
+            row.classList.add('dtl__row--on');
+        });
+    }
+});
+</script>
+{% endblock %}

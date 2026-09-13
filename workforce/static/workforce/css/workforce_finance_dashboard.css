@@ -1,460 +1,265 @@
-/* ============================================================
-   WORKFORCE FINANCE DASHBOARD  —  workforce_finance_dashboard.css
-   ============================================================ */
+/* Purpose: Staff finance overview — ledger surface for the money position, COD pipeline rail and period figures. */
+/* Used by: workforce/templates/workforce/workforce_finance_dashboard.html */
+/* Notes: Same teller vocabulary as driver_payout_worksheet.css and client_charge_verification.css so the finance
+   pages read as one system. Yellow appears once, and always means the same thing: cash sitting where it should
+   not be. Shared furniture (.wfhero, .wfstat, .wfcard) comes from workforce.css / staff-hero.css — not restated. */
 
-/* ── Period selector ─────────────────────────────────────── */
-select.wfd__period-select {
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.25);
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 600;
-  min-height: 32px; max-height: 32px;
-  border-radius: 2rem;
-  padding: 0.35rem 2rem 0.35rem 0.85rem;
-  cursor: pointer;
-  transition: background 0.2s;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%23fff' d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.7rem center;
+.wfd {
+  --tlr-ink: var(--brand-navy, #001f3f);
+  --tlr-paper: var(--brand-grey-100, #fafafa);
+  --tlr-card: var(--brand-white, #fff);
+  --tlr-rule: var(--brand-grey-200, #f0f0f0);
+  --tlr-rule-strong: var(--brand-grey-300, #dcdcdc);
+  --tlr-mark: var(--brand-primary, #f7c000);
+  --tlr-mark-ink: var(--brand-primary-text, #8f6b00);
+  --tlr-mark-soft: var(--brand-accent, #fef9e6);
+  --tlr-muted: var(--brand-grey-500, #6c757d);
+  --tlr-out: var(--brand-danger, #dc2626);
+  --tlr-hold: #94a9bd;
+  --tlr-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --tlr-cond: 'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --tlr-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+
+  background: var(--tlr-paper);
+  color: var(--tlr-ink);
+  font-family: var(--tlr-sans);
+  min-height: 100vh;
 }
-select.wfd__period-select option { background: #001f3f; color: #fff; }
+.wfd__wrap { max-width: 1320px; margin: 0 auto; }
+/* The hero runs flush; everything under it carries the page's hairline pad. */
+.wfd__body { padding: 0.325rem; }
 
-/* ── Section header ──────────────────────────────────────── */
-.wfd__section-header {
+/* ── Section head: title, time basis, and (once) the period control ─────── */
+.wfd__sec { margin-bottom: 1.125rem; }
+.wfd__sec-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: baseline;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.85rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid var(--brand-grey-200, #e9ecef);
+  gap: 0.375rem 0.75rem;
+  padding-bottom: 0.375rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--tlr-rule-strong);
 }
-.wfd__section-title {
+.wfd__sec-title {
+  font-family: var(--tlr-cond);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   margin: 0;
-  font-size: 0.7rem;
-  font-weight: 800;
+}
+/* Which clock a section is read against — a balance or a window. Stating it is
+   the point of the redesign, so it sits on the title line, not in a footnote. */
+.wfd__sec-basis {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  color: var(--tlr-muted);
+}
+.wfd__per { display: flex; gap: 0; margin-left: auto; }
+.wfd__per-opt {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  text-decoration: none;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--tlr-rule-strong);
+  border-right-width: 0;
+  background: var(--tlr-card);
+}
+.wfd__per-opt:last-child { border-right-width: 1px; }
+.wfd__per-opt:hover { color: var(--tlr-ink); }
+.wfd__per-opt--on {
+  background: var(--tlr-ink);
+  border-color: var(--tlr-ink);
+  color: var(--tlr-card);
+}
+.wfd__per-opt:focus-visible { outline: 2px solid var(--tlr-ink); outline-offset: 1px; }
+
+/* Reading note in a card header — same place as the header's link, but it is
+   prose, not a way out of the card. */
+.wfd__hint {
+  margin-left: auto;
+  font-family: var(--tlr-mono);
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--tlr-muted);
+}
+
+/* ── The measure column: one bar per statement line, sized against the biggest
+      line on show. Not a share of what was collected — a payout inside a short
+      window releases cash collected before it, and that bar would read past
+      full. Widths arrive from data-pct via the page script. ───────────────── */
+.wfd__bar { width: 22%; min-width: 4rem; padding-right: 0.375rem; }
+.wfd__bar-fill {
+  display: block;
+  height: 0.35rem;
+  width: 0;
+  background: var(--tlr-ink);
+}
+.wfd__bar-fill--out { background: var(--tlr-hold); }
+/* The two residual lines — cash that has not moved on yet. The page's one yellow. */
+.wfd__bar-fill--open { background: var(--tlr-mark); }
+
+/* ── The statement: two legs, each closing on the amount still to move ───── */
+.wfd__ledger { width: 100%; border-collapse: collapse; }
+.wfd__ledger th,
+.wfd__ledger td {
+  padding: 0.3rem 0.75rem;
+  font-weight: 400;
+  font-size: 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid var(--tlr-rule);
+  vertical-align: baseline;
+}
+.wfd__ledger tbody tr:last-child th,
+.wfd__ledger tbody tr:last-child td { border-bottom: 0; }
+.wfd__leg th {
+  font-family: var(--tlr-cond);
+  font-size: 0.68rem;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--brand-grey-600, #6c757d);
+  color: var(--tlr-muted);
+  background: var(--tlr-paper);
+  border-bottom: 1px solid var(--tlr-rule-strong);
+  padding-top: 0.5rem;
 }
-.wfd__section-icon {
-  color: var(--brand-primary, #f7c000);
-  font-size: 0.85rem;
-}
-.wfd__section-badge {
-  font-size: 0.7rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--brand-primary,#f7c000) 0%, var(--brand-primary-dark,#e6b800) 100%);
-  color: var(--brand-grey-900, #1a1a2e);
-  padding: 0.2rem 0.65rem;
-  border-radius: 2rem;
-  white-space: nowrap;
-}
-
-/* ── Period pills ────────────────────────────────────────── */
-.wfd__period-pill {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.2rem 0.6rem;
-  border-radius: 2rem;
-  border: 1px solid var(--brand-grey-300, #dee2e6);
-  color: var(--brand-grey-600, #6c757d);
-  text-decoration: none;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.wfd__period-pill:hover {
-  border-color: var(--brand-primary,#f7c000);
-  color: var(--brand-grey-800,#343a40);
-}
-.wfd__period-pill--active {
-  background: var(--brand-primary,#f7c000);
-  border-color: var(--brand-primary-dark,#e6b800);
-  color: var(--brand-grey-900,#1a1a2e);
-}
-
-/* ── Fleet cards (large summary) ─────────────────────────── */
-.wfd__fleet-card {
-  background: #fff;
-  border: 1px solid var(--brand-grey-200, #e9ecef);
-  border-radius: var(--brand-radius-md, 0.75rem);
-  padding: 1.25rem 1rem;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  transition: transform 0.2s, box-shadow 0.2s;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  position: relative;
-  overflow: hidden;
-}
-.wfd__fleet-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--brand-primary,#f7c000), var(--brand-primary-dark,#e6b800));
-}
-.wfd__fleet-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-}
-.wfd__fleet-icon {
-  width: 2.75rem; height: 2.75rem;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-}
-.wfd__fleet-icon--warning { background: rgba(255,193,7,0.15); color: #e6a817; }
-.wfd__fleet-icon--info    { background: rgba(13,202,240,0.15); color: #0dcaf0; }
-.wfd__fleet-icon--success { background: rgba(25,135,84,0.15);  color: #198754; }
-.wfd__fleet-icon--primary { background: rgba(13,110,253,0.15); color: #0d6efd; }
-.wfd__fleet-icon--danger  { background: rgba(220,53,69,0.15);  color: #dc3545; }
-
-.wfd__fleet-amount {
-  font-size: 1.75rem;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--brand-grey-900, #1a1a2e);
-}
-.wfd__fleet-currency {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--brand-primary-dark, #e6b800);
-}
-.wfd__fleet-label {
+.wfd__sub-row th { padding-left: 1.5rem; color: var(--tlr-muted); }
+.wfd__note { font-size: 0.72rem; color: var(--tlr-muted); }
+.wfd__note a { color: var(--tlr-ink); text-decoration: underline; }
+.wfd__amt {
+  font-family: var(--tlr-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--brand-grey-700, #495057);
-  margin-top: 0.1rem;
-}
-.wfd__fleet-sublabel {
-  font-size: 0.7rem;
-  color: var(--brand-grey-500, #adb5bd);
-}
-
-/* ── Pipeline cards (small 6-col) ────────────────────────── */
-.wfd__pipeline-card {
-  background: #fff;
-  border: 1px solid var(--brand-grey-200, #e9ecef);
-  border-radius: var(--brand-radius-md, 0.75rem);
-  padding: 1rem 0.75rem 0.75rem;
-  text-align: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-  transition: transform 0.2s, box-shadow 0.2s;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-}
-.wfd__pipeline-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.09);
-}
-.wfd__pipeline-icon { font-size: 1.5rem; margin-bottom: 0.35rem; line-height: 1; }
-.wfd__pipeline-amount {
-  font-size: 1.35rem;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--brand-grey-900, #1a1a2e);
-}
-.wfd__pipeline-currency {
-  font-size: 0.6rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--brand-grey-500, #adb5bd);
-}
-.wfd__pipeline-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--brand-grey-600, #6c757d);
-  margin-top: 0.1rem;
-  flex: 1;
-}
-.wfd__pipeline-btn {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 0.2rem 0.6rem;
-  border-radius: 2rem;
-  text-decoration: none;
-  margin-top: 0.4rem;
-  transition: all 0.2s;
+  text-align: right;
   white-space: nowrap;
+  width: 1%;
 }
-.wfd__pipeline-btn--warning  { background: rgba(255,193,7,0.15);  color: #c07b00; border: 1px solid rgba(255,193,7,0.35); }
-.wfd__pipeline-btn--info     { background: rgba(13,202,240,0.15); color: #0a7b96; border: 1px solid rgba(13,202,240,0.35); }
-.wfd__pipeline-btn--primary  { background: rgba(13,110,253,0.12); color: #0850c0; border: 1px solid rgba(13,110,253,0.3); }
-.wfd__pipeline-btn--danger   { background: rgba(220,53,69,0.12);  color: #a5202e; border: 1px solid rgba(220,53,69,0.3); }
-.wfd__pipeline-btn--secondary{ background: rgba(108,117,125,0.1); color: #495057; border: 1px solid rgba(108,117,125,0.25); }
-.wfd__pipeline-btn:hover { filter: brightness(0.9); transform: scale(1.03); }
-
-/* ── Metric cards ────────────────────────────────────────── */
-.wfd__metric-card {
-  background: #fff;
-  border: 1px solid var(--brand-grey-200, #e9ecef);
-  border-radius: var(--brand-radius-md, 0.75rem);
-  padding: 1.1rem 0.75rem;
-  text-align: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-  transition: transform 0.2s, box-shadow 0.2s;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
+.wfd__amt--out { color: var(--tlr-out); }
+.wfd__amt--quiet { color: var(--tlr-muted); }
+.wfd__amt--held { font-weight: 600; }
+/* A leg's closing line. Open means money is still sitting in that leg. */
+.wfd__total th,
+.wfd__total td {
+  font-weight: 600;
+  border-top: 1px solid var(--tlr-rule-strong);
+  border-bottom: 0;
 }
-.wfd__metric-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.09);
-}
-.wfd__metric-card--highlight {
-  background: linear-gradient(145deg, #fff9e6 0%, #fffbf0 100%);
-  border-color: rgba(247,192,0,0.4);
-  box-shadow: 0 2px 12px rgba(247,192,0,0.15);
-}
-.wfd__metric-icon {
-  font-size: 1.4rem;
-  margin-bottom: 0.35rem;
-}
-.wfd__metric-value {
-  font-size: 1.3rem;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--brand-grey-900, #1a1a2e);
-}
-.wfd__metric-unit {
-  font-size: 0.6rem;
-  font-weight: 700;
-  text-transform: uppercase;
+.wfd__total th { font-family: var(--tlr-cond); letter-spacing: 0.02em; }
+/* The closing line carries its own way out, so the explanatory column can drop
+   on a phone without taking the action with it. */
+.wfd__act {
+  display: inline-block;
+  margin-left: 0.5rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
   letter-spacing: 0.06em;
-  color: var(--brand-grey-400, #ced4da);
-}
-.wfd__metric-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--brand-grey-600, #6c757d);
-  margin-top: 0.1rem;
-}
-
-/* ── Table cards ─────────────────────────────────────────── */
-.wfd__table-card {
-  background: #fff;
-  border: 1px solid var(--brand-grey-200, #e9ecef);
-  border-radius: var(--brand-radius-md, 0.75rem);
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  height: 100%;
-}
-.wfd__table-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.85rem 1rem;
-  background: var(--brand-grey-50, #f8f9fa);
-  border-bottom: 1px solid var(--brand-grey-200, #e9ecef);
-}
-.wfd__table-title {
-  margin: 0;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--brand-grey-600, #6c757d);
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-.wfd__view-all-btn {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--brand-primary-dark, #c9a800);
+  color: var(--tlr-ink);
   text-decoration: none;
-  padding: 0.15rem 0.5rem;
-  border: 1px solid rgba(247,192,0,0.4);
-  border-radius: 2rem;
-  transition: all 0.2s;
+  border-bottom: 1px solid var(--tlr-mark);
 }
-.wfd__view-all-btn:hover {
-  background: var(--brand-primary,#f7c000);
-  color: var(--brand-grey-900, #1a1a2e);
-  border-color: var(--brand-primary-dark,#e6b800);
-}
+.wfd__act:hover { color: var(--tlr-mark-ink); }
+.wfd__total--open { background: var(--tlr-mark-soft); }
+.wfd__total--open th { box-shadow: inset 3px 0 0 var(--tlr-mark); }
+.wfd__total--open .wfd__amt { color: var(--tlr-mark-ink); }
 
-/* Table */
-.wfd__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8rem;
-}
+/* ── Ledger tables ──────────────────────────────────────────────────────── */
+.wfd__table { width: 100%; border-collapse: collapse; }
 .wfd__table thead th {
-  padding: 0.55rem 1rem;
-  font-size: 0.65rem;
-  font-weight: 700;
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--brand-grey-500, #adb5bd);
-  background: var(--brand-grey-50, #f8f9fa);
-  border-bottom: 1px solid var(--brand-grey-200, #e9ecef);
+  color: var(--tlr-muted);
+  text-align: left;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--tlr-rule-strong);
   white-space: nowrap;
 }
-.wfd__table tbody tr {
-  border-bottom: 1px solid var(--brand-grey-100, #f1f3f5);
-  transition: background 0.15s;
-}
-.wfd__table tbody tr:last-child { border-bottom: none; }
-.wfd__table tbody tr:hover { background: var(--brand-grey-50, #f8f9fa); }
+.wfd__table thead th.text-end { text-align: right; }
+.wfd__table tbody th,
 .wfd__table tbody td {
-  padding: 0.6rem 1rem;
-  vertical-align: middle;
-  color: var(--brand-grey-700, #495057);
-}
-
-/* Driver link */
-.wfd__driver-link {
-  font-weight: 600;
-  color: var(--brand-grey-800, #343a40);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-.wfd__driver-link:hover { color: var(--brand-primary-dark, #c9a800); }
-.wfd__driver-code {
-  font-size: 0.65rem;
-  color: var(--brand-grey-400, #ced4da);
-  font-family: monospace;
-  margin-top: 0.05rem;
-}
-
-/* Transaction type badge */
-.wfd__txn-type {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.4rem; height: 1.4rem;
-  border-radius: 50%;
-  font-size: 0.65rem;
-  margin-right: 0.35rem;
-  flex-shrink: 0;
-  vertical-align: middle;
-}
-.wfd__txn-type--success  { background: rgba(25,135,84,0.12);  color: #198754; }
-.wfd__txn-type--warning  { background: rgba(255,193,7,0.15);  color: #c07b00; }
-.wfd__txn-type--primary  { background: rgba(13,110,253,0.12); color: #0850c0; }
-.wfd__txn-type--danger   { background: rgba(220,53,69,0.12);  color: #a5202e; }
-.wfd__txn-type--secondary{ background: rgba(108,117,125,0.1); color: #495057; }
-
-.wfd__txn-code {
-  font-size: 0.68rem;
-  background: var(--brand-grey-100, #f1f3f5);
-  padding: 0.1rem 0.35rem;
-  border-radius: 0.25rem;
-  color: var(--brand-grey-700, #495057);
-  font-family: monospace;
-}
-.wfd__txn-time {
-  font-size: 0.65rem;
-  color: var(--brand-grey-400, #ced4da);
-}
-.wfd__cell-truncate {
-  max-width: 11rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.wfd__empty-cell {
-  text-align: center;
-  padding: 2rem 1rem;
-  color: var(--brand-grey-400, #ced4da);
+  padding: 0.375rem 0.75rem;
   font-size: 0.8rem;
+  font-weight: 400;
+  text-align: left;
+  border-bottom: 1px solid var(--tlr-rule);
 }
-
-/* ── Quick links footer ──────────────────────────────────── */
-.wfd__quick-links {
-  margin-top: 0.5rem;
-  padding: 1rem 0;
+.wfd__table tbody tr:last-child th,
+.wfd__table tbody tr:last-child td { border-bottom: 0; }
+.wfd__table tbody tr:hover { background: var(--tlr-paper); }
+.wfd__who { color: var(--tlr-ink); text-decoration: none; font-weight: 600; }
+.wfd__who:hover { text-decoration: underline; }
+.wfd__who-code {
+  display: block;
+  font-family: var(--tlr-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--tlr-muted);
 }
-.wfd__quick-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 0.5rem 1.1rem;
-  border-radius: 2rem;
-  text-decoration: none;
-  transition: all 0.2s;
-  border: 1.5px solid transparent;
-}
-.wfd__quick-link--warning  { background: rgba(255,193,7,0.12);  color: #8a5f00; border-color: rgba(255,193,7,0.4); }
-.wfd__quick-link--success  { background: rgba(25,135,84,0.1);   color: #145a37; border-color: rgba(25,135,84,0.3); }
-.wfd__quick-link--primary  { background: rgba(13,110,253,0.1);  color: #0a3d8f; border-color: rgba(13,110,253,0.3); }
-.wfd__quick-link--secondary{ background: rgba(108,117,125,0.09);color: #343a40; border-color: rgba(108,117,125,0.25); }
-.wfd__quick-link:hover { filter: brightness(0.88); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-
-/* ── Summary bar (COD flow visual) ──────────────────────── */
-.wfd__flow-bar {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  border-radius: var(--brand-radius-md, 0.75rem);
-  overflow: hidden;
-  border: 1px solid var(--brand-grey-200, #e9ecef);
-  margin-bottom: 1.5rem;
-}
-.wfd__flow-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0.85rem 0.5rem;
+.wfd__type { text-transform: capitalize; }
+.wfd__empty {
+  padding: 1.125rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--tlr-muted);
   text-align: center;
-  border-right: 1px solid var(--brand-grey-200, #e9ecef);
-  background: #fff;
-  transition: background 0.15s;
-}
-.wfd__flow-item:last-child { border-right: none; }
-.wfd__flow-item:hover { background: var(--brand-grey-50, #f8f9fa); }
-.wfd__flow-item__amount {
-  font-size: 1.05rem;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--brand-grey-900, #1a1a2e);
-}
-.wfd__flow-item__label {
-  font-size: 0.63rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--brand-grey-500, #adb5bd);
-  margin-top: 0.2rem;
-}
-.wfd__flow-item__dot {
-  width: 0.5rem; height: 0.5rem;
-  border-radius: 50%;
-  margin-bottom: 0.35rem;
 }
 
-/* Responsive */
-@media (max-width: 767px) {
-  .wfd__fleet-amount { font-size: 1.35rem; }
-  .wfd__pipeline-amount { font-size: 1.1rem; }
-  .wfd__metric-value { font-size: 1.05rem; }
-  .wfd__flow-bar { flex-wrap: wrap; }
-  .wfd__flow-item { min-width: 33.33%; border-bottom: 1px solid var(--brand-grey-200,#e9ecef); }
+/* ── Where to act ───────────────────────────────────────────────────────── */
+.wfd__jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--tlr-rule-strong);
+}
+.wfd__jump-link {
+  font-family: var(--tlr-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  color: var(--tlr-ink);
+  text-decoration: none;
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule-strong);
+  padding: 0.25rem 0.6rem;
+}
+.wfd__jump-link:hover { border-color: var(--tlr-ink); background: var(--tlr-paper); }
+.wfd__jump-link:focus-visible { outline: 2px solid var(--tlr-ink); outline-offset: 1px; }
+
+/* Figures on this page are ledger data — mono everywhere, including the shared
+   stat cards, so a number reads the same in a card and in a table. */
+.wfd .wfstat__value { font-family: var(--tlr-mono); font-variant-numeric: tabular-nums; }
+.wfd .wfhero__tally-num { font-family: var(--tlr-mono); }
+
+/* Six cards per section: six across on a wide console, then 3 + 3, then 2 + 2 + 2.
+   The shared auto-fit grid left a single card stranded on its own row at the
+   in-between widths. */
+.wfd .wfstat { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width: 1399.98px) {
+  .wfd .wfstat { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 767.98px) {
+  .wfd .wfstat { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 479.98px) {
+  .wfd .wfstat { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ── PAGE SHELL ───────────────────────────────────────────────────────────── */
-/* Hero sits flush; .wfdash__body below it carries the page padding. */
-.wfdash { padding: 0; }
-.wfdash__body { padding: 0.325rem; }
+@media (max-width: 767.98px) {
+  .wfd__sec-head { gap: 0.25rem 0.5rem; }
+  .wfd__per { margin-left: 0; }
+  .wfd__ledger th,
+  .wfd__ledger td { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
+  /* The explanatory column is the first thing to go — the stage and the amount
+     are what a phone reader needs. */
+  .wfd__ledger .wfd__note,
+  .wfd__ledger .wfd__bar { display: none; }
+}
