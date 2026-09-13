@@ -1,5 +1,6 @@
 from django.urls import path, include
 from ezzy_api import views as ezzy_api_views
+from ezzy_api import store_api as ezzy_api_store
 
 #path('api/', include('ezzy_api.urls'))
 
@@ -9,6 +10,7 @@ urlpatterns = [
     path('docs/', ezzy_api_views.docs_index, name='docs_index'),
     path('docs/getting-started/', ezzy_api_views.docs_getting_started, name='docs_getting_started'),
     path('docs/authentication/', ezzy_api_views.docs_authentication, name='docs_authentication'),
+    path('docs/custom-website/', ezzy_api_views.docs_custom_website, name='docs_custom_website'),
     path('docs/shopify/', ezzy_api_views.docs_shopify, name='docs_shopify'),
     path('docs/woocommerce/', ezzy_api_views.docs_woocommerce, name='docs_woocommerce'),
     path('docs/tiktok/', ezzy_api_views.docs_tiktok, name='docs_tiktok'),
@@ -44,6 +46,7 @@ urlpatterns = [
     path('driver/performance-metrics/', ezzy_api_views.driver_performance_metrics, name='driver_performance_metrics'),
     path('driver/app-config/', ezzy_api_views.driver_app_config, name='driver_app_config'),
     path('driver/location/', ezzy_api_views.driver_update_location, name='driver_update_location'),
+    path('driver/nav-handoff/', ezzy_api_views.driver_nav_handoff, name='driver_nav_handoff'),
     path('driver/<int:driver_id>/location/', ezzy_api_views.driver_latest_location, name='driver_latest_location'),
     path('driver/statistics/', ezzy_api_views.driver_statistics, name='driver_statistics'),
 
@@ -83,6 +86,12 @@ urlpatterns = [
     path('integrations/tiktokshop/import/', ezzy_api_views.import_tiktokshop_orders, name='import_tiktokshop_orders'),
     path('integrations/tiktokshop/test/', ezzy_api_views.test_tiktokshop_connection, name='test_tiktokshop_connection'),
     
+    # ==================== STORE APIs (seller's own website) ====================
+    # Inbound order push from a custom storefront. Auth: ClientApiKey (Bearer).
+    path('store/ping/', ezzy_api_store.store_ping, name='store_ping'),
+    path('store/orders/', ezzy_api_store.store_create_order, name='store_create_order'),
+    path('store/orders/<str:code>/', ezzy_api_store.store_order_status, name='store_order_status'),
+
     # ==================== WEBHOOK APIs ====================
     # Webhook receivers (from driver apps)
     path('webhooks/task/status/', ezzy_api_views.webhook_receive_task_status_update, name='webhook_receive_task_status_update'),

@@ -28,6 +28,11 @@ class OrderSerializer(serializers.ModelSerializer):
         # decide settled-vs-owed, so a client-writable value corrupts payouts.
         read_only_fields = (
             'business', 'order_number',
+            # Whose personal P2P console this order shows up in. `fields = '__all__'`
+            # makes every new column writable by default, so leaving this off would
+            # let a write-scope key attach an order to any user id — dropping the
+            # sender's address and phone into a stranger's console.
+            'p2p_customer',
             'cod_status_by_staff', 'cod_amount_locked',
             'verification_status', 'verification_notes',
             'address_verified', 'address_verified_at', 'address_verified_by',

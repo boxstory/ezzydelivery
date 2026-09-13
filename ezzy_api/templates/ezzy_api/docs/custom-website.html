@@ -1,0 +1,406 @@
+{% extends "ezzy_api/docs-base.html" %}
+{% load static %}
+
+{% block title %}Custom Website Integration - EzzyDelivery API{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/ezzy_api/docs.css?v=20260417c">
+{% endblock %}
+
+{% block content %}
+<div class="api-docs-container">
+  <aside class="api-docs-sidebar">
+    <div class="api-docs-logo">
+      <h2>📚 API Docs</h2>
+    </div>
+    <nav class="api-docs-nav">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_index' %}">Overview</a></li>
+        <li><a href="{% url 'ezzy_api:docs_authentication' %}">Authentication</a></li>
+      </ul>
+      <h3>Integrations</h3>
+      <ul>
+        <li><a href="#" class="nav-link active">🧩 Custom Website</a></li>
+        <li><a href="{% url 'ezzy_api:docs_shopify' %}">🛒 Shopify</a></li>
+        <li><a href="{% url 'ezzy_api:docs_woocommerce' %}">📦 WooCommerce</a></li>
+        <li><a href="{% url 'ezzy_api:docs_tiktok' %}">🎵 TikTok Shop</a></li>
+      </ul>
+      <h3>API Reference</h3>
+      <ul>
+        <li><a href="{% url 'ezzy_api:docs_api_reference' %}">Endpoints</a></li>
+        <li><a href="{% url 'ezzy_api:docs_webhooks' %}">Webhooks</a></li>
+        <li><a href="{% url 'ezzy_api:docs_errors' %}">Error Handling</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="api-docs-content">
+    <div class="api-docs-header">
+      <h1>🧩 Custom Website Integration</h1>
+      <p class="subtitle">Push orders straight from your own checkout into EzzyDelivery</p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>How It Works</h2>
+      <p>
+        If your store is not on Shopify or WooCommerce, your website sends each confirmed
+        order to EzzyDelivery itself. There is nothing to install and nothing for us to
+        poll — when your checkout completes, your server makes one HTTPS <strong>POST</strong>
+        to our order endpoint.
+      </p>
+      <div class="demo-box">
+        <h4>📋 The flow</h4>
+        <ul class="permission-list">
+          <li>Customer completes checkout on your site.</li>
+          <li>Your server posts the order JSON to <code>/api/v1/store/orders/</code>.</li>
+          <li>We reply with our <strong>order number</strong> — store it against the order.</li>
+          <li>The order lands in your EzzyDelivery dashboard as <em>Hold for Review</em>,
+              and our team confirms it into a delivery task.</li>
+          <li>You can ask for the delivery status of any order at any time.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Authentication</h2>
+      <p>
+        Every request carries the API key EzzyDelivery issued for your store. Send it as a
+        Bearer token (or in the <code>X-API-Key</code> header — both work):
+      </p>
+      <div class="demo-box">
+        <h4>Headers</h4>
+        <code class="demo-code">Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json</code>
+      </div>
+      <p>
+        The key identifies your store, so you never send a business or account id in the
+        body — orders can only ever be created under your own account. Keep the key on your
+        <strong>server</strong>; never place it in browser JavaScript, a mobile app, or a
+        public repository. If it leaks, ask us to rotate it.
+      </p>
+      <div class="step-card">
+        <h3>Check your key works</h3>
+        <div class="endpoint-item">
+          <span class="method get">GET</span>
+          <span class="path">/api/v1/store/ping/</span>
+        </div>
+        <code class="demo-code">curl https://ezzydelivery.qa/api/v1/store/ping/ \
+  -H "Authorization: Bearer YOUR_API_KEY"</code>
+        {% verbatim %}
+        <div class="demo-box">
+          <h4>Response</h4>
+          <code class="demo-code">{
+  "success": true,
+  "business": "Your Store",
+  "account_status": "active",
+  "can_create_orders": true,
+  "scope": "write"
+}</code>
+        </div>
+        {% endverbatim %}
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Create an Order</h2>
+      <div class="endpoint-item">
+        <span class="method post">POST</span>
+        <span class="path">https://ezzydelivery.qa/api/v1/store/orders/</span>
+      </div>
+      <p>Post one order per request, as a single JSON object.</p>
+
+      {% verbatim %}
+      <div class="demo-box">
+        <h4>Request body</h4>
+        <code class="demo-code">{
+  "orderNumber": "GOOEY-429869",
+  "paymentMethod": "applepay",
+  "customer": {
+    "name": "Hind Alobaidli",
+    "phone": "51060099",
+    "area": "Doha",
+    "street": "Al wahat street - alkhuraitiat",
+    "buildingType": "Apartment",
+    "buildingNumber": "31",
+    "notes": "Big gate 3 go inside 31"
+  },
+  "items": [
+    { "id": "smore", "name": "S'more", "qty": 2, "price": 35, "lineTotal": 70 }
+  ],
+  "subtotal": 70,
+  "deliveryFee": 20,
+  "total": 90,
+  "createdAt": "2026-09-11T16:00:29.000Z"
+}</code>
+      </div>
+
+      <div class="demo-box">
+        <h4>Response — 201 Created</h4>
+        <code class="demo-code">{
+  "success": true,
+  "duplicate": false,
+  "message": "Order received",
+  "order_number": "GOE181-29869-AB796",
+  "client_order_code": "GOOEY-429869",
+  "order_status": "to_review",
+  "order_status_label": "Hold for Review",
+  "cod_amount": "0",
+  "cod_status": "online_paid",
+  "delivery_status": "",
+  "driver_name": "",
+  "tracking_url": ""
+}</code>
+      </div>
+      {% endverbatim %}
+      <p>
+        Save <code>order_number</code> — that is the EzzyDelivery reference your staff and
+        ours will both quote.
+      </p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Fields</h2>
+      <table class="api-docs-table">
+        <thead>
+          <tr><th>Field</th><th>Required</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>orderNumber</code></td><td>Yes</td><td>Your own order reference. Must be unique in your store — it is what makes retries safe.</td></tr>
+          <tr><td><code>paymentMethod</code></td><td>Yes</td><td><code>cod</code> / <code>cash</code> means the driver collects. Anything else (<code>applepay</code>, <code>card</code>, <code>googlepay</code>…) is treated as already paid.</td></tr>
+          <tr><td><code>customer.name</code></td><td>Yes</td><td>Recipient name.</td></tr>
+          <tr><td><code>customer.phone</code></td><td>Yes</td><td>Qatar mobile. <code>51060099</code>, <code>+974 5106 0099</code> and <code>00974 51060099</code> are all accepted.</td></tr>
+          <tr><td><code>customer.area</code></td><td>Yes*</td><td>Area / district, e.g. <code>Doha</code>, <code>Al Sadd</code>.</td></tr>
+          <tr><td><code>customer.street</code></td><td>Yes*</td><td>Street name or number.</td></tr>
+          <tr><td><code>customer.buildingNumber</code></td><td>Yes*</td><td>Building / villa number.</td></tr>
+          <tr><td><code>customer.buildingType</code></td><td>No</td><td><code>Apartment</code>, <code>Villa</code>, <code>Office</code>…</td></tr>
+          <tr><td><code>customer.notes</code></td><td>No</td><td>Landmark or delivery instruction. Shown to the driver.</td></tr>
+          <tr><td><code>customer.zone</code></td><td>No</td><td>QNAS zone number, if your checkout collects it. Speeds up our address verification.</td></tr>
+          <tr><td><code>customer.whatsapp</code></td><td>No</td><td>Defaults to the phone number.</td></tr>
+          <tr><td><code>items[]</code></td><td>No</td><td>Line items: <code>name</code>, <code>qty</code>, <code>price</code>, <code>lineTotal</code>, optional <code>sku</code>. Up to 50 lines.</td></tr>
+          <tr><td><code>subtotal</code></td><td>No</td><td>Goods value before delivery.</td></tr>
+          <tr><td><code>deliveryFee</code></td><td>No</td><td>What you charged the customer for delivery.</td></tr>
+          <tr><td><code>total</code></td><td>Yes for COD</td><td>Amount the driver must collect on a COD order. Falls back to <code>subtotal + deliveryFee</code>.</td></tr>
+          <tr><td><code>createdAt</code></td><td>No</td><td>ISO-8601 timestamp of the checkout.</td></tr>
+        </tbody>
+      </table>
+      <p>
+        <small>* At least one address field must be present — area, street and building
+        together give the driver a deliverable address.</small>
+      </p>
+      <div class="demo-box">
+        <h4>🔧 Already have your own field names?</h4>
+        <p>
+          You do not have to rename anything. Send us one sample order payload and
+          EzzyDelivery maps your field names onto ours — <code>ref</code> to the order
+          number, <code>buyer.mobile</code> to the phone, <code>basket[].title</code> to
+          the line items, and so on. Once that mapping is saved, post your payload exactly
+          as your site already builds it.
+        </p>
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Cash on Delivery</h2>
+      <p>
+        This is the one field to get right. <code>paymentMethod</code> decides whether the
+        driver asks the customer for money:
+      </p>
+      <table class="api-docs-table">
+        <thead><tr><th>paymentMethod</th><th>What we do</th></tr></thead>
+        <tbody>
+          <tr><td><code>cod</code>, <code>cash</code>, <code>cash_on_delivery</code></td><td>COD amount = <code>total</code>. Driver collects and we settle it to you.</td></tr>
+          <tr><td>anything else</td><td>COD amount = 0. The order is marked paid online; the driver collects nothing.</td></tr>
+        </tbody>
+      </table>
+      <p>
+        Sending a prepaid order with a COD payment method makes the driver charge your
+        customer twice, so map this field from your real payment status, not from the cart.
+      </p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Retries &amp; Duplicates</h2>
+      <p>
+        If your request times out, send it again. We key each order on your
+        <code>orderNumber</code>: the second call does not create a second delivery, it
+        returns the order that already exists with <code>"duplicate": true</code> and
+        HTTP <strong>200</strong> instead of 201.
+      </p>
+      <p>
+        This only works if <code>orderNumber</code> is unique per order on your side. Never
+        reuse one for a different customer.
+      </p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Check Delivery Status</h2>
+      <div class="endpoint-item">
+        <span class="method get">GET</span>
+        <span class="path">/api/v1/store/orders/{orderNumber}/</span>
+      </div>
+      <p>
+        Look an order up with your own reference (our order number also works).
+        You get the whole order back — status, customer, lines, amounts, and the
+        exact payload we received from you, so you can reconcile without keeping
+        a second copy of what you sent.
+      </p>
+      {% verbatim %}
+      <div class="demo-box">
+        <h4>Response</h4>
+        <code class="demo-code">{
+  "success": true,
+  "order_number": "GOE181-29869-AB796",
+  "client_order_code": "GOOEY-429869",
+  "order_status": "publish",
+  "order_status_label": "Published",
+  "order_date": "2026-09-11",
+  "cod_amount": "0.00",
+  "cod_status": "online_paid",
+  "delivery_status": "out_for_delivery",
+  "delivery_status_label": "Out for Delivery",
+  "driver_name": "Ahmed K.",
+  "tracking_url": "https://ezzydelivery.qa/track/abc123.../",
+  "delivered_at": null,
+  "customer": {
+    "name": "Hind Alobaidli",
+    "phone": "51060099",
+    "whatsapp": "51060099",
+    "address": "Apartment 31, Al wahat street - alkhuraitiat, Doha",
+    "zone": 26,
+    "street": null,
+    "building": 31,
+    "area": "Al Khuraitiyat",
+    "notes": "Big gate 3 go inside 31",
+    "latitude": "25.3521...",
+    "longitude": "51.4712...",
+    "address_verified": true
+  },
+  "items": [
+    { "name": "S'more", "sku": "", "qty": 2, "unit_price": "35.00", "line_total": "70.00" }
+  ],
+  "amounts": {
+    "items_total": "70.00",
+    "delivery_fee": "20.00",
+    "cod_amount": "0.00"
+  },
+  "package": { "description": "S'more x2", "qty": 2 },
+  "received": { "...the exact JSON you posted..." }
+}</code>
+      </div>
+      {% endverbatim %}
+      <p>
+        Money is always a two-decimal string (<code>"0.00"</code>, <code>"70.00"</code>).
+        <code>zone</code>, <code>area</code> and the coordinates fill in once our team
+        verifies the address — they are <code>null</code> while the order is still in review.
+      </p>
+      <p>
+        <code>tracking_url</code> appears once the delivery task is created — you can show
+        it to your customer or put it in your confirmation email. Poll this endpoint no more
+        than once a minute per order; for push updates, ask us to set up a
+        <a href="{% url 'ezzy_api:docs_webhooks' %}">webhook</a> to your server instead.
+      </p>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Errors</h2>
+      <table class="api-docs-table">
+        <thead><tr><th>HTTP</th><th>Meaning</th><th>What to do</th></tr></thead>
+        <tbody>
+          <tr><td>400</td><td>A required field is missing or invalid</td><td>Read <code>error</code> in the body and fix the payload. Do not retry unchanged.</td></tr>
+          <tr><td>401</td><td>Missing, wrong, or disabled API key</td><td>Check the Authorization header. Contact us if the key was revoked.</td></tr>
+          <tr><td>403</td><td>Account is suspended or awaiting approval</td><td>Contact EzzyDelivery — orders cannot be created until the account is cleared.</td></tr>
+          <tr><td>404</td><td>Order not found (status lookup)</td><td>Confirm the reference you posted.</td></tr>
+          <tr><td>429</td><td>Too many requests</td><td>Back off and retry after a short pause.</td></tr>
+          <tr><td>500</td><td>Something failed on our side</td><td>Retry — the idempotency rule protects you from duplicates.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Code Examples</h2>
+
+      <div class="step-card">
+        <h3>cURL</h3>
+        {% verbatim %}
+        <code class="demo-code">curl -X POST https://ezzydelivery.qa/api/v1/store/orders/ \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderNumber": "ORD-1001",
+    "paymentMethod": "cod",
+    "customer": {
+      "name": "Hind Alobaidli",
+      "phone": "51060099",
+      "area": "Doha",
+      "street": "Al wahat street",
+      "buildingNumber": "31",
+      "notes": "Big gate 3"
+    },
+    "items": [{ "name": "S'more", "qty": 2, "price": 35, "lineTotal": 70 }],
+    "subtotal": 70,
+    "deliveryFee": 20,
+    "total": 90
+  }'</code>
+        {% endverbatim %}
+      </div>
+
+      <div class="step-card">
+        <h3>Node.js</h3>
+        {% verbatim %}
+        <code class="demo-code">const res = await fetch('https://ezzydelivery.qa/api/v1/store/orders/', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${process.env.EZZY_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify(order),
+});
+
+const data = await res.json();
+if (!data.success) throw new Error(data.error);
+
+await saveDeliveryRef(order.id, data.order_number);</code>
+        {% endverbatim %}
+      </div>
+
+      <div class="step-card">
+        <h3>PHP</h3>
+        {% verbatim %}
+        <code class="demo-code">$ch = curl_init('https://ezzydelivery.qa/api/v1/store/orders/');
+curl_setopt_array($ch, [
+    CURLOPT_POST           =&gt; true,
+    CURLOPT_RETURNTRANSFER =&gt; true,
+    CURLOPT_HTTPHEADER     =&gt; [
+        'Authorization: Bearer ' . getenv('EZZY_API_KEY'),
+        'Content-Type: application/json',
+    ],
+    CURLOPT_POSTFIELDS =&gt; json_encode($order),
+]);
+
+$data = json_decode(curl_exec($ch), true);
+if (empty($data['success'])) {
+    error_log('EzzyDelivery: ' . ($data['error'] ?? 'unknown error'));
+}</code>
+        {% endverbatim %}
+      </div>
+    </div>
+
+    <div class="api-docs-section">
+      <h2>Going Live</h2>
+      <div class="demo-box">
+        <h4>✅ Checklist</h4>
+        <ul class="permission-list">
+          <li>Key stored server-side, in an environment variable.</li>
+          <li><code>GET /api/v1/store/ping/</code> returns <code>can_create_orders: true</code>.</li>
+          <li>One real test order posted and visible in your dashboard.</li>
+          <li><code>paymentMethod</code> mapped from the real payment result.</li>
+          <li>Our <code>order_number</code> saved against your order.</li>
+          <li>Failed posts logged and retried — never dropped silently.</li>
+        </ul>
+      </div>
+      <p>Need help? Contact EzzyDelivery support with your store name and the order reference.</p>
+    </div>
+  </main>
+</div>
+{% endblock %}

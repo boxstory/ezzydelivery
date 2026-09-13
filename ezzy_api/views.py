@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 from orders import models as orders_models
 from fleet import models as fleet_models
 from delivery import models as delivery_models
+from delivery.ordering import TASK_SEQ_DESC, annotate_task_sequence
 from delivery.state_machine import can_transition as task_can_transition
 from core import models as core_models
 from business import models as business_models
@@ -232,7 +233,9 @@ def driver_tasks(request):
 
         # N+1 FIX: Use select_related to fetch related objects in one query
         # Only show tasks published to fleet
-        tasks = delivery_models.DeliveryTask.objects.filter(
+        tasks = annotate_task_sequence(
+            delivery_models.DeliveryTask.objects
+        ).filter(
             driver=driver,
             dl_task_publish=True,
         ).exclude(
@@ -243,7 +246,7 @@ def driver_tasks(request):
             'order__client',
             'driver',
             'business'
-        )
+        ).order_by(*TASK_SEQ_DESC)
 
         if status_filter:
             tasks = tasks.filter(dl_task_status=status_filter)
@@ -322,6 +325,13 @@ def driver_accept_task(request, task_id):
                     {'error': 'Task already assigned to another driver'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+
+            # First-mile parcel already collected by someone else — the delivery
+            # belongs to whoever is physically holding it.
+            from delivery.selectors import parcel_claim_block
+            blocked, block_msg = parcel_claim_block(task, driver)
+            if blocked:
+                return Response({'error': block_msg}, status=status.HTTP_400_BAD_REQUEST)
 
             task.driver = driver
             task.dl_task_status = 'accepted'
@@ -579,6 +589,37 @@ def _dedupe_pings(driver_id, rows):
     return kept, duplicates
 
 
+#: A handoff is opened moments before the browser leaves for the nav app, and
+#: the PWA's parting keepalive ping lands right behind it. A ping inside this
+#: window is that goodbye, not the driver coming back.
+_NAV_RETURN_GRACE_SECONDS = 30
+
+
+def _close_nav_handoff(driver, rows):
+    """Close an open nav handoff once the driver's device reports in again.
+
+    The PWA sends its own return event when it regains focus, but that can never
+    be relied on alone — a driver may kill the app inside Waze and reopen it
+    cold — so a live ping is treated as proof of return in its own right. Both
+    paths land on the same idempotent close.
+
+    Replayed pings are ignored: a background sync flushing the offline queue
+    proves the queue drained, not that the driver is looking at the screen.
+    """
+    live = [r for r in rows if not r.queued]
+    if not live:
+        return None
+    handoff = fleet_models.DriverNavHandoff.open_for_driver(driver.pk)
+    if not handoff:
+        return None
+    now = timezone.now()
+    if (now - handoff.opened_at).total_seconds() < _NAV_RETURN_GRACE_SECONDS:
+        return None
+    newest = max(live, key=lambda r: r.fixed_at or now)
+    handoff.close(at=newest.fixed_at or now, fix=newest, reason='ping')
+    return handoff
+
+
 def _as_float(value):
     """Coerce an optional numeric ping field, discarding junk instead of 500ing."""
     if value is None or value == '':
@@ -689,6 +730,9 @@ def driver_update_location(request):
     rows, duplicates = _dedupe_pings(driver.pk, rows)
     created = fleet_models.DriverLocation.objects.bulk_create(rows)
 
+    # A ping arriving at all is the end of any nav-app gap this driver was in.
+    _close_nav_handoff(driver, created)
+
     if is_batch:
         return Response({
             'message': 'Locations updated successfully',
@@ -713,6 +757,113 @@ def driver_update_location(request):
         'longitude': str(loc.longitude),
         'timestamp': (loc.fixed_at or loc.created_at).isoformat() if (loc.fixed_at or loc.created_at) else None,
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
+def driver_nav_handoff(request):
+    """Record a driver leaving for, or returning from, an external nav app.
+
+    Tapping Waze or Google Maps backgrounds the PWA, and a backgrounded browser
+    cannot take GPS fixes at all — the trail simply stops until the driver comes
+    back. This endpoint does not recover those fixes; it records the boundary so
+    the gap is explained rather than mistaken for a dead phone.
+
+    ``event`` is ``open`` (leaving) or ``return`` (back). The return is also
+    inferred from the next live ping, so a driver who never fires it still gets
+    their handoff closed.
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    event = (request.data.get('event') or 'open').strip().lower()
+    if event not in ('open', 'return', 'background'):
+        return Response({'error': 'event must be open, return or background'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    if event == 'return':
+        handoff = fleet_models.DriverNavHandoff.open_for_driver(driver.pk)
+        if not handoff:
+            # Already closed by the ping that came with the driver's return.
+            return Response({'message': 'No open handoff'}, status=status.HTTP_200_OK)
+        left = request.data.get('left_foreground')
+        fix = fleet_models.DriverLocation.latest_for_driver(driver.pk, within_minutes=5)
+        gap = handoff.gap_seconds
+        handoff.close(fix=fix, reason='return',
+                      left_foreground=None if left is None else bool(left))
+        return Response({
+            'id': handoff.pk,
+            'gap_seconds': gap,
+            'route_km': handoff.route_km,
+        }, status=status.HTTP_200_OK)
+
+    if event == 'background':
+        # The page lost the foreground without a link being tapped — the screen
+        # locked, the home button was pressed, something was opened from the
+        # notification shade. No button can see these, and they are most of what
+        # actually puts holes in the trail.
+        if fleet_models.DriverNavHandoff.open_for_driver(driver.pk):
+            return Response({'message': 'Already accounted for'}, status=status.HTTP_200_OK)
+        last_fix = fleet_models.DriverLocation.latest_for_driver(driver.pk, within_minutes=30)
+        handoff = fleet_models.DriverNavHandoff.objects.create(
+            driver=driver,
+            provider='background',
+            auto=True,
+            left_foreground=True,
+            from_latitude=last_fix.latitude if last_fix else None,
+            from_longitude=last_fix.longitude if last_fix else None,
+        )
+        return Response({'id': handoff.pk, 'opened_at': handoff.opened_at.isoformat()},
+                        status=status.HTTP_201_CREATED)
+
+    provider = (request.data.get('provider') or 'other').strip().lower()
+    valid = {key for key, _ in fleet_models.DriverNavHandoff.PROVIDERS}
+    if provider not in valid:
+        provider = 'other'
+
+    # A task id is only accepted for a task this driver actually holds — of
+    # either kind, since the pickup leg has its own buttons and its own tasks.
+    task_id = request.data.get('task_id') or None
+    if task_id:
+        task_id = delivery_models.DeliveryTask.objects.filter(
+            pk=task_id, driver=driver).values_list('pk', flat=True).first()
+    pickup_task_id = request.data.get('pickup_task_id') or None
+    if pickup_task_id:
+        pickup_task_id = delivery_models.PickupTask.objects.filter(
+            pk=pickup_task_id, driver=driver).values_list('pk', flat=True).first()
+
+    # A destination of 0,0 is an unset coordinate that reached the link anyway,
+    # not a delivery in the Gulf of Guinea.
+    dest_lat = _as_float(request.data.get('dest_lat'))
+    dest_lng = _as_float(request.data.get('dest_lng'))
+    if (dest_lat is None or dest_lng is None
+            or not (-90 <= dest_lat <= 90) or not (-180 <= dest_lng <= 180)
+            or (dest_lat == 0 and dest_lng == 0)):
+        dest_lat = dest_lng = None
+
+    # One driver is only ever out on one nav app. A previous handoff still open
+    # here is one whose return was never seen — close it rather than stack.
+    stale = fleet_models.DriverNavHandoff.open_for_driver(driver.pk)
+    if stale:
+        stale.close(reconstruct=False, reason='superseded')
+
+    last_fix = fleet_models.DriverLocation.latest_for_driver(driver.pk, within_minutes=30)
+    handoff = fleet_models.DriverNavHandoff.objects.create(
+        driver=driver,
+        task_id=task_id,
+        pickup_task_id=pickup_task_id,
+        provider=provider,
+        from_latitude=last_fix.latitude if last_fix else None,
+        from_longitude=last_fix.longitude if last_fix else None,
+        dest_latitude=dest_lat,
+        dest_longitude=dest_lng,
+    )
+    return Response({
+        'id': handoff.pk,
+        'opened_at': handoff.opened_at.isoformat(),
+    }, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
@@ -1009,6 +1160,15 @@ def driver_complete_task(request, task_id):
                     'error': f'This order has COD of {task.order.cod_amount} QAR. '
                              f'Please confirm COD collection before marking as delivered.'
                 }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Block a close-out that the client contracted proof for. The driver app
+        # hides the button too, but this is the gate that counts — a direct post
+        # must not slip through. Runs before the write, never after.
+        from delivery import pod as delivery_pod
+        pod_error = delivery_pod.missing(
+            task, status_value, delivery_pod.supplied_kinds(request.FILES))
+        if pod_error:
+            return Response({'error': pod_error}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             # Re-fetch with row lock inside atomic block
@@ -3248,14 +3408,6 @@ def business_orders_api(request):
         )
 
 
-# ==================== API TESTING UI ====================
-
-@login_required(login_url='account_login')
-def api_tester_view(request):
-    """Render the API testing UI for clients"""
-    logger.info(f"User {request.user.id} accessing API tester UI")
-    return render(request, 'ezzy_api/api_tester.html')
-
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
@@ -3349,14 +3501,6 @@ def business_order_detail_api(request, order_id):
         )
 
 
-# ==================== API TESTING UI ====================
-
-@login_required(login_url='account_login')
-def api_tester_view(request):
-    """Render the API testing UI for clients"""
-    logger.info(f"User {request.user.id} accessing API tester UI")
-    return render(request, 'ezzy_api/api_tester.html')
-
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
@@ -3446,14 +3590,6 @@ def business_clients_api(request):
         )
 
 
-# ==================== API TESTING UI ====================
-
-@login_required(login_url='account_login')
-def api_tester_view(request):
-    """Render the API testing UI for clients"""
-    logger.info(f"User {request.user.id} accessing API tester UI")
-    return render(request, 'ezzy_api/api_tester.html')
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
@@ -3517,14 +3653,6 @@ def business_tasks_api(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
-
-# ==================== API TESTING UI ====================
-
-@login_required(login_url='account_login')
-def api_tester_view(request):
-    """Render the API testing UI for clients"""
-    logger.info(f"User {request.user.id} accessing API tester UI")
-    return render(request, 'ezzy_api/api_tester.html')
 
 
 @api_view(['GET'])
@@ -4186,8 +4314,16 @@ def webhook_inbound_order(request, webhook_key):
         return Response({'success': False, 'error': SUSPENSION_MESSAGE}, status=403)
 
     # --- WooCommerce HMAC-SHA256 signature verification ---
+    # Once a secret is configured the signature is MANDATORY. Gating this on the
+    # header being present meant a caller could skip verification outright by
+    # simply not sending it, which made the stored secret decorative.
     wc_sig_header = request.META.get('HTTP_X_WC_WEBHOOK_SIGNATURE', '')
-    if wc_sig_header and wk.wc_webhook_secret:
+    if wk.wc_webhook_secret:
+        if not wc_sig_header:
+            return Response(
+                {'success': False, 'error': 'Missing webhook signature'},
+                status=401,
+            )
         try:
             raw_body = request.body
             expected = base64.b64encode(
@@ -5200,8 +5336,11 @@ def driver_report_task_issue(request, task_id):
     if task.order:
         comment = orders_models.OrderComments.objects.create(
             order=task.order,
+            name=request.user.get_full_name() or request.user.username,
             body=issue_note,
-            user=request.user,
+            author=request.user,
+            author_role='driver',
+            is_internal=True,
         )
 
     if issue_type == 'customer_unreachable' and task.dl_task_status not in ['delivered', 'failed', 'cancelled']:
@@ -5472,6 +5611,9 @@ def docs_getting_started(request):
 
 def docs_authentication(request):
     return render(request, 'ezzy_api/docs/authentication.html')
+
+def docs_custom_website(request):
+    return render(request, 'ezzy_api/docs/custom-website.html')
 
 def docs_shopify(request):
     return render(request, 'ezzy_api/docs/shopify.html')
