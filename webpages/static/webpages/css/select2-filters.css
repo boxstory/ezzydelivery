@@ -135,3 +135,15 @@
 @media (prefers-reduced-motion: reduce) {
     .picker-modal__body { transition: none; }
 }
+
+/* ── Stacking above the staff console's own overlays ──────────
+   Select2 parents a dropdown to <body> unless a `dropdownParent` is given,
+   and the initialiser only passes one for Bootstrap `.modal` dialogs. The
+   staff console's hand-rolled dialogs (`.sld__modal-overlay` and friends) sit
+   at z-index 9999, so a body-parented list opened inside one rendered behind
+   the dialog — the picker looked dead because the options were painted under
+   an opaque panel. Scoped to our own dropdown container class, so Select2
+   instances elsewhere in the project keep their stock stacking. */
+.select2-container--open.ez-filter-select__menu {
+    z-index: 10050;
+}

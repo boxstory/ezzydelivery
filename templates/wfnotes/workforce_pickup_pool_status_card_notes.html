@@ -99,7 +99,8 @@ Notes: Fetched by panel id "workforce_pickup_pool_status_card_notes"; renaming t
                     <div class="wfnote__item">
                         <dt class="wfnote__term">Collected</dt>
                         <dd class="wfnote__def">Goods are with the driver. From here the after-collection
-                            rule takes over and staff can no longer reassign or recall it.</dd>
+                            rule takes over and staff can no longer reassign or recall it — the row
+                            names whoever is running the delivery, and <em>Close leg</em> ends it.</dd>
                     </div>
                     <div class="wfnote__item">
                         <dt class="wfnote__term">Dropped</dt>
@@ -107,9 +108,9 @@ Notes: Fetched by panel id "workforce_pickup_pool_status_card_notes"; renaming t
                     </div>
                     <div class="wfnote__item">
                         <dt class="wfnote__term">Handed Off</dt>
-                        <dd class="wfnote__def">Passed to another driver who has confirmed. While the
-                            confirmation is outstanding the row still reads Collected and names the
-                            driver it is waiting on.</dd>
+                        <dd class="wfnote__def">Passed on and confirmed. Taking the delivery task counts
+                            as the confirmation, so a leg closes by itself the moment any driver picks the
+                            job up — this is also where a self-delivered pickup ends.</dd>
                     </div>
                     <div class="wfnote__item">
                         <dt class="wfnote__term">Cancelled</dt>
@@ -130,6 +131,12 @@ Notes: Fetched by panel id "workforce_pickup_pool_status_card_notes"; renaming t
                     job is refused rather than reassigned to themselves.</li>
                 <li><em>Back to pool</em> stops working once the goods are collected. At that point the
                     driver is holding the client's stock and the after-collection flow has to finish it.</li>
+                <li>A collected parcel <strong>disappears from the New task pool</strong> for everyone except
+                    the driver holding it and the driver a transfer is addressed to — nobody can take a
+                    delivery for a package sitting in someone else's car.</li>
+                <li><em>Close leg</em> is the repair for a collected row that never moved: it closes as
+                    Handed off onto whoever holds the delivery task, and both drivers are told to swap the
+                    parcel if that is somebody else. It never cancels — the collection did happen.</li>
                 <li>Returning an assigned-fleet job to the pool re-notifies that client's drivers. If the
                     client has no active pickup drivers, it will sit unclaimed until staff assign it.</li>
                 <li>Bulk actions are best-effort: rows in a state that cannot move are skipped and listed

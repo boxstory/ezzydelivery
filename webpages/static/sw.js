@@ -1,11 +1,18 @@
 // EzzyDriver Service Worker
-const CACHE_NAME = 'ezzydriver-v7';
-const STATIC_CACHE = 'ezzydriver-static-v7';
-const DYNAMIC_CACHE = 'ezzydriver-dynamic-v7';
+const CACHE_NAME = 'ezzydriver-v8';
+const STATIC_CACHE = 'ezzydriver-static-v8';
+const DYNAMIC_CACHE = 'ezzydriver-dynamic-v8';
 
 // Shared GPS queue implementation — the same module the page uses, so a ping
 // queued in the tab and one replayed here go through identical code.
 importScripts('/static/fleet/js/ezzy-gps-queue.js');
+
+// Paths that must never be served from cache — see the fetch handler for why.
+const AUTH_PATHS = ['/admin/', '/api/', '/accounts/', '/password/', '/join_us/', '/driver/start/'];
+
+// Only the driver PWA's own screens are worth an offline copy. Everything else
+// (marketing pages, forms, other apps' consoles) goes network-only.
+const OFFLINE_HTML_PREFIXES = ['/fleet/', '/delivery/'];
 
 // Static assets to cache
 const STATIC_ASSETS = [
@@ -56,8 +63,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Skip admin, API, and auth requests
-  if (url.pathname.startsWith('/admin/') || url.pathname.startsWith('/api/') || url.pathname.startsWith('/accounts/')) {
+  // Never touch admin, API or auth pages.
+  //
+  // An HTML page replayed from Cache Storage arrives without its Set-Cookie
+  // header and carries the csrfmiddlewaretoken of whoever filled the cache, so
+  // posting that form fails with "CSRF cookie not set" — and because the cached
+  // copy is served again on every retry, the driver can never get a fresh
+  // cookie and is stuck on "Page Expired". Any page holding a CSRF form must
+  // therefore come from the network or not at all.
+  if (AUTH_PATHS.some(prefix => url.pathname.startsWith(prefix))) {
     return;
   }
 
@@ -79,13 +93,21 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // For pages - network first, fallback to cache
-  if (request.headers.get('accept').includes('text/html')) {
+  // For pages - network first, fallback to cache.
+  // request.headers.get('accept') is null on some navigations; guard it.
+  const accept = request.headers.get('accept') || '';
+  if (accept.includes('text/html')) {
+    const offlineCapable = OFFLINE_HTML_PREFIXES.some(p => url.pathname.startsWith(p));
+    if (!offlineCapable) {
+      return;  // network-only: no stale HTML, no stale CSRF token
+    }
     event.respondWith(
       fetch(request)
         .then(networkResponse => {
-          // Only cache successful, non-redirected responses
-          if (networkResponse.ok && !networkResponse.redirected) {
+          // Only cache successful, non-redirected responses the origin allows us
+          // to store — a no-store page (auth, one-time forms) is never cached.
+          const cc = networkResponse.headers.get('cache-control') || '';
+          if (networkResponse.ok && !networkResponse.redirected && !cc.includes('no-store')) {
             const responseClone = networkResponse.clone();
             caches.open(DYNAMIC_CACHE).then(cache => {
               cache.put(request, responseClone);

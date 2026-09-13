@@ -1,0 +1,133 @@
+{% comment %}
+Purpose: "About this page" notes panel for delivery_app_control.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_delivery_app_control_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+        <p class="wfnote__lede">
+            Some clients contract for <strong>proof of delivery</strong> — evidence that a parcel really
+            reached the customer, or really could not be handed over. This page is where that requirement
+            is switched on, one client at a time. With it on, the driver app will not let the driver close
+            the task until they have captured what the client asked for, and neither will the API: the rule
+            is checked on the server, so it cannot be skipped by a driver on a patchy connection or by a
+            client's own integration posting the status directly.
+        </p>
+        <p class="wfnote__lede">
+            The same row also decides whether the client gets <strong>live tracking</strong> — a map in
+            their own dashboard following their driver from the moment the ride starts. Both are
+            per-client switches: turn them on for the clients who asked, not across the board.
+        </p>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What you can do here</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Proof on delivered</dt>
+                        <dd class="wfnote__def">The driver must capture proof before <em>Delivered</em> or
+                            <em>Partial</em> will go through. Partial counts because goods changed hands —
+                            otherwise it would be the easy way around the rule.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Proof on failed</dt>
+                        <dd class="wfnote__def">The driver must take a photo before <em>Failed</em> will go
+                            through — the closed door, the wrong building, the refused parcel still in their
+                            hand. This is the one clients ask for when they are arguing about attempts.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Counts as proof</dt>
+                        <dd class="wfnote__def">What a successful delivery needs: a photo, the customer's
+                            signature drawn on the driver's screen, or both. The box greys out when
+                            <em>Proof on delivered</em> is off, because it only governs that outcome.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Live tracking</dt>
+                        <dd class="wfnote__def">Puts a <strong>Live Tracking</strong> link in this
+                            client's own sidebar, showing their driver's position on a map. The link
+                            carries a count that lights up the moment a driver taps <em>Start Ride</em>,
+                            and the map only follows deliveries that are actually on their way —
+                            a parcel still sitting at the hub is not shown.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Driver sees</dt>
+                        <dd class="wfnote__def">A plain-English read-back of the rule as the driver will meet
+                            it, updated as you change the row. Check this line before saving.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Save</dt>
+                        <dd class="wfnote__def">Saves that one row only, so nothing else on the page can change
+                            by accident. Every change is written to the log with your username.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">Where the proof ends up</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">On the order</dt>
+                        <dd class="wfnote__def">Photos and signatures appear on the order details page under
+                            <strong>Proof of Delivery</strong>, where the client can see them too.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">On the task</dt>
+                        <dd class="wfnote__def">Staff see the same files on the delivery task detail page,
+                            alongside the completion GPS point the app records with them.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Who can open them</dt>
+                        <dd class="wfnote__def">Proof files are served through Django, not straight off disk —
+                            only the owning client and staff can open one. A link is not a public link.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <div class="wfnote__cols">
+            <section class="wfnote__sec">
+                <h2 class="wfnote__h">What the client's map shows</h2>
+                <dl class="wfnote__list">
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Deliberately thin</dt>
+                        <dd class="wfnote__def">A pin for the drop-off, a live dot for the driver, the
+                            task number and its status. It is not the staff task view — no customer
+                            phone number, no order file, no driver identity beyond "driver on the way".</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">Only their own</dt>
+                        <dd class="wfnote__def">Scoped to the client's own deliveries. A client never
+                            sees another client's parcels or a driver who is not carrying theirs.</dd>
+                    </div>
+                    <div class="wfnote__item">
+                        <dt class="wfnote__term">When the dot stops</dt>
+                        <dd class="wfnote__def">The driver's position carries its own age ("4 min ago"),
+                            and once the app has been quiet for ten minutes the dot greys out and says
+                            so — a parked driver and a closed app look different, which saves you the
+                            phone call.</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+
+        <section class="wfnote__sec wfnote__sec--note">
+            <h2 class="wfnote__h">Worth knowing</h2>
+            <ul class="wfnote__notes">
+                <li>A failed attempt always takes a <strong>photo</strong>, whatever the proof type says. There is
+                    no customer standing there to sign for a parcel they did not take, so a signature requirement
+                    would leave the driver stuck on the doorstep.</li>
+                <li>The rule is read <strong>when the driver submits</strong>, not when the order was created —
+                    turning it on binds every task already out on the road.</li>
+                <li>Proof the driver already uploaded counts. A submit that failed on a dead connection will not be
+                    blocked a second time by the photo its own first attempt managed to send.</li>
+                <li>Turning this on makes the driver's day slower. Every closed task costs a camera step, and a
+                    driver with no signal has to wait for the upload — switch it on for clients who asked, not
+                    across the board.</li>
+                <li>Staff closing a task from the office are <strong>not</strong> stopped by the proof rule. It
+                    binds the driver app and the API; a staff correction on the task page is a deliberate override.</li>
+                <li>Live tracking shows only what the driver's phone has actually reported. A browser cannot
+                    take GPS fixes once the app is closed, so gaps are real gaps — the map says so rather
+                    than guessing a position.</li>
+                <li>Every client trading when this setting was introduced already had the tracking page, so
+                    they were switched <strong>on</strong> to avoid taking a working feature away. Turn one
+                    off here if a client should not have it.</li>
+            </ul>
+        </section>

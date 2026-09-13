@@ -9,7 +9,7 @@
 
   var LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
   var LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-  var TILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  var TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   var loading = null;
   var built = {};

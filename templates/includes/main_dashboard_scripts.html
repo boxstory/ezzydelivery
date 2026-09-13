@@ -4,7 +4,7 @@
      the navbar user-dropdown twice per click (open → close), making it appear broken on dashboards. -->
 
 <!-- Page-notes help button (staff, warehouse, delivery dashboards) -->
-<script src="{% static 'webpages/js/wfnote.js' %}?v=20260730a"></script>
+<script src="{% static 'webpages/js/wfnote.js' %}?v=20260908a"></script>
 
 <script
   src="https://unpkg.com/htmx.org@2.0.3"
@@ -167,7 +167,12 @@
         // HTML5 validation with "not focusable" because the browser cannot
         // focus a hidden control.
         var form = el.form;
-        var isGetForm = !form || (form.method || 'get').toLowerCase() === 'get';
+        // getAttribute, not form.method: a form containing a control named
+        // "method" (the COD reconciliation filter has <select name="method">)
+        // shadows the property with that element, and .toLowerCase() on a
+        // <select> threw, killing Select2 for the whole page.
+        var formMethod = form ? (form.getAttribute('method') || 'get') : 'get';
+        var isGetForm = !form || formMethod.toLowerCase() === 'get';
         if (!isGetForm) {
           var isDriverPicker = /driver/i.test(el.name || '') || /driver/i.test(el.id || '');
           if (!isDriverPicker || el.required) return;

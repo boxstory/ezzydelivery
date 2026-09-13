@@ -1,0 +1,46 @@
+/* Purpose: The masthead band at the top of the blog category and post pages. */
+/* Used by: blog/templates/blog/category.html, blog/templates/blog/post_detail.html */
+/* Notes: Replaces an inline background-image pointing at blog/assets/img/page-title-bg.jpg —
+   that theme asset was never shipped, so the band rendered as a 404 and the heading sat on
+   bare white. A navy field off the Brand Kit needs no photograph to carry a page title. */
+
+.page-title {
+    position: relative;
+    padding: var(--spacing-xl, 3rem) 0 var(--spacing-lg, 2rem);
+    background-color: var(--brand-navy, #001f3f);
+    /* A single soft wash so the band is not a flat rectangle. Kept low-contrast:
+       it sits behind a heading and must never compete with it. */
+    background-image:
+        radial-gradient(120% 140% at 15% 0%, rgba(247, 192, 0, 0.14) 0%, rgba(247, 192, 0, 0) 55%),
+        linear-gradient(180deg, #01294f 0%, var(--brand-navy, #001f3f) 100%);
+    border-bottom: 3px solid var(--brand-primary, #f7c000);
+}
+
+.page-title h1 {
+    margin: 0 0 var(--spacing-xs, 0.5rem);
+    color: #fff;
+    font-weight: 700;
+}
+
+/* Breadcrumbs: yellow reaches 9.86:1 on navy, so it is safe as a link colour here
+   in a way it never is on white. */
+.page-title .breadcrumbs ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.page-title .breadcrumbs ol li + li::before {
+    content: "/";
+    padding-right: 0.5rem;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.page-title .breadcrumbs a { color: var(--brand-primary, #f7c000); text-decoration: none; }
+.page-title .breadcrumbs a:hover { text-decoration: underline; }
+.page-title .breadcrumbs .current { color: #fff; }

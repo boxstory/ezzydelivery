@@ -1,0 +1,67 @@
+{% comment %}
+Purpose: "About this page" notes panel for client_ledger.html, kept out of the page payload
+Used by: workforce.views.page_notes via workforce.js on first help-button click
+Notes: Fetched by panel id "workforce_client_ledger_card_notes"; renaming this file breaks that page's help button.
+{% endcomment %}
+      <p class="wfnote__lede">
+        This is <strong>one client's account</strong>. Every other finance screen shows a slice of a
+        client's money — COD on one page, invoices on another — and none of them add up to a figure.
+        This one does. Each money event is a single line, and the <strong>Balance</strong> column is the
+        answer to "where does this account stand right now".
+      </p>
+
+      <div class="wfnote__cols">
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">How to read it</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Balance</dt>
+              <dd class="wfnote__def">Always means <strong>what EzzyDelivery owes the client</strong>.
+                A negative balance means the client owes us instead — the headline says which in words,
+                so you never have to read a minus sign to know the direction.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Credit</dt>
+              <dd class="wfnote__def">Raises what we owe. COD we collected for the client is a credit —
+                we are holding their money. So is a payment they make against a charge.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Debit</dt>
+              <dd class="wfnote__def">Lowers what we owe. A delivery charge, an advance paid out early,
+                and the COD payout itself are all debits — the payout discharges the liability, which is
+                why a fully settled account reads zero.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Filters do not move the balance</dt>
+              <dd class="wfnote__def">Narrowing to one segment hides rows but never restates the Balance
+                column — it stays the account's real balance at each line. A running total of only the
+                rows you filtered to would look like a statement and be wrong.</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="wfnote__sec">
+          <h2 class="wfnote__h">Things worth knowing</h2>
+          <dl class="wfnote__list">
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Opening balance</dt>
+              <dd class="wfnote__def">An account that has never been opened starts at zero even though
+                the client may already hold COD and owe invoices. <strong>Post opening balance</strong>
+                seeds it with what is already documented — COD we hold, less unpaid invoices. Charges
+                not yet on an invoice are deliberately left out, or they would be billed twice.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Nothing is ever deleted</dt>
+              <dd class="wfnote__def">A reversed entry stays on the account, struck through and marked
+                Void, with a matching contra entry beside it. The two cancel. That is why the ledger can
+                be trusted as a record rather than a view.</dd>
+            </div>
+            <div class="wfnote__item">
+              <dt class="wfnote__term">Status</dt>
+              <dd class="wfnote__def"><strong>Pending</strong> is money that exists but has not reached
+                us — COD still in a driver's pocket. <strong>Open</strong> is realised and awaiting
+                settlement. <strong>Cleared</strong> is done.</dd>
+            </div>
+          </dl>
+        </section>
+      </div>

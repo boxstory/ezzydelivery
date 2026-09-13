@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="{% static 'mobile-app.css' %}?v=20260803a">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
   <!-- Brand sizing for the searchable filter selects (see main_dashboard_scripts.html) -->
-  <link rel="stylesheet" href="{% static 'webpages/css/select2-filters.css' %}?v=20260729c" type="text/css" />
+  <link rel="stylesheet" href="{% static 'webpages/css/select2-filters.css' %}?v=20260911a" type="text/css" />
 
   <!-- Dashboard CSS - Always loaded for HTMX compatibility -->
   <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260514a" type="text/css" />
@@ -132,6 +132,16 @@
   {% block extra_js %}
   <!--  -->
   {% endblock extra_js %}
+
+  {% if is_fleet_driver %}
+  <!-- EzzyGPS — the same single GPS consumer the PWA runs, so these older driver
+       pages report their position and record their handoffs to other apps too.
+       Gated on is_fleet_driver: this base is shared with a few staff screens,
+       and nobody without a driver row should be asked for their location. -->
+  <script>window.EZZY_GPS_CONFIG = { onDuty: {{ driver_on_duty|yesno:"true,false" }} };</script>
+  <script src="{% static 'fleet/js/ezzy-gps-queue.js' %}?v=20260802a"></script>
+  <script src="{% static 'fleet/js/ezzy-gps.js' %}?v=20260903c"></script>
+  {% endif %}
 
   <!-- PWA Service Worker Registration -->
   <script>

@@ -173,6 +173,8 @@
     color: rgba(255, 255, 255, 0.4);
     margin-right: 0.1rem;
 }
+/* Anchor or button — the WhatsApp chip opens a send composer rather than a link,
+   so the chip has to survive being a <button> (no inherited font, no pointer). */
 .wfhero__contact {
     display: inline-flex;
     align-items: center;
@@ -184,8 +186,15 @@
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
+    font-family: inherit;
     font-size: 0.7rem;
+    line-height: 1.4;
+    cursor: pointer;
     transition: background 0.2s;
+}
+.wfhero__contact:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 2px;
 }
 .wfhero__contact i { font-size: 0.68rem; opacity: 0.8; }
 .wfhero__contact-val {
@@ -317,6 +326,13 @@
     letter-spacing: -0.01em;
     color: #001f3f;
 }
+
+/* Inside the band that navy ink is invisible, so a code or figure put in the
+   masthead record line simply vanished. The band sets its own colour; mono
+   there only has to change the face, not the ink. */
+[data-dashboard="staff"] :is(
+    [class$="__hero"], [class*="__hero "], .wfhero, .wh__header
+) .wfmono { color: inherit; }
 
 @media (max-width: 767.98px) {
     .wfhero__record { font-size: 0.66rem; }
