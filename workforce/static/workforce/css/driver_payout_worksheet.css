@@ -145,8 +145,8 @@
 }
 .dpw__field-label {
   font-family: var(--tlr-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--tlr-muted);
   margin: 0;
@@ -195,6 +195,102 @@
 .dpw__rail-tag--on { color: var(--tlr-ink); background: var(--tlr-mark-soft); border-color: var(--tlr-mark); }
 .dpw__rail-clear { margin-left: auto; color: var(--tlr-ink); text-decoration: underline; }
 
+/* ── Per-driver split ─────────────────────────────────────── */
+/* A fleet-wide queue is paid one driver at a time, so the pile is broken up
+   before the list. Ledger rows, not cards: hairline separators, mono figures,
+   ink only — the yellow stays spent on the fee marker and the pay action. */
+.dpw__split {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--tlr-rule);
+  background: var(--tlr-card);
+}
+.dpw__split-cap {
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  padding-top: 0.25rem;
+}
+.dpw__split-rows { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; flex: 1 1 auto; }
+.dpw__split-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.1875rem 0.5rem;
+  border: 1px solid var(--tlr-rule);
+  border-left-width: 2px;
+  border-left-color: var(--tlr-rule-strong);
+  text-decoration: none;
+  color: var(--tlr-ink);
+  background: var(--tlr-card);
+}
+.dpw__split-row:hover { border-color: var(--tlr-rule-strong); border-left-color: var(--tlr-ink); }
+.dpw__split-row--on { background: var(--tlr-mark-soft); border-color: var(--tlr-mark); border-left-color: var(--tlr-mark); }
+.dpw__split-code { font-family: var(--tlr-mono); font-size: 0.72rem; font-weight: 600; }
+.dpw__split-name {
+  font-family: var(--tlr-cond);
+  font-size: 0.75rem;
+  color: var(--tlr-ink-soft);
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dpw__split-n, .dpw__split-val {
+  font-family: var(--tlr-mono);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.dpw__split-val { font-weight: 600; }
+.dpw__split-unit {
+  font-family: var(--tlr-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: var(--tlr-muted);
+  margin-left: 0.1875rem;
+}
+.dpw__split-flag, .dpw__split-since {
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  color: var(--tlr-muted);
+}
+/* Overridden to nothing: the one figure on this strip that has to be argued
+   with before anybody publishes. */
+.dpw__split-flag--zero { color: var(--tlr-void); }
+/* Same blue as the rows that driver's salary will absorb. */
+.dpw__split-flag--salary {
+  color: var(--tlr-info);
+  background-color: var(--brand-info-bg);
+  padding: 0 0.25rem;
+}
+.dpw__split-acts { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; }
+.dpw__split-desk {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  color: var(--tlr-ink);
+  text-decoration: underline;
+}
+
+/* A zeroed count is a warning, not a filter tag like the others. */
+.dpw__rail-tag--warn { color: var(--tlr-void); box-shadow: inset 2px 0 0 var(--tlr-void); }
+.dpw__rail-export {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--tlr-ink);
+  text-decoration: underline;
+  /* Far end of the rail — unless `--clear` is there, which already claims the
+     auto margin, and then the export just follows it. */
+  margin-left: auto;
+}
+.dpw__rail-clear ~ .dpw__rail-export { margin-left: 0.75rem; }
+
 /* ── Tools row ────────────────────────────────────────────── */
 .dpw__tools {
   display: flex;
@@ -206,6 +302,26 @@
   background: var(--tlr-paper);
 }
 .dpw__set { display: flex; align-items: center; gap: 0.375rem; }
+
+/* Select-all-across-pages notice — sits in the tools row, only while offered */
+.dpw__allpages {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  color: var(--tlr-muted);
+}
+.dpw__allpages-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--tlr-ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.dpw__allpages-btn:hover { color: var(--tlr-ink-soft); }
 .dpw__set-group { width: 12rem; }
 .dpw__acts { display: flex; gap: 0.375rem; margin-left: auto; }
 .dpw__btn {
@@ -233,6 +349,43 @@
   .dpw__scroll--queue { max-height: calc(100vh - 17rem); overflow-y: auto; }
 }
 .dpw__table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+
+/* Fleet-wide desk only: the driver code is the way into that driver's own desk. */
+.dpw__driver-link { color: var(--tlr-ink); text-decoration: none; border-bottom: 1px solid var(--tlr-rule-strong); }
+.dpw__driver-link:hover { color: var(--tlr-ink-soft); border-bottom-color: var(--tlr-ink); }
+
+/* Salary-covered rows. Publishing one creates no earning at all, so it is a
+   different KIND of line, not a different figure — the whole row is tinted and
+   edged in the info blue rather than the fee cell alone, which read as an
+   ordinary delivery until the eye reached the last column. The blue is spent
+   only here and on the count that explains it; the yellow stays the pay accent. */
+.dpw__row--salary > td { background-color: var(--brand-info-bg); }
+.dpw__row--salary > td:first-child { box-shadow: inset 3px 0 0 var(--tlr-info); }
+/* The hover tint is the card colour, which would erase the row's own. */
+.dpw__table tbody tr.dpw__row--salary:hover > td { background-color: var(--brand-info-bg); }
+.dpw__row--salary .dpw__mono,
+.dpw__row--salary .dpw__truncate { color: var(--tlr-ink); }
+/* The figure is quiet because it will not be paid — the caption below says why. */
+.dpw__fee--salary .dpw__fee-input { color: var(--tlr-muted); }
+.dpw__table tbody tr.dpw__row--salary:hover .dpw__fee-input,
+.dpw__row--salary .dpw__fee-input { background-color: transparent; }
+.dpw__salary-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--tlr-info);
+}
+/* Swatch beside the count: the tint in the list is only legible if the colour
+   is named once, where the number is. */
+.dpw__salary-swatch {
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 1px solid var(--tlr-info);
+  background-color: var(--brand-info-bg);
+}
 .dpw__table thead th {
   position: sticky;
   top: 0;
@@ -335,6 +488,11 @@
 .dpw .dpw__fee-input { -moz-appearance: textfield; appearance: textfield; }
 /* Rows that leave the flat rate carry the mark; everything else stays silent. */
 .dpw__fee--metered, .dpw__fee--adjusted { box-shadow: inset 2px 0 0 var(--tlr-mark); }
+/* Doubled class: the generic .dpw__fee-why below sets its own colour at the same
+   specificity, so a single modifier class loses on source order and the caption
+   rendered muted grey instead of the info blue. */
+.dpw__fee-why.dpw__fee-why--salary { color: var(--tlr-info); font-weight: 600; }
+
 .dpw__fee-why {
   display: block;
   font-family: var(--tlr-mono);
@@ -393,8 +551,132 @@
 }
 .dpw__field { display: flex; flex-direction: column; gap: 0.125rem; min-width: 10rem; }
 .dpw__field--grow { flex: 1 1 16rem; }
-.dpw__period { display: flex; align-items: center; gap: 0.375rem; }
-.dpw__period .form-select, .dpw__field .form-select { width: auto; }
+.dpw__field .form-select { width: auto; }
+
+/* ── Period strip ─────────────────────────────────────────────
+   Its own band under the panel head. Bootstrap's .form-control is width:100%
+   and loads after this file, so every selector that resizes a field here is
+   deliberately two classes deep — a bare .dpw__date loses that tie and each
+   date box goes full-width, which is what stacked the whole bar vertically. */
+.dpw__filter {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--tlr-rule);
+  background: var(--tlr-paper);
+}
+.dpw__filter-field { display: flex; flex-direction: column; gap: 0.1875rem; }
+.dpw__filter-sep {
+  align-self: flex-end;
+  width: 1px;
+  height: 2.125rem;
+  background: var(--tlr-rule-strong);
+  margin: 0 0.1875rem;
+}
+
+/* The preset is a Select2, not this <select> — main_dashboard_scripts.html
+   enhances every filter select on a staff GET form, leaving the native control
+   hidden at 1x1. Style the container from select2-filters.css (34px) and match
+   the rest of the strip to it; sizing .dpw__select itself is dead CSS. */
+.dpw__filter-field--preset { min-width: 9.75rem; }
+.dpw__filter .select2-container.ez-filter-select .select2-selection--single {
+  border-color: var(--tlr-rule-strong);
+  border-radius: 0.25rem;
+}
+.dpw__filter .select2-container.ez-filter-select .select2-selection--single .select2-selection__rendered {
+  font-family: var(--tlr-sans);
+  font-size: 0.82rem;
+  color: var(--tlr-ink);
+}
+
+/* Both boxes inside one shell, so a range reads as a single control. */
+.dpw__range {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2.125rem;
+  padding: 0 0.5rem;
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule-strong);
+  border-radius: 0.25rem;
+}
+.dpw__range:focus-within { border-color: var(--tlr-ink); }
+.dpw__range-cap {
+  font-family: var(--tlr-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  margin: 0;
+  cursor: pointer;
+}
+.dpw__range .dpw__date {
+  width: auto;
+  min-width: 8.5rem;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  font-family: var(--tlr-mono);
+  font-size: 0.85rem;
+  color: var(--tlr-ink);
+}
+.dpw__range .dpw__date:focus { box-shadow: none; outline: none; }
+.dpw__range-arrow { color: var(--tlr-rule-strong); font-size: 0.85rem; }
+
+.dpw__filter-apply {
+  height: 2.125rem;
+  border-radius: 0.25rem;
+  padding: 0 0.9rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tlr-ink);
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule-strong);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.dpw__filter-apply:hover { border-color: var(--tlr-ink); background: var(--tlr-mark-soft); }
+/* The strip bottom-aligns its fields (some carry a label row, some do not), so
+   anything without a label has to be pinned to the control row explicitly or it
+   floats above the baseline. */
+.dpw__filter-clear {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  height: 2.125rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.78rem;
+  color: var(--tlr-ink);
+  text-decoration: underline;
+}
+.dpw__filter-clear:hover { color: var(--tlr-ink-soft); }
+
+/* What the queue below is actually showing, in words. */
+.dpw__filter-state {
+  margin-left: auto;
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  height: 2.125rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--tlr-ink);
+}
+.dpw__filter-state-arrow,
+.dpw__filter-state-sep { color: var(--tlr-rule-strong); margin: 0 0.125rem; }
+
+@media (max-width: 575px) {
+  .dpw__filter-sep { display: none; }
+  .dpw__filter-state { margin-left: 0; }
+  .dpw__range .dpw__date { min-width: 7rem; }
+}
 
 .dpw__empty { padding: 0.75rem; margin: 0; font-size: 0.78rem; color: var(--tlr-muted); }
 .dpw__pager { padding: 0.375rem 0.75rem; border-top: 1px solid var(--tlr-rule); }
@@ -489,3 +771,103 @@
   /* No hover on touch, so the fee field has to look like a field. */
   .dpw input.dpw__fee-input { border-color: var(--tlr-rule-strong); background-color: var(--tlr-card); }
 }
+
+/* ── Bonus / deduction entry ──────────────────────────────────
+   The incentive leg's only door outside the Django admin. Shares the payform
+   band so the two money actions on the page read as one strip, not two
+   competing forms. The add button stays a bordered secondary: the yellow on
+   this page belongs to the payout, and only to the payout. */
+/* ── The aside panel ──────────────────────────────────────────
+   An occasional utility sitting beside the ledger, not part of it. It reads
+   quieter than the payable lines and the queue by three moves that cost nothing
+   in legibility: a lowercase head instead of the tracked ledger caps, its own
+   inset surface instead of a full-width band, and muted ink. Every field keeps
+   its size — a control staff use rarely is the one that must not be fiddly. */
+.dpw__panel--aside { background: var(--tlr-paper); }
+.dpw__panel-head--aside {
+  background: transparent;
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.dpw__panel-title--aside {
+  font-family: var(--tlr-sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--tlr-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.dpw__panel-title--aside i { font-size: 0.7rem; color: var(--tlr-rule-strong); }
+
+.dpw__adjform {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  /* Inset box: the form is a thing you step into, not another ledger band. */
+  margin: 0.375rem 0.75rem 0.75rem;
+  padding: 0.75rem;
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule);
+  border-radius: var(--brand-radius-sm);
+}
+.dpw__field--action { min-width: 0; }
+
+/* Quiet is a matter of colour and containment, never of control size: this is
+   the panel staff touch least, so it is the one that must not be fiddly. The
+   Bootstrap -sm controls came out at 26px/11.5px, under the console floors
+   (34px, 0.82rem). Two classes deep on purpose — Bootstrap loads after this
+   file and a bare .form-control loses the tie. */
+.dpw__adjform .form-control,
+.dpw__adjform .form-select {
+  height: 2.125rem;
+  font-size: 0.82rem;
+  color: var(--tlr-ink);
+}
+.dpw__adjform .dpw__adjbtn {
+  height: 2.125rem;
+  font-size: 0.8rem;
+  padding-inline: 0.75rem;
+}
+/* Date sits between the kind and the amount and needs no room to grow. */
+.dpw__adjform #workforce_adjustment_date { width: 9.5rem; }
+.dpw__adjbtn {
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-400);
+  color: var(--tlr-ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.dpw__adjbtn:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+  color: var(--tlr-ink);
+}
+.dpw__adjhint {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--tlr-muted);
+}
+
+/* Withdrawing an unpaid hand-entered line. Quiet until the row is hovered —
+   a delete affordance on 50 rows at full strength reads as a warning strip. */
+.dpw__col-rm { width: 1.75rem; }
+.dpw__rm {
+  border: 0;
+  background: none;
+  padding: 0 0.1875rem;
+  line-height: 1;
+  font-size: 0.85rem;
+  color: var(--tlr-rule-strong);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.dpw__rm:hover,
+.dpw__rm:focus-visible { color: var(--brand-danger); }

@@ -1,0 +1,231 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static humanize %}
+{% comment %}
+Purpose: What a delivery pays the driver — the fleet-wide rate card and the per-driver overrides that beat it
+Used by: fleet.views_pay.pay_rate_register at /workforce/fleet/pay-rates/
+Notes: Cards are dated agreements, so a rate change is a new row and an old queue still explains its figures.
+       This is the per-delivery leg only; salaried drivers are at /workforce/fleet/salary/.
+       Hero, page shell and card chrome come from the shared staff shell (webpages/css/staff-hero.css).
+{% endcomment %}
+
+{% block title %}Delivery pay rates{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'fleet/css/pay-rates.css' %}?v=20260909b" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="wfpage fpr">
+
+  <div class="fpr__hero">
+    <div class="wfhero__content">
+      <nav aria-label="breadcrumb">
+        <ol class="wfhero__crumbs">
+          <li class="wfhero__crumb">
+            <a href="{% url 'workforce:wf_dashboard' %}" class="wfhero__crumb-link">
+              <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
+            </a>
+          </li>
+          <li class="wfhero__crumb wfhero__crumb--active">
+            <i class="fa-solid fa-tags"></i><span>Delivery pay rates</span>
+          </li>
+        </ol>
+      </nav>
+      <h1 class="wfhero__heading"><i class="fa-solid fa-tags me-2"></i>Delivery pay rates</h1>
+      <p class="wfhero__record">
+        <span class="wfhero__tag">{{ override_count }} DRIVER OVERRIDE{{ override_count|pluralize:"S" }}</span>
+        <span class="wfhero__dot">&middot;</span>
+        normal <span class="wfmono">{{ active_card.normal_fee|floatformat:2 }}</span> QAR
+        <span class="wfhero__dot">&middot;</span>
+        hub <span class="wfmono">{{ active_card.hub_fee|floatformat:2 }}</span> QAR
+        <span class="wfhero__dot">&middot;</span>
+        pick &amp; drop <span class="wfmono">{{ active_card.pick_and_drop_percent|floatformat:2 }}</span>%
+      </p>
+    </div>
+    <div class="wfhero__bank">
+      <div class="d-flex flex-wrap justify-content-end gap-2">
+        <a href="{% url 'workforce:driver_payout_overview' %}" class="wfhero__btn">
+          <i class="fa-solid fa-clipboard-check"></i> Earnings verification
+        </a>
+        <a href="{% url 'workforce:salary_register' %}" class="wfhero__btn">
+          <i class="fa-solid fa-money-check-dollar"></i> Driver salaries
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wfpage__body">
+
+    {% comment %}
+    The resolver never returns nothing, so an empty table still pays. Say which
+    figures are in force rather than letting the page read as "unconfigured".
+    {% endcomment %}
+    {% if using_fallback %}
+    <div class="fpr__notice">
+      <i class="fa-solid fa-circle-info"></i>
+      <span>
+        No fleet rate card has been set, so deliveries are paying the built-in fallback —
+        <span class="wfmono">{{ fallback.normal_fee|floatformat:2 }}</span> QAR normal,
+        <span class="wfmono">{{ fallback.hub_fee|floatformat:2 }}</span> QAR hub,
+        <span class="wfmono">{{ fallback.pick_and_drop_percent|floatformat:0 }}</span>% of the client
+        charge on pick &amp; drop. Save a fleet card below to take control of these figures.
+      </span>
+    </div>
+    {% endif %}
+
+    <div class="wfcard wfcard--form">
+      <div class="wfcard__header"><i class="fa-solid fa-plus"></i> Start a rate card</div>
+      <div class="wfcard__body">
+        <form method="post" action="{% url 'workforce:pay_rate_save' %}" class="row g-2 align-items-end">
+          {% csrf_token %}
+          <div class="col-12 col-md-4">
+            <label for="fleet_payrate_select_driver" class="fpr__label">Applies to</label>
+            <select name="driver_id" id="fleet_payrate_select_driver" class="form-select">
+              <option value="">Whole fleet (default card)</option>
+              {% for d in candidates %}
+              <option value="{{ d.driver_id }}">{{ d.driver_code|default:d.driver_id }} — {{ d.user.get_full_name|default:d.user.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
+            <label for="fleet_payrate_input_normal" class="fpr__label">Normal delivery</label>
+            <input type="number" step="0.01" min="0" name="normal_fee"
+                   id="fleet_payrate_input_normal" class="form-control"
+                   value="{{ active_card.normal_fee|floatformat:2 }}" required>
+          </div>
+          <div class="col-6 col-md-2">
+            <label for="fleet_payrate_input_hub" class="fpr__label">Hub leg</label>
+            <input type="number" step="0.01" min="0" name="hub_fee"
+                   id="fleet_payrate_input_hub" class="form-control"
+                   value="{{ active_card.hub_fee|floatformat:2 }}" required>
+          </div>
+          <div class="col-6 col-md-2">
+            <label for="fleet_payrate_input_percent" class="fpr__label">Pick &amp; drop %</label>
+            <input type="number" step="0.01" min="0" max="100" name="pick_and_drop_percent"
+                   id="fleet_payrate_input_percent" class="form-control"
+                   value="{{ active_card.pick_and_drop_percent|floatformat:2 }}" required>
+          </div>
+          <div class="col-6 col-md-2">
+            <label for="fleet_payrate_input_from" class="fpr__label">Effective from</label>
+            <input type="date" name="effective_from" id="fleet_payrate_input_from"
+                   class="form-control" value="{{ today|date:'Y-m-d' }}" required>
+          </div>
+          <div class="col-12 col-md-10">
+            <label for="fleet_payrate_input_notes" class="fpr__label">Note (optional)</label>
+            <input type="text" name="notes" id="fleet_payrate_input_notes"
+                   class="form-control" placeholder="Why this rate changed">
+          </div>
+          <div class="col-12 col-md-2">
+            <button type="submit" class="btn fpr__btn-primary w-100">
+              <i class="fa-solid fa-check"></i> Save card
+            </button>
+          </div>
+          <div class="col-12">
+            <div class="form-check fpr__replace">
+              <input class="form-check-input" type="checkbox" name="replace" value="1"
+                     id="fleet_payrate_check_replace" checked>
+              <label class="form-check-label" for="fleet_payrate_check_replace">
+                Replace the running card — close the one already in force the day before this
+                card starts, instead of refusing to save.
+              </label>
+            </div>
+          </div>
+          <div class="col-12">
+            <p class="fpr__hint">
+              A driver card always beats the fleet card. Rates are never edited in place —
+              changing a rate closes the running card and starts a new one, so what a past
+              delivery was priced at stays readable. A card that has priced nothing yet can be
+              deleted outright. Salary absorbs the fee entirely up to a driver's monthly target.
+            </p>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="wfcard">
+      <div class="wfcard__header">
+        <i class="fa-solid fa-list-check"></i> Rate cards
+        <span class="fpr__filters">
+          <a href="?show=active" class="fpr__filter {% if show == 'active' %}fpr__filter--on{% endif %}">Running</a>
+          <a href="?show=ended" class="fpr__filter {% if show == 'ended' %}fpr__filter--on{% endif %}">Ended</a>
+          <a href="?show=all" class="fpr__filter {% if show == 'all' %}fpr__filter--on{% endif %}">All</a>
+        </span>
+      </div>
+      <div class="wfcard__body p-0">
+        {% if cards %}
+        <div class="table-responsive">
+          <table class="table fpr__table mb-0" id="fleet_payrates_table_cards">
+            <thead>
+              <tr>
+                <th>Applies to</th>
+                <th class="text-end">Normal</th>
+                <th class="text-end">Hub leg</th>
+                <th class="text-end">Pick &amp; drop</th>
+                <th>Period</th>
+                <th>Note</th>
+                <th class="text-end">Manage</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for card in cards %}
+              <tr>
+                <td>
+                  {% if card.driver %}
+                  <span class="wfmono">{{ card.driver.driver_code|default:card.driver.driver_id }}</span>
+                  <span class="fpr__name">{{ card.driver.user.get_full_name|default:"" }}</span>
+                  {% else %}
+                  <span class="fpr__scope">Whole fleet</span>
+                  {% endif %}
+                </td>
+                <td class="text-end wfmono">{{ card.normal_fee|floatformat:2 }}</td>
+                <td class="text-end wfmono">{{ card.hub_fee|floatformat:2 }}</td>
+                <td class="text-end wfmono">{{ card.pick_and_drop_percent|floatformat:2 }}%</td>
+                <td class="fpr__dim">
+                  {{ card.effective_from|date:"d M Y" }}
+                  {% if card.effective_to %}– {{ card.effective_to|date:"d M Y" }}
+                  {% else %}<span class="fpr__running">running</span>{% endif %}
+                </td>
+                <td class="fpr__dim fpr__note">{{ card.notes|default:"—" }}</td>
+                <td class="text-end">
+                  <div class="d-inline-flex flex-wrap gap-1 align-items-center justify-content-end">
+                    {% if card.is_open %}
+                    <form method="post" action="{% url 'workforce:pay_rate_end' card.id %}"
+                          class="d-inline-flex gap-1 align-items-center"
+                          onsubmit="return confirm('End this rate card? Deliveries after that date fall back to the card below it.');">
+                      {% csrf_token %}
+                      <input type="date" name="effective_to" class="form-control form-control-sm fpr__end-date"
+                             value="{{ today|date:'Y-m-d' }}" aria-label="Rate card end date">
+                      <button type="submit" class="btn btn-sm fpr__btn-ghost">End</button>
+                    </form>
+                    {% else %}<span class="fpr__dim">closed</span>{% endif %}
+                    {% comment %}
+                    Deletion is refused server-side once the card has priced a delivery,
+                    so this button is offered on every row rather than guessing here.
+                    {% endcomment %}
+                    <form method="post" action="{% url 'workforce:pay_rate_delete' card.id %}"
+                          class="d-inline"
+                          onsubmit="return confirm('Delete this rate card? This is only allowed while it has priced no deliveries.');">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm fpr__btn-danger" title="Delete this card">
+                        <i class="fa-solid fa-trash-can"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="wf-empty-state">
+          <i class="fa-solid fa-tags"></i>
+          <p class="wf-empty-state__title">No rate cards yet</p>
+          <p class="wf-empty-state__text">Deliveries are paying the built-in fallback. Save a fleet card above to set your own figures.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,184 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static humanize %}
+{% comment %}
+Purpose: The register of salaried drivers — who is on salary, for how much, and how much of the month's target they have used
+Used by: payroll.views.salary_register at /workforce/fleet/salary/
+Notes: Salary is its own money leg. This page never shows COD or client charges; per-delivery
+       earnings appear only as the target counter, which explains what the salary has absorbed.
+       Hero, page shell and card chrome come from the shared staff shell (webpages/css/staff-hero.css).
+{% endcomment %}
+
+{% block title %}Driver salaries{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'payroll/css/salary.css' %}?v=20260909c" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="wfpage sal">
+
+  <div class="sal__hero">
+    <div class="wfhero__content">
+      <nav aria-label="breadcrumb">
+        <ol class="wfhero__crumbs">
+          <li class="wfhero__crumb">
+            <a href="{% url 'workforce:wf_dashboard' %}" class="wfhero__crumb-link">
+              <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
+            </a>
+          </li>
+          <li class="wfhero__crumb wfhero__crumb--active">
+            <i class="fa-solid fa-money-check-dollar"></i><span>Driver salaries</span>
+          </li>
+        </ol>
+      </nav>
+      <h1 class="wfhero__heading"><i class="fa-solid fa-money-check-dollar me-2"></i>Driver salaries</h1>
+      <p class="wfhero__record">
+        <span class="wfhero__tag">{{ open_count }} ON SALARY</span>
+        <span class="wfhero__dot">&middot;</span>
+        <span class="wfmono">{{ monthly_total|floatformat:2|intcomma }}</span> QAR per month
+        <span class="wfhero__dot">&middot;</span> target usage shown for {{ period|date:"F Y" }}
+      </p>
+    </div>
+    <div class="wfhero__bank">
+      <div class="d-flex flex-wrap justify-content-end gap-2">
+        <a href="{% url 'workforce:salary_runs' %}" class="wfhero__btn">
+          <i class="fa-solid fa-calendar-check"></i> Monthly runs
+        </a>
+        <a href="{% url 'workforce:fleet_drivers_earnings' %}" class="wfhero__btn">
+          <i class="fa-solid fa-motorcycle"></i> Per-delivery payouts
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wfpage__body">
+    <div class="wfcard">
+      <div class="wfcard__header"><i class="fa-solid fa-user-plus"></i> Put a driver on salary</div>
+      <div class="wfcard__body">
+        {% comment %}
+        Only drivers with no running agreement are listed. A second open agreement
+        for one driver would make "what is this month worth?" ambiguous.
+        {% endcomment %}
+        <form method="post" action="{% url 'workforce:salary_structure_save' %}" class="row g-2 align-items-end">
+          {% csrf_token %}
+          <div class="col-12 col-md-4">
+            <label for="payroll_register_select_driver" class="sal__label">Driver</label>
+            <select name="driver_id" id="payroll_register_select_driver" class="form-select" required>
+              <option value="">Choose a driver…</option>
+              {% for d in candidates %}
+              <option value="{{ d.driver_id }}">{{ d.driver_code|default:d.driver_id }} — {{ d.user.get_full_name|default:d.user.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
+            <label for="payroll_register_input_amount" class="sal__label">Monthly salary</label>
+            <input type="number" step="0.01" min="0" name="monthly_amount"
+                   id="payroll_register_input_amount" class="form-control" placeholder="0.00" required>
+          </div>
+          <div class="col-6 col-md-2">
+            <label for="payroll_register_input_target" class="sal__label">Deliveries covered</label>
+            <input type="number" step="1" min="0" name="delivery_target"
+                   id="payroll_register_input_target" class="form-control" placeholder="0">
+          </div>
+          <div class="col-6 col-md-2">
+            <label for="payroll_register_input_from" class="sal__label">Effective from</label>
+            <input type="date" name="effective_from" id="payroll_register_input_from"
+                   class="form-control" value="{{ period|date:'Y-m-d' }}" required>
+          </div>
+          <div class="col-6 col-md-2">
+            <button type="submit" class="btn sal__btn-primary w-100">
+              <i class="fa-solid fa-check"></i> Start salary
+            </button>
+          </div>
+          <div class="col-12">
+            <p class="sal__hint">
+              A target of <span class="wfmono">0</span> means the salary covers every delivery.
+              Above the target the driver earns the normal per-delivery fee on top.
+            </p>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="wfcard">
+      <div class="wfcard__header">
+        <i class="fa-solid fa-list-check"></i> Agreements
+        <span class="sal__filters">
+          <a href="?show=active" class="sal__filter {% if show == 'active' %}sal__filter--on{% endif %}">Running</a>
+          <a href="?show=ended" class="sal__filter {% if show == 'ended' %}sal__filter--on{% endif %}">Ended</a>
+          <a href="?show=all" class="sal__filter {% if show == 'all' %}sal__filter--on{% endif %}">All</a>
+        </span>
+      </div>
+      <div class="wfcard__body p-0">
+        {% if rows %}
+        <div class="table-responsive">
+          <table class="table sal__table mb-0" id="payroll_register_table_agreements">
+            <thead>
+              <tr>
+                <th>Driver</th>
+                <th class="text-end">Monthly</th>
+                <th class="text-end">Target</th>
+                <th>{{ period|date:"M Y" }} usage</th>
+                <th>Period</th>
+                <th class="text-end">Manage</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+              <tr>
+                <td>
+                  <span class="wfmono">{{ row.structure.driver.driver_code|default:row.structure.driver.driver_id }}</span>
+                  <span class="sal__name">{{ row.structure.driver.user.get_full_name|default:"" }}</span>
+                </td>
+                <td class="text-end wfmono">
+                  {{ row.structure.monthly_amount|floatformat:2|intcomma }}
+                  {% comment %}A zero agreement absorbs deliveries and pays nothing — it can no longer be created, but existing ones must be visible.{% endcomment %}
+                  {% if not row.structure.monthly_amount %}
+                  <span class="sal__zero" title="This agreement pays nothing while still absorbing deliveries — end it or set a real amount">pays nothing</span>
+                  {% endif %}
+                </td>
+                <td class="text-end wfmono">{% if row.target %}{{ row.target|intcomma }}{% else %}<span class="sal__all">all</span>{% endif %}</td>
+                <td>
+                  {% comment %}Covered vs target — the one number that says whether the salary is earning its keep.{% endcomment %}
+                  <span class="wfmono">{{ row.covered|intcomma }}</span>
+                  {% if row.target %}
+                    <span class="sal__of">of {{ row.target|intcomma }}</span>
+                    {% if row.remaining == 0 %}<span class="sal__flag">target used — now on incentive</span>{% endif %}
+                  {% else %}
+                    <span class="sal__of">absorbed</span>
+                  {% endif %}
+                </td>
+                <td class="sal__dim">
+                  {{ row.structure.effective_from|date:"d M Y" }}
+                  {% if row.structure.effective_to %}– {{ row.structure.effective_to|date:"d M Y" }}
+                  {% else %}<span class="sal__running">running</span>{% endif %}
+                </td>
+                <td class="text-end">
+                  {% if row.structure.is_open %}
+                  <form method="post" action="{% url 'workforce:salary_structure_end' row.structure.id %}"
+                        class="d-inline-flex gap-1 align-items-center"
+                        onsubmit="return confirm('End this salary? From the next day the driver returns to per-delivery pay.');">
+                    {% csrf_token %}
+                    <input type="date" name="effective_to" class="form-control form-control-sm sal__end-date"
+                           value="{{ period|date:'Y-m-d' }}" aria-label="Salary end date">
+                    <button type="submit" class="btn btn-sm sal__btn-ghost">End</button>
+                  </form>
+                  {% else %}<span class="sal__dim">closed</span>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="wf-empty-state">
+          <i class="fa-solid fa-money-check-dollar"></i>
+          <p class="wf-empty-state__title">No salary agreements</p>
+          <p class="wf-empty-state__text">Every driver is on per-delivery pay. Put someone on salary above.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

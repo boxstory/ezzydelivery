@@ -1,0 +1,296 @@
+/* Purpose: Driver salary console — register, monthly run, and the printable slip. */
+/* Used by: payroll/templates/payroll/salary_*.html */
+/* Notes: Hero band, page shell and card headers come from webpages/css/staff-hero.css by class
+   suffix (*__hero, *__card-header) — never re-declare them here. Yellow is spent once: the pay
+   action. Everything else is navy ink on hairlines, money in tabular mono. */
+
+.sal {
+  --sal-ink: var(--brand-navy);
+  --sal-muted: var(--brand-grey-500);
+  --sal-rule: var(--brand-grey-200);
+  --sal-rule-strong: var(--brand-grey-300);
+  --sal-paper: var(--brand-grey-100);
+}
+
+/* ── Forms ────────────────────────────────────────────────── */
+.sal__label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sal-muted);
+  margin-bottom: 0.1875rem;
+}
+.sal__hint {
+  font-size: 0.78rem;
+  color: var(--sal-muted);
+  margin: 0.375rem 0 0;
+}
+
+/* The single yellow action on the page: money leaving. */
+.sal__btn-primary {
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
+  color: var(--brand-grey-800);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.sal__btn-primary:hover {
+  background: var(--brand-primary-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--brand-shadow-sm);
+}
+.sal__btn-ghost {
+  background: var(--sal-paper);
+  border: 1px solid var(--brand-grey-400);
+  color: var(--brand-grey-800);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.sal__btn-ghost:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+  color: var(--brand-grey-800);
+}
+.sal__month { width: auto; }
+.sal__end-date { width: 9rem; }
+.sal__amt { width: 6.5rem; }
+
+/* ── Tables ───────────────────────────────────────────────── */
+.sal__table { font-size: 0.85rem; }
+.sal__table thead th {
+  background: var(--sal-paper);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sal-muted);
+  border-bottom: 1px solid var(--sal-rule-strong);
+  white-space: nowrap;
+}
+.sal__table tbody td { vertical-align: middle; color: var(--brand-grey-700); }
+.sal__name { color: var(--sal-muted); margin-left: 0.375rem; }
+.sal__dim { color: var(--sal-muted); font-size: 0.8rem; }
+.sal__of { color: var(--sal-muted); font-size: 0.78rem; margin-left: 0.25rem; }
+.sal__all { color: var(--sal-muted); font-style: italic; }
+.sal__running { color: var(--brand-success); font-size: 0.72rem; margin-left: 0.25rem; }
+.sal__zero {
+  display: inline-block;
+  margin-left: 0.375rem;
+  padding: 0.0625rem 0.375rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-danger);
+  background: var(--brand-danger-bg);
+  border-radius: var(--brand-radius-sm);
+}
+
+/* The one thing staff scan for: the salary has stopped covering deliveries. */
+.sal__flag {
+  display: inline-block;
+  margin-left: 0.375rem;
+  padding: 0.0625rem 0.375rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-warning);
+  background: var(--brand-warning-bg);
+  border-radius: var(--brand-radius-sm);
+}
+
+/* ── Status (swatch + text, never a loud pill) ────────────── */
+.sal__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--sal-muted);
+}
+.sal__status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-grey-400);
+}
+.sal__status--paid { color: var(--brand-success); }
+.sal__status--paid::before { background: var(--brand-success); }
+.sal__status--draft::before,
+.sal__status--pending::before { background: var(--brand-warning); }
+
+.sal__filters { margin-left: auto; display: inline-flex; gap: 0.375rem; }
+.sal__filter {
+  font-size: 0.72rem;
+  color: var(--sal-muted);
+  text-decoration: none;
+  padding: 0.0625rem 0.375rem;
+  border: 1px solid transparent;
+  border-radius: var(--brand-radius-sm);
+}
+.sal__filter:hover { color: var(--sal-ink); border-color: var(--sal-rule-strong); }
+.sal__filter--on { color: var(--sal-ink); border-color: var(--brand-primary); font-weight: 600; }
+
+/* ── Run tallies in the hero ──────────────────────────────── */
+.sal__tallies { display: flex; flex-wrap: wrap; gap: 1.125rem; justify-content: flex-end; }
+.sal__tally { display: flex; flex-direction: column; align-items: flex-end; }
+.sal__tally-lbl {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+.sal__tally-val {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.sal__tally--net .sal__tally-val { color: var(--brand-primary); }
+
+/* ── Slip cards on the run ────────────────────────────────── */
+.sal__slip-code { font-family: ui-monospace, monospace; color: var(--sal-ink); text-decoration: none; }
+.sal__slip-code:hover { text-decoration: underline; }
+.sal__slip-driver { color: var(--sal-muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
+.sal__slip--paid { opacity: 0.82; }
+
+.sal__figures { display: flex; flex-direction: column; gap: 0.375rem; }
+.sal__fig { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+.sal__fig-lbl { font-size: 0.75rem; color: var(--sal-muted); }
+.sal__fig-val {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  font-variant-numeric: tabular-nums;
+}
+.sal__fig-val--minus { color: var(--brand-danger); }
+/* Bonus reads as money arriving. Green, not the page's yellow — yellow is spent
+   once on the pay action and must not be borrowed for a figure. */
+.sal__fig-val--plus { color: var(--brand-success); }
+.sal__fig--net { border-top: 1px solid var(--sal-rule); padding-top: 0.375rem; }
+.sal__fig--net .sal__fig-val { font-size: 1.125rem; font-weight: 700; }
+.sal__unit { font-size: 0.65rem; font-weight: 600; color: var(--sal-muted); margin-left: 0.25rem; }
+.sal__coverage { font-size: 0.78rem; color: var(--sal-muted); margin: 0.75rem 0 0; }
+
+/* A month the agreement only partly covered. Not pro-rated — flagged so staff can
+   choose to deduct. */
+.sal__partial {
+  font-size: 0.78rem;
+  color: var(--brand-warning);
+  background: var(--brand-warning-bg);
+  border-radius: var(--brand-radius-sm);
+  padding: 0.375rem 0.5rem;
+  margin: 0.75rem 0 0;
+}
+
+.sal__sub {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sal-muted);
+  margin-bottom: 0.375rem;
+}
+.sal__deductions { list-style: none; margin: 0 0 0.375rem; padding: 0; }
+.sal__deduction {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.1875rem 0;
+  border-bottom: 1px solid var(--sal-rule);
+  font-size: 0.8rem;
+}
+.sal__deduction-label { flex: 1 1 auto; color: var(--brand-grey-700); }
+.sal__deduction-amt { color: var(--brand-danger); font-variant-numeric: tabular-nums; }
+.sal__deduction-amt--plus { color: var(--brand-success); }
+.sal__deduction-x {
+  border: 0;
+  background: none;
+  color: var(--sal-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+  cursor: pointer;
+}
+.sal__deduction-x:hover { color: var(--brand-danger); }
+.sal__paid-note { font-size: 0.78rem; color: var(--brand-grey-700); margin-bottom: 0.375rem; }
+
+/* ── The printable sheet ──────────────────────────────────── */
+.sal__sheet {
+  max-width: 46rem;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid var(--sal-rule-strong);
+  border-radius: var(--brand-radius-md);
+  padding: 1.125rem;
+}
+.sal__sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--sal-ink);
+}
+.sal__sheet-brand { font-size: 1.125rem; font-weight: 700; color: var(--sal-ink); margin: 0; }
+.sal__sheet-kind {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sal-muted);
+  margin: 0;
+}
+.sal__sheet-ref { text-align: right; }
+.sal__sheet-ref p { margin: 0; font-size: 0.8rem; }
+
+.sal__sheet-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.sal__sheet-meta dt {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sal-muted);
+}
+.sal__sheet-meta dd { margin: 0; font-size: 0.85rem; color: var(--brand-grey-800); }
+
+.sal__sheet-table { width: 100%; border-collapse: collapse; margin-top: 0.375rem; }
+.sal__sheet-table th,
+.sal__sheet-table td {
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--sal-rule);
+  font-size: 0.85rem;
+  text-align: left;
+  font-weight: 400;
+  color: var(--brand-grey-700);
+}
+.sal__sheet-table td { text-align: right; font-variant-numeric: tabular-nums; }
+.sal__sheet-minus td { color: var(--brand-danger); }
+.sal__sheet-plus td { color: var(--brand-success); }
+.sal__sheet-net th,
+.sal__sheet-net td {
+  border-top: 2px solid var(--sal-ink);
+  border-bottom: 0;
+  padding-top: 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--sal-ink);
+}
+.sal__sheet-foot { margin-top: 1.125rem; font-size: 0.8rem; color: var(--brand-grey-700); }
+.sal__sheet-note { margin-top: 0.375rem; }
+
+@media print {
+  .sal__no-print,
+  .wf-sidebar, .site-nav, .htmx-loader { display: none !important; }
+  .sal__sheet { border: 0; max-width: none; padding: 0; }
+}

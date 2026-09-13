@@ -1,0 +1,133 @@
+/* Purpose: Delivery pay rate console — the fleet card and the per-driver cards that override it. */
+/* Used by: fleet/templates/fleet/pay/pay_rate_register.html */
+/* Notes: Hero band, page shell and card headers come from webpages/css/staff-hero.css by class
+   suffix (*__hero, *__card-header) — never re-declare them here. Yellow is spent once: saving a
+   card. Everything else is navy ink on hairlines, money in tabular mono. */
+
+.fpr {
+  --fpr-ink: var(--brand-navy);
+  --fpr-muted: var(--brand-grey-500);
+  --fpr-rule: var(--brand-grey-200);
+  --fpr-rule-strong: var(--brand-grey-300);
+  --fpr-paper: var(--brand-grey-100);
+}
+
+/* ── The "you are on the fallback" strip ──────────────────── */
+.fpr__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--brand-grey-700);
+  background: var(--brand-info-bg);
+  border: 1px solid var(--brand-grey-250);
+  border-left: 3px solid var(--brand-info);
+  border-radius: var(--brand-radius-sm);
+}
+.fpr__notice i { color: var(--brand-info); margin-top: 0.125rem; }
+
+/* ── Forms ────────────────────────────────────────────────── */
+.fpr__label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fpr-muted);
+  margin-bottom: 0.1875rem;
+}
+.fpr__hint {
+  font-size: 0.78rem;
+  color: var(--fpr-muted);
+  margin: 0.375rem 0 0;
+}
+
+/* Replacing the running card is the usual reason to open this form, so the
+   choice reads as a sentence rather than a warning. */
+.fpr__replace .form-check-label {
+  font-size: 0.78rem;
+  color: var(--brand-grey-700);
+}
+
+/* The single yellow action on the page: committing a new rate. */
+.fpr__btn-primary {
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
+  color: var(--brand-grey-800);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.fpr__btn-primary:hover {
+  background: var(--brand-primary-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--brand-shadow-sm);
+}
+.fpr__btn-ghost {
+  background: var(--fpr-paper);
+  border: 1px solid var(--brand-grey-400);
+  color: var(--brand-grey-800);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.fpr__btn-ghost:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+  color: var(--brand-grey-800);
+}
+.fpr__end-date { width: 9rem; }
+
+/* Destructive, and refused server-side once the card has priced anything —
+   quiet until hovered so the table does not read as a row of red buttons. */
+.fpr__btn-danger {
+  background: transparent;
+  border: 1px solid var(--brand-grey-300);
+  color: var(--brand-grey-500);
+  font-size: 0.8rem;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.fpr__btn-danger:hover {
+  background: var(--brand-danger-bg);
+  border-color: var(--brand-danger);
+  color: var(--brand-danger);
+}
+
+/* ── Table ────────────────────────────────────────────────── */
+.fpr__table { font-size: 0.85rem; }
+.fpr__table thead th {
+  background: var(--fpr-paper);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fpr-muted);
+  border-bottom: 1px solid var(--fpr-rule-strong);
+  white-space: nowrap;
+}
+.fpr__table tbody td { vertical-align: middle; color: var(--brand-grey-700); }
+.fpr__name { color: var(--fpr-muted); margin-left: 0.375rem; }
+.fpr__dim { color: var(--fpr-muted); font-size: 0.8rem; }
+.fpr__note { max-width: 18rem; }
+.fpr__running { color: var(--brand-success); font-size: 0.72rem; margin-left: 0.25rem; }
+
+/* The fleet card is the one every other row falls back to — name it, don't colour it. */
+.fpr__scope {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--fpr-ink);
+}
+
+.fpr__filters { margin-left: auto; display: inline-flex; gap: 0.375rem; }
+.fpr__filter {
+  font-size: 0.72rem;
+  color: var(--fpr-muted);
+  text-decoration: none;
+  padding: 0.0625rem 0.375rem;
+  border: 1px solid transparent;
+  border-radius: var(--brand-radius-sm);
+}
+.fpr__filter:hover { color: var(--fpr-ink); border-color: var(--fpr-rule-strong); }
+.fpr__filter--on { color: var(--fpr-ink); border-color: var(--brand-primary); font-weight: 600; }

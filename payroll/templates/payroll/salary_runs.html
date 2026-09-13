@@ -1,0 +1,96 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static humanize %}
+{% comment %}
+Purpose: Every month's salary run, and the control that opens a new one
+Used by: payroll.views.salary_runs at /workforce/fleet/salary/runs/
+Notes: Opening a month is safe to repeat — build_run only adds slips for drivers who have none,
+       so a driver put on salary mid-month can be picked up by running it again.
+{% endcomment %}
+
+{% block title %}Salary runs{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'payroll/css/salary.css' %}?v=20260909c" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="wfpage sal">
+
+  <div class="sal__hero">
+    <div class="wfhero__content">
+      <nav aria-label="breadcrumb">
+        <ol class="wfhero__crumbs">
+          <li class="wfhero__crumb">
+            <a href="{% url 'workforce:wf_dashboard' %}" class="wfhero__crumb-link">
+              <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
+            </a>
+          </li>
+          <li class="wfhero__crumb">
+            <a href="{% url 'workforce:salary_register' %}" class="wfhero__crumb-link">
+              <i class="fa-solid fa-money-check-dollar"></i><span>Driver salaries</span>
+            </a>
+          </li>
+          <li class="wfhero__crumb wfhero__crumb--active">
+            <i class="fa-solid fa-calendar-check"></i><span>Runs</span>
+          </li>
+        </ol>
+      </nav>
+      <h1 class="wfhero__heading"><i class="fa-solid fa-calendar-check me-2"></i>Salary runs</h1>
+      <p class="wfhero__record">One run per month &middot; a slip per driver on salary that month</p>
+    </div>
+    <div class="wfhero__bank">
+      <form method="post" action="{% url 'workforce:salary_run_create' %}"
+            class="d-flex flex-wrap justify-content-end gap-2 align-items-center">
+        {% csrf_token %}
+        <input type="month" name="month" class="form-control form-control-sm sal__month"
+               value="{{ default_month|date:'Y-m' }}" aria-label="Month to run" required>
+        <button type="submit" class="wfhero__btn"><i class="fa-solid fa-play"></i> Open month</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="wfpage__body">
+    <div class="wfcard">
+      <div class="wfcard__header"><i class="fa-solid fa-clock-rotate-left"></i> History</div>
+      <div class="wfcard__body p-0">
+        {% if runs %}
+        <div class="table-responsive">
+          <table class="table sal__table mb-0" id="payroll_runs_table_history">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th class="text-end">Slips</th>
+                <th class="text-end">Net total</th>
+                <th>Status</th>
+                <th class="text-end">Open</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for run in runs %}
+              <tr>
+                <td class="wfmono">{{ run.period_month|date:"F Y" }}</td>
+                <td class="text-end wfmono">{{ run.slip_count|intcomma }}</td>
+                <td class="text-end wfmono">{{ run.total|default:0|floatformat:2|intcomma }}</td>
+                <td>
+                  <span class="sal__status sal__status--{{ run.status }}">{{ run.get_status_display }}</span>
+                </td>
+                <td class="text-end">
+                  <a href="{% url 'workforce:salary_run_detail' run.id %}" class="btn btn-sm sal__btn-ghost">Open</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="wf-empty-state">
+          <i class="fa-solid fa-calendar-check"></i>
+          <p class="wf-empty-state__title">No runs yet</p>
+          <p class="wf-empty-state__text">Open a month above to draw this month's slips.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
