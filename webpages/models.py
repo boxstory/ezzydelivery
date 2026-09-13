@@ -263,6 +263,8 @@ class PricingRule(models.Model):
         ('cod', 'Cash on delivery'),
         ('special_handling', 'Special handling'),
         ('returns', 'Return logistics'),
+        ('same_day_pickup', 'Same-day pick & deliver'),
+        ('pickup_type', 'Pickup point type'),
         ('pickup_locations', 'Pickup locations'),
         ('pickups_per_day', 'Pickups per day'),
     ]

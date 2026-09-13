@@ -53,9 +53,26 @@ SIZE_RANK = {
 
 SPEED_RANK = {
     'standard (3-5 days)': 1,
+    # A 2-3 day promise is the same kind of plan-ahead job as 3-5 days, so it
+    # shares rank 1 and the standard discount with it.
+    '2-3 days': 1,
     '48 hours': 2,
+    # Next day is quicker than 48 hours but still an overnight batch, not a
+    # same-day run — rank 2 keeps it in the neutral tier the card prices at zero.
+    'next day': 2,
     'same day': 3,
     'express (few hours)': 4,
+}
+
+# How hard a pickup POINT is to serve, independent of how many there are — the
+# count is priced separately by the pickup_locations ladder, so ranking multi-store
+# above a single store here would charge the same fact twice.
+PICKUP_TYPE_RANK = {
+    'fulfillment': 1,
+    'office': 2,
+    'store': 2,
+    'multiple store': 2,
+    'home': 3,
 }
 
 STORAGE_RANK = {
@@ -162,6 +179,22 @@ def rank_of(raw, table):
     return table.get(_key(raw))
 
 
+def rank_of_multi(raw, table):
+    """Highest rank among a comma-separated multi-answer.
+
+    Speed, parcel size and pickup type are multi-select bubbles on the public
+    form, so they arrive as "Express (Few Hours), Same Day". A plain rank_of on
+    that whole string matches nothing, and the dimension silently prices at zero
+    — which is how half of all inquiries ended up with no speed surcharge at all.
+
+    We take the MAX, not the average: a business that promises express delivery
+    has to be resourced for express, whatever else it also offers.
+    """
+    ranks = [table.get(_key(part)) for part in split_multi(raw)]
+    ranks = [r for r in ranks if r is not None]
+    return max(ranks) if ranks else None
+
+
 def distance_km(raw):
     """Distance answer → km midpoint. Falls back to generic parsing so a staff-typed
     "12 km" still works, and so the table is not the only accepted phrasing."""
@@ -219,13 +252,19 @@ def normalise_enquiry(inquiry):
     if coverage_rank is None:
         missing.append('delivery_coverage')
 
-    size_rank = rank_of(getattr(inquiry, 'typical_package_size', None), SIZE_RANK)
+    size_rank = rank_of_multi(getattr(inquiry, 'typical_package_size', None), SIZE_RANK)
     if size_rank is None:
         missing.append('typical_package_size')
 
-    speed_rank = rank_of(getattr(inquiry, 'speed_delivery_offer_to_customers', None), SPEED_RANK)
+    speed_rank = rank_of_multi(getattr(inquiry, 'speed_delivery_offer_to_customers', None),
+                               SPEED_RANK)
     if speed_rank is None:
         missing.append('speed_delivery_offer_to_customers')
+
+    pickup_type_rank = rank_of_multi(getattr(inquiry, 'type_of_pickup_location', None),
+                                     PICKUP_TYPE_RANK)
+    if pickup_type_rank is None:
+        missing.append('type_of_pickup_location')
 
     weight = band('average_package_weight')
     benchmark = band('current_delivery_cost')
@@ -259,6 +298,8 @@ def normalise_enquiry(inquiry):
                              if inquiry.is_special_handling_required else []),
         'returns_required': bool(inquiry.is_return_logistics_required),
 
+        'pickup_type_rank': pickup_type_rank,
+        'pickup_type': (getattr(inquiry, 'type_of_pickup_location', '') or '').strip(),
         'pickup_locations_mid': pickup_locations.mid,
         'pickups_per_day_mid': pickups_per_day.mid,
         'storage_rank': rank_of(getattr(inquiry, 'fulfillment_storage_volume', None), STORAGE_RANK),

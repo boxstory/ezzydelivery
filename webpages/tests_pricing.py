@@ -41,7 +41,35 @@ def ensure_rate_card():
     module.seed(_Apps, None)
     # 0014 corrects the COD rules so they stack; apply it here too.
     PricingRule.objects.filter(dimension='cod', label='Cash on delivery').update(stop_on_match=False)
+    # 0017 adds the two dimensions 0013 normalised but never priced.
+    importlib.import_module(
+        'webpages.migrations.0017_seed_urgency_and_pickup_type_rules').seed(_Apps, None)
     return PricingRuleSet.objects.get(code='rate_card_v1')
+
+
+def ensure_rate_card_v2(activate=True):
+    """The live card. Re-seeded for the same reason as ensure_rate_card above.
+
+    Note that ensure_rate_card() ACTIVATES v1 as a side effect (0013 seeds it
+    active and the model enforces a single active card), so any test that means
+    to exercise v2 has to say so explicitly.
+    """
+    import importlib
+    ruleset = PricingRuleSet.objects.filter(code='rate_card_v2').first()
+    if ruleset is None:
+        module = importlib.import_module('webpages.migrations.0018_rate_card_v2')
+
+        class _Apps:
+            @staticmethod
+            def get_model(app_label, model_name):
+                return {'PricingRuleSet': PricingRuleSet, 'PricingRule': PricingRule}[model_name]
+
+        module.seed(_Apps, None)
+        ruleset = PricingRuleSet.objects.get(code='rate_card_v2')
+    if activate and not ruleset.is_active:
+        ruleset.is_active = True
+        ruleset.save()
+    return ruleset
 
 
 class BandParsingTests(TestCase):
@@ -273,7 +301,8 @@ class EngineTests(TestCase):
         self.assertEqual(result.suggested_price, Decimal('33.00'))  # 30 + 10%
 
     def test_only_one_rate_card_can_be_active(self):
-        other = PricingRuleSet.objects.create(code='rate_card_v2', name='v2', is_active=True)
+        other = PricingRuleSet.objects.create(code='rate_card_fixture', name='fixture',
+                                              is_active=True)
         self.ruleset.refresh_from_db()
         self.assertTrue(other.is_active)
         self.assertFalse(self.ruleset.is_active)
@@ -395,6 +424,264 @@ class RequiredPricingAnswersTests(TestCase):
         # they cannot complete and cannot leave.
         response = self._post_step(2, {}, button='prev_step')
         self.assertEqual(response.status_code, 302)
+
+
+class MultiSelectAnswerTests(TestCase):
+    """Speed, size and pickup type are multi-select bubbles on the public form.
+
+    A single-key rank lookup matched none of them, so half of every inquiry
+    ever taken priced its speed dimension at zero. These lock that shut.
+    """
+
+    def setUp(self):
+        self.ruleset = ensure_rate_card()
+
+    def _enquiry(self, **kwargs):
+        defaults = dict(
+            full_name='Sara', business_name='Aiwa Home', business_contact_number='97455512345',
+            product_category='Home decor', is_complete=True,
+            avarage_number_of_order_done_last_month='1-25',
+            typical_delivery_distance='Under 10 km',
+            typical_package_size='Small (Envelopes / Packets)',
+            speed_delivery_offer_to_customers='48 Hours',
+            delivery_coverage='Doha Only',
+            type_of_pickup_location='Store',
+        )
+        defaults.update(kwargs)
+        return PricingEnquiry.objects.create(**defaults)
+
+    def test_a_multi_speed_ranks_by_its_fastest_promise(self):
+        """You have to be resourced for express even if you also offer standard."""
+        self.assertEqual(bands.rank_of_multi('Express (Few Hours), Same Day', bands.SPEED_RANK), 4)
+        self.assertEqual(bands.rank_of_multi('Same Day, Standard (3-5 Days)', bands.SPEED_RANK), 3)
+
+    def test_speeds_the_form_stores_but_the_table_lacked(self):
+        for answer, rank in (('Next Day', 2), ('2-3 Days', 1), ('Next Day, 2-3 Days', 2)):
+            with self.subTest(answer=answer):
+                self.assertEqual(bands.rank_of_multi(answer, bands.SPEED_RANK), rank)
+
+    def test_a_multi_speed_is_no_longer_reported_missing(self):
+        result = suggest_price(
+            self._enquiry(speed_delivery_offer_to_customers='Express (Few Hours), Same Day'),
+            with_comparables=False)
+        self.assertNotIn('speed_delivery_offer_to_customers', result.missing)
+        self.assertTrue(any(line['dimension'] == 'speed' for line in result.breakdown),
+                        'express should have surcharged')
+
+    def test_a_multi_size_still_finds_the_bulky_item(self):
+        result = suggest_price(
+            self._enquiry(typical_package_size='Medium (Shoe Box Size), Large (Appliances / Bulky)'),
+            with_comparables=False)
+        self.assertEqual(result.inputs['size_rank'], 3)
+        self.assertTrue(any(line['dimension'] == 'size' for line in result.breakdown))
+
+    def test_mixed_sizes_alone_is_still_unknown(self):
+        """'Mixed' carries no magnitude — it must not resolve to a rank."""
+        self.assertIsNone(bands.rank_of_multi('Mixed Sizes', bands.SIZE_RANK))
+
+
+class UrgencyAndPickupPricingTests(TestCase):
+    """The dimension machinery for same-day pickup and pickup type.
+
+    Rate card v2 deliberately prices both INTO the base (see
+    RateCardV2CalibrationTests), so these build their own rules rather than
+    leaning on whichever card happens to be active — the point here is that the
+    plumbing works when a rate card does choose to charge for them.
+    """
+
+    def setUp(self):
+        self.ruleset = PricingRuleSet.objects.create(
+            code='rate_card_urgency_fixture', name='urgency fixture', is_active=True,
+            base_price_default=Decimal('20.00'), min_price_floor=Decimal('5.00'))
+        PricingRule.objects.create(
+            ruleset=self.ruleset, dimension='same_day_pickup', label='Same-day pick & deliver',
+            match_field='same_day_required', match_kind=PricingRule.KIND_BOOL,
+            effect=PricingRule.EFFECT_ADD, amount=Decimal('5.00'))
+        PricingRule.objects.create(
+            ruleset=self.ruleset, dimension='pickup_type', label='Residential pickup point',
+            match_field='pickup_type_rank', match_kind=PricingRule.KIND_NUMERIC,
+            match_min=Decimal('3.00'), effect=PricingRule.EFFECT_ADD, amount=Decimal('2.00'))
+
+    def _enquiry(self, **kwargs):
+        defaults = dict(
+            full_name='Sara', business_name='Aiwa Home', business_contact_number='97455512345',
+            product_category='Home decor', is_complete=True,
+            avarage_number_of_order_done_last_month='1-25',
+            typical_delivery_distance='Under 10 km',
+            typical_package_size='Small (Envelopes / Packets)',
+            speed_delivery_offer_to_customers='48 Hours',
+            delivery_coverage='Doha Only',
+            type_of_pickup_location='Store',
+        )
+        defaults.update(kwargs)
+        return PricingEnquiry.objects.create(**defaults)
+
+    def _price(self, **kwargs):
+        return suggest_price(self._enquiry(**kwargs), ruleset=self.ruleset,
+                             with_comparables=False).suggested_price
+
+    def test_same_day_pick_and_deliver_can_be_charged_for(self):
+        self.assertEqual(self._price(is_frequent_same_day_pick_and_delivery_required=True)
+                         - self._price(is_frequent_same_day_pick_and_delivery_required=False),
+                         Decimal('5.00'))
+
+    def test_a_home_pickup_costs_more_than_a_fulfilment_dock(self):
+        self.assertGreater(self._price(type_of_pickup_location='Home'),
+                           self._price(type_of_pickup_location='Fulfillment'))
+
+    def test_a_commercial_pickup_point_pays_nothing_extra(self):
+        dock = self._price(type_of_pickup_location='Fulfillment')
+        for premises in ('Store', 'Office', 'Multiple Store'):
+            with self.subTest(premises=premises):
+                self.assertEqual(self._price(type_of_pickup_location=premises), dock)
+
+    def test_any_residential_point_in_a_multi_answer_carries_the_cost(self):
+        self.assertEqual(self._price(type_of_pickup_location='Home, Office'),
+                         self._price(type_of_pickup_location='Home'))
+
+    def test_multi_store_is_not_charged_twice_for_being_many(self):
+        """The count ladder prices how many; the type must not price it again."""
+        self.assertEqual(bands.PICKUP_TYPE_RANK['multiple store'],
+                         bands.PICKUP_TYPE_RANK['store'])
+
+    def test_an_unanswered_pickup_type_is_asked_for_not_guessed(self):
+        result = suggest_price(self._enquiry(type_of_pickup_location=''),
+                               ruleset=self.ruleset, with_comparables=False)
+        self.assertIn('type_of_pickup_location', result.missing)
+        self.assertIn('Where we collect from', result.missing_labels)
+        self.assertFalse(any(line['dimension'] == 'pickup_type' for line in result.breakdown))
+
+
+class RateCardV2CalibrationTests(TestCase):
+    """v2 is calibrated to what we have actually billed: 15 / 20 / 25 inside Doha.
+
+    673 verified deliveries have only ever been charged 20 or 25 QR, with the
+    same median in every distance band under 30 km — the rate tracks the account,
+    not the kilometre. These tests are what stop a well-meaning rule edit from
+    quietly reinventing v1's stacked surcharges.
+    """
+
+    def setUp(self):
+        self.ruleset = ensure_rate_card_v2()
+
+    def _enquiry(self, **kwargs):
+        defaults = dict(
+            full_name='Sara', business_name='Aiwa Home', business_contact_number='97455512345',
+            product_category='Home decor', is_complete=True,
+            typical_delivery_distance='Under 10 km',
+            typical_package_size='Small (Envelopes / Packets)',
+            average_package_weight='1-5 kg',
+            speed_delivery_offer_to_customers='Same Day',
+            delivery_coverage='Doha Only',
+            type_of_pickup_location='Store',
+        )
+        defaults.update(kwargs)
+        return PricingEnquiry.objects.create(**defaults)
+
+    def _price(self, **kwargs):
+        return suggest_price(self._enquiry(**kwargs), ruleset=self.ruleset,
+                             with_comparables=False).suggested_price
+
+    # ── the 15 / 20 / 25 spine ────────────────────────────────────────────────
+
+    def test_doha_prices_are_the_three_the_desk_actually_quotes(self):
+        # 301-1000 midpoints to 650, so that band clears the 500 boundary too.
+        for volume, expected in (('1000+', '15.00'), ('301-1000', '15.00'),
+                                 ('101-300', '20.00'), ('1-25', '25.00')):
+            with self.subTest(volume=volume):
+                self.assertEqual(
+                    self._price(avarage_number_of_order_done_last_month=volume),
+                    Decimal(expected))
+
+    def test_the_15_tier_starts_at_500_orders_a_month(self):
+        self.assertEqual(self._price(avarage_number_of_order_done_last_month='301-1000'),
+                         Decimal('15.00'))
+        self.assertEqual(self._price(avarage_number_of_order_done_last_month='101-300'),
+                         Decimal('20.00'))
+
+    def test_doha_is_flat_across_every_band_under_25km(self):
+        """The ledger's median is 20 in every band under 30 km — distance inside
+        Doha does not move the price, volume does."""
+        for volume in ('1000+', '101-300', '1-25'):
+            prices = {self._price(avarage_number_of_order_done_last_month=volume,
+                                  typical_delivery_distance=d)
+                      for d in ('Under 10 km', '10-15 km', '15-25 km')}
+            with self.subTest(volume=volume):
+                self.assertEqual(len(prices), 1, f'{volume} should be flat across Doha: {prices}')
+
+    def test_beyond_doha_steps_up_to_what_the_desk_says(self):
+        self.assertGreater(self._price(avarage_number_of_order_done_last_month='1-25',
+                                       typical_delivery_distance='25-30 km'),
+                           self._price(avarage_number_of_order_done_last_month='1-25',
+                                       typical_delivery_distance='15-25 km'))
+
+    def test_over_30km_is_still_priced_by_hand(self):
+        result = suggest_price(self._enquiry(typical_delivery_distance='Over 30 km'),
+                               ruleset=self.ruleset, with_comparables=False)
+        self.assertIn('outside_rate_card', result.flags)
+
+    def test_volume_alone_still_tiers_when_distance_is_unanswered(self):
+        """A flat default for a 2,000-order account was plainly wrong."""
+        big = self._price(avarage_number_of_order_done_last_month='1000+',
+                          typical_delivery_distance='')
+        small = self._price(avarage_number_of_order_done_last_month='1-25',
+                            typical_delivery_distance='')
+        self.assertLess(big, small)
+        self.assertEqual(big, Decimal('15.00'))
+
+    # ── what is in the base, and what is not ──────────────────────────────────
+
+    def test_the_standard_qatar_profile_costs_nothing_extra(self):
+        """Same-day, COD, returns, home pickup and several pickups a day are what
+        most leads tick. A fee nearly everyone pays is a higher base, not a fee."""
+        plain = self._price(avarage_number_of_order_done_last_month='1-25')
+        loaded = self._price(
+            avarage_number_of_order_done_last_month='1-25',
+            speed_delivery_offer_to_customers='Same Day, Next Day',
+            is_required_COD_service=True,
+            is_return_logistics_required=True,
+            is_frequent_same_day_pick_and_delivery_required=True,
+            type_of_pickup_location='Home',
+            number_of_pickup_times_in_day='3-5',
+        )
+        self.assertEqual(loaded, plain)
+        self.assertLessEqual(loaded, Decimal('25.00'))
+
+    def test_a_normal_doha_delivery_never_exceeds_25(self):
+        for volume in ('1000+', '101-300', '1-25'):
+            for distance in ('Under 10 km', '10-15 km', '15-25 km'):
+                with self.subTest(volume=volume, distance=distance):
+                    self.assertLessEqual(
+                        self._price(avarage_number_of_order_done_last_month=volume,
+                                    typical_delivery_distance=distance),
+                        Decimal('25.00'))
+
+    def test_only_the_rare_exceptions_surcharge(self):
+        plain = self._price(avarage_number_of_order_done_last_month='1-25')
+        for label, kwargs in (
+            ('express', dict(speed_delivery_offer_to_customers='Express (Few Hours)')),
+            ('bulky', dict(typical_package_size='Large (Appliances / Bulky)')),
+            ('15kg+', dict(average_package_weight='15+ kg')),
+            ('fragile', dict(is_special_handling_required=True,
+                             special_handling_detail='Fragile')),
+        ):
+            with self.subTest(exception=label):
+                self.assertGreater(
+                    self._price(avarage_number_of_order_done_last_month='1-25', **kwargs), plain)
+
+    def test_ordinary_weight_is_not_an_exception(self):
+        """v1 charged +5 for 5-15 kg, which is under 2% away from ordinary."""
+        self.assertEqual(self._price(average_package_weight='5-15 kg'),
+                         self._price(average_package_weight='1-5 kg'))
+
+    def test_nothing_normal_reaches_the_uplift_cap(self):
+        """v1 clamped on 55% of leads, so the cap was setting the price, not the rules."""
+        result = suggest_price(
+            self._enquiry(avarage_number_of_order_done_last_month='1-25',
+                          is_required_COD_service=True, is_return_logistics_required=True,
+                          is_frequent_same_day_pick_and_delivery_required=True),
+            ruleset=self.ruleset, with_comparables=False)
+        self.assertNotIn('clamped_uplift', result.flags)
 
 
 class P2PRoutingTests(TestCase):

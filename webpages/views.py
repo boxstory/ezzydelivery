@@ -117,55 +117,39 @@ def delivery_pricing(request):
     return render(request, 'webpages/3pl_pricing.html', data)
 
 def p2p_pricing(request):
-    import json as _json
-    from delivery.models import ZoneName, ZoneArea
+    from p2p.localities import localities as p2p_localities, popular as p2p_popular
 
-    # Hardcoded extras for well-known areas absent from DB
-    _extras = [
-        {'name': 'West Bay',     'zone': 'Doha',      'lat': 25.3272, 'lng': 51.5310},
-        {'name': 'Al Wakrah',    'zone': 'South',     'lat': 25.1719, 'lng': 51.5989},
-        {'name': 'Abu Hamour',   'zone': 'Doha',      'lat': 25.2390, 'lng': 51.4654},
-        {'name': 'Garaffa',      'zone': 'Al Rayyan', 'lat': 25.2900, 'lng': 51.4400},
-        {'name': 'Al Rayyan',    'zone': 'Al Rayyan', 'lat': 25.2546, 'lng': 51.4225},
-        {'name': 'Al Khor City', 'zone': 'North',     'lat': 25.6839, 'lng': 51.5037},
-        {'name': 'Education City','zone': 'Al Rayyan','lat': 25.3152, 'lng': 51.4249},
-        {'name': 'Corniche',     'zone': 'Doha',      'lat': 25.3068, 'lng': 51.5352},
-    ]
+    # One list for the public calculator and the staff booking desk — p2p.localities is
+    # the only place it is built, so a place ops can book to is one a customer can too.
+    localities = p2p_localities()
+    popular = p2p_popular(localities)
 
-    seen = {e['name'] for e in _extras}
-    localities = list(_extras)
-
-    # Add all active ZoneName records (deduplicated by name)
-    for z in ZoneName.objects.filter(is_active=True, latitude__isnull=False).order_by('zone_number'):
-        if z.zone_name not in seen:
-            seen.add(z.zone_name)
-            localities.append({'name': z.zone_name, 'zone': f'Zone {z.zone_number}', 'lat': float(z.latitude), 'lng': float(z.longitude)})
-
-    # Add all active ZoneArea records with coords (deduplicated by name)
-    for a in ZoneArea.objects.filter(is_active=True, latitude__isnull=False).select_related('zone').order_by('area_name'):
-        if a.area_name not in seen:
-            seen.add(a.area_name)
-            localities.append({'name': a.area_name, 'zone': a.zone.zone_name, 'lat': float(a.latitude), 'lng': float(a.longitude)})
-
-    # Popular chips — well-known names in display order
-    _popular_names = [
-        'West Bay', 'The Pearl', 'The Pearl Island', 'Lusail', 'Al Sadd',
-        'Mushaireb', 'Industrial Area', 'Al Khor', 'Al Khor City', 'Old Airport',
-        'Al Waab', 'Al Gharrafa', 'Gharrafat Al Rayyan', 'Muaither', 'Al Thumama',
-        'Duhail', 'Hamad International Airport', 'Al Wakrah', 'Abu Hamour',
-        'Education City', 'Al Rayyan', 'Corniche', 'Madinat Khalifa North',
-        'Madinat Khalifa South', 'Fereej Bin Omran', 'Al Mansoura', 'Najma',
-        'Al Aziziya', 'Mesaieed', 'Al Daayen', 'Nuaija', 'Onaiza',
-        'Fereej Al Nasr', 'Al Dafna', 'Wholesale Market',
-        'Fereej Al Soudan', 'Al Sailiya', 'Bu Sidra', 'Fereej Al Manaseer',
-        'Fereej Al Murra', 'Al Ghanim Al Jadeed',
-    ]
-    loc_index = {l['name']: l for l in localities}
-    popular = [loc_index[n] for n in _popular_names if n in loc_index]
+    # The rate card, injected so the page prices from the database instead of literals
+    # in the JS. Ops edit a price in admin and it lands here with no deploy; more
+    # importantly, the page and p2p/pricing.py can no longer drift apart and quote the
+    # customer one number while the order is written with another.
+    from p2p.pricing import box_tiers_for_client, capacity_for_client, ladder_for_client
+    from p2p.models import P2P_MAX_BOXES
+    # The size and vehicle cards come from p2p.models too, for the same reason: the
+    # dimensions and weight a customer reads here are the ones the booking form repeats
+    # back to them, and one dict is the only way to keep that true.
+    from p2p.models import size_card_list, speed_card_list, vehicle_card_list
 
     return render(request, 'webpages/p2p_pricing.html', {
         'localities_json': safe_json(localities),
         'popular_json': safe_json(popular),
+        'price_ladder_json': safe_json(ladder_for_client()),
+        # The box tiers ride along for the same reason as the ladder: the calculator
+        # adds the uplift itself, and a hardcoded copy would drift from the server.
+        'box_tiers_json': safe_json(box_tiers_for_client()),
+        # The stepper's ceiling is the booking form's, not a second 20 typed into the JS.
+        'max_boxes': P2P_MAX_BOXES,
+        # What each vehicle holds and what each box takes up, so the page can grey out a
+        # vehicle the load will not go in instead of quoting one the server refuses.
+        'capacity_json': safe_json(capacity_for_client()),
+        'size_cards': size_card_list(),
+        'vehicle_cards': vehicle_card_list(),
+        'speed_cards': speed_card_list(),
     })
 
 @require_http_methods(["POST"])
@@ -573,7 +557,8 @@ def delivery_inquiry(request):
             if inquiry.business_contact_number:
                 send_inquiry_thank_you_message(
                     phone_number=inquiry.business_contact_number,
-                    business_name=inquiry.business_name
+                    business_name=inquiry.business_name,
+                    contact_name=inquiry.full_name,
                 )
 
             # Send admin notification

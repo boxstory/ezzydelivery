@@ -17,8 +17,8 @@ logger = logging.getLogger('webpages')
 # Adjustments always evaluate in this order, so a stored breakdown reads the
 # same way every time regardless of how the rules happen to be sorted in the DB.
 DIMENSION_ORDER = (
-    'weight', 'size', 'speed', 'cod', 'special_handling',
-    'returns', 'pickup_locations', 'pickups_per_day',
+    'weight', 'size', 'speed', 'same_day_pickup', 'cod', 'special_handling',
+    'returns', 'pickup_type', 'pickup_locations', 'pickups_per_day',
 )
 
 ZERO = Decimal('0')
@@ -36,6 +36,7 @@ MISSING_LABELS = {
     'current_delivery_cost': 'What they pay today',
     'average_order_value_qar': 'Average order value',
     'cod_orders_share': 'Share of orders paid COD',
+    'type_of_pickup_location': 'Where we collect from',
 }
 
 
