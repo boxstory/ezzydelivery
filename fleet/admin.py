@@ -159,6 +159,33 @@ class DriverLocationAdmin(admin.ModelAdmin):
         return obj.lag_seconds
 
 
+@admin.register(fleet_models.DriverNavHandoff)
+class DriverNavHandoffAdmin(admin.ModelAdmin):
+    list_display = ('driver', 'provider', 'task', 'opened_at', 'returned_at',
+                    'gap_minutes', 'route_km', 'auto', 'left_foreground', 'close_reason')
+    list_filter = ('provider', 'auto', 'close_reason', 'left_foreground', 'opened_at')
+    raw_id_fields = ('driver', 'task', 'pickup_task')
+    readonly_fields = ('created_at', 'gap_minutes')
+    list_per_page = 50
+
+    @admin.display(description='Gap (min)')
+    def gap_minutes(self, obj):
+        """How long the trail was dark while the driver was in the nav app."""
+        return round(obj.gap_seconds / 60, 1)
+
+
+@admin.register(fleet_models.DeliveryPayRate)
+class DeliveryPayRateAdmin(admin.ModelAdmin):
+    """Read-mostly. The staff console at /workforce/fleet/pay-rates/ is the real
+    entry point — it enforces one open card per scope, which this form cannot."""
+    list_display = ('__str__', 'driver', 'normal_fee', 'hub_fee',
+                    'pick_and_drop_percent', 'effective_from', 'effective_to')
+    list_filter = ('effective_from', 'effective_to')
+    search_fields = ('driver__driver_code', 'notes')
+    autocomplete_fields = ()
+    raw_id_fields = ('driver',)
+
+
 @admin.register(fleet_models.ZoneEarningsRate)
 class ZoneEarningsRateAdmin(admin.ModelAdmin):
     list_display = ('order_type', 'pickup_zone', 'delivery_zone', 'driver_rate',

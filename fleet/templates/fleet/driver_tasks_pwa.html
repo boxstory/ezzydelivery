@@ -106,6 +106,7 @@
         <!-- Sort -->
         <select name="sort" onchange="this.form.submit()"
                 class="fleet-select fleet-filter-bar__sort">
+            <option value="code" {% if sort_by == 'code' or not sort_by %}selected{% endif %}>By Task #</option>
             <option value="date" {% if sort_by == 'date' %}selected{% endif %}>By Date</option>
             <option value="zone" {% if sort_by == 'zone' %}selected{% endif %}>By Zone</option>
             <option value="status" {% if sort_by == 'status' %}selected{% endif %}>By Status</option>
@@ -171,6 +172,7 @@
     data-product-qty="{{ card.order.package_qty|default:'' }}"
     data-earn="{{ card.driver_earnings|default:'' }}"
     data-notes="{{ card.order.order_notes|default:'' }}"
+    data-office-note="{{ card.driver_note|default:'' }}"
     data-address="{{ card.order.customer_address|default:'' }}"
     data-tasknum="{{ card.dl_task_number|default:'' }}"
     data-lat="{{ card.order.latitude|default:'' }}{% if not card.order.latitude and addr %}{{ addr.dl_latitude|default:'' }}{% endif %}"
@@ -182,6 +184,12 @@
     data-payment-split-cash="{{ card.payment_split_cash|default:'' }}"
     data-payment-split-pos="{{ card.payment_split_pos|default:'' }}"
     data-payment-split-fawran="{{ card.payment_split_fawran|default:'' }}"
+    {% comment %}Proof-of-delivery rule for this task's client — the sheet reads these
+    to decide what it must collect before letting the driver submit. The server checks
+    the same rule in delivery/pod.py, so these are convenience, not the gate.{% endcomment %}
+    data-pod-delivered="{% if card.order.business.pod_required_delivered %}1{% else %}0{% endif %}"
+    data-pod-failed="{% if card.order.business.pod_required_failed %}1{% else %}0{% endif %}"
+    data-pod-kind="{{ card.order.business.pod_kind|default:'photo' }}"
     data-verify-url="{% with av=card.order.address_verifications.first %}{% with phone=addr.mobile_no|default:card.order.customer_phone|default:'' %}{% if av and av.verification_token and phone %}{{ request.scheme }}://{{ request.get_host }}{% url 'verify_location_short' phone|cut:'/' av.verification_token %}{% endif %}{% endwith %}{% endwith %}"
 >
 <script type="application/json" class="task-products-data">{% spaceless %}[{% for item in card.order.order_items.all %}{"name":"{{ item.display_name|escapejs }}","brand":"{% if item.product %}{{ item.product.brand_name|default:''|escapejs }}{% endif %}","sku":"{% if item.product %}{{ item.product.item_sku|default:''|escapejs }}{% endif %}","qty":{{ item.quantity }}{% if item.unit_price %},"price":"{{ item.unit_price }}"{% endif %}{% if item.product and item.notes %},"note":"{{ item.notes|escapejs }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]{% endspaceless %}
@@ -347,6 +355,28 @@
         </div>
         {% endif %}
 
+        {# P2P receiver-pays fee. The person who ordered the delivery is the one #}
+        {# waiting for it, so the cash only exists at this end of the job. #}
+        {% with p2pb=card.order.p2p_booking %}
+        {% if p2pb.fee_due_at_delivery %}
+        <div class="task-card__fee" id="fleet_task_fee_{{ card.id }}">
+            <span class="task-card__fee-label">Collect delivery fee at the door</span>
+            <span class="task-card__fee-amount">QAR {{ p2pb.fee_amount|floatformat:2 }}</span>
+            {% if current_tab != 'all' %}
+            <button type="button" class="task-card__fee-btn" data-p2p-task-fee="{{ card.id }}"
+                    onclick="event.stopPropagation()" id="fleet_task_btn_fee_{{ card.id }}">
+                Mark collected
+            </button>
+            {% endif %}
+        </div>
+        {% elif p2pb.fee_payer == 'receiver' and p2pb.fee_status == 'collected_cash' %}
+        <div class="task-card__fee task-card__fee--done" id="fleet_task_fee_{{ card.id }}">
+            <span class="task-card__fee-label">Delivery fee collected</span>
+            <span class="task-card__fee-amount">QAR {{ p2pb.fee_amount|floatformat:2 }}</span>
+        </div>
+        {% endif %}
+        {% endwith %}
+
         <!-- Bottom info strip: COD + Items + Earnings + inline action -->
         <div class="task-card__strip">
             {% if card.order.cod_amount %}
@@ -386,6 +416,17 @@
             <div class="task-card__strip-item task-card__strip-item--note" title="{{ card.order.order_notes }}">
                 <i class="fa-solid fa-note-sticky"></i>
                 <span>Note</span>
+            </div>
+            {% endif %}
+
+            {% if card.driver_note %}
+            {% comment %}
+            An instruction the office pushed down for this task - louder than the
+            order note because someone is waiting on the driver to act on it.
+            {% endcomment %}
+            <div class="task-card__strip-item task-card__strip-item--office" title="{{ card.driver_note }}">
+                <i class="fa-solid fa-comment-dots"></i>
+                <span>Office</span>
             </div>
             {% endif %}
 
@@ -662,6 +703,39 @@
         return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     }
 
+    /* P2P delivery fee taken at the door. Mirrors the pickup-side handler in
+     * driver_pickups_pwa.html — same csrf-token meta, and the row is re-rendered in
+     * place so the driver does not lose their scroll position mid-round. */
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-p2p-task-fee]');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        btn.disabled = true;
+        const taskId = btn.dataset.p2pTaskFee;
+        const form = new FormData();
+        form.append('task_id', taskId);
+        form.append('csrfmiddlewaretoken', getCsrf());
+        fetch('{% url "fleet:p2p_mark_fee_collected_at_delivery" %}', { method: 'POST', body: form })
+            .then(r => r.json())
+            .then(res => {
+                const box = document.getElementById('fleet_task_fee_' + taskId);
+                if (res.success && box) {
+                    box.classList.add('task-card__fee--done');
+                    box.querySelector('.task-card__fee-label').textContent = 'Delivery fee collected';
+                    btn.remove();
+                    showToast('Fee recorded', 'success');
+                } else {
+                    btn.disabled = false;
+                    showToast(res.error || 'Could not record the fee', 'error');
+                }
+            })
+            .catch(() => {
+                btn.disabled = false;
+                showToast('Network error. Please try again.', 'error');
+            });
+    });
+
     function waMessage(el, phone, orderNum, zone, street, building, cod) {
         let msg = 'Hello! 👋 This is EzzyDelivery.\n\n';
         msg += '📦 Order: ' + (orderNum || '—') + '\n';
@@ -672,12 +746,15 @@
         if (cod) msg += '💵 COD: ' + cod + ' QR\n';
         msg += '\nYour delivery is on its way. Please be available to receive it. Thank you! 🚚';
         const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+        if (window.EzzyGPS && EzzyGPS.navHandoff) EzzyGPS.navHandoff.openUrl(url);
         window.open(url, '_blank');
     }
 
     function tdOpenWa(el) {
         const url = el.dataset.waUrl;
-        if (url) window.open(url, '_blank');
+        if (!url) return false;
+        if (window.EzzyGPS && EzzyGPS.navHandoff) EzzyGPS.navHandoff.openUrl(url);
+        window.open(url, '_blank');
         return false;
     }
 
@@ -858,6 +935,11 @@
         if (!lat || !lng || parseFloat(lat) === 0) {
             showToast('No GPS coordinates for this order', 'error');
             return;
+        }
+        // File the handoff before leaving: the trail stops the moment Maps is
+        // in front, and this is what tells staff why.
+        if (window.EzzyGPS && EzzyGPS.navHandoff) {
+            EzzyGPS.navHandoff.open('google', { taskId: card.dataset.id, lat: lat, lng: lng });
         }
         window.open('https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng + '&travelmode=driving', '_blank');
     }

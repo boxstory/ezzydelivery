@@ -68,8 +68,14 @@ def is_enrolled_driver(user):
         return False
 
 
-def driver_phone(user):
-    """Best WhatsApp number for a driver, preferring the fleet record."""
+def driver_phone_candidates(user):
+    """Every number we could reach this driver on, best first, de-duplicated.
+
+    A driver record can carry a landline-style contact number in one field and a
+    WhatsApp number in the other, and nothing guarantees the preferred one has a
+    WhatsApp account at all. Sending to the first and giving up strands the
+    driver with no way to confirm a device, so the sender walks this list.
+    """
     driver = Driver.objects.filter(user=user).order_by('-driver_id').first()
     candidates = []
     if driver:
@@ -77,10 +83,20 @@ def driver_phone(user):
     profile = getattr(user, 'profile', None)
     if profile:
         candidates += [profile.whatsapp, profile.phone]
+
+    seen, ordered = set(), []
     for value in candidates:
-        if value and str(value).strip():
-            return str(value).strip()
-    return ''
+        value = str(value).strip() if value else ''
+        if value and value not in seen:
+            seen.add(value)
+            ordered.append(value)
+    return ordered
+
+
+def driver_phone(user):
+    """Best WhatsApp number for a driver, preferring the fleet record."""
+    candidates = driver_phone_candidates(user)
+    return candidates[0] if candidates else ''
 
 
 def mask_phone(phone):
@@ -225,28 +241,39 @@ def send_device_code(device):
     if device.otp_send_count >= OTP_MAX_SENDS:
         return False, 'Too many codes requested. Please contact operations to release this device.'
 
-    phone = driver_phone(device.user)
-    if not phone:
+    candidates = driver_phone_candidates(device.user)
+    if not candidates:
         return False, 'No WhatsApp number on file. Please contact operations.'
 
-    result = create_verification(
-        user=device.user, phone_number=phone, verification_type='device_verify'
-    )
-    if not result.get('success'):
-        return False, result.get('error') or 'Could not send the code. Please contact operations.'
+    # Try each number we hold until one actually takes the message. The first
+    # choice is often a contact number with no WhatsApp account behind it, and a
+    # code sent there is silently lost — the driver sees "sent" and waits forever.
+    last_error = None
+    for phone in candidates:
+        result = create_verification(
+            user=device.user, phone_number=phone, verification_type='device_verify'
+        )
+        if not result.get('success'):
+            last_error = result.get('error')
+            continue
 
-    send_result = result.get('send_result') or {}
-    device.otp_sent_at = now
-    device.otp_send_count += 1
-    device.save(update_fields=['otp_sent_at', 'otp_send_count', 'last_seen_at'])
+        send_result = result.get('send_result') or {}
+        device.otp_sent_at = now
+        device.otp_send_count += 1
+        device.save(update_fields=['otp_sent_at', 'otp_send_count', 'last_seen_at'])
 
-    if not send_result.get('success', True):
-        # The row exists, so ops can still read the code out if needed, but the
-        # driver must be told plainly that nothing is coming.
-        logger.error('Device code for driver %s not delivered: %s', device.user_id, send_result)
-        return False, 'WhatsApp is not responding. Please contact operations to release this device.'
+        if send_result.get('success', True):
+            return True, f'Code sent to {mask_phone(phone)} on WhatsApp.'
 
-    return True, f'Code sent to {mask_phone(phone)} on WhatsApp.'
+        # The row exists, so ops can still read the code out if needed.
+        last_error = send_result.get('error')
+        logger.error('Device code for driver %s not delivered to %s: %s',
+                     device.user_id, mask_phone(phone), send_result)
+
+    logger.error('Device code for driver %s failed on every number (%d tried): %s',
+                 device.user_id, len(candidates), last_error)
+    return False, ('We could not deliver a code to any number on your record. '
+                   'Please ask operations to unlock this device.')
 
 
 def verify_device_code(device, code):

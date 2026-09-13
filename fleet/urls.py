@@ -91,6 +91,13 @@ urlpatterns = [
           fleet_views.accept_pickup, name='accept_pickup'),
      path('pickups/status/',
           fleet_views.update_pickup_status, name='update_pickup_status'),
+     path('pickups/p2p-fee-collected/',
+          fleet_views.p2p_mark_fee_collected, name='p2p_mark_fee_collected'),
+     # The receiver-pays twin. Keyed on the delivery task, not the pickup: on this
+     # path there is nothing to collect at the pickup end at all.
+     path('tasks/p2p-fee-collected/',
+          fleet_views.p2p_mark_fee_collected_at_delivery,
+          name='p2p_mark_fee_collected_at_delivery'),
      path('pickups/scan/',
           fleet_views.pickup_scan_collect, name='pickup_scan_collect'),
      path('pickups/route/',

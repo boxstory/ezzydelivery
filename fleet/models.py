@@ -42,6 +42,7 @@ Related:
     - fleet.wallet_service: Business logic for wallet operations
 """
 
+import json
 from datetime import datetime, timedelta
 from decimal import Decimal
 from django.db import models
@@ -75,6 +76,13 @@ DRIVER_AVAILABILITY_CHOICES = [
     ('on_break', 'On Break'),
     ('returning', 'Returning'),
 ]
+
+#: Availability values that mean the driver is on shift and reachable — everything
+#: except 'offline'. A driver on a break or driving back from a drop is still working,
+#: so "how many drivers are online" counts those too. Anything showing an Online figure
+#: must use this rather than driver_status='approved', which only means the account is
+#: in good standing and says nothing about whether anyone is working right now.
+ONLINE_AVAILABILITIES = ['available', 'on_delivery', 'on_break', 'returning']
 
 DRIVER_JOB_TYPE_CHOICES = [
     ('full_time', 'Full Time'),
@@ -488,6 +496,16 @@ class DriverTransaction(models.Model):
     # silently matches nothing, because the writer only ever emits 'cod_deposit'.
     COD_SUBMISSION_TYPES = ['cod_driver_settle', 'cod_deposit']
 
+    # Every type that books a charge against a business. Read this list — never
+    # write the types out again. A dashboard carrying its own copy silently omits
+    # any charge kind added later, so money we charged appears on no report.
+    CHARGE_TYPES = [
+        'delivery_charge',
+        'fulfillment_charge',
+        'inventory_handling',
+        'other_charge',
+    ]
+
     PAYMENT_METHOD_CHOICES = [
         ('cash', 'Cash'),
         ('pos', 'POS / Card'),
@@ -612,11 +630,19 @@ class DriverTransaction(models.Model):
             super().save(*args, **kwargs)
 
     def _generate_transaction_code(self):
-        """Generate transaction code: {TYPECODE}-{YYYYMMDD}-{daily_seq:04d}"""
+        """Generate transaction code: {TYPECODE}-{YYYYMMDD}-{daily_seq:04d}
+
+        A backdated entry (staff recording a payout that happened last month)
+        sets ``_code_date`` before saving, so the document is numbered with the
+        date the money actually moved. Numbering it "today" instead produced
+        codes that read as a different month than the transaction they belong
+        to, and codes that sorted against each other backwards.
+        """
         from django.db.models import Max
 
         prefix = self.TYPE_PREFIXES.get(self.transaction_type, 'TXN')
-        today_str = dj_timezone.localtime().strftime('%Y%m%d')
+        code_date = getattr(self, '_code_date', None) or dj_timezone.localtime()
+        today_str = code_date.strftime('%Y%m%d')
         code_pattern = f"{prefix}-{today_str}-"
 
         # Get next daily sequence for this prefix+date
@@ -868,6 +894,77 @@ class ZoneEarningsRate(models.Model):
         ordering = ['order_type', 'delivery_zone__zone_number']
 
 
+class DeliveryPayRate(models.Model):
+    """What one delivery pays the driver — a dated rate card, fleet-wide or per driver.
+
+    Held as a dated agreement for the same reason a salary is: a rate change is a
+    new row, so a queue re-opened next month still explains the figure it proposed
+    today. Resolution is per-driver first, then the fleet card, then the built-in
+    fallback in ``delivery.earnings`` — so the fee never becomes None just because
+    nobody has filled the table in.
+
+    This replaces the QAR 10 / 80% that used to be hardcoded in
+    ``DeliveryTask.calculate_driver_earnings``. Never re-inline those numbers:
+    ``delivery.earnings`` is the only place allowed to know them.
+    """
+
+    driver = models.ForeignKey(
+        'fleet.Driver', on_delete=models.CASCADE, related_name='pay_rates',
+        null=True, blank=True, db_index=True,
+        help_text="Leave empty for the fleet-wide card. Set it to pay one driver "
+                  "differently - a per-driver card always beats the fleet card.",
+    )
+    normal_fee = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('10.00'),
+        help_text="QAR paid for a normal (fulfilment) delivery.",
+    )
+    hub_fee = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('10.00'),
+        help_text="QAR paid for the hub delivery leg (leg 2 of a two-leg job).",
+    )
+    pick_and_drop_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('80.00'),
+        help_text="Percent of the client delivery charge paid on a pick & drop job.",
+    )
+
+    effective_from = models.DateField(help_text="First day this card applies.")
+    effective_to = models.DateField(
+        null=True, blank=True,
+        help_text="Last day it applies. Empty means it is still running.",
+    )
+    notes = models.TextField(blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='delivery_pay_rates_created',
+    )
+
+    class Meta:
+        verbose_name = "Delivery Pay Rate"
+        verbose_name_plural = "Delivery Pay Rates"
+        ordering = ['-effective_from', '-id']
+        indexes = [models.Index(fields=['driver', 'effective_from'])]
+
+    def __str__(self):
+        who = self.driver.driver_code if self.driver_id else 'Fleet'
+        return f"{who} - {self.normal_fee} QAR / {self.pick_and_drop_percent}%"
+
+    @property
+    def is_open(self):
+        return self.effective_to is None
+
+    @property
+    def is_fleet_default(self):
+        return self.driver_id is None
+
+    def covers_date(self, on_date):
+        if on_date < self.effective_from:
+            return False
+        return self.effective_to is None or on_date <= self.effective_to
+
+
 # =============================================================================
 # DRIVER NOTIFICATIONS
 # =============================================================================
@@ -1009,6 +1106,246 @@ class DriverLocation(models.Model):
         indexes = [
             models.Index(fields=['driver', '-created_at'], name='driverloc_driver_ts_idx'),
         ]
+
+
+class DriverNavHandoff(models.Model):
+    """One trip out to another app, and the trail gap it leaves.
+
+    A browser cannot take GPS fixes while another app is in front, so the moment
+    a driver taps Waze — or Google Maps, or WhatsApp, or a phone number — the
+    trail goes dark until they come back. Nothing recovers those fixes. What
+    this records is *why* they are missing: when the driver left, from where,
+    where they were heading, and when and where they returned.
+    Staff then read "in Waze since 14:32" instead of a dead marker, and the GPS
+    heartbeat in :mod:`delivery.tasks` stops calling a known handoff an outage.
+
+    ``route_polyline`` is the missing leg reconstructed by the routing engine.
+    It is an estimate and is deliberately never written back as
+    :class:`DriverLocation` rows — the trail must only ever contain positions
+    the device actually measured.
+    """
+
+    PROVIDERS = [
+        ('waze', 'Waze'),
+        ('google', 'Google Maps'),
+        ('whatsapp', 'WhatsApp'),
+        ('phone', 'Phone call'),
+        ('background', 'App in background'),
+        ('other', 'Other app'),
+    ]
+
+    #: How the handoff was closed. Kept because the same gap can end three
+    #: different ways, and when a handoff looks wrong — a zero-second one, say —
+    #: this is the difference between diagnosing it and guessing.
+    CLOSE_REASONS = [
+        ('return', 'Driver came back'),
+        ('ping', 'Device reported in'),
+        ('superseded', 'Another handoff opened'),
+    ]
+
+    #: A background spell shorter than this left no hole in the trail worth
+    #: explaining — a glance at a notification, a link that bounced straight
+    #: back — so the record is dropped rather than stored as noise. Link taps
+    #: are kept whatever their length: that a driver opened Waze at all is worth
+    #: knowing, and a zero-second one says something about the button.
+    MIN_AUTO_GAP_SECONDS = 45
+
+    #: How the live map says it. A provider name alone reads badly in the
+    #: sentence the map builds ("In Phone call since 14:32"), so the whole
+    #: phrase is decided here rather than stitched together on the client.
+    STATUS_LABELS = {
+        'waze': 'In Waze',
+        'google': 'In Google Maps',
+        'whatsapp': 'In WhatsApp',
+        'phone': 'On a call',
+        'background': 'App in background',
+        'other': 'In another app',
+    }
+
+    #: A handoff nobody closed stops meaning anything after a while — a driver
+    #: who killed the app inside Waze never sends the return. Past this the map
+    #: falls back to plain "no GPS" rather than claiming they are still driving.
+    MAX_OPEN_MINUTES = 45
+
+    driver = models.ForeignKey(
+        Driver, on_delete=models.CASCADE, related_name='nav_handoffs', db_index=True
+    )
+    task = models.ForeignKey(
+        'delivery.DeliveryTask', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='nav_handoffs'
+    )
+    # The first-mile leg has its own tasks, and its Pin/Navigate buttons leave
+    # the app exactly like the delivery ones. Kept apart from `task` because a
+    # PickupTask id is not a DeliveryTask id — storing one in the other's column
+    # would attribute the gap to whichever delivery happened to share the number.
+    pickup_task = models.ForeignKey(
+        'delivery.PickupTask', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='nav_handoffs'
+    )
+    provider = models.CharField(max_length=10, choices=PROVIDERS, default='other')
+
+    opened_at = models.DateTimeField(default=dj_timezone.now, db_index=True)
+    returned_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the driver came back to the PWA. Null while still in the nav app.",
+    )
+
+    # Last fix before leaving, and the first one after coming back. Together
+    # they bound the gap the reconstruction has to span.
+    from_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    from_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    to_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    to_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+
+    # Where the driver asked to be navigated to — what the live map projects
+    # towards while the position itself is frozen.
+    dest_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    dest_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+
+    route_polyline = models.TextField(
+        blank=True, default='',
+        help_text="JSON [[lat, lng], ...] reconstructing the gap. An estimate, not measured.",
+    )
+    route_km = models.FloatField(null=True, blank=True, help_text="Road distance across the gap, km")
+
+    auto = models.BooleanField(
+        default=False,
+        help_text="Opened by the page losing the foreground rather than by a tap on a link. "
+                  "Catches the gaps no button can see: the screen locking, the home button, "
+                  "an app opened from the notification shade.",
+    )
+    left_foreground = models.BooleanField(
+        null=True, blank=True,
+        help_text="Whether the page actually went to the background. Null when the client never said.",
+    )
+    close_reason = models.CharField(max_length=12, choices=CLOSE_REASONS, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Driver Nav Handoff"
+        verbose_name_plural = "Driver Nav Handoffs"
+        ordering = ['-opened_at']
+        indexes = [
+            models.Index(fields=['driver', '-opened_at'], name='navhandoff_driver_ts_idx'),
+        ]
+
+    def __str__(self):
+        return f"[{self.driver}] {self.get_provider_display()} @ {self.opened_at:%H:%M}"
+
+    @property
+    def status_label(self):
+        """What staff read on the marker: "In Waze", "On a call"."""
+        return self.STATUS_LABELS.get(self.provider, self.STATUS_LABELS['other'])
+
+    @property
+    def is_open(self):
+        """Still out in the nav app, as far as anything here knows."""
+        return self.returned_at is None
+
+    @property
+    def gap_seconds(self):
+        """How long the trail was dark — or has been so far, while still open."""
+        end = self.returned_at or dj_timezone.now()
+        return max(int((end - self.opened_at).total_seconds()), 0)
+
+    @property
+    def is_stale(self):
+        """Open so long that "in the nav app" is no longer a claim worth making."""
+        return self.is_open and self.gap_seconds > self.MAX_OPEN_MINUTES * 60
+
+    def route_points(self):
+        """The reconstructed leg as ``[[lat, lng], ...]``, or an empty list."""
+        if not self.route_polyline:
+            return []
+        try:
+            points = json.loads(self.route_polyline)
+        except (TypeError, ValueError):
+            return []
+        return points if isinstance(points, list) else []
+
+    def close(self, at=None, fix=None, reconstruct=True, reason='', left_foreground=None):
+        """Record the return. Idempotent — a handoff is only ever closed once.
+
+        Both the PWA (on regaining focus) and the location endpoint (on the next
+        live ping) try to close a handoff, because neither is reliable alone: a
+        driver may kill the app inside Waze and never fire the client event.
+        Returns True when this call was the one that closed it.
+
+        A background spell too short to have cost a fix is deleted instead of
+        stored — see :attr:`MIN_AUTO_GAP_SECONDS`. The row is gone afterwards,
+        so callers must not save it again.
+        """
+        if self.returned_at is not None:
+            return False
+        self.returned_at = at or dj_timezone.now()
+
+        if self.auto and self.gap_seconds < self.MIN_AUTO_GAP_SECONDS:
+            self.delete()
+            return True
+
+        fields = ['returned_at']
+        if fix is not None:
+            self.to_latitude = fix.latitude
+            self.to_longitude = fix.longitude
+            fields += ['to_latitude', 'to_longitude']
+        if reason:
+            self.close_reason = reason
+            fields.append('close_reason')
+        if left_foreground is not None:
+            self.left_foreground = left_foreground
+            fields.append('left_foreground')
+        if reconstruct and self._reconstruct():
+            fields += ['route_polyline', 'route_km']
+        self.save(update_fields=fields)
+        return True
+
+    def _reconstruct(self):
+        """Fill the gap from the routing engine. A silent no-op when it can't."""
+        # Below a minute there is nothing worth drawing, and a handoff that
+        # ended where it started is a driver who glanced at the map and came
+        # straight back.
+        if self.gap_seconds < 60:
+            return False
+        if None in (self.from_latitude, self.from_longitude, self.to_latitude, self.to_longitude):
+            return False
+
+        from delivery import routing
+
+        origin = (float(self.from_latitude), float(self.from_longitude))
+        destination = (float(self.to_latitude), float(self.to_longitude))
+        leg = routing.route_leg(origin, destination)
+        if not leg:
+            return False
+        self.route_polyline = json.dumps(leg['points'])
+        self.route_km = leg['km']
+        return True
+
+    @classmethod
+    def open_for_driver(cls, driver_id):
+        """The handoff a driver is currently out on, or None.
+
+        Stale ones are not returned: see :attr:`MAX_OPEN_MINUTES`.
+        """
+        if not driver_id:
+            return None
+        cutoff = dj_timezone.now() - timedelta(minutes=cls.MAX_OPEN_MINUTES)
+        return cls.objects.filter(
+            driver_id=driver_id, returned_at__isnull=True, opened_at__gte=cutoff,
+        ).order_by('-opened_at').first()
+
+    @classmethod
+    def open_map(cls, driver_ids):
+        """``{driver_id: handoff}`` for drivers currently out, in one query."""
+        if not driver_ids:
+            return {}
+        cutoff = dj_timezone.now() - timedelta(minutes=cls.MAX_OPEN_MINUTES)
+        rows = cls.objects.filter(
+            driver_id__in=list(driver_ids), returned_at__isnull=True, opened_at__gte=cutoff,
+        ).order_by('driver_id', '-opened_at')
+        out = {}
+        for row in rows:
+            out.setdefault(row.driver_id, row)
+        return out
 
 
 class DriverActivityLog(models.Model):
@@ -1210,12 +1547,39 @@ class BusinessChargeInvoice(models.Model):
         else:
             super().save(*args, **kwargs)
 
+    # Longest business-code segment an invoice code will carry. Real codes run to
+    # six characters; the cap only exists so a freak long one cannot overflow the
+    # 40-character invoice_code column.
+    CODE_SEGMENT_MAX = 16
+
+    @staticmethod
+    def code_segment_for(business):
+        """The business's own code, cleaned for use inside an invoice number.
+
+        Raises when the account has no code: the number is meant to name the
+        client on sight, and 'INV--2609-0001' names nobody. Ops assigns a code on
+        the seller's page before the account can be billed.
+        """
+        raw = (getattr(business, 'business_code', '') or '').strip().upper()
+        segment = ''.join(ch for ch in raw if ch.isalnum())
+        if not segment:
+            name = getattr(business, 'business_name', '') or 'this business'
+            raise ValueError(
+                f"{name} has no business code — set one on the seller's page "
+                f"before invoicing, since the invoice number is built from it"
+            )
+        return segment[:BusinessChargeInvoice.CODE_SEGMENT_MAX]
+
     def _generate_invoice_code(self):
-        """INVC-{YYYYMMDD}-{daily_seq:04d} — same shape as a transaction code."""
+        """INV-{business code}-{YYMM}-{seq:04d}, e.g. INV-SMP102-2609-0001.
+
+        The sequence runs per client per month, so an invoice number says who it
+        is for and which month it bills without anyone opening it.
+        """
         from django.db.models import Max
 
-        today_str = dj_timezone.localtime().strftime('%Y%m%d')
-        pattern = f"INVC-{today_str}-"
+        segment = self.code_segment_for(self.business)
+        pattern = f"INV-{segment}-{dj_timezone.localtime().strftime('%y%m')}-"
         last = BusinessChargeInvoice.objects.filter(
             invoice_code__startswith=pattern
         ).aggregate(m=Max('invoice_code'))['m']
@@ -1281,8 +1645,28 @@ class BusinessChargeInvoiceLine(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # --- Amendment trail (super admin only) ---
+    # A line is frozen at issue, which is right for a document already sent and
+    # wrong for a plain keying mistake. A super admin can correct one figure
+    # (billing_service.amend_invoice_line_amount); what it used to say is kept
+    # here so the correction is never silent.
+    original_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="What this line said before the first amendment; blank if never amended"
+    )
+    amended_at = models.DateTimeField(null=True, blank=True)
+    amended_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='charge_invoice_lines_amended'
+    )
+    amend_reason = models.CharField(max_length=255, blank=True, null=True)
+
     def __str__(self):
         return f"{self.label} - {self.amount} QR"
+
+    @property
+    def was_amended(self):
+        return self.amended_at is not None
 
     class Meta:
         verbose_name = "Business Charge Invoice Line"
@@ -1416,3 +1800,245 @@ class DriverDevice(models.Model):
     def is_known(self):
         """True once the device has been verified, even if later revoked."""
         return self.activated_at is not None
+
+
+class BusinessLedgerEntry(models.Model):
+    """One line of a client's account — the running record of what we owe them.
+
+    Client money used to be assembled at read time from three unrelated places:
+    ``DriverTransaction`` for the money events, ``DeliveryTask`` booleans for the
+    COD and charge state, and ``BusinessChargeInvoice`` for receivables. Nothing
+    carried a balance, a status or a direction, so no screen could answer "what
+    does this account stand at" without re-deriving it, differently, each time.
+
+    This is the account. Every money event posts one append-only row, and the
+    balance is the running sum of ``credit - debit``:
+
+        Balance = what EzzyDelivery owes the client.
+        Negative = the client owes EzzyDelivery.
+
+    So COD collected for a client is a credit (we are holding their money), a
+    delivery charge is a debit, a payout is a debit that discharges the
+    liability, and a payment the client makes is a credit that clears their debt.
+
+    Written only by ``fleet.ledger_service``. Nothing else may insert a row: the
+    posting rules (which side, which status, which links) live there so they
+    cannot drift between callers.
+    """
+
+    # ── Segments ────────────────────────────────────────────────────────────
+    # What kind of money this is. The finer charge type lives in ``kind``.
+    SEGMENT_OPENING = 'opening'
+    SEGMENT_COD = 'cod'
+    SEGMENT_DELIVERY_CHARGE = 'delivery_charge'
+    SEGMENT_EXPENSE = 'expense'
+    SEGMENT_CREDIT = 'credit'
+    SEGMENT_ADVANCE = 'advance'
+    SEGMENT_PAYOUT = 'payout'
+    SEGMENT_PAYMENT = 'payment'
+    SEGMENT_ADJUSTMENT = 'adjustment'
+    SEGMENT_REVERSAL = 'reversal'
+    SEGMENT_CHOICES = [
+        (SEGMENT_OPENING, 'Opening Balance'),
+        (SEGMENT_COD, 'COD Collected'),
+        (SEGMENT_DELIVERY_CHARGE, 'Delivery Charge'),
+        (SEGMENT_EXPENSE, 'Expense Recharged'),
+        (SEGMENT_CREDIT, 'Credit Issued'),
+        (SEGMENT_ADVANCE, 'Advance Paid'),
+        (SEGMENT_PAYOUT, 'COD Payout'),
+        (SEGMENT_PAYMENT, 'Payment Received'),
+        (SEGMENT_ADJUSTMENT, 'Adjustment'),
+        (SEGMENT_REVERSAL, 'Reversal'),
+    ]
+
+    # ── Status ──────────────────────────────────────────────────────────────
+    # Where this entry sits in its own lifecycle. 'pending' is money that exists
+    # but has not reached us yet (COD still in a driver's pocket); 'open' is
+    # realised and awaiting settlement; 'cleared' is done.
+    STATUS_PENDING = 'pending'
+    STATUS_OPEN = 'open'
+    STATUS_CLEARED = 'cleared'
+    STATUS_VOID = 'void'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_OPEN, 'Open'),
+        (STATUS_CLEARED, 'Cleared'),
+        (STATUS_VOID, 'Void'),
+    ]
+
+    # ── Billing state ───────────────────────────────────────────────────────
+    # Whether this entry still needs to reach a document the client can pay
+    # against. A journal entry posts 'unbilled' and is swept onto the next
+    # invoice or settlement, which stamps it 'billed' — the same discipline
+    # DeliveryTask.charge_invoice provides for delivery fees, and what stops the
+    # same expense being billed twice.
+    BILLING_UNBILLED = 'unbilled'
+    BILLING_BILLED = 'billed'
+    BILLING_NOT_BILLABLE = 'not_billable'
+    BILLING_STATE_CHOICES = [
+        (BILLING_UNBILLED, 'Unbilled'),
+        (BILLING_BILLED, 'Billed'),
+        (BILLING_NOT_BILLABLE, 'Not Billable'),
+    ]
+
+    entry_code = models.CharField(max_length=40, unique=True, db_index=True, blank=True)
+    business = models.ForeignKey(
+        'business.Business', on_delete=models.PROTECT,
+        related_name='ledger_entries'
+    )
+
+    # The accounting date — the day the money moved, which is not always the day
+    # the row was written (staff backdate a payout they are recording late).
+    occurred_on = models.DateField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    segment = models.CharField(max_length=20, choices=SEGMENT_CHOICES, db_index=True)
+    kind = models.CharField(
+        max_length=30, blank=True, null=True,
+        help_text="For charge segments, the DriverTransaction type that booked it"
+    )
+    status = models.CharField(
+        max_length=12, choices=STATUS_CHOICES, default=STATUS_OPEN, db_index=True
+    )
+    billing_state = models.CharField(
+        max_length=14, choices=BILLING_STATE_CHOICES, default=BILLING_NOT_BILLABLE
+    )
+
+    # Exactly one side carries a figure. Direction is read off these two rather
+    # than stored: a stored direction is a second source of truth, and the one
+    # thing this table cannot afford is disagreeing with itself.
+    debit = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    credit = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+
+    description = models.CharField(max_length=200)
+
+    # ── Related records ─────────────────────────────────────────────────────
+    # All SET_NULL: losing a link must never delete a line of the account.
+    delivery_task = models.ForeignKey(
+        'delivery.DeliveryTask', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ledger_entries'
+    )
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ledger_entries'
+    )
+    driver = models.ForeignKey(
+        'Driver', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ledger_entries'
+    )
+    txn = models.ForeignKey(
+        'DriverTransaction', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ledger_entries',
+        help_text="The money row this entry accounts for"
+    )
+    charge_invoice = models.ForeignKey(
+        'BusinessChargeInvoice', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ledger_entries',
+        help_text="Set when this entry was billed on an invoice"
+    )
+    reversal_of = models.ForeignKey(
+        'self', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='reversed_by'
+    )
+
+    # Denormalised so the accounting table renders without joining four tables
+    # per row. Frozen at post time; a later rename of an order does not restate
+    # a line that has already been sent to a client.
+    order_number = models.CharField(max_length=64, blank=True, null=True)
+    task_number = models.CharField(max_length=100, blank=True, null=True)
+    reference = models.CharField(max_length=120, blank=True, null=True)
+    payment_method = models.CharField(max_length=20, blank=True, null=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ledger_entries_created'
+    )
+
+    class Meta:
+        verbose_name = "Business Ledger Entry"
+        verbose_name_plural = "Business Ledger Entries"
+        # The account reads in date order; id breaks ties so two entries on the
+        # same day always stack in the order they were posted.
+        ordering = ['occurred_on', 'id']
+        indexes = [
+            models.Index(fields=['business', 'occurred_on']),
+            models.Index(fields=['business', 'segment', 'status']),
+            models.Index(fields=['business', 'billing_state']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(debit=0) | models.Q(credit=0),
+                name='ledger_entry_single_sided',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(debit__gte=0) & models.Q(credit__gte=0),
+                name='ledger_entry_non_negative',
+            ),
+        ]
+
+    def __str__(self):
+        side = f"Dr {self.debit}" if self.debit else f"Cr {self.credit}"
+        return f"{self.entry_code} - {self.get_segment_display()} - {side}"
+
+    def save(self, *args, **kwargs):
+        if self.entry_code:
+            return super().save(*args, **kwargs)
+
+        from django.db import IntegrityError, transaction as db_transaction
+
+        for attempt in range(5):
+            self.entry_code = self._generate_entry_code()
+            try:
+                # Each attempt gets its own savepoint. A failed INSERT marks the
+                # surrounding transaction broken, so without this the retry
+                # cannot run even one more query — the next _generate_entry_code
+                # would raise TransactionManagementError and bury the real cause.
+                with db_transaction.atomic():
+                    return super().save(*args, **kwargs)
+            except IntegrityError as exc:
+                # Only a duplicate code is worth retrying. A check-constraint
+                # violation or a bad FK is a genuine error, and retrying it five
+                # times behind the caller's back would hide it.
+                if attempt == 4 or 'entry_code' not in str(exc).lower():
+                    raise
+                continue
+
+    def _generate_entry_code(self):
+        """LDG-{YYYYMMDD}-{daily_seq:04d} — same shape as a transaction code.
+
+        Numbered on ``occurred_on`` rather than today, so a backdated entry
+        carries a code that reads as the month the money actually moved.
+        """
+        from django.db.models import Max
+
+        day = self.occurred_on or dj_timezone.localtime().date()
+        pattern = f"LDG-{day.strftime('%Y%m%d')}-"
+        last = BusinessLedgerEntry.objects.filter(
+            entry_code__startswith=pattern
+        ).aggregate(m=Max('entry_code'))['m']
+        seq = 1
+        if last:
+            try:
+                seq = int(last.rsplit('-', 1)[1]) + 1
+            except (IndexError, ValueError):
+                seq = 1
+        return f"{pattern}{seq:04d}"
+
+    @property
+    def amount(self):
+        """The figure on whichever side carries it."""
+        return self.debit if self.debit else self.credit
+
+    @property
+    def direction(self):
+        """'receivable' = the client owes us; 'payable' = we owe the client."""
+        if self.debit:
+            return 'receivable'
+        if self.credit:
+            return 'payable'
+        return 'square'
+
+    @property
+    def signed_amount(self):
+        """Effect on the balance: positive raises what we owe the client."""
+        return (self.credit or Decimal('0')) - (self.debit or Decimal('0'))

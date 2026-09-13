@@ -44,8 +44,8 @@ def _phone(line):
     return (order.customer_phone if order else '') or '—'
 
 
-def _area(line):
-    """Delivery area and zone as one cell — "Al Aziziya · Z55".
+def _line_zone(line):
+    """(area name, zone number) as this line's own records have them.
 
     The order is the source: ``DeliveryTask.dl_to_address`` is an address-update
     override that in practice is never set, so reading only that column would
@@ -53,20 +53,52 @@ def _area(line):
     """
     task = line.delivery_task
     if not task:
-        return '—'
-
+        return '', None
     addr = task.dl_to_address
     if addr:
-        name, zone = (addr.area_name or '').strip(), addr.dl_zone
-    else:
-        order = task.order
-        name = (order.delivery_area_name or '').strip() if order else ''
-        zone = order.dl_zone if order else None
+        return (addr.area_name or '').strip(), addr.dl_zone
+    order = task.order
+    return (
+        (order.delivery_area_name or '').strip() if order else '',
+        order.dl_zone if order else None,
+    )
+
+
+def _area(line):
+    """Delivery area and zone as one cell — "Al Aziziya · Z55".
+
+    An order booked straight off a zone number carries no area name of its own
+    (``delivery_area_source='same_as_zone'``), which printed a bare "Z43" on the
+    client's invoice. The zone register knows what Z43 is called, so fall back to
+    it — primed one query per sheet by ``_prime_zone_names``.
+    """
+    name, zone = _line_zone(line)
+    if not name and zone:
+        name = (getattr(line, '_zone_names', None) or {}).get(zone, '')
 
     parts = [p for p in [name] if p]
     if zone:
         parts.append(f"Z{zone}")
     return ' · '.join(parts) or '—'
+
+
+def _prime_zone_names(delivery_lines):
+    """Hand every line the zone-number -> name map its area cell may need.
+
+    Resolved here rather than inside ``_area`` so naming the zones on a
+    300-delivery invoice costs one query instead of three hundred.
+    """
+    zones = {z for _name, z in map(_line_zone, delivery_lines) if z}
+    names = {}
+    if zones:
+        from delivery.models import ZoneName
+        names = {
+            z.zone_number: (z.zone_name or '').strip()
+            for z in ZoneName.objects.filter(zone_number__in=zones)
+        }
+    for line in delivery_lines:
+        line._zone_names = names
+    return names
 
 
 def _service(line):
@@ -227,6 +259,8 @@ def render_table(invoice, delivery_lines):
     """
     columns = resolve_columns(invoice)
     keys = [c[0] for c in columns]
+
+    _prime_zone_names(delivery_lines)
 
     header_groups = []
     for group_key, group_label in GROUPS:

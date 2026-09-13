@@ -5,7 +5,7 @@
 
 {% block extra_css %}
   {{ block.super }}
-  <link rel="stylesheet" href="{% static 'fleet/css/device-verify.css' %}?v=20260824a">
+  <link rel="stylesheet" href="{% static 'fleet/css/device-verify.css' %}?v=20260829a">
 {% endblock extra_css %}
 
 {% block account_content %}
@@ -22,8 +22,9 @@
   </div>
 
   <div class="fdv__chip px-3 py-2 mb-3">
-    <i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>
-    Signing in from <strong>{{ device.label|default:"this device" }}</strong>
+    <i class="fa-solid fa-circle-check me-1" aria-hidden="true"></i>
+    You are signed in on <strong>{{ device.label|default:"this device" }}</strong> &mdash;
+    this device just needs confirming.
   </div>
 
   {% if has_phone %}
@@ -56,15 +57,25 @@
         {% if code_sent %}Send a new code{% else %}Send code{% endif %}
       </button>
     </form>
+
+    <p class="fdv__help mt-2 mb-0">
+      Not your WhatsApp number? Ask operations below &mdash; the code cannot reach you.
+    </p>
   {% else %}
     <div class="fdv__warn px-3 py-2 mb-3">
       There is no WhatsApp number on your driver record, so we can&rsquo;t send a code.
-      Please contact operations to release this device.
+      Use the button below and operations will release this device for you.
     </div>
   {% endif %}
 
-  <p class="fdv__help mt-3 mb-0">
-    Didn&rsquo;t get the code? Operations can release this device for you.
+  {# A locked driver must always have one tappable way out, not just the advice #}
+  {# to "contact operations" — the code button is useless if the number is wrong. #}
+  <a href="{{ ops_release_url }}" target="_blank" rel="noopener"
+     class="btn fdv__btn-ops w-100 mt-3" id="fleet_device_verify_link_ops">
+    <i class="fa-brands fa-whatsapp me-2" aria-hidden="true"></i>Ask operations to unlock me
+  </a>
+  <p class="fdv__help mt-2 mb-0">
+    Opens WhatsApp with your driver details already filled in.
   </p>
 
   <hr class="my-3">

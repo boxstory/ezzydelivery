@@ -267,6 +267,47 @@
 }
 .fps__stop-addr { font-size: 0.7rem; color: #6b7280; line-height: 1.3; }
 
+/* --- Pickup window: the promise the customer was given ---
+   Sits inside the collect stop because it qualifies that stop and nothing else.
+   Quiet by default; a window that falls today gets a navy rule and darker ink
+   rather than a colour, so a list of them still reads as one list. */
+.fps__window {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 5px;
+    padding: 3px 8px 3px 7px;
+    background: #f8f9fb;
+    border: 1px solid #e5e7eb;
+    border-left: 2px solid #d3d8e0;
+    border-radius: 6px;
+}
+.fps__window i {
+    font-size: 0.6rem;
+    color: #9ca3af;
+}
+.fps__window-label {
+    font-size: 0.56rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: #9ca3af;
+}
+.fps__window-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #4b5563;
+    white-space: nowrap;
+}
+.fps__window--today {
+    background: #fff;
+    border-left-color: #001f3f;
+}
+.fps__window--today i,
+.fps__window--today .fps__window-label { color: #6b7280; }
+.fps__window--today .fps__window-value { color: #001f3f; }
+
 /* --- Customer strip: its own quiet panel --- */
 .fps__customer {
     margin: 6px 14px 0;
@@ -435,4 +476,69 @@
     justify-content: center;
     margin-top: 10px;
     min-height: 44px;
+}
+
+/* ---- P2P delivery fee on the pickup card ------------------------------- */
+/* The sender pays the driver in cash at collection, so the amount has to be
+   unmissable on a phone in daylight — but it is not an alert, so it stays a
+   quiet plate rather than a bright chip. */
+.fps__fee {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.65rem;
+    background: var(--brand-warning-bg, #fff6e5);
+    border: 1px solid rgba(147, 89, 10, 0.2);
+    border-radius: var(--brand-radius-sm, 6px);
+}
+
+.fps__fee-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--brand-warning-text, #93590a);
+}
+
+.fps__fee-amount {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 700;
+    color: var(--brand-navy, #0f1b33);
+}
+
+.fps__fee-btn {
+    margin-left: auto;
+    min-height: 38px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--brand-navy, #0f1b33);
+    background: var(--brand-white, #fff);
+    border: 1px solid rgba(16, 24, 40, 0.2);
+    border-radius: var(--brand-radius-sm, 6px);
+}
+
+.fps__fee-btn:disabled {
+    opacity: 0.6;
+}
+
+/* Receiver-pays: a statement, not a task. Reads quiet so it cannot be mistaken
+   for something the driver has to act on at this door. */
+.fps__fee--later {
+    background: var(--fleet-grey-100, #f2f4f7);
+    border-color: rgba(16, 24, 40, 0.12);
+}
+
+.fps__fee--later .fps__fee-label {
+    color: var(--brand-grey-600, #475467);
+}
+
+.fps__fee--done {
+    background: var(--brand-success-bg, #e7f6ec);
+    border-color: rgba(5, 96, 58, 0.2);
+}
+
+.fps__fee--done .fps__fee-label {
+    color: var(--brand-success-dark, #05603a);
 }

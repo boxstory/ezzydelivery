@@ -2636,6 +2636,142 @@ class ChargeInvoiceTest(ClientPayoutMixin, TransactionTestCase):
             billing_service.remove_invoice_charge_line(
                 invoice, line_id=line.id, created_by=self.user)
 
+    def test_invoice_number_carries_the_client_code_and_the_month(self):
+        from django.utils import timezone as dj_tz
+        from fleet import billing_service
+
+        first = self._issued()
+        stamp = dj_tz.localtime().strftime('%y%m')
+        self.assertEqual(first.invoice_code, f'INV-TESTB001-{stamp}-0001')
+
+        second, _billed, _skipped = billing_service.issue_charge_invoice(
+            business=self.business,
+            extras=[{'kind': 'other_charge', 'label': 'Ad hoc',
+                     'amount': Decimal('5.00')}],
+            created_by=self.user)
+        self.assertEqual(second.invoice_code, f'INV-TESTB001-{stamp}-0002')
+
+    def test_a_business_with_no_code_cannot_be_invoiced(self):
+        """The number is built from the code, so there is nothing to number."""
+        from fleet import billing_service
+
+        self.business.business_code = ''
+        self.business.save(update_fields=['business_code'])
+        prepaid = self._prepaid_task(number='NOCODE-1')
+
+        with self.assertRaises(ValueError) as caught:
+            billing_service.issue_charge_invoice(
+                business=self.business, task_ids=[prepaid.id], created_by=self.user)
+        self.assertIn('business code', str(caught.exception))
+
+        # Nothing was billed on the way out.
+        prepaid.refresh_from_db()
+        self.assertIsNone(prepaid.charge_invoice_id)
+
+    def test_code_segment_strips_punctuation_and_caps_the_length(self):
+        from fleet.models import BusinessChargeInvoice
+
+        class _Biz:
+            business_code = 'smp-102 /x'
+            business_name = 'Test'
+        self.assertEqual(BusinessChargeInvoice.code_segment_for(_Biz()), 'SMP102X')
+
+        _Biz.business_code = 'A' * 40
+        self.assertEqual(len(BusinessChargeInvoice.code_segment_for(_Biz())),
+                         BusinessChargeInvoice.CODE_SEGMENT_MAX)
+
+    def test_amend_line_restates_the_document_the_ledger_and_the_task(self):
+        """A super admin corrects a keyed figure without voiding and reissuing."""
+        from fleet import billing_service
+
+        invoice = self._issued()
+        line = invoice.lines.filter(delivery_task__isnull=False).first()
+        task = line.delivery_task
+        self.assertEqual(invoice.total_amount, Decimal('20.00'))
+
+        line, invoice = billing_service.amend_invoice_line_amount(
+            invoice, line_id=line.id, amount=Decimal('25.00'),
+            created_by=self.user, reason='Keyed 20 instead of 25')
+
+        self.assertEqual(line.amount, Decimal('25.00'))
+        self.assertEqual(line.original_amount, Decimal('20.00'))
+        self.assertEqual(line.amend_reason, 'Keyed 20 instead of 25')
+        self.assertTrue(line.was_amended)
+        self.assertEqual(invoice.total_amount, Decimal('25.00'))
+
+        # The shared revenue row is restated in place, not doubled up: a second
+        # row would survive the void, which only reverses what the lines point at.
+        txns = fleet_models.DriverTransaction.objects.filter(
+            business=self.business, transaction_type='delivery_charge',
+            reference_number=invoice.invoice_code)
+        self.assertEqual(txns.count(), 1)
+        self.assertEqual(txns.first().amount, Decimal('25.00'))
+
+        task.refresh_from_db()
+        self.assertEqual(task.verified_delivery_charge, Decimal('25.00'))
+
+    def test_amend_line_keeps_the_first_original_across_two_corrections(self):
+        from fleet import billing_service
+
+        invoice = self._issued()
+        line = invoice.lines.filter(delivery_task__isnull=False).first()
+        line, invoice = billing_service.amend_invoice_line_amount(
+            invoice, line_id=line.id, amount=Decimal('25.00'), created_by=self.user)
+        line, invoice = billing_service.amend_invoice_line_amount(
+            invoice, line_id=line.id, amount=Decimal('30.00'), created_by=self.user)
+
+        self.assertEqual(line.original_amount, Decimal('20.00'))
+        self.assertEqual(invoice.total_amount, Decimal('30.00'))
+
+    def test_amend_line_refused_below_what_was_paid_and_when_unchanged(self):
+        from fleet import billing_service
+
+        invoice = self._issued()
+        line = invoice.lines.filter(delivery_task__isnull=False).first()
+
+        with self.assertRaises(ValueError):
+            billing_service.amend_invoice_line_amount(
+                invoice, line_id=line.id, amount=Decimal('20.00'),
+                created_by=self.user)
+
+        billing_service.record_invoice_payment(
+            invoice, amount=Decimal('20.00'), created_by=self.user)
+        invoice.refresh_from_db()
+        with self.assertRaises(ValueError):
+            billing_service.amend_invoice_line_amount(
+                invoice, line_id=line.id, amount=Decimal('15.00'),
+                created_by=self.user)
+
+    def test_amend_line_refused_on_a_void_invoice(self):
+        from fleet import billing_service
+
+        invoice = self._issued()
+        line = invoice.lines.filter(delivery_task__isnull=False).first()
+        billing_service.void_charge_invoice(invoice, created_by=self.user)
+        invoice.refresh_from_db()
+
+        with self.assertRaises(ValueError):
+            billing_service.amend_invoice_line_amount(
+                invoice, line_id=line.id, amount=Decimal('25.00'),
+                created_by=self.user)
+
+    def test_amended_line_voids_at_the_corrected_figure(self):
+        """Void reverses what the invoice now claims, not what it claimed at issue."""
+        from fleet import billing_service
+
+        invoice = self._issued()
+        line = invoice.lines.filter(delivery_task__isnull=False).first()
+        billing_service.amend_invoice_line_amount(
+            invoice, line_id=line.id, amount=Decimal('25.00'), created_by=self.user)
+        invoice.refresh_from_db()
+        billing_service.void_charge_invoice(invoice, created_by=self.user)
+
+        net = fleet_models.DriverTransaction.objects.filter(
+            business=self.business, transaction_type='delivery_charge',
+            reference_number=invoice.invoice_code,
+        ).aggregate(t=Sum('amount'))['t']
+        self.assertEqual(net, Decimal('0.00'))
+
     def test_adding_to_a_settled_invoice_reopens_it_as_part_paid(self):
         """A charge missed at issue is billed on the same document, not a new one."""
         from fleet import billing_service
@@ -2780,6 +2916,49 @@ class ChargeInvoiceTest(ClientPayoutMixin, TransactionTestCase):
         self.assertEqual(table['rows'][0]['cells'][0]['sub'], '')
 
 
+    def test_area_column_names_a_zone_the_order_left_blank(self):
+        """An order booked off a zone number printed a bare "Z43" to the client."""
+        from fleet import invoice_columns
+
+        delivery_models.ZoneName.objects.update_or_create(
+            zone_number=43, defaults={'zone_name': 'Al Maamoura'})
+
+        invoice = self._issued()
+        invoice.column_keys = ['order', 'area', 'charge']
+        invoice.save(update_fields=['column_keys'])
+        lines = list(invoice.lines.select_related(
+            'delivery_task', 'delivery_task__order',
+            'delivery_task__dl_to_address').filter(delivery_task__isnull=False))
+        orders_models.Order.objects.filter(
+            id=lines[0].delivery_task.order_id).update(
+                delivery_area_name='', dl_zone=43)
+        lines[0].delivery_task.order.refresh_from_db()
+
+        with self.assertNumQueries(1):
+            table = invoice_columns.render_table(invoice, lines)
+        self.assertEqual(table['rows'][0]['cells'][1]['value'], 'Al Maamoura · Z43')
+
+    def test_area_column_still_prefers_the_area_the_order_carries(self):
+        from fleet import invoice_columns
+
+        delivery_models.ZoneName.objects.update_or_create(
+            zone_number=43, defaults={'zone_name': 'Al Maamoura'})
+
+        invoice = self._issued()
+        invoice.column_keys = ['order', 'area', 'charge']
+        invoice.save(update_fields=['column_keys'])
+        lines = list(invoice.lines.select_related(
+            'delivery_task', 'delivery_task__order',
+            'delivery_task__dl_to_address').filter(delivery_task__isnull=False))
+        orders_models.Order.objects.filter(
+            id=lines[0].delivery_task.order_id).update(
+                delivery_area_name='Nuaija', dl_zone=43)
+        lines[0].delivery_task.order.refresh_from_db()
+
+        table = invoice_columns.render_table(invoice, lines)
+        self.assertEqual(table['rows'][0]['cells'][1]['value'], 'Nuaija · Z43')
+
+
 class DriverTaskCardDeliveryAreaTest(DriverTestMixin, TestCase):
     """The task card prints the stored area and no longer resolves it per request.
 
@@ -2846,3 +3025,161 @@ class DriverTaskCardDeliveryAreaTest(DriverTestMixin, TestCase):
         area_queries = [q for q in ctx.captured_queries
                         if 'zonearea' in q['sql'].lower()]
         self.assertEqual(area_queries, [], 'driver_tasks must read the stored area')
+
+
+# =============================================================================
+# CLIENT ACCOUNTING LEDGER
+# =============================================================================
+
+class BusinessLedgerTest(ClientPayoutMixin, TestCase):
+    """The account: one balance per client, and the rules that keep it honest."""
+
+    def setUp(self):
+        from fleet import ledger_service
+        self.ls = ledger_service
+        self.LE = fleet_models.BusinessLedgerEntry
+        self.user, self.profile = self.create_driver_user()
+        self.driver = self.create_driver(self.user, self.profile)
+        self.business, self.pickup, self.order = self.create_business_and_order(
+            self.user, self.profile)
+        self.day = date(2026, 9, 1)
+
+    def _ladder(self):
+        """The worked example: COD in, charges and an advance out, then payout."""
+        LE = self.LE
+        self.ls.post(self.business, LE.SEGMENT_COD, credit=Decimal('500.00'),
+                     description='COD order A', occurred_on=self.day)
+        self.ls.post(self.business, LE.SEGMENT_COD, credit=Decimal('300.00'),
+                     description='COD order B', occurred_on=self.day)
+        self.ls.post(self.business, LE.SEGMENT_DELIVERY_CHARGE, debit=Decimal('75.00'),
+                     description='Delivery charges', occurred_on=self.day)
+        self.ls.post(self.business, LE.SEGMENT_ADVANCE, debit=Decimal('200.00'),
+                     description='Advance paid', occurred_on=self.day)
+        return self.ls.post(self.business, LE.SEGMENT_PAYOUT, debit=Decimal('525.00'),
+                            description='COD payout', occurred_on=self.day,
+                            status=LE.STATUS_CLEARED)
+
+    def test_worked_example_nets_to_zero(self):
+        self._ladder()
+        self.assertEqual(self.ls.balance(self.business), Decimal('0.00'))
+        running = [e.balance_after for e in self.ls.entries(self.business)]
+        self.assertEqual(running, [Decimal('500.00'), Decimal('800.00'),
+                                   Decimal('725.00'), Decimal('525.00'),
+                                   Decimal('0.00')])
+
+    def test_filtering_does_not_restate_the_balance(self):
+        """The trap a window function walks into.
+
+        Filtered to the advance alone, the balance column must still read the
+        account's balance at that row (525), not a running total of the filtered
+        rows (-200). Otherwise the page looks like a statement and lies.
+        """
+        self._ladder()
+        rows = list(self.ls.entries(self.business, segment=self.LE.SEGMENT_ADVANCE))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].balance_after, Decimal('525.00'))
+
+    def test_direction_filter_splits_the_two_sides(self):
+        self._ladder()
+        self.assertEqual(self.ls.entries(self.business, direction='receivable').count(), 3)
+        self.assertEqual(self.ls.entries(self.business, direction='payable').count(), 2)
+
+    def test_an_entry_takes_exactly_one_side(self):
+        LE = self.LE
+        with self.assertRaises(ValueError):
+            self.ls.post(self.business, LE.SEGMENT_COD, debit=10, credit=5,
+                         description='both sides')
+        with self.assertRaises(ValueError):
+            self.ls.post(self.business, LE.SEGMENT_COD, description='no amount')
+        with self.assertRaises(ValueError):
+            self.ls.post(self.business, LE.SEGMENT_COD, debit=Decimal('-5.00'),
+                         description='negative')
+        with self.assertRaises(ValueError):
+            self.ls.post(self.business, LE.SEGMENT_COD, credit=10, description='')
+
+    def test_database_rejects_a_two_sided_row(self):
+        """The service validates, but the constraint is what actually guarantees it."""
+        from django.db import IntegrityError
+        with self.assertRaises(IntegrityError):
+            self.LE.objects.create(
+                business=self.business, occurred_on=self.day,
+                segment=self.LE.SEGMENT_COD, description='smuggled past the service',
+                debit=Decimal('10.00'), credit=Decimal('5.00'))
+
+    def test_reversal_contra_posts_and_keeps_both_rows(self):
+        payout = self._ladder()
+        self.ls.reverse(payout, reason='Payout returned by bank')
+        payout.refresh_from_db()
+
+        self.assertEqual(payout.status, self.LE.STATUS_VOID)
+        # Both rows remain on the account and cancel: the liability is back.
+        self.assertEqual(self.ls.balance(self.business), Decimal('525.00'))
+        self.assertEqual(self.LE.objects.filter(business=self.business).count(), 6)
+
+    def test_reversal_is_refused_twice(self):
+        payout = self._ladder()
+        self.ls.reverse(payout)
+        with self.assertRaises(ValueError):
+            self.ls.reverse(payout)
+
+    def test_entry_code_is_numbered_on_the_accounting_date(self):
+        """A backdated entry carries a code reading as the month money moved."""
+        entry = self.ls.post(self.business, self.LE.SEGMENT_COD, credit=100,
+                             description='Backdated COD', occurred_on=date(2026, 7, 14))
+        self.assertTrue(entry.entry_code.startswith('LDG-20260714-'))
+
+    def test_segment_summary_separates_open_from_cleared(self):
+        self._ladder()
+        summary = {s['segment']: s for s in self.ls.segment_summary(self.business)}
+
+        self.assertEqual(summary['cod']['net'], Decimal('800.00'))
+        self.assertEqual(summary['cod']['open_count'], 2)
+        # The payout was posted cleared, so it totals but leaves nothing open.
+        self.assertEqual(summary['payout']['net'], Decimal('-525.00'))
+        self.assertEqual(summary['payout']['open_count'], 0)
+
+
+class BusinessLedgerOpeningBalanceTest(ClientPayoutMixin, TestCase):
+    """Seeding an account with where it already stands, without billing twice."""
+
+    def setUp(self):
+        from fleet import ledger_service
+        self.ls = ledger_service
+        self.LE = fleet_models.BusinessLedgerEntry
+        self.tasks = self.make_payout_candidates(count=2, cod=Decimal('150.00'),
+                                                 dl_price=Decimal('20.00'))
+
+    def test_seeds_the_cod_we_are_holding(self):
+        self.ls.post_opening_balance(self.business)
+        self.assertEqual(self.ls.balance(self.business), Decimal('300.00'))
+
+    def test_unbilled_charges_are_excluded(self):
+        """The double-count trap.
+
+        Those two deliveries carry 40.00 of fees that no invoice has billed yet.
+        Seeding them here would charge the client once on the opening balance and
+        again when an invoice is finally issued, so the opening figure is COD only.
+        """
+        self.ls.post_opening_balance(self.business)
+        self.assertEqual(self.ls.balance(self.business), Decimal('300.00'))
+        self.assertFalse(
+            self.LE.objects.filter(
+                business=self.business,
+                segment=self.LE.SEGMENT_OPENING,
+                debit__gt=0,
+            ).exists())
+
+    def test_outstanding_invoice_is_seeded_as_a_debit(self):
+        from fleet import billing_service
+        invoice, billed, _ = billing_service.issue_charge_invoice(
+            self.business, task_ids=[t.id for t in self.tasks])
+        self.assertEqual(billed, 2)
+
+        self.ls.post_opening_balance(self.business)
+        # 300 COD held, less the 40 now sitting unpaid on a real invoice.
+        self.assertEqual(self.ls.balance(self.business), Decimal('260.00'))
+
+    def test_is_refused_twice(self):
+        self.ls.post_opening_balance(self.business)
+        with self.assertRaises(ValueError):
+            self.ls.post_opening_balance(self.business)

@@ -2653,6 +2653,60 @@
 }
 
 /* Strip */
+/* ---- P2P delivery fee due at the door ---------------------------------- */
+/* Cash the driver must ask for before they walk away, so it sits on its own row
+   above the strip rather than competing with COD inside it. A quiet plate, not a
+   bright chip — it is a step in the round, not an alert. */
+.task-card__fee {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  background: #fff7e6;
+  border: 1px solid rgba(147, 89, 10, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+.task-card__fee-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #93590a;
+}
+
+.task-card__fee-amount {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fleet-navy, #0f1b33);
+}
+
+.task-card__fee-btn {
+  margin-left: auto;
+  min-height: 38px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fleet-navy, #0f1b33);
+  background: #fff;
+  border: 1px solid rgba(16, 24, 40, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+.task-card__fee-btn:disabled {
+  opacity: 0.6;
+}
+
+.task-card__fee--done {
+  background: #eafaf1;
+  border-color: rgba(5, 96, 58, 0.2);
+}
+
+.task-card__fee--done .task-card__fee-label {
+  color: #05603a;
+}
+
 .task-card__strip {
   display: flex;
   align-items: center;
@@ -2698,6 +2752,15 @@
 .task-card__strip-item--note {
   background: #fef9e7;
   color: #d4ac0d;
+  cursor: pointer;
+}
+
+/* Office instruction — a person is waiting on this one, so it reads as an
+   alert rather than a note. */
+.task-card__strip-item--office {
+  background: #fdecea;
+  color: #c0392b;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -3915,6 +3978,17 @@
 .td-notes i {
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+/* Office instruction inside the task sheet — same shape as the order note so
+   it reads as one family, red so the driver can tell them apart at a glance. */
+.td-notes--office {
+  background: #fdecea;
+  color: #a93226;
+}
+
+.td-notes__from {
+  font-weight: 700;
 }
 
 .td-addr-verify {
@@ -7285,3 +7359,56 @@ img.vf-photo-preview {
 }
 
 .fgeo__advice strong { display: block; margin-bottom: 0.25rem; }
+
+/* ── Proof of delivery (task detail sheets) ──────────────────────────────
+   The flag next to a proof label, and the signature pad shown when a client's
+   rule asks for a signature. Rule comes from data-pod-* on the task card. */
+.td-pod-flag {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--fleet-grey-400);
+}
+
+.td-pod-flag--req {
+  color: var(--fleet-danger);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.td-sign-pad {
+  width: 100%;
+  height: 140px;
+  display: block;
+  border: 2px dashed var(--fleet-grey-200);
+  border-radius: var(--radius-sm);
+  background: var(--fleet-white);
+  /* The pad owns every touch inside it, or the sheet scrolls under the finger
+     instead of drawing a line. */
+  touch-action: none;
+}
+
+.td-sign-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-top: 4px;
+}
+
+.td-sign-hint {
+  font-size: var(--font-size-xs);
+  color: var(--fleet-grey-400);
+}
+
+.td-sign-clear {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--fleet-grey-200);
+  background: var(--fleet-grey-50);
+  color: var(--fleet-grey-500);
+}
+
+.td-sign-clear:active { transform: scale(0.95); }

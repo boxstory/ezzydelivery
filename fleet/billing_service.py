@@ -32,6 +32,10 @@ KIND_NAMES = dict(BusinessChargeInvoiceLine.KIND_CHOICES)
 EDITABLE_KINDS = [(k, v) for k, v in BusinessChargeInvoiceLine.KIND_CHOICES
                   if k != 'delivery_charge']
 
+# Same ceiling the Charges to Collect desk enforces on a typed charge — a figure
+# past this is a slipped decimal point, not a delivery.
+MAX_LINE_AMOUNT = Decimal('10000')
+
 
 def billable_tasks(business_id=None, date_from=None, date_to=None,
                    verified_only=False):
@@ -105,6 +109,12 @@ def issue_charge_invoice(business, task_ids=None, extras=None, created_by=None,
     Returns ``(invoice, billed_count, skipped_count)``; ``(None, 0, skipped)``
     when nothing was billable.
     """
+    # Checked before anything is read: the invoice number is built from the
+    # client's own code, so an account without one cannot be numbered at all.
+    # Raising here rather than at save() keeps the message about the account
+    # instead of about a code generator.
+    BusinessChargeInvoice.code_segment_for(business)
+
     extra_lines = _clean_extras(extras)
 
     locked = []
@@ -328,6 +338,84 @@ def remove_invoice_charge_line(invoice, line_id, created_by=None):
     line.delete()
     _resync_invoice_totals(invoice)
     return invoice
+
+
+@transaction.atomic
+def amend_invoice_line_amount(invoice, line_id, amount, created_by=None, reason=None):
+    """Correct a mis-keyed amount on a line of an invoice that is already issued.
+
+    Issuing freezes a line so an edit on the Charges to Collect desk cannot
+    restate a document the client has been sent — which is right for a real
+    repricing and wrong for a fat-fingered figure. This is the one way back in,
+    and the view gates it to super admins.
+
+    The revenue row the line was booked on is restated by the same delta rather
+    than a second row being written: every delivery line on an invoice shares
+    one transaction, and ``void_charge_invoice`` reverses whatever that row says
+    at void time, so a correction booked anywhere else would leave the void
+    reversing a figure the invoice no longer claims. The delivery's own verified
+    charge follows too, so the desk and the document keep saying the same thing.
+    """
+    invoice = BusinessChargeInvoice.objects.select_for_update().select_related(
+        'business'
+    ).get(pk=invoice.pk)
+    _assert_editable(invoice)
+
+    line = invoice.lines.select_related('charge_txn', 'delivery_task').filter(pk=line_id).first()
+    if not line:
+        raise ValueError("That charge is not on this invoice")
+
+    new_amount = Decimal(str(amount)).quantize(Decimal('0.01'))
+    if new_amount < 0:
+        raise ValueError("Charge amount cannot be negative")
+    if new_amount > MAX_LINE_AMOUNT:
+        raise ValueError(f"Charge looks wrong — over {MAX_LINE_AMOUNT:,.0f} QAR")
+
+    old_amount = line.amount or Decimal('0')
+    delta = new_amount - old_amount
+    if delta == 0:
+        raise ValueError(f"This charge is already {old_amount:.2f} QAR")
+
+    # Mirror how _resync_invoice_totals will restate the invoice, so the guard
+    # below tests the total the save is actually about to produce.
+    lines_total = invoice.lines.aggregate(t=Sum('amount'))['t'] or Decimal('0')
+    projected = lines_total + delta
+    paid = invoice.amount_paid or Decimal('0')
+    if projected < paid:
+        raise ValueError(
+            f"That would drop the invoice to {projected:.2f}, below the {paid:.2f} "
+            f"already received against it"
+        )
+
+    txn = line.charge_txn
+    if txn is not None:
+        txn.amount = (txn.amount or Decimal('0')) + delta
+        txn.description = (
+            f"{txn.description.rstrip('.')} (amended by "
+            f"{getattr(created_by, 'username', 'staff')})"
+        )[:255]
+        txn.save(update_fields=['amount', 'description'])
+
+    if line.original_amount is None:
+        line.original_amount = old_amount
+    line.amount = new_amount
+    line.amended_at = timezone.now()
+    line.amended_by = created_by
+    line.amend_reason = (reason or '')[:255]
+    line.save(update_fields=[
+        'amount', 'original_amount', 'amended_at', 'amended_by', 'amend_reason',
+    ])
+
+    # The task's verified figure is what every other charge screen reads. Left
+    # behind, the desk would keep showing the wrong number for a delivery whose
+    # invoice has already been corrected.
+    task = line.delivery_task
+    if task is not None:
+        task.verified_delivery_charge = new_amount
+        task.save(update_fields=['verified_delivery_charge'])
+
+    _resync_invoice_totals(invoice)
+    return line, invoice
 
 
 @transaction.atomic

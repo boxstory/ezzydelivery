@@ -62,7 +62,7 @@ class WalletService:
     def record_transaction(driver, transaction_type, amount, description,
                           delivery_task=None, settlement=None, created_by=None,
                           reference_number=None, notes=None, payment_method=None,
-                          business=None):
+                          business=None, occurred_at=None):
         """
         Record a financial transaction and update driver balances
 
@@ -78,6 +78,9 @@ class WalletService:
             notes: Optional additional notes
             payment_method: Optional payment method (cash, bank, atm, fawran)
             business: Optional Business instance for business-linked transactions
+            occurred_at: Optional aware datetime the money actually moved. Used
+                when staff record a payment that happened in the past: the row
+                is stamped and numbered with that date instead of "now".
 
         Returns:
             DriverTransaction instance
@@ -125,8 +128,10 @@ class WalletService:
             cod_bank_after = Decimal('0')
             cod_atm_after = Decimal('0')
 
-            # Create transaction record
-            trans = DriverTransaction.objects.create(
+            # Create transaction record. Built and saved in two steps rather
+            # than via create() so a backdated entry can hand the model its
+            # date before the transaction code is generated from it.
+            trans = DriverTransaction(
                 driver=driver,
                 business=business,
                 transaction_type=transaction_type,
@@ -147,6 +152,14 @@ class WalletService:
                 notes=notes,
                 payment_method=payment_method
             )
+            if occurred_at:
+                trans._code_date = timezone.localtime(occurred_at)
+            trans.save()
+            if occurred_at:
+                # created_at is auto_now_add, so it can only be set after the
+                # insert. Kept inside the same atomic block as the row itself.
+                DriverTransaction.objects.filter(pk=trans.pk).update(created_at=occurred_at)
+                trans.created_at = occurred_at
 
             # Stamp the running per-method balances on the new row immediately.
             # Without this the row carries zeros until the staff transactions
@@ -197,6 +210,9 @@ class WalletService:
 
         with transaction.atomic():
             # Calculate earnings (example: 80% to driver, 20% commission)
+            # NOTE: this path is not what production pays. The live fee comes
+            # from delivery.earnings.driver_fee() and the DeliveryPayRate cards;
+            # the flat 80/20 below belongs to this older completion helper only.
             delivery_charge = Decimal(delivery_task.dl_price or 0)
             driver_earnings = delivery_charge * Decimal('0.80')
             company_commission = delivery_charge * Decimal('0.20')
@@ -620,7 +636,8 @@ class WalletService:
     def settle_cod_with_client(business, amount, delivery_task_ids=None,
                                created_by=None, reference_number=None, notes=None,
                                payment_method=None, delivery_charge=None,
-                               deductions=None, charge_by_task=None):
+                               deductions=None, charge_by_task=None,
+                               occurred_at=None):
         """
         Record COD settlement from EzzyDelivery to business client.
 
@@ -638,6 +655,10 @@ class WalletService:
                 taken off the gross at payout (delivery, fulfilment, cargo
                 handling, ad-hoc). Each becomes an invoice line, a revenue
                 transaction and a BusinessPayoutDeduction row.
+            occurred_at: Optional aware datetime the payout actually happened.
+                Stamps the transaction, its charge rows and the tasks' client
+                settlement date, so a payout entered late reads as the day the
+                money moved rather than the day it was typed in.
             charge_by_task: Optional ``{task_id: Decimal}`` — the delivery charge
                 each task is paying in this payout. Frozen onto the task so a
                 later edit in the Client Charges console cannot restate an
@@ -700,7 +721,8 @@ class WalletService:
                 reference_number=reference_number,
                 notes=notes,
                 payment_method=payment_method,
-                business=business
+                business=business,
+                occurred_at=occurred_at,
             )
 
             # Each charge is booked as its own revenue row rather than netted
@@ -718,6 +740,7 @@ class WalletService:
                     created_by=created_by,
                     reference_number=reference_number,
                     business=business,
+                    occurred_at=occurred_at,
                 )
                 BusinessPayoutDeduction.objects.create(
                     settle_txn=trans,
@@ -732,7 +755,7 @@ class WalletService:
             if delivery_task_ids:
                 # Idempotent: only flag tasks not already client-settled, so a
                 # re-run never re-flags or links to a second payout transaction.
-                now = timezone.now()
+                now = occurred_at or timezone.now()
                 settled_ids = list(DeliveryTask.objects.filter(
                     id__in=delivery_task_ids,
                     cod_collected=True,
@@ -999,10 +1022,7 @@ class WalletService:
         Returns:
             DriverTransaction instance
         """
-        valid_charge_types = [
-            'delivery_charge', 'fulfillment_charge',
-            'inventory_handling', 'other_charge'
-        ]
+        valid_charge_types = fleet_models.DriverTransaction.CHARGE_TYPES
         if charge_type not in valid_charge_types:
             raise ValueError(f"Invalid charge type: {charge_type}. Must be one of {valid_charge_types}")
 
@@ -1181,9 +1201,13 @@ class WalletService:
 
         # COD is the only thing that moves the wallet today; manual bonuses and
         # deductions are added on top so they are never silently discarded.
+        # Only the UNPAID ones: a bonus already handed over on a payout is money
+        # the driver has, not money still owed, and counting it for life left the
+        # PWA wallet permanently overstated by every incentive ever paid.
         adjustments = fleet_models.DriverTransaction.objects.filter(
             driver=driver,
             transaction_type__in=['deduction', 'bonus', 'adjustment'],
+            settlement__isnull=True,
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         wallet = adjustments - live
 

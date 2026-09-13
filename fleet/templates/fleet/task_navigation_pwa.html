@@ -250,7 +250,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260729a">
+<link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260912a">
 {% endblock %}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -365,6 +365,15 @@
         var url = hasDropoff
             ? 'https://www.google.com/maps/dir/?api=1&destination=' + dropoffLat + ',' + dropoffLng + '&travelmode=driving'
             : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addressText);
+        // Live mode ends here — Maps takes the foreground and the browser can no
+        // longer fix a position. The handoff records the gap that opens.
+        if (window.EzzyGPS && EzzyGPS.navHandoff) {
+            EzzyGPS.navHandoff.open('google', {
+                taskId: {{ task.id }},
+                lat: hasDropoff ? dropoffLat : null,
+                lng: hasDropoff ? dropoffLng : null
+            });
+        }
         window.open(url, '_blank');
     });
 
@@ -396,7 +405,11 @@
                 msg += '\n';
             }
             msg += '\nPlease make sure someone is available to receive the delivery.\n\nThank you! 🙏';
-            window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+            var waUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+            if (window.EzzyGPS && EzzyGPS.navHandoff) {
+                EzzyGPS.navHandoff.openUrl(waUrl, { taskId: {{ task.id }} });
+            }
+            window.open(waUrl, '_blank');
         });
     }
 })();

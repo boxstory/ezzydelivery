@@ -50,8 +50,10 @@ Related:
 
 import json
 import logging
+from datetime import time
 from django.db import connection, transaction
-from django.db.models import Q
+from django.db.models import Case, Q, TimeField, Value, When
+from django.db.models.functions import Coalesce, TruncDate, TruncTime
 from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse
 from django.http import HttpResponse, JsonResponse
@@ -79,6 +81,7 @@ DriverVehicle = fleet_models.DriverVehicle
 DriverTransaction = fleet_models.DriverTransaction
 DriverSettlement = fleet_models.DriverSettlement
 DeliveryTask = delivery_models.DeliveryTask
+from delivery.ordering import TASK_SEQ_DESC, annotate_task_sequence
 ZoneName = delivery_models.ZoneName
 ZoneGroup = delivery_models.ZoneGroup
 Profile = core_models.Profile
@@ -225,11 +228,15 @@ def fleet_dashboard(request):
 
         # Task counts for dashboard summary — mirrors driver_tasks view logic exactly
         from delivery import models as delivery_models
-        new_tasks_count = delivery_models.DeliveryTask.objects.filter(
-            dl_task_publish=True,
-            driver__isnull=True,
-            dl_task_status__in=['pending', 'for_review'],
-        ).exclude(order__order_status='cancelled').count()
+        from delivery.selectors import exclude_held_parcels
+        new_tasks_count = exclude_held_parcels(
+            delivery_models.DeliveryTask.objects.filter(
+                dl_task_publish=True,
+                driver__isnull=True,
+                dl_task_status__in=['pending', 'for_review'],
+            ).exclude(order__order_status='cancelled'),
+            driver,
+        ).count()
 
         assigned_tasks_count = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
@@ -591,7 +598,7 @@ def cod_collection(request):
         ).exclude(id__in=cod_in_hand_ids).select_related('order', 'order__business', 'dl_to_address')
         if date_cutoff:
             settled_qs = settled_qs.filter(completed_at__gte=date_cutoff)
-        cod_deliveries = settled_qs.order_by('-completed_at')[:50]
+        cod_deliveries = annotate_task_sequence(settled_qs).order_by(*TASK_SEQ_DESC)[:50]
 
         from orders.models import Order
         cod_orders = Order.objects.filter(
@@ -659,14 +666,16 @@ def cod_submission(request):
         # Cash only — electronic collections (Fawran/POS/bank/ATM) land in
         # Ezzy's account at collection and are never part of a driver hand-in.
         if request.method == 'GET':
-            cod_in_hand_list = delivery_models.DeliveryTask.objects.filter(
+            cod_in_hand_list = annotate_task_sequence(
+                delivery_models.DeliveryTask.objects
+            ).filter(
                 driver=driver,
                 cod_collected=True,
                 cod_settled=False,
                 dl_task_status__in=['delivered', 'partial_delivery']
             ).exclude(
                 payment_method__in=WalletService.ELECTRONIC_METHODS
-            ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')
+            ).select_related('order', 'order__business', 'dl_to_address').order_by(*TASK_SEQ_DESC)
 
             from django.db.models import Sum
             cod_in_hand_total = cod_in_hand_list.aggregate(
@@ -820,7 +829,9 @@ def cod_submission(request):
 
         # Get pending COD deliveries (unsettled, cash only — electronic never
         # forms part of a driver hand-in)
-        cod_in_hand_list = delivery_models.DeliveryTask.objects.filter(
+        cod_in_hand_list = annotate_task_sequence(
+            delivery_models.DeliveryTask.objects
+        ).filter(
             driver=driver,
             cod_collected=True,
             cod_settled=False,
@@ -956,9 +967,9 @@ def cod_export(request):
                     )
                 except (ValueError, TypeError):
                     pass
-        deliveries = deliveries.select_related(
+        deliveries = annotate_task_sequence(deliveries).select_related(
             'order', 'order__business', 'dl_to_address'
-        ).prefetch_related('transactions').order_by('-completed_at')
+        ).prefetch_related('transactions').order_by(*TASK_SEQ_DESC)
 
         # Calculate total COD amount — real cash only (zero rows contribute nothing)
         total_cod = sum(
@@ -1487,13 +1498,15 @@ def driver_earnings(request):
         start_date = timezone.now() - timedelta(days=days)
 
         # Get completed delivery tasks using direct driver FK (consistent with dashboard)
-        completed_tasks = delivery_models.DeliveryTask.objects.filter(
+        completed_tasks = annotate_task_sequence(
+            delivery_models.DeliveryTask.objects
+        ).filter(
             driver=driver,
             dl_task_status__in=['delivered', 'partial_delivery', 'failed'],
             dl_task_date__gte=start_date.date()
         ).select_related(
             'order', 'order__business', 'pickup_location', 'dl_to_address'
-        ).order_by('-dl_task_date', '-id')
+        ).order_by(*TASK_SEQ_DESC)
 
         # Apply status filter
         if status_filter == 'delivered':
@@ -1526,14 +1539,16 @@ def driver_earnings(request):
 
         # Get unsettled deliveries for settlement selection
         # Only show published earnings (verified by staff)
-        unsettled_tasks = delivery_models.DeliveryTask.objects.filter(
+        unsettled_tasks = annotate_task_sequence(
+            delivery_models.DeliveryTask.objects
+        ).filter(
             driver=driver,
             dl_task_status__in=['delivered', 'partial_delivery'],
             earnings_settled=False,
             earnings_verification_status='published'  # Only published earnings can be settled
         ).select_related(
             'order', 'order__business', 'dl_to_address'
-        ).order_by('-completed_at')
+        ).order_by(*TASK_SEQ_DESC)
 
         unsettled_total = unsettled_tasks.aggregate(
             total=Sum(
@@ -1800,7 +1815,7 @@ def fleet_finance_summary(request):
 
         # Charges summary
         charges = txns.filter(
-            transaction_type__in=['delivery_charge', 'fulfillment_charge', 'inventory_handling', 'other_charge']
+            transaction_type__in=fleet_models.DriverTransaction.CHARGE_TYPES
         ).values('transaction_type').annotate(
             total=Sum('amount'),
             count=Count('id')
@@ -2442,10 +2457,12 @@ def pickup_scanner(request):
             driver=driver
         ).values_list('dl_task_id', flat=True)
 
-        pending_tasks = delivery_models.DeliveryTask.objects.filter(
+        pending_tasks = annotate_task_sequence(
+            delivery_models.DeliveryTask.objects
+        ).filter(
             id__in=assigned_task_ids,
             dl_task_status__in=['assigned', 'pending']
-        ).select_related('order', 'order__business', 'pickup_location').order_by('dl_task_date')
+        ).select_related('order', 'order__business', 'pickup_location').order_by(*TASK_SEQ_DESC)
 
         context = {
             'driver': driver,
@@ -2828,28 +2845,35 @@ def driver_tasks(request):
     area_filter = request.GET.get('area', 'all')
     type_filter = request.GET.get('type', 'all')
     status_filter = request.GET.get('status', 'all')
-    sort_by = request.GET.get('sort', 'date')
+    sort_by = request.GET.get('sort', 'code')
     zone_filter = request.GET.get('zone', '')
     search_query = request.GET.get('search', '').strip()
     page = request.GET.get('page', 1)
 
     base_qs = delivery_models.DeliveryTask.objects.select_related(
         'order', 'order__business', 'order__pickup_location', 'driver', 'dl_to_address',
+        # The card reads the booking for a receiver-pays fee; without this every P2P
+        # row on the page costs an extra query.
+        'order__p2p_booking',
     ).prefetch_related(
         'assigneddriver_set', 'assigneddriver_set__driver',
         'order__order_items', 'order__order_items__product', 'task_qrcode',
         'order__address_verifications',
     )
+    base_qs = annotate_task_sequence(base_qs)
 
     driver_active = (driver.driver_status == 'approved')
 
     if driver_active:
-        all_tasks = base_qs.filter(
+        from delivery.selectors import exclude_held_parcels
+        # A parcel already collected by another driver is not takeable from the
+        # pool — only its holder and the transfer target still see the task.
+        all_tasks = exclude_held_parcels(base_qs.filter(
             dl_task_publish=True, driver__isnull=True,
             dl_task_status__in=['pending', 'for_review'],
         ).exclude(
             dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed']
-        ).exclude(order__order_status='cancelled').order_by('-id')
+        ).exclude(order__order_status='cancelled'), driver).order_by('-id')
     else:
         from delivery.models import DeliveryTask as _DT
         all_tasks = _DT.objects.none()
@@ -2946,13 +2970,17 @@ def driver_tasks(request):
         accepted_tasks = accepted_tasks.filter(q)
         history_tasks = history_tasks.filter(q)
 
-    # Sort
+    # Sort. Default is the trailing sequence code of the task number
+    # (AOP067-1395-AB759 -> AB759), newest code first — the raw dl_task_number
+    # leads with the business code, so it would group by client instead.
     if sort_by == 'zone':
-        sort_order = ['dl_to_address__dl_zone', '-dl_task_date', '-id']
+        sort_order = ['dl_to_address__dl_zone', *TASK_SEQ_DESC]
     elif sort_by == 'status':
-        sort_order = ['dl_task_status', '-dl_task_date', '-id']
-    else:
-        sort_order = ['-dl_task_date', '-id']
+        sort_order = ['dl_task_status', *TASK_SEQ_DESC]
+    elif sort_by == 'date':
+        sort_order = ['-dl_task_date', *TASK_SEQ_DESC]
+    else:  # 'code' (default)
+        sort_order = list(TASK_SEQ_DESC)
 
     all_tasks = all_tasks.order_by(*sort_order)
     assigned_tasks = assigned_tasks.order_by(*sort_order)
@@ -3124,6 +3152,13 @@ def fleet_task_take_scan(request):
                 'error': f'Task is already {task.get_dl_task_status_display()}'
             })
 
+        # The parcel may already be in another driver's car (first-mile pickup
+        # collected but not handed over) — scanning the label does not move it.
+        from delivery.selectors import parcel_claim_block
+        blocked, block_msg = parcel_claim_block(task, driver)
+        if blocked:
+            return JsonResponse({'success': False, 'error': block_msg})
+
         # Assign driver and set to accepted
         from django.db import transaction as db_transaction
         with db_transaction.atomic():
@@ -3209,19 +3244,21 @@ def fleet_task_scan_take_any(request):
         'order', 'order__business', 'order__pickup_location', 'driver', 'dl_to_address')
 
     # Claimable pool — same rule as the New tab, minus its UI filters
-    task = base.filter(
+    from delivery.selectors import exclude_held_parcels, parcel_claim_block
+    task = exclude_held_parcels(base.filter(
         _code_q(), dl_task_publish=True, driver__isnull=True,
         dl_task_status__in=['pending', 'for_review'],
-    ).exclude(order__order_status='cancelled').first()
+    ).exclude(order__order_status='cancelled'), driver).first()
 
     if not task:
         # Explain why this label is not takeable instead of a blank "not found"
         other = base.filter(_code_q()).first()
         if not other:
             # Loose match — label may carry a prefix/suffix around the order number
-            for cand in base.filter(dl_task_publish=True, driver__isnull=True,
-                                    dl_task_status__in=['pending', 'for_review']
-                                    ).exclude(order__order_status='cancelled')[:500]:
+            for cand in exclude_held_parcels(
+                    base.filter(dl_task_publish=True, driver__isnull=True,
+                                dl_task_status__in=['pending', 'for_review']
+                                ).exclude(order__order_status='cancelled'), driver)[:500]:
                 order_num = (cand.order.order_number or '').lower() if cand.order else ''
                 if order_num and (order_num in code_l or code_l in order_num):
                     task = cand
@@ -3236,6 +3273,10 @@ def fleet_task_scan_take_any(request):
                 return JsonResponse({'success': False, 'error': 'Another driver already took this task'})
             if not other.dl_task_publish:
                 return JsonResponse({'success': False, 'error': 'Task is not published to fleet yet'})
+            # Held parcel: the task looks free but the goods are in another car.
+            blocked, block_msg = parcel_claim_block(other, driver)
+            if blocked:
+                return JsonResponse({'success': False, 'error': block_msg})
             return JsonResponse({
                 'success': False,
                 'error': f'Task is {other.get_dl_task_status_display()} — cannot take it',
@@ -3398,6 +3439,14 @@ def fleet_partial_delivery(request, task_id):
 
     if task.dl_task_status in ('delivered', 'partial_delivery', 'failed', 'cancelled'):
         return JsonResponse({'success': False, 'error': 'Task already completed'})
+
+    # Goods changed hands, so a client's delivered-proof rule applies here too —
+    # otherwise "Partial" is a way around it. This endpoint takes JSON, so the app
+    # uploads the proof first (fleet:upload_delivery_proof) and we check the record.
+    from delivery import pod as delivery_pod
+    pod_error = delivery_pod.missing(task, 'partial_delivery')
+    if pod_error:
+        return JsonResponse({'success': False, 'error': pod_error})
 
     if not returned_items:
         return JsonResponse({'success': False, 'error': 'Select at least one returned item'})
@@ -4029,20 +4078,24 @@ def fleet_tasks_map(request):
     new_statuses = ['for_review', 'pending']
 
     # Driver's own active tasks
-    active_tasks = delivery_models.DeliveryTask.objects.select_related(
+    active_tasks = annotate_task_sequence(
+        delivery_models.DeliveryTask.objects
+    ).select_related(
         'order', 'order__business', 'dl_to_address',
     ).filter(
         driver=driver,
         dl_task_status__in=active_statuses,
-    ).exclude(order__order_status='cancelled')
+    ).exclude(order__order_status='cancelled').order_by(*TASK_SEQ_DESC)
 
     # New/pending tasks not yet assigned to any driver
-    new_tasks = delivery_models.DeliveryTask.objects.select_related(
+    new_tasks = annotate_task_sequence(
+        delivery_models.DeliveryTask.objects
+    ).select_related(
         'order', 'order__business', 'dl_to_address',
     ).filter(
         dl_task_status__in=new_statuses,
         driver__isnull=True,
-    ).exclude(order__order_status='cancelled')
+    ).exclude(order__order_status='cancelled').order_by(*TASK_SEQ_DESC)
 
     from itertools import chain
     tasks = list(chain(active_tasks, new_tasks))
@@ -4144,9 +4197,15 @@ def upload_delivery_proof(request, task_id):
     except DjangoValidationError as exc:
         return JsonResponse({'error': exc.messages[0]}, status=400)
 
+    # An unrecognised proof_type would store as-is and then never match the
+    # proof-of-delivery check, which reads these values back by name.
+    proof_type = request.POST.get('proof_type', 'photo')
+    if proof_type not in dict(DeliveryProof.PROOF_TYPE_CHOICES):
+        proof_type = 'photo'
+
     proof = DeliveryProof.objects.create(
         delivery_task=task,
-        proof_type=request.POST.get('proof_type', 'photo'),
+        proof_type=proof_type,
         photo=photo,
         notes=request.POST.get('notes', ''),
         barcode_data=request.POST.get('barcode_data', ''),
@@ -4413,15 +4472,35 @@ def driver_pickups(request):
     tab = request.GET.get('tab', 'available')
 
     available = pickup_pool_for(driver).order_by('-id')
+    # The driver's own list is a plan for the day, not a feed, so it runs in the
+    # order the work is actually due. A job with no window is due now — express means
+    # exactly that — so it sorts at the moment it was accepted rather than being
+    # pushed behind every scheduled one. The pool and the in-progress tabs keep
+    # newest-first: neither is a plan.
     mine = PickupTask.objects.filter(
         driver=driver, status__in=['accepted', 'in_progress', 'arrived'],
-    ).select_related('order', 'business', 'pickup_location', 'drop_warehouse__warehouse').order_by('-id')
+    ).select_related(
+        'order', 'order__p2p_booking', 'business', 'pickup_location',
+        'drop_warehouse__warehouse',
+    ).annotate(
+        due_day=Coalesce('order__p2p_booking__pickup_date', TruncDate('created_at')),
+        due_time=Case(
+            When(order__p2p_booking__pickup_time__isnull=False,
+                 then='order__p2p_booking__pickup_time'),
+            # A day with no slab is "any time that day", which is last on that day —
+            # after everything that named an hour.
+            When(order__p2p_booking__pickup_date__isnull=False,
+                 then=Value(time(23, 59))),
+            default=TruncTime('created_at'),
+            output_field=TimeField(),
+        ),
+    ).order_by('due_day', 'due_time', '-id')
     in_progress = PickupTask.objects.filter(
         Q(driver=driver, status='collected')
         | Q(transfer_to_driver=driver, status='collected'),
     ).select_related(
-        'order', 'business', 'pickup_location', 'drop_warehouse__warehouse',
-        'driver', 'transfer_to_driver',
+        'order', 'order__p2p_booking', 'business', 'pickup_location',
+        'drop_warehouse__warehouse', 'driver', 'transfer_to_driver',
     ).order_by('-id')
 
     cards = {'available': available, 'mine': mine, 'in_progress': in_progress}.get(tab, available)
@@ -4734,3 +4813,144 @@ def pickup_transfer_targets(request):
             for d in targets.order_by('driver_code')[:30]
         ],
     })
+
+
+@login_required(login_url='/accounts/login/')
+def p2p_mark_fee_collected(request):
+    """A driver confirms they took the P2P delivery fee in cash at pickup.
+
+    Only for a sender-pays booking — see fee_payer. The receiver-pays twin is
+    p2p_mark_fee_collected_at_delivery, keyed on the delivery task instead.
+
+    Booked as a `cod_collection` against the delivery task rather than a new
+    transaction type. That is deliberate: WalletService.recalculate_cod_balances
+    derives cash-in-hand from exactly three types
+    ('cod_collection', 'cod_deposit', 'cod_driver_settle'), so a bespoke type would
+    produce a ledger row that the driver's cash figure and the hand-in reconciliation
+    both ignore — ops would under-count what the driver is holding. The P2PBooking row
+    keeps the breakdown so reports can still separate a fee from a receiver's COD.
+    """
+    from django.http import JsonResponse
+    from delivery.models import PickupTask
+    from delivery.services.pickup import log_pickup_history
+    from fleet.wallet_service import WalletService
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+    driver = _get_request_driver(request)
+    if not driver:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+
+    pickup = PickupTask.objects.filter(
+        pk=request.POST.get('pickup_id'), driver=driver
+    ).select_related('order').first()
+    if not pickup or not pickup.order:
+        return JsonResponse({'success': False, 'error': 'Pickup not found'})
+
+    booking = getattr(pickup.order, 'p2p_booking', None)
+    if booking is None:
+        return JsonResponse({'success': False, 'error': 'Not a P2P delivery'})
+    if booking.fee_payer != 'sender':
+        # The receiver is paying at the door. Taking it here would collect from the
+        # wrong person, and the door prompt would then ask for it a second time.
+        return JsonResponse({'success': False,
+                             'error': 'The receiver pays this fee on delivery'})
+    if booking.fee_status != 'pending':
+        # Forward-only, and idempotent: a double tap must not book the money twice.
+        return JsonResponse({'success': True, 'already': True,
+                             'fee_status': booking.fee_status})
+    if not booking.fee_amount:
+        return JsonResponse({'success': False, 'error': 'No fee is due on this delivery'})
+
+    task = pickup.order.delivery_task.exclude(dl_task_status='cancelled').order_by('-id').first()
+    txn = WalletService.record_transaction(
+        driver=driver,
+        transaction_type='cod_collection',
+        amount=booking.fee_amount,
+        description=f'P2P delivery fee collected at pickup for {pickup.order.order_number}',
+        delivery_task=task,
+        created_by=request.user,
+        business=pickup.order.business,
+    )
+
+    booking.fee_status = 'collected_cash'
+    booking.fee_txn = txn
+    booking.save(update_fields=['fee_status', 'fee_txn', 'updated_at'])
+    log_pickup_history(
+        pickup, pickup.status, pickup.status, actor=request.user,
+        notes=f'P2P delivery fee QAR {booking.fee_amount} collected in cash')
+
+    return JsonResponse({'success': True, 'fee_status': 'collected_cash',
+                         'amount': str(booking.fee_amount)})
+
+
+@login_required(login_url='/accounts/login/')
+def p2p_mark_fee_collected_at_delivery(request):
+    """A driver confirms they took the P2P delivery fee in cash at the door.
+
+    The twin of p2p_mark_fee_collected for a receiver-pays booking: the person who
+    ordered the delivery is the one waiting for it, so nobody at pickup owes anything
+    and the cash only exists at the drop.
+
+    Booked identically — a `cod_collection` against the delivery task, for the same
+    reason: WalletService.recalculate_cod_balances derives cash-in-hand from exactly
+    three transaction types, so a bespoke one would leave the driver's cash figure
+    under-counting what they are actually holding.
+    """
+    from django.http import JsonResponse
+    from delivery import models as delivery_models
+    from fleet.wallet_service import WalletService
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+    driver = _get_request_driver(request)
+    if not driver:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+
+    task = (delivery_models.DeliveryTask.objects
+            .select_related('order')
+            .filter(pk=request.POST.get('task_id')).first())
+    if not task or not task.order:
+        return JsonResponse({'success': False, 'error': 'Task not found'})
+
+    # Same ownership test the ride actions use: the assignment row or the task's own
+    # driver. A task can be worked by an assigned driver who is not task.driver.
+    assigned = (
+        delivery_models.AssignedDriver.objects
+        .filter(dl_task_id=task.pk, driver=driver).exists()
+        or task.driver_id == driver.pk
+    )
+    if not assigned:
+        return JsonResponse({'success': False, 'error': 'Task not assigned to you'})
+
+    booking = getattr(task.order, 'p2p_booking', None)
+    if booking is None:
+        return JsonResponse({'success': False, 'error': 'Not a P2P delivery'})
+    if booking.fee_payer != 'receiver':
+        return JsonResponse({'success': False,
+                             'error': 'The sender pays this fee at pickup'})
+    if booking.fee_status != 'pending':
+        # Forward-only, and idempotent: a double tap must not book the money twice.
+        return JsonResponse({'success': True, 'already': True,
+                             'fee_status': booking.fee_status})
+    if not booking.fee_amount:
+        return JsonResponse({'success': False, 'error': 'No fee is due on this delivery'})
+
+    txn = WalletService.record_transaction(
+        driver=driver,
+        transaction_type='cod_collection',
+        amount=booking.fee_amount,
+        description=f'P2P delivery fee collected at delivery for {task.order.order_number}',
+        delivery_task=task,
+        created_by=request.user,
+        business=task.order.business,
+    )
+
+    booking.fee_status = 'collected_cash'
+    booking.fee_txn = txn
+    booking.save(update_fields=['fee_status', 'fee_txn', 'updated_at'])
+
+    return JsonResponse({'success': True, 'fee_status': 'collected_cash',
+                         'amount': str(booking.fee_amount)})

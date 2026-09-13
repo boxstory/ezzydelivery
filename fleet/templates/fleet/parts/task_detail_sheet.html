@@ -134,6 +134,13 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                         <i class="fa-solid fa-note-sticky"></i>
                         <span id="tdNotes"></span>
                     </div>
+                    <!-- Instruction the office passed down (usually a seller's own
+                         words). Separated from the order note so the driver can tell
+                         who is asking. -->
+                    <div id="tdOfficeNoteBox" class="td-notes td-notes--office" style="display:none;">
+                        <i class="fa-solid fa-comment-dots"></i>
+                        <span><strong class="td-notes__from">From office:</strong> <span id="tdOfficeNote"></span></span>
+                    </div>
                     <div id="tdProductDescBox" class="td-notes" style="display:none;">
                         <i class="fa-solid fa-tag"></i>
                         <span id="tdProductDesc"></span>
@@ -189,15 +196,28 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         <button class="td-sheet__close" onclick="closeTdDelivered()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="td-sub-sheet__body">
-        <!-- Proof of Delivery Photo -->
-        <div class="td-form-group">
-            <label class="td-form-label"><i class="fa-solid fa-camera me-1"></i>Proof of Delivery Photo <span style="color:var(--fleet-grey-400)">(optional)</span></label>
+        <!-- Proof of Delivery Photo. Optional unless this task's client contracted for it —
+             the card's data-pod-* attributes flip the flag, and delivery/pod.py enforces it. -->
+        <div class="td-form-group" id="tdProofGroup">
+            <label class="td-form-label"><i class="fa-solid fa-camera me-1"></i>Proof of Delivery Photo
+                <span class="td-pod-flag" id="tdProofReq">(optional)</span></label>
             <div class="td-photo-upload" id="tdProofUploadBox" onclick="document.getElementById('tdProofInput').click()">
                 <i class="fa-solid fa-cloud-arrow-up td-photo-upload__icon"></i>
                 <span class="td-photo-upload__text">Tap to take / upload photo</span>
                 <img id="tdProofPreview" class="td-photo-preview" style="display:none;" alt="Proof">
             </div>
             <input type="file" id="tdProofInput" accept="image/*" capture="environment" style="display:none;" onchange="previewProof(this)">
+        </div>
+
+        <!-- Customer signature — shown only when this client's proof type asks for one -->
+        <div class="td-form-group" id="tdSignGroup" hidden>
+            <label class="td-form-label"><i class="fa-solid fa-signature me-1"></i>Customer Signature
+                <span class="td-pod-flag td-pod-flag--req">required</span></label>
+            <canvas id="tdSignPad" class="td-sign-pad" width="640" height="200"></canvas>
+            <div class="td-sign-foot">
+                <span class="td-sign-hint">Hand the phone over and ask the customer to sign</span>
+                <button type="button" class="td-sign-clear" onclick="tdSignClear('tdSignPad')">Clear</button>
+            </div>
         </div>
 
         <!-- Payment Mode — always visible -->
@@ -292,6 +312,23 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             <input type="hidden" id="tdFailReasonKey" value="">
             <textarea id="tdFailReason" class="td-form-textarea" placeholder="Add extra notes (optional)..." rows="2"></textarea>
         </div>
+        <!-- Evidence of the attempt. Hidden unless this client requires proof on a failed
+             close-out; a failed attempt always takes a photo, never a signature. -->
+        <div class="td-form-group" id="tdFailProofGroup" hidden>
+            <label class="td-form-label"><i class="fa-solid fa-camera me-1"></i>Attempt Photo
+                <span class="td-pod-flag td-pod-flag--req">required</span></label>
+            <div class="td-photo-upload" id="tdFailProofBox" onclick="document.getElementById('tdFailProofInput').click()">
+                <i class="fa-solid fa-cloud-arrow-up td-photo-upload__icon"></i>
+                <span class="td-photo-upload__text">Tap to photograph the door / address / parcel</span>
+                <img id="tdFailProofPreview" class="td-photo-preview" style="display:none;" alt="Attempt photo">
+            </div>
+            <input type="file" id="tdFailProofInput" accept="image/*" capture="environment" hidden
+                   onchange="tdPreviewInto(this, 'tdFailProofPreview', 'tdFailProofBox')">
+            <span class="td-nr-help__note"><i class="fa-solid fa-triangle-exclamation"></i>
+                This client requires evidence of a failed attempt. Photograph the closed door, the
+                building, or the parcel still in your hand — it settles the dispute later.</span>
+        </div>
+
         <button id="tdFailedBtn" class="fleet-btn td-confirm-btn td-confirm-btn--danger" onclick="submitFailed()">
             <i class="fa-solid fa-xmark me-2"></i>Confirm Failed
         </button>
@@ -422,6 +459,30 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                 </label>
             </div>
         </div>
+        <!-- Goods changed hands here too, so the client's delivered-proof rule applies.
+             Uploaded before the submit — this endpoint takes JSON, not files. -->
+        <div class="td-form-group" id="tdPartProofGroup" hidden>
+            <label class="td-form-label"><i class="fa-solid fa-camera me-1"></i>Proof of Delivery Photo
+                <span class="td-pod-flag td-pod-flag--req">required</span></label>
+            <div class="td-photo-upload" id="tdPartProofBox" onclick="document.getElementById('tdPartProofInput').click()">
+                <i class="fa-solid fa-cloud-arrow-up td-photo-upload__icon"></i>
+                <span class="td-photo-upload__text">Tap to take / upload photo</span>
+                <img id="tdPartProofPreview" class="td-photo-preview" style="display:none;" alt="Proof">
+            </div>
+            <input type="file" id="tdPartProofInput" accept="image/*" capture="environment" hidden
+                   onchange="tdPreviewInto(this, 'tdPartProofPreview', 'tdPartProofBox')">
+        </div>
+
+        <div class="td-form-group" id="tdPartSignGroup" hidden>
+            <label class="td-form-label"><i class="fa-solid fa-signature me-1"></i>Customer Signature
+                <span class="td-pod-flag td-pod-flag--req">required</span></label>
+            <canvas id="tdPartSignPad" class="td-sign-pad" width="640" height="200"></canvas>
+            <div class="td-sign-foot">
+                <span class="td-sign-hint">Signed for what the customer actually kept</span>
+                <button type="button" class="td-sign-clear" onclick="tdSignClear('tdPartSignPad')">Clear</button>
+            </div>
+        </div>
+
         <button id="tdPartialBtn" class="fleet-btn td-confirm-btn td-confirm-btn--warning" onclick="submitPartialDelivery()">
             <i class="fa-solid fa-box-open me-2"></i>Confirm Partial Delivery
         </button>
@@ -473,7 +534,11 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
 
     window.tdOpenWa = function(el) {
         const url = el.dataset.waUrl;
-        if (url) window.open(url, '_blank');
+        if (!url) return false;
+        if (window.EzzyGPS && EzzyGPS.navHandoff) {
+            EzzyGPS.navHandoff.openUrl(url, { taskId: _tdCurrentTaskId });
+        }
+        window.open(url, '_blank');
         return false;
     };
 
@@ -534,9 +599,14 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         if (pLat && pLng && parseFloat(pLat) !== 0 && parseFloat(pLng) !== 0) {
             pickupMapBtn.href = 'https://www.google.com/maps?q=' + pLat + ',' + pLng;
             pickupMapBtn.className = 'td-map-tile td-map-tile--green';
+            pickupMapBtn.setAttribute('data-nav-app', 'google');
+            pickupMapBtn.setAttribute('data-nav-task', d.id || '');
+            pickupMapBtn.setAttribute('data-nav-lat', pLat);
+            pickupMapBtn.setAttribute('data-nav-lng', pLng);
         } else {
             pickupMapBtn.removeAttribute('href');
             pickupMapBtn.className = 'td-map-tile td-map-tile--grey';
+            pickupMapBtn.removeAttribute('data-nav-app');
         }
 
         // Delivery address
@@ -611,6 +681,12 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         if (d.notes) { document.getElementById('tdNotes').textContent = d.notes; notesBox.style.display = ''; }
         else         { notesBox.style.display = 'none'; }
 
+        // Office note — staff passing on a seller instruction
+        const officeBox = document.getElementById('tdOfficeNoteBox');
+        const officeNote = card.dataset.officeNote || '';
+        if (officeNote) { document.getElementById('tdOfficeNote').textContent = officeNote; officeBox.style.display = ''; }
+        else            { officeBox.style.display = 'none'; }
+
         // Product Description (summary)
         const pdBox = document.getElementById('tdProductDescBox');
         const pdDesc = card.dataset.productDesc || '';
@@ -638,6 +714,16 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const navGoogle = document.getElementById('tdNavGoogle');
         const dropoffMapBtn = document.getElementById('tdDropoffMapBtn');
         const dropoffPin = dropoffMapBtn.querySelector('.td-map-tile__pin');
+        // data-nav-* marks a link that hands the driver to another app. EzzyGPS
+        // files the handoff on tap, so the trail gap it opens is explained
+        // rather than looking like a phone that died. See pwa_base.html.
+        const markNav = (el, app) => {
+            el.setAttribute('data-nav-app', app);
+            el.setAttribute('data-nav-task', d.id || '');
+            el.setAttribute('data-nav-lat', bestLat || '');
+            el.setAttribute('data-nav-lng', bestLng || '');
+        };
+
         if (bestLat && bestLng && parseFloat(bestLat) !== 0 && parseFloat(bestLng) !== 0) {
             navWaze.href = `https://waze.com/ul?ll=${bestLat},${bestLng}&navigate=yes`;
             navGoogle.href = `https://www.google.com/maps/dir/?api=1&destination=${bestLat},${bestLng}&travelmode=driving`;
@@ -645,12 +731,16 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             dropoffMapBtn.className = 'td-map-tile td-map-tile--blue';
             if (dropoffPin) dropoffPin.style.color = accMeta ? accMeta.color : '';
             dropoffMapBtn.style.display = '';
+            markNav(navWaze, 'waze');
+            markNav(navGoogle, 'google');
+            markNav(dropoffMapBtn, 'google');
         } else {
             navWaze.href = '#';
             navGoogle.href = '#';
             dropoffMapBtn.className = 'td-map-tile td-map-tile--grey';
             if (dropoffPin) dropoffPin.style.color = '';
             dropoffMapBtn.style.display = 'none';
+            [navWaze, navGoogle, dropoffMapBtn].forEach(el => el.removeAttribute('data-nav-app'));
         }
 
         // AI Parse button — store data for tdAiParse()
@@ -805,7 +895,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
-            fetch('/delivery/address_link/' + _tdCurrentTaskNum + '/update/', {
+            fetch('/delivery/task/' + encodeURIComponent(_tdCurrentTaskNum) + '/location/', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '' },
@@ -838,9 +928,19 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         // Set Edit Loc link
         var editLocBtn = document.getElementById('tdUpdateLocBtn');
         if (editLocBtn) editLocBtn.href = '/fleet/tasks/' + _tdCurrentTaskId + '/edit-location/';
+        // This task's client proof rule, before any sub-sheet is shaped by it
+        _tdPod = {
+            delivered: card.dataset.podDelivered === '1',
+            failed: card.dataset.podFailed === '1',
+            kind: card.dataset.podKind || 'photo',
+        };
+        _tdPodApply();
         // Reset sub-sheets
-        document.getElementById('tdProofPreview').style.display = 'none';
-        document.getElementById('tdProofInput').value = '';
+        _tdResetPhoto('tdFailProofInput', 'tdFailProofPreview', 'tdFailProofBox');
+        _tdResetPhoto('tdPartProofInput', 'tdPartProofPreview', 'tdPartProofBox');
+        window.tdSignClear('tdSignPad');
+        window.tdSignClear('tdPartSignPad');
+        _tdResetPhoto('tdProofInput', 'tdProofPreview', 'tdProofUploadBox');
         document.getElementById('tdCodCollected').checked = false;
         document.getElementById('tdCodAmountRow').style.display = 'none';
         document.getElementById('tdFailReason').value = '';
@@ -920,6 +1020,150 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         };
         reader.readAsDataURL(file);
     };
+
+    // ── Proof of delivery ───────────────────────────────────
+    // This client's rule, read off the task card (data-pod-*). delivery/pod.py checks
+    // the same rule server-side — this only spares the driver a doomed submit.
+    let _tdPod = { delivered: false, failed: false, kind: 'photo' };
+
+    const _tdNeedPhoto = () => _tdPod.delivered && (_tdPod.kind === 'photo' || _tdPod.kind === 'both');
+    const _tdNeedSign  = () => _tdPod.delivered && (_tdPod.kind === 'signature' || _tdPod.kind === 'both');
+
+    window.tdPreviewInto = function(input, previewId, boxId) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = document.getElementById(previewId);
+            img.src = e.target.result;
+            img.style.display = 'block';
+            const box = document.getElementById(boxId);
+            box.querySelector('.td-photo-upload__icon').style.display = 'none';
+            box.querySelector('.td-photo-upload__text').style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    };
+
+    function _tdResetPhoto(inputId, previewId, boxId) {
+        const input = document.getElementById(inputId);
+        if (input) input.value = '';
+        const img = document.getElementById(previewId);
+        if (img) { img.style.display = 'none'; img.removeAttribute('src'); }
+        const box = document.getElementById(boxId);
+        if (box) {
+            box.querySelector('.td-photo-upload__icon').style.display = '';
+            box.querySelector('.td-photo-upload__text').style.display = '';
+        }
+    }
+
+    // ── Signature pad ───────────────────────────────────────
+    const _tdSignInk = {};   // canvasId -> did the customer actually draw anything
+
+    function _tdSignSetup(canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#111827';
+        let drawing = false;
+
+        // The canvas is a fixed 640x200 bitmap laid out at whatever width the sheet
+        // gives it, so every touch point has to be scaled into bitmap space.
+        const at = ev => {
+            const r = canvas.getBoundingClientRect();
+            return [(ev.clientX - r.left) * (canvas.width / r.width),
+                    (ev.clientY - r.top) * (canvas.height / r.height)];
+        };
+        canvas.addEventListener('pointerdown', ev => {
+            drawing = true;
+            try { canvas.setPointerCapture(ev.pointerId); } catch (e) {}
+            const [x, y] = at(ev);
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ev.preventDefault();
+        });
+        canvas.addEventListener('pointermove', ev => {
+            if (!drawing) return;
+            const [x, y] = at(ev);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            _tdSignInk[canvas.id] = true;
+            ev.preventDefault();
+        });
+        const stop = ev => { drawing = false; if (ev && ev.cancelable) ev.preventDefault(); };
+        canvas.addEventListener('pointerup', stop);
+        canvas.addEventListener('pointercancel', stop);
+    }
+
+    window.tdSignClear = function(canvasId) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        _tdSignInk[canvasId] = false;
+    };
+
+    function _tdSignBlob(canvasId) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || !_tdSignInk[canvasId]) return Promise.resolve(null);
+        // Flatten onto white first: a transparent PNG signature disappears in any
+        // viewer that renders it on a dark surface, which is most of them.
+        const flat = document.createElement('canvas');
+        flat.width = canvas.width;
+        flat.height = canvas.height;
+        const fctx = flat.getContext('2d');
+        fctx.fillStyle = '#ffffff';
+        fctx.fillRect(0, 0, flat.width, flat.height);
+        fctx.drawImage(canvas, 0, 0);
+        return new Promise(resolve => flat.toBlob(blob => resolve(blob), 'image/png'));
+    }
+
+    ['tdSignPad', 'tdPartSignPad'].forEach(id => {
+        const canvas = document.getElementById(id);
+        if (canvas) _tdSignSetup(canvas);
+    });
+
+    // Shape the three outcome sheets to this client's rule.
+    function _tdPodApply() {
+        const needPhoto = _tdNeedPhoto();
+        const flag = document.getElementById('tdProofReq');
+        if (flag) {
+            flag.textContent = needPhoto ? 'required' : '(optional)';
+            flag.classList.toggle('td-pod-flag--req', needPhoto);
+        }
+        const set = (id, hidden) => {
+            const el = document.getElementById(id);
+            if (el) el.hidden = hidden;
+        };
+        set('tdSignGroup', !_tdNeedSign());
+        set('tdFailProofGroup', !_tdPod.failed);
+        set('tdPartProofGroup', !needPhoto);
+        set('tdPartSignGroup', !_tdNeedSign());
+    }
+
+    // One proof file to the task's proof endpoint. Used by the partial sheet, which
+    // posts JSON and so cannot carry the file on its own request.
+    function _tdUploadProof(file, proofType) {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const fd = new FormData();
+        fd.append('photo', file, proofType === 'signature' ? 'signature.png' : (file.name || 'proof.jpg'));
+        fd.append('proof_type', proofType);
+        return _tdFetch('/fleet/task/' + _tdCurrentTaskId + '/proof/upload/', {
+            method: 'POST', headers: { 'X-CSRFToken': csrf }, body: fd
+        }).then(r => r.json()).then(res => {
+            if (res.error) throw new Error(res.error);
+            return res;
+        });
+    }
+
+    function _tdPartialProofUploads() {
+        const photo = document.getElementById('tdPartProofInput').files[0];
+        return _tdSignBlob('tdPartSignPad').then(sig => {
+            let chain = Promise.resolve();
+            if (photo) chain = chain.then(() => _tdUploadProof(photo, 'photo'));
+            if (sig) chain = chain.then(() => _tdUploadProof(sig, 'signature'));
+            return chain;
+        });
+    }
 
     window.toggleCodAmount = function(chk) {
         document.getElementById('tdCodAmountRow').style.display = chk.checked ? '' : 'none';
@@ -1028,12 +1272,23 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             }
         }
 
+        // Proof gate. The server rejects this too, but the driver should find out before
+        // the button spins — and before the photo opportunity walks back inside.
+        const proofFile = document.getElementById('tdProofInput').files[0];
+        if (_tdNeedPhoto() && !proofFile) {
+            showToast('⚠️ This client requires a delivery photo. Take one before confirming.', 'error');
+            return;
+        }
+        if (_tdNeedSign() && !_tdSignInk['tdSignPad']) {
+            showToast('⚠️ This client requires the customer to sign. Hand over the phone.', 'error');
+            return;
+        }
+
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Submitting...';
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const fd = new FormData();
         fd.append('status', 'delivered');
-        const proofFile = document.getElementById('tdProofInput').files[0];
         if (proofFile) fd.append('delivery_proof', proofFile);
         fd.append('cod_collected', codCollected ? 'true' : 'false');
         if (codCollected) {
@@ -1052,10 +1307,15 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         if (payMethod) fd.append('payment_method', payMethod.value);
         const codRef = (document.getElementById('tdCodReference').value || '').trim();
         if (codRef) fd.append('cod_reference', codRef);
-        _tdFetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': csrf },
-            body: fd
+        // The signature is drawn, not picked, so it only becomes a file here.
+        _tdSignBlob('tdSignPad')
+        .then(sig => {
+            if (sig) fd.append('signature', sig, 'signature.png');
+            return _tdFetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf },
+                body: fd
+            });
         })
         .then(r => r.json())
         .then(data => {
@@ -1089,6 +1349,11 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const reasonKey = document.getElementById('tdFailReasonKey').value.trim();
         const notes = document.getElementById('tdFailReason').value.trim();
         if (!reasonKey) { showToast('Please select a failure reason', 'warning'); return; }
+        const failPhoto = document.getElementById('tdFailProofInput').files[0];
+        if (_tdPod.failed && !failPhoto) {
+            showToast('⚠️ This client requires a photo of the failed attempt.', 'error');
+            return;
+        }
         const btn = document.getElementById('tdFailedBtn');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Submitting...';
@@ -1101,6 +1366,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const selectedBtn = document.querySelector('.td-reason-btn.selected');
         const reasonLabel = selectedBtn ? selectedBtn.textContent.trim() : reasonKey;
         fd.append('notes', notes ? (reasonLabel + ' — ' + notes) : reasonLabel);
+        if (failPhoto) fd.append('delivery_proof', failPhoto);
         _tdFetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
             method: 'POST',
             headers: { 'X-CSRFToken': csrf },
@@ -1331,15 +1597,29 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const partialPayEl = document.querySelector('input[name="tdPartialPayMethod"]:checked');
         const partialPayMethod = (actualCod > 0 && partialPayEl) ? partialPayEl.value : '';
 
+        // A partial hand-over is still a hand-over, so the client's delivered-proof
+        // rule applies here as well.
+        if (_tdNeedPhoto() && !document.getElementById('tdPartProofInput').files[0]) {
+            showToast('⚠️ This client requires a delivery photo. Take one before confirming.', 'error');
+            return;
+        }
+        if (_tdNeedSign() && !_tdSignInk['tdPartSignPad']) {
+            showToast('⚠️ This client requires the customer to sign. Hand over the phone.', 'error');
+            return;
+        }
+
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Submitting...';
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
-        _tdFetch('/fleet/tasks/' + _tdCurrentTaskId + '/partial-delivery/', {
+        // Proof goes up first: this endpoint speaks JSON, so the files travel on their
+        // own request and the server then finds them already filed against the task.
+        _tdPartialProofUploads()
+        .then(() => _tdFetch('/fleet/tasks/' + _tdCurrentTaskId + '/partial-delivery/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
             body: JSON.stringify({ items: returnedItems, actual_cod: actualCod, payment_method: partialPayMethod })
-        })
+        }))
         .then(r => r.json())
         .then(data => {
             if (data.error) {
@@ -1353,8 +1633,8 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             window.closeTdPartial();
             setTimeout(() => { window.closeTaskDetail(); window.location.reload(); }, 900);
         })
-        .catch(() => {
-            showToast('Network error', 'error');
+        .catch(err => {
+            showToast((err && err.message) ? err.message : 'Network error', 'error');
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-box-open me-2"></i>Confirm Partial Delivery';
         });
