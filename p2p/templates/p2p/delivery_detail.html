@@ -1,0 +1,114 @@
+{% extends "p2p/_base.html" %}
+{% comment %}
+Purpose: One delivery — status, the money, the timeline and the message thread
+Used by: p2p.views.delivery_detail
+Notes: Comments are filtered to is_internal=False in the view; internal staff notes never render here.
+{% endcomment %}
+{% block title %}{{ order.order_number }} | EzzyDelivery{% endblock title %}
+{% block p2p_content %}
+<div class="p2pb__head">
+  <div>
+    <h1 class="p2pb__title">{{ order.order_number }}</h1>
+    <p class="p2pb__lead mb-0">{{ status }}</p>
+  </div>
+  {% comment %}One form owns both legs, so Edit on the leg back opens the outward
+  order's page — the view hands over which order that is.{% endcomment %}
+  {% if can_edit %}
+    <a href="{% url 'p2p:delivery_edit' order_number=edit_order_number %}"
+       class="btn p2pb__btn-secondary" id="p2p_detail_link_edit">Edit</a>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-7">
+    <div class="p2pb__card">
+      <h2 class="p2pb__section p2pb__section--first">Route</h2>
+      <div class="p2pb__summary">
+        {% if is_return %}
+          <div class="p2pb__summary-row"><span>This journey</span><strong>The leg back</strong></div>
+          {% if booking.order %}
+            <div class="p2pb__summary-row"><span>Delivered out on</span>
+              <strong><a href="{% url 'p2p:delivery_detail' order_number=booking.order.order_number %}"
+                         id="p2p_detail_link_outbound">{{ booking.order.order_number }}</a></strong></div>
+          {% endif %}
+        {% elif booking.return_trip and booking.return_order %}
+          <div class="p2pb__summary-row"><span>Leg back</span>
+            <strong><a href="{% url 'p2p:delivery_detail' order_number=booking.return_order.order_number %}"
+                       id="p2p_detail_link_return">{{ booking.return_order.order_number }}</a></strong></div>
+        {% endif %}
+        <div class="p2pb__summary-row"><span>Collect from</span><strong>{{ order.pickup_location.pickup_location_title|default:"—" }}</strong></div>
+        {% if booking.pickup_window %}
+          <div class="p2pb__summary-row"><span>Pickup window</span><strong>{{ booking.pickup_window }}</strong></div>
+        {% endif %}
+        <div class="p2pb__summary-row"><span>Deliver to</span><strong>{{ order.customer_name }}</strong></div>
+        <div class="p2pb__summary-row"><span>Address</span><strong>{{ order.customer_address }}</strong></div>
+        {% if booking.delivery_window %}
+          <div class="p2pb__summary-row"><span>Delivery window</span><strong>{{ booking.delivery_window }}</strong></div>
+        {% endif %}
+        {% if task and task.driver %}
+          <div class="p2pb__summary-row"><span>Driver</span><strong>{{ task.driver }}</strong></div>
+        {% endif %}
+      </div>
+
+      <h2 class="p2pb__section">Money</h2>
+      <div class="p2pb__summary">
+        <div class="p2pb__summary-row">
+          <span>Delivery fee</span>
+          <strong>
+            {% if order.dl_amount %}QAR {{ order.dl_amount|floatformat:2 }}{% else %}Awaiting price{% endif %}
+          </strong>
+        </div>
+        {% if booking %}
+          <div class="p2pb__summary-row">
+            <span>Paid by</span><strong>{{ booking.get_fee_payer_display }}</strong>
+          </div>
+          <div class="p2pb__summary-row">
+            <span>Fee status</span><strong>{{ booking.get_fee_status_display }}</strong>
+          </div>
+        {% endif %}
+        {% if order.cod_amount %}
+          <div class="p2pb__summary-row"><span>Collect from receiver</span><strong>QAR {{ order.cod_amount|floatformat:2 }}</strong></div>
+          <div class="p2pb__summary-row"><span>Collected</span><strong>{% if order.cod_status_by_staff == 'not_collected' %}Not yet{% else %}{{ order.get_cod_status_by_staff_display }}{% endif %}</strong></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="p2pb__card">
+      <h2 class="p2pb__section p2pb__section--first">Progress</h2>
+      {% if history %}
+        <ol class="p2pb__timeline">
+          {% for entry in history %}
+            <li class="p2pb__timeline-item">
+              <span class="p2pb__timeline-label">{{ entry.new_display|default:entry.new_value }}</span>
+              <span class="p2pb__timeline-time">{{ entry.created_at|date:"j M, H:i" }}</span>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <p class="p2pb__hint">Nothing to show yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="p2pb__card mt-3">
+      <h2 class="p2pb__section p2pb__section--first">Messages</h2>
+      {% for comment in comments %}
+        <div class="p2pb__msg {% if comment.author_role == 'staff' %}p2pb__msg--staff{% endif %}">
+          <span class="p2pb__msg-who">{{ comment.display_name }}</span>
+          <p class="p2pb__msg-body">{{ comment.body }}</p>
+          <span class="p2pb__msg-time">{{ comment.created_at|date:"j M, H:i" }}</span>
+        </div>
+      {% empty %}
+        <p class="p2pb__hint">No messages yet. Ask us anything about this delivery.</p>
+      {% endfor %}
+      <form method="post" action="{% url 'p2p:add_comment' order_number=order.order_number %}" class="mt-3" id="p2p_detail_form_comment">
+        {% csrf_token %}
+        <textarea name="body" class="form-control p2pb__input" rows="3" maxlength="2000"
+                  placeholder="Write a message…" id="p2p_detail_input_comment" required></textarea>
+        <button type="submit" class="btn p2pb__btn-primary w-100 mt-2" id="p2p_detail_btn_comment">Send</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock p2p_content %}

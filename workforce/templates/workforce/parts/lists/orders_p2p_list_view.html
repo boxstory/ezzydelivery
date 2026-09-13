@@ -1,0 +1,172 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% load humanize %}
+{% comment %}
+Purpose: The P2P desk — every point-to-point booking, with the ones awaiting a price first
+Used by: workforce.views.wf_orders_p2p at /workforce/orders/p2p/
+Notes: Uses the shared wfhero/wfstat furniture rather than a per-page masthead. Pricing posts to
+       workforce:wf_p2p_set_price, which routes through p2p.services so hand-priced and
+       auto-priced bookings reach the customer by one path.
+{% endcomment %}
+{% block title %}P2P Orders{% endblock title %}
+{% block content %}
+<div class="wfpage">
+
+  <div class="wfhero">
+    <div class="wfhero__text">
+      <h1 class="wfhero__title">P2P Orders</h1>
+      <p class="wfhero__sub">Point-to-point bookings from the public site and from client accounts.</p>
+    </div>
+    <div class="wfhero__actions">
+      <a href="{% url 'workforce:wf_p2p_new' %}" class="btn btn-warning"
+         id="workforce_p2p_link_new">
+        <i class="fa-solid fa-plus me-1"></i>New P2P booking
+      </a>
+      <a href="{% url 'workforce:wf_p2p_rate_card' %}" class="btn btn-outline-light"
+         id="workforce_p2p_link_rate_card">Rate card</a>
+    </div>
+  </div>
+
+  <div class="wfstat">
+    <div class="wfstat__card {% if tally.unpriced %}wfstat__card--here{% endif %}">
+      <span class="wfstat__label">Awaiting price</span>
+      <span class="wfstat__value">{{ tally.awaiting_price|default:"0" }}</span>
+      <span class="wfstat__sub">need a figure from ops</span>
+    </div>
+    <div class="wfstat__card">
+      <span class="wfstat__label">Awaiting customer</span>
+      <span class="wfstat__value">{{ tally.awaiting_customer|default:"0" }}</span>
+      <span class="wfstat__sub">priced, not yet confirmed</span>
+    </div>
+    <div class="wfstat__card">
+      <span class="wfstat__label">Confirmed</span>
+      <span class="wfstat__value">{{ tally.confirmed|default:"0" }}</span>
+      <span class="wfstat__sub">ready to publish</span>
+    </div>
+    <div class="wfstat__card">
+      <span class="wfstat__label">Published</span>
+      <span class="wfstat__value">{{ tally.published|default:"0" }}</span>
+      <span class="wfstat__sub">with a delivery task</span>
+    </div>
+    <div class="wfstat__card">
+      <span class="wfstat__label">Delivered</span>
+      <span class="wfstat__value">{{ tally.delivered|default:"0" }}</span>
+      <span class="wfstat__sub">all time</span>
+    </div>
+  </div>
+
+  <form method="get" class="d-flex flex-wrap gap-2 my-3" id="workforce_p2p_form_filter">
+    <input type="text" name="search" value="{{ filters.search }}" class="form-control"
+           style="max-width:260px" placeholder="Customer name or phone" id="workforce_p2p_input_search">
+    <button type="submit" class="btn btn-dark" id="workforce_p2p_btn_filter">Filter</button>
+    {% if filters.search %}
+      <a href="{% url 'workforce:wf_orders_p2p' %}" class="btn btn-outline-secondary" id="workforce_p2p_link_clear">Clear</a>
+    {% endif %}
+  </form>
+
+  <div class="table-responsive">
+    <table class="table align-middle" id="workforce_p2p_table_orders">
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Sender</th>
+          <th>Route</th>
+          <th>Parcel</th>
+          <th class="text-end">Fee</th>
+          <th class="text-end">COD</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+          <tr>
+            <td>
+              <a href="{% url 'workforce:order_detail' order_id=order.id %}">{{ order.order_number }}</a>
+              <span class="badge bg-info ms-1">P2P</span>
+              {% if not order.dl_amount %}<span class="badge bg-warning text-dark ms-1">Price pending</span>{% endif %}
+              <div class="text-muted small">{{ order.created_at|date:"j M Y, H:i" }}</div>
+            </td>
+            <td>
+              {% if order.p2p_customer %}
+                {{ order.p2p_customer.get_full_name|default:order.p2p_customer.username }}
+                <div class="text-muted small">Personal sender</div>
+              {% else %}
+                {{ order.business.business_name }}
+                <div class="text-muted small">Client account</div>
+              {% endif %}
+            </td>
+            <td>
+              {{ order.p2p_booking.from_label|default:order.pickup_location.locality|default:"—" }}
+              &rarr; {{ order.p2p_booking.to_label|default:order.customer_name }}
+              <div class="text-muted small">
+                {{ order.p2p_booking.distance_km|default:order.p2p_return_booking.distance_km|default:"—" }} km
+                {% if order.p2p_booking.booker_role == 'receiver' %}· booked by the receiver
+                {% elif order.p2p_booking.booker_role == 'other' %}· booked by a third party{% endif %}
+                {% comment %}A return trip is two orders off one booking; this one is the
+                leg back, and its route already reads the other way round above.{% endcomment %}
+                {% if order.p2p_return_booking %}· leg back on {{ order.p2p_return_booking.order.order_number }}
+                {% elif order.p2p_booking.return_trip %}· return trip{% endif %}
+              </div>
+            </td>
+            <td>
+              {{ order.package_qty|default:1 }} box{{ order.package_qty|pluralize:"es" }}
+              {% if order.package_weight_kg %}<div class="text-muted small">{{ order.package_weight_kg }} kg</div>{% endif %}
+            </td>
+            <td class="text-end">
+              {% if order.dl_amount %}
+                {{ order.dl_amount|floatformat:2 }}
+                {# Where the cash is due, not just whether it landed — ops field this on the phone. #}
+                <div class="text-muted small">{{ order.p2p_booking.get_fee_status_display|default:"" }}</div>
+                {% if order.p2p_booking.fee_status == 'pending' %}
+                  <div class="text-muted small">{{ order.p2p_booking.get_fee_payer_display }}</div>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if order.cod_amount %}{{ order.cod_amount|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td>
+              {{ order.get_order_status_display }}
+              {% if order.p2p_booking %}<div class="text-muted small">{{ order.p2p_booking.get_status_display }}</div>{% endif %}
+            </td>
+            <td class="text-end">
+              {% if order.p2p_booking and not order.dl_amount %}
+                <button type="button" class="btn btn-sm btn-warning"
+                        data-p2p-price="{{ order.p2p_booking.id }}"
+                        id="workforce_p2p_btn_price_{{ order.p2p_booking.id }}">Set price</button>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No P2P orders yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "includes/components/_pagination.html" with page_obj=orders filter_params=filter_params %}
+</div>
+
+<script>
+/* Set-price prompt. Deliberately posts to the same service the automatic path uses,
+   so a hand-priced booking and an auto-priced one reach the customer identically. */
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-p2p-price]');
+    if (!btn) return;
+    const amount = window.prompt('Delivery fee for this booking (QAR):');
+    if (!amount) return;
+    const body = new FormData();
+    body.append('amount', amount);
+    body.append('csrfmiddlewaretoken',
+        document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+        document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '');
+    fetch('/workforce/orders/p2p/' + btn.dataset.p2pPrice + '/price/', { method: 'POST', body: body })
+        .then(r => r.json())
+        .then(res => { if (res.success) { location.reload(); } else { alert(res.error || 'Failed'); } })
+        .catch(() => alert('Network error'));
+});
+</script>
+{% endblock content %}

@@ -1,0 +1,669 @@
+/*
+Purpose: Styling for the P2P customer pages — booking, verification, confirmation and the console
+Used by: p2p/templates/p2p/_base.html and every page that extends it
+Notes: Layout is Bootstrap utilities in the markup. Everything here is visual only — colour, edge,
+       shadow, rhythm — using Brand Kit tokens. Prefix p2pb__.
+*/
+
+.p2pb {
+    background: var(--brand-grey-50, #f8f9fa);
+    min-height: 60vh;
+}
+
+/* ---------- Surfaces ---------------------------------------------------- */
+
+.p2pb__card {
+    background: var(--brand-white, #fff);
+    border: 1px solid rgba(16, 24, 40, 0.08);
+    border-radius: var(--brand-radius-lg, 14px);
+    box-shadow: var(--brand-shadow-sm, 0 1px 2px rgba(16, 24, 40, 0.05));
+    padding: 1.5rem;
+}
+
+.p2pb__card--centred {
+    text-align: center;
+}
+
+/* ---------- Type -------------------------------------------------------- */
+
+.p2pb__title {
+    font-size: 1.5rem;
+    font-weight: var(--brand-font-weight-bold, 700);
+    color: var(--brand-navy, #0f1b33);
+    margin-bottom: 0.35rem;
+}
+
+.p2pb__lead {
+    color: #667085;
+    margin-bottom: 1.25rem;
+}
+
+.p2pb__section {
+    font-size: 0.75rem;
+    font-weight: var(--brand-font-weight-bold, 700);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #98a2b3;
+    margin: 1.75rem 0 0.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(16, 24, 40, 0.08);
+}
+
+/* First section in a card has nothing above it to divide from. */
+.p2pb__section--first {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+/* Mixed-load counters — one per box size, so a job can be two small and one medium
+   instead of being forced into whichever single size is least wrong. */
+.p2pb__load {
+    margin-top: 0.75rem;
+}
+
+/* One counter's stepper. Bootstrap's .input-group draws the joined row and .btn the two
+   buttons; these are the brand tweaks it does not cover — a centred, tabular figure and
+   no browser spin arrows, which would be a second tinier target on top of the field. */
+.p2pb__step .form-control {
+    text-align: center;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.p2pb__step .form-control::-webkit-outer-spin-button,
+.p2pb__step .form-control::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.p2pb__step-btn {
+    font-weight: 700;
+    line-height: 1;
+    color: var(--brand-grey-700, #444);
+    border-color: rgba(16, 24, 40, 0.15);
+}
+
+.p2pb__step-btn:hover:not(:disabled) {
+    background: var(--brand-primary, #ffc72c);
+    border-color: var(--brand-primary, #ffc72c);
+    color: var(--brand-navy, #0f1b33);
+}
+
+/* The running total, in place of the box-count field the counters replaced. */
+.p2pb__load-total {
+    margin: 0.625rem 0 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-600, #555);
+}
+
+.p2pb__load-label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-600, #555);
+}
+
+/* The return-leg tick, and the one field that only matters once it is on. Bootstrap's
+   .form-check supplies the layout; this is the tinted panel that sets the pair apart
+   from the plain fields above it. */
+.p2pb__switch {
+    background: var(--brand-grey-50, #f8f9fa);
+    border: 1px solid rgba(16, 24, 40, 0.08);
+    border-radius: var(--brand-radius-md, 10px);
+    padding: 0.875rem 1rem;
+}
+
+.p2pb__switch-label {
+    font-weight: 600;
+    color: var(--brand-navy, #0f1b33);
+}
+
+.p2pb__switch .form-check-input:focus {
+    border-color: var(--brand-primary, #ffc72c);
+    box-shadow: 0 0 0 3px rgba(255, 199, 44, 0.25);
+}
+
+.p2pb__hint {
+    font-size: 0.8125rem;
+    color: #98a2b3;
+    margin-top: 0.35rem;
+}
+
+.p2pb__error {
+    font-size: 0.8125rem;
+    color: var(--brand-danger, #d92d20);
+    margin-top: 0.35rem;
+}
+
+.p2pb__ref {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9375rem;
+    color: #667085;
+    margin-bottom: 1rem;
+}
+
+/* ---------- Head row ---------------------------------------------------- */
+
+.p2pb__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+/* ---------- Form controls ----------------------------------------------- */
+/* Bootstrap's .form-control/.form-select supply the box; these are brand tweaks only. */
+
+.p2pb__input {
+    border-color: rgba(16, 24, 40, 0.15);
+    border-radius: var(--brand-radius-md, 10px);
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+}
+
+.p2pb__input:focus {
+    border-color: var(--brand-primary, #ffc72c);
+    box-shadow: 0 0 0 3px rgba(255, 199, 44, 0.25);
+}
+
+.p2pb__input--code {
+    font-size: 1.5rem;
+    letter-spacing: 0.4em;
+    text-align: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---------- The two-way questions (role, fee payer) ---------------------- */
+/* Layout is Bootstrap in the markup; these are the swatch, the edge and the
+   selected state, which Bootstrap has no equivalent for. */
+
+.p2pb__choice {
+    border: 0;
+    margin: 0 0 0.25rem;
+    padding: 0;
+    min-width: 0;
+}
+
+.p2pb__choice legend {
+    float: none;
+    width: auto;
+    font-size: 0.875rem;
+    color: var(--brand-navy, #0f1b33);
+    margin-bottom: 0.4rem;
+}
+
+.p2pb__choice-set {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.p2pb__choice-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 12rem;
+    margin: 0;
+    padding: 0.65rem 0.85rem;
+    background: var(--brand-white, #fff);
+    border: 1px solid rgba(16, 24, 40, 0.15);
+    border-radius: var(--brand-radius-md, 10px);
+    cursor: pointer;
+    transition: var(--brand-transition, all 0.15s ease);
+}
+
+.p2pb__choice-opt:hover {
+    border-color: rgba(16, 24, 40, 0.3);
+}
+
+/* The whole row reads as chosen, not just the dot — on a phone the dot is the
+   smallest thing on the card. */
+.p2pb__choice-opt:has(input:checked) {
+    border-color: var(--brand-navy, #0f1b33);
+    box-shadow: inset 0 0 0 1px var(--brand-navy, #0f1b33);
+}
+
+.p2pb__choice-opt:focus-within {
+    box-shadow: 0 0 0 3px rgba(255, 199, 44, 0.25);
+}
+
+.p2pb__choice-input {
+    margin: 0;
+    flex: 0 0 auto;
+    accent-color: var(--brand-navy, #0f1b33);
+}
+
+.p2pb__choice-text {
+    font-size: 0.9375rem;
+    color: var(--brand-navy, #0f1b33);
+}
+
+/* The one field on the form the customer does not get to fill in. Reads as settled
+   rather than disabled — it is their own proven number, not a broken control. */
+.p2pb__input[readonly] {
+    background-color: var(--brand-grey-50, #f8f9fa);
+    color: var(--brand-grey-700, #333);
+    cursor: default;
+}
+
+.p2pb__lock {
+    margin-top: 0.3rem;
+    font-size: 0.8125rem;
+    color: #667085;
+}
+
+/* Which half of the form the booker is standing in. */
+.p2pb__you {
+    margin-left: 0.5rem;
+    padding: 0.1rem 0.45rem;
+    border: 1px solid rgba(16, 24, 40, 0.15);
+    border-radius: var(--brand-radius-sm, 6px);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    color: var(--brand-navy, #0f1b33);
+    background: var(--brand-white, #fff);
+}
+
+/* ---------- Buttons ----------------------------------------------------- */
+
+.p2pb__btn-primary {
+    background: var(--brand-primary, #ffc72c);
+    color: var(--brand-primary-text, #101828);
+    font-weight: var(--brand-font-weight-bold, 700);
+    border: 1px solid transparent;
+    border-radius: var(--brand-radius-md, 10px);
+    padding: 0.65rem 1.25rem;
+    transition: var(--brand-transition, all 0.15s ease);
+}
+
+.p2pb__btn-primary:hover,
+.p2pb__btn-primary:focus {
+    background: var(--brand-primary-dark, #e6ac00);
+    color: var(--brand-primary-text, #101828);
+}
+
+.p2pb__btn-secondary {
+    background: var(--brand-white, #fff);
+    color: var(--brand-navy, #0f1b33);
+    font-weight: var(--brand-font-weight-bold, 700);
+    border: 1px solid rgba(16, 24, 40, 0.15);
+    border-radius: var(--brand-radius-md, 10px);
+    padding: 0.65rem 1.25rem;
+    transition: var(--brand-transition, all 0.15s ease);
+}
+
+.p2pb__btn-secondary:hover,
+.p2pb__btn-secondary:focus {
+    border-color: var(--brand-navy, #0f1b33);
+    color: var(--brand-navy, #0f1b33);
+}
+
+/* ---------- Picture pickers (size, vehicle) ------------------------------- */
+/* The same cards as the public calculator (webpages/css/p2p-pricing.css) so the
+   choice a customer already made looks the same when they make it again here.
+   The radio itself is off-screen: the label is the control. */
+
+.p2pb__picker {
+    border: 0;
+    margin: 0 0 1rem;
+    padding: 0;
+    min-width: 0;
+}
+
+.p2pb__picker legend {
+    float: none;
+    width: auto;
+    font-size: 0.875rem;
+    color: var(--brand-navy, #0f1b33);
+    margin-bottom: 0.4rem;
+}
+
+/* Grid, not flex: the sets are 5, 6 and 2 cards long, and a flex row leaves the odd
+   one out stretched across the full width. Equal tracks wrap without that. */
+.p2pb__picker-set {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.25rem, 1fr));
+    gap: 0.5rem;
+}
+
+.p2pb__pick {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0.75rem 0.4rem;
+    background: var(--brand-white, #fff);
+    border: 2px solid var(--brand-grey-200, #e5e7eb);
+    border-radius: 0.875rem;
+    color: var(--brand-grey-500, #888);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+
+.p2pb__pick:hover {
+    border-color: var(--brand-primary, #f7c000);
+    background: #fffbeb;
+    color: var(--brand-grey-700, #444);
+    transform: translateY(-2px);
+}
+
+/* The input stays in the layout for the screen reader and the keyboard, just not
+   in the picture — display:none would take it out of the tab order. */
+.p2pb__pick .p2pb__choice-input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    pointer-events: none;
+}
+
+.p2pb__pick:has(input:checked) {
+    border-color: var(--brand-primary, #f7c000);
+    background: var(--brand-primary, #f7c000);
+    color: #0f1923;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
+}
+
+.p2pb__pick:focus-within {
+    outline: 2px solid var(--brand-navy, #0f1b33);
+    outline-offset: 2px;
+}
+
+/* The box glyph grows with the size — the same five steps as the calculator. */
+.p2pb__pick-box {
+    display: block;
+    border: 2.5px solid currentColor;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.p2pb__pick-box--xs { width: 12px; height: 16px; }
+.p2pb__pick-box--s  { width: 18px; height: 18px; }
+.p2pb__pick-box--m  { width: 24px; height: 22px; }
+.p2pb__pick-box--l  { width: 32px; height: 26px; }
+.p2pb__pick-box--xl { width: 40px; height: 30px; }
+
+.p2pb__pick-icon {
+    font-size: 1.375rem;
+    flex-shrink: 0;
+}
+
+.p2pb__pick-tag {
+    font-size: 0.875rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.p2pb__pick-name {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.2;
+}
+
+/* The one line under a card name: the size's outside measurement, or the speed's
+   plain-English timing. Vehicles and weights are deliberately not printed here. */
+.p2pb__pick-sub {
+    font-size: 0.65rem;
+    text-align: center;
+    line-height: 1.25;
+    opacity: 0.8;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 575.98px) {
+    .p2pb__picker-set {
+        grid-template-columns: repeat(auto-fit, minmax(5.25rem, 1fr));
+        gap: 0.4rem;
+    }
+
+    .p2pb__pick {
+        padding: 0.65rem 0.3rem;
+    }
+}
+
+/* ---------- The quote panel --------------------------------------------- */
+
+.p2pb__quote {
+    background: var(--brand-navy, #0f1b33);
+    color: var(--brand-white, #fff);
+    border-radius: var(--brand-radius-lg, 14px);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.p2pb__quote-route {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.9375rem;
+    opacity: 0.85;
+}
+
+.p2pb__quote-arrow {
+    color: var(--brand-primary, #ffc72c);
+}
+
+.p2pb__quote-figure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+}
+
+.p2pb__quote-price {
+    font-size: 2.25rem;
+    font-weight: var(--brand-font-weight-bold, 700);
+    line-height: 1;
+    color: var(--brand-primary, #ffc72c);
+}
+
+.p2pb__quote-unit {
+    font-weight: var(--brand-font-weight-bold, 700);
+    color: var(--brand-primary, #ffc72c);
+}
+
+.p2pb__quote-pending {
+    font-size: 1.125rem;
+    font-weight: var(--brand-font-weight-bold, 700);
+    color: var(--brand-primary, #ffc72c);
+}
+
+.p2pb__quote-distance {
+    font-size: 0.875rem;
+    opacity: 0.7;
+    margin-left: auto;
+}
+
+/* ---------- Summary rows ------------------------------------------------ */
+
+.p2pb__summary {
+    text-align: left;
+    margin-bottom: 0.5rem;
+}
+
+.p2pb__summary-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid rgba(16, 24, 40, 0.06);
+    font-size: 0.9375rem;
+}
+
+.p2pb__summary-row:last-child {
+    border-bottom: 0;
+}
+
+.p2pb__summary-row span {
+    color: #667085;
+}
+
+.p2pb__summary-row--total {
+    font-size: 1.0625rem;
+}
+
+/* ---------- List rows --------------------------------------------------- */
+
+.p2pb__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    background: var(--brand-white, #fff);
+    border: 1px solid rgba(16, 24, 40, 0.08);
+    border-radius: var(--brand-radius-md, 10px);
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.6rem;
+}
+
+.p2pb__row--link {
+    text-decoration: none;
+    color: inherit;
+    transition: var(--brand-transition, all 0.15s ease);
+}
+
+.p2pb__row--link:hover {
+    border-color: var(--brand-primary, #ffc72c);
+    color: inherit;
+}
+
+.p2pb__row-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.p2pb__route {
+    font-weight: var(--brand-font-weight-bold, 700);
+    color: var(--brand-navy, #0f1b33);
+}
+
+.p2pb__meta {
+    font-size: 0.8125rem;
+    color: #98a2b3;
+}
+
+/* Status reads as a word with a quiet ground, not a bright pill. */
+.p2pb__status {
+    flex-shrink: 0;
+    font-size: 0.8125rem;
+    font-weight: var(--brand-font-weight-bold, 700);
+    color: var(--brand-navy, #0f1b33);
+    background: rgba(16, 24, 40, 0.05);
+    border-radius: var(--brand-radius-sm, 6px);
+    padding: 0.3rem 0.6rem;
+    white-space: nowrap;
+}
+
+.p2pb__status--waiting {
+    background: var(--brand-warning-bg, #fff6e5);
+    color: var(--brand-warning-text, #93590a);
+}
+
+/* ---------- Timeline ---------------------------------------------------- */
+
+.p2pb__timeline {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0;
+}
+
+.p2pb__timeline-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0 0.5rem 1rem;
+    border-left: 2px solid rgba(16, 24, 40, 0.1);
+    font-size: 0.875rem;
+}
+
+.p2pb__timeline-item:last-child {
+    border-left-color: var(--brand-primary, #ffc72c);
+}
+
+.p2pb__timeline-time {
+    color: #98a2b3;
+    white-space: nowrap;
+}
+
+/* ---------- Messages ---------------------------------------------------- */
+
+.p2pb__msg {
+    border-left: 3px solid rgba(16, 24, 40, 0.12);
+    padding: 0.25rem 0 0.25rem 0.75rem;
+    margin-bottom: 0.9rem;
+}
+
+.p2pb__msg--staff {
+    border-left-color: var(--brand-primary, #ffc72c);
+}
+
+.p2pb__msg-who {
+    font-size: 0.8125rem;
+    font-weight: var(--brand-font-weight-bold, 700);
+    color: var(--brand-navy, #0f1b33);
+}
+
+.p2pb__msg-body {
+    margin: 0.15rem 0;
+    font-size: 0.9375rem;
+    white-space: pre-wrap;
+}
+
+.p2pb__msg-time {
+    font-size: 0.75rem;
+    color: #98a2b3;
+}
+
+/* ---------- Odds and ends ----------------------------------------------- */
+
+.p2pb__tick {
+    width: 3rem;
+    height: 3rem;
+    line-height: 3rem;
+    margin: 0 auto 0.75rem;
+    border-radius: 50%;
+    background: var(--brand-success-bg, #e7f6ec);
+    color: var(--brand-success-dark, #05603a);
+    font-size: 1.5rem;
+    font-weight: var(--brand-font-weight-bold, 700);
+}
+
+.p2pb__upsell {
+    margin-top: 2.5rem;
+    padding: 1.25rem;
+    background: var(--brand-white, #fff);
+    border: 1px dashed rgba(16, 24, 40, 0.15);
+    border-radius: var(--brand-radius-md, 10px);
+}
+
+@media (max-width: 575.98px) {
+    .p2pb__card {
+        padding: 1.1rem;
+    }
+
+    .p2pb__row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .p2pb__quote-distance {
+        margin-left: 0;
+    }
+}

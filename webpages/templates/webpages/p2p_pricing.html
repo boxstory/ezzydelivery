@@ -4,7 +4,7 @@
 {% block title %}P2P Delivery Price Calculator — Qatar | EzzyDelivery{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'webpages/css/p2p-pricing.css' %}?v=20260615i">
+<link rel="stylesheet" href="{% static 'webpages/css/p2p-pricing.css' %}?v=20260910b">
 {% endblock extra_css %}
 
 {% block content %}
@@ -138,42 +138,40 @@
                     <span class="p2p__step-num">3</span>
                     <div>
                         <h2 class="p2p__step-title">Package size</h2>
-                        <p class="p2p__step-sub">Optional — approximate dimensions &amp; weight</p>
+                        <p class="p2p__step-sub">Optional — pick the closest size; each card shows the outside measurement it fits within. Sending a mix? Add a count to more than one card.</p>
                     </div>
                 </div>
 
                 <div class="p2p__sizes">
-                    <button class="p2p__size-card" data-size="xs" data-label="Envelope / Docs">
-                        <span class="p2p__size-box p2p__size-box--xs"></span>
-                        <span class="p2p__size-tag">XS</span>
-                        <span class="p2p__size-name">Envelope</span>
-                        <span class="p2p__size-weight">≤ 0.5 kg</span>
+                    {% comment %}Rendered from p2p.models.size_card_list so this page and the
+                    booking form cannot describe the same box two different ways. data-size and
+                    data-label are the contract the calculator JS reads.{% endcomment %}
+                    {% for card in size_cards %}
+                    <button class="p2p__size-card" data-size="{{ card.slug }}" data-label="{{ card.label }}">
+                        <span class="p2p__size-box p2p__size-box--{{ card.slug }}"></span>
+                        <span class="p2p__size-tag">{{ card.tag }}</span>
+                        <span class="p2p__size-name">{{ card.name }}</span>
+                        <span class="p2p__size-dims">{{ card.dims }}</span>
+                        {% comment %}A count per card, so one job can be two small boxes and one
+                        medium. Tapping the card itself is still the one-tap "this size, one box"
+                        the page always had — the steppers are for the jobs that are a mix.{% endcomment %}
+                        <span class="p2p__size-step">
+                            <span class="p2p__size-btn p2p__size-minus" role="button" tabindex="-1"
+                                  aria-label="One fewer {{ card.name }}">&minus;</span>
+                            <span class="p2p__size-count" aria-live="polite">0</span>
+                            <span class="p2p__size-btn p2p__size-plus" role="button" tabindex="-1"
+                                  aria-label="One more {{ card.name }}">+</span>
+                        </span>
                     </button>
-                    <button class="p2p__size-card" data-size="s" data-label="Small Box">
-                        <span class="p2p__size-box p2p__size-box--s"></span>
-                        <span class="p2p__size-tag">S</span>
-                        <span class="p2p__size-name">Small box</span>
-                        <span class="p2p__size-weight">≤ 3 kg</span>
-                    </button>
-                    <button class="p2p__size-card" data-size="m" data-label="Medium Box">
-                        <span class="p2p__size-box p2p__size-box--m"></span>
-                        <span class="p2p__size-tag">M</span>
-                        <span class="p2p__size-name">Medium box</span>
-                        <span class="p2p__size-weight">≤ 10 kg</span>
-                    </button>
-                    <button class="p2p__size-card" data-size="l" data-label="Large Box">
-                        <span class="p2p__size-box p2p__size-box--l"></span>
-                        <span class="p2p__size-tag">L</span>
-                        <span class="p2p__size-name">Large box</span>
-                        <span class="p2p__size-weight">≤ 25 kg</span>
-                    </button>
-                    <button class="p2p__size-card" data-size="xl" data-label="Bulky / Extra Large">
-                        <span class="p2p__size-box p2p__size-box--xl"></span>
-                        <span class="p2p__size-tag">XL</span>
-                        <span class="p2p__size-name">Bulky item</span>
-                        <span class="p2p__size-weight">25 kg+</span>
-                    </button>
+                    {% endfor %}
                 </div>
+
+                {% comment %}The running total, and nothing else. There was a second "How many
+                boxes?" stepper here: it could only ever hold ONE number, so a job counted on
+                three cards left it stating a fourth — five small plus a medium plus a large
+                reading as "2". The count per card IS the count, and this adds them up.
+                {% endcomment %}
+                <p class="p2p__load-total" id="p2p_load_total" aria-live="polite">Nothing added yet</p>
             </div>
 
             <div class="p2p__step-divider"></div>
@@ -188,31 +186,66 @@
                     </div>
                 </div>
 
+                <p class="p2p__vehicle-note" id="p2p_vehicle_note"></p>
                 <div class="p2p__vehicles">
-                    <button class="p2p__vehicle-card" data-vehicle="bike" data-label="Motorcycle">
-                        <i class="fa-solid fa-motorcycle p2p__vehicle-icon"></i>
-                        <span class="p2p__vehicle-name">Bike</span>
-                        <span class="p2p__vehicle-cap">Docs · XS–S</span>
+                    {% for card in vehicle_cards %}
+                    <button class="p2p__vehicle-card" data-vehicle="{{ card.slug }}" data-label="{{ card.label }}">
+                        <i class="{{ card.icon }} p2p__vehicle-icon"></i>
+                        <span class="p2p__vehicle-name">{{ card.name }}</span>
                     </button>
-                    <button class="p2p__vehicle-card" data-vehicle="car" data-label="Car">
-                        <i class="fa-solid fa-car p2p__vehicle-icon"></i>
-                        <span class="p2p__vehicle-name">Car</span>
-                        <span class="p2p__vehicle-cap">S–M · ≤ 20 kg</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="p2p__step-divider"></div>
+
+            <!-- Step 5: When -->
+            <div class="p2p__step">
+                <div class="p2p__step-head">
+                    <span class="p2p__step-num">5</span>
+                    <div>
+                        <h2 class="p2p__step-title">When</h2>
+                        <p class="p2p__step-sub">Express by default — pick the date on the booking form if you schedule it</p>
+                    </div>
+                </div>
+
+                <div class="p2p__speeds">
+                    {% for card in speed_cards %}
+                    <button class="p2p__speed-card{% if card.slug == 'express' %} p2p__speed-card--active{% endif %}"
+                            data-speed="{{ card.slug }}" data-label="{{ card.label }}">
+                        <i class="{{ card.icon }} p2p__speed-icon"></i>
+                        <span class="p2p__speed-name">{{ card.name }}</span>
+                        <span class="p2p__speed-cap">{{ card.cap }}</span>
                     </button>
-                    <button class="p2p__vehicle-card" data-vehicle="suv" data-label="SUV / Pickup">
-                        <i class="fa-solid fa-truck-pickup p2p__vehicle-icon"></i>
-                        <span class="p2p__vehicle-name">SUV / Pickup</span>
-                        <span class="p2p__vehicle-cap">M–L · ≤ 60 kg</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="p2p__step-divider"></div>
+
+            <!-- Step 6: The leg back -->
+            <div class="p2p__step">
+                <div class="p2p__step-head">
+                    <span class="p2p__step-num">6</span>
+                    <div>
+                        <h2 class="p2p__step-title">The leg back</h2>
+                        <p class="p2p__step-sub">Need something returned to the pickup point on the same visit?</p>
+                    </div>
+                </div>
+
+                {% comment %}Two cards rather than a tick, so it reads like every other
+                choice on this page. The leg back is a second journey and is priced as
+                one — the server works the figure out again either way.{% endcomment %}
+                <div class="p2p__returns">
+                    <button class="p2p__return-card p2p__return-card--active" data-return="0" data-label="One way">
+                        <i class="fa-solid fa-arrow-right p2p__return-icon"></i>
+                        <span class="p2p__return-name">One way</span>
+                        <span class="p2p__return-cap">Deliver and done</span>
                     </button>
-                    <button class="p2p__vehicle-card" data-vehicle="van" data-label="Van">
-                        <i class="fa-solid fa-van-shuttle p2p__vehicle-icon"></i>
-                        <span class="p2p__vehicle-name">Van</span>
-                        <span class="p2p__vehicle-cap">L–XL · Bulky</span>
-                    </button>
-                    <button class="p2p__vehicle-card" data-vehicle="truck" data-label="Truck">
-                        <i class="fa-solid fa-truck p2p__vehicle-icon"></i>
-                        <span class="p2p__vehicle-name">Truck</span>
-                        <span class="p2p__vehicle-cap">XL · Heavy cargo</span>
+                    <button class="p2p__return-card" data-return="1" data-label="Return trip">
+                        <i class="fa-solid fa-right-left p2p__return-icon"></i>
+                        <span class="p2p__return-name">Return trip</span>
+                        <span class="p2p__return-cap">Bring something back</span>
                     </button>
                 </div>
             </div>
@@ -234,6 +267,9 @@
                         <span id="p2p_result_km_low"></span>–<span id="p2p_result_km_high"></span> km
                     </span>
                 </div>
+                {# The leg back, when it was asked for. Its own line rather than a second #}
+                {# arrow on the route: it is a separate journey and a separate order. #}
+                <p class="p2p__result-return d-none" id="p2p_result_return"></p>
 
                 <!-- Auto-price mode: XS/S with Bike or Car -->
                 <div id="p2p_price_section">
@@ -243,11 +279,36 @@
                             <span id="p2p_result_price"></span>
                             <span class="p2p__result-price__currency">QR</span>
                         </span>
-                        <span class="p2p__result-price__note">one-time delivery · Qatar</span>
+                        <span class="p2p__result-price__note" id="p2p_result_price_note">one-time delivery · Qatar</span>
                     </div>
                     <div class="p2p__result-actions">
+                        {# The booking form. No price field: the server recomputes from the rate #}
+                        {# card, so a page edited in DevTools cannot buy a cheap delivery. #}
+                        <form method="post" action="{% url 'p2p:book_start' %}" class="p2p__book-form" id="p2p_result_form_book">
+                            {% csrf_token %}
+                            <input type="hidden" name="from_lat" id="p2p_book_from_lat">
+                            <input type="hidden" name="from_lng" id="p2p_book_from_lng">
+                            <input type="hidden" name="to_lat" id="p2p_book_to_lat">
+                            <input type="hidden" name="to_lng" id="p2p_book_to_lng">
+                            <input type="hidden" name="from_label" id="p2p_book_from_label">
+                            <input type="hidden" name="to_label" id="p2p_book_to_label">
+                            <input type="hidden" name="size" id="p2p_book_size">
+                            <input type="hidden" name="vehicle" id="p2p_book_vehicle">
+                            <input type="hidden" name="box_count" id="p2p_book_box_count" value="1">
+                            <input type="hidden" name="speed" id="p2p_book_speed" value="express">
+                            <input type="hidden" name="category" id="p2p_book_category">
+                            <input type="hidden" name="return_trip" id="p2p_book_return_trip" value="">
+                            {# The mixed load, one count per size. Without these the calculator's #}
+                            {# steppers reached the booking form as whichever single size was biggest. #}
+                            {% for card in size_cards %}
+                            <input type="hidden" name="load_{{ card.slug }}" id="p2p_book_load_{{ card.slug }}" value="">
+                            {% endfor %}
+                            <button type="submit" class="p2p__btn p2p__btn--book" id="p2p_result_btn_book">
+                                <i class="fa-solid fa-check"></i> Accept &amp; book
+                            </button>
+                        </form>
                         <a id="p2p_wa_btn" href="#" class="p2p__btn p2p__btn--whatsapp" target="_blank" rel="noopener noreferrer">
-                            <i class="fa-brands fa-whatsapp"></i> Book on WhatsApp
+                            <i class="fa-brands fa-whatsapp"></i> Ask on WhatsApp
                         </a>
                     </div>
                     <p class="p2p__result-disclaimer">
@@ -265,8 +326,33 @@
                         </div>
                     </div>
                     <div class="p2p__result-actions">
+                        {# The booking form. No price field: the server recomputes from the rate #}
+                        {# card, so a page edited in DevTools cannot buy a cheap delivery. #}
+                        <form method="post" action="{% url 'p2p:book_start' %}" class="p2p__book-form" id="p2p_quote_form_book">
+                            {% csrf_token %}
+                            <input type="hidden" name="from_lat" id="p2p_qbook_from_lat">
+                            <input type="hidden" name="from_lng" id="p2p_qbook_from_lng">
+                            <input type="hidden" name="to_lat" id="p2p_qbook_to_lat">
+                            <input type="hidden" name="to_lng" id="p2p_qbook_to_lng">
+                            <input type="hidden" name="from_label" id="p2p_qbook_from_label">
+                            <input type="hidden" name="to_label" id="p2p_qbook_to_label">
+                            <input type="hidden" name="size" id="p2p_qbook_size">
+                            <input type="hidden" name="vehicle" id="p2p_qbook_vehicle">
+                            <input type="hidden" name="box_count" id="p2p_qbook_box_count" value="1">
+                            <input type="hidden" name="speed" id="p2p_qbook_speed" value="express">
+                            <input type="hidden" name="category" id="p2p_qbook_category">
+                            <input type="hidden" name="return_trip" id="p2p_qbook_return_trip" value="">
+                            {# The mixed load, one count per size. Without these the calculator's #}
+                            {# steppers reached the booking form as whichever single size was biggest. #}
+                            {% for card in size_cards %}
+                            <input type="hidden" name="load_{{ card.slug }}" id="p2p_qbook_load_{{ card.slug }}" value="">
+                            {% endfor %}
+                            <button type="submit" class="p2p__btn p2p__btn--book" id="p2p_quote_btn_book">
+                                <i class="fa-solid fa-check"></i> Request a price
+                            </button>
+                        </form>
                         <a id="p2p_wa_quote_btn" href="#" class="p2p__btn p2p__btn--whatsapp" target="_blank" rel="noopener noreferrer">
-                            <i class="fa-brands fa-whatsapp"></i> Get Price on WhatsApp
+                            <i class="fa-brands fa-whatsapp"></i> Ask on WhatsApp
                         </a>
                     </div>
                 </div>
@@ -280,6 +366,9 @@
     <section class="p2p__tiers">
         <div class="p2p__tiers-inner">
             <h2 class="p2p__tiers-title">Pricing Tiers</h2>
+            <p class="p2p__tiers-note">Express, one envelope or small box on a bike. Bigger boxes, a
+                bigger vehicle or a scheduled slot change the price &mdash; the calculator above shows
+                yours before you book.</p>
             <div class="p2p__tiers-grid">
                 <div class="p2p__tier">
                     <span class="p2p__tier-range">Up to 10 km</span>
@@ -310,6 +399,10 @@
 <script>
 window.P2P_LOCALITIES = {{ localities_json|safe }};
 window.P2P_POPULAR    = {{ popular_json|safe }};
+window.P2P_PRICE_LADDER = {{ price_ladder_json|safe }};
+window.P2P_BOX_TIERS    = {{ box_tiers_json|safe }};
+window.P2P_MAX_BOXES    = {{ max_boxes }};
+window.P2P_CAPACITY     = {{ capacity_json|safe }};
 </script>
-<script src="{% static 'webpages/js/p2p-calculator.js' %}?v=20260615j"></script>
+<script src="{% static 'webpages/js/p2p-calculator.js' %}?v=20260910d"></script>
 {% endblock extra_js %}

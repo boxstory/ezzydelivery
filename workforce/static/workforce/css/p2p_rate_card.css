@@ -1,0 +1,272 @@
+/* Purpose: P2P rate card ops screen — the resolved price matrix and the 170-row band editor. */
+/* Used by: workforce/templates/workforce/p2p_rate_card.html */
+/* Notes: Borrows the ledger --tlr-* vocabulary used across the finance desks. Quote cells read as
+   a word plus a hatched ground, never colour alone; yellow is spent once, on the size group rule. */
+
+.p2prc {
+  --tlr-ink: var(--brand-navy);
+  --tlr-paper: var(--brand-grey-100);
+  --tlr-card: var(--brand-white);
+  --tlr-rule: var(--brand-grey-200);
+  --tlr-rule-strong: var(--brand-grey-300);
+  --tlr-mark: var(--brand-primary);
+  --tlr-muted: var(--brand-grey-500);
+  --tlr-void: var(--brand-danger);
+  --tlr-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+
+/* ── Panels ───────────────────────────────────────────────────────────── */
+.p2prc__panel {
+  background: var(--tlr-card);
+  border: 1px solid var(--tlr-rule);
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+}
+.p2prc__panel-head {
+  border-bottom: 1px solid var(--tlr-rule);
+  padding: 0.75rem 1rem;
+}
+.p2prc__panel-title {
+  font-family: var(--tlr-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tlr-ink);
+  margin: 0;
+}
+.p2prc__panel-sub {
+  font-size: 0.78rem;
+  color: var(--tlr-muted);
+  margin: 0.2rem 0 0;
+}
+
+/* ── The resolved matrix ──────────────────────────────────────────────── */
+.p2prc__matrix {
+  font-size: 0.78rem;
+  margin: 0;
+}
+.p2prc__matrix th,
+.p2prc__matrix td {
+  border-color: var(--tlr-rule);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.p2prc__matrix thead th {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  background: var(--tlr-paper);
+}
+.p2prc__matrix tbody th {
+  font-weight: 600;
+  color: var(--tlr-ink);
+}
+/* The size tag reads as a plate, so the eye can find where a size block starts. */
+.p2prc__tag {
+  display: inline-block;
+  min-width: 2rem;
+  text-align: center;
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--tlr-rule-strong);
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+  margin-right: 0.4rem;
+  color: var(--tlr-muted);
+}
+/* One rule per size block — the only place the brand yellow is spent here. */
+.p2prc__row--group td,
+.p2prc__row--group th { border-top: 2px solid var(--tlr-mark); }
+
+.p2prc__price {
+  font-family: var(--tlr-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.p2prc__cell--quote {
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-align: right;
+  color: var(--tlr-muted);
+  background-image: repeating-linear-gradient(
+    45deg, transparent, transparent 4px,
+    var(--tlr-rule) 4px, var(--tlr-rule) 5px);
+}
+/* Nothing on the card covers this combination — a hole, not a decision. */
+.p2prc__cell--void {
+  text-align: right;
+  color: var(--tlr-void);
+  font-weight: 700;
+}
+/* Where Express ends and Scheduled begins. */
+.p2prc__cell--split { border-left: 2px solid var(--tlr-rule-strong); }
+
+/* The page's one primary action, on the navy hero. Brand yellow with navy ink rather
+   than Bootstrap's amber, and the only filled yellow control up here. */
+.p2prc__edit {
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
+  color: var(--brand-navy);
+  font-weight: 600;
+}
+.p2prc__edit:hover,
+.p2prc__edit:focus {
+  background: var(--brand-primary-dark);
+  border-color: var(--brand-primary-dark);
+  color: var(--brand-navy);
+}
+
+/* Four short rows of small numbers. Without a ceiling each input stretches to a third
+   of the page and a two-digit box count reads as a text field. */
+.p2prc__tiers input[type="number"] { max-width: 7rem; }
+.p2prc__tiers th,
+.p2prc__tiers td { width: 1%; white-space: nowrap; }
+
+/* The load does not fit this vehicle. Not a price and not a hole in the card — a
+   physical no, so it reads as a redirection to the vehicle that can take it. */
+.p2prc__cell--big {
+  font-family: var(--tlr-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  text-align: right;
+  color: var(--tlr-muted);
+  background: var(--tlr-paper);
+  white-space: nowrap;
+}
+
+/* Where one box tier ends and the next begins. Heavier than the speed rule, because
+   the tier group is the outer one and the eye has to find it first across 32 columns. */
+.p2prc__cell--tier { border-left: 3px solid var(--tlr-ink); }
+
+.p2prc__tier-kg {
+  display: block;
+  font-weight: 400;
+  opacity: 0.75;
+  font-size: 0.62rem;
+}
+
+/* Add a row. A bordered control on the panel's own ground — it changes the form, so it
+   cannot be a bare word. */
+.p2prc__addrow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--tlr-rule);
+  background: var(--tlr-paper);
+}
+.p2prc__addrow-btn {
+  background: var(--brand-white);
+  border: 1px solid var(--brand-grey-400);
+  color: var(--brand-grey-800);
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background 0.2s, border-color 0.2s;
+}
+.p2prc__addrow-btn:hover {
+  background: var(--brand-secondary);
+  border-color: var(--tlr-mark);
+  color: var(--brand-grey-800);
+}
+.p2prc__addrow-note {
+  font-size: 0.72rem;
+  color: var(--tlr-muted);
+}
+
+/* The fold. A real bordered control, not a link pretending to be one — it changes
+   what the table shows, so it has to look like something you press. */
+.p2prc__toggle {
+  margin-top: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-400);
+  border-radius: var(--radius-md, 8px);
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-grey-800);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.p2prc__toggle:hover {
+  background: var(--brand-secondary);
+  border-color: var(--tlr-mark);
+}
+
+/* An unfolded rare row stays legible but visibly secondary — it is a real price, not
+   a disabled one, so it is greyed by ground rather than by faded text. */
+.p2prc__row--rare th,
+.p2prc__row--rare td { background: var(--tlr-paper); }
+
+.p2prc__rare-tag {
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  border: 1px solid var(--tlr-rule-strong);
+  border-radius: 3px;
+  padding: 0 0.25rem;
+  white-space: nowrap;
+}
+
+.p2prc__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-family: var(--tlr-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+}
+
+/* ── Band editor filter bar ───────────────────────────────────────────── */
+.p2prc__filters {
+  background: var(--tlr-paper);
+  border-bottom: 1px solid var(--tlr-rule);
+  padding: 0.6rem 1rem;
+}
+.p2prc__filter-label {
+  font-family: var(--tlr-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  display: block;
+  margin-bottom: 0.15rem;
+}
+.p2prc__count {
+  font-family: var(--tlr-mono);
+  font-size: 0.7rem;
+  color: var(--tlr-muted);
+}
+
+/* The band table carries eleven controls a row; keep them from stretching the page. */
+.p2prc__bands { font-size: 0.78rem; }
+.p2prc__bands th { white-space: nowrap; }
+.p2prc__bands .form-control,
+.p2prc__bands .form-select { font-size: 0.75rem; }
+.p2prc__bands tr[hidden] { display: none; }
+
+/* Column widths for the band table. These were nine inline min-widths on the
+   header cells; they are layout, so they live here. Numbered by column because
+   the header cells carry no classes of their own — the order is: boxes from,
+   to, size, kg, vehicle, speed, km, price, needs quote, priority. */
+.p2prc__bands th:nth-child(1),
+.p2prc__bands th:nth-child(2),
+.p2prc__bands th:nth-child(4) { min-width: 90px; }
+.p2prc__bands th:nth-child(3),
+.p2prc__bands th:nth-child(5) { min-width: 130px; }
+.p2prc__bands th:nth-child(6) { min-width: 140px; }
+.p2prc__bands th:nth-child(7),
+.p2prc__bands th:nth-child(8) { min-width: 100px; }
+.p2prc__bands th:nth-child(10) { min-width: 80px; }

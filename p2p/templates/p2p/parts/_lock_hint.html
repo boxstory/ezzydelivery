@@ -1,0 +1,11 @@
+{% comment %}
+Purpose: Say why the booker's own number cannot be typed over
+Used by: p2p/book.html, p2p/delivery_edit.html — once per phone field that can hold it
+Notes: Rendered for both candidates and shown for the one the current role locks, so the role
+       toggle can move it without a round trip. The lock itself is enforced in the form's clean().
+{% endcomment %}
+<div class="p2pb__lock" data-lock-for="{{ role }}" id="p2p_book_lock_hint_{{ role }}"
+     {% if role == 'sender' and locked != 'sender_phone' %}hidden{% endif %}
+     {% if role == 'receiver' and locked != 'customer_whatsapp' %}hidden{% endif %}>
+  Verified on WhatsApp. We send your confirmation link here, so this one stays as it is.
+</div>

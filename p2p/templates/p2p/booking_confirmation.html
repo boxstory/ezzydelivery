@@ -1,0 +1,57 @@
+{% extends "p2p/_base.html" %}
+{% comment %}
+Purpose: What the sender sees straight after booking — and the reason to check WhatsApp
+Used by: p2p.views.booking_confirmation
+Notes: Reachable by URL forever, so it doubles as the receipt.
+{% endcomment %}
+{% block title %}Delivery booked | EzzyDelivery{% endblock title %}
+{% block p2p_content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+    <div class="p2pb__card p2pb__card--centred">
+      <div class="p2pb__tick">&check;</div>
+      <h1 class="p2pb__title">We've got your delivery</h1>
+      {% if order %}<p class="p2pb__ref">{{ order.order_number }}</p>{% endif %}
+
+      <div class="p2pb__summary">
+        <div class="p2pb__summary-row"><span>From</span><strong>{{ booking.from_label }}</strong></div>
+        <div class="p2pb__summary-row"><span>To</span><strong>{{ booking.to_label }}</strong></div>
+        <div class="p2pb__summary-row"><span>Boxes</span><strong>{{ booking.load_label|default:booking.box_count }}</strong></div>
+        {% if booking.return_trip %}
+          {# The leg back is its own order, so it is named here rather than folded into #}
+          {# the route line — the customer gets two order numbers and two drivers. #}
+          <div class="p2pb__summary-row"><span>Leg back</span><strong>{{ booking.return_route_label }}</strong></div>
+          {% if booking.return_description %}
+            <div class="p2pb__summary-row"><span>Coming back</span><strong>{{ booking.return_description }}</strong></div>
+          {% endif %}
+        {% endif %}
+        {% if booking.agreed_price %}
+          <div class="p2pb__summary-row"><span>Delivery fee</span><strong>QAR {{ booking.agreed_price|floatformat:2 }}</strong></div>
+          {% if booking.return_trip %}
+            <div class="p2pb__summary-row"><span>Of which the leg back</span><strong>QAR {{ booking.return_fee|floatformat:2 }}</strong></div>
+          {% endif %}
+          <div class="p2pb__summary-row"><span>Paid</span><strong>{{ booking.get_fee_payer_display }}</strong></div>
+        {% else %}
+          <div class="p2pb__summary-row"><span>Delivery fee</span><strong>We'll confirm shortly</strong></div>
+        {% endif %}
+        {% if booking.cod_amount %}
+          <div class="p2pb__summary-row"><span>Collect from receiver</span><strong>QAR {{ booking.cod_amount|floatformat:2 }}</strong></div>
+        {% endif %}
+      </div>
+
+      <p class="p2pb__lead">
+        {% if booking.needs_quote %}
+          Our team will send you a price on WhatsApp. Once you accept it, we'll assign a driver.
+        {% else %}
+          We've sent a WhatsApp to {{ booking.notify_phone }}. Tap the link in it to confirm, and we'll assign a driver.
+        {% endif %}
+      </p>
+
+      <div class="d-flex flex-column flex-sm-row gap-2 mt-3">
+        <a href="{% url 'p2p:my_deliveries' %}" class="btn p2pb__btn-primary flex-fill" id="p2p_confirm_link_mydeliveries">See my deliveries</a>
+        <a href="{% url 'webpages:p2p_pricing' %}" class="btn p2pb__btn-secondary flex-fill" id="p2p_confirm_link_bookanother">Book another</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock p2p_content %}

@@ -1,0 +1,30 @@
+{% comment %}
+Purpose: The per-size box counters — the one place a job says how many of each it is
+Used by: p2p/book.html, p2p/delivery_edit.html, workforce/forms/p2p_new.html
+Notes: There is no separate total field: the total IS the sum of these, and the server works it out
+       the same way (BookingDetailsForm.clean). Leaving every counter empty means the size card
+       above describes the job, which is one box. Bootstrap's input-group supplies the stepper;
+       p2pb__step only carries the brand tweaks it does not. data-size-cbm is that size's volume
+       from P2P_SIZE_CARDS, so the running total can say what the load measures.
+{% endcomment %}
+<div class="p2pb__load" id="p2p_load_block">
+  <p class="p2pb__hint mb-2">How many of each? One job can be two small boxes and one medium —
+    leave them all at zero and the card above is taken as a single box.</p>
+  <div class="row g-2">
+    {% for card, field in form.load_rows %}
+      <div class="col-6 col-md-4 col-lg-3">
+        <label class="p2pb__load-label" for="{{ field.id_for_label }}">{{ card.name }}</label>
+        <div class="input-group input-group-sm p2pb__step"
+             data-size-cbm="{{ card.cbm }}">
+          <button type="button" class="btn btn-outline-secondary p2pb__step-btn"
+                  data-load-step="-1" aria-label="One fewer {{ card.name }}">&minus;</button>
+          {{ field }}
+          <button type="button" class="btn btn-outline-secondary p2pb__step-btn"
+                  data-load-step="1" aria-label="One more {{ card.name }}">+</button>
+        </div>
+        {% for e in field.errors %}<div class="p2pb__error">{{ e }}</div>{% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+  <p class="p2pb__load-total" id="p2p_load_total" aria-live="polite">Nothing added yet</p>
+</div>

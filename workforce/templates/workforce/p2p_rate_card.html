@@ -1,0 +1,467 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Ops screen for the P2P rate card — the resolved price matrix, then every pricing band
+Used by: workforce.views.wf_p2p_rate_card at /workforce/orders/p2p/rate-card/
+Notes: A blank cell means "applies to any". Rows are matched most-specific-first, and Priority
+       overrides that; the matrix above the editor prints what that resolution actually returns,
+       because with 170-odd bands the number that matters is which row wins, not what one says.
+{% endcomment %}
+{% block title %}P2P Rate Card{% endblock title %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'workforce/css/p2p_rate_card.css' %}?v=20260909a">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="wfpage p2prc">
+
+  <div class="wfhero">
+    <div class="wfhero__text">
+      <h1 class="wfhero__title">P2P Rate Card</h1>
+      <p class="wfhero__sub">What a point-to-point delivery costs. Changes take effect immediately, on the public calculator and on every new booking.</p>
+    </div>
+    <div class="wfhero__actions">
+      {% comment %}The chart is what this page is read for; the rows behind it are what it is
+      occasionally edited for. One button decides which of the two is on screen, so a reader
+      checking a price is not scrolling past 172 rows of form controls to do it.{% endcomment %}
+      <button type="button" class="btn btn-sm p2prc__edit" id="workforce_ratecard_btn_edit"
+              aria-expanded="{% if editor_open %}true{% else %}false{% endif %}"
+              aria-controls="workforce_ratecard_editor">
+        {% if editor_open %}Close editor{% else %}Edit rate card{% endif %}
+      </button>
+      <a href="{% url 'workforce:wf_orders_p2p' %}" class="btn btn-outline-light btn-sm" id="workforce_ratecard_link_orders">P2P Orders</a>
+    </div>
+  </div>
+
+  <div class="wfstat">
+    <div class="wfstat__card">
+      <span class="wfstat__label">Bands</span>
+      <span class="wfstat__value">{{ band_count|default:"0" }}</span>
+      <span class="wfstat__sub">{{ active_count|default:"0" }} active</span>
+    </div>
+    <div class="wfstat__card">
+      <span class="wfstat__label">Combinations</span>
+      <span class="wfstat__value">{{ matrix_cells|default:"0" }}</span>
+      <span class="wfstat__sub">{{ quote_cells|default:"0" }} priced by hand at {{ matrix_tier.label|default:"1 box" }}</span>
+    </div>
+    <div class="wfstat__card">
+      <span class="wfstat__label">Uncovered</span>
+      <span class="wfstat__value">{{ unmatched_cells|default:"0" }}</span>
+      <span class="wfstat__sub">{% if unmatched_cells %}no band matches — fix below{% else %}every combination has a band{% endif %}</span>
+    </div>
+    {% if sample %}
+      <div class="wfstat__card wfstat__card--here">
+        <span class="wfstat__label">West Bay &rarr; Al Wakrah</span>
+        <span class="wfstat__value">
+          {% if sample.needs_quote %}Quote{% else %}{{ sample.price|floatformat:0 }}<span class="wfstat__unit">QAR</span>{% endif %}
+        </span>
+        <span class="wfstat__sub">1 small box, bike, {{ sample.km_high }} km — live check</span>
+      </div>
+    {% endif %}
+  </div>
+
+  {# ── The resolved matrix: what the card returns, not what a row claims ── #}
+  <div class="p2prc__panel mb-4">
+    <div class="p2prc__panel-head d-flex flex-wrap justify-content-between align-items-start gap-2">
+      <div>
+        <h2 class="p2prc__panel-title">Effective price matrix</h2>
+        <p class="p2prc__panel-sub">
+          Every box count &times; size &times; vehicle &times; speed &times; distance, run through
+          the real resolver. Prices in QAR with the box uplift already added, weight unstated.
+          A cell that names a vehicle is a load that does not fit the one on its row.
+          Edit a band below and this recomputes on save.
+        </p>
+        {% comment %}The oversized pairings (an envelope in a van) are priced and bookable —
+        nothing stops a customer picking them — but nobody does, so they start folded away and
+        the reader is left with the 13 rows that describe real traffic.{% endcomment %}
+        {% if rare_rows %}
+          <button type="button" class="p2prc__toggle" id="workforce_ratecard_btn_rare"
+                  aria-expanded="false" aria-controls="workforce_ratecard_table_matrix">
+            Show {{ rare_rows }} rare combinations
+          </button>
+        {% endif %}
+      </div>
+      <div class="p2prc__legend">
+        <span>Number = automatic price</span>
+        <span>Quote = staff price by hand</span>
+        <span>&mdash; = no band matches</span>
+        <span>Rare = priced, but a pairing nobody picks</span>
+        <span>&rarr; Car = wrong vehicle for the load; use that one</span>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered p2prc__matrix" id="workforce_ratecard_table_matrix">
+        <thead>
+          {% comment %}Every header row is looped. How many box tiers, speeds and distance
+          columns there are is whatever the two tables below say — this template does not get
+          to assume four columns and two speeds.{% endcomment %}
+          <tr>
+            <th rowspan="3">Size</th>
+            <th rowspan="3">Vehicle</th>
+            {% for tier in matrix_tiers %}
+              <th colspan="{{ matrix_tier_cols }}" class="text-center p2prc__cell--tier">
+                {{ tier.label }}{% if tier.needs_quote %} &middot; quote{% elif tier.uplift %} &middot; +{{ tier.uplift|floatformat:0 }}{% endif %}
+                {% if show_tier_weight %}<span class="p2prc__tier-kg">{{ tier.weight_label }}</span>{% endif %}
+              </th>
+            {% endfor %}
+          </tr>
+          <tr>
+            {% for tier in matrix_tiers %}
+              {% for speed_label in matrix_speeds %}
+                <th colspan="{{ matrix_cols }}" class="text-center{% if forloop.first %} p2prc__cell--tier{% else %} p2prc__cell--split{% endif %}">{{ speed_label }}</th>
+              {% endfor %}
+            {% endfor %}
+          </tr>
+          <tr>
+            {% for tier in matrix_tiers %}
+              {% for speed_label in matrix_speeds %}
+                {% for label in matrix_km %}<th class="text-end{% if forloop.parentloop.first and forloop.first %} p2prc__cell--tier{% elif forloop.first %} p2prc__cell--split{% endif %}">{{ label }}</th>{% endfor %}
+              {% endfor %}
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in matrix %}
+            <tr class="{% if not row.vehicle %}p2prc__row--group{% endif %}{% if row.rare %} p2prc__row--rare{% endif %}"
+                {% if row.rare %}data-rare="1" hidden{% endif %}>
+              <th scope="row">
+                <span class="p2prc__tag">{{ row.size_tag }}</span>{{ row.size_name }}
+                <span class="text-muted small d-block">{{ row.size_weight }}</span>
+              </th>
+              <td>{{ row.vehicle_name }}{% if row.rare %} <span class="p2prc__rare-tag">rare</span>{% endif %}</td>
+              {% comment %}Rules are drawn by counting, not by position: a light one every
+              matrix_cols cells where a speed group starts, a heavy one every matrix_tier_cols
+              where a box tier does. Both counts come from the data.{% endcomment %}
+              {% for cell in row.cells %}
+                {% if cell.over_capacity %}
+                  <td class="p2prc__cell--big{% if forloop.counter0|divisibleby:matrix_tier_cols %} p2prc__cell--tier{% elif forloop.counter0|divisibleby:matrix_cols %} p2prc__cell--split{% endif %}"
+                            title="{% if cell.wrong_vehicle == 'oversized' %}{{ cell.boxes }} × {{ row.size_name|lower }} is less than this vehicle is sent out for{% else %}{{ cell.boxes }} × {{ row.size_name|lower }} does not fit this vehicle{% endif %}">
+                    {% if cell.needs_vehicle %}&rarr; {{ cell.needs_vehicle|title }}{% else %}Too big{% endif %}
+                  </td>
+                {% elif cell.unmatched %}
+                  <td class="p2prc__cell--void{% if forloop.counter0|divisibleby:matrix_tier_cols %} p2prc__cell--tier{% elif forloop.counter0|divisibleby:matrix_cols %} p2prc__cell--split{% endif %}">&mdash;</td>
+                {% elif cell.needs_quote %}
+                  <td class="p2prc__cell--quote{% if forloop.counter0|divisibleby:matrix_tier_cols %} p2prc__cell--tier{% elif forloop.counter0|divisibleby:matrix_cols %} p2prc__cell--split{% endif %}">Quote</td>
+                {% else %}
+                  <td class="p2prc__price{% if forloop.counter0|divisibleby:matrix_tier_cols %} p2prc__cell--tier{% elif forloop.counter0|divisibleby:matrix_cols %} p2prc__cell--split{% endif %}">{{ cell.price|floatformat:0 }}</td>
+                {% endif %}
+              {% endfor %}
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="{{ matrix_total_cols|add:2 }}" class="text-center text-muted py-4">
+                No active bands, so there is nothing to chart. Add a row below and this fills in.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ── The editable half: hidden until Edit is pressed, and forced open when a save failed ── #}
+  <div id="workforce_ratecard_editor"{% if not editor_open %} hidden{% endif %}>
+
+  <div class="alert alert-secondary" id="workforce_ratecard_note_rules">
+    <strong>How a price is chosen.</strong>
+    Leave a cell blank to mean <em>any</em>. Among the rows that match a booking, the one with the
+    highest <strong>Priority</strong> wins; if priorities are equal the row with the most cells
+    filled in wins, then the tightest distance limit.
+    Tick <strong>Needs quote</strong> for combinations staff should price by hand — those rows carry
+    no automatic price.
+    The generated combination rows sit at priority 20, above the priority-10 quote guards they
+    replace; run <code>manage.py fill_p2p_rate_card</code> to regenerate them.
+  </div>
+
+  <form method="post" id="workforce_ratecard_form_bands">
+    {% csrf_token %}
+    {{ formset.management_form }}
+    {{ tier_formset.management_form }}
+    {{ cap_formset.management_form }}
+    {{ limit_formset.management_form }}
+    {% if formset.non_form_errors %}
+      <div class="alert alert-danger">{{ formset.non_form_errors }}</div>
+    {% endif %}
+    {% if tier_formset.non_form_errors %}
+      <div class="alert alert-danger">{{ tier_formset.non_form_errors }}</div>
+    {% endif %}
+    {% if cap_formset.non_form_errors %}
+      <div class="alert alert-danger">{{ cap_formset.non_form_errors }}</div>
+    {% endif %}
+
+    <div class="p2prc__panel mb-4">
+      <div class="p2prc__panel-head">
+        <h2 class="p2prc__panel-title">Vehicle capacity</h2>
+        <p class="p2prc__panel-sub">
+          What each vehicle takes, in cubic metres. A motorcycle box is a 30 cm cube
+          &mdash; 0.027 cbm, which is one small box and not three. Both ends are enforced:
+          a load bigger than the vehicle holds is not priced on it, and a load under
+          &ldquo;send out from&rdquo; is not either &mdash; a pickup set to 1.0 is not
+          offered for a parcel a car could take. The minimum is ignored when nothing
+          smaller can carry the load, so it can never strand a job between two vehicles.
+          The chart names the vehicle to use instead. Switch a row off to drop both rules.
+        </p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle p2prc__bands p2prc__tiers mb-0" id="workforce_ratecard_table_caps">
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Send out from (cbm)</th>
+              <th>Holds (cbm)</th>
+              <th class="text-center">Enforced</th>
+              <th class="text-center">Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form in cap_formset %}
+              <tr>
+                {{ form.id }}
+                <td>{{ form.vehicle }}{% for e in form.vehicle.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.min_cbm }}{% for e in form.min_cbm.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.capacity_cbm }}{% for e in form.capacity_cbm.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td class="text-center">{{ form.is_active }}</td>
+                <td class="text-center">{% if form.instance.pk %}{{ form.DELETE }}{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="p2prc__addrow">
+        <button type="button" class="btn btn-sm p2prc__addrow-btn" id="workforce_ratecard_btn_add_cap"
+                data-table="workforce_ratecard_table_caps" data-prefix="caps">
+          <i class="fa-solid fa-plus"></i> Add a vehicle
+        </button>
+        <span class="p2prc__addrow-note">Box sizes in cbm: envelope 0.004 &middot; small 0.015 &middot; medium 0.047 &middot; large 0.108 &middot; bulky 0.250</span>
+      </div>
+    </div>
+
+    <div class="p2prc__panel mb-4">
+      <div class="p2prc__panel-head">
+        <h2 class="p2prc__panel-title">Box limits</h2>
+        <p class="p2prc__panel-sub">
+          The most boxes of one size a vehicle takes, whatever the cubic metres say.
+          Volume is only half of what stops a load: a car holds 0.4 cbm, which is nine
+          small boxes on paper and six in the boot. Three medium boxes and six small ones
+          cannot both be written as a cbm ceiling &mdash; 0.141 against 0.090 &mdash; so
+          the count lives here instead. Leave a count blank, switch a row off, or add no
+          row at all and that pairing has no count rule: the cbm ceiling above decides on
+          its own, exactly as it did before this table existed. Over the count reads as
+          &ldquo;too big&rdquo; and the chart names the vehicle to use instead.
+        </p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle p2prc__bands p2prc__tiers mb-0" id="workforce_ratecard_table_limits">
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Box size</th>
+              <th>Takes at most</th>
+              <th class="text-center">Enforced</th>
+              <th class="text-center">Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form in limit_formset %}
+              <tr>
+                {{ form.id }}
+                <td>{{ form.vehicle }}{% for e in form.vehicle.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.size }}{% for e in form.size.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.max_boxes }}{% for e in form.max_boxes.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td class="text-center">{{ form.is_active }}</td>
+                <td class="text-center">{% if form.instance.pk %}{{ form.DELETE }}{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="p2prc__addrow">
+        <button type="button" class="btn btn-sm p2prc__addrow-btn" id="workforce_ratecard_btn_add_limit"
+                data-table="workforce_ratecard_table_limits" data-prefix="limits">
+          <i class="fa-solid fa-plus"></i> Add a box limit
+        </button>
+        <span class="p2prc__addrow-note">A blank count means the cbm ceiling decides on its own</span>
+      </div>
+    </div>
+
+    <div class="p2prc__panel mb-4">
+      <div class="p2prc__panel-head">
+        <h2 class="p2prc__panel-title">Box tiers</h2>
+        <p class="p2prc__panel-sub">
+          What carrying more than one box adds, on top of whichever band the job resolves to.
+          Deliberately not part of a band: a per-tier row for every combination would turn a
+          {{ band_count }}-row card into a {{ band_count }}&times;{{ box_tiers|length }} one.
+        </p>
+        <p class="p2prc__panel-sub">
+          A row can be bounded by an absolute box count, by how full the vehicle is, or by
+          both &mdash; and every bound it states has to hold. <strong>Full from / to</strong>
+          is a fraction: 0.5 is half, 1 is full, blank means the row is not about fullness.
+          That is what makes one slab mean the same thing in every vehicle &mdash; a car
+          that takes six medium boxes reads &ldquo;up to 0.5&rdquo; as 1&ndash;3 boxes and
+          a van reads the identical row as 1&ndash;10. Leave both blank for a rule that is
+          about the job rather than the load, the way &ldquo;past eleven boxes a human
+          prices it&rdquo; is true in a car and in a van alike. The narrowest covering row
+          wins, counting both bounds; a row that needs a quote beats every other.
+        </p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle p2prc__bands p2prc__tiers mb-0" id="workforce_ratecard_table_tiers">
+          <thead>
+            <tr>
+              <th>Boxes from</th>
+              <th>to</th>
+              <th>Full from</th>
+              <th>to</th>
+              <th>Up to kg</th>
+              <th>Adds (QAR)</th>
+              <th class="text-center">Needs quote</th>
+              <th class="text-center">Active</th>
+              <th class="text-center">Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form in tier_formset %}
+              <tr>
+                {{ form.id }}
+                <td>{{ form.min_boxes }}{% for e in form.min_boxes.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.max_boxes }}{% for e in form.max_boxes.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.from_fill }}{% for e in form.from_fill.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.to_fill }}{% for e in form.to_fill.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.up_to_kg }}{% for e in form.up_to_kg.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.uplift }}{% for e in form.uplift.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td class="text-center">{{ form.needs_quote }}</td>
+                <td class="text-center">{{ form.is_active }}</td>
+                <td class="text-center">{% if form.instance.pk %}{{ form.DELETE }}{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% comment %}The formset renders one spare row; this button clones it, so adding five
+      tiers does not mean five round trips through Save.{% endcomment %}
+      <div class="p2prc__addrow">
+        <button type="button" class="btn btn-sm p2prc__addrow-btn" id="workforce_ratecard_btn_add_tier"
+                data-table="workforce_ratecard_table_tiers" data-prefix="tiers">
+          <i class="fa-solid fa-plus"></i> Add a tier
+        </button>
+      </div>
+    </div>
+
+    <div class="p2prc__panel">
+      <div class="p2prc__panel-head">
+        <h2 class="p2prc__panel-title">Bands</h2>
+        <p class="p2prc__panel-sub">One row per rule. Every row on the page is saved, including the ones a filter is hiding.</p>
+      </div>
+
+      <div class="p2prc__filters">
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3">
+            <label class="p2prc__filter-label" for="workforce_ratecard_filter_size">Size</label>
+            <select class="form-select form-select-sm" id="workforce_ratecard_filter_size">
+              <option value="">All sizes</option>
+              <option value="__any">Any (blank cell)</option>
+              {% for slug, label in size_choices %}<option value="{{ slug }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="p2prc__filter-label" for="workforce_ratecard_filter_vehicle">Vehicle</label>
+            <select class="form-select form-select-sm" id="workforce_ratecard_filter_vehicle">
+              <option value="">All vehicles</option>
+              <option value="__any">Any (blank cell)</option>
+              {% for slug, label in vehicle_choices %}<option value="{{ slug }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="p2prc__filter-label" for="workforce_ratecard_filter_speed">Speed</label>
+            <select class="form-select form-select-sm" id="workforce_ratecard_filter_speed">
+              <option value="">All speeds</option>
+              <option value="__any">Any (blank cell)</option>
+              {% for slug, label in speed_choices %}<option value="{{ slug }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="p2prc__filter-label" for="workforce_ratecard_filter_mode">Show</label>
+            <select class="form-select form-select-sm" id="workforce_ratecard_filter_mode">
+              <option value="">Everything</option>
+              <option value="priced">Priced rows only</option>
+              <option value="quote">Quote-only rows</option>
+              <option value="inactive">Inactive rows</option>
+            </select>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-3 mt-2">
+          <span class="p2prc__count" id="workforce_ratecard_count_shown"></span>
+          <button type="button" class="btn btn-link btn-sm p-0" id="workforce_ratecard_btn_filter_reset">Clear filters</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle p2prc__bands mb-0" id="workforce_ratecard_table_bands">
+          <thead>
+            <tr>
+              <th>Boxes from</th>
+              <th>to</th>
+              <th>Size</th>
+              <th>Up to kg</th>
+              <th>Vehicle</th>
+              <th>Speed</th>
+              <th>Up to km</th>
+              <th>Price (QAR)</th>
+              <th class="text-center">Needs quote</th>
+              <th>Priority</th>
+              <th class="text-center">Active</th>
+              <th class="text-center">Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form in formset %}
+              <tr{% if form.instance.pk %} data-size="{{ form.instance.size|default:"__any" }}"
+                    data-vehicle="{{ form.instance.vehicle|default:"__any" }}"
+                    data-speed="{{ form.instance.speed|default:"__any" }}"
+                    data-quote="{% if form.instance.needs_quote %}1{% else %}0{% endif %}"
+                    data-active="{% if form.instance.is_active %}1{% else %}0{% endif %}"{% else %} data-new="1"{% endif %}>
+                {{ form.id }}
+                <td>{{ form.min_boxes }}{% for e in form.min_boxes.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.max_boxes }}{% for e in form.max_boxes.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td>{{ form.size }}</td>
+                <td>{{ form.up_to_kg }}</td>
+                <td>{{ form.vehicle }}</td>
+                <td>{{ form.speed }}</td>
+                <td>{{ form.up_to_km }}</td>
+                <td>{{ form.price }}{% for e in form.price.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+                <td class="text-center">{{ form.needs_quote }}</td>
+                <td>{{ form.priority }}</td>
+                <td class="text-center">{{ form.is_active }}</td>
+                <td class="text-center">{% if form.instance.pk %}{{ form.DELETE }}{% endif %}</td>
+              </tr>
+              {% if form.non_field_errors %}
+                <tr><td colspan="12"><div class="text-danger small">{{ form.non_field_errors }}</div></td></tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+      <div class="p2prc__addrow">
+        <button type="button" class="btn btn-sm p2prc__addrow-btn" id="workforce_ratecard_btn_add_band"
+                data-table="workforce_ratecard_table_bands" data-prefix="form">
+          <i class="fa-solid fa-plus"></i> Add a band
+        </button>
+        <span class="p2prc__addrow-note">A row you add and leave empty is ignored on save.</span>
+      </div>
+
+    <div class="d-flex gap-2 mt-3">
+      <button type="submit" class="btn btn-dark" id="workforce_ratecard_btn_save">Save rate card</button>
+      <a href="{% url 'workforce:wf_p2p_rate_card' %}" class="btn btn-outline-secondary" id="workforce_ratecard_link_reset">Discard changes</a>
+    </div>
+  </form>
+
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+  <script src="{% static 'workforce/js/p2p_rate_card.js' %}?v=20260908e"></script>
+{% endblock extra_js %}

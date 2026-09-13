@@ -279,6 +279,52 @@ Notes: BEM prefix p2p__. Brand Kit variables from brandkit.css.
     box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
 }
 
+/* Per-card count stepper — a job can be two small boxes and one medium, so each card
+   carries its own number instead of the page having one count for one chosen size. */
+.p2p__size-step {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.125rem;
+}
+
+.p2p__size-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* 28px: a real touch target on a card this narrow, and the smallest the brand kit
+       allows a tap to be. */
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.5rem;
+    border: 1.5px solid currentColor;
+    font-size: 1rem;
+    line-height: 1;
+    font-weight: 700;
+    user-select: none;
+    opacity: 0.75;
+    transition: opacity 0.15s, background 0.15s;
+}
+
+.p2p__size-btn:hover {
+    opacity: 1;
+    background: rgba(15, 25, 35, 0.08);
+}
+
+.p2p__size-btn[disabled] {
+    opacity: 0.3;
+    cursor: default;
+    pointer-events: none;
+}
+
+.p2p__size-count {
+    min-width: 1.25rem;
+    text-align: center;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
 /* CSS box visual — grows per size */
 .p2p__size-box {
     display: block;
@@ -305,22 +351,52 @@ Notes: BEM prefix p2p__. Brand Kit variables from brandkit.css.
     line-height: 1.2;
 }
 
-.p2p__size-weight {
+/* What fits, on its own line under the size name. The weight bracket is deliberately
+   not printed here — the card sells a size band, and a kilo figure beside it only
+   invited the customer to price the same parcel two ways. Tabular figures so the
+   measurements line up card to card. */
+.p2p__size-dims {
     font-size: 0.65rem;
     color: currentColor;
-    opacity: 0.7;
+    opacity: 0.85;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    line-height: 1.25;
+}
+
+/* ==========================================================================
+   BOX COUNT (stepper under the size cards)
+   ========================================================================== */
+
+/* Sits under the size row because it qualifies that choice: "this box, times N".
+   A stepper rather than a bare number field — the answer is almost always 1 or 2,
+   and a tap is cheaper than a keyboard on a phone. The input stays typeable for
+   the rare bulk sender. */
+/* The running total under the size cards. It replaced a second "How many boxes?"
+   stepper, which could hold one number for a load counted on several cards. */
+.p2p__load-total {
+    margin: 0.875rem 0 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-600, #555);
 }
 
 /* ==========================================================================
    VEHICLE CARDS
    ========================================================================== */
 
-.p2p__vehicles {
+.p2p__vehicles,
+.p2p__speeds,
+.p2p__returns {
     display: flex;
     gap: 0.625rem;
 }
 
-.p2p__vehicle-card {
+/* Speed cards share the vehicle card exactly — same shape, same active state.
+   Grouped rather than copied so the two can never drift apart. */
+.p2p__vehicle-card,
+.p2p__speed-card,
+.p2p__return-card {
     flex: 1;
     min-width: 0;
     display: flex;
@@ -336,14 +412,18 @@ Notes: BEM prefix p2p__. Brand Kit variables from brandkit.css.
     color: var(--brand-grey-500, #888);
 }
 
-.p2p__vehicle-card:hover {
+.p2p__vehicle-card:hover,
+.p2p__speed-card:hover,
+.p2p__return-card:hover {
     border-color: var(--brand-primary, #f7c000);
     background: #fffbeb;
     color: var(--brand-grey-700, #444);
     transform: translateY(-2px);
 }
 
-.p2p__vehicle-card--active {
+.p2p__vehicle-card--active,
+.p2p__speed-card--active,
+.p2p__return-card--active {
     border-color: var(--brand-primary, #f7c000);
     background: var(--brand-primary, #f7c000);
     color: #0f1923;
@@ -351,19 +431,44 @@ Notes: BEM prefix p2p__. Brand Kit variables from brandkit.css.
     box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
 }
 
-.p2p__vehicle-icon {
+/* This vehicle cannot take the load that is currently chosen. Greyed and inert rather
+   than hidden: the customer should see that a bike exists and that their three boxes are
+   why it is not on offer. */
+.p2p__vehicle-card--over {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: var(--brand-grey-100, #fafafa);
+}
+.p2p__vehicle-card--over:hover {
+    border-color: var(--brand-grey-200, #e5e7eb);
+    background: var(--brand-grey-100, #fafafa);
+    transform: none;
+}
+
+.p2p__vehicle-note {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+.p2p__vehicle-icon,
+.p2p__speed-icon,
+.p2p__return-icon {
     font-size: 1.375rem;
     flex-shrink: 0;
 }
 
-.p2p__vehicle-name {
+.p2p__vehicle-name,
+.p2p__speed-name,
+.p2p__return-name {
     font-size: 0.75rem;
     font-weight: 700;
     text-align: center;
     line-height: 1.2;
 }
 
-.p2p__vehicle-cap {
+.p2p__return-cap,
+.p2p__speed-cap {
     font-size: 0.65rem;
     color: currentColor;
     opacity: 0.65;
@@ -839,6 +944,17 @@ Notes: BEM prefix p2p__. Brand Kit variables from brandkit.css.
     text-align: center;
 }
 
+/* The tier cards are the small-parcel express case; the card prices size, vehicle and
+   speed too, so the grid needs the qualifier or it reads as the whole price list. */
+.p2p__tiers-note {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--brand-grey-600, #6c757d);
+    margin: -0.5rem auto 1.25rem;
+    max-width: 46rem;
+    text-align: center;
+}
+
 .p2p__tiers-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -893,15 +1009,24 @@ Notes: BEM prefix p2p__. Brand Kit variables from brandkit.css.
 
     .p2p__cat-search { max-width: 100%; }
 
-    .p2p__sizes { gap: 0.375rem; }
-    .p2p__size-card { padding: 0.75rem 0.25rem; border-radius: 0.75rem; }
+    /* Three across and wrapping, rather than five squeezed into a phone width. The
+       dimensions are the point of the card; a row that cannot fit them is worth
+       less than a second row. */
+    .p2p__sizes { gap: 0.375rem; flex-wrap: wrap; }
+    .p2p__size-card { flex: 0 1 calc(33.333% - 0.5rem); padding: 0.75rem 0.35rem; border-radius: 0.75rem; }
     .p2p__size-name { font-size: 0.625rem; }
-    .p2p__size-weight { display: none; }
+    .p2p__size-dims { font-size: 0.6rem; }
 
-    .p2p__vehicles { gap: 0.375rem; }
-    .p2p__vehicle-card { padding: 0.75rem 0.2rem 0.5rem; border-radius: 0.75rem; }
-    .p2p__vehicle-icon { font-size: 1.125rem; }
-    .p2p__vehicle-cap { display: none; }
+    .p2p__load-total { font-size: 0.75rem; }
+
+    .p2p__vehicles,
+    .p2p__speeds { gap: 0.375rem; flex-wrap: wrap; }
+    .p2p__vehicle-card { flex: 0 1 calc(33.333% - 0.5rem); padding: 0.75rem 0.35rem 0.5rem; border-radius: 0.75rem; }
+    .p2p__speed-card { flex: 1 1 calc(50% - 0.5rem); padding: 0.75rem 0.35rem 0.5rem; border-radius: 0.75rem; }
+    .p2p__vehicle-icon,
+    .p2p__speed-icon { font-size: 1.125rem; }
+    .p2p__return-cap,
+    .p2p__speed-cap { font-size: 0.6rem; }
 
     .p2p__result-price__amount { font-size: 2.5rem; }
     .p2p__tiers-grid { grid-template-columns: repeat(2, 1fr); }
@@ -910,8 +1035,17 @@ Notes: BEM prefix p2p__. Brand Kit variables from brandkit.css.
 
 @media (max-width: 480px) {
     .p2p__sizes { gap: 0.25rem; }
-    .p2p__size-card { padding: 0.625rem 0.2rem; border-radius: 0.625rem; border-width: 1.5px; }
+    .p2p__size-card { flex: 0 1 calc(50% - 0.25rem); padding: 0.625rem 0.3rem; border-radius: 0.625rem; border-width: 1.5px; }
     .p2p__size-tag { font-size: 0.75rem; }
-    .p2p__size-name { display: none; }
+    .p2p__vehicle-card { flex: 0 1 calc(50% - 0.25rem); }
     .p2p__result-actions { flex-direction: column; }
+}
+
+/* The leg back, on the result panel. A quiet line under the route: it is a second
+   journey, and it must not compete with the figure the customer came for. */
+.p2p__result-return {
+    margin: 0.5rem 0 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-grey-600, #555);
 }

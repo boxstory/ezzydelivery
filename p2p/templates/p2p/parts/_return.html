@@ -1,0 +1,17 @@
+{% comment %}
+Purpose: The return-leg tick and what comes back — one block, shared by every form that offers it
+Used by: p2p/book.html, p2p/delivery_edit.html, workforce/forms/p2p_new.html
+Notes: A tick, not a second route: the leg back is the same two points reversed. Ticking it writes a
+       SECOND order (p2p.services.create_return_order), and it is priced as a full second journey.
+{% endcomment %}
+<div class="p2pb__switch" id="p2p_return_block">
+  <div class="form-check">
+    {{ field }}
+    <label class="form-check-label p2pb__switch-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+  </div>
+  <div class="p2pb__hint">{{ field.help_text }}</div>
+  {% for e in field.errors %}<div class="p2pb__error">{{ e }}</div>{% endfor %}
+  <div class="p2pb__switch-body mt-2" data-return-body {% if not field.value %}hidden{% endif %}>
+    {% include "p2p/parts/_field.html" with field=note_field %}
+  </div>
+</div>

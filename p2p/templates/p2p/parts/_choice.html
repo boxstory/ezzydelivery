@@ -1,0 +1,19 @@
+{% comment %}
+Purpose: One radio group rendered as a segmented card row — the role and fee-payer questions
+Used by: p2p/book.html, p2p/delivery_edit.html
+Notes: Radios, not a select: both questions are two-way and change what the rest of the form means,
+       so they must be readable without opening anything.
+{% endcomment %}
+<fieldset class="p2pb__choice" id="p2p_choice_{{ field.name }}">
+  <legend class="form-label">{{ field.label }}</legend>
+  <div class="p2pb__choice-set">
+    {% for radio in field %}
+      <label class="p2pb__choice-opt" for="{{ radio.id_for_label }}">
+        {{ radio.tag }}
+        <span class="p2pb__choice-text">{{ radio.choice_label }}</span>
+      </label>
+    {% endfor %}
+  </div>
+  {% if field.help_text %}<div class="p2pb__hint">{{ field.help_text }}</div>{% endif %}
+  {% for error in field.errors %}<div class="p2pb__error">{{ error }}</div>{% endfor %}
+</fieldset>

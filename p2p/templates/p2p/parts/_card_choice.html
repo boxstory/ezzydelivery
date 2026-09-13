@@ -1,0 +1,27 @@
+{% load custom_filters %}
+{% comment %}
+Purpose: A radio group rendered as picture cards — the size and vehicle pickers
+Used by: p2p/book.html, p2p/delivery_edit.html
+Notes: Same cards the public calculator shows (p2p.models.P2P_SIZE_CARDS / P2P_VEHICLE_CARDS), so a
+       customer meets the identical choice twice. Radios, not buttons + hidden input: the picker then
+       works with no JavaScript and the whole card is one hit target.
+{% endcomment %}
+<fieldset class="p2pb__picker" id="p2p_cards_{{ field.name }}">
+  <legend class="form-label">{{ field.label }}</legend>
+  <div class="p2pb__picker-set">
+    {% for radio in field %}
+      {% with meta=cards|get_item:radio.data.value %}
+      <label class="p2pb__pick" for="{{ radio.id_for_label }}">
+        {{ radio.tag }}
+        {% if meta.box %}<span class="p2pb__pick-box p2pb__pick-box--{{ radio.data.value }}"></span>{% endif %}
+        {% if meta.icon %}<i class="{{ meta.icon }} p2pb__pick-icon"></i>{% endif %}
+        {% if meta.tag %}<span class="p2pb__pick-tag">{{ meta.tag }}</span>{% endif %}
+        <span class="p2pb__pick-name">{{ meta.name|default:radio.choice_label }}</span>
+        {% if meta.dims %}<span class="p2pb__pick-sub">{{ meta.dims }}</span>{% endif %}
+        {% if meta.cap %}<span class="p2pb__pick-sub">{{ meta.cap }}</span>{% endif %}
+      </label>
+      {% endwith %}
+    {% endfor %}
+  </div>
+  {% for error in field.errors %}<div class="p2pb__error">{{ error }}</div>{% endfor %}
+</fieldset>

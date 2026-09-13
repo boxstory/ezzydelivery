@@ -1,0 +1,47 @@
+{% extends "p2p/_base.html" %}
+{% comment %}
+Purpose: The page the WhatsApp confirm link opens — shows the terms, then releases the job on POST
+Used by: p2p.views.accept_price
+Notes: Public and login-free. Confirming is a POST on purpose: WhatsApp fetches link previews, and a
+       mutating GET would confirm orders nobody clicked.
+{% endcomment %}
+{% block title %}Confirm your delivery | EzzyDelivery{% endblock title %}
+{% block p2p_content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+    <div class="p2pb__card p2pb__card--centred">
+      {% if confirmed %}
+        <div class="p2pb__tick">&check;</div>
+        <h1 class="p2pb__title">Confirmed</h1>
+        <p class="p2pb__lead">Thank you. We're assigning a driver to collect from {{ booking.from_label }}.{% if booking.return_trip %} The leg back to {{ booking.from_label }} is booked with it.{% endif %}</p>
+        {% if order %}<p class="p2pb__ref">{{ order.order_number }}</p>{% endif %}
+      {% else %}
+        <h1 class="p2pb__title">Confirm your delivery</h1>
+        <div class="p2pb__summary">
+          <div class="p2pb__summary-row"><span>From</span><strong>{{ booking.from_label }}</strong></div>
+          <div class="p2pb__summary-row"><span>To</span><strong>{{ booking.to_label }}</strong></div>
+          <div class="p2pb__summary-row"><span>Boxes</span><strong>{{ booking.load_label|default:booking.box_count }}</strong></div>
+          {% if booking.return_trip %}
+            <div class="p2pb__summary-row"><span>Leg back</span><strong>{{ booking.return_route_label }}</strong></div>
+            {% if booking.return_description %}
+              <div class="p2pb__summary-row"><span>Coming back</span><strong>{{ booking.return_description }}</strong></div>
+            {% endif %}
+            <div class="p2pb__summary-row"><span>Of which the leg back</span><strong>QAR {{ booking.return_fee|floatformat:2 }}</strong></div>
+          {% endif %}
+          <div class="p2pb__summary-row p2pb__summary-row--total">
+            <span>{% if booking.return_trip %}Both journeys{% else %}Delivery fee{% endif %}</span><strong>QAR {{ booking.agreed_price|floatformat:2 }}</strong>
+          </div>
+          {% if booking.cod_amount %}
+            <div class="p2pb__summary-row"><span>Collect from receiver</span><strong>QAR {{ booking.cod_amount|floatformat:2 }}</strong></div>
+          {% endif %}
+        </div>
+        <p class="p2pb__hint">{{ booking.fee_note }}</p>
+        <form method="post" id="p2p_accept_form_confirm">
+          {% csrf_token %}
+          <button type="submit" class="btn p2pb__btn-primary w-100" id="p2p_accept_btn_confirm">Yes, book it</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock p2p_content %}

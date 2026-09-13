@@ -1,0 +1,116 @@
+{% extends "p2p/_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: The booking details form — who is booking, pickup and drop addresses, package, money, timing
+Used by: p2p.views.book
+Notes: The price panel is read-only. There is no price input anywhere in this flow; the server
+       recomputes it from the rate card on submit. The booker may be at either end of the job — the
+       role toggle moves the prefill and the "this is you" marker; nothing here assumes sender.
+{% endcomment %}
+{% block title %}Book your delivery | EzzyDelivery{% endblock title %}
+{% block p2p_content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-9">
+
+    <div class="p2pb__quote" id="p2p_book_panel_quote">
+      <div class="p2pb__quote-route">
+        <span class="p2pb__quote-place">{{ booking.from_label }}</span>
+        <span class="p2pb__quote-arrow">&rarr;</span>
+        <span class="p2pb__quote-place">{{ booking.to_label }}</span>
+      </div>
+      <div class="p2pb__quote-figure">
+        {% if booking.needs_quote %}
+          <span class="p2pb__quote-pending">We'll confirm your price</span>
+        {% else %}
+          <span class="p2pb__quote-price">{{ booking.quoted_price|floatformat:0 }}</span>
+          <span class="p2pb__quote-unit">QAR</span>
+        {% endif %}
+        <span class="p2pb__quote-distance">about {{ booking.distance_km|floatformat:0 }} km</span>
+      </div>
+    </div>
+
+    <form method="post" class="p2pb__card" id="p2p_book_form_details"
+          data-me-name="{{ me_name }}" data-me-phone="{{ me_phone }}">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <h2 class="p2pb__section p2pb__section--first">Your part in this</h2>
+      {% include "p2p/parts/_choice.html" with field=form.booker_role %}
+
+      <h2 class="p2pb__section">
+        Where we collect
+        <span class="p2pb__you" data-you-for="sender" hidden>This is you</span>
+      </h2>
+      <div class="row g-3">
+        <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.sender_name %}</div>
+        <div class="col-12 col-md-6">
+          {% include "p2p/parts/_field.html" with field=form.sender_phone %}
+          {% include "p2p/parts/_lock_hint.html" with role='sender' locked=form.locked_field %}
+        </div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.pickup_zone %}</div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.pickup_street %}</div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.pickup_building %}</div>
+        <div class="col-12">{% include "p2p/parts/_field.html" with field=form.pickup_notes %}</div>
+        <div class="col-6">{% include "p2p/parts/_field.html" with field=form.pickup_date %}</div>
+        <div class="col-6">{% include "p2p/parts/_field.html" with field=form.pickup_time %}</div>
+      </div>
+      <p class="p2pb__hint">Windows are 3-hour slots, and they apply to a Scheduled
+        delivery. Express is collected as soon as a driver is free.</p>
+
+      <h2 class="p2pb__section">
+        Where it goes
+        <span class="p2pb__you" data-you-for="receiver" hidden>This is you</span>
+      </h2>
+      <div class="row g-3">
+        <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.customer_name %}</div>
+        <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.customer_phone %}</div>
+        <div class="col-12 col-md-6">
+          {% include "p2p/parts/_field.html" with field=form.customer_whatsapp %}
+          {% include "p2p/parts/_lock_hint.html" with role='receiver' locked=form.locked_field %}
+        </div>
+        <div class="col-12">{% include "p2p/parts/_field.html" with field=form.customer_address %}</div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.dl_zone %}</div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.dl_street %}</div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.dl_building %}</div>
+        <div class="col-6">{% include "p2p/parts/_field.html" with field=form.scheduled_date %}</div>
+        <div class="col-6">{% include "p2p/parts/_field.html" with field=form.scheduled_time %}</div>
+      </div>
+      <p class="p2pb__hint">Leave the delivery day blank to have it delivered on the
+        same day we collect it.</p>
+
+      <h2 class="p2pb__section">The parcel</h2>
+      {% include "p2p/parts/_card_choice.html" with field=form.size cards=form.size_cards %}
+      {% include "p2p/parts/_load.html" %}
+      {% include "p2p/parts/_card_choice.html" with field=form.vehicle cards=form.vehicle_cards %}
+      <div class="row g-3 mt-1">
+        <div class="col-6 col-md-4">{% include "p2p/parts/_field.html" with field=form.weight_kg %}</div>
+        <div class="col-12 col-md-8">{% include "p2p/parts/_field.html" with field=form.package_description %}</div>
+      </div>
+      <p class="p2pb__hint">The card is the size band we price on; the weight is what the parcel
+        actually weighs. Tell us both — they are different limits.</p>
+
+      <h2 class="p2pb__section">The leg back</h2>
+      {% include "p2p/parts/_return.html" with field=form.return_trip note_field=form.return_description %}
+      <p class="p2pb__hint">We book it as a second delivery on the same visit &mdash; the driver
+        hands your parcel over, collects what is going back, and returns it to the pickup address.</p>
+
+      <h2 class="p2pb__section">Money</h2>
+      <div class="row g-3">
+        <div class="col-12">{% include "p2p/parts/_choice.html" with field=form.fee_payer %}</div>
+        <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.cod_amount %}</div>
+        <div class="col-12">{% include "p2p/parts/_card_choice.html" with field=form.speed cards=form.speed_cards %}</div>
+      </div>
+      <p class="p2pb__hint">Leave "cash to collect" empty unless the receiver is paying for the goods. The delivery fee is separate, and the driver takes it in cash from whoever you picked above.</p>
+
+      <button type="submit" class="btn p2pb__btn-primary w-100 mt-3" id="p2p_book_btn_submit">Book this delivery</button>
+    </form>
+  </div>
+</div>
+{% endblock p2p_content %}
+{% block extra_js %}
+  <script src="{% static 'p2p/js/p2p-book.js' %}?v=20260910b"></script>
+  <script src="{% static 'p2p/js/p2p-return.js' %}?v=20260910b"></script>
+  <script src="{% static 'p2p/js/p2p-load.js' %}?v=20260910d"></script>
+{% endblock extra_js %}

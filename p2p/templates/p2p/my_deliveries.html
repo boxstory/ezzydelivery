@@ -1,0 +1,65 @@
+{% extends "p2p/_base.html" %}
+{% comment %}
+Purpose: The personal sender's list of deliveries
+Used by: p2p.views.my_deliveries
+Notes: Statuses are the plain-English ones derived in the view; raw codes never reach this page.
+{% endcomment %}
+{% block title %}My deliveries | EzzyDelivery{% endblock title %}
+{% block p2p_content %}
+<div class="p2pb__head">
+  <div>
+    <h1 class="p2pb__title">My deliveries</h1>
+    <p class="p2pb__lead mb-0">Everything you've sent with EzzyDelivery.</p>
+  </div>
+  <a href="{% url 'webpages:p2p_pricing' %}" class="btn p2pb__btn-primary" id="p2p_list_link_new">Send something</a>
+</div>
+
+{% if pending %}
+  <h2 class="p2pb__section">Awaiting a price</h2>
+  {% for booking in pending %}
+    <div class="p2pb__row">
+      <div class="p2pb__row-main">
+        <span class="p2pb__route">{{ booking.from_label }} &rarr; {{ booking.to_label }}</span>
+        <span class="p2pb__meta">{{ booking.box_count }} box{{ booking.box_count|pluralize:"es" }} · {{ booking.created_at|date:"j M Y" }}</span>
+      </div>
+      <span class="p2pb__status p2pb__status--waiting">Awaiting price</span>
+    </div>
+  {% endfor %}
+{% endif %}
+
+{% if rows %}
+  <h2 class="p2pb__section">Deliveries</h2>
+  {% for row in rows %}
+    <a class="p2pb__row p2pb__row--link" href="{% url 'p2p:delivery_detail' order_number=row.order.order_number %}"
+       id="p2p_list_link_order_{{ row.order.id }}">
+      <div class="p2pb__row-main">
+        {% comment %}A return trip is two rows, one per journey. The leg back runs the
+        other way, so it must not borrow the outward route or it reads as a duplicate.
+        {% endcomment %}
+        <span class="p2pb__route">
+          {% if row.is_return %}{{ row.booking.to_label }}{% else %}{{ row.booking.from_label|default:"Pickup" }}{% endif %}
+          &rarr; {{ row.order.customer_name }}
+        </span>
+        <span class="p2pb__meta">
+          {{ row.order.order_number }} · {{ row.order.created_at|date:"j M Y" }}
+          {% if row.order.dl_amount %} · QAR {{ row.order.dl_amount|floatformat:0 }}{% endif %}
+        </span>
+      </div>
+      <span class="p2pb__status">{% if row.is_return %}Leg back &middot; {% endif %}{{ row.status }}</span>
+    </a>
+  {% endfor %}
+{% elif not pending %}
+  <div class="p2pb__card p2pb__card--centred">
+    <h2 class="p2pb__title">Nothing sent yet</h2>
+    <p class="p2pb__lead">When you book a delivery it will appear here, with live status.</p>
+    <a href="{% url 'webpages:p2p_pricing' %}" class="btn p2pb__btn-primary" id="p2p_list_link_first">Send your first parcel</a>
+  </div>
+{% endif %}
+
+<div class="p2pb__upsell">
+  <p class="mb-2"><strong>Sending regularly, or running a shop?</strong></p>
+  <p class="p2pb__hint mb-2">Business accounts get bulk orders, integrations and invoicing.</p>
+  <a href="{% url 'core:profile_complete_update' %}" class="btn p2pb__btn-secondary btn-sm" id="p2p_list_link_business">Register a business</a>
+  <a href="{% url 'core:join_driver_start' %}" class="btn p2pb__btn-secondary btn-sm" id="p2p_list_link_driver">Drive with us</a>
+</div>
+{% endblock p2p_content %}

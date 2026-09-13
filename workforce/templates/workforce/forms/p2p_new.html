@@ -1,0 +1,171 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: The staff-side P2P booking form — ops take a point-to-point job over the phone or at the counter
+Used by: workforce.views.wf_p2p_new at /workforce/orders/p2p/new/
+Notes: Reuses the customer booking form's own field/card includes and p2p-console.css, so a job booked
+       here describes a parcel with exactly the same words and pictures a customer would have used.
+{% endcomment %}
+{% block title %}New P2P Booking{% endblock title %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'p2p/css/p2p-console.css' %}?v=20260910c">
+  <link rel="stylesheet" href="{% static 'workforce/css/wf-p2p-new.css' %}?v=20260910a">
+{% endblock extra_css %}
+{% block content %}
+<div class="wfpage">
+
+  <div class="wfhero">
+    <div class="wfhero__text">
+      <h1 class="wfhero__title">New P2P Booking</h1>
+      <p class="wfhero__sub">Take a point-to-point job on the phone or at the counter. The rate card
+        prices it as you type; you can overrule that figure before it is saved.</p>
+    </div>
+    <div class="wfhero__actions">
+      <a href="{% url 'workforce:wf_orders_p2p' %}" class="btn btn-outline-light"
+         id="workforce_p2p_new_link_back">Back to P2P orders</a>
+    </div>
+  </div>
+
+  <form method="post" class="p2pb__card wfp2p__form" id="workforce_p2p_new_form_booking"
+        data-quote-url="{% url 'workforce:wf_p2p_quote' %}">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger" id="workforce_p2p_new_alert_errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    {# ---- Route ------------------------------------------------------- #}
+    <h2 class="p2pb__section p2pb__section--first">The journey</h2>
+    <p class="p2pb__hint">Type an area name and pick it from the list — that fills the pin. If the
+      customer sent a map link, paste the coordinates into the two boxes beside it instead.</p>
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <div class="wfp2p__leg">
+          <span class="wfp2p__leg-tag">Collect from</span>
+          {% include "p2p/parts/_field.html" with field=form.from_label %}
+          <div class="row g-2 mt-1">
+            <div class="col-6">{% include "p2p/parts/_field.html" with field=form.from_lat %}</div>
+            <div class="col-6">{% include "p2p/parts/_field.html" with field=form.from_lng %}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="wfp2p__leg">
+          <span class="wfp2p__leg-tag">Deliver to</span>
+          {% include "p2p/parts/_field.html" with field=form.to_label %}
+          <div class="row g-2 mt-1">
+            <div class="col-6">{% include "p2p/parts/_field.html" with field=form.to_lat %}</div>
+            <div class="col-6">{% include "p2p/parts/_field.html" with field=form.to_lng %}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <datalist id="workforce_p2p_new_list_localities"></datalist>
+    {{ localities|json_script:"workforce_p2p_new_data_localities" }}
+
+    <div class="wfp2p__quote" id="workforce_p2p_new_panel_quote" aria-live="polite">
+      <span class="wfp2p__quote-label">Rate card</span>
+      <span class="wfp2p__quote-figure" id="workforce_p2p_new_text_price">—</span>
+      <span class="wfp2p__quote-note" id="workforce_p2p_new_text_note">Pick both ends and a size.</span>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.category %}</div>
+      <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.bill_to %}</div>
+    </div>
+
+    {# ---- Who asked ---------------------------------------------------- #}
+    <h2 class="p2pb__section">Who asked for it</h2>
+    {% include "p2p/parts/_choice.html" with field=form.booker_role %}
+    <div class="row g-3">
+      <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.booker_phone %}</div>
+    </div>
+
+    {# ---- Pickup ------------------------------------------------------- #}
+    <h2 class="p2pb__section">Where we collect</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.sender_name %}</div>
+      <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.sender_phone %}</div>
+      <div class="col-4">{% include "p2p/parts/_field.html" with field=form.pickup_zone %}</div>
+      <div class="col-4">{% include "p2p/parts/_field.html" with field=form.pickup_street %}</div>
+      <div class="col-4">{% include "p2p/parts/_field.html" with field=form.pickup_building %}</div>
+      <div class="col-12">{% include "p2p/parts/_field.html" with field=form.pickup_notes %}</div>
+      <div class="col-6 col-md-3">{% include "p2p/parts/_field.html" with field=form.pickup_date %}</div>
+      <div class="col-6 col-md-3">{% include "p2p/parts/_field.html" with field=form.pickup_time %}</div>
+    </div>
+    <p class="p2pb__hint">Windows are 3-hour slots and apply to a scheduled job. Express is collected
+      as soon as a driver is free, so both windows are ignored on it.</p>
+
+    {# ---- Drop --------------------------------------------------------- #}
+    <h2 class="p2pb__section">Where it goes</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.customer_name %}</div>
+      <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.customer_phone %}</div>
+      <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.customer_whatsapp %}</div>
+      <div class="col-12">{% include "p2p/parts/_field.html" with field=form.customer_address %}</div>
+      <div class="col-4">{% include "p2p/parts/_field.html" with field=form.dl_zone %}</div>
+      <div class="col-4">{% include "p2p/parts/_field.html" with field=form.dl_street %}</div>
+      <div class="col-4">{% include "p2p/parts/_field.html" with field=form.dl_building %}</div>
+      <div class="col-6 col-md-3">{% include "p2p/parts/_field.html" with field=form.scheduled_date %}</div>
+      <div class="col-6 col-md-3">{% include "p2p/parts/_field.html" with field=form.scheduled_time %}</div>
+    </div>
+    <p class="p2pb__hint">Leave the delivery day blank on a scheduled job and it is delivered the same
+      day we collect it.</p>
+
+    {# ---- Parcel ------------------------------------------------------- #}
+    <h2 class="p2pb__section">The parcel</h2>
+    {% include "p2p/parts/_card_choice.html" with field=form.size cards=form.size_cards %}
+    {% include "p2p/parts/_load.html" %}
+    {% include "p2p/parts/_card_choice.html" with field=form.vehicle cards=form.vehicle_cards %}
+    <div class="row g-3 mt-1">
+      <div class="col-6 col-md-4">{% include "p2p/parts/_field.html" with field=form.weight_kg %}</div>
+      <div class="col-12 col-md-8">{% include "p2p/parts/_field.html" with field=form.package_description %}</div>
+    </div>
+
+    {# ---- The leg back -------------------------------------------------- #}
+    <h2 class="p2pb__section">The leg back</h2>
+    {% include "p2p/parts/_return.html" with field=form.return_trip note_field=form.return_description %}
+    <p class="p2pb__hint">Booked as a second delivery on the same visit, the other way round, and
+      priced as a second journey. It becomes an order of its own and is released with the first.</p>
+
+    {# ---- Money -------------------------------------------------------- #}
+    <h2 class="p2pb__section">Money</h2>
+    {% include "p2p/parts/_choice.html" with field=form.fee_payer %}
+    <div class="row g-3">
+      <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.cod_amount %}</div>
+      <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.agreed_price %}</div>
+      <div class="col-12">{% include "p2p/parts/_card_choice.html" with field=form.speed cards=form.speed_cards %}</div>
+    </div>
+    <p class="p2pb__hint">Cash to collect is the receiver's money for the goods — leave it empty
+      unless there is any. The delivery fee is separate and never folds into it.</p>
+
+    {# ---- Release ------------------------------------------------------ #}
+    <h2 class="p2pb__section">Releasing it</h2>
+    <div class="wfp2p__switches">
+      <div class="form-check">
+        {{ form.confirm_now }}
+        <label class="form-check-label" for="{{ form.confirm_now.id_for_label }}">{{ form.confirm_now.label }}</label>
+        <div class="p2pb__hint">{{ form.confirm_now.help_text }}</div>
+        {% for e in form.confirm_now.errors %}<div class="p2pb__error">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="form-check">
+        {{ form.notify_customer }}
+        <label class="form-check-label" for="{{ form.notify_customer.id_for_label }}">{{ form.notify_customer.label }}</label>
+        <div class="p2pb__hint">Sends the booking summary, and the confirm link if it is still
+          waiting on one.</div>
+        {% for e in form.notify_customer.errors %}<div class="p2pb__error">{{ e }}</div>{% endfor %}
+      </div>
+    </div>
+    {% for e in form.agreed_price.errors %}<div class="p2pb__error">{{ e }}</div>{% endfor %}
+
+    <button type="submit" class="btn p2pb__btn-primary mt-3" id="workforce_p2p_new_btn_submit">
+      Create the booking
+    </button>
+  </form>
+</div>
+{% endblock content %}
+{% block extra_js %}
+  <script src="{% static 'workforce/js/wf-p2p-new.js' %}?v=20260910b"></script>
+  {# The leg back's own disclosure — shared with the customer booking form. #}
+  <script src="{% static 'p2p/js/p2p-return.js' %}?v=20260910b"></script>
+  <script src="{% static 'p2p/js/p2p-load.js' %}?v=20260910d"></script>
+{% endblock extra_js %}

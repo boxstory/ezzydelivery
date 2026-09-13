@@ -1,0 +1,44 @@
+{% extends "p2p/_base.html" %}
+{% comment %}
+Purpose: Collect the sender's WhatsApp number and prove it with an OTP
+Used by: p2p.views.verify_number
+Notes: The number is written to the Profile only after the code checks out — the order confirmation
+       link is sent to whatever is on file, so an unverified number on record defeats the step.
+{% endcomment %}
+{% block title %}Verify your WhatsApp number | EzzyDelivery{% endblock title %}
+{% block p2p_content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-7 col-lg-5">
+    <div class="p2pb__card">
+      <h1 class="p2pb__title">Verify your WhatsApp number</h1>
+      <p class="p2pb__lead">We send your delivery updates and the confirmation link here, so we need to know it reaches you.</p>
+
+      <form method="post" class="mb-4" id="p2p_verify_form_send">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="send">
+        <label class="form-label" for="id_whatsapp">{{ number_form.whatsapp.label }}</label>
+        <div class="d-flex gap-2">
+          <input type="tel" name="whatsapp" id="id_whatsapp" class="form-control p2pb__input"
+                 placeholder="5555 1234" value="{{ number_form.whatsapp.value|default:'' }}" required>
+          <button type="submit" class="btn p2pb__btn-secondary text-nowrap" id="p2p_verify_btn_send">
+            {% if pending %}Resend{% else %}Send code{% endif %}
+          </button>
+        </div>
+        {% for error in number_form.whatsapp.errors %}<div class="p2pb__error">{{ error }}</div>{% endfor %}
+      </form>
+
+      {% if pending %}
+        <form method="post" id="p2p_verify_form_code">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="verify">
+          <label class="form-label" for="id_code">Enter the code sent to {{ masked }}</label>
+          <input type="text" name="code" id="id_code" class="form-control p2pb__input p2pb__input--code"
+                 inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required>
+          {% for error in otp_form.code.errors %}<div class="p2pb__error">{{ error }}</div>{% endfor %}
+          <button type="submit" class="btn p2pb__btn-primary w-100 mt-3" id="p2p_verify_btn_confirm">Verify</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock p2p_content %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Shell for every P2P customer page — booking, verification and the sender's console
+Used by: all p2p/*.html templates
+Notes: Extends the public base, NOT business_dashboard_base — that one assumes request.current_business
+       and a personal sender has none.
+{% endcomment %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'p2p/css/p2p-console.css' %}?v=20260910c">
+{% endblock extra_css %}
+{% block content %}
+<div class="p2pb">
+  <div class="container py-4 py-md-5">
+    {% if messages %}
+      <div class="mb-3">
+        {% for message in messages %}
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} mb-2">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block p2p_content %}{% endblock p2p_content %}
+  </div>
+</div>
+{% endblock content %}

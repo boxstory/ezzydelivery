@@ -1,0 +1,105 @@
+{% extends "p2p/_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Let the sender change a delivery before anyone is sent to collect it
+Used by: p2p.views.delivery_edit
+Notes: Only reachable while order_status is 'to_review' — the view enforces it; this template just
+       renders the same field set as the booking form.
+{% endcomment %}
+{% block title %}Edit {{ order.order_number }} | EzzyDelivery{% endblock title %}
+{% block p2p_content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-9">
+    <h1 class="p2pb__title">Edit this delivery</h1>
+    <p class="p2pb__lead">You can change anything until a driver is sent to collect.</p>
+
+    <form method="post" class="p2pb__card" id="p2p_edit_form_details"
+          {# No name prefill on an edit — both ends are already filled in. The phone is #}
+          {# here only so the verified-number lock knows what it is guarding. #}
+          data-me-name="" data-me-phone="{{ me_phone }}">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+      <h2 class="p2pb__section p2pb__section--first">Your part in this</h2>
+      {% include "p2p/parts/_choice.html" with field=form.booker_role %}
+
+      <h2 class="p2pb__section">
+        Where we collect
+        <span class="p2pb__you" data-you-for="sender" hidden>This is you</span>
+      </h2>
+      <div class="row g-3">
+        <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.sender_name %}</div>
+        <div class="col-12 col-md-6">
+          {% include "p2p/parts/_field.html" with field=form.sender_phone %}
+          {% include "p2p/parts/_lock_hint.html" with role='sender' locked=form.locked_field %}
+        </div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.pickup_zone %}</div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.pickup_street %}</div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.pickup_building %}</div>
+        <div class="col-12">{% include "p2p/parts/_field.html" with field=form.pickup_notes %}</div>
+        <div class="col-6">{% include "p2p/parts/_field.html" with field=form.pickup_date %}</div>
+        <div class="col-6">{% include "p2p/parts/_field.html" with field=form.pickup_time %}</div>
+      </div>
+      <p class="p2pb__hint">Windows are 3-hour slots, and they apply to a Scheduled
+        delivery. Express is collected as soon as a driver is free.</p>
+
+      <h2 class="p2pb__section">
+        Where it goes
+        <span class="p2pb__you" data-you-for="receiver" hidden>This is you</span>
+      </h2>
+      <div class="row g-3">
+        <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.customer_name %}</div>
+        <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.customer_phone %}</div>
+        <div class="col-12 col-md-6">
+          {% include "p2p/parts/_field.html" with field=form.customer_whatsapp %}
+          {% include "p2p/parts/_lock_hint.html" with role='receiver' locked=form.locked_field %}
+        </div>
+        <div class="col-12">{% include "p2p/parts/_field.html" with field=form.customer_address %}</div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.dl_zone %}</div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.dl_street %}</div>
+        <div class="col-4">{% include "p2p/parts/_field.html" with field=form.dl_building %}</div>
+        <div class="col-6">{% include "p2p/parts/_field.html" with field=form.scheduled_date %}</div>
+        <div class="col-6">{% include "p2p/parts/_field.html" with field=form.scheduled_time %}</div>
+      </div>
+      <p class="p2pb__hint">Leave the delivery day blank to have it delivered on the
+        same day we collect it.</p>
+
+      <h2 class="p2pb__section">The parcel</h2>
+      {% include "p2p/parts/_card_choice.html" with field=form.size cards=form.size_cards %}
+      {% include "p2p/parts/_load.html" %}
+      {% include "p2p/parts/_card_choice.html" with field=form.vehicle cards=form.vehicle_cards %}
+      <div class="row g-3 mt-1">
+        <div class="col-6 col-md-4">{% include "p2p/parts/_field.html" with field=form.weight_kg %}</div>
+        <div class="col-12 col-md-8">{% include "p2p/parts/_field.html" with field=form.package_description %}</div>
+      </div>
+      <p class="p2pb__hint">The card is the size band we price on; the weight is what the parcel
+        actually weighs. Tell us both — they are different limits.</p>
+
+      <h2 class="p2pb__section">The leg back</h2>
+      {% include "p2p/parts/_return.html" with field=form.return_trip note_field=form.return_description %}
+      <p class="p2pb__hint">We book it as a second delivery on the same visit &mdash; the driver
+        hands your parcel over, collects what is going back, and returns it to the pickup address.</p>
+
+      <h2 class="p2pb__section">Money</h2>
+      <div class="row g-3">
+        <div class="col-12">{% include "p2p/parts/_choice.html" with field=form.fee_payer %}</div>
+        <div class="col-12 col-md-6">{% include "p2p/parts/_field.html" with field=form.cod_amount %}</div>
+        <div class="col-12">{% include "p2p/parts/_card_choice.html" with field=form.speed cards=form.speed_cards %}</div>
+      </div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn p2pb__btn-primary flex-fill" id="p2p_edit_btn_save">Save changes</button>
+        <a href="{% url 'p2p:delivery_detail' order_number=order.order_number %}"
+           class="btn p2pb__btn-secondary" id="p2p_edit_link_cancel">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock p2p_content %}
+{% block extra_js %}
+  {# Same toggle behaviour as the booking form: it only re-labels here, since both #}
+  {# ends are already filled in and must not be moved under the customer's feet. #}
+  <script src="{% static 'p2p/js/p2p-book.js' %}?v=20260910b"></script>
+  <script src="{% static 'p2p/js/p2p-return.js' %}?v=20260910b"></script>
+  <script src="{% static 'p2p/js/p2p-load.js' %}?v=20260910d"></script>
+{% endblock extra_js %}
