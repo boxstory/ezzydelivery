@@ -77,6 +77,7 @@ from orders import forms, models as orders_models
 from business import models as business_models
 from orders import forms as orders_forms
 from orders.order_code_suggest import suggest_next_order_code
+from orders.status_actions import READY_AND_PUBLISH, apply_ready_and_publish
 from business.decorators import (
     business_permission_required,
     business_access_required,
@@ -121,6 +122,36 @@ DL_STATUS_ACTIVE = [
     'out_for_delivery', 'in_transit', 'start_ride',
 ]
 DL_STATUS_FAILED = ['failed', 'non_reachable']
+
+
+def alert_if_business_not_active(business, order):
+    """Shout when an order lands for a business that is not cleared to trade.
+
+    business_active_required already refuses these at the door, so reaching here
+    means a write path is missing the gate (or staff parked the account after it
+    was approved). Log first — that is the record that always survives — then let
+    ops know. Never let a messaging failure break order creation.
+    """
+    status = getattr(business, 'business_status', None)
+    if status == 'active':
+        return
+
+    logger.warning(
+        "Order %s created for non-active business %s (%s) with status %r",
+        getattr(order, 'order_number', order.pk), getattr(business, 'business_id', '?'),
+        getattr(business, 'business_name', ''), status,
+    )
+    try:
+        from core.auto_flow_executor import execute_flows_for_trigger
+        execute_flows_for_trigger('business_unapproved_order', order=order, extra_context={
+            'business_name': getattr(business, 'business_name', '') or '',
+            'business_id': str(getattr(business, 'business_id', '')),
+            'business_status': status or '',
+            'order_number': getattr(order, 'order_number', '') or '',
+        })
+    except Exception:
+        logger.exception("Unapproved-business alert failed for business %s",
+                         getattr(business, 'business_id', '?'))
 
 
 # =============================================================================
@@ -391,6 +422,12 @@ def orders_all_list(request):
         'sort_by': sort_by,
         'sort_dir': sort_dir,
         # Filter values for template
+        # Mirrors the nine keys the filter bar counts, so the panel opens and the
+        # query readout shows without waiting for JS.
+        'has_active_filters': any([
+            order_number, mobile, customer_name, zone, c_status,
+            date_range, cod_status, dl_status, delivered_range,
+        ]),
         'filters': {
             'orderNumber': order_number,
             'mobile': mobile,
@@ -725,6 +762,7 @@ def order_upload_review_data(request):
                 order = order_form.save(commit=False)
                 order.business = business
                 order.save()
+                alert_if_business_not_active(business, order)
             else:
                 logger.warning(f"Order form invalid for row {idx}: {order_form.errors}")
                 messages.error(request, f'Error in row {idx}: {order_form.errors}')
@@ -752,7 +790,7 @@ def bulk_order_entry(request):
     # Show fulfillment stores first when fulfillment service is enabled
     pickup_locations = business_models.PickupLocation.objects.filter(
         business_id=business.business_id
-    ).order_by('-is_fulfilment_center', 'pickup_location_title')
+    ).selectable().order_by('-is_fulfilment_center', 'pickup_location_title')
 
     if not pickup_locations.exists():
         messages.warning(request, "Please add a pickup location or link a fulfillment center first.")
@@ -803,6 +841,7 @@ def bulk_order_entry(request):
                     pickup_location=pickup_locations.first(),
                 )
                 order.save()
+                alert_if_business_not_active(business, order)
 
                 # Add products if provided
                 package_desc = request.POST.get(f'data[{i}][package_desc]', '')
@@ -876,7 +915,7 @@ def add_order(request):
     # The seller's own default comes first, then fulfilment stores
     pickup_locations = business_models.PickupLocation.objects.filter(
         business_id=business.business_id
-    ).order_by('-is_default', '-is_fulfilment_center', 'pickup_location_title')
+    ).selectable().order_by('-is_default', '-is_fulfilment_center', 'pickup_location_title')
 
     if not pickup_locations:
         # If fulfillment is active, try to auto-create the missing pickup location from the warehouse link
@@ -903,7 +942,7 @@ def add_order(request):
                 logger.info(f"Auto-created missing fulfillment pickup location for business {business.business_id}")
                 pickup_locations = business_models.PickupLocation.objects.filter(
                     business_id=business.business_id
-                ).order_by('-is_default', '-is_fulfilment_center', 'pickup_location_title')
+                ).selectable().order_by('-is_default', '-is_fulfilment_center', 'pickup_location_title')
             else:
                 messages.warning(request, "Please add a pickup location or link a fulfillment center first.")
                 return redirect('business:pickup_location_list')
@@ -934,6 +973,7 @@ def add_order(request):
                 try:
                     with transaction.atomic():
                         order.save()
+                    alert_if_business_not_active(order.business, order)
                 except IntegrityError:
                     # Race / duplicate order number that slipped past form validation
                     form.add_error(
@@ -1155,6 +1195,7 @@ def add_order_bulk(request):
                 order_status=order_data.get('order_status', 'to_review'),
             )
             order.save()
+            alert_if_business_not_active(order.business, order)
             created_count += 1
 
         except Exception as e:
@@ -1464,7 +1505,7 @@ def pick_from_here(request, pickup_id):
     # Show fulfillment stores first when fulfillment service is enabled
     pickup_locations = business_models.PickupLocation.objects.filter(
         business_id=business.business_id
-    ).order_by('-is_fulfilment_center', 'pickup_location_title')
+    ).selectable().order_by('-is_fulfilment_center', 'pickup_location_title')
 
     if request.method == 'POST':
         form = orders_forms.AddOrderForm(request.POST)
@@ -1646,18 +1687,27 @@ def order_details(request, order_id):
             old_value='publish',
             new_value='ready_to_pickup',
         ).select_related('changed_by').order_by('created_at')
-        reconfirm_comments = list(
-            order.order_comments.filter(name__istartswith='Reconfirmed by').order_by('created_at')
-        )
+        reconfirm_history = list(reconfirm_history)
+        # The note is copied onto OrderStatusHistory.notes at write time, so that
+        # is the real link. The name-prefix + timestamp match below only runs for
+        # rows created before that link existed.
+        legacy_notes = []
+        if any(not hist.notes for hist in reconfirm_history):
+            legacy_notes = list(
+                order.order_comments.filter(
+                    name__istartswith='Reconfirmed by'
+                ).order_by('created_at')
+            )
         reconfirm_events = []
         for hist in reconfirm_history:
-            # find the closest reconfirm comment after this history entry (within 5s)
-            body = ''
-            for c in reconfirm_comments:
-                delta = (c.created_at - hist.created_at).total_seconds()
-                if -2 <= delta <= 10:
-                    body = c.body
-                    break
+            body = hist.notes or ''
+            if not body:
+                # find the closest reconfirm comment after this history entry
+                for c in legacy_notes:
+                    delta = (c.created_at - hist.created_at).total_seconds()
+                    if -2 <= delta <= 10:
+                        body = c.body
+                        break
             reconfirm_events.append({
                 'created_at': hist.created_at,
                 'by': (hist.changed_by.get_full_name() if hist.changed_by else '') or (hist.changed_by.username if hist.changed_by else ''),
@@ -1713,6 +1763,7 @@ def update_order_zone(request, order_id):
             return JsonResponse({'success': False, 'error': 'Zone number is required'}, status=400)
 
         from delivery import models as delivery_models
+        from delivery.selectors import task_address
         # Look up zone name (save even if zone not in ZoneName table)
         zone = delivery_models.ZoneName.objects.filter(zone_number=zone_number, is_active=True).first()
         zone_display = zone.zone_name if zone else f'Zone {zone_number}'
@@ -1744,8 +1795,12 @@ def update_order_zone(request, order_id):
             # Also update delivery task address for legacy compatibility
             if latitude and longitude:
                 delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
-                if delivery_task and delivery_task.dl_to_address:
-                    dl_address = delivery_task.dl_to_address
+                # Resolve through task_address(): this used to read delivery_task
+                # .dl_to_address directly, which was NULL on every row, so the whole
+                # block was a silent no-op and the parsed zone/pin never reached the
+                # address row.
+                dl_address = task_address(delivery_task)
+                if dl_address:
                     dl_address.dl_latitude = latitude
                     dl_address.dl_longitude = longitude
                     dl_address.dl_zone = zone_number
@@ -2031,6 +2086,14 @@ def update_order_status(request, order_id=None):
             if not user_business or user_business.business_id != order.business_id:
                 return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
 
+        # Publishing on its own is a staff action, driven from the workforce console.
+        # The client dashboard posts READY_AND_PUBLISH instead, which runs both legs.
+        if status == 'publish' and not request.user.is_staff:
+            return JsonResponse({
+                'success': False,
+                'error': 'Use "Ready to Pickup" — publishing on its own is handled by our team.',
+            }, status=403)
+
         # Published orders — restricted transitions:
         #   - publish → ready_to_pickup: allowed for staff and owning business, ONLY when
         #     the latest delivery task is 'failed' (client reconfirm-for-redispatch).
@@ -2051,6 +2114,16 @@ def update_order_status(request, order_id=None):
         if order.order_status in ('delivered', 'cancelled') and not request.user.is_staff:
             return JsonResponse({'success': False, 'error': 'This order status cannot be changed.'}, status=403)
 
+        # Combined seller handover: reserve stock + open the pickup leg, then publish.
+        if status == READY_AND_PUBLISH:
+            legs = apply_ready_and_publish(order, request.user)
+            return JsonResponse({
+                'success': True,
+                'status': 'success',
+                'message': 'Order is ready for pickup and published for delivery',
+                'legs': legs,
+            })
+
         old_status = order.order_status
         order.order_status = status
         # Attach the acting user so the post-save signal records it on OrderStatusHistory
@@ -2068,6 +2141,11 @@ def update_order_status(request, order_id=None):
                         order=order,
                         name=f"Reconfirmed by {commenter}"[:255] if status == 'ready_to_pickup' else commenter[:255],
                         body=comment,
+                        author=request.user,
+                        author_role=orders_models.OrderComments.role_for(request.user),
+                        # A reconfirmation note is a shared delivery instruction, not
+                        # an internal remark - both sides of the order need to read it.
+                        is_internal=False,
                     )
                 except Exception as e:
                     logger.warning(f'Failed to save comment for order {order_id}: {e}')
@@ -2133,9 +2211,17 @@ def bulk_update_order_status(request):
         if not order_ids or not status:
             return JsonResponse({'success': False, 'error': 'Missing order_ids or status'}, status=400)
 
-        ALLOWED_STATUSES = ['publish', 'ready_to_pickup', 'cancelled']
+        ALLOWED_STATUSES = ['publish', 'ready_to_pickup', 'cancelled', READY_AND_PUBLISH]
         if status not in ALLOWED_STATUSES:
             return JsonResponse({'success': False, 'error': 'Invalid status'}, status=400)
+
+        # Publishing on its own is a staff action, driven from the workforce console.
+        # The client dashboard posts READY_AND_PUBLISH instead, which runs both legs.
+        if status == 'publish' and not request.user.is_staff:
+            return JsonResponse({
+                'success': False,
+                'error': 'Use "Ready to Pickup" — publishing on its own is handled by our team.',
+            }, status=403)
 
         # Check business ownership
         user_business = get_cached_business(request)
@@ -2155,6 +2241,9 @@ def bulk_update_order_status(request):
             # from its delivery task. Bulk selections are checkbox-sized, so this is cheap.
             targets = list(orders_qs)
             for order in targets:
+                if status == READY_AND_PUBLISH:
+                    apply_ready_and_publish(order, request.user)
+                    continue
                 order.order_status = status
                 order._status_changed_by = request.user
                 order.save()
@@ -2202,11 +2291,15 @@ def add_order_comment(request, order_id):
             else:
                 name = 'Anonymous'
 
-            # Create comment
+            # Create comment. This is the client-facing thread, so anything
+            # posted here is shared with the business by definition.
             orders_models.OrderComments.objects.create(
                 order=order,
                 name=name,
-                body=comment_text
+                body=comment_text,
+                author=request.user if request.user.is_authenticated else None,
+                author_role=orders_models.OrderComments.role_for(request.user),
+                is_internal=False,
             )
 
             # Notify assigned driver if order is published to fleet
@@ -2228,11 +2321,18 @@ def add_order_comment(request, order_id):
                 pass
 
         # Get all comments for this order
-        comments = order.order_comments.all().order_by('created_at')
+        # Visibility follows the viewer's real role, never a request header:
+        # internal notes are staff-only.
+        is_staff_view = request.user.is_staff
+        comments = order.order_comments.select_related('author').order_by('created_at')
+        if not is_staff_view:
+            comments = comments.filter(is_internal=False)
 
-        # Check referer to determine which template to use
+        # The workforce renderer is cosmetic (no add-comment form), so the
+        # Referer still picks it - but only for staff, so a client cannot
+        # switch renderers by forging the header.
         referer = request.META.get('HTTP_REFERER', '')
-        if 'workforce' in referer:
+        if is_staff_view and 'workforce' in referer:
             template = 'orders/parts/order_comments_workforce.html'
         else:
             template = 'orders/parts/order_comments_list.html'
@@ -2255,11 +2355,18 @@ def get_order_comments(request, order_id):
             user_business = get_cached_business(request)
             if not user_business or user_business.business_id != order.business_id:
                 return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
-        comments = order.order_comments.all().order_by('created_at')
+        # Visibility follows the viewer's real role, never a request header:
+        # internal notes are staff-only.
+        is_staff_view = request.user.is_staff
+        comments = order.order_comments.select_related('author').order_by('created_at')
+        if not is_staff_view:
+            comments = comments.filter(is_internal=False)
 
-        # Check referer to determine which template to use
+        # The workforce renderer is cosmetic (no add-comment form), so the
+        # Referer still picks it - but only for staff, so a client cannot
+        # switch renderers by forging the header.
         referer = request.META.get('HTTP_REFERER', '')
-        if 'workforce' in referer:
+        if is_staff_view and 'workforce' in referer:
             template = 'orders/parts/order_comments_workforce.html'
         else:
             template = 'orders/parts/order_comments_list.html'
@@ -2298,8 +2405,18 @@ def get_order_by_api(request):
 
     if not api_data:
         logger.warning(f"No API settings found for business {business.business_id}")
-        messages.error(request, "No API configuration found. Please configure your Shopify API settings.")
-        return redirect('business:business_settings_api_list', business.business_id)
+        # Only send them to the settings page if they are allowed to open it —
+        # a team member without api_view lands on two stacked errors and the
+        # dashboard, which reads as a broken button rather than a missing setup.
+        if user_has_business_permission(request.user, BusinessPermissions.API_VIEW, business):
+            messages.error(request, "No API configuration found. Please configure your Shopify API settings.")
+            return redirect('business:business_settings_api_list', business.business_id)
+        messages.error(
+            request,
+            "No store integration is connected for this account. Ask the account owner "
+            "to connect one under Settings \u2192 API Settings."
+        )
+        return redirect('business:business_dashboard')
 
     logger.debug(f"Using API settings for business {business.business_id}")
 
@@ -2841,8 +2958,17 @@ def get_orders_by_base_api(request):
 
     if not business_api:
         logger.warning(f"No API settings found for business {business_id}")
-        messages.error(request, "No API configuration found")
-        return redirect('business:business_settings_api_list', business_id)
+        # Same reasoning as get_order_by_api: never bounce someone to a page
+        # their permissions will refuse.
+        if user_has_business_permission(request.user, BusinessPermissions.API_VIEW, business):
+            messages.error(request, "No API configuration found")
+            return redirect('business:business_settings_api_list', business_id)
+        messages.error(
+            request,
+            "No store integration is connected for this account. Ask the account owner "
+            "to connect one under Settings \u2192 API Settings."
+        )
+        return redirect('business:business_dashboard')
 
     logger.info(f"Fetching orders via {business_api.api_type} API for business {business_id}")
      

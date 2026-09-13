@@ -307,7 +307,7 @@ def _sync_onedrive_source(source):
     # Resolve mapping — use saved mapping only (business-level or per-source)
     raw_biz_full = source.business.import_mapping or {}
     # Handle nested format: extract onedrive key
-    is_nested = any(k in raw_biz_full for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link'))
+    is_nested = any(k in raw_biz_full for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link', 'custom_api'))
     raw_biz = raw_biz_full.get('onedrive', {}) if is_nested else raw_biz_full
     raw_source = source.last_column_mapping or {}
 
@@ -627,7 +627,7 @@ def _sync_google_sheet_source(api_settings):
     # Column mapping — use saved mapping only (business-level or per-source)
     raw_biz_full = api_settings.business.import_mapping or {}
     # Handle nested format: extract google_sheet key
-    is_nested = any(k in raw_biz_full for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link'))
+    is_nested = any(k in raw_biz_full for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link', 'custom_api'))
     raw_biz = raw_biz_full.get('google_sheet', {}) if is_nested else raw_biz_full
     saved_mapping = api_settings.column_mapping or {}     # {db_field: col_header_name}
 
@@ -1012,7 +1012,7 @@ def _business_mapping(api_settings, platform=None):
     because it was written against a different column vocabulary.
     """
     raw = (getattr(api_settings.business, 'import_mapping', None) or {})
-    nested_keys = ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link')
+    nested_keys = ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link', 'custom_api')
     if any(k in raw for k in nested_keys):
         return raw.get(platform or api_settings.api_type) or {}
     return {}
@@ -1419,7 +1419,7 @@ def _sync_public_link_source(source):
     # Use saved mapping only — skip if no mapping configured
     raw_biz = source.business.import_mapping or {}
     # Handle nested format: extract public_link key
-    is_nested = any(k in raw_biz for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link'))
+    is_nested = any(k in raw_biz for k in ('shopify', 'woocommerce', 'csv', 'google_sheet', 'onedrive', 'public_link', 'custom_api'))
     business_mapping = raw_biz.get('public_link', {}) if is_nested else raw_biz
     source_mapping = source.last_column_mapping or {}
     if business_mapping:

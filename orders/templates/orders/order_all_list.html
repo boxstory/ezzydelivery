@@ -5,7 +5,7 @@
 {% load business_pwa_tags %}
 <!-- extra css -->
 {% block extra_css %}
-  <link href="{% static 'orders/css/orders.css' %}?v=20260808a"
+  <link href="{% static 'orders/css/orders.css' %}?v=20260827a"
         rel="stylesheet"
         type="text/css" />
 {% endblock extra_css %}
@@ -310,42 +310,68 @@
       countBadge.style.display = 'none';
     }
 
-    // Update filter tags
+    // Update filter tags — the query readout on the filter strip. Field name in
+    // sans, the value in mono, matching the ledger's two-voice type.
     const tagsContainer = document.getElementById('filterTagsContainer');
     const tagsDisplay = document.getElementById('activeFilterTags');
+    const hint = document.getElementById('orders_all_list_text_filter_hint');
 
     if (filterCount > 0) {
       tagsDisplay.style.display = 'block';
+      if (hint) hint.classList.add('d-none');
       tagsContainer.innerHTML = '';
 
       const filterLabels = {
         'orderNumber': 'Order',
         'mobile': 'Mobile',
-        'customerName': 'Name',
+        'customerName': 'Customer',
         'zone': 'Zone',
         'cStatus': 'Status',
-        'dateRange': 'Date',
+        'dateRange': 'Ordered',
         'codStatus': 'COD',
         'dlStatus': 'Delivery',
         'deliveredRange': 'Delivered'
       };
-      const dateRangeLabels = {
-        'today': 'Today', 'yesterday': 'Yesterday', '3days': '3 Days',
-        'week': 'Week', 'month': 'Month', 'custom': 'Custom'
+      const valueLabels = {
+        'today': 'Today', 'yesterday': 'Yesterday', '3days': 'Last 3 days',
+        'week': 'This week', 'month': 'This month', 'custom': 'Custom range',
+        'with_cod': 'With COD', 'no_cod': 'No COD',
+        'to_review': 'Review', 'ready_to_pickup': 'Ready', 'publish': 'Published',
+        'active': 'In transit', 'out_for_delivery': 'Out for delivery',
+        'in_transit': 'In transit', 'no_task': 'No task',
+        'assigned': 'Assigned', 'delivered': 'Delivered',
+        'failed': 'Failed', 'cancelled': 'Cancelled'
       };
 
       activeFilters.forEach(function(entry) {
         const key = entry[0];
-        let value = entry[1];
-        if (key === 'dateRange' || key === 'deliveredRange') value = dateRangeLabels[value] || value;
+        const raw = entry[1];
+        const value = valueLabels[raw] || raw;
         const tag = document.createElement('span');
         tag.className = 'ofb__tag';
-        tag.innerHTML = filterLabels[key] + ': ' + value +
-          ' <i class="fa fa-times ofb__tag-remove" onclick="removeFilter(\'' + key + '\')"></i>';
+
+        const k = document.createElement('span');
+        k.className = 'ofb__tag-key';
+        k.textContent = filterLabels[key];
+        const v = document.createElement('span');
+        v.className = 'ofb__tag-value';
+        v.textContent = value;
+
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'ofb__tag-remove';
+        x.setAttribute('aria-label', 'Remove ' + filterLabels[key] + ' filter');
+        x.innerHTML = '<i class="fa fa-times" aria-hidden="true"></i>';
+        x.addEventListener('click', function() { removeFilter(key); });
+
+        tag.appendChild(k);
+        tag.appendChild(v);
+        tag.appendChild(x);
         tagsContainer.appendChild(tag);
       });
     } else {
       tagsDisplay.style.display = 'none';
+      if (hint) hint.classList.remove('d-none');
     }
   }
 
@@ -427,7 +453,7 @@
 
       if (status === 'cancelled' && !confirm('Cancel ' + ids.length + ' order(s)? This cannot be undone.')) return;
 
-      var statusLabels = { 'publish': 'Publish', 'ready_to_pickup': 'Confirmed', 'cancelled': 'Cancel' };
+      var statusLabels = { 'ready_and_publish': 'Ready to Pickup', 'ready_to_pickup': 'Confirmed', 'cancelled': 'Cancel' };
       bar.querySelectorAll('.bulk-action-bar__btn').forEach(function(b) { b.disabled = true; });
       countEl.textContent = 'Updating ' + ids.length + ' orders...';
 
@@ -457,8 +483,9 @@
       });
     }
 
-    document.getElementById('orders_bulk_btn_confirmed').addEventListener('click', function() { bulkUpdate('ready_to_pickup'); });
-    document.getElementById('orders_bulk_btn_publish').addEventListener('click', function() { bulkUpdate('publish'); });
+    // One seller action: confirms the goods (stock + pick list + first-mile leg) and
+    // publishes for delivery in the same call. See orders/status_actions.py.
+    document.getElementById('orders_bulk_btn_ready').addEventListener('click', function() { bulkUpdate('ready_and_publish'); });
     document.getElementById('orders_bulk_btn_cancel').addEventListener('click', function() { bulkUpdate('cancelled'); });
 
     // Parse Location

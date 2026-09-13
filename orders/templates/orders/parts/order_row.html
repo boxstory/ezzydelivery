@@ -69,7 +69,8 @@
     <div class="orc__cell orc__cell--act">
         <button type="button" class="orc__btn" title="View" onclick="openOrderDetailPanel({{ order.id }})"><i class="fa-solid fa-eye"></i></button>
         <a href="{% url 'workforce:order_edit' order.id %}" hx-get="{% url 'workforce:order_edit' order.id %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true" class="orc__btn orc__btn--edit" title="Edit"><i class="fa-solid fa-pen"></i></a>
-        {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
+        {# Both pre-publish statuses — 'to_publish' was never a real status and matched nothing #}
+        {% if order.order_status == 'to_review' or order.order_status == 'ready_to_pickup' %}
         <button type="button" class="orc__btn orc__btn--info" title="Publish" hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML"><i class="fa-solid fa-paper-plane"></i></button>
         {% endif %}
         {% if order.order_status != 'cancelled' and order.order_status != 'publish' and order.order_status != 'delivered' %}

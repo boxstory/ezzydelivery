@@ -25,10 +25,12 @@ OrdersKanban.prototype.init = function() {
     self.makeCardDraggable(card);
   });
 
-  // Make all columns droppable
+  // Make all columns droppable — except Published. Sellers reach it by dropping
+  // into Confirmed, which runs ready_to_pickup + publish together; publishing on
+  // its own is a staff action in the workforce console.
   Object.keys(this.columns).forEach(function(key) {
     var column = self.columns[key];
-    if (column) {
+    if (column && key !== 'publish') {
       self.makeColumnDroppable(column);
     }
   });
@@ -75,13 +77,21 @@ OrdersKanban.prototype.makeColumnDroppable = function(column) {
 
   cardsContainer.addEventListener('drop', function(e) {
     e.preventDefault();
+    // Held in a local: 'dragend' clears self.draggedCard before the fetch below
+    // resolves, so the callbacks cannot read it off the instance.
+    var card = self.draggedCard;
+    if (!card) return;
     var newStatus = column.dataset.status;
-    var orderId = self.draggedCard.dataset.orderId;
-    var oldStatus = self.draggedCard.dataset.status;
+    var orderId = card.dataset.orderId;
+    var oldStatus = card.dataset.status;
 
     if (newStatus !== oldStatus) {
-      self.updateOrderStatus(orderId, newStatus, oldStatus);
-      self.draggedCard.dataset.status = newStatus;
+      // Dropping into Confirmed is the seller handover: it confirms the goods AND
+      // publishes for delivery, so the card settles as 'publish'.
+      var postStatus = newStatus === 'ready_to_pickup' ? 'ready_and_publish' : newStatus;
+      var settledStatus = newStatus === 'ready_to_pickup' ? 'publish' : newStatus;
+      self.updateOrderStatus(card, orderId, postStatus, oldStatus, settledStatus);
+      card.dataset.status = settledStatus;
     }
 
     self.updateAllCounts();
@@ -103,8 +113,11 @@ OrdersKanban.prototype.getDragAfterElement = function(container, y) {
   }, { offset: Number.NEGATIVE_INFINITY }).element;
 };
 
-OrdersKanban.prototype.updateOrderStatus = function(orderId, newStatus, oldStatus) {
+OrdersKanban.prototype.updateOrderStatus = function(card, orderId, newStatus, oldStatus, settledStatus) {
   var self = this;
+  // What the order actually ends up as — differs from the posted token for the
+  // combined ready_and_publish action.
+  settledStatus = settledStatus || newStatus;
   try {
     // Show loading toast
     this.showToast('Updating order status...', 'info');
@@ -124,7 +137,15 @@ OrdersKanban.prototype.updateOrderStatus = function(orderId, newStatus, oldStatu
     }).then(function(data) {
       if (data.success) {
         self.showToast('Order status updated!', 'success');
-        self.updateCardBadge(self.draggedCard, newStatus);
+        self.updateCardBadge(card, settledStatus);
+        // The combined action lands the order in Published — move the card there.
+        if (settledStatus !== newStatus) {
+          var target = document.querySelector('[data-status="' + settledStatus + '"] .okb__cards');
+          if (target && card) {
+            target.appendChild(card);
+          }
+        }
+        self.updateAllCounts();
       } else {
         throw new Error(data.error || 'Update failed');
       }
@@ -134,8 +155,9 @@ OrdersKanban.prototype.updateOrderStatus = function(orderId, newStatus, oldStatu
 
       // Revert card to old column
       var oldColumn = document.querySelector('[data-status="' + oldStatus + '"] .okb__cards');
-      if (oldColumn && self.draggedCard) {
-        oldColumn.appendChild(self.draggedCard);
+      if (oldColumn && card) {
+        card.dataset.status = oldStatus;
+        oldColumn.appendChild(card);
         self.updateAllCounts();
       }
     });
@@ -145,8 +167,9 @@ OrdersKanban.prototype.updateOrderStatus = function(orderId, newStatus, oldStatu
 
     // Revert card to old column
     var oldColumn = document.querySelector('[data-status="' + oldStatus + '"] .okb__cards');
-    if (oldColumn && this.draggedCard) {
-      oldColumn.appendChild(this.draggedCard);
+    if (oldColumn && card) {
+      card.dataset.status = oldStatus;
+      oldColumn.appendChild(card);
       this.updateAllCounts();
     }
   }

@@ -179,6 +179,13 @@ def _refresh_delivery_area(instance):
                 delivery_area_name=instance.delivery_area_name,
                 delivery_area_source=instance.delivery_area_source,
             )
+        # Push the resolved name down onto the address row the driver app reads.
+        # This belongs here, not in the `if created:` block below: the pin often
+        # arrives after the order does (staff drop it, or the AI parse fills the
+        # zone), and that resolves an area on a save where created is False —
+        # the majority case. Blanks only, so a typed area is never overwritten.
+        if instance.order_number:
+            _fill_blank_address_fields(instance)
     except Exception:
         # An area label is never worth failing an order save over.
         logger.warning('Could not refresh delivery area for order %s', instance.pk,
@@ -233,7 +240,9 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
                 # WhatsApp verification link is sent later when the delivery task is published
                 # (see delivery/signals.py → _send_location_verification_on_publish)
         
-        if instance.order_number not in DlAddressUpdate.objects.values_list('dl_task_number', flat=True):
+        # `in queryset.values_list(...)` pulled every address row's number into
+        # Python on each order save; .exists() is the same test as one indexed query.
+        if not DlAddressUpdate.objects.filter(dl_task_number=instance.order_number).exists():
             from decimal import Decimal
             DlAddressUpdate.objects.create(
                 full_name=instance.customer_name,
@@ -243,6 +252,11 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
                 dl_zone=instance.dl_zone,
                 dl_street=instance.dl_street,
                 dl_building=instance.dl_building,
+                # These two live on the order but were never copied across, so the
+                # driver card read a blank area and time slot off the address row
+                # while the order beside it had both.
+                area_name=instance.delivery_area_name or '',
+                time_slot=instance.preferred_time_slot or '',
                 dl_longitude=Decimal('0'),
                 dl_latitude=Decimal('0'))
 
@@ -922,3 +936,23 @@ def log_delivery_task_status_change(task, field_name, old_val, new_val, display_
 # All handled by warehouse/signals.py (reserve_stock_for_order, fulfill_stock_reservation,
 # release_stock_reservation, return_stock_on_failed_delivery).
 # ============================================================================
+
+
+def _fill_blank_address_fields(order):
+    """Copy area name / time slot from the order onto its address rows, blanks only."""
+    from delivery.models import DlAddressUpdate
+    from django.db.models import Q
+
+    pairs = (
+        ('area_name', order.delivery_area_name),
+        ('time_slot', order.preferred_time_slot),
+    )
+    for field, value in pairs:
+        if not value:
+            continue
+        DlAddressUpdate.objects.filter(
+            dl_task_number=order.order_number,
+        ).filter(
+            Q(**{f'{field}': ''}) | Q(**{f'{field}__isnull': True})
+        ).update(**{field: value})
+

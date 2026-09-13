@@ -96,6 +96,13 @@ class Order(models.Model):
         help_text="Seller's package description e.g. 'Perfumes', 'Food items'")
     package_qty = models.PositiveIntegerField(default=0,
         help_text="Package quantity for the product description")
+    # Real kilograms. Deliberately a new column: DeliveryTask.dl_waight looks like
+    # a weight and is not — it is fed from package_qty (orders/signals.py), so it
+    # holds a count, and writing kilograms into it would corrupt every reader that
+    # treats it as one. P2P prices on weight, so it needs somewhere honest to live.
+    package_weight_kg = models.DecimalField(
+        max_digits=7, decimal_places=2, blank=True, null=True,
+        help_text="Package weight in kg. Priced on for P2P; blank elsewhere.")
     order_status = models.CharField(
         max_length=100, choices=ORDER_STATUS_BY_CLIENT, default='to_review', db_index=True  # INDEX: Filtered for pending/published orders
     )
@@ -126,7 +133,18 @@ class Order(models.Model):
     dl_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     order_type = models.CharField(
         max_length=20, choices=ORDER_TYPE_CHOICES, default='normal_delivery',
+        db_index=True,  # INDEX: the P2P staff list filters the whole table on this
         help_text="Order type: normal delivery or pick and drop")
+    # The personal sender behind a P2P booking, when there is no business to own
+    # the order. Identity lives here rather than on a role flag because Order.business
+    # is non-nullable and every list, decorator, invoice and payout keys off it — so a
+    # sender with no Business needs a second, explicit column to scope their console on.
+    # Null on every business order, including a P2P booking routed to the sender's own
+    # business (that one belongs in their client console, not the personal one).
+    p2p_customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True,
+        db_index=True, related_name='p2p_orders',
+        help_text="Personal sender for a P2P booking. Null for every business order.")
     delivery_speed = models.CharField(
         max_length=20, choices=DELIVERY_SPEED_CHOICES, default='standard',
         db_index=True, help_text="Delivery speed tier: same_day or standard (48hr)")
@@ -487,19 +505,117 @@ class OrderLog(models.Model):
         return str(self.change_data_log)
 
 class OrderComments(models.Model):
+    """A note on an order's comment thread.
+
+    Authorship is recorded three ways on purpose: ``author`` is the real link,
+    ``author_role`` freezes who they were at write time (a user's is_staff flag
+    changes later), and ``name`` stays as the denormalised display string so a
+    comment survives its author being deleted.
+
+    ``is_internal`` defaults to True so a write site that forgets to set it
+    stays hidden from the client rather than leaking.
+
+    ``staff_read_at`` is the staff-side read receipt for a seller's note. Only
+    client-authored comments count as unread - staff never chase their own
+    notes - and the flag is stamped when a staff member opens the order's
+    delivery-task console, so the task list can flag the ones nobody has seen.
+    """
+
+    AUTHOR_ROLE_CHOICES = [
+        ('staff', 'Staff'),
+        ('client', 'Client'),
+        ('driver', 'Driver'),
+        ('system', 'System'),
+    ]
+
     order =  models.ForeignKey(
         Order, on_delete=models.CASCADE, related_name='order_comments')
     name = models.CharField(max_length=255, blank=True, null=True,)
     body =  models.TextField()
 
+    author = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='order_comments')
+    author_role = models.CharField(
+        max_length=20, choices=AUTHOR_ROLE_CHOICES, default='system')
+    is_internal = models.BooleanField(
+        default=True,
+        help_text="Internal notes are visible to staff only, never to the client.")
+
+    # Staff read receipt - see the class docstring. Null means no staff member
+    # has opened the task console since the seller wrote this note.
+    staff_read_at = models.DateTimeField(null=True, blank=True)
+    staff_read_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='order_comments_read')
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['order', 'is_internal'],
+                         name='ord_comment_visibility_idx'),
+            # Drives the unread-seller-comment counts on the task list.
+            models.Index(fields=['order', 'author_role', 'staff_read_at'],
+                         name='ord_comment_unread_idx'),
+        ]
 
     def __str__(self):
         return str(self.order.order_number)
+
+    @property
+    def is_unread_by_staff(self):
+        """True for a seller note no staff member has opened yet."""
+        return self.author_role == 'client' and self.staff_read_at is None
+
+    @staticmethod
+    def unread_counts_for_orders(order_ids):
+        """{order_id: unread seller comments} for a page of orders, in one query."""
+        order_ids = [oid for oid in order_ids if oid]
+        if not order_ids:
+            return {}
+        rows = (OrderComments.objects
+                .filter(order_id__in=order_ids, author_role='client',
+                        staff_read_at__isnull=True)
+                .values('order_id')
+                .annotate(unread=models.Count('id'))
+                .values_list('order_id', 'unread'))
+        return dict(rows)
+
+    @staticmethod
+    def mark_read_for_order(order, user=None):
+        """Stamp the order's unread seller notes as seen. Returns rows touched.
+
+        Called when staff open the task console, so the read receipt follows the
+        act of actually looking at the thread rather than a separate button.
+        """
+        from django.utils import timezone
+        return (OrderComments.objects
+                .filter(order=order, author_role='client', staff_read_at__isnull=True)
+                .update(staff_read_at=timezone.now(),
+                        staff_read_by=user if getattr(user, 'is_authenticated', False) else None))
+
+    @staticmethod
+    def role_for(user):
+        """Freeze an author's role at write time.
+
+        Driver notes come in through the driver API, which passes 'driver'
+        explicitly; this only has to separate staff from client.
+        """
+        if not getattr(user, 'is_authenticated', False):
+            return 'system'
+        return 'staff' if user.is_staff else 'client'
+
+    @property
+    def display_name(self):
+        """Author label safe to show a client - never a staff login username."""
+        if self.author_role == 'staff':
+            return 'EzzyDelivery Support'
+        if self.author_role == 'system':
+            return 'System'
+        return self.name or 'Unknown'
 
 
 def upload_path_handler(instance, filename):

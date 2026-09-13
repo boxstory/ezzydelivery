@@ -1189,7 +1189,6 @@
     const orderStatusOptions = [
       { value: 'to_review', text: 'To Review' },
       { value: 'ready_to_pickup', text: 'Ready to Pickup' },
-      { value: 'publish', text: 'Publish' },
       { value: 'cancelled', text: 'Cancelled' }
     ];
 
@@ -1359,12 +1358,29 @@
         status.title = '';
         if (!text) return;
 
-        input.classList.add('oap__bulk-loc__input--bad');
-        if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(text)) {
-          status.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Open the short link, then paste the full one';
-        } else {
-          status.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> No coordinates in that link';
+        // Short link: no coords in the URL, so resolve it server-side (the browser
+        // cannot follow the goo.gl redirect) and re-enter with the plain "lat,lng".
+        if (typeof resolveShortLink === 'function' && LOC_SHORTLINK_RE.test(text)) {
+          const rowKey = 'bulkrow:' + Array.prototype.indexOf.call(tableBody.rows, input.closest('tr'));
+          status.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Resolving...';
+          status.title = 'Resolving short link';
+          if (resolveShortLink(text, rowKey, null, function(lat, lng, inQatar) {
+                input.value = lat + ', ' + lng;
+                applyRowLocation(input);
+                if (!inQatar) {
+                  status.innerHTML += ' <i class="fa-solid fa-earth-americas" title="Outside Qatar"></i>';
+                }
+              }, function(msg) {
+                input.classList.add('oap__bulk-loc__input--bad');
+                status.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' + msg;
+                status.title = msg;
+              })) {
+            return;
+          }
         }
+
+        input.classList.add('oap__bulk-loc__input--bad');
+        status.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> No coordinates in that link';
         status.title = status.textContent;
       }
 

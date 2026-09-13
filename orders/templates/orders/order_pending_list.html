@@ -73,8 +73,8 @@
             <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--reconfirmed" data-status="ready_to_pickup" data-needs-comment="true" title="Reconfirmed">
               <i class="fas fa-check-double"></i>
             </button>
-            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--publish" data-status="publish" title="Publish">
-              <i class="fas fa-rocket"></i>
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--publish" data-status="ready_and_publish" title="Ready to Pickup">
+              <i class="fas fa-clipboard-check"></i>
             </button>
             <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--cancel" data-status="cancelled" title="Cancel">
               <i class="fas fa-ban"></i>
@@ -137,11 +137,8 @@
             <div class="bulk-action-bar__inner">
               <span class="bulk-action-bar__count" id="orders_pending_bulk_count">0 selected</span>
               <div class="bulk-action-bar__actions">
-                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--confirmed" id="orders_pending_bulk_btn_confirmed">
-                  <i class="fa-solid fa-clipboard-check"></i> Confirmed
-                </button>
-                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--publish" id="orders_pending_bulk_btn_publish">
-                  <i class="fa-solid fa-rocket"></i> Publish
+                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--confirmed" id="orders_pending_bulk_btn_ready">
+                  <i class="fa-solid fa-clipboard-check"></i> Ready to Pickup
                 </button>
                 <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--cancel" id="orders_pending_bulk_btn_cancel">
                   <i class="fa-solid fa-ban"></i> Cancel
@@ -266,8 +263,9 @@
       });
     }
 
-    document.getElementById('orders_pending_bulk_btn_confirmed').addEventListener('click', function() { bulkUpdate('ready_to_pickup'); });
-    document.getElementById('orders_pending_bulk_btn_publish').addEventListener('click', function() { bulkUpdate('publish'); });
+    // One seller action: confirms the goods (stock + pick list + first-mile leg) and
+    // publishes for delivery in the same call. See orders/status_actions.py.
+    document.getElementById('orders_pending_bulk_btn_ready').addEventListener('click', function() { bulkUpdate('ready_and_publish'); });
     document.getElementById('orders_pending_bulk_btn_cancel').addEventListener('click', function() { bulkUpdate('cancelled'); });
   })();
 
@@ -426,7 +424,7 @@
     });
   })();
   </script>
-  <script src="{% static 'orders/js/orders-kanban.js' %}"></script>
+  <script src="{% static 'orders/js/orders-kanban.js' %}?v=20260827a"></script>
   <script>
     // Set the order status update URL for kanban
     window.orderStatusUpdateUrl = '{% url "orders:update_order_status" %}';

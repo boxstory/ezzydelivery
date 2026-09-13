@@ -550,6 +550,75 @@ class OrderSignalTestCase(TransactionTestCase):
         self.assertEqual(address_update.full_name, order.customer_name)
         self.assertEqual(address_update.mobile_no, order.customer_phone)
 
+    def test_address_update_inherits_area_and_time_slot(self):
+        """The address row must pick up the order's area name and time slot.
+
+        Both already lived on the Order (delivery_area_name resolved from the pin,
+        preferred_time_slot from the customer) but nothing copied them across, so
+        DlAddressUpdate.area_name sat at 2.7% and time_slot at 0% while the driver
+        card read its area and slot off that row and rendered blank.
+        """
+        order = Order.objects.create(
+            business=self.business,
+            client_order_code='SIG004',
+            customer_name='Area Inherit Test',
+            customer_phone='55555556',
+            customer_address='Area Inherit',
+            dl_zone=31,
+            dl_building=3100,
+            dl_street=310,
+            preferred_time_slot='morning',
+            pickup_location=self.pickup_location,
+        )
+
+        address = DlAddressUpdate.objects.filter(order=order).first()
+        self.assertIsNotNone(address)
+        self.assertEqual(address.time_slot, 'morning')
+
+    def test_area_name_fills_in_after_the_pin_resolves_it(self):
+        """A later save must fill a blank area, but never overwrite a typed one.
+
+        delivery_area_name is resolved from the pin *after* the address row exists,
+        so copying only at creation would miss it on every order.
+        """
+        order = Order.objects.create(
+            business=self.business,
+            client_order_code='SIG005',
+            customer_name='Late Area Test',
+            customer_phone='55555557',
+            customer_address='Late Area',
+            dl_zone=31,
+            pickup_location=self.pickup_location,
+        )
+        address = DlAddressUpdate.objects.filter(order=order).first()
+        self.assertIsNotNone(address)
+
+        # The receiver re-resolves the area from the pin on EVERY save
+        # (delivery.geo.apply_delivery_area), so setting the field by hand on a
+        # pin-less order is correctly wiped. Simulate the resolver finding one.
+        def _resolve(o, area_map=None):
+            o.delivery_area_name = 'Al Sadd'
+            o.delivery_area_source = 'pin'
+            return True
+
+        DlAddressUpdate.objects.filter(pk=address.pk).update(area_name='')
+        with patch('delivery.geo.apply_delivery_area', side_effect=_resolve):
+            order.save()
+
+        address.refresh_from_db()
+        self.assertEqual(address.area_name, 'Al Sadd', "blank area should fill in")
+
+        # A hand-typed area must survive a later order save.
+        DlAddressUpdate.objects.filter(pk=address.pk).update(area_name='Typed By Staff')
+        with patch('delivery.geo.apply_delivery_area', side_effect=_resolve):
+            order.save()
+
+        address.refresh_from_db()
+        self.assertEqual(
+            address.area_name, 'Typed By Staff',
+            "an area someone typed must never be overwritten",
+        )
+
     @patch('orders.signals._create_delivery_task_from_order')
     def test_verified_order_creates_delivery_task(self, mock_create_task):
         """Test that verifying order triggers delivery task creation"""

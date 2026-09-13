@@ -164,7 +164,16 @@ class WarehouseInventoryAdjustmentTest(TestCase):
         ).last()
 
         self.assertIsNotNone(transaction, "Inventory transaction should be created")
-        self.assertEqual(transaction.quantity, self.order_item.quantity)
+        # InventoryTransaction.quantity is a SIGNED delta and every other writer in
+        # warehouse/signals.py follows it: ship is negative, return/receive positive,
+        # so quantity_after - quantity_before == quantity always holds. Asserting a
+        # positive quantity on a ship row would have forced this one path to break
+        # that invariant and left the ledger un-summable.
+        self.assertEqual(transaction.quantity, -self.order_item.quantity)
+        self.assertEqual(
+            transaction.quantity_after - transaction.quantity_before,
+            transaction.quantity,
+        )
 
     def test_inventory_increases_on_failed_delivery(self):
         """Test that inventory increases when task fails (returned to warehouse)."""
@@ -222,6 +231,71 @@ class WarehouseInventoryAdjustmentTest(TestCase):
             self.stock_level.quantity_on_hand,
             stock_after_pickup,
             "Stock should not change on delivered (already decreased on pickup)"
+        )
+
+    def test_pickup_does_not_deduct_twice_on_status_bounce(self):
+        """picked_up -> in_transit -> picked_up must move stock only once.
+
+        Status legitimately revisits picked_up when staff correct a mis-tap, and
+        without the idempotency gate each pass took another 5 units off the shelf.
+        """
+        initial_stock = self.stock_level.quantity_on_hand
+
+        for status in ('picked_up', 'in_transit', 'picked_up'):
+            self.delivery_task.dl_task_status = status
+            self.delivery_task.save()
+
+        self.stock_level.refresh_from_db()
+        self.assertEqual(
+            self.stock_level.quantity_on_hand,
+            initial_stock - self.order_item.quantity,
+            "Bouncing through picked_up twice must still deduct only once",
+        )
+        self.assertEqual(
+            warehouse_models.InventoryTransaction.objects.filter(
+                reference_type='delivery_task',
+                reference_id=self.delivery_task.dl_task_number,
+                transaction_type='ship',
+            ).count(),
+            1,
+            "Exactly one ship row per task",
+        )
+
+    def test_failed_returns_stock_only_once(self):
+        """A second save on 'failed' must not put the goods back twice."""
+        self.delivery_task.dl_task_status = 'picked_up'
+        self.delivery_task.save()
+        self.stock_level.refresh_from_db()
+        after_pickup = self.stock_level.quantity_on_hand
+
+        self.delivery_task.dl_task_status = 'failed'
+        self.delivery_task.save()
+        self.delivery_task.dl_task_status = 'failed'
+        self.delivery_task.save()
+
+        self.stock_level.refresh_from_db()
+        self.assertEqual(
+            self.stock_level.quantity_on_hand,
+            after_pickup + self.order_item.quantity,
+            "Stock must come back exactly once",
+        )
+
+    def test_delivered_without_pickup_still_deducts(self):
+        """An order that never passes through picked_up must still leave the books.
+
+        Some flows go to_review -> publish -> delivered; the legacy order-level
+        fulfilment is what covers them, and it must not be bypassed.
+        """
+        initial_stock = self.stock_level.quantity_on_hand
+
+        self.delivery_task.dl_task_status = 'delivered'
+        self.delivery_task.save()
+
+        self.stock_level.refresh_from_db()
+        self.assertEqual(
+            self.stock_level.quantity_on_hand,
+            initial_stock - self.order_item.quantity,
+            "Delivered-without-pickup must still deduct once",
         )
 
     def test_no_adjustment_without_fulfillment(self):
