@@ -6,10 +6,12 @@ This module handles delivery task management and address verification.
 
 View Categories:
     Address Management:
-        - dl_address_update: Update delivery address (authenticated)
-        - dl_address_link: Public address verification page for customers
-        - dl_address_link_update: Update address via link
-        - save_location_data: AJAX endpoint to save GPS coordinates
+        - dl_address_link: Public address verification page for customers,
+          addressed by DlAddressUpdate.access_token (a random secret)
+        - save_location_data: AJAX endpoint to save the customer's GPS pin,
+          same token
+        - driver_update_task_location: the driver PWA equivalent, authorised by
+          task assignment rather than by a URL secret
 
     Task Management:
         - all_delivery_tasks: List all tasks (driver view)
@@ -25,7 +27,9 @@ View Categories:
 
 Public Endpoints:
     - dl_address_link: Allows customers to verify/update their delivery
-      address via a link sent to their phone. No authentication required.
+      address via a link sent to their phone. No login required — the row's
+      random access_token IS the credential, so never build one of these URLs
+      from an order number or expose the token in a staff-facing page.
 
 Security:
     - Driver views verify user has driver profile
@@ -34,8 +38,12 @@ Security:
 
 Related:
     - delivery.models: DeliveryTask, DlAddressUpdate, AssignedDriver
-    - delivery.forms: DlAddressUpdateForm
     - fleet.models: Driver
+
+Note: delivery.forms.DlAddressUpdateForm is currently unused. It carries exactly the
+fields nothing in the system captures (dl_unit, is_villa_compound / is_flat /
+is_office), so it is the obvious basis for a customer-facing capture form on the
+tokenised dl_address_link page, which today only accepts a map pin.
 """
 
 import logging
@@ -46,6 +54,7 @@ from core.decorators import api_staff_required
 from core.pagination import paginate
 from django.contrib import messages
 from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from django.db import transaction, IntegrityError
 from django.db.models import Q
 from decouple import config
@@ -64,6 +73,7 @@ from orders import forms as orders_forms
 from delivery import forms as delivery_forms
 from fleet import forms as fleet_forms
 from core.json_utils import safe_json
+from delivery.ordering import TASK_SEQ_DESC, annotate_task_sequence
 
 # Local aliases for commonly used models
 DeliveryTask = delivery_models.DeliveryTask
@@ -120,39 +130,11 @@ def get_filter_params(request):
 # =============================================================================
 
 
-def dl_address_update(request, dl_task_number, mobile_no):
-    try:
-        instance = delivery_models.DlAddressUpdate.objects.get(
-            dl_task_number=dl_task_number)
-        form = delivery_forms.DlAddressUpdateForm(
-            request.POST or None, instance=instance)
-
-        if request.method == 'POST':
-            logger.info(f"Address update request for task {dl_task_number}, mobile {mobile_no}")
-
-            f = delivery_forms.DlAddressUpdateForm(request.POST)
-
-            if f.is_valid():
-                logger.info(f"Address update form valid for task {dl_task_number}")
-                form = f.save(commit=False)
-                form.dl_task_number = dl_task_number
-                form.mobile_no = mobile_no
-                form.save()
-                logger.info(f"Address updated successfully for task {dl_task_number}")
-                return redirect('/')
-            else:
-                logger.warning(f"Invalid address update form for task {dl_task_number}: {f.errors}")
-
-        context = {
-            'form': form,
-            'dl_task_number': dl_task_number,
-            'mobile_no': mobile_no,
-        }
-        return render(request, 'delivery/dl_address.html', context)
-    except delivery_models.DlAddressUpdate.DoesNotExist:
-        logger.error(f"Address update record not found for task {dl_task_number}")
-        messages.error(request, "Delivery task not found")
-        return redirect('/')
+# dl_address_update was removed in favour of the tokenised customer page below.
+# It was routed at /delivery/<order_number>/<mobile>/ with no authentication, so
+# a GET disclosed a customer's name, phone and pin to anyone who guessed an order
+# number, and its POST branch saved a form with no `order` FK at all. Nothing
+# linked to it — no reverse() call and no hardcoded href existed in the project.
 
 
 # AJAX
@@ -192,7 +174,7 @@ def all_delivery_tasks(request):
     area_filter = request.GET.get('area', 'my_zone')  # 'all', 'doha', 'my_zone', 'qatar'
     type_filter = request.GET.get('type', 'all')  # 'all', 'public', 'pnd'
     status_filter = request.GET.get('status', 'all')  # 'all' or specific status
-    sort_by = request.GET.get('sort', 'date')  # 'date', 'zone', 'status'
+    sort_by = request.GET.get('sort', 'code')  # 'code', 'date', 'zone', 'status'
     zone_filter = request.GET.get('zone', '')  # specific zone number or empty for all
 
     # Base queryset with optimized joins
@@ -209,6 +191,7 @@ def all_delivery_tasks(request):
         'order__order_items__product',
         'task_qrcode',
     )
+    base_qs = annotate_task_sequence(base_qs)
 
     # All tasks: published and available (not assigned to any driver) — only verified orders
     all_tasks = base_qs.filter(
@@ -315,13 +298,18 @@ def all_delivery_tasks(request):
             # Non reachable tasks
             accepted_tasks = accepted_tasks.filter(dl_task_status='non_reachable')
 
-    # Apply sorting
+    # Apply sorting. Default is the trailing sequence code of the task number
+    # (AOP067-1395-AB759 -> AB759), newest code first: the raw dl_task_number
+    # leads with the business code, so ordering on it groups by client instead
+    # of by when the job was issued.
     if sort_by == 'zone':
-        sort_order = ['dl_to_address__dl_zone', '-dl_task_date', '-id']
+        sort_order = ['dl_to_address__dl_zone', *TASK_SEQ_DESC]
     elif sort_by == 'status':
-        sort_order = ['dl_task_status', '-dl_task_date', '-id']
-    else:  # 'date' (default)
-        sort_order = ['-dl_task_date', '-id']
+        sort_order = ['dl_task_status', *TASK_SEQ_DESC]
+    elif sort_by == 'date':
+        sort_order = ['-dl_task_date', *TASK_SEQ_DESC]
+    else:  # 'code' (default)
+        sort_order = list(TASK_SEQ_DESC)
 
     all_tasks = all_tasks.order_by(*sort_order)
     assigned_tasks = assigned_tasks.order_by(*sort_order)
@@ -412,6 +400,13 @@ def assign_driver(request):
 
                 logger.info(f"Driver {driver.driver_id} assigning themselves to task {task_id}")
 
+                # The goods may already be with the pickup driver — only they and
+                # the driver a transfer is addressed to may take this delivery.
+                from delivery.selectors import parcel_claim_block
+                blocked, block_msg = parcel_claim_block(task, driver)
+                if blocked:
+                    return JsonResponse({"success": False, "error": block_msg})
+
                 delivery_models.AssignedDriver.objects.create(
                     driver=driver, dl_task=task
                 )
@@ -487,6 +482,13 @@ def accept_task(request):
 
             # Assign driver if not assigned
             if task.driver_id is None:
+                # Claiming an unassigned task: refuse when the parcel is already
+                # in another driver's car (first-mile pickup still 'collected').
+                from delivery.selectors import parcel_claim_block
+                blocked, block_msg = parcel_claim_block(task, driver)
+                if blocked:
+                    return JsonResponse({"success": False, "error": block_msg})
+
                 task.driver = driver
                 # Create AssignedDriver record if not exists
                 if not delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists():
@@ -813,19 +815,25 @@ def delivery_business_update(request):
 # customer address link  create and updates --------------------------------------------------------------
 
 
-def dl_address_link(request, dl_task_code):
+def dl_address_link(request, token):
+    """Public address-confirmation page for one customer.
+
+    Addressed by the row's random ``access_token``, never by dl_task_number:
+    that field is the order number, so the old URL could be walked to read any
+    customer's pin or overwrite it.
+    """
     task = get_object_or_404(
-        delivery_models.DlAddressUpdate, dl_task_number=dl_task_code)
+        delivery_models.DlAddressUpdate, access_token=token)
     MAPBOX_API_KEY = config("MAPBOX_API_KEY")
     address = f'{task.dl_latitude},{task.dl_longitude}'
     address2 = f'{task.dl_longitude},{task.dl_latitude}'
-    logger.info(f"Viewing address link for task {dl_task_code}, coordinates: {address}")
+    logger.info(f"Viewing address link for task {task.dl_task_number}, coordinates: {address}")
 
     try:
         g = geocoder.mapbox(address2, key=MAPBOX_API_KEY)
-        logger.debug(f"Geocoding successful for task {dl_task_code}")
+        logger.debug(f"Geocoding successful for task {task.dl_task_number}")
     except Exception as e:
-        logger.error(f"Geocoding failed for task {dl_task_code}: {e}")
+        logger.error(f"Geocoding failed for task {task.dl_task_number}: {e}")
         g = None
 
     data = {
@@ -837,51 +845,114 @@ def dl_address_link(request, dl_task_code):
     return render(request, 'delivery/frontend/dl_address_link.html', data)
 
 
-def dl_address_link_update(request, dl_task_code):
 
-    data = {
+def _coerce_latlng(raw_lat, raw_lng):
+    """Return (lat, lng) as Decimals inside Qatar's bounding box, or (None, None).
 
-    }
-    return render(request, 'delivery/frontend/dl_address_link_update.html', data)
-
-
-def save_location_data(request, dl_task_code):
+    The column is DecimalField(max_digits=19, decimal_places=15); an unbounded
+    client value either raises on save or stores a pin in the wrong hemisphere.
     """
-    Save customer location data for delivery address.
+    from decimal import Decimal, InvalidOperation
+    try:
+        lat = Decimal(str(raw_lat))
+        lng = Decimal(str(raw_lng))
+    except (InvalidOperation, TypeError, ValueError):
+        return None, None
+    if not (Decimal('24.0') <= lat <= Decimal('27.0')):
+        return None, None
+    if not (Decimal('50.0') <= lng <= Decimal('52.5')):
+        return None, None
+    return lat, lng
+
+
+@require_POST
+def save_location_data(request, token):
+    """
+    Save a customer-confirmed pin for one delivery address.
+
+    Addressed by the row's random ``access_token``. The previous URL keyed on
+    dl_task_number (= the order number), so anyone could POST a replacement pin
+    onto any order in the system and misdirect the delivery.
 
     CSRF token is required - sent via X-CSRFToken header from frontend.
-    The template already includes the CSRF token and sends it properly.
     """
-    logger.info(f"Saving location data for task {dl_task_code}")
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        logger.error(f"Invalid JSON in location update request: {e}")
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body.decode('utf-8'))
-            dl_latitude = data.get('dl_latitude')
-            dl_longitude = data.get('dl_longitude')
+    lat, lng = _coerce_latlng(data.get('dl_latitude'), data.get('dl_longitude'))
+    if lat is None:
+        return JsonResponse(
+            {'error': 'Valid latitude and longitude inside Qatar are required'},
+            status=400)
 
-            # Validate latitude and longitude
-            if dl_latitude is None or dl_longitude is None:
-                logger.warning(f"Missing coordinates in location update for task {dl_task_code}")
-                return JsonResponse({'error': 'Latitude and longitude are required'}, status=400)
+    try:
+        instance = delivery_models.DlAddressUpdate.objects.get(access_token=token)
+    except delivery_models.DlAddressUpdate.DoesNotExist:
+        logger.warning("Location update for an unknown address token")
+        return JsonResponse({'error': 'Instance not found'}, status=404)
 
-            instance = delivery_models.DlAddressUpdate.objects.get(dl_task_number=dl_task_code)
-            logger.debug(f"Found task {dl_task_code}, updating location: {dl_latitude}, {dl_longitude}")
+    instance.dl_latitude = lat
+    instance.dl_longitude = lng
+    instance.save(update_fields=['dl_latitude', 'dl_longitude', 'updated_at'])
+    logger.info(f"Customer pin saved for task {instance.dl_task_number}")
 
-        except delivery_models.DlAddressUpdate.DoesNotExist:
-            logger.warning(f"Task {dl_task_code} not found for location update")
-            return JsonResponse({'error': 'Instance not found'}, status=404)
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in location update request: {e}")
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    return JsonResponse({'message': 'Data saved successfully'})
 
-        instance.dl_latitude = dl_latitude
-        instance.dl_longitude = dl_longitude
-        instance.save()
 
-        return JsonResponse({'message': 'Data saved successfully'})
-    else:
-        return JsonResponse({'message': 'Invalid request method'}, status=400)
+@require_POST
+def driver_update_task_location(request, dl_task_number):
+    """
+    Driver PWA equivalent of save_location_data: the assigned driver drops their
+    own GPS onto the customer address while standing at the door.
+
+    Kept separate from the public tokenised endpoint so the driver app can keep
+    addressing tasks by number — authorisation here is "this task is assigned to
+    the Driver row behind the session", not a URL secret.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    lat, lng = _coerce_latlng(data.get('dl_latitude'), data.get('dl_longitude'))
+    if lat is None:
+        return JsonResponse(
+            {'error': 'Valid latitude and longitude inside Qatar are required'},
+            status=400)
+
+    task = delivery_models.DeliveryTask.objects.filter(
+        dl_task_number=dl_task_number,
+        driver__user=request.user,
+    ).select_related('dl_address_update', 'dl_to_address').first()
+
+    if task is None:
+        logger.warning(
+            f"User {request.user.id} tried to move the pin on unassigned task {dl_task_number}")
+        return JsonResponse({'error': 'Task not found'}, status=404)
+
+    # DeliveryTask carries two FKs to DlAddressUpdate. Only dl_address_update is
+    # actually populated (1781/1781 rows); dl_to_address has never been written.
+    # Fall back the way the pre-token code did — a direct dl_task_number match —
+    # so tasks created before the FK was wired up still resolve.
+    address = task.dl_address_update or task.dl_to_address
+    if address is None:
+        address = delivery_models.DlAddressUpdate.objects.filter(
+            dl_task_number=task.dl_task_number).first()
+    if address is None:
+        return JsonResponse({'error': 'Task has no delivery address'}, status=404)
+
+    address.dl_latitude = lat
+    address.dl_longitude = lng
+    address.save(update_fields=['dl_latitude', 'dl_longitude', 'updated_at'])
+    logger.info(f"Driver {request.user.id} saved pin for task {dl_task_number}")
+
+    return JsonResponse({'message': 'Data saved successfully'})
 
 
 # Zone Map View --------------------------------------------------------------
@@ -969,11 +1040,16 @@ def zone_map_api(request):
     return JsonResponse({'zones': zones_data})
 
 
+@api_staff_required
 def get_street_polygon(request, zone_number, street_number):
     """
     Get street polygon coordinates for a given zone and street from QNAS API.
 
     URL: /delivery/get_street_polygon/<zone_number>/<street_number>/
+
+    Staff-only: ``?update_zone=true`` WRITES ``zone.polygon``, and the view also
+    proxies QNAS (an outbound request against our quota), so it must never be
+    reachable anonymously.
 
     Query params:
         - update_zone: If 'true', updates the zone's polygon field

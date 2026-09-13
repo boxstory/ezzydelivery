@@ -1,5 +1,6 @@
 from django.contrib import admin
 from delivery import models as delivery_models
+from delivery.ordering import TASK_SEQ_DESC, annotate_task_sequence
 
 # Register your models here.
 
@@ -96,6 +97,12 @@ class DeliveryTaskAdmin(admin.ModelAdmin):
         'business__business_name',
     )
     readonly_fields = ('completion_latitude', 'completion_longitude', 'completed_at')
+
+    def get_queryset(self, request):
+        # Newest task-number sequence first (AOP067-1395-AB759 -> AB759). The
+        # raw number leads with the business code, so ordering on it would
+        # group the changelist by client instead of by when the job was issued.
+        return annotate_task_sequence(super().get_queryset(request)).order_by(*TASK_SEQ_DESC)
 
 
 @admin.register(delivery_models.TaskStatusPoint)

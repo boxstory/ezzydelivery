@@ -103,8 +103,31 @@ class DlAddressUpdate(models.Model):
     notes = models.TextField(blank=True, default='')
     order = models.ForeignKey(orders_models.Order, on_delete=models.DO_NOTHING, related_name='delivery_addresses')
 
+    # Random URL key for the public customer address page. That page used to be
+    # addressed by dl_task_number (= the order number), which is sequential and
+    # therefore guessable: anyone could walk the range to read a customer's name,
+    # phone and GPS pin, or POST a replacement pin over it and misdirect the
+    # delivery. Generated on first save, never reused, never exposed to staff UI.
+    access_token = models.CharField(max_length=64, unique=True, db_index=True,
+                                    blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @staticmethod
+    def new_access_token():
+        import secrets
+        return secrets.token_urlsafe(32)
+
+    def save(self, *args, **kwargs):
+        if not self.access_token:
+            self.access_token = self.new_access_token()
+            # A partial save (update_fields=[...]) would otherwise generate the
+            # token in memory and never write it, leaving the row unreachable.
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None:
+                kwargs['update_fields'] = list(update_fields) + ['access_token']
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return self.full_name
@@ -432,6 +455,26 @@ class DeliveryTask(models.Model):
         help_text="When the client delivery charge was verified by staff"
     )
 
+    # --- Office note to the driver ---------------------------------------
+    # A seller's comment lives on the order thread, which the driver app never
+    # shows. Staff pass the relevant part of it here (usually straight from the
+    # Seller Comments card), and the driver reads it on the task sheet. It is a
+    # separate column from Order.order_notes on purpose: order_notes is the
+    # seller's own 100-char line and is printed on the waybill.
+    driver_note = models.TextField(
+        blank=True, default='',
+        help_text="Instruction from the office, shown to the assigned driver on the task sheet."
+    )
+    driver_note_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='driver_notes_sent',
+        help_text="Staff member who sent the note"
+    )
+    driver_note_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the office note was last sent"
+    )
+
     # --- Failure & Retry Tracking ---
     FAILURE_REASON_CHOICES = [
         ('customer_not_home', 'Customer Not Home'),
@@ -622,31 +665,33 @@ class DeliveryTask(models.Model):
         from delivery.charges import charge_paid
         return charge_paid(self)
 
-    def calculate_driver_earnings(self):
-        """
-        Calculate driver earnings based on order type and distance.
+    def calculate_driver_earnings(self, card=None):
+        """What this delivery pays its driver under the rate card in force.
 
-        Rules:
-        - Pick & Drop orders: 80% of dl_price
-        - Normal orders: Fixed QAR 10
-        - Long distance (>20km): Requires manual adjustment by staff
+        The figures are no longer hardcoded here: they come from
+        fleet.DeliveryPayRate via delivery.earnings, resolved per-driver first,
+        then fleet-wide, then the built-in fallback (QAR 10 / 80%) that this
+        method used to hold on its own. Pass `card` when pricing many tasks so
+        the card is resolved once instead of per row.
 
-        Returns:
-            Decimal: Calculated earnings amount
+        Returns the *proposal*; `verified_earnings` is what actually gets paid
+        once staff have set it, and is applied by the caller.
         """
+        from delivery.earnings import driver_fee
+        return driver_fee(self, card=card)
+
+    @property
+    def proposed_driver_fee(self):
+        """Template-safe alias for calculate_driver_earnings() with no arguments."""
+        return self.calculate_driver_earnings()
+
+    @property
+    def payable_driver_fee(self):
+        """The figure that would actually be paid — the staff override, else the proposal."""
         from decimal import Decimal
-
-        # Hub delivery leg (Leg 2): same as normal delivery
-        if self.task_leg == 'hub_delivery':
-            return Decimal('10.00')
-
-        # Pick & Drop orders: 80% of delivery price
-        if self.order and self.order.order_type == 'pick_and_drop':
-            delivery_charge = Decimal(str(self.dl_price or 0))
-            return delivery_charge * Decimal('0.80')
-
-        # Normal single-leg orders: Fixed QAR 10
-        return Decimal('10.00')
+        if self.verified_earnings is not None:
+            return Decimal(str(self.verified_earnings))
+        return self.calculate_driver_earnings()
 
     def is_long_distance(self):
         """
@@ -1123,6 +1168,20 @@ class PickupTask(models.Model):
             'pending': 0, 'accepted': 1, 'in_progress': 2, 'arrived': 3,
             'collected': 4, 'dropped': 5, 'handed_off': 5,
         }.get(self.status, -1)
+
+    @property
+    def closed_at(self):
+        """When the first-mile leg finished, or None while it is still live.
+
+        Only 'dropped' carries a dedicated stamp; hand-offs and cancels close on
+        their last write, so updated_at stands in — good enough to age a closed
+        row, and it only drifts if staff touch the row afterwards.
+        """
+        if self.status == 'dropped':
+            return self.dropped_at or self.updated_at
+        if self.status in ('handed_off', 'cancelled'):
+            return self.updated_at
+        return None
 
     class Meta:
         verbose_name = "Pickup Task"

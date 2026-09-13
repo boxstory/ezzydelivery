@@ -814,6 +814,31 @@ class WorkforcePickupAssignTestCase(PickupBaseTestCase):
         resp_all = self.client.get('/workforce/pickups/', {'status': 'all'})
         self.assertContains(resp_all, order.order_number)
 
+    def test_pool_status_hides_dropped_by_default(self):
+        # A hub drop ends the first-mile leg exactly as a hand-off does.
+        order = self.make_order('PKA05D')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.status = 'dropped'
+        pickup.save(update_fields=['status'])
+
+        resp = self.client.get('/workforce/pickups/')
+        self.assertNotContains(resp, order.order_number)
+        resp_all = self.client.get('/workforce/pickups/', {'status': 'all'})
+        self.assertContains(resp_all, order.order_number)
+
+    def test_pool_status_keeps_cancelled_in_open(self):
+        # Cancelled is closed but not finished work — staff still need to see it,
+        # which is why 'open' is not the same filter as 'active'.
+        order = self.make_order('PKA05C')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.status = 'cancelled'
+        pickup.save(update_fields=['status'])
+
+        resp = self.client.get('/workforce/pickups/')
+        self.assertContains(resp, order.order_number)
+        resp_active = self.client.get('/workforce/pickups/', {'status': 'active'})
+        self.assertNotContains(resp_active, order.order_number)
+
     def test_pool_status_defaults_to_last_7_days(self):
         old = self.make_order('PKA06')
         recent = self.make_order('PKA07')
@@ -830,9 +855,12 @@ class WorkforcePickupAssignTestCase(PickupBaseTestCase):
 
     def test_pool_status_custom_date_range_overrides_preset(self):
         order = self.make_order('PKA08')
-        PickupTask.objects.filter(order=order).update(
-            created_at=timezone.now() - timedelta(days=45))
-        day = (timezone.now() - timedelta(days=45)).strftime('%Y-%m-%d')
+        moment = timezone.now() - timedelta(days=45)
+        PickupTask.objects.filter(order=order).update(created_at=moment)
+        # The From/To boxes are read as Qatar dates (settings.TIME_ZONE), so the day
+        # string has to be that instant's LOCAL date. Formatting the UTC date instead
+        # shifted the window three hours and the test failed after 21:00 UTC.
+        day = timezone.localtime(moment).strftime('%Y-%m-%d')
 
         # The To box is inclusive of its whole day, so a single-day range finds it
         resp = self.client.get('/workforce/pickups/', {'date_from': day, 'date_to': day})
@@ -948,3 +976,156 @@ class WorkforcePickupCancelDeleteTestCase(PickupBaseTestCase):
         resp = self.client.post('/workforce/pickups/delete/', {'pickup_id': pickup.pk})
         self.assertFalse(resp.json()['success'])
         self.assertTrue(PickupTask.objects.filter(pk=pickup.pk).exists())
+
+
+class PickupDeliveryClaimTestCase(PickupBaseTestCase):
+    """Taking the delivery task IS the hand-off — the first-mile leg closes with it.
+
+    Drivers skip the Pickup tab's 'Deliver myself' / 'Confirm hand-off' buttons and
+    grab the job from the New pool instead, which used to leave the leg stuck at
+    'collected' for the whole delivery.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.target = make_driver(20)
+        self.outsider = make_driver(21)
+
+    def collected_with_pool_task(self, code, disposition='transfer', transfer_to=None):
+        """A collected pickup whose delivery task is published and unclaimed."""
+        from orders.signals import _create_delivery_task_from_order
+
+        order = self.make_order(code)
+        pickup = PickupTask.objects.get(order=order)
+        pickup.driver = self.driver
+        pickup.disposition = disposition
+        pickup.status = 'collected'
+        pickup.collected_at = timezone.now()
+        if transfer_to:
+            pickup.transfer_to_driver = transfer_to
+            pickup.transfer_initiated_at = timezone.now()
+        pickup.save()
+
+        task = _create_delivery_task_from_order(order)
+        task.dl_task_publish = True
+        task.dl_task_status = 'pending'
+        task.save(update_fields=['dl_task_publish', 'dl_task_status'])
+        return pickup, task
+
+    def claim(self, task, driver):
+        """What every claim path boils down to: the driver lands on the task row."""
+        task.driver = driver
+        task.dl_task_status = 'accepted'
+        task._status_actor = 'driver'
+        task.save(update_fields=['driver', 'dl_task_status'])
+        return task
+
+    # -- reconcile ---------------------------------------------------------
+    def test_transfer_target_claiming_task_confirms_and_closes(self):
+        pickup, task = self.collected_with_pool_task('PKR01', transfer_to=self.target)
+        self.claim(task, self.target)
+
+        pickup.refresh_from_db()
+        task.refresh_from_db()
+        self.assertEqual(pickup.status, 'handed_off')
+        self.assertIsNotNone(pickup.transfer_confirmed_at)
+        self.assertEqual(task.source_pickup_task_id, pickup.pk)
+        self.assertTrue(orders_models.OrderStatusHistory.objects.filter(
+            order=pickup.order, field_name='pickup_status', new_value='handed_off').exists())
+
+    def test_collecting_driver_claiming_task_closes_as_self_deliver(self):
+        pickup, task = self.collected_with_pool_task('PKR02', disposition='drop')
+        self.claim(task, self.driver)
+
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'handed_off')
+        self.assertIsNone(pickup.transfer_confirmed_at)
+        self.assertFalse(fleet_models.DriverNotification.objects.filter(
+            title='Hand over the parcel').exists())
+
+    def test_third_driver_claim_closes_leg_and_warns_both(self):
+        pickup, task = self.collected_with_pool_task('PKR03', transfer_to=self.target)
+        self.claim(task, self.outsider)
+
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'handed_off')
+        self.assertIsNone(pickup.transfer_confirmed_at)  # that hand-off never happened
+        self.assertTrue(fleet_models.DriverNotification.objects.filter(
+            driver=self.driver, title='Hand over the parcel').exists())
+        self.assertTrue(fleet_models.DriverNotification.objects.filter(
+            driver=self.outsider, title='Collect the parcel first').exists())
+
+    def test_disposition_flow_closes_the_leg_only_once(self):
+        """_hand_delivery_to writes the driver too — the signal must not double up."""
+        order = self.make_order('PKR04')
+        pickup = PickupTask.objects.get(order=order)
+        pickup.driver = self.driver
+        pickup.disposition = 'self_deliver'
+        pickup.status = 'collected'
+        pickup.save()
+
+        ok, _ = pickup_service.execute_disposition(pickup)
+        self.assertTrue(ok)
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'handed_off')
+        self.assertEqual(orders_models.OrderStatusHistory.objects.filter(
+            order=order, field_name='pickup_status', new_value='handed_off').count(), 1)
+
+    # -- pool visibility ---------------------------------------------------
+    def test_held_parcel_hidden_from_other_drivers_pool(self):
+        from delivery.selectors import exclude_held_parcels
+
+        pickup, task = self.collected_with_pool_task('PKR05', transfer_to=self.target)
+        pool = DeliveryTask.objects.filter(pk=task.pk)
+
+        self.assertFalse(exclude_held_parcels(pool, self.outsider).exists())
+        self.assertTrue(exclude_held_parcels(pool, self.driver).exists())   # holder
+        self.assertTrue(exclude_held_parcels(pool, self.target).exists())   # transfer target
+
+        # Once the leg is off 'collected' the parcel is at the hub — open to all.
+        pickup.status = 'dropped'
+        pickup.save(update_fields=['status'])
+        self.assertTrue(exclude_held_parcels(pool, self.outsider).exists())
+
+    def test_claim_endpoint_refuses_third_driver(self):
+        pickup, task = self.collected_with_pool_task('PKR06', transfer_to=self.target)
+        self.client.force_login(self.outsider.user)
+        resp = self.client.post('/delivery/delivery_task/assign_driver/', {'task_id': task.pk})
+        body = resp.json()
+        self.assertFalse(body['success'])
+        self.assertIn('parcel is with', body['error'])
+        task.refresh_from_db()
+        pickup.refresh_from_db()
+        self.assertIsNone(task.driver_id)
+        self.assertEqual(pickup.status, 'collected')
+
+    # -- staff close -------------------------------------------------------
+    def test_staff_close_uses_the_delivery_driver(self):
+        staff = User.objects.create_user(username='pkstaff9', password='x', is_staff=True)
+        core_models.Profile.objects.create(user=staff, is_staff=True, dept_operations=True)
+        pickup, task = self.collected_with_pool_task('PKR07', transfer_to=self.target)
+        task.driver = self.target
+        task.save(update_fields=['driver'])
+        pickup.refresh_from_db()
+        pickup.status = 'collected'          # the signal already closed it; re-open to test the lever
+        pickup.transfer_confirmed_at = None
+        pickup.save(update_fields=['status', 'transfer_confirmed_at'])
+
+        self.client.force_login(staff)
+        resp = self.client.post('/workforce/pickups/close/', {'pickup_id': pickup.pk})
+        self.assertTrue(resp.json()['success'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'handed_off')
+        self.assertIsNotNone(pickup.transfer_confirmed_at)
+
+    def test_staff_close_refused_before_collection(self):
+        staff = User.objects.create_user(username='pkstaff10', password='x', is_staff=True)
+        core_models.Profile.objects.create(user=staff, is_staff=True, dept_operations=True)
+        order = self.make_order('PKR08')
+        pickup = PickupTask.objects.get(order=order)
+
+        self.client.force_login(staff)
+        resp = self.client.post('/workforce/pickups/close/', {'pickup_id': pickup.pk})
+        self.assertFalse(resp.json()['success'])
+        pickup.refresh_from_db()
+        self.assertEqual(pickup.status, 'pending')

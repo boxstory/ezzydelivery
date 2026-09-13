@@ -11,10 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 def generate_label_number(order, delivery_task):
-    """Generate a unique label number based on order and task info"""
-    timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
+    """Generate a unique label number based on order and task info.
+
+    The order number already opens with the client's business code
+    (MVA124-5850-AB785), so prefixing it again only made the id longer to read
+    with no extra information: LBL-MVA124-MVA124-5850-AB785-DCD323.
+    """
     short_uuid = str(uuid.uuid4()).replace('-', '').upper()[:6]
-    return f"LBL-{order.business.business_code}-{order.order_number}-{short_uuid}"
+    return f"LBL-{order.order_number}-{short_uuid}"
 
 
 def generate_barcode_image(barcode_data):
@@ -80,6 +84,92 @@ def generate_barcode_svg(barcode_data, quiet_zone=10, bar_height=100):
         f'<g fill="#000">{"".join(rects)}</g>'
         f'</svg>'
     )
+
+
+def generate_qr_svg(data, border=2, error_correction='M'):
+    """
+    Build a QR code as inline SVG markup — the scannable code on the waybill.
+
+    Code128 lost the parcels: stretched to the label width it ends up around a
+    pixel per module, which a phone camera cannot resolve, and a 1D code also
+    has to be held straight and close. A QR carries the same order number in a
+    square a driver can scan from any angle, tolerates ink smudge through its
+    error correction, and stays readable at 20mm.
+
+    Emitted as one <rect> per run of dark modules in a unitless viewBox with
+    shape-rendering="crispEdges", so the printer rasterises it at its own
+    resolution instead of resampling a PNG. The default aspect ratio is kept —
+    a stretched QR does not scan.
+
+    `border` is the quiet zone in modules (the spec asks for 4; 2 is the floor
+    that still reads and buys space on a 58mm roll).
+    Returns an SVG string, or '' if the data cannot be encoded.
+    """
+    from html import escape
+
+    import qrcode
+
+    levels = {
+        'L': qrcode.constants.ERROR_CORRECT_L,
+        'M': qrcode.constants.ERROR_CORRECT_M,
+        'Q': qrcode.constants.ERROR_CORRECT_Q,
+        'H': qrcode.constants.ERROR_CORRECT_H,
+    }
+
+    try:
+        qr = qrcode.QRCode(
+            error_correction=levels.get(error_correction, qrcode.constants.ERROR_CORRECT_M),
+            box_size=1, border=border,
+        )
+        qr.add_data(str(data))
+        qr.make(fit=True)
+        matrix = qr.get_matrix()  # already includes the quiet zone
+    except Exception as e:
+        logger.error(f"Error generating QR SVG: {str(e)}")
+        return ''
+
+    size = len(matrix)
+    rects = []
+    for y, row in enumerate(matrix):
+        run_start = None
+        for x, module in enumerate(row):
+            if module and run_start is None:
+                run_start = x
+            elif not module and run_start is not None:
+                rects.append(f'<rect x="{run_start}" y="{y}" width="{x - run_start}" height="1"/>')
+                run_start = None
+        if run_start is not None:
+            rects.append(f'<rect x="{run_start}" y="{y}" width="{size - run_start}" height="1"/>')
+
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" '
+        f'shape-rendering="crispEdges" '
+        f'role="img" aria-label="{escape(str(data), quote=True)}">'
+        f'<rect x="0" y="0" width="{size}" height="{size}" fill="#fff"/>'
+        f'<g fill="#000">{"".join(rects)}</g>'
+        f'</svg>'
+    )
+
+
+def generate_qr_image(data, box_size=8, border=2):
+    """QR code as a PNG buffer — the raster twin of generate_qr_svg, for the
+    stored label image where there is no printer to rasterise vectors."""
+    import qrcode
+
+    try:
+        qr = qrcode.QRCode(
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=box_size, border=border,
+        )
+        qr.add_data(str(data))
+        qr.make(fit=True)
+        buffer = BytesIO()
+        qr.make_image(fill_color="black", back_color="white").save(buffer, format='PNG')
+        buffer.seek(0)
+        return buffer
+    except Exception as e:
+        logger.error(f"Error generating QR image: {str(e)}")
+        return None
 
 
 def generate_label_image(shipping_label):
@@ -176,21 +266,20 @@ def generate_label_image(shipping_label):
             draw.text((padding, y_position + 25), notes_text, font=font_small, fill='black')
             y_position += 70
 
-        # Barcode Section
-        barcode_buffer = generate_barcode_image(shipping_label.barcode_data or shipping_label.label_number)
-        if barcode_buffer:
+        # Scannable code — a QR, because drivers scan with a phone camera and a
+        # stretched Code128 was coming out too fine to resolve.
+        code_data = shipping_label.barcode_data or shipping_label.label_number
+        qr_buffer = generate_qr_image(code_data)
+        if qr_buffer:
             try:
-                barcode_img = Image.open(barcode_buffer)
-                # Resize barcode to fit
-                barcode_width = width - 40
-                barcode_height = int(barcode_img.height * (barcode_width / barcode_img.width))
-                barcode_img = barcode_img.resize((barcode_width, barcode_height))
-
-                # Calculate position to paste barcode
-                barcode_y = height - barcode_height - 30
-                img.paste(barcode_img, (20, barcode_y))
+                qr_img = Image.open(qr_buffer)
+                qr_size = 300
+                qr_img = qr_img.resize((qr_size, qr_size), Image.NEAREST)  # keep module edges hard
+                qr_y = height - qr_size - 60
+                img.paste(qr_img, ((width - qr_size) // 2, qr_y))
+                draw.text((padding, height - 45), str(code_data), font=font_medium, fill='black')
             except Exception as e:
-                logger.warning(f"Could not add barcode to label: {str(e)}")
+                logger.warning(f"Could not add QR code to label: {str(e)}")
 
         # Save to buffer
         output_buffer = BytesIO()

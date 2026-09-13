@@ -168,8 +168,7 @@
 
   function saveToDatabase(latitude, longitude) {
     const csrfToken = '{{ csrf_token }}';
-    const dl_task_number = '{{ task.dl_task_number }}';
-    const url = `/delivery/address_link/${dl_task_number}/update/`;
+    const url = '{% url "delivery:save_location_data" token=task.access_token %}';
     const data = { dl_latitude: latitude, dl_longitude: longitude, csrfmiddlewaretoken: csrfToken };
 
     fetch(url, {

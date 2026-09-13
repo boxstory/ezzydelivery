@@ -28,6 +28,18 @@ def delivery_task_pre_save(sender, instance, **kwargs):
     if not instance.tracking_token:
         instance.tracking_token = uuid.uuid4().hex[:12]
 
+    # Keep the two address FKs pointing at the same row. DeliveryTask has both
+    # `dl_address_update` and `dl_to_address` against DlAddressUpdate; creation
+    # only ever set the first, so the second was NULL on all 1781 rows while
+    # ~168 read sites (driver card unit/area/property-type, the Doha/My Zone/
+    # Qatar area filter, COD and earnings location columns) read *that* one and
+    # silently got nothing. Mirroring here is deliberately before the status
+    # guards below, which return early.
+    if instance.dl_address_update_id and not instance.dl_to_address_id:
+        instance.dl_to_address_id = instance.dl_address_update_id
+    elif instance.dl_to_address_id and not instance.dl_address_update_id:
+        instance.dl_address_update_id = instance.dl_to_address_id
+
     if instance.pk:
         try:
             old = DeliveryTask.objects.get(pk=instance.pk)
@@ -295,6 +307,16 @@ def _flag_location_discrepancy(task, distance_km, driver_lat, driver_lng,
         logger.exception('Could not flag location discrepancy for task %s', task.pk)
 
 
+def _as_pk(value):
+    """Primary key as an int, so a POST string and the stored int compare equal."""
+    if value in (None, ''):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return value
+
+
 def _driver_label(driver):
     """Name staff identify a driver by — Driver.__str__ is the login username."""
     if not driver:
@@ -516,9 +538,22 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
     # each caller, where it was simply never written and reassignments vanished.
     if not created and instance.order_id:
         try:
-            old_driver_id = getattr(instance, '_old_driver_id', None)
-            if old_driver_id != instance.driver_id:
+            # Compared as ints: a caller that assigned driver_id straight from
+            # POST leaves a string on the instance, which never equals the stored
+            # int and logged a "reassignment" to the same driver on every save.
+            old_driver_id = _as_pk(getattr(instance, '_old_driver_id', None))
+            if old_driver_id != _as_pk(instance.driver_id):
                 _log_driver_change(instance, old_driver_id)
+
+                # Taking the delivery IS the hand-off — drivers claim the task from
+                # the New pool instead of tapping through the Pickup tab, which left
+                # the first-mile leg stuck at 'collected'. Every claim path (driver
+                # accept, QR/pool scan, API, staff assign) writes the driver here, so
+                # the reconcile is hooked once here rather than in each caller.
+                if instance.driver_id and not getattr(instance, '_pickup_disposition_run', False):
+                    from delivery.services.pickup import reconcile_pickup_on_delivery_claim
+                    reconcile_pickup_on_delivery_claim(
+                        instance, actor=getattr(instance, '_status_changed_by', None))
         except Exception as e:
             logger.error(f"Error logging driver change for task {instance.pk}: {e}")
 

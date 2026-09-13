@@ -93,6 +93,59 @@ def road_distance_km(pickup, drop, timeout=None):
     return round(metres / 1000.0, 1)
 
 
+def route_leg(origin, destination, timeout=None):
+    """The driving route between two ``(lat, lon)`` points, or None.
+
+    Returns ``{'points': [[lat, lng], ...], 'km': float}``. The geometry is
+    OSRM's simplified overview — a dashed line across a city map, not a
+    turn-by-turn track — which is a couple of dozen points rather than the five
+    hundred the full one carries for the same trip.
+
+    Used to reconstruct the stretch of trail lost while a driver was inside an
+    external navigation app. It is an estimate of where they went, never a
+    measurement, and callers must present it as such.
+
+    None means "no answer" — service off, unreachable, or no route — exactly as
+    :func:`road_distance_km` does.
+    """
+    if not is_enabled() or not origin or not destination or _circuit_open():
+        return None
+
+    base = settings.OSRM_BASE_URL.rstrip('/')
+    timeout = timeout or getattr(settings, 'OSRM_TIMEOUT', 3)
+    # OSRM coordinate order is lon,lat.
+    coords = f"{origin[1]},{origin[0]};{destination[1]},{destination[0]}"
+    url = f"{base}/route/v1/driving/{coords}"
+
+    try:
+        resp = _session.get(
+            url, params={'overview': 'simplified', 'geometries': 'geojson'}, timeout=timeout)
+        resp.raise_for_status()
+        payload = resp.json()
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning('OSRM geometry lookup failed for %s: %s', coords, exc)
+        _record_failure()
+        return None
+
+    _record_success()
+
+    if payload.get('code') != 'Ok' or not payload.get('routes'):
+        return None
+
+    route = payload['routes'][0]
+    coordinates = (route.get('geometry') or {}).get('coordinates') or []
+    if len(coordinates) < 2:
+        return None
+
+    # GeoJSON is lon,lat; every map consumer here works in lat,lng.
+    points = [[round(lat, 6), round(lon, 6)] for lon, lat in coordinates]
+    metres = route.get('distance')
+    return {
+        'points': points,
+        'km': round(metres / 1000.0, 1) if metres is not None else None,
+    }
+
+
 def health():
     """(ok, detail) for the ops page — is the routing service answering?"""
     if not is_enabled():

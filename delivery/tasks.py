@@ -25,7 +25,7 @@ def check_delivery_task_health(self):
     - Fix 9: Inactive driver with COD > 24 hours
     """
     from delivery.models import DeliveryTask
-    from fleet.models import Driver, DriverLocation, DriverActivityLog
+    from fleet.models import Driver, DriverLocation, DriverActivityLog, DriverNavHandoff
     # Same set the driver PWA uses to pick its high-accuracy GPS profile — if
     # this alert watched a wider set it would fire for drivers the app is
     # deliberately tracking at the cheap idle rate.
@@ -85,6 +85,17 @@ def check_delivery_task_health(self):
                 driver=task.driver
             ).order_by('-created_at').first()
             if latest_loc and latest_loc.created_at < now - timedelta(minutes=10):
+                # A driver who tapped Waze or Google Maps cannot report — the
+                # browser is not running. That silence is accounted for, so it
+                # is not the outage this alert exists to catch.
+                #
+                # A background spell is deliberately NOT excused: a phone locked
+                # in a pocket for ten minutes in the middle of a delivery is
+                # precisely what this alert is for. Knowing why it went quiet
+                # does not make it fine.
+                handoff = DriverNavHandoff.open_for_driver(task.driver_id)
+                if handoff and not handoff.auto:
+                    continue
                 mins_ago = (now - latest_loc.created_at).total_seconds() / 60
                 logger.warning(
                     f"GPS LOST: No GPS ping for {mins_ago:.0f} min from "

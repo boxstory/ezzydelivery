@@ -107,8 +107,13 @@
     <div class="dtk__sort">
       <span class="dtk__sort-count">{{ cards|length }} {% if current_tab == 'all' %}new{% elif current_tab == 'assigned' %}assigned{% elif current_tab == 'accepted' %}active{% else %}completed{% endif %} task{{ cards|length|pluralize }}</span>
       <div class="dtk__sort-controls">
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=code&zone={{ zone_filter }}"
+           class="dtk__sort-btn {% if sort_by == 'code' or not sort_by %}dtk__sort-btn--active{% endif %}"
+           title="Sort by task number">
+          <i class="fa-solid fa-hashtag"></i>
+        </a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=date&zone={{ zone_filter }}"
-           class="dtk__sort-btn {% if sort_by == 'date' or not sort_by %}dtk__sort-btn--active{% endif %}"
+           class="dtk__sort-btn {% if sort_by == 'date' %}dtk__sort-btn--active{% endif %}"
            title="Sort by date">
           <i class="fa-solid fa-calendar"></i>
         </a>
@@ -239,6 +244,7 @@
               <div class="d-flex gap-2 mb-3" style="width: 100%;">
                 <a href="#" class="btn btn-outline-primary flex-fill d-flex align-items-center justify-content-center"
                    style="min-height: 48px; font-size: 16px; border-radius: 10px; padding: 8px;"
+                   data-task-id="{{ card.id }}"
                    data-lat="{% if card.dl_to_address %}{{ card.dl_to_address.dl_latitude|default:'0' }}{% else %}0{% endif %}"
                    data-lng="{% if card.dl_to_address %}{{ card.dl_to_address.dl_longitude|default:'0' }}{% else %}0{% endif %}"
                    data-zone="{% if card.dl_to_address %}{{ card.dl_to_address.dl_zone|default:'' }}{% else %}{{ card.order.dl_zone|default:'' }}{% endif %}"
@@ -774,6 +780,10 @@
       var addressText = addressParts.join(', ');
       url = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addressText);
     }
+    // The page is about to lose the foreground — record the gap that opens.
+    if (window.EzzyGPS && EzzyGPS.navHandoff) {
+      EzzyGPS.navHandoff.openUrl(url, { taskId: btn.dataset.taskId, lat: lat || null, lng: lng || null });
+    }
     window.open(url, '_blank');
   }
 
@@ -791,6 +801,7 @@
     var name = btn.dataset.name || 'Customer';
     var message = 'Hello ' + name + '! This is your delivery driver from EzzyDelivery. I am on my way with your order.';
     var whatsappUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
+    if (window.EzzyGPS && EzzyGPS.navHandoff) EzzyGPS.navHandoff.openUrl(whatsappUrl);
     window.open(whatsappUrl, '_blank');
   }
 

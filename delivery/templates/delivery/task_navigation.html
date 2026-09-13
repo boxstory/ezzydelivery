@@ -290,6 +290,10 @@ document.addEventListener('DOMContentLoaded', function() {
       // Fall back to address text search
       url = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addressText);
     }
+    // The page is about to lose the foreground — record the gap that opens.
+    if (window.EzzyGPS && EzzyGPS.navHandoff) {
+      EzzyGPS.navHandoff.openUrl(url, { taskId: {{ task.id }} });
+    }
     window.open(url, '_blank');
   });
 
@@ -307,6 +311,9 @@ document.addEventListener('DOMContentLoaded', function() {
         : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addressText);
       var message = 'Hello! I am the delivery driver. Here is your delivery location: ' + locationUrl;
       var whatsappUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
+      if (window.EzzyGPS && EzzyGPS.navHandoff) {
+        EzzyGPS.navHandoff.openUrl(whatsappUrl, { taskId: {{ task.id }} });
+      }
       window.open(whatsappUrl, '_blank');
     });
   }

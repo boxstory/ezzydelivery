@@ -15,10 +15,6 @@ urlpatterns = [
     path('zones/areas/update-pin/', delivery_views.update_area_pin, name='update_area_pin'),
     path('zones/update-pin/', delivery_views.update_zone_pin, name='update_zone_pin'),
 
-    # requst to user update address before delivery
-    path('<str:dl_task_number>/<int:mobile_no>/',
-         delivery_views.dl_address_update, name='dl_address'),
-
     path('ajax/get_zone_name/', delivery_views.get_zone_name, name='get_zone_name'),
     path('get_street_polygon/<int:zone_number>/<int:street_number>/',
          delivery_views.get_street_polygon, name='get_street_polygon'),
@@ -57,10 +53,17 @@ urlpatterns = [
          delivery_views.task_navigation, name="task_navigation"),
 
     # ADDRESS LINK CREATE AND UPDATE FOR CUSTUMERS
-    path("address_link/<str:dl_task_code>/",
+    # <token> is DlAddressUpdate.access_token, not the order number: the old
+    # order-number URL could be enumerated to read or overwrite any customer pin.
+    path("address_link/<str:token>/",
          delivery_views.dl_address_link, name="dl_address_link"),
 
-    path('address_link/<str:dl_task_code>/update/',
+    path('address_link/<str:token>/update/',
          delivery_views.save_location_data, name='save_location_data'),
+
+    # Driver PWA pin drop — authorised by task assignment, not by a URL secret.
+    path('task/<str:dl_task_number>/location/',
+         delivery_views.driver_update_task_location,
+         name='driver_update_task_location'),
 
 ]

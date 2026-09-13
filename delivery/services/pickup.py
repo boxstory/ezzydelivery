@@ -311,6 +311,14 @@ def _ensure_delivery_task(pickup):
     if existing:
         return existing
     task = _create_delivery_task_from_order(order)
+    # The disposition builds the delivery leg without the order ever passing through
+    # 'publish', so the board would keep showing the order as unpublished while a
+    # driver is already holding the parcel. update_fields (not a full save) because
+    # task_created is already True and the publish branch must not re-enter task
+    # creation — this write is only bringing the label into line with reality.
+    if task and order.order_status != 'publish':
+        order.order_status = 'publish'
+        order.save(update_fields=['order_status'])
     return task
 
 
@@ -409,6 +417,9 @@ def _hand_delivery_to(pickup, driver, final_status):
         task.dl_task_publish = True
         task.dl_task_status = 'accepted'
         task._status_actor = 'driver'  # for_review/pending -> accepted is a driver transition
+        # This function closes the pickup itself a few lines down, so the post_save
+        # reconciler must not also close it and write a second history row.
+        task._pickup_disposition_run = True
         task.save(update_fields=[
             'driver', 'source_pickup_task', 'dl_task_publish', 'dl_task_status'])
         AssignedDriver.objects.get_or_create(driver=driver, dl_task=task)
@@ -420,3 +431,99 @@ def _hand_delivery_to(pickup, driver, final_status):
         pickup, 'collected', final_status,
         notes=f"Delivery leg {task.dl_task_number or ''} handed to {driver}".strip())
     return True, 'Delivery task is now in the driver task list'
+
+
+def reconcile_pickup_on_delivery_claim(task, actor=None):
+    """
+    A driver now owns the delivery leg — close the first-mile leg that is still
+    sitting at 'collected'.
+
+    Drivers do not tap 'Deliver myself' or 'Confirm hand-off' on the Pickup tab;
+    they take the task straight from the New pool, so the pickup used to stay at
+    'collected' for the whole delivery with `source_pickup_task` never linked and
+    the transfer never confirmed. The claim IS the hand-off, so it is read as one:
+
+    - the transfer target claimed it  -> the proposed hand-off happened, confirm it
+    - the collecting driver claimed it -> they kept the parcel (self-deliver)
+    - anyone else claimed it (staff assign only, the pool hides held parcels)
+      -> close it, but warn both drivers that the parcel has to change hands
+
+    Never raises: the leg is a record of what happened, not part of the claim.
+    """
+    from delivery.models import DeliveryTask, PickupTask
+    from fleet.models import DriverNotification
+
+    try:
+        driver = task.driver
+        if not driver or not task.order_id:
+            return None
+
+        pickup = PickupTask.objects.filter(
+            order_id=task.order_id, status='collected'
+        ).select_related('order', 'driver', 'transfer_to_driver').first()
+        if not pickup:
+            return None
+
+        order_number = pickup.order.order_number
+        holder = pickup.driver
+
+        # Queryset write, not task.save(): this runs inside the task's own
+        # post_save and must not re-enter it.
+        if task.source_pickup_task_id != pickup.pk:
+            DeliveryTask.objects.filter(pk=task.pk).update(source_pickup_task=pickup)
+            task.source_pickup_task = pickup
+
+        extra_fields = []
+        if pickup.transfer_to_driver_id == driver.pk:
+            if not pickup.transfer_confirmed_at:
+                pickup.transfer_confirmed_at = timezone.now()
+                extra_fields.append('transfer_confirmed_at')
+            notes = (f"Delivery leg {task.dl_task_number or ''} taken by {driver} — "
+                     f"transfer from {holder or 'the pickup driver'} confirmed").strip()
+        elif holder and holder.pk == driver.pk:
+            notes = (f"Delivery leg {task.dl_task_number or ''} taken by {driver} — "
+                     f"collecting driver kept the parcel").strip()
+        else:
+            notes = (f"Delivery leg {task.dl_task_number or ''} taken by {driver} — "
+                     f"parcel is with {holder or 'the pickup driver'}, hand-off needed").strip()
+            if holder and holder.pk != driver.pk:
+                DriverNotification.objects.create(
+                    driver=holder,
+                    title='Hand over the parcel',
+                    message=(f"{driver} is delivering order {order_number}. "
+                             f"Hand them the package you collected."),
+                    notification_type='alert',
+                )
+                DriverNotification.objects.create(
+                    driver=driver,
+                    title='Collect the parcel first',
+                    message=(f"Order {order_number} was collected by {holder}. "
+                             f"Take the package from them before you deliver."),
+                    notification_type='alert',
+                )
+
+        close_collected_leg(pickup, notes, actor=actor, extra_fields=extra_fields)
+        return pickup
+    except Exception as e:
+        logger.error(
+            f"Pickup reconcile failed for delivery task {getattr(task, 'pk', None)}: {e}",
+            exc_info=True)
+        return None
+
+
+def close_collected_leg(pickup, notes, actor=None, extra_fields=None):
+    """
+    The one place a 'collected' leg becomes 'handed_off'.
+
+    The parcel physically changed hands (or staff confirmed it did), so the leg
+    is closed as executed, never cancelled. `extra_fields` carries any column the
+    caller already set on the instance, e.g. transfer_confirmed_at.
+    """
+    update_fields = ['status', 'updated_at'] + list(extra_fields or [])
+    pickup.status = 'handed_off'
+    pickup.save(update_fields=update_fields)
+    log_pickup_history(pickup, 'collected', 'handed_off', actor=actor, notes=(notes or '')[:255])
+    logger.info(
+        f"PickupTask {pickup.pk} closed as handed_off "
+        f"(order {pickup.order.order_number}): {notes}")
+    return pickup
