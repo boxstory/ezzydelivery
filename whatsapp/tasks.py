@@ -139,6 +139,15 @@ def drain_verification_queue():
 
         if job.kind == 'delivery_failed':
             text = _build_delivery_recovery_whatsapp_message(job.order, job.driver_failure_note)
+            if not text:
+                # The recovery wording is switched off on the Messages page, and
+                # nothing else gates this send. Cancel rather than retry: the queue
+                # would otherwise re-read the same switched-off body every tick.
+                job.status = 'cancelled'
+                job.last_error = 'Recovery message is switched off'
+                job.save(update_fields=['status', 'last_error'])
+                skipped += 1
+                continue
         else:
             text = _build_order_whatsapp_message(job.order)
         ok, info = (False, {'error': 'no sender'})

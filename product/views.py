@@ -382,26 +382,6 @@ def product_categories(request):
     return render(request, 'product/product_categories.html', data)
 
 
-# -----------------------------------------------------------------------------
-# test_images: Diagnostic page to test image rendering
-# PUBLIC: For troubleshooting only
-# Template: product/test_images.html
-# -----------------------------------------------------------------------------
-def test_images(request):
-    business = get_cached_business(request)
-    if not business:
-        products = []
-    else:
-        products = product_models.Product.objects.filter(
-            business=business
-        ).select_related('business')[:10]
-
-    data = {
-        'products': products
-    }
-    return render(request, 'product/test_images.html', data)
-
-
 # =============================================================================
 # PRODUCT TABLE VIEW WITH INLINE EDITING
 # =============================================================================

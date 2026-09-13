@@ -97,6 +97,9 @@ urlpatterns = [
 
     path('', include('core.urls', namespace='core')),
     path('', include('webpages.urls', namespace='webpages')),
+    # After webpages on purpose: /p2p/pricing/ is a marketing URL in the sitemap and must
+    # keep resolving to webpages.views.p2p_pricing. This app owns the booking routes only.
+    path('p2p/', include('p2p.urls', namespace='p2p')),
     path('workforce/', include('workforce.urls', namespace='workforce')),
 
     path('product/', include('product.urls', namespace='product')),

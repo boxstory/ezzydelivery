@@ -47,9 +47,6 @@ urlpatterns = [
     path('inventory/<int:product_id>/', product_views.stock_card, name='stock_card'),
     path('transactions/', product_views.transaction_list, name='transaction_list'),
 
-    # Test images
-    path('test-images/', product_views.test_images, name='test_images'),
-
     # Product Combos / Bundles
     path('combos/', product_views.combo_list, name='combo_list'),
     path('combos/create/', product_views.combo_create, name='combo_create'),

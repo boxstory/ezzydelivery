@@ -116,6 +116,8 @@ INSTALLED_APPS = [
     'ai_agent',
     'whatsapp',
     'crm',
+    'p2p',
+    'payroll',
 
 ]
 
@@ -291,6 +293,8 @@ TEMPLATES = [
                 'core.context_processors.user_driver',
                 # User business to avoid duplicate queries in sidebar
                 'core.context_processors.user_business',
+                # Live Tracking badge on the client sidebar (client paths only)
+                'core.context_processors.business_live_rides',
                 # Business team permissions context
                 'business.decorators.business_permissions_context',
                 # Workforce dashboard sidebar counts

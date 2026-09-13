@@ -24,6 +24,7 @@ def _parse_date(date_str):
     return datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=_QATAR_TZ)
 
 from ai_agent.tools.base import BaseTool, ToolError, register_tool
+from delivery.ordering import TASK_SEQ_DESC, annotate_task_sequence
 
 logger = logging.getLogger(__name__)
 
@@ -493,7 +494,7 @@ class GetBusinessDeliveriesTool(BaseTool):
 
         # Limit results
         limit = min(limit, 50)
-        tasks = queryset.order_by('-created_at')[:limit]
+        tasks = annotate_task_sequence(queryset).order_by(*TASK_SEQ_DESC)[:limit]
 
         results = []
         for task in tasks:

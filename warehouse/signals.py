@@ -1074,6 +1074,168 @@ def order_post_save_handler(sender, instance, created, *args, **kwargs):
             logger.exception(f"Error removing pick list for order {instance.order_number}: {e}")
 
 
+# =============================================================================
+# TASK-LEVEL STOCK MOVEMENT
+# Goods leave the shelf when the DRIVER COLLECTS them (picked_up), not when the
+# customer signs for them. Between those two events the units are on a motorbike:
+# counting them as on-hand overstates the shelf for the whole delivery window.
+# `delivered` therefore moves no stock — it was already moved at pickup — and
+# `failed` puts it back.
+#
+# These rows are tagged reference_type='delivery_task' (the order-level
+# reservation path uses 'order'), so the two can never be mistaken for each other
+# and the idempotency checks below stay exact.
+# =============================================================================
+
+
+def _task_has_txn(task, transaction_type):
+    """True if this task already wrote a row of this type — the idempotency gate.
+
+    Status can legitimately revisit a value (picked_up -> in_transit -> picked_up
+    after a correction), and without this each pass would move stock again.
+    """
+    from warehouse.models import InventoryTransaction
+    return InventoryTransaction.objects.filter(
+        reference_type='delivery_task',
+        reference_id=task.dl_task_number,
+        transaction_type=transaction_type,
+    ).exists()
+
+
+def _fulfilment_enabled(order):
+    business = getattr(order, 'business', None)
+    return bool(business and business.fulfillment_service_enabled)
+
+
+def ship_stock_for_task(task):
+    """Take the goods off the shelf when the driver collects them."""
+    from warehouse.models import StockLevel, InventoryTransaction, SellerWarehouseLink
+    from orders.models import OrderItem
+
+    order = task.order
+    if not _fulfilment_enabled(order):
+        return
+    if _task_has_txn(task, 'ship'):
+        return
+
+    linked_warehouse_ids = list(
+        SellerWarehouseLink.objects.filter(
+            business=order.business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+    )
+    warehouse_scope = {'warehouse_id__in': linked_warehouse_ids} if linked_warehouse_ids else {}
+    if not linked_warehouse_ids:
+        logger.error(
+            f"No active SellerWarehouseLink for business {order.business.business_name} "
+            f"(task {task.dl_task_number}) — shipping from whichever warehouse holds "
+            f"the stock. Link the business to its warehouse to restore correct routing."
+        )
+
+    with transaction.atomic():
+        for item in OrderItem.objects.filter(order=order).select_related('product'):
+            if not item.product:
+                continue
+
+            remaining = item.quantity
+            stock_levels = StockLevel.objects.filter(
+                product=item.product, quantity_on_hand__gt=0, **warehouse_scope
+            ).select_for_update().order_by('-quantity_on_hand')
+
+            for stock_level in stock_levels:
+                if remaining <= 0:
+                    break
+                take = min(remaining, stock_level.quantity_on_hand)
+                before = stock_level.quantity_on_hand
+                stock_level.quantity_on_hand = max(0, before - take)
+                stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
+
+                InventoryTransaction.objects.create(
+                    product=item.product,
+                    warehouse=stock_level.warehouse,
+                    location=stock_level.location,
+                    transaction_type='ship',
+                    # Signed delta, matching every other ship row in this module.
+                    quantity=-take,
+                    quantity_before=before,
+                    quantity_after=stock_level.quantity_on_hand,
+                    reference_type='delivery_task',
+                    reference_id=task.dl_task_number,
+                    notes=f"Collected by driver for task {task.dl_task_number}",
+                )
+                check_and_create_low_stock_alert(stock_level)
+                remaining -= take
+
+            if remaining > 0:
+                logger.error(
+                    f"Unrecorded collection: task {task.dl_task_number}, product "
+                    f"{item.product.item_sku} short by {remaining} of {item.quantity} — "
+                    f"on-hand now overstates physical stock by that amount."
+                )
+
+    logger.info(f"Stock shipped out for task {task.dl_task_number} (driver collection)")
+
+
+def return_stock_for_task(task):
+    """Put the goods back on the shelf when the delivery fails after collection."""
+    from warehouse.models import InventoryTransaction
+    from orders.models import OrderItem
+
+    order = task.order
+    if not _fulfilment_enabled(order):
+        return
+    if not _task_has_txn(task, 'ship'):
+        return          # never left the shelf, nothing to put back
+    if _task_has_txn(task, 'return'):
+        return
+
+    ship_rows = InventoryTransaction.objects.filter(
+        reference_type='delivery_task',
+        reference_id=task.dl_task_number,
+        transaction_type='ship',
+    ).select_related('product', 'warehouse', 'location')
+
+    with transaction.atomic():
+        for row in ship_rows:
+            # Return to the exact StockLevel the units were taken from, so a
+            # multi-warehouse pick unwinds to the same shelves it drew down.
+            from warehouse.models import StockLevel
+            stock_level = StockLevel.objects.select_for_update().filter(
+                product=row.product, warehouse=row.warehouse, location=row.location
+            ).first()
+            if stock_level is None:
+                logger.error(
+                    f"Cannot return stock for task {task.dl_task_number}: StockLevel for "
+                    f"product {row.product_id} at warehouse {row.warehouse_id} is gone."
+                )
+                continue
+
+            give_back = abs(row.quantity)
+            before = stock_level.quantity_on_hand
+            stock_level.quantity_on_hand = before + give_back
+            stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
+
+            InventoryTransaction.objects.create(
+                product=row.product,
+                warehouse=stock_level.warehouse,
+                location=stock_level.location,
+                transaction_type='return',
+                quantity=give_back,
+                quantity_before=before,
+                quantity_after=stock_level.quantity_on_hand,
+                reference_type='delivery_task',
+                reference_id=task.dl_task_number,
+                notes=f"Returned to warehouse - delivery failed for task {task.dl_task_number}",
+            )
+
+        OrderItem.objects.filter(order=order).update(
+            delivery_status='returned',
+            quantity_returned=models.F('quantity'),
+            quantity_delivered=0,
+        )
+
+    logger.info(f"Stock returned for task {task.dl_task_number} (failed delivery)")
+
+
 @receiver(pre_save, sender='delivery.DeliveryTask', dispatch_uid='warehouse.delivery_task_pre_save_handler')
 def delivery_task_pre_save_handler(sender, instance, *args, **kwargs):
     """Track delivery task status changes"""
@@ -1091,8 +1253,11 @@ def delivery_task_post_save_handler(sender, instance, created, *args, **kwargs):
     """
     Handle delivery task lifecycle for warehouse operations.
 
-    delivered → deduct reserved stock from on_hand (fulfill)
-    failed    → return reserved/fulfilled stock back to on_hand
+    picked_up → goods leave the shelf (this is the physical movement)
+    delivered → no stock movement if pickup already shipped it; the legacy
+                order-level fulfil only runs for tasks that never passed through
+                picked_up (e.g. to_review → publish → delivered)
+    failed    → goods come back to the shelf
 
     NOTE: Pick list creation moved to order_post_save_handler (triggered on ready_to_pickup).
     """
@@ -1100,16 +1265,36 @@ def delivery_task_post_save_handler(sender, instance, created, *args, **kwargs):
         return
 
     old_status = _old_delivery_status.pop(instance.pk, None)
+    status = instance.dl_task_status
 
-    # Fulfill stock when delivery is successful
-    if old_status != 'delivered' and instance.dl_task_status == 'delivered':
-        with transaction.atomic():
-            fulfill_stock_reservation(instance.order)
+    # The driver has the goods — take them off the shelf now, not at delivery.
+    if status == 'picked_up' and old_status != 'picked_up':
+        ship_stock_for_task(instance)
 
-    # Return stock when delivery fails
-    elif instance.dl_task_status == 'failed' and old_status not in (None, 'failed'):
-        with transaction.atomic():
-            return_stock_on_failed_delivery(instance.order)
+    elif old_status != 'delivered' and status == 'delivered':
+        # Already shipped at pickup: the stock has moved, only the paperwork is
+        # left. Deducting again here is what made on-hand fall by twice the order.
+        if _task_has_txn(instance, 'ship'):
+            _mark_items_delivered(instance.order)
+        else:
+            with transaction.atomic():
+                fulfill_stock_reservation(instance.order)
+
+    elif status == 'failed' and old_status not in (None, 'failed'):
+        if _task_has_txn(instance, 'ship'):
+            return_stock_for_task(instance)
+        else:
+            with transaction.atomic():
+                return_stock_on_failed_delivery(instance.order)
+
+
+def _mark_items_delivered(order):
+    """Close out the order lines without touching stock (already shipped)."""
+    from orders.models import OrderItem
+    OrderItem.objects.filter(order=order, delivery_status='pending').update(
+        delivery_status='delivered',
+        quantity_delivered=models.F('quantity'),
+    )
 
 
 @receiver(post_save, sender='warehouse.StockLevel', dispatch_uid='warehouse.stock_level_post_save_handler')
