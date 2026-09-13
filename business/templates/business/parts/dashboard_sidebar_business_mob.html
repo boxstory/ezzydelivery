@@ -72,17 +72,21 @@
 
       <!-- CATALOG -->
       <li class="bsb__section">{% trans "Catalog" %}</li>
-      <li class="nav-item {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' %}active{% endif %}">
-        <div class="nav-link d-flex align-items-center {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' %}active{% endif %}"
+      <li class="nav-item {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'combo_list' or current_url == 'combo_create' or current_url == 'combo_update' %}active{% endif %}">
+        <div class="nav-link d-flex align-items-center {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'combo_list' or current_url == 'combo_create' or current_url == 'combo_update' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-product-mobile"
-             aria-expanded="{% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' %}true{% else %}false{% endif %}">
+             aria-expanded="{% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'combo_list' or current_url == 'combo_create' or current_url == 'combo_update' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-box-open me-2"></i>
           <span class="flex-fill text-start">{% trans "Products" %}</span>
           <i class="fa-solid fa-caret-down ms-auto"></i>
         </div>
-        <div class="bsb__submenu collapse {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' %}show{% endif %}"
+        <div class="bsb__submenu collapse {% if current_url == 'product_all_list_table' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'combo_list' or current_url == 'combo_create' or current_url == 'combo_update' %}show{% endif %}"
              id="submenu-product-mobile">
+          <a class="nav-link {% if current_url == 'combo_list' or current_url == 'combo_create' or current_url == 'combo_update' %}active{% endif %}" href="{% url 'product:combo_list' %}">
+            <i class="fa-solid fa-layer-group me-2"></i>
+            <span>{% trans "Combos / Bundles" %}</span>
+          </a>
           <a class="nav-link {% if current_url == 'product_all_list_table' %}active{% endif %}" href="{% url 'product:product_all_list_table' %}">
             <i class="fa-solid fa-bars me-2"></i>
             <span>{% trans "All Products" %}</span>
@@ -117,6 +121,26 @@
         <a class="nav-link d-flex align-items-center {% if current_url == 'pickup_location_list' or current_url == 'pickup_location_add' or current_url == 'pickup_location_update' %}active{% endif %}" href="{% url 'business:pickup_location_list' %}">
           <i class="fa-solid fa-location-dot me-2"></i>
           <span>{% trans "Stores List" %}</span>
+        </a>
+      </li>
+
+      {% if user_business.live_tracking_enabled %}
+      <li class="nav-item {% if current_url == 'live_tracking_map' %}active{% endif %}">
+        <a class="nav-link d-flex align-items-center {% if current_url == 'live_tracking_map' %}active{% endif %}" href="{% url 'business:live_tracking_map' %}">
+          <i class="fa-solid fa-map-location-dot me-2"></i>
+          <span>{% trans "Live Tracking" %}</span>
+          {% if live_rides_count %}
+          <span class="bsb__badge bsb__badge--live ms-auto">{{ live_rides_count|default:"0" }}</span>
+          {% endif %}
+        </a>
+      </li>
+      {% endif %}
+
+      <li class="bsb__section">{% trans "Reports" %}</li>
+      <li class="nav-item {% if current_url == 'reports_dashboard' %}active{% endif %}">
+        <a class="nav-link d-flex align-items-center {% if current_url == 'reports_dashboard' %}active{% endif %}" href="{% url 'business:reports_dashboard' %}">
+          <i class="fa-solid fa-file-export me-2"></i>
+          <span>{% trans "Reports & Export" %}</span>
         </a>
       </li>
 
@@ -166,16 +190,16 @@
       <!-- SETTINGS -->
       {% if is_business_owner %}
       <li class="bsb__section">{% trans "Settings" %}</li>
-      <li class="nav-item {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}">
-        <div class="nav-link d-flex align-items-center {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}"
+      <li class="nav-item {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' or current_url == 'whatsapp_triggers_list' or current_url == 'branded_tracking_settings' %}active{% endif %}">
+        <div class="nav-link d-flex align-items-center {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' or current_url == 'whatsapp_triggers_list' or current_url == 'branded_tracking_settings' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-settings-mobile"
-             aria-expanded="{% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}true{% else %}false{% endif %}">
+             aria-expanded="{% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' or current_url == 'whatsapp_triggers_list' or current_url == 'branded_tracking_settings' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-gear me-2"></i>
           <span class="flex-fill text-start">{% trans "Settings" %}</span>
           <i class="fa-solid fa-caret-down ms-auto"></i>
         </div>
-        <div class="bsb__submenu collapse {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}show{% endif %}"
+        <div class="bsb__submenu collapse {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' or current_url == 'whatsapp_triggers_list' or current_url == 'branded_tracking_settings' %}show{% endif %}"
              id="submenu-settings-mobile">
           {% if user_business %}
           <a class="nav-link {% if current_url == 'business_settings' %}active{% endif %}"
@@ -188,10 +212,20 @@
             <i class="fa-solid fa-users me-2"></i>
             <span>{% trans "Teams" %}</span>
           </a>
-          <a class="nav-link {% if current_url == 'business_settings_api_list' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}"
+          <a class="nav-link {% if current_url == 'business_settings_api_list' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' or current_url == 'whatsapp_triggers_list' or current_url == 'branded_tracking_settings' %}active{% endif %}"
              href="{% url 'business:business_settings_api_list' user_business.business_id %}">
             <i class="fa-solid fa-code me-2"></i>
             <span>{% trans "API Settings" %}</span>
+          </a>
+          <a class="nav-link {% if current_url == 'whatsapp_triggers_list' %}active{% endif %}"
+             href="{% url 'business:whatsapp_triggers_list' %}">
+            <i class="fa-brands fa-whatsapp me-2"></i>
+            <span>{% trans "WhatsApp Alerts" %}</span>
+          </a>
+          <a class="nav-link {% if current_url == 'branded_tracking_settings' %}active{% endif %}"
+             href="{% url 'business:branded_tracking_settings' %}">
+            <i class="fa-solid fa-palette me-2"></i>
+            <span>{% trans "Tracking Page" %}</span>
           </a>
           {% endif %}
         </div>

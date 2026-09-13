@@ -1132,28 +1132,43 @@ a.bcon__plate:hover {
 }
 
 /* ============================================================================
-   ORDERS FILTER — clean, compact, restrained. Scoped to .business-dashboard
-   (orders.css classes kept for JS). Neutral palette, hairline borders, one
-   navy accent for the primary action; no mono/uppercase, no loud edges.
+   ORDERS QUERY BAR (.ofb) — the line between the tally rail and the ledger.
+   The rail says what the set holds and the table says what is in it; this strip
+   says how the set was narrowed. Controls sit on a grey field so the two data
+   surfaces around it stay white, and the query itself is spelled out in the
+   ledger's two voices: sans for the field name, mono for the value.
+   Scoped to .business-dashboard (orders.css class names kept for the JS).
    ============================================================================ */
-/* One bordered card: toolbar (.ofb) + body */
+.business-dashboard .ofb__section:has(.ofb) { margin-bottom: 0.75rem; }
+
 .business-dashboard .ofb {
-  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  min-height: 3.25rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--brand-grey-100);
   border: 1px solid var(--brand-grey-200);
-  border-radius: var(--brand-radius-sm) var(--brand-radius-sm) 0 0;
-  padding: 0.45rem 0.7rem;
+  border-radius: var(--brand-radius-md);
+}
+/* Panel open → the strip becomes its header and gives up its bottom corners */
+.business-dashboard .ofb:has(+ .collapse.show),
+.business-dashboard .ofb:has(+ .collapsing) {
+  border-radius: var(--brand-radius-md) var(--brand-radius-md) 0 0;
 }
 .business-dashboard .ofb__body {
   background: #fff;
   border: 1px solid var(--brand-grey-200);
   border-top: none;
-  border-radius: 0 0 var(--brand-radius-sm) var(--brand-radius-sm);
+  border-radius: 0 0 var(--brand-radius-md) var(--brand-radius-md);
   padding: 0.75rem;
 }
 .business-dashboard .ofb__body .row {
   --bs-gutter-y: 0.6rem;
   --bs-gutter-x: 0.5rem;
 }
+
 /* One-line filter row — fields flex to fit, Customer gets extra width */
 .business-dashboard .ofb__filters {
   display: flex;
@@ -1161,23 +1176,36 @@ a.bcon__plate:hover {
   gap: 0.55rem;
   align-items: flex-end;
 }
+/* Fields share the line evenly. The max-width matters on the wrap: without it a
+   field left alone on the second row stretches the full width of the panel. */
 .business-dashboard .ofb__filters__col {
   flex: 1 1 0;
-  min-width: 4.75rem;
+  min-width: 5.5rem;
+  max-width: 14rem;
 }
 .business-dashboard .ofb__filters__col--wide {
   flex: 1.9 1 0;
-  min-width: 8rem;
+  min-width: 8.5rem;
+  max-width: 20rem;
 }
-@media (min-width: 992px) {
-  .business-dashboard .ofb__filters { flex-wrap: nowrap; }
+/* A native date control needs room for the whole date plus its picker icon */
+.business-dashboard .ofb__filters__col:has(input[type="date"]) {
+  flex: 1.2 1 0;
+  min-width: 8.5rem;
+  max-width: 12rem;
+}
+/* A select has to show its longest label; a text field only its placeholder */
+.business-dashboard .ofb__filters__col:has(.form-select) {
+  flex: 1.35 1 0;
+  min-width: 7rem;
+  max-width: 16rem;
 }
 
 /* Standalone filter body — no .ofb toolbar above it, so it carries its own
    full border and radius instead of the flat-top edge the paired body uses. */
 .business-dashboard .ofb__body--solo {
   border-top: 1px solid var(--brand-grey-200);
-  border-radius: var(--brand-radius-sm);
+  border-radius: var(--brand-radius-md);
 }
 /* Action column — buttons sit on the field baseline, sized to their content */
 .business-dashboard .ofb__filters__col--actions {
@@ -1188,33 +1216,148 @@ a.bcon__plate:hover {
   gap: 0.4rem;
 }
 .business-dashboard .ofb__filters__col--actions .oal__filter-btn {
-  height: 1.9rem;
+  height: 2.25rem;
   text-decoration: none;
   white-space: nowrap;
 }
 
-/* Toggle — quiet, borderless */
+/* Disclosure — a real button: focusable, labelled, and it says how many
+   filters are running without needing the panel open. */
 .business-dashboard .ofb__toggle {
-  height: 1.9rem;
+  flex: 0 0 auto;
+  height: 2.25rem;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   font-family: inherit;
   text-transform: none;
   letter-spacing: 0;
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--brand-grey-700);
-  background: transparent;
-  border: none;
+  background: #fff;
+  border: 1px solid var(--brand-grey-300);
   border-radius: 0.375rem;
-  padding: 0 0.25rem;
+  padding: 0 0.65rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
-.business-dashboard .ofb__toggle:hover { color: var(--brand-navy); background: transparent; }
+.business-dashboard .ofb__toggle:hover {
+  color: var(--brand-navy);
+  border-color: var(--brand-grey-400);
+  background: #fff;
+}
+.business-dashboard .ofb__toggle:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 1px;
+}
+.business-dashboard .ofb__toggle > i:first-child { color: var(--brand-grey-500); font-size: 0.78rem; }
+.business-dashboard .ofb__caret {
+  font-size: 0.62rem;
+  color: var(--brand-grey-400);
+  transition: transform 0.18s ease;
+}
+.business-dashboard .ofb__toggle[aria-expanded="true"] { border-color: var(--brand-grey-400); color: var(--brand-navy); }
+.business-dashboard .ofb__toggle[aria-expanded="true"] .ofb__caret { transform: rotate(180deg); }
 .business-dashboard .ofb__count {
-  font-size: 0.65rem;
-  font-weight: 600;
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.25rem;
+  background: var(--brand-navy);
+  color: #fff;
+  font-family: var(--oal-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+/* Query readout — the one thing this strip is remembered by. It sits between
+   a hairline and the quick filters and takes the leftover width. */
+.business-dashboard .ofb__query {
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--brand-grey-250, #dee2e6);
+}
+.business-dashboard .ofb__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--brand-grey-500);
+}
+.business-dashboard .ofb__tags {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+  margin-top: 0;
+}
+.business-dashboard .ofb__tags-label { flex: 0 0 auto; }
+.business-dashboard .ofb__tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.business-dashboard .ofb__tags-label {
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+}
+/* Chip: field name in sans, the value in mono — same split the ledger uses
+   between what a human typed and what the system holds. */
+.business-dashboard .ofb__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 1.75rem;
+  padding: 0 0.2rem 0 0.45rem;
+  background: #fff;
+  border: 1px solid var(--brand-grey-300);
+  border-radius: 0.375rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  color: var(--brand-grey-800);
+}
+.business-dashboard .ofb__tag-key {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+}
+.business-dashboard .ofb__tag-value {
+  font-family: var(--oal-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.business-dashboard .ofb__tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--brand-grey-400);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.business-dashboard .ofb__tag-remove:hover {
+  background: var(--brand-danger-bg, #fef2f2);
+  color: var(--brand-danger);
+  opacity: 1;
+}
+.business-dashboard .ofb__tag-remove:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 1px;
 }
 
 /* Labels — small and quiet */
@@ -1223,25 +1366,25 @@ a.bcon__plate:hover {
   font-family: inherit;
   text-transform: none;
   letter-spacing: 0;
-  font-size: 0.6875rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--brand-grey-500);
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.25rem;
   line-height: 1;
 }
 
-/* Inputs + selects — compact 30px, hairline border */
+/* Inputs + selects — 36px, hairline border, text at the console floor */
 .business-dashboard .ofb__body .form-control,
 .business-dashboard .ofb__body .form-select {
-  height: 1.9rem;
-  min-height: 1.9rem;
-  padding: 0 0.55rem;
-  font-size: 0.75rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0 0.6rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  line-height: 1.9rem;
+  line-height: 2.25rem;
   color: var(--brand-grey-800);
   background-color: #fff;
-  border: 1px solid var(--brand-grey-200);
+  border: 1px solid var(--brand-grey-300);
   border-radius: 0.375rem;
   box-shadow: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1253,10 +1396,10 @@ a.bcon__plate:hover {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  padding-right: 1.5rem;
+  padding-right: 1.6rem;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%236c757d' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 0.5rem center;
+  background-position: right 0.55rem center;
   background-size: 0.5rem;
 }
 .business-dashboard .ofb__body .form-control:hover,
@@ -1267,64 +1410,80 @@ a.bcon__plate:hover {
   box-shadow: 0 0 0 2px rgba(0, 31, 63, 0.08);
   outline: none;
 }
-.business-dashboard .ofb__body input[type="date"] { font-size: 0.75rem; }
+.business-dashboard .ofb__body input[type="date"] { font-size: 0.82rem; }
 
-/* Buttons — compact; search solid navy, the rest quiet ghost */
-.business-dashboard .oal__filter-btn {
-  height: 1.9rem;
-  padding: 0 0.65rem;
+/* Quick filters — lighter siblings of the action cluster */
+.business-dashboard .ofb__pills {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--brand-grey-250, #dee2e6);
+}
+.business-dashboard .oal__quick-pill {
+  height: 2.25rem;
+  padding: 0 0.7rem;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.82rem;
+  font-weight: 500;
   border-radius: 0.375rem;
-  font-size: 0.75rem;
+  background: #fff;
+  border: 1px solid var(--brand-grey-300);
+  color: var(--brand-grey-600);
+}
+.business-dashboard .oal__quick-pill:hover {
+  background: var(--brand-secondary);
+  color: var(--brand-navy);
+  border-color: var(--brand-primary);
+}
+.business-dashboard .oal__quick-pill:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 1px;
+}
+
+/* Action cluster — the strip ends where the work happens: one navy Search,
+   the rest quiet. */
+.business-dashboard .ofb__actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.business-dashboard .oal__filter-btn {
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.82rem;
   font-weight: 600;
 }
 .business-dashboard .oal__filter-btn--clear,
 .business-dashboard .oal__filter-btn--save,
 .business-dashboard .oal__filter-btn--load {
-  background: transparent;
+  background: #fff;
   color: var(--brand-grey-600);
-  border-color: var(--brand-grey-200);
+  border-color: var(--brand-grey-300);
 }
 .business-dashboard .oal__filter-btn--clear:hover,
 .business-dashboard .oal__filter-btn--save:hover,
 .business-dashboard .oal__filter-btn--load:hover {
   background: var(--brand-grey-100);
   color: var(--brand-grey-800);
-  border-color: var(--brand-grey-300);
+  border-color: var(--brand-grey-400);
 }
 .business-dashboard .oal__filter-btn--search:hover { transform: none; box-shadow: none; }
-
-/* Quick pills — compact, quiet, squared */
-.business-dashboard .oal__quick-pill {
-  height: 1.75rem;
-  padding: 0 0.65rem;
-  font-family: inherit;
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border-radius: 0.375rem;
-  background: var(--brand-grey-100);
-  border: 1px solid var(--brand-grey-200);
-  color: var(--brand-grey-600);
-}
-.business-dashboard .oal__quick-pill:hover {
-  background: var(--brand-grey-200);
-  color: var(--brand-navy);
-  border-color: var(--brand-grey-300);
+.business-dashboard .oal__filter-btn:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 1px;
 }
 
-/* Active filter chips — quiet */
-.business-dashboard .ofb__tag {
-  font-family: inherit;
-  font-size: 0.7rem;
-}
-.business-dashboard .ofb__tags-label {
-  font-family: inherit;
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--brand-grey-500);
+/* Narrow desktops — the query keeps its line, the controls wrap under it */
+@media (max-width: 1199.98px) {
+  .business-dashboard .ofb__query { flex-basis: 100%; order: 3; padding-left: 0; border-left: 0; }
+  .business-dashboard .ofb__pills { order: 1; margin-left: auto; }
+  .business-dashboard .ofb__actions { order: 2; }
 }
 
 /* ----------------------------------------------------------------------------
@@ -1433,6 +1592,16 @@ a.bcon__plate:hover {
 .bcon__alertbar--danger .bcon__alertbar__icon,
 .bcon__alertbar--danger .bcon__alertbar__text strong {
   color: var(--brand-danger);
+}
+
+/* Awaiting approval is a wait, not a fault — same bar, cooler accent. */
+.bcon__alertbar--warning {
+  border-bottom-color: var(--brand-warning);
+  background: var(--brand-warning-bg);
+}
+.bcon__alertbar--warning .bcon__alertbar__icon,
+.bcon__alertbar--warning .bcon__alertbar__text strong {
+  color: var(--brand-warning-text);
 }
 
 @media (max-width: 575.98px) {

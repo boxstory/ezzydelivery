@@ -162,14 +162,22 @@
           <span>{% trans "Stores List" %}</span>
         </a>
       </li>
+      {% comment %}Live Tracking is a per-client feature — staff switch it on at
+      /workforce/delivery-app-control/. The badge counts deliveries on the road, so the
+      link lights up as soon as a driver taps Start Ride.{% endcomment %}
+      {% if user_business.live_tracking_enabled %}
       <li class="nav-item">
         <a class="nav-link btn bsb__link--single {% if current_url == 'live_tracking_map' %}active{% endif %}"
            href="{% url 'business:live_tracking_map' %}"
            data-label="{% trans "Live Tracking" %}">
           <i class="fa-solid fa-map-location-dot me-2"></i>
           <span>{% trans "Live Tracking" %}</span>
+          {% if live_rides_count %}
+            <span class="bsb__badge bsb__badge--live">{{ live_rides_count|default:"0" }}</span>
+          {% endif %}
         </a>
       </li>
+      {% endif %}
       <li class="nav-item">
         <a class="nav-link btn bsb__link--single {% if current_url == 'business_profile' %}active{% endif %}"
            href="{% url 'business:business_profile' %}"

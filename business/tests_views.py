@@ -608,6 +608,55 @@ class OrderUpdateDeleteTest(BusinessTestMixin, TestCase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.order_status, 'ready_to_pickup')
 
+    def test_seller_cannot_publish_directly(self):
+        """A seller posting a bare 'publish' is refused — that is a staff action."""
+        resp = self.client.post(
+            reverse('orders:update_order_status'),
+            json.dumps({'order_id': self.order.id, 'status': 'publish'}),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 403)
+        self.order.refresh_from_db()
+        self.assertNotEqual(self.order.order_status, 'publish')
+
+    def test_ready_and_publish_runs_both_legs(self):
+        """The seller's single 'Ready to Pickup' action confirms AND publishes."""
+        resp = self.client.post(
+            reverse('orders:update_order_status'),
+            json.dumps({'order_id': self.order.id, 'status': 'ready_and_publish'}),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+        self.assertEqual(resp.json()['legs'], ['ready_to_pickup', 'publish'])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.order_status, 'publish')
+        # Both transitions are on the record, not just the final one.
+        history = list(orders_models.OrderStatusHistory.objects.filter(
+            order=self.order, field_name='order_status',
+        ).values_list('old_value', 'new_value'))
+        self.assertIn(('to_review', 'ready_to_pickup'), history)
+        self.assertIn(('ready_to_pickup', 'publish'), history)
+
+    def test_bulk_ready_and_publish(self):
+        """Same combined action over the bulk endpoint."""
+        resp = self.client.post(
+            reverse('orders:bulk_update_order_status'),
+            json.dumps({'order_ids': [self.order.id], 'status': 'ready_and_publish'}),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.order_status, 'publish')
+
+    def test_bulk_seller_cannot_publish_directly(self):
+        """The bulk endpoint refuses a bare 'publish' from a seller too."""
+        resp = self.client.post(
+            reverse('orders:bulk_update_order_status'),
+            json.dumps({'order_ids': [self.order.id], 'status': 'publish'}),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 403)
+        self.order.refresh_from_db()
+        self.assertNotEqual(self.order.order_status, 'publish')
+
     def test_update_order_status_idor(self):
         """#57: Cannot update another business order status"""
         other = self.create_other_business()
@@ -746,6 +795,81 @@ class OrderCommentTest(BusinessTestMixin, TestCase):
             reverse('orders:get_order_comments',
                     kwargs={'order_id': other_order.id}))
         self.assertEqual(resp.status_code, 403)
+
+    def test_new_comment_defaults_to_internal(self):
+        """A write site that forgets the flag must not leak to the client."""
+        comment = orders_models.OrderComments.objects.create(
+            order=self.order, name='Test', body='Unflagged note')
+        self.assertTrue(comment.is_internal)
+        self.assertEqual(comment.author_role, 'system')
+
+    def test_client_comment_is_shared(self):
+        """A note the client posts on its own thread is not internal."""
+        self.client.post(
+            reverse('orders:add_order_comment',
+                    kwargs={'order_id': self.order.id}),
+            {'comment': 'Client note'})
+        comment = orders_models.OrderComments.objects.get(
+            order=self.order, body='Client note')
+        self.assertFalse(comment.is_internal)
+        self.assertEqual(comment.author_role, 'client')
+        self.assertEqual(comment.author, self.user)
+
+    def test_internal_comment_hidden_from_client(self):
+        """#70: Internal staff notes never reach the client thread"""
+        orders_models.OrderComments.objects.create(
+            order=self.order, name='opsadmin', body='INTERNAL ONLY',
+            author_role='staff', is_internal=True)
+        orders_models.OrderComments.objects.create(
+            order=self.order, name='Biz Owner', body='SHARED NOTE',
+            author_role='client', is_internal=False)
+        resp = self.client.get(
+            reverse('orders:get_order_comments',
+                    kwargs={'order_id': self.order.id}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, 'INTERNAL ONLY')
+        self.assertNotContains(resp, 'opsadmin')
+        self.assertContains(resp, 'SHARED NOTE')
+
+    def test_forged_workforce_referer_reveals_nothing(self):
+        """#71: Visibility follows the user, not the Referer header"""
+        orders_models.OrderComments.objects.create(
+            order=self.order, name='opsadmin', body='INTERNAL ONLY',
+            author_role='staff', is_internal=True)
+        resp = self.client.get(
+            reverse('orders:get_order_comments',
+                    kwargs={'order_id': self.order.id}),
+            HTTP_REFERER='https://ezzydelivery.qa/workforce/orders/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, 'INTERNAL ONLY')
+
+    def test_staff_sees_internal_comments(self):
+        """#72: Staff read the full thread"""
+        orders_models.OrderComments.objects.create(
+            order=self.order, name='opsadmin', body='INTERNAL ONLY',
+            author_role='staff', is_internal=True)
+        staff = User.objects.create_user(
+            username='opsstaff', password='Ops@12345', is_staff=True)
+        staff_client = Client()
+        staff_client.force_login(staff)
+        resp = staff_client.get(
+            reverse('orders:get_order_comments',
+                    kwargs={'order_id': self.order.id}),
+            HTTP_REFERER='https://ezzydelivery.qa/workforce/orders/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'INTERNAL ONLY')
+
+    def test_staff_username_not_rendered_to_client(self):
+        """#73: The client thread shows a support label, not a staff login"""
+        orders_models.OrderComments.objects.create(
+            order=self.order, name='opsadmin', body='SHARED BY STAFF',
+            author_role='staff', is_internal=False)
+        resp = self.client.get(
+            reverse('orders:get_order_comments',
+                    kwargs={'order_id': self.order.id}))
+        self.assertContains(resp, 'SHARED BY STAFF')
+        self.assertNotContains(resp, 'opsadmin')
+        self.assertContains(resp, 'EzzyDelivery Support')
 
     def test_comment_on_nonexistent_order(self):
         """#69: Comment on nonexistent order returns 404"""
@@ -1411,3 +1535,134 @@ class BusinessApiTestViewTest(BusinessTestMixin, TestCase):
         """#138: Warehouse request page loads without crashing"""
         resp = self.client.get(reverse('business:warehouse_request'))
         self.assertIn(resp.status_code, [200, 302])
+
+
+# =============================================================================
+# LIVE TRACKING (per-client, gated on Business.live_tracking_enabled)
+# =============================================================================
+
+class LiveTrackingTests(BusinessTestMixin, TestCase):
+    """The client-facing driver map: who may open it, and how thin it is."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user, self.profile = self.create_business_user()
+        self.business = self.create_business(self.user, self.profile)
+        self.business.live_tracking_enabled = True
+        self.business.save(update_fields=['live_tracking_enabled'])
+        self.order = self.create_order(self.business, status='publish')
+        self.order.latitude = 25.2854
+        self.order.longitude = 51.5310
+        self.order.save(update_fields=['latitude', 'longitude'])
+        self.client.login(username='bizowner', password='BizPass@123')
+        self.map_url = reverse('business:live_tracking_map')
+        self.data_url = reverse('business:live_tracking_data')
+
+    def _driver(self, did=8801):
+        drv_user = User.objects.create_user(username=f'trkdrv{did}', password='x')
+        drv_profile = core_models.Profile.objects.create(
+            user=drv_user, first_name='Track', last_name='Driver',
+            phone=44000000 + did, is_driver=True)
+        return fleet_models.Driver.objects.create(
+            driver_id=did, user=drv_user, profile=drv_profile,
+            driver_code=f'TRK{did}', driver_phone=str(44000000 + did),
+            driver_status='approved')
+
+    def _task(self, status='out_for_delivery', driver=None):
+        return delivery_models.DeliveryTask.objects.create(
+            order=self.order, business=self.business, driver=driver,
+            dl_task_number=f'TRK-{status}', dl_task_status=status,
+            dl_task_publish=True, dl_price=20)
+
+    # --- the gate ---------------------------------------------------------
+    def test_map_loads_when_enabled(self):
+        self.assertEqual(self.client.get(self.map_url).status_code, 200)
+
+    def test_map_404s_when_disabled(self):
+        self.business.live_tracking_enabled = False
+        self.business.save(update_fields=['live_tracking_enabled'])
+        self.assertEqual(self.client.get(self.map_url).status_code, 404)
+
+    def test_data_404s_when_disabled(self):
+        self.business.live_tracking_enabled = False
+        self.business.save(update_fields=['live_tracking_enabled'])
+        self.assertEqual(self.client.get(self.data_url).status_code, 404)
+
+    def test_sidebar_link_follows_the_setting(self):
+        resp = self.client.get(reverse('business:business_dashboard'))
+        self.assertContains(resp, self.map_url)
+        self.business.live_tracking_enabled = False
+        self.business.save(update_fields=['live_tracking_enabled'])
+        from django.core.cache import cache
+        cache.clear()
+        resp = self.client.get(reverse('business:business_dashboard'))
+        self.assertNotContains(resp, self.map_url)
+
+    # --- what is tracked --------------------------------------------------
+    def test_tracking_starts_at_start_ride_not_before(self):
+        # Start Ride writes out_for_delivery; a parcel merely accepted is not shown.
+        self._task(status='accepted')
+        self.assertEqual(self.client.get(self.data_url).json()['tasks'], [])
+        self._task(status='out_for_delivery')
+        self.assertEqual(len(self.client.get(self.data_url).json()['tasks']), 1)
+
+    def test_finished_task_drops_off_the_map(self):
+        self._task(status='delivered')
+        self.assertEqual(self.client.get(self.data_url).json()['tasks'], [])
+
+    def test_task_with_no_business_fk_still_matches_on_the_order(self):
+        # DeliveryTask.business is nullable on older rows; the order still says whose it is.
+        task = self._task()
+        task.business = None
+        task.save(update_fields=['business'])
+        self.assertEqual(len(self.client.get(self.data_url).json()['tasks']), 1)
+
+    def test_another_clients_delivery_is_not_visible(self):
+        other = self.create_other_business()
+        other_order = self.create_order(other, status='publish')
+        delivery_models.DeliveryTask.objects.create(
+            order=other_order, business=other, dl_task_number='TRK-OTHER',
+            dl_task_status='out_for_delivery', dl_task_publish=True, dl_price=20)
+        self.assertEqual(self.client.get(self.data_url).json()['tasks'], [])
+
+    # --- how thin the payload is -----------------------------------------
+    def test_payload_carries_only_the_current_task_essentials(self):
+        self._task(driver=self._driver())
+        row = self.client.get(self.data_url).json()['tasks'][0]
+        self.assertEqual(set(row.keys()), {
+            'task_number', 'status', 'status_display',
+            'delivery_lat', 'delivery_lng', 'driver_lat', 'driver_lng',
+            'fix_age_seconds', 'gps_stale',
+        })
+
+    def test_payload_leaks_no_customer_or_driver_identity(self):
+        self._task(driver=self._driver(did=8802))
+        body = self.client.get(self.data_url).content.decode()
+        for leaked in ('Test Customer', '12345678', '123 Test St', 'Track Driver', 'TRK8802'):
+            self.assertNotIn(leaked, body)
+
+    def test_driver_position_and_freshness_are_reported(self):
+        from django.utils import timezone
+        driver = self._driver(did=8803)
+        self._task(driver=driver)
+        fleet_models.DriverLocation.objects.create(
+            driver=driver, latitude='25.3000000', longitude='51.5000000',
+            accuracy=10, fixed_at=timezone.now())
+        row = self.client.get(self.data_url).json()['tasks'][0]
+        self.assertAlmostEqual(row['driver_lat'], 25.3, places=4)
+        self.assertIsNotNone(row['fix_age_seconds'])
+        self.assertFalse(row['gps_stale'])
+
+    def test_quiet_app_is_flagged_stale(self):
+        from datetime import timedelta as _td
+        from django.utils import timezone
+        driver = self._driver(did=8804)
+        self._task(driver=driver)
+        loc = fleet_models.DriverLocation.objects.create(
+            driver=driver, latitude='25.3000000', longitude='51.5000000',
+            accuracy=10, fixed_at=timezone.now() - _td(minutes=30))
+        # created_at is auto_now_add, so age it through the queryset
+        fleet_models.DriverLocation.objects.filter(pk=loc.pk).update(
+            created_at=timezone.now() - _td(minutes=30))
+        row = self.client.get(self.data_url).json()['tasks'][0]
+        self.assertTrue(row['gps_stale'])

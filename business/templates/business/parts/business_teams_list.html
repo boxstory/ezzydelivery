@@ -187,9 +187,15 @@
         <!-- Actions -->
         {% if can_manage_team %}
         <div class="btl__actions">
+          {% comment %}
+          Permissions are the owner's call — a manager holds team_manage, so
+          offering it here would show them a page that refuses them.
+          {% endcomment %}
+          {% if is_business_owner %}
           <a href="{% url 'business:business_team_permissions' business.business_id team.id %}" class="btl__action-btn btl__action-btn--primary" title="Manage Permissions">
             <i class="fa-solid fa-key"></i> Permissions
           </a>
+          {% endif %}
           <a href="{% url 'business:business_teams_update' business.business_id team.id %}" class="btl__action-btn btl__action-btn--secondary" title="Edit">
             <i class="fa-solid fa-pen"></i> Edit
           </a>

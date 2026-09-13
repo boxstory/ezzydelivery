@@ -60,13 +60,15 @@ Related:
 import os
 import logging
 from django import forms
-from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from core.decorators import business_required
+from business.decorators import business_permission_required
+from business.permissions import BusinessPermissions
 from business.suspension import business_active_required, is_business_suspended
 from core.pagination import paginate, other_params
 from decouple import config
@@ -81,6 +83,7 @@ from django.db.models import Sum, Q
 from business import models as business_models
 from core import models as core_models
 from delivery import models as delivery_models
+from delivery.ordering import TASK_SEQ_DESC, annotate_task_sequence
 from fleet import models as fleet_models
 from ezzydelivery.settings import BASE_DIR
 from orders import models as orders_models
@@ -326,6 +329,7 @@ def driver_directory(request):
 
 @login_required(login_url='account_login')
 @business_required
+@business_active_required
 def driver_directory_add(request):
     """
     Add a driver to the business directory (AJAX endpoint).
@@ -381,6 +385,7 @@ def driver_directory_add(request):
 
 @login_required(login_url='account_login')
 @business_required
+@business_active_required
 def driver_directory_delete(request, id):
     # IDOR FIX: Verify directory entry belongs to user's business (use cached)
     business = get_cached_business(request)
@@ -462,6 +467,7 @@ def pickup_location_choose(request):
 
 @login_required(login_url='account_login')
 @business_required
+@business_active_required
 def pickup_location_add(request):
     try:
         # IDOR FIX: Verify user has associated business (using cached helper)
@@ -502,6 +508,7 @@ def pickup_location_add(request):
 @login_required(login_url='account_login')
 @business_required
 @require_POST
+@business_active_required
 def pickup_location_add_ajax(request):
     """
     Create a pickup location for the signed-in business and return it as JSON.
@@ -571,6 +578,7 @@ def pickup_location_add_ajax(request):
 
 @login_required(login_url='account_login')
 @business_required
+@business_active_required
 def pickup_location_delete(request, pickup_location_id):
     try:
         # IDOR FIX: Verify pickup location belongs to user's business (using cached helper)
@@ -601,6 +609,7 @@ def pickup_location_delete(request, pickup_location_id):
 
 @login_required(login_url='account_login')
 @business_required
+@business_active_required
 def pickup_location_update(request, pickup_location_id):
     try:
         # IDOR FIX: Verify pickup location belongs to user's business (using cached helper)
@@ -921,117 +930,120 @@ def business_settings(request, business_id):
 
 #business_settings_api---------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
-@business_required
+@business_permission_required(BusinessPermissions.API_MANAGE)
 @business_active_required
 def business_settings_api_update(request, business_id, api_id):
-    user_business = get_cached_business(request)
-    if user_business and request.user.id == user_business.user_id:
-        business = user_business if user_business.business_id == business_id else None
-        if not business:
-            return redirect('business:business_settings', business_id=user_business.business_id)
-        business_apis = business_models.BusinessApiSettings.objects.filter(id=api_id, business=business).first()
-        if not business_apis:
-            messages.error(request, "API settings not found.")
-            return redirect('business:business_settings', business_id=business_id)
+    # The decorator resolved which business this user is acting for; the id in
+    # the URL has to name that same business or this is someone else's console.
+    business = request.current_business
+    if not business or business.business_id != business_id:
+        messages.error(request, "You don't have permission to access this page.")
+        return redirect('business:business_dashboard')
+    business_apis = business_models.BusinessApiSettings.objects.filter(id=api_id, business=business).first()
+    if not business_apis:
+        messages.error(request, "API settings not found.")
+        return redirect('business:business_settings', business_id=business_id)
 
-        form = business_forms.businessApiSettingsForm(instance=business_apis)
+    form = business_forms.businessApiSettingsForm(instance=business_apis)
 
-        if request.method == 'POST':
-            logger.debug(f'Updating API settings for business_id={business_id}, api_id={api_id}')
-            form = business_forms.businessApiSettingsForm(
-                request.POST, instance=business_apis)
+    if request.method == 'POST':
+        logger.debug(f'Updating API settings for business_id={business_id}, api_id={api_id}')
+        form = business_forms.businessApiSettingsForm(
+            request.POST, instance=business_apis)
 
-            if form.is_valid():
-                api_settings = form.save(commit=False)
-                # Reset verification when settings change
-                if api_settings.is_verify_api:
-                    api_settings.is_verify_api = False
-                # Ensure business is set (for security)
-                api_settings.business = business
-                api_settings.save()
-                logger.info(f'API settings updated successfully for business_id={business_id}, api_id={api_id}')
-                messages.success(request, "Successful Submission")
-                return redirect("business:business_settings", business_id)
-            else:
-                logger.warning(f'API settings form invalid: {form.errors}')
-                messages.error(request, "Error")
-        context = {
-            'business': business,
-            'form': form,
-            'api': business_apis,
-            'api_id': api_id,
-            'form_title': 'Business API Settings Add',
-            'shopify_oauth_redirect_uri': shopify_oauth_redirect_uri(),
-            'shopify_oauth_app_url': shopify_oauth_app_url(),
-        }
+        if form.is_valid():
+            api_settings = form.save(commit=False)
+            # Reset verification when settings change
+            if api_settings.is_verify_api:
+                api_settings.is_verify_api = False
+            # Ensure business is set (for security)
+            api_settings.business = business
+            api_settings.save()
+            logger.info(f'API settings updated successfully for business_id={business_id}, api_id={api_id}')
+            messages.success(request, "Successful Submission")
+            return redirect("business:business_settings", business_id)
+        else:
+            logger.warning(f'API settings form invalid: {form.errors}')
+            messages.error(request, "Error")
+    context = {
+        'business': business,
+        'form': form,
+        'api': business_apis,
+        'api_id': api_id,
+        'form_title': 'Business API Settings Add',
+        'shopify_oauth_redirect_uri': shopify_oauth_redirect_uri(),
+        'shopify_oauth_app_url': shopify_oauth_app_url(),
+    }
 
-        return render(request, 'business/parts/business_settings_api_update.html', context)
-    else:
-        return redirect("business:business_dashboard")
+    return render(request, 'business/parts/business_settings_api_update.html', context)
 
 
 
 @login_required(login_url='/accounts/login/')
-@business_required
+@business_permission_required(BusinessPermissions.API_MANAGE)
 @business_active_required
 def business_settings_api_add(request, business_id):
-    user_business = get_cached_business(request)
-    if user_business and request.user.id == user_business.user_id:
-        business = user_business if user_business.business_id == business_id else None
-        if not business:
-            return redirect('business:business_settings', business_id=user_business.business_id)
-        form = business_forms.businessApiSettingsForm()
+    # The decorator resolved which business this user is acting for; the id in
+    # the URL has to name that same business or this is someone else's console.
+    business = request.current_business
+    if not business or business.business_id != business_id:
+        messages.error(request, "You don't have permission to access this page.")
+        return redirect('business:business_dashboard')
+    form = business_forms.businessApiSettingsForm()
 
-        if request.method == 'POST':
-            logger.debug(f'Adding API settings for business_id={business_id}')
-            form = business_forms.businessApiSettingsForm(request.POST)
+    if request.method == 'POST':
+        logger.debug(f'Adding API settings for business_id={business_id}')
+        form = business_forms.businessApiSettingsForm(request.POST)
 
-            if form.is_valid():
-                # Set business before saving (excluded from form for security)
-                api_settings = form.save(commit=False)
-                api_settings.business = business
-                api_settings.save()
-                logger.info(f'API settings added successfully for business_id={business_id}')
+        if form.is_valid():
+            # Set business before saving (excluded from form for security)
+            api_settings = form.save(commit=False)
+            api_settings.business = business
+            api_settings.save()
+            logger.info(f'API settings added successfully for business_id={business_id}')
 
-                # Shopify OAuth needs a second step, and saving credentials on
-                # its own connects nothing. Hand straight off to authorization
-                # instead of dropping the merchant back on the settings list
-                # with a config that will 401 on every call.
-                if (api_settings.api_type == 'shopify'
-                        and form.cleaned_data.get('shopify_setup_mode', 'oauth') != 'custom_app'):
-                    return redirect(
-                        'business:shopify_oauth_start',
-                        business_id=business_id, api_id=api_settings.id,
-                    )
+            # Shopify OAuth needs a second step, and saving credentials on
+            # its own connects nothing. Hand straight off to authorization
+            # instead of dropping the merchant back on the settings list
+            # with a config that will 401 on every call.
+            if (api_settings.api_type == 'shopify'
+                    and form.cleaned_data.get('shopify_setup_mode', 'oauth') != 'custom_app'):
+                return redirect(
+                    'business:shopify_oauth_start',
+                    business_id=business_id, api_id=api_settings.id,
+                )
 
-                messages.success(request, "Successful Submission")
-                return redirect("business:business_settings", business_id)
-            else:
-                logger.warning(f'API settings form invalid: {form.errors}')
-                messages.error(request, "Error")
-        context = {
-            'business': business,
-            'form': form,
-            'form_title': 'Business API Settings Adding Form',
-            'shopify_oauth_redirect_uri': shopify_oauth_redirect_uri(),
-            'shopify_oauth_app_url': shopify_oauth_app_url(),
-        }
+            messages.success(request, "Successful Submission")
+            return redirect("business:business_settings", business_id)
+        else:
+            logger.warning(f'API settings form invalid: {form.errors}')
+            messages.error(request, "Error")
+    context = {
+        'business': business,
+        'form': form,
+        'form_title': 'Business API Settings Adding Form',
+        'shopify_oauth_redirect_uri': shopify_oauth_redirect_uri(),
+        'shopify_oauth_app_url': shopify_oauth_app_url(),
+    }
 
-        return render(request, 'business/parts/business_settings_api_add.html', context)
-    else:
-        return redirect("business:business_dashboard")
+    return render(request, 'business/parts/business_settings_api_add.html', context)
 
 
 @login_required(login_url='/accounts/login/')
-@business_required
+@business_permission_required(BusinessPermissions.API_VIEW)
 def business_settings_api_list(request, business_id):
     # IDOR FIX: Verify user owns this business
-    user_business = get_cached_business(request)
+    user_business = request.current_business
     if not user_business or user_business.business_id != business_id:
         messages.error(request, "You don't have permission to access this page.")
         return redirect('business:business_dashboard')
 
     business = user_business
+    can_manage_api = (
+        request.access_type == 'owner'
+        or (request.team_profile is not None
+            and request.team_profile.has_permission(BusinessPermissions.API_MANAGE))
+    )
     # Ordered explicitly — the paginator needs a stable sort or rows shuffle
     # between pages.
     business_apis = business_models.BusinessApiSettings.objects.filter(
@@ -1089,15 +1101,19 @@ def business_settings_api_list(request, business_id):
         'has_shopify_integration': has_shopify_integration,
         'shopify_oauth_redirect_uri': shopify_oauth_redirect_uri(),
         'shopify_oauth_app_url': shopify_oauth_app_url(),
+        # API_VIEW opens this page; the add / edit / delete affordances need
+        # API_MANAGE, so a view-only member gets the page read-only instead of
+        # buttons that bounce them back to the dashboard.
+        'can_manage_api': can_manage_api,
     }
     return render(request, 'business/parts/business_settings_api_list.html', context)
 
 @login_required(login_url='/accounts/login/')
-@business_required
+@business_permission_required(BusinessPermissions.API_MANAGE)
 @business_active_required
 def business_settings_api_delete(request, business_id, api_id):
     # IDOR FIX: Verify user owns this business
-    user_business = get_cached_business(request)
+    user_business = request.current_business
     if not user_business or user_business.business_id != business_id:
         messages.error(request, "You don't have permission to access this page.")
         return redirect('business:business_dashboard')
@@ -1112,11 +1128,11 @@ def business_settings_api_delete(request, business_id, api_id):
 
 
 @login_required(login_url='/accounts/login/')
-@business_required
+@business_permission_required(BusinessPermissions.API_VIEW)
 @business_active_required
 def business_settings_api_test(request, business_id, api_id):
     # IDOR FIX: Verify user owns this business
-    user_business = get_cached_business(request)
+    user_business = request.current_business
     if not user_business or user_business.business_id != business_id:
         messages.error(request, "You don't have permission to access this page.")
         return redirect('business:business_dashboard')
@@ -1137,11 +1153,11 @@ def business_settings_api_test(request, business_id, api_id):
 
 
 @login_required(login_url='/accounts/login/')
-@business_required
+@business_permission_required(BusinessPermissions.API_VIEW)
 @business_active_required
 def business_settings_api_test_result(request, business_id, api_id):
     # IDOR FIX: Verify user owns this business
-    user_business = get_cached_business(request)
+    user_business = request.current_business
     if not user_business or user_business.business_id != business_id:
         messages.error(request, "You don't have permission to access this page.")
         return redirect('business:business_dashboard')
@@ -1412,11 +1428,11 @@ def shopify_oauth_app_url():
     return f'{parts.scheme}://{parts.netloc}/'
 
 @login_required(login_url='/accounts/login/')
-@business_required
+@business_permission_required(BusinessPermissions.API_MANAGE)
 @business_active_required
 def shopify_oauth_start(request, business_id, api_id):
     """Initiate Shopify OAuth flow - redirects user to Shopify authorization page."""
-    user_business = get_cached_business(request)
+    user_business = request.current_business
     if not user_business or user_business.business_id != business_id:
         messages.error(request, "You don't have permission to access this page.")
         return redirect('business:business_dashboard')
@@ -1460,7 +1476,7 @@ def shopify_oauth_start(request, business_id, api_id):
 
 
 @login_required(login_url='/accounts/login/')
-@business_required
+@business_permission_required(BusinessPermissions.API_MANAGE)
 @business_active_required
 def shopify_oauth_callback(request):
     """Handle Shopify OAuth callback - exchange code for access token."""
@@ -1676,6 +1692,7 @@ def business_teams(request, business_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 @business_permission_required(BusinessPermissions.TEAM_MANAGE)
+@business_active_required
 def business_teams_add(request, business_id):
     """
     Add a new team member to the business.
@@ -1820,6 +1837,7 @@ def business_team_user_lookup(request, business_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 @business_permission_required(BusinessPermissions.TEAM_MANAGE)
+@business_active_required
 def business_teams_update(request, business_id, team_id):
     """
     Update an existing team member.
@@ -1866,13 +1884,17 @@ def business_teams_update(request, business_id, team_id):
 
 @login_required(login_url='/accounts/login/')
 @business_required
-@business_manager_or_owner_required()
+@business_owner_required()
+@business_active_required
 def business_team_permissions(request, business_id, team_id):
     """
     Manage individual team member permissions.
 
-    Requires manager or owner access.
-    Allows granting/revoking specific permissions beyond role defaults.
+    Owner only. A manager holds TEAM_MANAGE, so while this page accepted
+    "manager or owner" a manager could open their own record and grant
+    themselves any code on it — api_manage included — which made every
+    permission gate advisory for anyone holding the manager role.
+    Granting access is the account holder's call, so it stays with the owner.
     """
     business = request.current_business
 
@@ -1957,6 +1979,7 @@ def business_team_permissions(request, business_id, team_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 @business_permission_required(BusinessPermissions.TEAM_MANAGE)
+@business_active_required
 def business_team_remove(request, business_id, team_id):
     """
     Remove a team member from the business.
@@ -1993,6 +2016,7 @@ def business_team_remove(request, business_id, team_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 @business_permission_required(BusinessPermissions.TEAM_MANAGE)
+@business_active_required
 def business_team_status_change(request, business_id, team_id):
     """
     Change team member status (activate/suspend/deactivate).
@@ -2358,7 +2382,7 @@ def business_finance_dashboard(request):
     # they were already withheld from the COD above, so counting them here as
     # well showed the seller the same money owed twice.
     charges = txns.filter(
-        transaction_type__in=['delivery_charge', 'fulfillment_charge', 'inventory_handling', 'other_charge']
+        transaction_type__in=fleet_models.DriverTransaction.CHARGE_TYPES
     ).filter(deduction_line__isnull=True).values('transaction_type').annotate(
         total=Sum('amount'),
         count=Count('id')
@@ -2477,16 +2501,19 @@ def business_transactions(request):
     if txn_type != 'all':
         transactions = transactions.filter(transaction_type=txn_type)
 
-    # Transaction types relevant to business
-    business_types = [
-        ('cod_client_settle', 'COD Client Settlement'),
-        ('delivery_charge', 'Delivery Charge'),
-        ('fulfillment_charge', 'Fulfillment Charge'),
-        ('inventory_handling', 'Inventory Handling'),
-        ('other_charge', 'Other Charge'),
-        ('bills_payable', 'Bills Payable'),
-        ('bills_receivable', 'Bills Receivable'),
-    ]
+    # Transaction types relevant to business. The charge kinds are read off the
+    # shared list rather than spelled out, so a kind added later shows up in this
+    # filter on its own instead of being quietly unfilterable. Labels come from
+    # TRANSACTION_TYPES so the dropdown matches the rest of the app.
+    _txn_labels = dict(fleet_models.DriverTransaction.TRANSACTION_TYPES)
+    business_types = (
+        [('cod_client_settle', _txn_labels['cod_client_settle'])]
+        + [(t, _txn_labels[t]) for t in fleet_models.DriverTransaction.CHARGE_TYPES]
+        + [
+            ('bills_payable', _txn_labels['bills_payable']),
+            ('bills_receivable', _txn_labels['bills_receivable']),
+        ]
+    )
 
     # Paginate — at ?days=365 an active seller's ledger is thousands of rows,
     # all of which were being rendered on one page. The badge keeps the total.
@@ -2537,11 +2564,13 @@ def business_cod_statement(request):
     # plates are period totals, so they aggregate THIS queryset; the search /
     # status / date filters below narrow the ledger list alone, otherwise
     # defaulting the list to unsettled would silently shrink the headline totals.
-    period_deliveries = delivery_models.DeliveryTask.objects.filter(
+    period_deliveries = annotate_task_sequence(
+        delivery_models.DeliveryTask.objects
+    ).filter(
         business=business.business_id,
         cod_collected_amount__gt=0,
         dl_task_date__gte=start_date.date()
-    ).select_related('order').order_by('-dl_task_date')
+    ).select_related('order').order_by(*TASK_SEQ_DESC)
 
     # Summary stats
     stats = period_deliveries.aggregate(
@@ -2943,13 +2972,13 @@ def business_delivery_charges(request):
 
     # Same row rule as the staff Client Charges console — every completed job is
     # billable, COD or prepaid — so the two screens never disagree on what exists.
-    tasks = delivery_models.DeliveryTask.objects.filter(
+    tasks = annotate_task_sequence(delivery_models.DeliveryTask.objects).filter(
         business=business.business_id,
         dl_task_status__in=['delivered', 'partial_delivery'],
         dl_task_date__gte=start_date,
     ).select_related('order', 'charge_invoice').annotate(
         est_charge=BILLABLE_CHARGE,
-    ).order_by('-dl_task_date', '-id')
+    ).order_by(*TASK_SEQ_DESC)
 
     period = tasks.aggregate(
         total=Sum('est_charge'),
@@ -3328,6 +3357,7 @@ def outbound_requests_list(request):
 
 @login_required(login_url='account_login')
 @business_required
+@business_active_required
 def warehouse_request(request):
     """
     Business-facing view to request linking to a fulfillment center.
@@ -3540,6 +3570,7 @@ def business_join_requests_list(request, business_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 @business_permission_required(BusinessPermissions.TEAM_MANAGE)
+@business_active_required
 def business_join_request_action(request, business_id, req_id):
     """Accept or reject a join request (AJAX, business owner)."""
     if request.method != 'POST':
@@ -3579,61 +3610,85 @@ def business_join_request_action(request, business_id, req_id):
 
 
 # ─── Live Tracking Map ──────────────────────────────────────────────
+#: A delivery the client may follow on the map. Tracking opens when the driver taps
+#: Start Ride, which writes 'out_for_delivery' — 'start_ride' and 'in_transit' are the
+#: same moment under older labels. A parcel merely 'picked_up' at the hub is not yet
+#: on its way to the customer, so it is deliberately absent.
+LIVE_TRACKING_STATUSES = ['start_ride', 'in_transit', 'out_for_delivery']
+
+
+def live_tracking_tasks(business):
+    """This client's deliveries out on the road right now.
+
+    Matched on either FK: DeliveryTask.business is nullable on older rows, and a task
+    with a blank one still belongs to whoever placed the order.
+    """
+    from delivery.models import DeliveryTask
+    return DeliveryTask.objects.filter(
+        Q(business=business) | Q(order__business=business),
+        dl_task_status__in=LIVE_TRACKING_STATUSES,
+    ).select_related('order', 'driver', 'driver__profile').distinct()
+
+
 @login_required
 @business_required
 def live_tracking_map(request):
-    """Live tracking map showing active deliveries for this business."""
-    from delivery.models import DeliveryTask
-    active_statuses = ['start_ride', 'in_transit', 'out_for_delivery']
-    active_tasks = DeliveryTask.objects.filter(
-        business=request.current_business,
-        dl_task_status__in=active_statuses
-    ).select_related('order', 'driver').count()
+    """Live tracking map showing this client's deliveries that are on their way.
+
+    Staff switch this per client on /workforce/delivery-app-control/; with it off the
+    page is not theirs to see, so it 404s rather than rendering an empty map.
+    """
+    business = request.current_business
+    if not business.live_tracking_enabled:
+        raise Http404('Live tracking is not enabled for this account')
 
     return render(request, 'business/live_tracking_map.html', {
-        'active_count': active_tasks,
-        'user_business': request.current_business,
+        'active_count': live_tracking_tasks(business).count(),
+        'user_business': business,
     })
 
 
 @login_required
 @business_required
 def live_tracking_data(request):
-    """JSON endpoint returning driver locations for active tasks."""
-    from delivery.models import DeliveryTask
+    """JSON: where each of this client's in-flight deliveries is.
+
+    Deliberately thin. The client is following a driver towards a known address, not
+    reading the task file, so this carries the task number, its status, the two points
+    to draw and how fresh the driver's fix is — nothing else.
+    """
     from fleet.models import DriverLocation
 
-    active_statuses = ['start_ride', 'in_transit', 'out_for_delivery']
-    tasks = DeliveryTask.objects.filter(
-        business=request.current_business,
-        dl_task_status__in=active_statuses
-    ).select_related('order', 'driver')
+    business = request.current_business
+    if not business.live_tracking_enabled:
+        raise Http404('Live tracking is not enabled for this account')
 
+    now = timezone.now()
     pins = []
-    for task in tasks:
-        # Get latest driver location
-        driver_loc = None
-        if task.driver_id:
-            driver_loc = DriverLocation.latest_for_driver(task.driver_id)
-
+    for task in live_tracking_tasks(business):
+        driver_loc = DriverLocation.latest_for_driver(task.driver_id) if task.driver_id else None
         order = task.order
-        pin = {
-            'task_number': task.dl_task_number,
+
+        # `at` is when the device took the fix, `created_at` when we received it —
+        # the first answers "where was the driver", the second "has the app gone
+        # quiet". Both matter to a client watching a dot that has stopped moving.
+        fix_age = None
+        stale = False
+        if driver_loc:
+            fix_age = int((now - driver_loc.at).total_seconds())
+            stale = (now - driver_loc.created_at).total_seconds() > 600
+
+        pins.append({
+            'task_number': task.dl_task_number or '',
             'status': task.dl_task_status,
             'status_display': task.get_dl_task_status_display(),
-            'customer_name': order.customer_name if order else '',
-            'customer_phone': order.customer_phone if order else '',
             'delivery_lat': float(order.latitude) if order and order.latitude else None,
             'delivery_lng': float(order.longitude) if order and order.longitude else None,
-            'delivery_address': order.customer_address if order else '',
-            'zone': order.dl_zone if order else None,
-            'street': order.dl_street if order else None,
-            'building': order.dl_building if order else None,
-            'driver_name': str(task.driver) if task.driver else 'Unassigned',
             'driver_lat': float(driver_loc.latitude) if driver_loc else None,
             'driver_lng': float(driver_loc.longitude) if driver_loc else None,
-        }
-        pins.append(pin)
+            'fix_age_seconds': fix_age,
+            'gps_stale': stale,
+        })
 
     return JsonResponse({'tasks': pins})
 
@@ -3853,6 +3908,7 @@ def whatsapp_triggers_list(request):
 
 @login_required(login_url='/accounts/login/')
 @business_required
+@business_active_required
 def whatsapp_trigger_toggle(request):
     """HTMX POST endpoint to toggle a WhatsApp trigger."""
     from business.models import WhatsAppNotificationTrigger
@@ -3940,7 +3996,7 @@ def print_waybill(request):
     from django.utils.safestring import mark_safe
     from orders.models import Order
     from delivery.models import ZoneName
-    from delivery.label_utils import generate_barcode_svg
+    from delivery.label_utils import generate_qr_svg
 
     raw_ids = request.GET.getlist('order_ids') or request.POST.getlist('order_ids')
     order_ids = [int(v) for v in raw_ids if str(v).isdigit()]
@@ -3972,11 +4028,11 @@ def print_waybill(request):
     for order in orders:
         # Vector, not PNG: the label stretches the barcode to the full label
         # width and a resampled bitmap loses its bar edges on a thermal head.
-        barcode_svg = mark_safe(generate_barcode_svg(order.order_number))
+        qr_svg = mark_safe(generate_qr_svg(order.order_number))
         pickup_zone = order.pickup_location.pickup_zone_no if order.pickup_location else None
         waybills.append({
             'order': order,
-            'barcode_svg': barcode_svg,
+            'qr_svg': qr_svg,
             'from_zone_name': _zone_name(pickup_zone),
             'to_zone_name': _zone_name(order.dl_zone),
         })
@@ -3993,6 +4049,7 @@ def print_waybill(request):
 
 @login_required(login_url='account_login')
 @business_required
+@business_active_required
 def branded_tracking_settings(request):
     """Settings page for configuring the branded customer tracking page."""
     business = request.current_business

@@ -33,7 +33,7 @@ from django.http import JsonResponse
 
 from business.models import Business, BusinessTeamProfile
 from business.permissions import TeamRoles
-from business.suspension import is_business_suspended
+from business.suspension import is_business_suspended, is_business_pending_approval
 
 logger = logging.getLogger('business.permissions')
 
@@ -221,6 +221,43 @@ def user_has_business_permission(user, permission_code, business=None):
 # VIEW DECORATORS
 # =============================================================================
 
+def adopt_url_business(request, business_id):
+    """
+    Point the session at the business named in the URL, when the caller really
+    has access to it.
+
+    A user with more than one business otherwise resolves to an arbitrary one:
+    `get_user_business_access` falls back to `.first()` with no ordering, so
+    opening a URL for their *second* business was refused as someone else's
+    console — an owner locked out of their own settings page. Adopting the URL's
+    business is the same move the business switcher makes, and it does nothing
+    at all for a business the caller cannot reach, so the refusal still stands
+    where it should.
+    """
+    if not business_id or not getattr(request, 'user', None) or not request.user.is_authenticated:
+        return
+    if not hasattr(request, 'session'):
+        return
+    if str(request.session.get('selected_business_id') or '') == str(business_id):
+        return
+
+    reachable = Business.objects.filter(
+        user=request.user, business_id=business_id
+    ).exists() or BusinessTeamProfile.objects.filter(
+        user=request.user, business_id=business_id, team_status='active'
+    ).exists()
+    if not reachable:
+        return
+
+    request.session['selected_business_id'] = business_id
+    # Resolution already ran for the old selection on this request in some
+    # flows (context processors, an outer decorator) — drop those so the new
+    # selection is what the view and its template both see.
+    for attr in ('_cached_business_access', '_cached_user_business'):
+        if hasattr(request, attr):
+            delattr(request, attr)
+
+
 def business_permission_required(permission_code, redirect_url=None):
     """
     Decorator to check if user has required business permission.
@@ -251,6 +288,7 @@ def business_permission_required(permission_code, redirect_url=None):
                 messages.error(request, "Please log in to access this page.")
                 return redirect('account_login')
 
+            adopt_url_business(request, kwargs.get('business_id'))
             business, access_type, team_profile = get_user_business_access(request.user, request)
 
             if not business:
@@ -348,6 +386,7 @@ def business_owner_required(redirect_url=None):
                 messages.error(request, "Please log in to access this page.")
                 return redirect('account_login')
 
+            adopt_url_business(request, kwargs.get('business_id'))
             business, access_type, _ = get_user_business_access(request.user, request)
 
             if access_type != 'owner':
@@ -544,6 +583,7 @@ def business_permissions_context(request):
             context['user_team_profile'] = team_profile
             context['is_business_owner'] = (access_type == 'owner')
             context['business_suspended'] = is_business_suspended(business)
+            context['business_pending_approval'] = is_business_pending_approval(business)
 
             if access_type == 'owner':
                 # Owners have all permissions

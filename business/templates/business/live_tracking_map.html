@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="{% static 'business/css/business-live-tracking.css' %}?v=20260729a">
+<link rel="stylesheet" href="{% static 'business/css/business-live-tracking.css' %}?v=20260913a">
 {% endblock %}
 
 
@@ -60,7 +60,7 @@
       zoom: 12
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19
     }).addTo(map);
 
@@ -72,12 +72,15 @@
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  function addrLine(t) {
-    var parts = [];
-    if (t.zone) parts.push('Z' + t.zone);
-    if (t.street) parts.push('S' + t.street);
-    if (t.building) parts.push('B' + t.building);
-    return parts.length ? parts.join('/') : (t.delivery_address || 'No address');
+  // "4 min ago" rather than a timestamp — a client watching a moving dot wants to
+  // know how stale it is, not what the clock said when the fix was taken.
+  function freshness(seconds) {
+    if (seconds === null || seconds === undefined) return '';
+    if (seconds < 60) return 'just now';
+    var mins = Math.round(seconds / 60);
+    if (mins < 60) return mins + ' min ago';
+    var hrs = Math.round(mins / 60);
+    return hrs + (hrs === 1 ? ' hour ago' : ' hours ago');
   }
 
   function pinClass(status) {
@@ -87,25 +90,37 @@
     return 'blt__pin--delivery';
   }
 
+  // Drop-off pin: which delivery this is, and nothing more. The client already knows
+  // the address and the customer — repeating the task file here would only clutter it.
   function popupHtml(t) {
     var html = '<div class="blt__popup">';
     html += '<div class="blt__popup-header">';
     html += '<span class="blt__popup-task">#' + escHtml(t.task_number) + '</span>';
     html += '<span class="blt__popup-badge blt__popup-badge--' + t.status + '">' + escHtml(t.status_display) + '</span>';
     html += '</div>';
+    html += '<div class="blt__popup-row"><i class="fa-solid fa-flag-checkered"></i>Delivery address</div>';
+    html += '</div>';
+    return html;
+  }
 
-    if (t.customer_name) {
-      html += '<div class="blt__popup-row"><i class="fa-solid fa-user"></i>' + escHtml(t.customer_name) + '</div>';
+  // Driver pin: the live one. Says how fresh the fix is, and says so plainly when
+  // the app has gone quiet instead of leaving a stopped dot to be misread.
+  function driverPopupHtml(t) {
+    var html = '<div class="blt__popup">';
+    html += '<div class="blt__popup-header">';
+    html += '<span class="blt__popup-task">#' + escHtml(t.task_number) + '</span>';
+    html += '<span class="blt__popup-badge blt__popup-badge--' + t.status + '">' + escHtml(t.status_display) + '</span>';
+    html += '</div>';
+    html += '<div class="blt__popup-row"><i class="fa-solid fa-motorcycle"></i>Driver on the way</div>';
+    var age = freshness(t.fix_age_seconds);
+    if (age) {
+      html += '<div class="blt__popup-row blt__popup-row--muted">';
+      html += '<i class="fa-regular fa-clock"></i>Position ' + escHtml(age) + '</div>';
     }
-    if (t.customer_phone) {
-      html += '<div class="blt__popup-row"><i class="fa-solid fa-phone"></i>';
-      html += '<a href="tel:' + escHtml(t.customer_phone) + '">' + escHtml(t.customer_phone) + '</a></div>';
+    if (t.gps_stale) {
+      html += '<div class="blt__popup-row blt__popup-row--warn">';
+      html += '<i class="fa-solid fa-triangle-exclamation"></i>Not updating — the driver\'s app is closed</div>';
     }
-    html += '<div class="blt__popup-row"><i class="fa-solid fa-location-dot"></i>' + addrLine(t) + '</div>';
-    if (t.driver_name) {
-      html += '<div class="blt__popup-row"><i class="fa-solid fa-motorcycle"></i>' + escHtml(t.driver_name) + '</div>';
-    }
-
     html += '</div>';
     return html;
   }
@@ -142,15 +157,16 @@
 
       // Driver location pin (blue pulsing dot)
       if (t.driver_lat && t.driver_lng) {
+        var staleCls = t.gps_stale ? ' blt__driver--stale' : '';
         var driverIcon = L.divIcon({
           className: '',
-          html: '<div class="blt__driver-pulse"></div><div class="blt__driver-dot"></div>',
+          html: '<div class="blt__driver-pulse' + staleCls + '"></div>' +
+                '<div class="blt__driver-dot' + staleCls + '"></div>',
           iconSize: [20, 20],
           iconAnchor: [10, 10]
         });
-        var driverPopup = '<div class="blt__popup"><strong>' + escHtml(t.driver_name) + '</strong><br><small>Driver for #' + escHtml(t.task_number) + '</small></div>';
         var dMarker = L.marker([t.driver_lat, t.driver_lng], { icon: driverIcon, zIndexOffset: 1000 })
-          .bindPopup(driverPopup, { maxWidth: 200 })
+          .bindPopup(driverPopupHtml(t), { maxWidth: 240 })
           .addTo(map);
         driverMarkers.push(dMarker);
         bounds.extend([t.driver_lat, t.driver_lng]);

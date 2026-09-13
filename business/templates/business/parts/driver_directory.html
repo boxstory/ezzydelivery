@@ -1,6 +1,7 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 {% load business_console %}
+{% load custom_filters %}
 {% block content %}
 <div class="bdd" id="business_driver_directory_container_main">
 
@@ -63,7 +64,7 @@
             <td class="bdd__td">
               <div class="d-flex align-items-center gap-2">
                 <span class="bdd__phone">{{ contact.driver.driver_phone }}</span>
-                <a href="https://wa.me/974{{ contact.driver.driver_phone }}"
+                <a href="https://wa.me/{{ contact.driver.driver_phone|whatsapp_number }}"
                    class="bdd__icon-btn bdd__icon-btn--whatsapp"
                    title="WhatsApp">
                   <i class="fa-brands fa-whatsapp"></i>

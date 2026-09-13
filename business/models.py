@@ -191,6 +191,37 @@ class Business(EmailNormalizedModel, models.Model):
         help_text="Preset route after collection: drop at hub, deliver by self, or transfer"
     )
 
+    # Proof of delivery — some clients contract for evidence on every closed task.
+    # Off for everyone by default; staff turn it on per client at
+    # /workforce/delivery-app-control/. The rule itself is enforced server-side in
+    # delivery/pod.py, so the driver app cannot skip it by posting directly.
+    POD_KIND_CHOICES = [
+        ('photo', 'Photo'),
+        ('signature', 'Customer signature'),
+        ('both', 'Photo and signature'),
+    ]
+    pod_required_delivered = models.BooleanField(
+        default=False,
+        help_text="Driver must capture proof before a task for this client can close as delivered"
+    )
+    pod_required_failed = models.BooleanField(
+        default=False,
+        help_text="Driver must capture a photo before a task for this client can close as failed"
+    )
+    pod_kind = models.CharField(
+        max_length=20, choices=POD_KIND_CHOICES, default='photo',
+        help_text="What counts as proof on a successful delivery. A failed attempt always "
+                  "takes a photo — there is no customer present to sign for it."
+    )
+
+    # Live tracking — lets this client follow their driver's GPS position on a map
+    # once a ride is under way. Staff switch it on alongside the proof rules.
+    live_tracking_enabled = models.BooleanField(
+        default=False,
+        help_text="Show this client a Live Tracking map of their driver's position while "
+                  "a delivery is out on the road"
+    )
+
     # Shared column mapping used across all import sources (OneDrive, Google Sheet, CSV, Public Link)
     # Format: {db_field: source_column_header}  e.g. {"customer_name": "Customer Name", "customer_phone": "Phone"}
     import_mapping = models.JSONField(default=dict, blank=True,
@@ -339,6 +370,9 @@ class BusinessApiSettings(models.Model):
         help_text='Google Sheet column mapping: {"customer_name": "Col Header", "phone": "Col Header", ...}')
     last_headers = models.JSONField(blank=True, default=list,
         help_text='Last-seen header row from the source sheet, used to map raw_row positions to db fields.')
+    last_sample_payload = models.JSONField(blank=True, null=True, default=None,
+        help_text='Custom API: the last sample order payload staff pasted, kept so the '
+                  'mapping can be tested before the seller has sent a real order.')
     last_sync_at = models.DateTimeField(blank=True, null=True,
         help_text='Last successful sync fetch from this source (Google Sheet / Shopify / WooCommerce).')
     last_sync_count = models.PositiveIntegerField(default=0,
@@ -743,6 +777,19 @@ class BusinessTeamJoinRequest(models.Model):
         return f"{self.user.username} → {self.business.business_name} ({self.status})"
 
 
+class PickupLocationQuerySet(models.QuerySet):
+    def selectable(self):
+        """Addresses a human should be offered in a pickup dropdown.
+
+        Excludes the one-off rows a P2P booking creates: one is written per personal
+        parcel, so an unfiltered dropdown grows without bound and buries the client's
+        two or three real addresses. Deliberately a separate method rather than a
+        default-manager filter — lookups by id (relocating a leg, loading an order's
+        own pickup) must still find these rows.
+        """
+        return self.filter(is_p2p=False)
+
+
 class PickupLocation(models.Model):
     business = models.ForeignKey(
         Business, on_delete=models.CASCADE, related_name='pickup_location')
@@ -754,6 +801,23 @@ class PickupLocation(models.Model):
         blank=True, null=True)
     pickup_lat = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
     pickup_lon = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
+    # Who the driver asks for and rings on arrival. Until now the only phone on the
+    # driver's pickup card was the *receiver's*, so nobody could reach the person
+    # actually handing the parcel over. That gap is not P2P-specific — it applies to
+    # every business — but P2P is where it becomes unworkable, because the sender is
+    # a private individual standing at their own door.
+    contact_name = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text="Person the driver asks for at this address")
+    contact_phone = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text="Number the driver calls on arrival")
+    # A one-off address created by a single P2P booking, not a saved address the
+    # client picks from. Kept out of every pickup dropdown so a business's own list
+    # does not grow by one row per personal parcel.
+    is_p2p = models.BooleanField(
+        default=False, db_index=True,
+        help_text="One-off address from a P2P booking, not a client's saved address")
     status_choices = [
         ('active', 'Active'),
         ('inactive', 'Inactive'),
@@ -774,6 +838,8 @@ class PickupLocation(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = PickupLocationQuerySet.as_manager()
 
     def __str__(self):
         return self.pickup_location_title

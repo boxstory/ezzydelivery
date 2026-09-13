@@ -1,8 +1,10 @@
 {% comment %}
-Purpose: Persistent notice shown on every client dashboard page while staff have suspended the account.
+Purpose: Persistent notice shown on every client dashboard page while the account may not write —
+         staff have suspended it, or staff have not approved it yet.
 Used by: templates/business_dashboard_base.html
 Notes: Reads the cached business already loaded for the sidebar, so it costs no extra query.
        Not a Django message — those are consumed once and the toasts auto-hide after 8s.
+       Mirrors WRITE_BLOCKED_STATUSES in business/suspension.py; keep the two in step.
 {% endcomment %}
 {% with biz=business|default:user_business %}
 {% if biz.business_status == 'suspended' %}
@@ -13,6 +15,19 @@ Notes: Reads the cached business already loaded for the sidebar, so it costs no 
       <strong>Account suspended</strong>
       <span>You can still view your orders, statements and invoices. Adding, editing and
       deleting orders is paused, and API and store imports are closed until this is lifted.</span>
+    </div>
+    <a href="{% url 'webpages:contactus' %}" class="bcon__alertbar__btn">Contact support</a>
+  </div>
+</div>
+{% elif biz.business_status == 'pending' %}
+<div class="bcon__alertbar bcon__alertbar--warning" role="alert">
+  <div class="bcon__alertbar__inner">
+    <i class="fa-solid fa-hourglass-half bcon__alertbar__icon" aria-hidden="true"></i>
+    <div class="bcon__alertbar__text">
+      <strong>Account awaiting approval</strong>
+      <span>Our team is reviewing your registration. You can look around and finish your
+      profile, but creating orders, pickup locations and store connections stays closed
+      until the account is approved.</span>
     </div>
     <a href="{% url 'webpages:contactus' %}" class="bcon__alertbar__btn">Contact support</a>
   </div>

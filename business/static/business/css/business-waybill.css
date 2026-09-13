@@ -348,17 +348,12 @@ body {
     gap: 3px;
     padding-top: 5px;
   }
-  /* Taller bars on rolls: a longer scan line tolerates a light/patchy thermal
-     burn, and roll pages grow to the content so the height is free. */
-  .bwb__barcode-svg svg { height: 60px; }
-  .bwb__barcode-num { font-size: 13px; letter-spacing: 1px; }
 }
 
 /* Very narrow rolls (58mm): trim the largest type further. */
 @container (max-width: 62mm) {
   .bwb__name { font-size: 13px; }
   .bwb__cod-amt { font-size: 15px; }
-  .bwb__barcode-num { font-size: 12px; letter-spacing: 0.5px; }
 }
 
 .bwb__box-label {
@@ -539,9 +534,9 @@ body {
   margin-top: 2px;
 }
 
-/* The barcode owns a full-width row of its own: a wider bar module survives a
-   low-resolution thermal head far better than a scaled-down one. Ref/Date/
-   Pieces/COD sit above it as a single meta line. */
+/* The scannable code owns a row of its own: QR square on the left, the number
+   printed beside it so a human can read what the driver scans. Ref/Date/
+   Pieces/COD sit above as a single meta line. */
 .bwb__footer {
   margin-top: auto;
   display: flex;
@@ -560,22 +555,42 @@ body {
 
 .bwb__footer-code {
   width: 100%;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
-/* Inline vector barcode. preserveAspectRatio="none" on the SVG lets it fill the
-   label edge to edge while the printer rasterises the bars at its own DPI, so
-   the edges stay hard instead of being resampled like a PNG would be. */
-.bwb__barcode-svg svg {
+/* Inline vector QR. Sized in mm, never in %, and the aspect ratio is left
+   alone — a stretched QR does not decode. The printer rasterises the modules
+   at its own DPI, so the edges stay hard instead of being resampled like a
+   PNG would be. 24mm reads from roughly arm's length on a phone camera. */
+.bwb__qr svg {
   display: block;
-  width: 100%;
-  height: 52px;
+  width: 24mm;
+  height: 24mm;
 }
 
 .bwb__barcode-num {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 1px;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+/* These two live here rather than up with the other container queries: at equal
+   specificity the later rule wins, and the base sizes above are declared after
+   that block — an override written up there never reaches the page. */
+@container (max-width: 78mm) {
+  .bwb__barcode-num { font-size: 13px; letter-spacing: 1px; }
+}
+
+/* Very narrow rolls (58mm): 20mm is the floor that still decodes — below it the
+   modules fall under the thermal head's dot pitch and the code stops reading. */
+@container (max-width: 62mm) {
+  .bwb__qr svg { width: 20mm; height: 20mm; }
+  .bwb__barcode-num { font-size: 12px; letter-spacing: 0.5px; }
 }
 
 .bwb__detail {
@@ -603,9 +618,9 @@ body {
   body { background: #fff; }
   .bwb__toolbar { display: none; }
 
-  /* Thermal drivers dither anything that is not pure black; force the bars
+  /* Thermal drivers dither anything that is not pure black; force the modules
      through as solid ink and keep their edges unsmoothed. */
-  .bwb__barcode-svg svg {
+  .bwb__qr svg {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
     shape-rendering: crispEdges;

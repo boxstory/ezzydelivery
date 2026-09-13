@@ -1,0 +1,211 @@
+{% load static %}
+{% load i18n %}
+{% comment %}
+Purpose: Mobile slide-in account menu for the business PWA (profile, settings, business switch, logout).
+Used by: templates/business_dashboard_base.html — opened by #business_pwa_menu_btn in business/parts/pwa_header.html.
+Notes: Replaces the old header gear icon. Carries the full desktop sidebar — the bottom bar only
+       reaches six destinations, so every other page was unreachable on a phone. Gates mirror
+       dashboard_sidebar_business.html (fulfilment, live tracking, owner-only settings).
+{% endcomment %}
+<div class="bmnu d-md-none" id="business_pwa_menu" hidden>
+  <div class="bmnu__scrim" data-bmnu-close></div>
+
+  <aside class="bmnu__panel" role="dialog" aria-modal="true" aria-labelledby="business_pwa_menu_name"
+         id="business_pwa_menu_panel" tabindex="-1">
+
+    <header class="bmnu__head">
+      <span class="bmnu__avatar" aria-hidden="true">
+        {% firstof user.first_name|slice:":1" user.username|slice:":1" "U" %}
+      </span>
+      <span class="bmnu__identity">
+        <span class="bmnu__name" id="business_pwa_menu_name">{{ user.get_full_name|default:user.username }}</span>
+        {% if user.email %}<span class="bmnu__meta">{{ user.email }}</span>{% endif %}
+      </span>
+      <button type="button" class="bmnu__close" data-bmnu-close aria-label="{% trans 'Close menu' %}">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+    </header>
+
+    {% if user_business %}
+    <div class="bmnu__biz">
+      <span class="bmnu__biz-name">{{ user_business.business_name }}</span>
+      <span class="bmnu__biz-role">
+        {% if is_business_owner %}{% trans "Owner" %}
+        {% elif user_team_profile %}{{ user_team_profile.get_team_role_display }}
+        {% else %}{% trans "Team" %}{% endif %}
+      </span>
+    </div>
+    {% endif %}
+
+    <nav class="bmnu__nav">
+
+      {% if user_business %}
+      <p class="bmnu__label">{% trans "Orders" %}</p>
+      <a class="bmnu__item" href="{% url 'orders:orders_all_list' %}">
+        <i class="fa-solid fa-list bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "All Orders" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'orders:orders_pending_list' %}">
+        <i class="fa-solid fa-spinner bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Pending" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'orders:orders_successfull_list' %}">
+        <i class="fa-solid fa-check bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Successful" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'orders:bulk_import_orders' %}">
+        <i class="fa-solid fa-file-import bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Bulk Import" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'orders:get_orders_by_base_api' %}">
+        <i class="fa-solid fa-code bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "API Orders" %}</span>
+      </a>
+
+      <p class="bmnu__label">{% trans "Catalog" %}</p>
+      <a class="bmnu__item" href="{% url 'product:product_all_list_table' %}">
+        <i class="fa-solid fa-bars bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "All Products" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'product:combo_list' %}">
+        <i class="fa-solid fa-layer-group bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Combos / Bundles" %}</span>
+      </a>
+      {% if user_business.fulfillment_service_enabled %}
+      <a class="bmnu__item" href="{% url 'business:inbound_requests_list' %}">
+        <i class="fa-solid fa-arrow-right-to-bracket bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Inbound Requests" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'business:outbound_requests_list' %}">
+        <i class="fa-solid fa-arrow-right-from-bracket bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Outbound Requests" %}</span>
+      </a>
+      {% endif %}
+
+      <p class="bmnu__label">{% trans "Operations" %}</p>
+      <a class="bmnu__item" href="{% url 'product:product_inventory' %}">
+        <i class="fa-solid fa-chart-bar bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Inventory Report" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'business:pickup_location_list' %}">
+        <i class="fa-solid fa-location-dot bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Stores List" %}</span>
+      </a>
+      {% if user_business.live_tracking_enabled %}
+      <a class="bmnu__item" href="{% url 'business:live_tracking_map' %}">
+        <i class="fa-solid fa-map-location-dot bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Live Tracking" %}</span>
+        {% if live_rides_count %}
+        <span class="bmnu__item-count">{{ live_rides_count|default:"0" }}</span>
+        {% endif %}
+      </a>
+      {% endif %}
+
+      <p class="bmnu__label">{% trans "Finance" %}</p>
+      <a class="bmnu__item" href="{% url 'business:business_finance_dashboard' %}">
+        <i class="fa-solid fa-chart-line bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Finance Overview" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'business:business_transactions' %}">
+        <i class="fa-solid fa-clock-rotate-left bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Recent Transactions" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'business:business_cod_statement' %}">
+        <i class="fa-solid fa-file-invoice-dollar bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "COD Collections" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'business:business_delivery_charges' %}">
+        <i class="fa-solid fa-sack-dollar bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "EST Delivery Charges" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'business:business_charge_invoices' %}">
+        <i class="fa-solid fa-file-invoice bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Invoices" %}</span>
+      </a>
+
+      <p class="bmnu__label">{% trans "Reports" %}</p>
+      <a class="bmnu__item" href="{% url 'business:reports_dashboard' %}">
+        <i class="fa-solid fa-file-export bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Reports & Export" %}</span>
+      </a>
+      {% endif %}
+
+      <p class="bmnu__label">{% trans "Account" %}</p>
+      <a class="bmnu__item" href="{% url 'core:profile_view' %}">
+        <i class="fa-solid fa-user bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "My Profile" %}</span>
+      </a>
+      {% if user_business %}
+      <a class="bmnu__item" href="{% url 'business:business_profile' %}">
+        <i class="fa-solid fa-store bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Public View" %}</span>
+      </a>
+      {% endif %}
+
+      {% if is_business_owner and user_business %}
+      <p class="bmnu__label">{% trans "Settings" %}</p>
+      <a class="bmnu__item" href="{% url 'business:business_settings' user_business.business_id %}">
+        <i class="fa-solid fa-sliders bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Business Settings" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'business:business_teams' user_business.business_id %}">
+        <i class="fa-solid fa-users bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Teams" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'business:business_settings_api_list' user_business.business_id %}">
+        <i class="fa-solid fa-code bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "API Settings" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'business:whatsapp_triggers_list' %}">
+        <i class="fa-brands fa-whatsapp bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "WhatsApp Alerts" %}</span>
+      </a>
+      <a class="bmnu__item" href="{% url 'business:branded_tracking_settings' %}">
+        <i class="fa-solid fa-palette bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Tracking Page" %}</span>
+      </a>
+      {% endif %}
+
+      {% if show_business_switcher %}
+      <p class="bmnu__label">{% trans "Switch Business" %}</p>
+      {% for business_info in user_businesses %}
+      <a class="bmnu__item {% if business_info.business.business_id == user_business.business_id %}bmnu__item--current{% endif %}"
+         href="{% url 'business:business_switch' business_info.business.business_id %}">
+        <i class="fa-solid {% if business_info.access_type == 'owner' %}fa-crown{% else %}fa-user-tie{% endif %} bmnu__item-icon"
+           aria-hidden="true"></i>
+        <span>{{ business_info.business.business_name|truncatechars:24 }}</span>
+        {% if business_info.business.business_id == user_business.business_id %}
+        <i class="fa-solid fa-check bmnu__item-flag" aria-hidden="true"></i>
+        {% endif %}
+      </a>
+      {% endfor %}
+      <a class="bmnu__item" href="{% url 'business:business_selector' %}">
+        <i class="fa-solid fa-table-cells-large bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "View All" %}</span>
+      </a>
+      {% endif %}
+
+      <p class="bmnu__label">{% trans "Support" %}</p>
+      <a class="bmnu__item" href="{% url 'webpages:help_center' %}" target="_blank" rel="noopener">
+        <i class="fa-solid fa-circle-question bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Help Center" %}</span>
+      </a>
+
+      <form action="{% url 'set_language' %}" method="post" class="bmnu__form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <button type="submit" name="language" value="{% if LANGUAGE_CODE == 'ar' %}en{% else %}ar{% endif %}"
+                class="bmnu__item bmnu__item--button">
+          <i class="fa-solid fa-language bmnu__item-icon" aria-hidden="true"></i>
+          <span>{% if LANGUAGE_CODE == 'ar' %}English{% else %}العربية{% endif %}</span>
+        </button>
+      </form>
+
+      <a class="bmnu__item bmnu__item--danger" href="{% url 'account_logout' %}">
+        <i class="fa-solid fa-right-from-bracket bmnu__item-icon" aria-hidden="true"></i>
+        <span>{% trans "Log Out" %}</span>
+      </a>
+
+    </nav>
+  </aside>
+</div>
