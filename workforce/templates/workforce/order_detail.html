@@ -12,7 +12,7 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
 {% block title %}Order {{ order.order_number }} - Workforce{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/order-detail.css' %}?v=20260701a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/order-detail.css' %}?v=20260918a" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -84,6 +84,19 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                onclick="return confirm('Create a new draft order copied from this one?');">
                 <i class="fa-solid fa-copy me-1"></i> Repeat Order
             </a>
+            {% if can_replace %}
+            <button type="button"
+                    class="wod__btn wod__btn--light"
+                    id="wod_btn_replacement"
+                    data-bs-toggle="modal" data-bs-target="#wodReplacementModal">
+                <i class="fa-solid fa-right-left me-1"></i> Send Replacement
+            </button>
+            {% else %}
+            <span class="wod__btn wod__btn--light wod__btn--disabled"
+                  title="{{ replace_blocked_reason }}">
+                <i class="fa-solid fa-right-left me-1"></i> Send Replacement
+            </span>
+            {% endif %}
             {% if order.order_status == 'to_review' or order.order_status == 'ready_to_pickup' %}
             <button type="button"
                     class="wod__btn wod__btn--info"
@@ -111,6 +124,29 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
 
     <div class="wfnote" id="workforce_order_detail_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_order_detail_card_notes' %}" hidden></div>
+
+    {% if order.replaces or order.replacements.exists %}
+    <div class="wod__replnote" role="note">
+        {% if order.replaces %}
+        <div class="wod__replnote-line">
+            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+            <span>Replacement for
+                <a href="{% url 'workforce:order_detail' order.replaces.id %}">{{ order.replaces.order_number }}</a>
+                {% if order.replacement_reason %}— {{ order.get_replacement_reason_display }}{% endif %}
+            </span>
+        </div>
+        {% endif %}
+        {% for repl in order.replacements.all %}
+        <div class="wod__replnote-line">
+            <i class="fa-solid fa-right-left" aria-hidden="true"></i>
+            <span>Replaced by
+                <a href="{% url 'workforce:order_detail' repl.id %}">{{ repl.order_number }}</a>
+                {% if repl.replacement_reason %}— {{ repl.get_replacement_reason_display }}{% endif %}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <div class="row g-3 px-1 pt-0">
         <!-- Order Info -->
@@ -839,6 +875,98 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
         </div>
     </div>
 </div>
+<div class="modal fade" id="wodReplacementModal" tabindex="-1"
+     aria-labelledby="wodReplacementTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content wod__repl">
+            <div class="modal-header wod__repl-header">
+                <h6 class="modal-title mb-0" id="wodReplacementTitle">
+                    <i class="fa-solid fa-right-left me-2"></i>Send a replacement
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="wod__repl-lede">
+                    A new order goes out to the same customer. The customer is not charged again
+                    unless you collect a difference below.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label wod__repl-label" for="wod_repl_reason">Reason</label>
+                    <select class="form-select" id="wod_repl_reason" required>
+                        {% for value, label in replacement_reasons %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <span class="form-label wod__repl-label d-block">Settlement at the door</span>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="wod_repl_settle"
+                               id="wod_repl_settle_none" value="none" checked>
+                        <label class="form-check-label" for="wod_repl_settle_none">
+                            Even exchange — no money changes hands
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="wod_repl_settle"
+                               id="wod_repl_settle_collect" value="collect">
+                        <label class="form-check-label" for="wod_repl_settle_collect">
+                            Collect extra from the customer
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="wod_repl_settle"
+                               id="wod_repl_settle_refund" value="refund">
+                        <label class="form-check-label" for="wod_repl_settle_refund">
+                            Refund the customer
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3 d-none" id="wod_repl_amount_wrap">
+                    <label class="form-label wod__repl-label" for="wod_repl_amount">
+                        Amount (QAR)
+                    </label>
+                    <input type="number" class="form-control" id="wod_repl_amount"
+                           min="0" step="0.01" placeholder="0.00">
+                    <div class="wod__repl-hint" id="wod_repl_amount_hint"></div>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="wod_repl_collect_back">
+                    <label class="form-check-label" for="wod_repl_collect_back">
+                        Driver takes the original items back on the same visit
+                    </label>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label wod__repl-label" for="wod_repl_notes">
+                        Notes <span class="wod__repl-optional">optional</span>
+                    </label>
+                    <textarea class="form-control" id="wod_repl_notes" rows="2"
+                              placeholder="What happened?"></textarea>
+                </div>
+
+                <div class="wod__repl-figures">
+                    <span>Customer paid so far: <strong>QAR {{ collected_so_far }}</strong></span>
+                    <span>Refundable: <strong>QAR {{ refund_ceiling }}</strong></span>
+                </div>
+            </div>
+            <div class="modal-footer wod__repl-footer">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="wod__btn wod__btn--info" id="wod_repl_submit"
+                        data-url="{% url 'workforce:create_replacement_order' order.id %}"
+                        data-ceiling="{{ refund_ceiling }}">
+                    <i class="fa-solid fa-paper-plane me-1"></i> Create replacement
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -987,6 +1115,93 @@ function wodPublishOrder(btn, url) {
 function wodCancelOrder(btn, url) {
     wodPostAction(btn, url, 'Are you sure you want to cancel this order?', 'Order cancelled.');
 }
+
+// --- Replacement / exchange ---------------------------------------------------
+// The amount is typed, never derived: most orders carry no priced items, so there
+// is nothing to compute a difference from.
+(function wodReplacementModal() {
+    var wrap = document.getElementById('wod_repl_amount_wrap');
+    var hint = document.getElementById('wod_repl_amount_hint');
+    var amount = document.getElementById('wod_repl_amount');
+    var submit = document.getElementById('wod_repl_submit');
+    if (!wrap || !submit) return;
+
+    function settlement() {
+        var picked = document.querySelector('input[name="wod_repl_settle"]:checked');
+        return picked ? picked.value : 'none';
+    }
+
+    function sync() {
+        var mode = settlement();
+        var ceiling = parseFloat(submit.dataset.ceiling || '0');
+        wrap.classList.toggle('d-none', mode === 'none');
+        if (mode === 'collect') {
+            hint.textContent = 'The driver collects this from the customer at the door.';
+            amount.removeAttribute('max');
+        } else if (mode === 'refund') {
+            hint.textContent = 'At most QAR ' + ceiling.toFixed(2) +
+                ' can be handed back on this order.';
+            amount.setAttribute('max', ceiling);
+        }
+    }
+
+    Array.prototype.forEach.call(
+        document.querySelectorAll('input[name="wod_repl_settle"]'),
+        function (el) { el.addEventListener('change', sync); });
+    sync();
+
+    submit.addEventListener('click', function () {
+        var mode = settlement();
+        var value = parseFloat(amount.value || '0');
+        var ceiling = parseFloat(submit.dataset.ceiling || '0');
+
+        if (mode !== 'none' && !(value > 0)) {
+            wodShowToast('Enter an amount, or choose an even exchange.', 'danger');
+            return;
+        }
+        if (mode === 'refund' && value > ceiling) {
+            wodShowToast('Only QAR ' + ceiling.toFixed(2) + ' is refundable on this order.',
+                         'danger');
+            return;
+        }
+
+        var body = new FormData();
+        body.append('reason', document.getElementById('wod_repl_reason').value);
+        body.append('notes', document.getElementById('wod_repl_notes').value);
+        body.append('collect_back',
+            document.getElementById('wod_repl_collect_back').checked ? '1' : '0');
+        if (mode === 'collect') { body.append('collect_amount', value); }
+        if (mode === 'refund') { body.append('refund_amount', value); }
+
+        var orig = submit.innerHTML;
+        submit.disabled = true;
+        submit.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Creating…';
+
+        var csrfToken = getCookie('csrftoken') ||
+            document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+        fetch(submit.dataset.url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+            body: body
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.success) {
+                wodShowToast(data.message || 'Replacement created.', 'success');
+                setTimeout(function () { window.location.href = data.redirect; }, 1400);
+            } else {
+                wodShowToast(data.error || 'Something went wrong', 'danger');
+                submit.disabled = false;
+                submit.innerHTML = orig;
+            }
+        })
+        .catch(function () {
+            wodShowToast('Network error. Please try again.', 'danger');
+            submit.disabled = false;
+            submit.innerHTML = orig;
+        });
+    });
+})();
 
 // Get CSRF token - multiple fallback methods
 function getCookie(name) {

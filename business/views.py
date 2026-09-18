@@ -64,6 +64,7 @@ from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonRespon
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from core.decorators import business_required
@@ -4127,19 +4128,28 @@ def returns_list(request):
     })
 
 
+# 'refunded' asserts that EzzyDelivery paid money back to a customer. That is a
+# claim about our cash, not the seller's, so they may not make it — there is no
+# refund path anywhere that a seller can trigger.
+#
+# Deliberately NOT 'approved'/'rejected': those decide whether the seller takes
+# their own goods back and write to their own OrderItem counts, which is theirs
+# to call. There is also no staff-side return console, so restricting them would
+# mean no one could approve a return at all.
+STAFF_ONLY_RETURN_STATUSES = ('refunded',)
+
+
 def _collected_cod_for(order):
     """COD actually taken from the customer on this order — the refund ceiling.
 
-    An order the driver never collected on has nothing to hand back, however
-    large its cod_amount is.
+    Delegates to orders.money.collected_for, which is NET of refunds already
+    made. The figure this used to return counted the gross collection, so two
+    sequential returns on one order each believed the whole amount was still
+    refundable.
     """
-    from decimal import Decimal
-    from delivery import models as delivery_models
+    from orders import money
 
-    total = delivery_models.DeliveryTask.objects.filter(
-        order=order, cod_collected=True,
-    ).aggregate(total=Sum('cod_collected_amount'))['total']
-    return total or Decimal('0')
+    return money.collected_for(order)
 
 
 @login_required(login_url='account_login')
@@ -4170,6 +4180,54 @@ def return_detail(request, return_id):
         'status_choices': dict(ReturnRequest.RETURN_STATUS_CHOICES),
         'user_business': business,
     })
+
+
+@login_required(login_url='account_login')
+@business_required
+@business_permission_required(BusinessPermissions.ORDER_REPLACE)
+@business_active_required
+@require_POST
+def replacement_create(request, order_id):
+    """Seller asks for fresh goods to go out for an order that went wrong.
+
+    The client path deliberately cannot publish and cannot collect extra money:
+    a replacement raised here lands as a draft for staff to confirm, and any
+    settlement at the door is an ops decision. What the seller controls is the
+    request and the reason.
+    """
+    from orders import services as orders_services
+
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    # Scoped to the seller's own business — this is the tenant boundary.
+    order = get_object_or_404(
+        orders_models.Order.objects.select_related('business'),
+        id=order_id, business=business)
+
+    reason = (request.POST.get('reason') or '').strip()
+    notes = (request.POST.get('notes') or '').strip()
+    collect_back = request.POST.get('collect_back') in ('1', 'true', 'on', 'yes')
+
+    try:
+        new_order = orders_services.create_replacement_order(
+            order, reason=reason, collect_back=collect_back,
+            user=request.user, notes=notes)
+    except ValidationError as exc:
+        messages.error(request, '; '.join(exc.messages))
+        return redirect('orders:order_details', order.id)
+    except Exception:
+        logger.exception("Client replacement failed for order %s", order_id)
+        messages.error(request, "Could not raise the replacement. Please contact support.")
+        return redirect('orders:order_details', order.id)
+
+    messages.success(
+        request,
+        f"Replacement {new_order.order_number} raised for {order.order_number}. "
+        f"Our team will confirm it before it goes out.")
+    return redirect('orders:order_details', new_order.id)
 
 
 @login_required(login_url='account_login')
@@ -4259,9 +4317,17 @@ def return_create(request, order_id):
 
 @login_required(login_url='account_login')
 @business_required
+@business_permission_required(BusinessPermissions.ORDER_REPLACE)
 @business_active_required
 def return_update_status(request, return_id):
-    """Update the status of a return request (approve/reject)."""
+    """Update the status of a return request (approve/reject).
+
+    Two gates, because this used to have neither. Approving writes back to
+    OrderItem quantities, so it is not something a read-only team member should
+    be able to do — hence ORDER_REPLACE above. And a seller marking their own
+    return 'refunded' would be recording money we never paid, so that one
+    outcome is ours alone.
+    """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -4279,6 +4345,15 @@ def return_update_status(request, return_id):
     valid_statuses = [s[0] for s in ReturnRequest.RETURN_STATUS_CHOICES]
     if new_status not in valid_statuses:
         messages.error(request, "Invalid status.")
+        return redirect('business:return_detail', ret.id)
+
+    # A seller decides their own return and moves it through the handling steps.
+    # What they cannot do is declare that we refunded their customer.
+    if new_status in STAFF_ONLY_RETURN_STATUSES and not request.user.is_staff:
+        messages.error(
+            request,
+            "A refund is recorded by EzzyDelivery once the money has actually gone "
+            "back. Approve the return and our team will settle it.")
         return redirect('business:return_detail', ret.id)
 
     ret.status = new_status

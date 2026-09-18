@@ -550,6 +550,10 @@ class DeliveryTask(models.Model):
     TASK_LEG_CHOICES = [
         ('single',       'Single Leg (Standard)'),
         ('hub_delivery', 'Hub Delivery — Leg 2 (To Customer)'),
+        # One visit that goes both ways: the driver hands over the replacement and
+        # takes the original away. Priced on its own rate card line rather than as
+        # a normal drop, because it is two handovers and often a cash settlement.
+        ('exchange',     'Exchange — Collect Old, Deliver New'),
     ]
     task_leg = models.CharField(
         max_length=20, choices=TASK_LEG_CHOICES, default='single',

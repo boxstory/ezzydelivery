@@ -56,7 +56,7 @@ _OPS = [
     'wf_orders_published', 'wf_orders_reported', 'wf_orders_fulfilled_clients',
     'wf_orders_non_fulfilled_clients', 'orders_pending_verification', 'verify_order_address',
     'order_detail', 'order_edit', 'order_item_add', 'order_item_update', 'order_item_delete',
-    'cancel_order', 'duplicate_order', 'partial_return_order', 'delete_order',
+    'cancel_order', 'duplicate_order', 'create_replacement_order', 'partial_return_order', 'delete_order',
     'publish_order_to_delivery', 'update_order_status', 'bulk_update_order_status',
     'add_order_comment', 'update_order_coords', 'update_order_zone', 'assign_driver_to_order',
     'submit_to_task', 'order_autoflow_status',

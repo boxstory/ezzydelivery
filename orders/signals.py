@@ -828,6 +828,13 @@ def _create_delivery_task_from_order(order):
             else:
                 preferred_time = '6pm-10pm'
 
+        # An exchange goes both ways: the driver hands over the replacement and
+        # brings the original back. The leg is what prices the round trip and what
+        # raises the 'collect the old item' banner in his app, so it has to be set
+        # wherever the task is born — a replacement raised by the seller is a draft
+        # with no task yet, and only gets one here when staff publish it.
+        task_leg = 'exchange' if order.collect_back else 'single'
+
         # Create delivery task with all mapped fields
         delivery_task = DeliveryTask.objects.create(
             dl_task_number=order.order_number,
@@ -838,7 +845,7 @@ def _create_delivery_task_from_order(order):
             dl_task_status='for_review',
             dl_task_status_client='for_review',
             pickup_location=order.pickup_location,
-            task_leg='single',
+            task_leg=task_leg,
             dl_task_date=task_date,
             dl_price=order.dl_amount or 0,
             dl_waight=order.package_qty or 1,

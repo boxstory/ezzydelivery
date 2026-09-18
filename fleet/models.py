@@ -246,6 +246,13 @@ class Driver(models.Model):
         help_text="Driver's preferred delivery zone groups"
     )
 
+    # Which columns this driver's payout invoices carry, as a list of keys from
+    # fleet.payout_columns.PAYOUT_COLUMNS. Empty means "not set" — the document
+    # falls back to the default column set, which is what every payout showed
+    # before the picker existed. A single payout can override this.
+    payout_columns = models.JSONField(default=list, blank=True,
+        help_text='Default payout-invoice columns for this driver (keys from fleet.payout_columns)')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -709,6 +716,12 @@ class DriverSettlement(models.Model):
     )
 
     # Status and workflow
+    # Per-payout override of the driver's default column set. Empty means "follow
+    # the driver", which in turn falls back to the default columns — so a payout
+    # nobody has touched renders exactly as it did before the picker existed.
+    column_keys = models.JSONField(default=list, blank=True,
+        help_text="Columns this payout invoice shows, overriding Driver.payout_columns")
+
     status = models.CharField(max_length=20, choices=SETTLEMENT_STATUS, default='pending')
     payment_method = models.CharField(
         max_length=50, blank=True, null=True,
@@ -925,6 +938,12 @@ class DeliveryPayRate(models.Model):
     pick_and_drop_percent = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal('80.00'),
         help_text="Percent of the client delivery charge paid on a pick & drop job.",
+    )
+    exchange_fee = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('10.00'),
+        help_text="QAR paid for an exchange visit — replacement handed over and the "
+                  "original collected in one trip. Starts level with a normal "
+                  "delivery; raise it here if the round trip should pay more.",
     )
 
     effective_from = models.DateField(help_text="First day this card applies.")

@@ -144,6 +144,7 @@ urlpatterns = [
     path('orders/<int:order_id>/items/<int:item_id>/delete/', workforce_views.order_item_delete, name='order_item_delete'),
     path('orders/<int:order_id>/cancel/', workforce_views.cancel_order, name='cancel_order'),
     path('orders/<int:order_id>/duplicate/', workforce_views.duplicate_order, name='duplicate_order'),
+    path('orders/<int:order_id>/replacement/', workforce_views.create_replacement_order, name='create_replacement_order'),
     path('orders/<int:order_id>/partial-return/', workforce_views.partial_return_order, name='partial_return_order'),
     path('orders/<int:order_id>/delete/', workforce_views.delete_order, name='delete_order'),
     path('order/<int:order_id>/update-zone/', workforce_views.update_order_zone, name='update_order_zone'),

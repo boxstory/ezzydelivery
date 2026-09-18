@@ -20,6 +20,25 @@ ZERO = Decimal('0.00')
 # with thousands of rows can total past what one entry could hold.
 BALANCE_FIELD = DecimalField(max_digits=14, decimal_places=2)
 
+# Money a client has paid in that we may pay back out at a customer's door.
+#
+# Deliberately NOT balance(): the COD, charge and payout legs do not post to this
+# ledger yet, so counting their segments would credit a client for money the
+# account has no record of receiving. Widen this list — here, once — the day
+# those legs are wired in.
+#
+# SEGMENT_REVERSAL is not a member. A reversal is counted only when the row it
+# reverses was itself prefunded (see available_refund_credit): a blanket include
+# would let the contra of a non-prefunded entry subtract from a client's float
+# while the original it cancels was never counted in the first place.
+PREFUNDED_SEGMENTS = [
+    BusinessLedgerEntry.SEGMENT_OPENING,
+    BusinessLedgerEntry.SEGMENT_PAYMENT,
+    BusinessLedgerEntry.SEGMENT_ADVANCE,
+    BusinessLedgerEntry.SEGMENT_CREDIT,
+    BusinessLedgerEntry.SEGMENT_ADJUSTMENT,
+]
+
 
 def _money(value):
     """Coerce to a 2dp Decimal, treating None as zero."""
@@ -126,6 +145,55 @@ def reverse(entry, reason=None, created_by=None, occurred_on=None):
 
 
 @transaction.atomic
+def post_refund(business, amount, order=None, reason='', created_by=None,
+                occurred_on=None, delivery_task=None):
+    """Debit a client's float to hand money back to their customer.
+
+    This is the leg that pays a refund the driver's wallet cannot: the COD was
+    already settled to the seller, or it was never collected because the order
+    was prepaid. Either way the cash is no longer the driver's to return, so it
+    comes off what the seller has on deposit with us.
+
+    Refused above available_refund_credit(), deliberately: a refund pays a
+    customer with money that is not ours, so it is allowed only against float
+    the account can actually evidence receiving. That figure is read inside this
+    transaction, so two refunds authorised at the same moment cannot both pass
+    on a stale balance — the first one's debit is already posted when the second
+    reads the gate.
+
+    Posted as an ADJUSTMENT rather than a negative anything: BusinessLedgerEntry
+    is single-sided and non-negative by database constraint, and ADJUSTMENT is
+    already counted in PREFUNDED_SEGMENTS, so the float self-corrects.
+    """
+    amount = _money(amount)
+    if amount <= ZERO:
+        raise ValueError("A refund must be more than zero")
+
+    available = available_refund_credit(business)
+    if amount > available:
+        raise ValueError(
+            f"Refund of {amount} exceeds the {available} this client has on deposit. "
+            f"Take a payment from them, or reverse the COD payout first."
+        )
+
+    label = reason or "Customer refund"
+    if order is not None:
+        label = f"{label} — order {order.order_number}"
+
+    return post(
+        business=business,
+        segment=BusinessLedgerEntry.SEGMENT_ADJUSTMENT,
+        debit=amount,
+        description=label[:255],
+        occurred_on=occurred_on or timezone.localdate(),
+        status=BusinessLedgerEntry.STATUS_CLEARED,
+        order=order,
+        delivery_task=delivery_task,
+        created_by=created_by,
+    )
+
+
+@transaction.atomic
 def post_opening_balance(business, created_by=None, occurred_on=None):
     """Seed an account with where it already stands.
 
@@ -191,6 +259,35 @@ def post_opening_balance(business, created_by=None, occurred_on=None):
 def balance(business, as_of=None):
     """What we owe this client right now. Negative means they owe us."""
     qs = BusinessLedgerEntry.objects.filter(business=business)
+    if as_of:
+        qs = qs.filter(occurred_on__lte=as_of)
+    return qs.aggregate(
+        t=Coalesce(Sum(F('credit') - F('debit')), Value(ZERO), output_field=BALANCE_FIELD)
+    )['t']
+
+
+def available_refund_credit(business, as_of=None):
+    """What this client has on deposit that we may hand back at a door.
+
+    A refund pays a customer with money that is not ours, so it is allowed only
+    against float the account can actually evidence — see PREFUNDED_SEGMENTS for
+    why that is a narrower set than the balance.
+
+    Void rows are deliberately kept, exactly as balance() keeps them: a voided
+    entry and its reversal cancel, and dropping only the original would move the
+    figure by the amount twice.
+
+    Pending holds are already debits here, which is what lets two refunds
+    authorised at the same moment be made safe by posting the hold before the
+    gate is re-read, rather than by a lock held across the whole flow.
+    """
+    reversal_of_prefunded = Q(
+        segment=BusinessLedgerEntry.SEGMENT_REVERSAL,
+        reversal_of__segment__in=PREFUNDED_SEGMENTS,
+    )
+    qs = BusinessLedgerEntry.objects.filter(business=business).filter(
+        Q(segment__in=PREFUNDED_SEGMENTS) | reversal_of_prefunded
+    )
     if as_of:
         qs = qs.filter(occurred_on__lte=as_of)
     return qs.aggregate(

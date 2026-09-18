@@ -263,6 +263,21 @@
         </div>
     </div>
 
+    {% if card.task_leg == 'exchange' %}
+    {% comment %}An exchange goes both ways. Leaving without the original wastes the
+    whole trip and the goods stay with the customer, so this sits above the address
+    rather than in the strip at the bottom with the rest of the figures.{% endcomment %}
+    <div class="task-card__exchange">
+        <i class="fa-solid fa-right-left" aria-hidden="true"></i>
+        <div class="task-card__exchange-text">
+            <strong>Exchange — collect the old item</strong>
+            <span>Hand over the replacement and bring the original back with you.
+                {% if card.order.cod_amount %}Collect {{ card.order.cod_amount }} QR.{% endif %}
+            </span>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Business + Customer Row -->
     <div class="task-card__body">
         <!-- Customer Info -->

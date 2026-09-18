@@ -139,9 +139,13 @@ class Business(EmailNormalizedModel, models.Model):
     business_status = models.CharField(
         max_length=100,  choices=status_choices, default='pending')
 
-    # Fulfillment Service - Businesses using EzzyDelivery's fulfillment/WMS service
+    # Fulfillment Service - Businesses using EzzyDelivery's fulfillment/WMS service.
+    # Opt-in: staff switch it on from the seller Store Locations tab, which links the
+    # warehouse and adds its pickup address (workforce.views seller_detail). It must
+    # not default to True — a client born with it on is refused SKU-less products
+    # (Product.save) and is shown warehouse menus it has no warehouse for.
     fulfillment_service_enabled = models.BooleanField(
-        default=True,
+        default=False,
         help_text="Enable fulfillment service (WMS integration) for this business"
     )
     FULFILLMENT_STATUS_CHOICES = [
@@ -373,6 +377,52 @@ class BusinessApiSettings(models.Model):
     last_sample_payload = models.JSONField(blank=True, null=True, default=None,
         help_text='Custom API: the last sample order payload staff pasted, kept so the '
                   'mapping can be tested before the seller has sent a real order.')
+    # ---- Custom REST pull: we fetch orders FROM the seller's own site ----
+    # A 'custom' integration is inbound by default (their site POSTs to
+    # /api/v1/store/orders/). Filling fetch_orders_url turns the SAME row into a
+    # pull source as well, so one row keeps one column_mapping: the JSON shape is
+    # identical whether we were handed the order or went and got it.
+    fetch_auth_choices = [
+        ('bearer', 'Authorization: Bearer <key>'),
+        ('header', 'Custom header'),
+        ('query', 'Query string parameter'),
+        ('basic', 'HTTP Basic (key:secret)'),
+        ('none', 'No authentication'),
+    ]
+    fetch_orders_url = models.URLField(max_length=500, blank=True, default='',
+        help_text="Full URL on the seller's own site that returns their orders as JSON, "
+                  "e.g. https://theirshop.com/api/orders. Leave empty for push-only.")
+    fetch_auth_style = models.CharField(max_length=20, choices=fetch_auth_choices, default='bearer',
+        help_text='How the key issued by the seller is presented to their endpoint.')
+    fetch_auth_name = models.CharField(max_length=100, blank=True, default='',
+        help_text="Header or query-parameter name - only for the 'header' and 'query' styles "
+                  "(e.g. X-API-Key, api_key).")
+    fetch_api_key = models.CharField(max_length=255, blank=True, default='',
+        help_text="The API key the SELLER's site issued to us. Never our own ClientApiKey.")
+    fetch_list_path = models.CharField(max_length=200, blank=True, default='',
+        help_text="Path to the order array inside the response, e.g. 'data.orders'. "
+                  "Leave empty when the response is the array itself.")
+    fetch_params = models.JSONField(blank=True, null=True, default=None,
+        help_text='Extra query string sent with every fetch, e.g. {"status": "pending", "limit": "50"}.')
+    fetch_products_url = models.URLField(max_length=500, blank=True, default='',
+        help_text="URL on the seller's site returning their product catalogue as JSON. "
+                  "Separate from the order URL — an order feed says nothing about a catalogue.")
+    fetch_products_list_path = models.CharField(max_length=200, blank=True, default='',
+        help_text="Path to the product array in that response, e.g. 'data.products'. "
+                  "Leave empty when the response is the array itself.")
+    product_column_mapping = models.JSONField(blank=True, null=True, default=None,
+        help_text='Product field -> JSON path in the seller\'s product response, e.g. '
+                  '{"item_name": "title", "item_sku": "sku", "item_price": "price"}. '
+                  'Nothing is guessed: an unmapped field is simply not imported.')
+    fetch_status_path = models.CharField(max_length=200, blank=True, default='',
+        help_text="Path to each order's status field, e.g. 'status'. Only used with "
+                  "fetch_status_include.")
+    fetch_status_include = models.CharField(max_length=255, blank=True, default='',
+        help_text="Comma-separated statuses worth delivering, e.g. 'accepted'. Orders in any "
+                  "other status are ignored. Empty means take every order returned.")
+    fetch_enabled = models.BooleanField(default=False,
+        help_text='Include this source in the hourly order pull.')
+
     last_sync_at = models.DateTimeField(blank=True, null=True,
         help_text='Last successful sync fetch from this source (Google Sheet / Shopify / WooCommerce).')
     last_sync_count = models.PositiveIntegerField(default=0,

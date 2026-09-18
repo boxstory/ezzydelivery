@@ -314,6 +314,18 @@ def pay_rate_save(request):
     if error:
         messages.error(request, error)
         return back
+    # Left blank the exchange visit pays the normal fee, which is what it paid
+    # before the leg existed — so an old form that does not post the field cannot
+    # silently zero a driver's pay.
+    raw_exchange = request.POST.get('exchange_fee')
+    if raw_exchange in (None, ''):
+        exchange = normal
+    else:
+        exchange, error = _parse_amount(
+            raw_exchange, 'exchange visit fee', minimum=Decimal('0'))
+        if error:
+            messages.error(request, error)
+            return back
 
     effective_from = _parse_day(request.POST.get('effective_from'), timezone.localdate())
 
@@ -371,6 +383,7 @@ def pay_rate_save(request):
             normal_fee=normal,
             hub_fee=hub,
             pick_and_drop_percent=percent,
+            exchange_fee=exchange,
             effective_from=effective_from,
             notes=(request.POST.get('notes') or '').strip()[:2000],
             created_by=request.user,

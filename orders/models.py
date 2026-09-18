@@ -77,6 +77,23 @@ ORDER_TYPE_CHOICES = [
         ('pick_and_drop', 'Pick and Drop'),
     ]
 
+# Why a replacement is going out. Deliberately NOT ReturnRequest.RETURN_REASON_CHOICES:
+# 'customer_changed_mind' and 'duplicate_order' are reasons to take goods back, not
+# reasons to send fresh ones at our own cost.
+REPLACEMENT_REASON_CHOICES = [
+        ('wrong_item', 'Wrong Item Sent'),
+        ('damaged', 'Damaged in Transit'),
+        ('lost', 'Lost in Transit'),
+        ('missing_items', 'Items Missing from Package'),
+        ('failed_delivery', 'Failed Delivery'),
+        ('size_exchange', 'Exchange — different item or size'),
+        ('other', 'Other'),
+    ]
+
+# A replacement of a replacement is legitimate once; past that it is a loop someone
+# needs to look at rather than another free parcel.
+MAX_REPLACEMENT_DEPTH = 2
+
 DELIVERY_SPEED_CHOICES = [
     ('standard', 'Standard (48hr)'),
     ('same_day', 'Same Day'),
@@ -141,6 +158,20 @@ class Order(models.Model):
     # sender with no Business needs a second, explicit column to scope their console on.
     # Null on every business order, including a P2P booking routed to the sender's own
     # business (that one belongs in their client console, not the personal one).
+    # A replacement is marked by `replaces` being set, NOT by an order_type value:
+    # order_type is a pricing dimension (delivery/earnings.py branches on it), so a new
+    # member there would silently reroute driver pay. A replacement is still a normal
+    # delivery or a pick & drop in how it travels.
+    replaces = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, blank=True, null=True,
+        db_index=True, related_name='replacements',
+        help_text="The original order this one re-sends. Null for a first delivery.")
+    replacement_reason = models.CharField(
+        max_length=30, choices=REPLACEMENT_REASON_CHOICES, blank=True, default='',
+        help_text="Why the replacement went out. Blank on a first delivery.")
+    collect_back = models.BooleanField(
+        default=False,
+        help_text="Driver takes the original items back on this visit — an exchange, not a re-send.")
     p2p_customer = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True,
         db_index=True, related_name='p2p_orders',
@@ -474,6 +505,26 @@ class Order(models.Model):
 
         return 'low_stock' if has_low else 'ok'
 
+    @property
+    def is_replacement(self):
+        """True when this order re-sends goods for an earlier one."""
+        return self.replaces_id is not None
+
+    @property
+    def replacement_depth(self):
+        """How many originals sit behind this order.
+
+        Walks with a `seen` set: `replaces` is SET_NULL rather than a tree with a
+        guaranteed root, so a hand-edited or restored row could point in a circle,
+        and an unguarded walk would hang the request serving it.
+        """
+        depth, node, seen = 0, self.replaces, set()
+        while node is not None and node.pk not in seen:
+            seen.add(node.pk)
+            depth += 1
+            node = node.replaces
+        return depth
+
     def __str__(self):
         return f'({self.business}-{self.order_number}-{self.client_order_code})'
 
@@ -487,9 +538,11 @@ class Order(models.Model):
             models.Index(fields=['client_order_code'], name='ord_client_code_idx'),
             models.Index(fields=['-created_at'], name='ord_created_idx'),
             models.Index(fields=['verification_status'], name='ord_verification_idx'),
+            models.Index(fields=['business', 'replaces'], name='ord_biz_replaces_idx'),
         ]
         constraints = [
             models.UniqueConstraint(fields=['business', 'client_order_code'], name='ord_unique_client_code_per_business'),
+            models.CheckConstraint(check=~models.Q(replaces=models.F('id')), name='ord_replacement_not_self'),
         ]
 
 class OrderLog(models.Model):
@@ -1024,6 +1077,9 @@ class TempOrder(models.Model):
         ('imported', 'Imported'),
         ('skipped', 'Skipped'),
     ]
+    # 'webhook' and 'custom_api' are PUSHED by the seller, not pulled by the
+    # sync task: rows appear the moment their site posts one, and there is no
+    # upstream to refetch them from.
     SOURCE_TYPE_CHOICES = [
         ('onedrive', 'OneDrive'),
         ('google_sheet', 'Google Sheet'),
@@ -1031,7 +1087,9 @@ class TempOrder(models.Model):
         ('woocommerce', 'WooCommerce'),
         ('public_link', 'Public Link'),
         ('webhook', 'Webhook'),
+        ('custom_api', 'Custom API'),
     ]
+    PUSH_SOURCE_TYPES = ('webhook', 'custom_api')
 
     source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES, default='onedrive', db_index=True)
     onedrive_source = models.ForeignKey(
@@ -1416,6 +1474,13 @@ class ReturnRequest(models.Model):
     status = models.CharField(max_length=20, choices=RETURN_STATUS_CHOICES, default='pending', db_index=True)
     cod_reversal_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     cod_reversal_processed = models.BooleanField(default=False)
+    # The replacement sent for this return, when one was. Nullable both ways on
+    # purpose: staff replacing a failed delivery never open a return at all, and a
+    # return can be refunded instead of replaced.
+    replacement_order = models.OneToOneField(
+        'Order', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='source_return',
+        help_text="The replacement order sent for this return, if goods were re-sent.")
     reviewed_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_returns')
     reviewed_at = models.DateTimeField(null=True, blank=True)
     review_notes = models.TextField(blank=True, default='')

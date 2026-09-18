@@ -179,7 +179,8 @@ class DeliveryPayRateAdmin(admin.ModelAdmin):
     """Read-mostly. The staff console at /workforce/fleet/pay-rates/ is the real
     entry point — it enforces one open card per scope, which this form cannot."""
     list_display = ('__str__', 'driver', 'normal_fee', 'hub_fee',
-                    'pick_and_drop_percent', 'effective_from', 'effective_to')
+                    'pick_and_drop_percent', 'exchange_fee',
+                    'effective_from', 'effective_to')
     list_filter = ('effective_from', 'effective_to')
     search_fields = ('driver__driver_code', 'notes')
     autocomplete_fields = ()

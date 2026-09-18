@@ -1725,6 +1725,19 @@ def order_details(request, order_id):
             'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
         }
 
+        # Replacement: the same gate the service enforces, so a button that renders
+        # always corresponds to a call that will go through.
+        from orders import models as _orders_models
+        from orders import services as orders_services
+
+        can_replace, replace_blocked_reason = orders_services.can_replace(order)
+        data.update({
+            'can_request_replacement': can_replace and user_has_business_permission(
+                request.user, BusinessPermissions.ORDER_REPLACE),
+            'replace_blocked_reason': replace_blocked_reason,
+            'replacement_reasons': _orders_models.REPLACEMENT_REASON_CHOICES,
+        })
+
         # Check if this is being loaded in a slide-in panel (via HTMX or query param)
         is_panel = request.GET.get('panel') == '1'
         is_htmx = request.headers.get('HX-Request') == 'true'

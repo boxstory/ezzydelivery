@@ -959,31 +959,35 @@ class WalletService:
         Returns:
             DriverTransaction instance
 
-        Idempotent: a second return for the same task is rejected so repeated
-        calls cannot keep crediting the driver and drive cod_in_hand negative.
-        The amount is validated positive and capped at what was collected.
+        Capped by the RUNNING TOTAL, not by a one-shot flag: a customer can hand
+        back two items on two visits, so several returns against one task are
+        legitimate. What must never happen is refunding more than was collected,
+        which would credit the driver cash he never took and drive cod_in_hand
+        negative. The sum is read inside the driver lock, so two refunds
+        authorised at the same moment cannot both pass a stale total.
         """
         amount = Decimal(str(amount or '0'))
         if amount <= Decimal('0'):
             raise ValueError("COD return amount must be positive")
 
         collected = delivery_task.cod_collected_amount or Decimal('0')
-        if collected and amount > collected:
-            raise ValueError(
-                f"COD return {amount} exceeds collected amount {collected} for this task"
-            )
 
         with transaction.atomic():
             # Lock the driver row for the whole check-and-act (consistent driver->task
             # lock order with the rest of the COD paths, so no deadlock).
             driver = Driver.objects.select_for_update().get(pk=driver.pk)
 
-            # Guard against a duplicate return for the same task.
-            already_returned = DriverTransaction.objects.filter(
+            already = DriverTransaction.objects.filter(
                 delivery_task=delivery_task, transaction_type='cod_return'
-            ).exists()
-            if already_returned:
-                raise ValueError("A COD return has already been recorded for this task")
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            already = abs(already)
+
+            if collected and (already + amount) > collected:
+                remaining = max(collected - already, Decimal('0'))
+                raise ValueError(
+                    f"COD return {amount} exceeds the {remaining} still refundable on "
+                    f"this task ({collected} collected, {already} already returned)"
+                )
 
             trans = WalletService.record_transaction(
                 driver=driver,

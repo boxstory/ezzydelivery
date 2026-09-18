@@ -40,6 +40,8 @@ Notes: Cards are dated agreements, so a rate change is a new row and an old queu
         hub <span class="wfmono">{{ active_card.hub_fee|floatformat:2 }}</span> QAR
         <span class="wfhero__dot">&middot;</span>
         pick &amp; drop <span class="wfmono">{{ active_card.pick_and_drop_percent|floatformat:2 }}</span>%
+        <span class="wfhero__dot">&middot;</span>
+        exchange <span class="wfmono">{{ active_card.exchange_fee|floatformat:2 }}</span> QAR
       </p>
     </div>
     <div class="wfhero__bank">
@@ -68,7 +70,9 @@ Notes: Cards are dated agreements, so a rate change is a new row and an old queu
         <span class="wfmono">{{ fallback.normal_fee|floatformat:2 }}</span> QAR normal,
         <span class="wfmono">{{ fallback.hub_fee|floatformat:2 }}</span> QAR hub,
         <span class="wfmono">{{ fallback.pick_and_drop_percent|floatformat:0 }}</span>% of the client
-        charge on pick &amp; drop. Save a fleet card below to take control of these figures.
+        charge on pick &amp; drop, and
+        <span class="wfmono">{{ fallback.exchange_fee|floatformat:2 }}</span> QAR on an exchange
+        visit. Save a fleet card below to take control of these figures.
       </span>
     </div>
     {% endif %}
@@ -104,6 +108,12 @@ Notes: Cards are dated agreements, so a rate change is a new row and an old queu
             <input type="number" step="0.01" min="0" max="100" name="pick_and_drop_percent"
                    id="fleet_payrate_input_percent" class="form-control"
                    value="{{ active_card.pick_and_drop_percent|floatformat:2 }}" required>
+          </div>
+          <div class="col-6 col-md-2">
+            <label for="fleet_payrate_input_exchange" class="fpr__label">Exchange visit</label>
+            <input type="number" step="0.01" min="0" name="exchange_fee"
+                   id="fleet_payrate_input_exchange" class="form-control"
+                   value="{{ active_card.exchange_fee|floatformat:2 }}" required>
           </div>
           <div class="col-6 col-md-2">
             <label for="fleet_payrate_input_from" class="fpr__label">Effective from</label>

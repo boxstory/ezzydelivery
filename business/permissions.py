@@ -24,6 +24,9 @@ class BusinessPermissions:
     ORDER_EDIT = 'orders_edit'
     ORDER_DELETE = 'orders_delete'
     ORDER_PUBLISH = 'orders_publish'  # Publish orders for delivery
+    # Sending a replacement dispatches real goods at the seller's own cost, and
+    # deciding a return is settled moves money. Operational, not read-only.
+    ORDER_REPLACE = 'orders_replace'
 
     # Product Management
     PRODUCT_VIEW = 'products_view'
@@ -62,6 +65,7 @@ class BusinessPermissions:
         (ORDER_EDIT, 'Edit Orders'),
         (ORDER_DELETE, 'Delete Orders'),
         (ORDER_PUBLISH, 'Publish Orders'),
+        (ORDER_REPLACE, 'Send Replacements & Decide Returns'),
         (PRODUCT_VIEW, 'View Products'),
         (PRODUCT_CREATE, 'Create Products'),
         (PRODUCT_EDIT, 'Edit Products'),
@@ -91,6 +95,7 @@ class BusinessPermissions:
             (ORDER_EDIT, 'Edit Orders'),
             (ORDER_DELETE, 'Delete Orders'),
             (ORDER_PUBLISH, 'Publish Orders'),
+            (ORDER_REPLACE, 'Send Replacements & Decide Returns'),
         ],
         'Products': [
             (PRODUCT_VIEW, 'View Products'),
@@ -155,6 +160,7 @@ ROLE_PERMISSIONS = {
         BusinessPermissions.ORDER_EDIT,
         BusinessPermissions.ORDER_DELETE,
         BusinessPermissions.ORDER_PUBLISH,
+        BusinessPermissions.ORDER_REPLACE,
         BusinessPermissions.PRODUCT_VIEW,
         BusinessPermissions.PRODUCT_CREATE,
         BusinessPermissions.PRODUCT_EDIT,
@@ -180,6 +186,7 @@ ROLE_PERMISSIONS = {
         BusinessPermissions.ORDER_EDIT,
         BusinessPermissions.ORDER_DELETE,
         BusinessPermissions.ORDER_PUBLISH,
+        BusinessPermissions.ORDER_REPLACE,
         BusinessPermissions.PRODUCT_VIEW,
         BusinessPermissions.PRODUCT_CREATE,
         BusinessPermissions.PRODUCT_EDIT,
@@ -200,6 +207,7 @@ ROLE_PERMISSIONS = {
         BusinessPermissions.ORDER_VIEW,
         BusinessPermissions.ORDER_CREATE,
         BusinessPermissions.ORDER_EDIT,
+        BusinessPermissions.ORDER_REPLACE,
         BusinessPermissions.PRODUCT_VIEW,
         BusinessPermissions.PRODUCT_CREATE,
         BusinessPermissions.PRODUCT_EDIT,

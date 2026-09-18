@@ -55,6 +55,7 @@ Related:
 from django.conf import settings
 from django.http import Http404, HttpResponse, JsonResponse
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from datetime import datetime, timedelta
@@ -7441,6 +7442,20 @@ def order_detail(request, order_id):
         'address_verify_job': address_verify_job,
     }
 
+    # Replacement / exchange. The same gate the service enforces, so a button that
+    # renders always corresponds to a call that will go through.
+    from orders import money as orders_money
+    from orders import services as orders_services
+
+    can_replace, replace_blocked_reason = orders_services.can_replace(order)
+    context.update({
+        'can_replace': can_replace,
+        'replace_blocked_reason': replace_blocked_reason,
+        'replacement_reasons': orders_models.REPLACEMENT_REASON_CHOICES,
+        'refund_ceiling': orders_money.refund_ceiling(order),
+        'collected_so_far': orders_money.collected_for(order),
+    })
+
     # Check if this is being loaded in a panel (via HTMX)
     # Use panel template only when targeting the slide panel, not main content
     is_htmx = request.headers.get('HX-Request') == 'true'
@@ -7902,6 +7917,79 @@ def duplicate_order(request, order_id):
         logger.exception("Error duplicating order %s: %s", order_id, str(e))
         messages.error(request, "An error occurred while duplicating the order.")
         return redirect('workforce:order_detail', order_id=order_id)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def create_replacement_order(request, order_id):
+    """Send fresh goods for an order that arrived wrong, damaged, or not at all.
+
+    POST only — unlike duplicate_order next door, which is a GET and should not be
+    copied. The settlement is typed by staff: `collect_amount` is what the driver
+    takes at the door when the replacement is worth more than the customer already
+    paid. Giving money back is a refund, routed separately.
+    """
+    from orders import services as orders_services
+
+    order = get_object_or_404(
+        orders_models.Order.objects.select_related('business'), id=order_id)
+
+    reason = (request.POST.get('reason') or '').strip()
+    notes = (request.POST.get('notes') or '').strip()
+    collect_amount = request.POST.get('collect_amount') or 0
+    collect_back = request.POST.get('collect_back') in ('1', 'true', 'on', 'yes')
+    publish = request.POST.get('publish') in ('1', 'true', 'on', 'yes')
+
+    try:
+        new_order = orders_services.create_replacement_order(
+            order, reason=reason, collect_amount=collect_amount,
+            collect_back=collect_back, user=request.user, notes=notes,
+            publish=publish)
+    except ValidationError as exc:
+        message = '; '.join(exc.messages)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': message}, status=400)
+        messages.error(request, message)
+        return redirect('workforce:order_detail', order_id=order_id)
+    except Exception:
+        logger.exception("Error creating replacement for order %s", order_id)
+        message = "Could not create the replacement order."
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': message}, status=500)
+        messages.error(request, message)
+        return redirect('workforce:order_detail', order_id=order_id)
+
+    # The refund is money out, so it happens here rather than being left as an
+    # instruction someone may or may not carry out. The replacement order is
+    # already created at this point and is not rolled back if the refund fails —
+    # the goods still need to go, and staff are told plainly what did not happen.
+    refund_hint = ''
+    refund_amount = request.POST.get('refund_amount')
+    if refund_amount:
+        try:
+            _route, _record, refund_message = orders_services.issue_refund(
+                order, refund_amount, user=request.user,
+                reason=f"Replacement {new_order.order_number}")
+            refund_hint = f" {refund_message}"
+        except ValidationError as exc:
+            refund_hint = (f" Replacement created, but the refund did NOT go through: "
+                           f"{'; '.join(exc.messages)}")
+        except Exception:
+            logger.exception("Refund failed for order %s", order_id)
+            refund_hint = (" Replacement created, but the refund did NOT go through. "
+                           "Check the COD console.")
+
+    text = (f"Replacement {new_order.order_number} created from "
+            f"{order.order_number}.{refund_hint}")
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True, 'order_id': new_order.id,
+            'order_number': new_order.order_number, 'message': text,
+            'redirect': reverse('workforce:order_detail', args=[new_order.id]),
+        })
+    messages.success(request, text)
+    return redirect('workforce:order_detail', order_id=new_order.id)
 
 
 @require_http_methods(["POST"])
@@ -31921,17 +32009,22 @@ def process_cod_return(request, task_id):
                      'then process the return.'
         }, status=400)
 
-    from fleet.wallet_service import WalletService
     from decimal import Decimal, InvalidOperation
 
-    # Idempotency guard: never process a return twice for the same task.
-    # A second return would credit wallet_balance and debit cod_in_hand again,
-    # driving cod_in_hand negative and reversing more cash than was collected.
-    if fleet_models.DriverTransaction.objects.filter(
-        delivery_task=task,
-        transaction_type='cod_return',
-    ).exists():
-        return JsonResponse({'error': 'COD return already processed for this task'}, status=400)
+    from django.db.models import Sum
+
+    from fleet.wallet_service import WalletService
+    from orders.cod_status import apply_cod_status
+
+    # A customer can hand goods back over more than one visit, so several returns
+    # against one task are legitimate. What must never happen is refunding more
+    # than was collected — record_cod_return enforces that on the running total,
+    # inside the driver lock. Here we only pre-check so the caller gets a useful
+    # message instead of an exception.
+    already_returned = abs(
+        fleet_models.DriverTransaction.objects.filter(
+            delivery_task=task, transaction_type='cod_return',
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
 
     data = json.loads(request.body) if request.content_type == 'application/json' else {}
     notes = data.get('notes', '')
@@ -31944,11 +32037,14 @@ def process_cod_return(request, task_id):
         return JsonResponse({'error': 'Invalid amount'}, status=400)
 
     collected = Decimal(str(task.cod_collected_amount or 0))
+    remaining = max(collected - already_returned, Decimal('0'))
     if amount <= 0:
         return JsonResponse({'error': 'Return amount must be positive'}, status=400)
-    if amount > collected:
+    if amount > remaining:
         return JsonResponse({
-            'error': f'Return amount ({amount}) exceeds COD collected ({collected})'
+            'error': (f'Return amount ({amount}) exceeds the {remaining} still refundable '
+                      f'on this task ({collected} collected, {already_returned} already '
+                      f'returned)')
         }, status=400)
 
     WalletService.record_cod_return(
@@ -31961,17 +32057,25 @@ def process_cod_return(request, task_id):
 
     # Only a full reversal means nothing was collected. A partial refund leaves
     # the rest of the cash exactly where it was, so the custody status stands.
-    fully_reversed = amount >= collected
+    fully_reversed = (already_returned + amount) >= collected
     if fully_reversed:
-        task.order.cod_status_by_staff = 'not_collected'
-        task.order.save(update_fields=['cod_status_by_staff'])
+        # Through apply_cod_status, not a direct write: setting cod_status_by_staff
+        # on its own left the seller looking at "Collected" after the money had
+        # already gone back to their customer.
+        apply_cod_status(task.order, 'not_collected')
 
-    # Close out any open return request on this order — without this,
-    # cod_reversal_processed stays False forever and the business sees a refund
-    # that never reads as done.
-    reversal_marked = orders_models.ReturnRequest.objects.filter(
-        order=task.order, cod_reversal_processed=False,
-    ).update(cod_reversal_processed=True)
+    # Close out the return requests this refund actually covers. Marking every
+    # open one regardless of amount showed the seller a green "Processed" badge
+    # after a 100 refund against a 300 reversal.
+    refunded_total = already_returned + amount
+    reversal_marked = 0
+    for ret in orders_models.ReturnRequest.objects.filter(
+            order=task.order, cod_reversal_processed=False):
+        expected = Decimal(str(ret.cod_reversal_amount or 0))
+        if refunded_total >= expected:
+            ret.cod_reversal_processed = True
+            ret.save(update_fields=['cod_reversal_processed', 'updated_at'])
+            reversal_marked += 1
 
     return JsonResponse({
         'success': True,

@@ -141,6 +141,7 @@ urlpatterns = [
     path('returns/<int:return_id>/', business_views.return_detail, name='return_detail'),
     path('returns/create/<int:order_id>/', business_views.return_create, name='return_create'),
     path('returns/<int:return_id>/status/', business_views.return_update_status, name='return_update_status'),
+    path('orders/<int:order_id>/replacement/', business_views.replacement_create, name='replacement_create'),
 
     # Product Requests (Fulfillment Service)
     path('inbound-requests/', business_views.inbound_requests_list, name='inbound_requests_list'),
