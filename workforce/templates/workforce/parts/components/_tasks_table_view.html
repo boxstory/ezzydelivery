@@ -141,6 +141,12 @@ Each task should have select_related: order, driver, business, pickup_location, 
                                 {# Seller wrote something no staff member has opened yet - see OrderComments.staff_read_at #}
                                 <span class="dl-table__comment-flag" title="{{ dl.unread_seller_comments }} unread seller comment{{ dl.unread_seller_comments|pluralize }}">
                                     <i class="fa-solid fa-comment-dots"></i>{{ dl.unread_seller_comments }}
+                                </span>{% endif %}{% if dl.task_leg == 'exchange' %}
+                                {# Two handovers in one visit - the driver has to come back with the
+                                   original. Dispatch needs to see that before assigning, not just
+                                   the driver once he is already at the door. #}
+                                <span class="dl-table__leg-flag" title="Exchange - the driver hands over the replacement and brings the original back">
+                                    <i class="fa-solid fa-right-left"></i>Exchange
                                 </span>{% endif %}</span>
                             <span class="dl-table__order-num" title="{{ dl.order.client_order_code }}">{{ dl.order.client_order_code|default:"—"|truncatechars:14 }}</span>
                         </div>
