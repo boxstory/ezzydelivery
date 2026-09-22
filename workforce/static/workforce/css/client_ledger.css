@@ -66,6 +66,106 @@
   color: #92400e;
 }
 
+/* ── Refundable float ─────────────────────────────────────────────────────── */
+/* Sits beside the balance because it is a DIFFERENT figure and the pair has to
+   be read together: the balance is what we owe, this is the narrower slice a
+   door-step refund may actually be paid out of. */
+.clg__float {
+  flex: 1 1 14rem;
+  border: 1px solid var(--brand-grey-200);
+  border-left: 3px solid var(--brand-success);
+  border-radius: var(--brand-radius-sm);
+  padding: 0.75rem 1.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.125rem;
+}
+
+.clg__float-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500);
+}
+
+.clg__float-value {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--brand-success);
+}
+
+.clg__float-sub {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--brand-grey-500);
+}
+
+/* Nothing on deposit is the state that blocks a refund, so it reads as a
+   condition rather than a number. */
+.clg__float--empty { border-left-color: var(--brand-grey-200); }
+.clg__float--empty .clg__float-value { color: var(--brand-grey-500); }
+
+/* ── Record an entry ──────────────────────────────────────────────────────── */
+.clg__postbox {
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-sm);
+  padding: 0.875rem 1.125rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.clg__postbox-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-navy);
+}
+
+.clg__postbox-note {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--brand-grey-500);
+}
+
+.clg__field-label {
+  display: block;
+  margin-bottom: 0.1875rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-grey-500);
+}
+
+/* Only the things Bootstrap's .form-control / .form-select do not give us.
+   Deliberately no `background` shorthand: .form-select paints its arrow with a
+   background-image, and the shorthand would erase it and leave a bare box. */
+.clg__field {
+  font-size: 0.8rem;
+  border-color: var(--brand-grey-200);
+}
+
+.clg__field:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 0.15rem rgba(0, 0, 0, 0.06);
+}
+
+.clg__postbox-msg {
+  margin: 0.5rem 0 0;
+  min-height: 1rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.clg__postbox-msg--ok { color: var(--brand-success); }
+.clg__postbox-msg--error { color: var(--brand-danger); }
+
 /* ── Segment strip ────────────────────────────────────────────────────────── */
 .clg__segments {
   display: grid;

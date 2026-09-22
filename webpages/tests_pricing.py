@@ -10,6 +10,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils.html import escape
 
 from webpages.models import (
     PricingEnquiry, PricingEnquiryActivity, PricingRule, PricingRuleSet, PricingSuggestion,
@@ -889,3 +890,142 @@ class StaffQuoteTests(TestCase):
         self.assertContains(response, 'How we got here')
         self.assertContains(response, 'configured, not a measured cost')
         self.assertNotContains(response, 'Margin')
+
+
+class OverlongAnswerTests(TestCase):
+    """An answer longer than its column must never cost us the inquiry.
+
+    The form used to write POST strings straight onto the model, so a pasted
+    tracking URL raised DataError and 500'd the step — the seller lost the whole
+    submission. It is now saved cut to fit, the full text is kept on the record,
+    and the seller is asked to shorten it.
+    """
+
+    URL = '/3pl/inquiry/'
+    LONG_URL = 'https://yourstore.qa/?' + ('utm_source=instagram&' * 30)   # ~600 chars
+
+    STEP1_OK = {
+        'full_name': 'Ahmed Al-Rashidi',
+        'business_name': 'Doha Boutique',
+        'business_contact_number': '+974 5555 0000',
+        'product_category': 'Fashion & Apparel',
+        'average_order_value_qar': '100-500',
+        'business_operating_age': '1-3 years',
+    }
+    STEP2_OK = {
+        'typical_delivery_distance': '10-15 km',
+        'delivery_coverage': 'Doha Only',
+    }
+    STEP3_OK = {
+        'speed_delivery_offer_to_customers': '48 Hours',
+        'typical_package_size': 'Small (Envelopes / Packets)',
+        'average_package_weight': '1-5 kg',
+        'type_of_pickup_location': 'Store',
+        'pickup_Location_area_name': 'Al Sadd',
+    }
+
+    def _post_step(self, step, data, button='next_step'):
+        payload = dict(data)
+        payload[button] = '1'
+        return self.client.post(f'{self.URL}?step={step}', payload)
+
+    def _step1(self, **overrides):
+        return self._post_step(1, dict(self.STEP1_OK, website_url=self.LONG_URL, **overrides))
+
+    # ── the step still goes through ───────────────────────────────────────────
+
+    def test_an_over_long_answer_still_advances_and_saves(self):
+        response = self._step1()
+        self.assertEqual(response.status_code, 302)          # advanced, not a 500
+
+        inquiry = PricingEnquiry.objects.get()
+        self.assertEqual(len(inquiry.website_url), 200)      # cut to the column
+        self.assertTrue(self.LONG_URL.startswith(inquiry.website_url))
+
+    def test_the_full_text_is_kept_on_the_record(self):
+        self._step1()
+        inquiry = PricingEnquiry.objects.get()
+        self.assertEqual(inquiry.trimmed_answers['website_url'], self.LONG_URL)
+
+    def test_a_long_note_is_capped_too(self):
+        """additional_notes is a TextField — no column width to save us."""
+        self._step1()
+        self._post_step(2, self.STEP2_OK)
+        with patch('core.whatsapp_utils.send_inquiry_thank_you_message'), \
+             patch('core.whatsapp_utils.send_admin_inquiry_notification'):
+            self._post_step(3, dict(self.STEP3_OK, additional_notes='x' * 6000),
+                            button='submit_final')
+
+        inquiry = PricingEnquiry.objects.get()
+        self.assertEqual(len(inquiry.additional_notes), 5000)
+        self.assertEqual(len(inquiry.trimmed_answers['additional_notes']), 6000)
+
+    # ── and the seller is asked to fix it ─────────────────────────────────────
+
+    def test_the_next_step_asks_for_a_shorter_answer(self):
+        self._step1()
+        response = self.client.get(f'{self.URL}?step=2')
+        self.assertContains(response, 'We shortened')
+        self.assertContains(response, 'Website URL')
+
+    def test_shortening_it_clears_the_notice(self):
+        self._step1()
+        self._post_step(1, dict(self.STEP1_OK, website_url='https://yourstore.qa'))
+
+        inquiry = PricingEnquiry.objects.get()
+        self.assertEqual(inquiry.trimmed_answers, {})
+        self.assertNotContains(self.client.get(f'{self.URL}?step=2'), 'We shortened')
+
+    def test_an_untouched_step_does_not_clear_another_steps_notice(self):
+        """Each step only owns its own answers — step 2 must not wipe step 1's."""
+        self._step1()
+        self._post_step(2, self.STEP2_OK)
+
+        inquiry = PricingEnquiry.objects.get()
+        self.assertIn('website_url', inquiry.trimmed_answers)
+
+    # ── right through to a complete submission ────────────────────────────────
+
+    def test_the_inquiry_completes_and_reaches_the_staff_list(self):
+        self._step1()
+        self._post_step(2, self.STEP2_OK)
+        with patch('core.whatsapp_utils.send_inquiry_thank_you_message') as thanks, \
+             patch('core.whatsapp_utils.send_admin_inquiry_notification'):
+            response = self._post_step(3, self.STEP3_OK, button='submit_final')
+
+        self.assertEqual(response.status_code, 302)
+        inquiry = PricingEnquiry.objects.get()
+        self.assertTrue(inquiry.is_complete)                 # it is on the list page
+        self.assertTrue(thanks.called)                       # and they were thanked
+        self.assertIn('website_url', inquiry.trimmed_answers)
+
+    def test_the_quote_page_asks_for_the_full_answer(self):
+        self._step1()
+        self._post_step(2, self.STEP2_OK)
+        with patch('core.whatsapp_utils.send_inquiry_thank_you_message'), \
+             patch('core.whatsapp_utils.send_admin_inquiry_notification'):
+            self._post_step(3, self.STEP3_OK, button='submit_final')
+
+        inquiry = PricingEnquiry.objects.get()
+        response = self.client.get(
+            reverse('webpages:inquiry_quote', kwargs={'token': inquiry.quote_token}))
+        self.assertContains(response, 'We shortened')
+
+    def test_staff_see_what_was_actually_typed(self):
+        self._step1()
+        inquiry = PricingEnquiry.objects.get()
+        # Pricing inquiries sit in the marketing department, and
+        # StaffDepartmentMiddleware fails closed for a staff user without one.
+        from core import models as core_models
+        ops = User.objects.create_user('ops', password='pw', is_staff=True)
+        core_models.Profile.objects.create(
+            user=ops, first_name='Ops', last_name='Desk', phone=55500333,
+            is_staff=True, dept_marketing=True,
+        )
+        self.client.force_login(ops)
+
+        response = self.client.get(
+            reverse('workforce:pricing_inquiry_detail', kwargs={'inquiry_id': inquiry.pk}))
+        self.assertContains(response, 'Shortened on save')
+        # Escaped on the way out — the panel prints it as a plain string, not a link.
+        self.assertContains(response, escape(self.LONG_URL))

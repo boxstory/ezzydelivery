@@ -99,6 +99,10 @@ class DriverSerializer(serializers.ModelSerializer):
             'job_type', 'work_time_slabs', 'profile', 'driver_vehicle', 'driver_document',
             'created_at', 'updated_at'
         ]
+        # driver_code is admin-only (see Driver.save) — expose it, never accept it.
+        read_only_fields = ['driver_id', 'driver_code', 'driver_status',
+                            'driver_rating', 'driver_rating_count',
+                            'created_at', 'updated_at']
 
 
 class DriverLocationSerializer(serializers.Serializer):
@@ -175,6 +179,8 @@ class DriverListSerializer(serializers.ModelSerializer):
             'driver_whatsapp', 'driver_status', 'driver_availability', 'driver_rating', 'driver_rating_count',
             'driver_name', 'vehicle_type', 'job_type', 'work_time_slabs'
         ]
+        # driver_code is admin-only (see Driver.save) — expose it, never accept it.
+        read_only_fields = ['driver_id', 'driver_code']
     
     def get_driver_name(self, obj):
         if obj.profile:
@@ -198,7 +204,7 @@ class TaskStatusUpdateSerializer(serializers.Serializer):
         'start_ride', 'out_for_delivery', 'in_transit', 'contacted',
         'non_reachable', 'address_pending', 'customer_confiration_pending',
         'customer_delaying', 'dl_pending_payment',
-        'delivered', 'failed', 'rejected', 'cancelled',
+        'delivered', 'failed', 'rejected', 'cancelled', 'returned_to_shipper',
     ])
     notes = serializers.CharField(required=False, allow_blank=True)
 
@@ -328,7 +334,8 @@ class EcommerceIntegrationSerializer(serializers.ModelSerializer):
 # Task Completion Serializer
 class TaskCompletionSerializer(serializers.Serializer):
     task_id = serializers.IntegerField(required=False)
-    status = serializers.ChoiceField(choices=['delivered', 'cancelled', 'rejected', 'failed', 'accepted'])
+    status = serializers.ChoiceField(choices=['delivered', 'cancelled', 'rejected', 'failed',
+                                              'accepted', 'returned_to_shipper'])
     delivery_proof = serializers.FileField(required=False, allow_null=True)
     signature = serializers.FileField(required=False, allow_null=True)
     photo = serializers.FileField(required=False, allow_null=True)

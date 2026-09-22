@@ -258,6 +258,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                                 {% if not c.template %}
                                     <span class="badge bg-secondary-subtle text-secondary border" title="Staff type the whole message — there is no stored body to edit">Free text</span>
                                 {% else %}
+                                    <span class="wmsg-id">{{ c.template.msg_id }}</span>
                                     <span data-msg-state="{{ c.template.key }}">
                                     {% if c.template.is_enabled %}
                                         <span class="badge bg-success">Pre-filled</span>
@@ -275,8 +276,8 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                                 <div class="atl__actions btn-group btn-group-sm" role="group">
                                     <button type="button" class="btn btn-sm btn-outline-secondary"
                                             onclick="openMessageModal('{{ c.template.key }}')"
-                                            title="Edit the message body: {{ c.template.label }}">
-                                        <i class="fa-solid fa-pen-to-square"></i>
+                                            title="Edit the message body: {{ c.template.msg_id }} — {{ c.template.label }}">
+                                        <i class="fa-solid fa-pen-to-square"></i><span class="wmsg-id">{{ c.template.msg_id }}</span>
                                     </button>
                                     {% if can_open_messages_page %}
                                     <a href="{{ c.template_url }}" class="btn btn-sm btn-outline-secondary"
@@ -400,8 +401,8 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                                     {% if t.template %}
                                     <button type="button" class="btn btn-sm btn-outline-secondary"
                                             onclick="openMessageModal('{{ t.template.key }}')"
-                                            title="Edit the message body: {{ t.template.label }}">
-                                        <i class="fa-solid fa-comment-dots"></i>
+                                            title="Edit the message body: {{ t.template.msg_id }} — {{ t.template.label }}">
+                                        <i class="fa-solid fa-comment-dots"></i><span class="wmsg-id">{{ t.template.msg_id }}</span>
                                     </button>
                                     {% if can_open_messages_page %}
                                     <a href="{{ t.template_url }}" class="btn btn-sm btn-outline-secondary"

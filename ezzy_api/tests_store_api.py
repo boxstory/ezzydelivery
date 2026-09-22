@@ -1,8 +1,10 @@
 # Purpose: Tests for the custom-storefront order API (/api/v1/store/…).
 # Used by: manage.py test ezzy_api.tests_store_api
-# Notes: The COD rule and the idempotency rule are the two that cost real money
-#        when they break — a prepaid order billed as COD charges the customer twice.
+# Notes: A checkout is STAGED as TempOrder(source_type='custom_api') and becomes an
+#        Order only when staff import it. The COD rule and the idempotency rule are
+#        the two that cost real money — a prepaid order billed as COD charges twice.
 
+import json
 from decimal import Decimal
 
 from django.test import TestCase
@@ -20,6 +22,19 @@ def make_active_business(idx, username):
     business.business_status = 'active'
     business.save(update_fields=['business_status'])
     return user, business
+
+
+def make_custom_source(business, **over):
+    """The custom-API source row staged orders hang off. The Temp Orders page
+    hides rows whose source FK is null, so this is not optional decoration."""
+    fields = dict(
+        business=business, api_type='custom',
+        site_api_url='https://shop.example',
+        is_verify_api=True, is_default=True,
+    )
+    fields.update(over)
+    return business_models.BusinessApiSettings.objects.create(**fields)
+
 
 SAMPLE = {
     'orderNumber': 'GOOEY-429869',
@@ -47,6 +62,7 @@ CREATE_URL = '/api/v1/store/orders/'
 class StoreOrderApiTest(TestCase):
     def setUp(self):
         self.user, self.business = make_active_business(9101, 'storeowner')
+        make_custom_source(self.business)
         _, self.raw = make_key(self.business)
         self.client = APIClient()
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.raw}')
@@ -56,43 +72,60 @@ class StoreOrderApiTest(TestCase):
         body.update(over)
         return self.client.post(CREATE_URL, body, format='json')
 
-    def test_creates_order_from_storefront_payload(self):
+    def staged(self, code='GOOEY-429869'):
+        return orders_models.TempOrder.objects.get(client_order_code=code)
+
+    def test_checkout_is_staged_not_turned_into_an_order(self):
         res = self.post()
         self.assertEqual(res.status_code, 201, res.data)
-        order = orders_models.Order.objects.get(client_order_code='GOOEY-429869')
-        self.assertEqual(order.business, self.business)
-        self.assertEqual(order.customer_name, 'Hind Alobaidli')
-        self.assertEqual(order.customer_phone, '51060099')
-        self.assertEqual(order.dl_building, 31)
-        self.assertEqual(order.order_status, 'to_review')
-        self.assertEqual(order.platform, 'api')
-        self.assertEqual(order.package_qty, 2)
-        self.assertIn('Apartment 31', order.customer_address)
-        self.assertEqual(order.order_items.count(), 1)
-        item = order.order_items.first()
-        self.assertEqual(item.quantity, 2)
-        self.assertEqual(item.unit_price, Decimal('35'))
+        temp = self.staged()
+        self.assertEqual(temp.business, self.business)
+        self.assertEqual(temp.source_type, 'custom_api')
+        self.assertEqual(temp.status, 'new')
+        self.assertEqual(temp.customer_name, 'Hind Alobaidli')
+        self.assertEqual(temp.customer_phone, '51060099')
+        self.assertEqual(temp.dl_building, '31')
+        self.assertIn('Apartment 31', temp.customer_address)
+        self.assertEqual(temp.package_desc, "S'more x2")
+        self.assertEqual(temp.order_date, '2026-09-11')
+        # No Order until staff import it
+        self.assertFalse(
+            orders_models.Order.objects.filter(client_order_code='GOOEY-429869').exists())
+        self.assertIsNone(res.data['order_number'])
+        self.assertEqual(res.data['order_status'], 'received')
+
+    def test_staged_row_is_visible_to_the_temp_orders_page(self):
+        """The page hides rows with no source FK — a staged row must carry one."""
+        self.post()
+        temp = self.staged()
+        self.assertIsNotNone(temp.api_settings_id)
+        self.assertEqual(temp.api_settings.api_type, 'custom')
+
+    def test_whole_checkout_is_kept_for_staff(self):
+        self.post()
+        self.assertEqual(self.staged().raw_row['orderNumber'], 'GOOEY-429869')
+        self.assertEqual(self.staged().raw_row['deliveryFee'], 20)
 
     def test_prepaid_order_is_never_cod(self):
-        """applepay/card must leave the driver nothing to collect."""
+        """applepay/card must leave the driver nothing to collect. 'paid' is the
+        word both import paths read to set cod_status_by_client='online_paid'."""
         self.post()
-        order = orders_models.Order.objects.get(client_order_code='GOOEY-429869')
-        self.assertEqual(order.cod_amount, Decimal('0'))
-        self.assertEqual(order.cod_status_by_client, 'online_paid')
+        temp = self.staged()
+        self.assertEqual(temp.cod_amount, '0')
+        self.assertEqual(temp.financial_status, 'paid')
 
     def test_cod_order_carries_the_full_total(self):
         self.post(orderNumber='COD-1', paymentMethod='cod')
-        order = orders_models.Order.objects.get(client_order_code='COD-1')
-        self.assertEqual(order.cod_amount, Decimal('90'))
-        self.assertEqual(order.cod_status_by_client, 'unpaid')
+        temp = self.staged('COD-1')
+        self.assertEqual(temp.cod_amount, '90')
+        self.assertEqual(temp.financial_status, 'pending')
 
     def test_cod_total_falls_back_to_subtotal_plus_fee(self):
         payload = dict(SAMPLE)
         payload.pop('total')
         res = self.post(payload, orderNumber='COD-2', paymentMethod='cash')
         self.assertEqual(res.status_code, 201, res.data)
-        order = orders_models.Order.objects.get(client_order_code='COD-2')
-        self.assertEqual(order.cod_amount, Decimal('90'))
+        self.assertEqual(self.staged('COD-2').cod_amount, '90')
 
     def test_retry_is_idempotent(self):
         first = self.post()
@@ -100,24 +133,38 @@ class StoreOrderApiTest(TestCase):
         self.assertEqual(first.status_code, 201)
         self.assertEqual(second.status_code, 200)
         self.assertTrue(second.data['duplicate'])
-        self.assertEqual(second.data['order_number'], first.data['order_number'])
+        self.assertEqual(second.data['client_order_code'], first.data['client_order_code'])
         self.assertEqual(
-            orders_models.Order.objects.filter(client_order_code='GOOEY-429869').count(), 1
-        )
+            orders_models.TempOrder.objects.filter(client_order_code='GOOEY-429869').count(), 1)
+
+    def test_retry_after_import_returns_the_real_order(self):
+        """Once staff import the row the storefront must see the Order, not a
+        second staging attempt."""
+        self.post()
+        order = orders_models.Order.objects.create(
+            business=self.business, client_order_code='GOOEY-429869',
+            customer_name='Hind Alobaidli', customer_phone='51060099',
+            customer_address='Doha', order_status='to_review')
+        res = self.post()
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.data['duplicate'])
+        self.assertEqual(res.data['order_number'], order.order_number)
+        self.assertEqual(
+            orders_models.TempOrder.objects.filter(client_order_code='GOOEY-429869').count(), 1)
 
     def test_phone_is_normalized_to_local_form(self):
         payload = dict(SAMPLE)
         payload['customer'] = dict(SAMPLE['customer'], phone='+974 5566 7788')
         self.post(payload, orderNumber='PH-1')
-        order = orders_models.Order.objects.get(client_order_code='PH-1')
-        self.assertEqual(order.customer_phone, '55667788')
+        self.assertEqual(self.staged('PH-1').customer_phone, '55667788')
 
     def test_missing_name_or_phone_is_rejected(self):
         payload = dict(SAMPLE)
         payload['customer'] = {'area': 'Doha', 'street': 'X', 'buildingNumber': '1'}
         res = self.post(payload, orderNumber='BAD-1')
         self.assertEqual(res.status_code, 400)
-        self.assertFalse(orders_models.Order.objects.filter(client_order_code='BAD-1').exists())
+        self.assertFalse(
+            orders_models.TempOrder.objects.filter(client_order_code='BAD-1').exists())
 
     def test_missing_order_number_is_rejected(self):
         payload = {k: v for k, v in SAMPLE.items() if k != 'orderNumber'}
@@ -128,8 +175,7 @@ class StoreOrderApiTest(TestCase):
         """A caller cannot file an order under someone else's account."""
         _, other = make_active_business(9102, 'otherowner')
         self.post(orderNumber='TEN-1', business=other.pk)
-        order = orders_models.Order.objects.get(client_order_code='TEN-1')
-        self.assertEqual(order.business, self.business)
+        self.assertEqual(self.staged('TEN-1').business, self.business)
 
     def test_read_scope_key_cannot_create(self):
         _, read_only = make_key(self.business, scope='read')
@@ -147,7 +193,8 @@ class StoreOrderApiTest(TestCase):
         self.business.save(update_fields=['business_status'])
         res = self.post(orderNumber='SUS-1')
         self.assertIn(res.status_code, (401, 403))
-        self.assertFalse(orders_models.Order.objects.filter(client_order_code='SUS-1').exists())
+        self.assertFalse(
+            orders_models.TempOrder.objects.filter(client_order_code='SUS-1').exists())
 
     def test_pending_business_cannot_create(self):
         self.business.business_status = 'pending'
@@ -157,47 +204,119 @@ class StoreOrderApiTest(TestCase):
         self.assertEqual(res.data['code'], 'business_pending_approval')
 
 
+class StoreStagedImportTest(TestCase):
+    """End to end: a staged checkout imported by staff through the real Temp
+    Orders transfer view. This is where the COD rule has to survive — the
+    importer reads TempOrder.financial_status, nothing else."""
+
+    def setUp(self):
+        from workforce.tests_views import WorkforceTestMixin
+        self.helper = WorkforceTestMixin()
+        self.user, self.business = make_active_business(9301, 'importowner')
+        make_custom_source(self.business)
+        _, raw = make_key(self.business)
+        api = APIClient()
+        api.credentials(HTTP_AUTHORIZATION=f'Bearer {raw}')
+        self.api = api
+        self.helper.create_staff_user(username='tempimporter')
+        self.staff = self.client
+        self.staff.login(username='tempimporter', password='Staff@123')
+
+    def transfer(self, temp):
+        return self.staff.post(
+            '/workforce/orders/temp/transfer/',
+            data=json.dumps({'rows': [{'id': temp.id}]}),
+            content_type='application/json')
+
+    def test_prepaid_checkout_imports_as_online_paid(self):
+        self.api.post(CREATE_URL, SAMPLE, format='json')
+        temp = orders_models.TempOrder.objects.get(client_order_code='GOOEY-429869')
+
+        res = self.transfer(temp)
+        self.assertEqual(res.status_code, 200, res.content)
+
+        order = orders_models.Order.objects.get(
+            business=self.business, client_order_code='GOOEY-429869')
+        self.assertEqual(order.cod_amount, Decimal('0'))
+        self.assertEqual(order.cod_status_by_client, 'online_paid')
+        self.assertEqual(order.customer_name, 'Hind Alobaidli')
+        temp.refresh_from_db()
+        self.assertEqual(temp.status, 'imported')
+        self.assertEqual(temp.imported_order_id, order.id)
+
+    def test_basket_survives_the_import_as_order_items(self):
+        """The line quantities only reach the Order through the product_N /
+        count_N pairs staged into raw_row — a seller who maps package_desc to
+        bare item names would otherwise import "S'more", qty 1, no items."""
+        payload = dict(SAMPLE, orderNumber='BASKET-1')
+        payload['items'] = [
+            {'id': 'smore', 'name': "S'more", 'qty': 2, 'price': 35, 'lineTotal': 70},
+            {'id': 'cocoa', 'name': 'Cocoa', 'qty': 3, 'price': 10, 'lineTotal': 30},
+        ]
+        self.api.post(CREATE_URL, payload, format='json')
+        temp = orders_models.TempOrder.objects.get(client_order_code='BASKET-1')
+        self.assertEqual(temp.raw_row['product_1'], "S'more")
+        self.assertEqual(temp.raw_row['count_1'], 2)
+        self.assertEqual(temp.raw_row['count_2'], 3)
+
+        res = self.transfer(temp)
+        self.assertEqual(res.status_code, 200, res.content)
+        order = orders_models.Order.objects.get(
+            business=self.business, client_order_code='BASKET-1')
+        self.assertEqual(order.package_qty, 5)
+        self.assertEqual(
+            sorted((i.notes, i.quantity) for i in order.order_items.all()),
+            [('Cocoa', 3), ("S'more", 2)])
+
+    def test_cod_checkout_imports_with_money_to_collect(self):
+        payload = dict(SAMPLE, orderNumber='COD-9', paymentMethod='cod')
+        self.api.post(CREATE_URL, payload, format='json')
+        temp = orders_models.TempOrder.objects.get(client_order_code='COD-9')
+
+        res = self.transfer(temp)
+        self.assertEqual(res.status_code, 200, res.content)
+
+        order = orders_models.Order.objects.get(
+            business=self.business, client_order_code='COD-9')
+        self.assertEqual(order.cod_amount, Decimal('90'))
+        self.assertNotEqual(order.cod_status_by_client, 'online_paid')
+
+
 class StoreStatusApiTest(TestCase):
     def setUp(self):
         self.user, self.business = make_active_business(9103, 'statusowner')
+        make_custom_source(self.business)
         _, self.raw = make_key(self.business)
         self.client = APIClient()
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.raw}')
         self.client.post(CREATE_URL, SAMPLE, format='json')
 
-    def test_lookup_by_seller_reference(self):
+    def test_staged_order_reads_as_received(self):
+        """A storefront polling right after checkout must not read its own
+        order as lost while it waits in the staff queue."""
         res = self.client.get('/api/v1/store/orders/GOOEY-429869/')
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['client_order_code'], 'GOOEY-429869')
-        self.assertEqual(res.data['order_status'], 'to_review')
-        self.assertEqual(res.data['cod_amount'], '0.00')
+        self.assertEqual(res.data['order_status'], 'received')
+        self.assertIsNone(res.data['order_number'])
+        self.assertEqual(res.data['cod_status'], 'online_paid')
 
-    def test_lookup_returns_the_whole_order(self):
-        """The seller must be able to read back everything they sent."""
+    def test_imported_order_answers_from_the_real_record(self):
+        temp = orders_models.TempOrder.objects.get(client_order_code='GOOEY-429869')
+        order = orders_models.Order.objects.create(
+            business=self.business, client_order_code='GOOEY-429869',
+            customer_name='Hind Alobaidli', customer_phone='51060099',
+            customer_address='Doha', order_status='to_review',
+            package_description="S'more x2", package_qty=2)
+        temp.status = 'imported'
+        temp.imported_order = order
+        temp.save(update_fields=['status', 'imported_order'])
+
         res = self.client.get('/api/v1/store/orders/GOOEY-429869/')
         self.assertEqual(res.status_code, 200)
-        body = res.data
-
-        self.assertEqual(body['customer']['name'], 'Hind Alobaidli')
-        self.assertEqual(body['customer']['phone'], '51060099')
-        self.assertEqual(body['customer']['building'], 31)
-        self.assertIn('Apartment 31', body['customer']['address'])
-        self.assertEqual(body['customer']['notes'], 'Big gate 3 go inside 31')
-
-        self.assertEqual(len(body['items']), 1)
-        line = body['items'][0]
-        self.assertEqual(line['name'], "S'more")
-        self.assertEqual(line['qty'], 2)
-        self.assertEqual(line['unit_price'], '35.00')
-        self.assertEqual(line['line_total'], '70.00')
-
-        self.assertEqual(body['amounts']['items_total'], '70.00')
-        self.assertEqual(body['amounts']['delivery_fee'], '20.00')
-        self.assertEqual(body['amounts']['cod_amount'], '0.00')
-
-        self.assertEqual(body['package']['qty'], 2)
-        self.assertEqual(body['received']['orderNumber'], 'GOOEY-429869')
-        self.assertEqual(body['received']['paymentMethod'], 'applepay')
+        self.assertEqual(res.data['order_status'], 'to_review')
+        self.assertEqual(res.data['order_number'], order.order_number)
+        self.assertEqual(res.data['customer']['name'], 'Hind Alobaidli')
 
     def test_unknown_reference_is_404(self):
         res = self.client.get('/api/v1/store/orders/NOPE/')
@@ -253,61 +372,43 @@ class StoreMappingTest(TestCase):
 
     def setUp(self):
         self.user, self.business = make_active_business(9201, 'mappedowner')
-        business_models.BusinessApiSettings.objects.create(
-            business=self.business, api_type='custom',
-            site_api_url='https://acme.example', column_mapping=self.MAPPING,
-            is_verify_api=True, is_default=True,
-        )
+        make_custom_source(self.business, site_api_url='https://acme.example',
+                           column_mapping=self.MAPPING)
         _, raw = make_key(self.business)
         self.client = APIClient()
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {raw}')
 
-    def test_mapped_payload_creates_a_correct_order(self):
+    def staged(self, code='ACME-77'):
+        return orders_models.TempOrder.objects.get(client_order_code=code)
+
+    def test_mapped_payload_stages_correctly(self):
         res = self.client.post(CREATE_URL, self.ODD_PAYLOAD, format='json')
         self.assertEqual(res.status_code, 201, res.data)
 
-        order = orders_models.Order.objects.get(client_order_code='ACME-77')
-        self.assertEqual(order.customer_name, 'Sara Ali')
-        self.assertEqual(order.customer_phone, '33445566')
-        self.assertEqual(order.customer_address, 'Street 850, Al Sadd')
-        self.assertEqual(order.dl_building, 12)
-        self.assertEqual(order.dl_zone, 38)
-        self.assertEqual(order.dl_amount, Decimal('15'))
-        self.assertEqual(order.order_notes, 'Leave with security')
-        self.assertEqual(order.order_date.isoformat(), '2026-09-10')
+        temp = self.staged()
+        self.assertEqual(temp.customer_name, 'Sara Ali')
+        self.assertEqual(temp.customer_phone, '33445566')
+        self.assertEqual(temp.customer_address, 'Street 850, Al Sadd')
+        self.assertEqual(temp.dl_building, '12')
+        self.assertEqual(temp.dl_zone, '38')
+        self.assertEqual(temp.order_date, '2026-09-10')
 
     def test_mapped_payment_method_drives_cod(self):
         self.client.post(CREATE_URL, self.ODD_PAYLOAD, format='json')
-        order = orders_models.Order.objects.get(client_order_code='ACME-77')
-        self.assertEqual(order.cod_amount, Decimal('120'))
-        self.assertEqual(order.cod_status_by_client, 'unpaid')
+        temp = self.staged()
+        self.assertEqual(temp.cod_amount, '120')
+        self.assertEqual(temp.financial_status, 'pending')
 
     def test_mapped_prepaid_payment_method_is_not_cod(self):
         payload = dict(self.ODD_PAYLOAD)
         payload['ref'] = 'ACME-78'
         payload['pay'] = dict(self.ODD_PAYLOAD['pay'], how='card')
         self.client.post(CREATE_URL, payload, format='json')
-        order = orders_models.Order.objects.get(client_order_code='ACME-78')
-        self.assertEqual(order.cod_amount, Decimal('0'))
-        self.assertEqual(order.cod_status_by_client, 'online_paid')
+        temp = self.staged('ACME-78')
+        self.assertEqual(temp.cod_amount, '0')
+        self.assertEqual(temp.financial_status, 'paid')
 
     def test_collapsed_list_path_carries_every_line(self):
         """product_1 -> basket[].title maps a whole variable-length basket."""
         self.client.post(CREATE_URL, self.ODD_PAYLOAD, format='json')
-        order = orders_models.Order.objects.get(client_order_code='ACME-77')
-        lines = list(order.order_items.order_by('id'))
-        self.assertEqual([(i.notes, i.quantity) for i in lines],
-                         [('Cake', 1), ('Candles', 3)])
-        self.assertEqual(order.package_qty, 4)
-
-    def test_unmapped_seller_still_uses_the_builtin_guesses(self):
-        """The mapping is per-seller — gooey's integration has none and must
-        keep working off the built-in camelCase handling."""
-        _, plain = make_active_business(9202, 'plainowner')
-        _, raw = make_key(plain)
-        client = APIClient()
-        client.credentials(HTTP_AUTHORIZATION=f'Bearer {raw}')
-        res = client.post(CREATE_URL, SAMPLE, format='json')
-        self.assertEqual(res.status_code, 201, res.data)
-        order = orders_models.Order.objects.get(business=plain)
-        self.assertEqual(order.customer_name, 'Hind Alobaidli')
+        self.assertEqual(self.staged().package_desc, 'Cake x1, Candles x3')

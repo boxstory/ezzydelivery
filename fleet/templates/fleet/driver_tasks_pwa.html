@@ -148,81 +148,9 @@
 {% for card in cards %}
 {% with addr=card.dl_to_address %}<div class="task-card fleet-slide-up" style="animation-delay: {{ forloop.counter0 }}00ms;"
     onclick="openTaskDetail(event, this)"
-    data-id="{{ card.id }}"
-    data-order="{{ card.order.order_number|default:card.id }}"
-    data-date="{{ card.dl_task_date|date:'M d, Y' }}"
-    data-status="{{ card.dl_task_status }}"
-    data-speed="{{ card.dl_speed|default:'' }}"
-    data-business="{{ card.order.business.business_name|default:'' }}"
-    data-customer="{% if addr %}{{ addr.full_name|default:card.order.customer_name|default:'' }}{% else %}{{ card.order.customer_name|default:'' }}{% endif %}"
-    data-phone="{% if addr %}{{ addr.mobile_no|default:card.order.customer_phone|default:'' }}{% else %}{{ card.order.customer_phone|default:'' }}{% endif %}"
-    data-pickup="{{ card.order.pickup_location.pickup_location_title|default:'' }}"
-    data-pickup-lat="{{ card.order.pickup_location.pickup_lat|default:'' }}"
-    data-pickup-lng="{{ card.order.pickup_location.pickup_lon|default:'' }}"
-    data-zone="{{ card.order.dl_zone|default:'' }}{% if not card.order.dl_zone and addr %}{{ addr.dl_zone|default:'' }}{% endif %}"
-    data-street="{{ card.order.dl_street|default:'' }}{% if not card.order.dl_street and addr %}{{ addr.dl_street|default:'' }}{% endif %}"
-    data-building="{{ card.order.dl_building|default:'' }}{% if not card.order.dl_building and addr %}{{ addr.dl_building|default:'' }}{% endif %}"
-    data-unit="{% if addr %}{{ addr.dl_unit|default:'' }}{% endif %}"
-    data-area="{% if addr %}{{ addr.area_name|default:'' }}{% endif %}"
-    data-ptype="{% if addr %}{% if addr.is_villa_compound %}Villa{% elif addr.is_flat %}Apartment{% elif addr.is_office %}Office{% endif %}{% endif %}"
-    data-timeslot="{% if addr %}{{ addr.time_slot|default:'' }}{% endif %}"
-    data-cod="{{ card.order.cod_amount|default_if_none:'' }}"
-    data-items="{{ card.order.order_items.count }}"
-    data-product-desc="{{ card.order.package_description|default:'' }}"
-    data-product-qty="{{ card.order.package_qty|default:'' }}"
-    data-earn="{{ card.driver_earnings|default:'' }}"
-    data-notes="{{ card.order.order_notes|default:'' }}"
-    data-office-note="{{ card.driver_note|default:'' }}"
-    data-address="{{ card.order.customer_address|default:'' }}"
-    data-tasknum="{{ card.dl_task_number|default:'' }}"
-    data-lat="{{ card.order.latitude|default:'' }}{% if not card.order.latitude and addr %}{{ addr.dl_latitude|default:'' }}{% endif %}"
-    data-lng="{{ card.order.longitude|default:'' }}{% if not card.order.longitude and addr %}{{ addr.dl_longitude|default:'' }}{% endif %}"
-    data-coords-accuracy="{{ card.order.coords_accuracy|default:'' }}"
-    data-order-id="{{ card.order.id }}"
-    data-payment-method="{{ card.payment_method|default:'' }}"
-    data-cod-collected-amount="{{ card.cod_collected_amount|default:'' }}"
-    data-payment-split-cash="{{ card.payment_split_cash|default:'' }}"
-    data-payment-split-pos="{{ card.payment_split_pos|default:'' }}"
-    data-payment-split-fawran="{{ card.payment_split_fawran|default:'' }}"
-    {% comment %}Proof-of-delivery rule for this task's client — the sheet reads these
-    to decide what it must collect before letting the driver submit. The server checks
-    the same rule in delivery/pod.py, so these are convenience, not the gate.{% endcomment %}
-    data-pod-delivered="{% if card.order.business.pod_required_delivered %}1{% else %}0{% endif %}"
-    data-pod-failed="{% if card.order.business.pod_required_failed %}1{% else %}0{% endif %}"
-    data-pod-kind="{{ card.order.business.pod_kind|default:'photo' }}"
-    data-verify-url="{% with av=card.order.address_verifications.first %}{% with phone=addr.mobile_no|default:card.order.customer_phone|default:'' %}{% if av and av.verification_token and phone %}{{ request.scheme }}://{{ request.get_host }}{% url 'verify_location_short' phone|cut:'/' av.verification_token %}{% endif %}{% endwith %}{% endwith %}"
+{% include "fleet/parts/_task_data_attrs.html" %}
 >
-<script type="application/json" class="task-products-data">{% spaceless %}[{% for item in card.order.order_items.all %}{"name":"{{ item.display_name|escapejs }}","brand":"{% if item.product %}{{ item.product.brand_name|default:''|escapejs }}{% endif %}","sku":"{% if item.product %}{{ item.product.item_sku|default:''|escapejs }}{% endif %}","qty":{{ item.quantity }}{% if item.unit_price %},"price":"{{ item.unit_price }}"{% endif %}{% if item.product and item.notes %},"note":"{{ item.notes|escapejs }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]{% endspaceless %}
-</script>
-{% with av=card.order.address_verifications.first %}
-<script type="application/json" class="task-address-data">{% spaceless %}{
-  {% if av %}
-  "result":"{{ av.verification_result }}",
-  "verified_address":"{{ av.verified_address|default:''|escapejs }}",
-  "zone":"{{ av.zone_number|default:'' }}",
-  "street":"{{ av.street_number|default:'' }}",
-  "building":"{{ av.building_number|default:'' }}",
-  "lat":"{{ av.latitude|default:'' }}",
-  "lng":"{{ av.longitude|default:'' }}",
-  "notes":"{{ av.notes|default:''|escapejs }}",
-  "verified_at":"{{ av.verified_at|date:'M d, Y H:i'|default:'' }}",
-  {% else %}
-  "result":"",
-  {% endif %}
-  "dl_lat":"{% if addr %}{{ addr.dl_latitude|default:'' }}{% endif %}",
-  "dl_lng":"{% if addr %}{{ addr.dl_longitude|default:'' }}{% endif %}",
-  "dl_pluscode":"{% if addr %}{{ addr.dl_pluscode|default:''|escapejs }}{% endif %}",
-  "order_lat":"{{ card.order.latitude|default:'' }}",
-  "order_lng":"{{ card.order.longitude|default:'' }}",
-  "order_zone":"{{ card.order.dl_zone|default:'' }}",
-  "order_street":"{{ card.order.dl_street|default:'' }}",
-  "order_building":"{{ card.order.dl_building|default:'' }}",
-  "coords_accuracy":"{{ card.order.coords_accuracy|default:'' }}",
-  "qnas_status":"{{ card.order.qnas_status|default:'' }}"
-}{% endspaceless %}
-</script>
-<script type="application/json" class="task-items-data">[{% for item in card.order.order_items.all %}{"id":{{ item.id }},"name":"{{ item.display_name|escapejs }}","qty":{{ item.quantity }}}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
-{% endwith %}
+{% include "fleet/parts/_task_data_json.html" %}
 
     <!-- Card Header: Status + Order ID + Date -->
     <div class="task-card__header">

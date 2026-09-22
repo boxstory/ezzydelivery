@@ -8,133 +8,149 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
 {% endcomment %}
 {% block title %}{{ business.business_name|default:"Seller Detail" }} - Ezzy Delivery{% endblock title %}
 {% block content %}
-<div class="sld">
+<div class="wfpage sld">
 
-    <!-- Merchant Dossier Header -->
-    <div class="sld__dossier">
-        <div class="sld__dossier-top">
-            <!-- Monogram seal -->
-            <div class="sld__seal" aria-hidden="true">
-                <span class="sld__seal-mono">{{ business.business_name|first|upper|default:"?" }}</span>
-            </div>
+    <!-- Record masthead. The navy band, the 3px yellow rule and the inner inset all
+         come from the shared staff shell (webpages/css/staff-hero.css) because the
+         class ends in __hero — this page must not restate them. -->
+    <div class="sld__hero">
+        <div class="wfhero__content">
+            <nav aria-label="breadcrumb" class="wfhero__crumbs-nav">
+                <ol class="wfhero__crumbs">
+                    <li class="wfhero__crumb">
+                        <a href="{% url 'workforce:wf_dashboard' %}" class="wfhero__crumb-link">
+                            <i class="fa-solid fa-gauge-high"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="wfhero__crumb">
+                        <a href="{% url 'workforce:sellers_list' %}" class="wfhero__crumb-link">
+                            <i class="fa-solid fa-store"></i>
+                            <span>Sellers</span>
+                        </a>
+                    </li>
+                    <li class="wfhero__crumb wfhero__crumb--active">
+                        <i class="fa-solid fa-hashtag"></i>
+                        <span>{{ business.business_code|default:business.business_id }}</span>
+                    </li>
+                </ol>
+            </nav>
 
-            <!-- Record identity -->
-            <div class="sld__rec">
-                <h1 class="sld__rec-name">{{ business.business_name|default:"Unknown Business" }}</h1>
-                <div class="sld__rec-line">
-                    <span class="sld__rec-tag">REC #{{ business.business_id }}</span>
-                    <span class="sld__rec-dot">·</span>
-                    <span>{{ business.business_code|default:"NO-CODE" }}</span>
-                    {% if business.business_since %}
-                    <span class="sld__rec-dot">·</span>
-                    <span>since {{ business.business_since|date:"M Y" }}</span>
-                    {% endif %}
-                </div>
-                {# Standing moved to the stamp block; this line is now just the service flags #}
+            <h1 class="wfhero__heading">
+                <span class="sld__seal" aria-hidden="true">{{ business.business_name|first|upper|default:"?" }}</span>
+                <span class="sld__hero-name">{{ business.business_name|default:"Unknown Business" }}</span>
+            </h1>
+
+            <p class="wfhero__record">
+                <span class="wfhero__tag">REC #{{ business.business_id }}</span>
+                <span class="wfhero__dot">&middot;</span> {{ business.business_code|default:"NO-CODE" }}
+                {% if business.business_since %}
+                <span class="wfhero__dot">&middot;</span> since {{ business.business_since|date:"M Y" }}
+                {% endif %}
                 {% if business.fulfillment_service_enabled %}
-                <div class="sld__rec-line sld__rec-line--status">
-                    <span class="sld__rec-flag"><i class="fa-solid fa-warehouse"></i> Fulfillment</span>
-                </div>
+                <span class="wfhero__dot">&middot;</span>
+                <span class="sld__hero-flag"><i class="fa-solid fa-warehouse"></i> Fulfilment</span>
                 {% endif %}
-                <div class="sld__rec-contacts">
-                    {% if business.business_phone %}
-                    <a href="tel:{{ business.business_phone }}" class="sld__rec-contact"><i class="fa-solid fa-phone"></i> {{ business.business_phone }}</a>
-                    {% endif %}
-                    {% if business.business_email %}
-                    <a href="mailto:{{ business.business_email }}" class="sld__rec-contact"><i class="fa-solid fa-envelope"></i> {{ business.business_email }}</a>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Stamps (the signature): account standing beside the verification mark -->
-            <div class="sld__stamp-wrap" aria-hidden="true">
-                {% if business.business_status == 'active' %}
-                <div class="sld__stamp sld__stamp--biz sld__stamp--biz-active">
-                    <i class="fa-solid fa-store sld__stamp-icon"></i>
-                    <span class="sld__stamp-text">Active</span>
-                    <span class="sld__stamp-sub">account standing</span>
-                </div>
-                {% elif business.business_status == 'suspended' %}
-                <div class="sld__stamp sld__stamp--biz sld__stamp--biz-suspended">
-                    <i class="fa-solid fa-ban sld__stamp-icon"></i>
-                    <span class="sld__stamp-text">Suspended</span>
-                    <span class="sld__stamp-sub">account standing</span>
-                </div>
-                {% elif business.business_status == 'pending' %}
-                {# "Awaiting", not "Pending": the verification stamp beside it is already a gold PENDING #}
-                <div class="sld__stamp sld__stamp--biz sld__stamp--biz-pending">
-                    <i class="fa-solid fa-clock sld__stamp-icon"></i>
-                    <span class="sld__stamp-text">Awaiting</span>
-                    <span class="sld__stamp-sub">account approval</span>
-                </div>
-                {% elif business.business_status == 'inactive' %}
-                <div class="sld__stamp sld__stamp--biz sld__stamp--biz-inactive">
-                    <i class="fa-solid fa-store-slash sld__stamp-icon"></i>
-                    <span class="sld__stamp-text">Inactive</span>
-                    <span class="sld__stamp-sub">account standing</span>
-                </div>
-                {% else %}
-                <div class="sld__stamp sld__stamp--biz sld__stamp--biz-unknown">
-                    <i class="fa-regular fa-circle-question sld__stamp-icon"></i>
-                    <span class="sld__stamp-text">Unknown</span>
-                    <span class="sld__stamp-sub">no standing set</span>
-                </div>
-                {% endif %}
-                {% if business.profile.verification_status == 'verified' %}
-                <div class="sld__stamp sld__stamp--verified">
-                    <i class="fa-solid fa-certificate sld__stamp-icon"></i>
-                    <span class="sld__stamp-text">Verified</span>
-                    <span class="sld__stamp-sub">merchant on file</span>
-                </div>
-                {% elif business.profile.verification_status == 'pending' %}
-                <div class="sld__stamp sld__stamp--pending">
-                    <i class="fa-solid fa-hourglass-half sld__stamp-icon"></i>
-                    <span class="sld__stamp-text">Pending</span>
-                    <span class="sld__stamp-sub">review required</span>
-                </div>
-                {% else %}
-                <div class="sld__stamp sld__stamp--none">
-                    <i class="fa-regular fa-circle-question sld__stamp-icon"></i>
-                    <span class="sld__stamp-text">Unverified</span>
-                    <span class="sld__stamp-sub">no record</span>
-                </div>
-                {% endif %}
-            </div>
-
-            <button type="button" class="wfnote__btn" data-wfnote-toggle
-                    aria-expanded="false" aria-controls="workforce_seller_detail_card_notes"
-                    title="About this page">
-                <i class="fa-solid fa-question" aria-hidden="true"></i>
-                <span class="visually-hidden">Show notes</span>
-            </button>
+            </p>
         </div>
 
-        <!-- Ledger strip: the figures as one data record -->
-        <div class="sld__ledger-strip">
-            <div class="sld__figure sld__figure--lead">
-                <div class="sld__figure-val">{{ order_stats.total_orders|default:0 }}</div>
-                <div class="sld__figure-lbl">Total Orders{% if last_7_days_orders > 0 %} <span class="sld__figure-trend">+{{ last_7_days_orders }}/wk</span>{% endif %}</div>
+        <div class="wfhero__bank">
+            {# Account standing and merchant verification: two separate facts, so two marks. #}
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                {% if business.business_status == 'active' %}
+                <span class="sld__mark sld__mark--ok" title="Account standing: active">
+                    <span class="sld__mark-dot" aria-hidden="true"></span>Active <span class="sld__mark-sub">standing</span>
+                </span>
+                {% elif business.business_status == 'suspended' %}
+                <span class="sld__mark sld__mark--bad" title="Account standing: suspended">
+                    <span class="sld__mark-dot" aria-hidden="true"></span>Suspended <span class="sld__mark-sub">standing</span>
+                </span>
+                {% elif business.business_status == 'pending' %}
+                <span class="sld__mark sld__mark--warn" title="Account standing: awaiting approval">
+                    <span class="sld__mark-dot" aria-hidden="true"></span>Awaiting <span class="sld__mark-sub">approval</span>
+                </span>
+                {% elif business.business_status == 'inactive' %}
+                <span class="sld__mark sld__mark--mute" title="Account standing: inactive">
+                    <span class="sld__mark-dot" aria-hidden="true"></span>Inactive <span class="sld__mark-sub">standing</span>
+                </span>
+                {% else %}
+                <span class="sld__mark sld__mark--mute" title="No account standing set">
+                    <span class="sld__mark-dot" aria-hidden="true"></span>Unknown <span class="sld__mark-sub">standing</span>
+                </span>
+                {% endif %}
+
+                {% if business.profile.verification_status == 'verified' %}
+                <span class="sld__mark sld__mark--ok" title="Merchant verification: verified">
+                    <i class="fa-solid fa-certificate"></i>Verified <span class="sld__mark-sub">on file</span>
+                </span>
+                {% elif business.profile.verification_status == 'pending' %}
+                <span class="sld__mark sld__mark--warn" title="Merchant verification: review required">
+                    <i class="fa-solid fa-hourglass-half"></i>Pending <span class="sld__mark-sub">review</span>
+                </span>
+                {% else %}
+                <span class="sld__mark sld__mark--mute" title="Merchant verification: no record">
+                    <i class="fa-regular fa-circle-question"></i>Unverified <span class="sld__mark-sub">no record</span>
+                </span>
+                {% endif %}
+
+                <button type="button" class="wfnote__btn" data-wfnote-toggle
+                        aria-expanded="false" aria-controls="workforce_seller_detail_card_notes"
+                        title="About this page">
+                    <i class="fa-solid fa-question" aria-hidden="true"></i>
+                    <span class="visually-hidden">Show notes</span>
+                </button>
             </div>
-            <div class="sld__figure">
-                <div class="sld__figure-val">{{ delivery_success_rate }}<span class="sld__figure-unit">%</span></div>
-                <div class="sld__figure-lbl">Success Rate</div>
+
+            <div class="wfhero__contacts">
+                <span class="wfhero__contacts-label">Contact</span>
+                {% if business.business_phone %}
+                <a href="tel:{{ business.business_phone }}" class="wfhero__contact" title="Call {{ business.business_phone }}">
+                    <i class="fa-solid fa-phone"></i>
+                    <span class="wfhero__contact-val">&middot;&middot;&middot;{{ business.business_phone|slice:"-4:" }}</span>
+                    <span class="visually-hidden">{{ business.business_phone }}</span>
+                </a>
+                {% endif %}
+                {% if business.business_email %}
+                <a href="mailto:{{ business.business_email }}" class="wfhero__contact" title="Email {{ business.business_email }}">
+                    <i class="fa-solid fa-envelope"></i>
+                    <span class="wfhero__contact-val wfhero__contact-val--email">{{ business.business_email }}</span>
+                </a>
+                {% endif %}
+                {% if not business.business_phone and not business.business_email %}
+                <span class="wfhero__contact wfhero__contact--none">No contact on file</span>
+                {% endif %}
             </div>
-            <div class="sld__figure">
-                <div class="sld__figure-val">{{ recent_orders_count|default:0 }}</div>
-                <div class="sld__figure-lbl">Last 30 Days</div>
-            </div>
-            <div class="sld__figure">
-                <div class="sld__figure-val">{{ cod_stats.total_cod_orders|default:0 }}</div>
-                <div class="sld__figure-lbl">COD Orders</div>
-            </div>
-            <div class="sld__figure">
-                <div class="sld__figure-val">{{ team_members.count|default:0 }}</div>
-                <div class="sld__figure-lbl">Team</div>
-            </div>
-            <div class="sld__figure">
-                <div class="sld__figure-val">{{ pickup_locations.count|default:0 }}</div>
-                <div class="sld__figure-lbl">Locations</div>
-            </div>
+        </div>
+    </div>
+
+    <div class="wfpage__body">
+
+    <!-- Record figures -->
+    <div class="wfstat">
+        <div class="wfstat__card">
+            <span class="wfstat__label">Total orders</span>
+            <span class="wfstat__value">{{ order_stats.total_orders|default:0 }}</span>
+            {% if last_7_days_orders > 0 %}<span class="wfstat__sub">+{{ last_7_days_orders }} in the last 7 days</span>{% endif %}
+        </div>
+        <div class="wfstat__card">
+            <span class="wfstat__label">Success rate</span>
+            <span class="wfstat__value">{{ delivery_success_rate }}<span class="wfstat__unit">%</span></span>
+        </div>
+        <div class="wfstat__card">
+            <span class="wfstat__label">Last 30 days</span>
+            <span class="wfstat__value">{{ recent_orders_count|default:0 }}</span>
+        </div>
+        <div class="wfstat__card{% if not cod_stats.total_cod_orders %} wfstat__card--null{% endif %}">
+            <span class="wfstat__label">COD orders</span>
+            <span class="wfstat__value">{{ cod_stats.total_cod_orders|default:0 }}</span>
+        </div>
+        <div class="wfstat__card{% if not team_members.count %} wfstat__card--null{% endif %}">
+            <span class="wfstat__label">Team</span>
+            <span class="wfstat__value">{{ team_members.count|default:0 }}</span>
+        </div>
+        <div class="wfstat__card{% if not pickup_locations.count %} wfstat__card--null{% endif %}">
+            <span class="wfstat__label">Locations</span>
+            <span class="wfstat__value">{{ pickup_locations.count|default:0 }}</span>
         </div>
     </div>
 
@@ -392,7 +408,15 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                             <span class="sld__contact-icon"><i class="fa-solid fa-warehouse"></i></span>
                             <div class="sld__contact-body">
                                 <div class="sld__contact-lbl">Fulfillment</div>
-                                <div class="sld__contact-val"><span class="badge badge-success">Active</span></div>
+                                <div class="sld__contact-val">
+                                    {% if business.fulfillment_service_status == 'active' %}
+                                    <span class="badge badge--success">Active</span>
+                                    {% elif business.fulfillment_service_status == 'requested' %}
+                                    <span class="badge badge--warning">Requested</span>
+                                    {% else %}
+                                    <span class="badge badge--muted">{{ business.get_fulfillment_service_status_display }}</span>
+                                    {% endif %}
+                                </div>
                             </div>
                         </li>
                         {% endif %}
@@ -515,11 +539,11 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
             </a>
         </div>
 
-        {% if api_products_platform %}
+        {% if api_products_platform or api_orders_pull_source %}
         <div class="d-flex flex-wrap align-items-center gap-2 mt-4 mb-2">
             <span class="text-muted small me-1">
                 <i class="fa-solid fa-cloud-arrow-down me-1"></i>
-                Show {{ api_products_platform|title }} Orders:
+                {% if api_orders_pull_source %}Fetch latest orders from the seller's site:{% else %}Show {{ api_products_platform|title }} Orders:{% endif %}
             </span>
             <div class="btn-group btn-group-sm" role="group" aria-label="Fetch order count">
                 <button type="button" class="btn btn-outline-primary"
@@ -650,10 +674,109 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
             </div>
         </div>
         {% endif %}
+
+        <!-- CRM origin. The lead card this client was converted from — or, when
+             nothing is attached yet, the open business leads that look like this
+             client, ranked by the same phone/name test the verification desk uses. -->
+        <div class="sld__section" id="workforce_seller_section_leads">
+            <h3 class="sld__section-title justify-content-between">
+                <span class="d-inline-flex align-items-center gap-2">
+                    <i class="fa-solid fa-handshake sld__section-icon"></i> CRM Leads
+                </span>
+                <a href="{% url 'workforce:crm_leads_list' %}" class="sld__lead-link" id="workforce_seller_leads_link_board">
+                    All leads <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                </a>
+            </h3>
+
+            {% if crm_linked_leads %}
+            <div class="sld__table-wrap">
+                <table class="sld__table" id="workforce_seller_leads_table_view">
+                    <thead>
+                        <tr>
+                            <th>Lead</th>
+                            <th>Stage</th>
+                            <th>Source</th>
+                            <th>Owner</th>
+                            <th>Created</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lead in crm_linked_leads %}
+                        <tr>
+                            <td>
+                                <div class="sld__order-id">{{ lead.company_name|default:lead.contact_name|default:lead.phone|default:"Lead" }}</div>
+                                <div class="sld__customer-phone">#{{ lead.pk }}{% if lead.phone %} &middot; {{ lead.phone }}{% endif %}</div>
+                            </td>
+                            <td><span class="sld__badge sld__badge--muted">{{ lead.stage_label }}</span></td>
+                            <td>
+                                {% for badge in lead.source_badges %}
+                                <span class="sld__lead-src">{{ badge.label }}</span>
+                                {% endfor %}
+                            </td>
+                            <td class="sld__date-cell">{% if lead.assigned_to %}{{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }}{% else %}Unassigned{% endif %}</td>
+                            <td class="sld__date-cell">{{ lead.created_at|date:"d M Y" }}</td>
+                            <td class="text-end">
+                                <div class="sld__row-actions">
+                                    <a href="{% url 'workforce:crm_lead_detail' lead.pk %}" class="sld__row-btn" title="Open lead" aria-label="Open lead">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="sld__empty-msg">
+                <i class="fa-solid fa-handshake-slash"></i>
+                No CRM lead is linked to this seller
+            </div>
+
+            {% if crm_lead_suggestions %}
+            <p class="sld__panel-note mt-2 mb-3">Open business leads matching this client's name or phone. Linking marks the lead <strong>Won</strong> and logs who linked it &mdash; nothing on this seller record changes.</p>
+            <div class="sld__lead-list" id="workforce_seller_leads_list_suggest">
+                {% for suggestion in crm_lead_suggestions %}
+                <div class="sld__lead-row d-flex align-items-center flex-wrap gap-2">
+                    <div class="sld__lead-row-main">
+                        <a href="{% url 'workforce:crm_lead_detail' suggestion.pk %}" class="sld__lead-name">#{{ suggestion.pk }} &mdash; {{ suggestion.label }}</a>
+                        {% if suggestion.sub %}<div class="sld__lead-sub">{{ suggestion.sub }}</div>{% endif %}
+                    </div>
+                    <span class="sld__lead-why">{{ suggestion.why }}</span>
+                    <button type="button" class="sld__action-btn" data-action="link-seller-lead"
+                            data-lead-id="{{ suggestion.pk }}" data-lead-label="{{ suggestion.label }}">
+                        <i class="fa-solid fa-link"></i> Link
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
     </div>
 
     <!-- Tab: Store Locations -->
     <div id="panel-locations" class="sld__panel">
+        <!-- Services: fulfilment switch. Sits above the addresses because turning
+             it off is what retires the warehouse pickup row listed below. -->
+        <div class="sld__section">
+            <h3 class="sld__section-title mb-2">
+                <i class="fa-solid fa-warehouse sld__section-icon"></i> Services
+            </h3>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <label class="sld__switch" for="sld_f_ffl">
+                    <input type="checkbox" id="sld_f_ffl" class="sld__switch-input" {% if business.fulfillment_service_enabled %}checked{% endif %}>
+                    <span class="sld__switch-track" aria-hidden="true"><span class="sld__switch-knob"></span></span>
+                    <span class="sld__switch-text">
+                        <span class="sld__switch-title">Fulfilment service</span>
+                        <span class="sld__switch-sub">Stock for this seller is held and picked in the Ezzy warehouse. Switching it on adds the warehouse pickup address below; switching it off retires it.</span>
+                    </span>
+                </label>
+                <span class="sld__location-addr" id="sld-ffl-msg" hidden></span>
+            </div>
+        </div>
+
         <!-- Pickup Locations -->
         <div class="sld__section">
             <div class="d-flex align-items-center justify-content-between mb-2">
@@ -1064,11 +1187,14 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
         {% else %}
         <div class="sld__empty-msg">
             <i class="fa-solid fa-folder-open"></i>
-            No documents uploaded
+            <p class="sld__empty-msg-title">No documents uploaded</p>
+            <p class="sld__empty-msg-sub">Trade licence, QID and any signed agreement are kept on the seller's document file.</p>
+            <div class="sld__empty-msg-act">
+                <a href="{% url 'workforce:store_document_detail' business.business_id %}" class="sld__act">
+                    <i class="fa-solid fa-folder-open"></i> Manage documents
+                </a>
+            </div>
         </div>
-        <a href="{% url 'workforce:store_document_detail' business.business_id %}" class="btn btn-sm btn-outline-secondary mt-2">
-            <i class="fa-solid fa-folder-open me-1"></i> Manage Documents
-        </a>
         {% endif %}
     </div>
 
@@ -1257,10 +1383,22 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                             {% else %}
                                 <span class="badge bg-secondary"><i class="fa-solid fa-plug me-1"></i>{{ api.api_type|title }}</span>
                             {% endif %}
+                            {% comment %}A seller can hold two custom rows — one their site pushes to,
+                            one we pull from — and both otherwise render as "Custom" on the same store
+                            URL, which reads as a duplicate.{% endcomment %}
+                            {% if api.api_type == 'custom' %}
+                                {% if api.fetch_orders_url %}
+                                <span class="badge bg-info text-dark" title="EzzyDelivery fetches orders from their API"><i class="fa-solid fa-arrow-down me-1"></i>Pull</span>
+                                {% else %}
+                                <span class="badge bg-light text-dark border" title="Their site posts orders to us"><i class="fa-solid fa-arrow-up me-1"></i>Push</span>
+                                {% endif %}
+                            {% endif %}
                         </td>
                         <td class="sld__api-url">
                             {% if api.api_type == 'google_sheet' and api.google_sheet_url %}
                                 <a href="{{ api.google_sheet_url }}" target="_blank" rel="noopener" class="text-break">{{ api.google_sheet_url|truncatechars:40 }}</a>
+                            {% elif api.api_type == 'custom' and api.fetch_orders_url %}
+                                <span class="text-break" title="{{ api.fetch_orders_url }}">{{ api.fetch_orders_url|truncatechars:40 }}</span>
                             {% else %}
                                 {{ api.site_api_url|default:"N/A"|truncatechars:40 }}
                             {% endif %}
@@ -1305,10 +1443,13 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
         {% else %}
         <div class="sld__empty-msg">
             <i class="fa-solid fa-plug"></i>
-            No API integrations
-            <button type="button" class="sld__act sld__act--primary mt-3 sld-api-add-btn">
-                <i class="fa-solid fa-plus"></i> Add integration
-            </button>
+            <p class="sld__empty-msg-title">No store connected</p>
+            <p class="sld__empty-msg-sub">Connect this seller's Shopify, WooCommerce or custom store and their orders arrive here automatically.</p>
+            <div class="sld__empty-msg-act">
+                <button type="button" class="sld__act sld__act--primary sld-api-add-btn">
+                    <i class="fa-solid fa-plus"></i> Add integration
+                </button>
+            </div>
         </div>
         {% endif %}
     </div>
@@ -1317,6 +1458,7 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
     <div class="sld__modal-overlay sld__modal-overlay--wide" id="sldApiEditModal" aria-hidden="true">
         <div class="sld__modal sld__modal--api-edit">
             <div class="sld__modal-header">
+                {{ api_field_config|json_script:"api-field-config" }}
                 <h4 class="sld__modal-title" id="sldApiEditTitle"><i class="fa-solid fa-pen-to-square me-2"></i>Edit API Integration</h4>
                 <button type="button" class="sld__modal-close" id="sldApiEditClose" aria-label="Close">&times;</button>
             </div>
@@ -1343,51 +1485,158 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                                 <input type="text" class="form-control form-control-sm" name="site_contry" id="sldApiEditCountry" placeholder="Qatar">
                             </div>
 
-                            <div class="col-12 sld__api-field-group" data-show-for="shopify,woocommerce,magento,opencart,prestashop,bigcommerce,custom,tiktokshop">
+                            <div class="col-12 sld__api-field-group" data-field="site_api_url">
                                 <label class="form-label small fw-semibold">Site / Store URL</label>
                                 <input type="url" class="form-control form-control-sm" name="site_api_url" id="sldApiEditUrl" placeholder="https://example.myshopify.com">
                             </div>
 
-                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="shopify,woocommerce,tiktokshop,magento,opencart,prestashop,bigcommerce,custom">
+                            <div class="col-12 col-md-6 sld__api-field-group" data-field="api_key">
                                 <label class="form-label small fw-semibold">API Key / Consumer Key</label>
                                 <input type="text" class="form-control form-control-sm" name="api_key" id="sldApiEditKey">
                             </div>
-                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="shopify,woocommerce,tiktokshop,magento,opencart,prestashop,bigcommerce,custom">
+                            <div class="col-12 col-md-6 sld__api-field-group" data-field="api_secret">
                                 <label class="form-label small fw-semibold">API Secret / Consumer Secret</label>
                                 <input type="text" class="form-control form-control-sm" name="api_secret" id="sldApiEditSecret">
                             </div>
-                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="shopify,tiktokshop,custom">
+                            <div class="col-12 col-md-6 sld__api-field-group" data-field="api_access_token">
                                 <label class="form-label small fw-semibold">Access Token</label>
                                 <input type="text" class="form-control form-control-sm" name="api_access_token" id="sldApiEditToken">
                             </div>
-                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="shopify,tiktokshop,custom">
+                            <div class="col-12 col-md-6 sld__api-field-group" data-field="api_version">
                                 <label class="form-label small fw-semibold">API Version</label>
                                 <input type="text" class="form-control form-control-sm" name="api_version" id="sldApiEditVersion" placeholder="e.g. 2023-10">
                             </div>
 
-                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="custom,woocommerce">
+                            {% comment %}Path fragments appended to the store URL by the Shopify and
+                            WooCommerce clients. A custom integration carries whole URLs in the fetch
+                            fields below, so showing these too gave two boxes for one job.{% endcomment %}
+                            <div class="col-12 col-md-6 sld__api-field-group" data-field="order_api_endpoint">
                                 <label class="form-label small fw-semibold">Order API Endpoint</label>
                                 <input type="text" class="form-control form-control-sm" name="order_api_endpoint" id="sldApiEditOrderEp">
                             </div>
-                            <div class="col-12 col-md-6 sld__api-field-group" data-show-for="custom,woocommerce">
+                            <div class="col-12 col-md-6 sld__api-field-group" data-field="product_api_endpoint">
                                 <label class="form-label small fw-semibold">Product API Endpoint</label>
                                 <input type="text" class="form-control form-control-sm" name="product_api_endpoint" id="sldApiEditProdEp">
                             </div>
 
-                            <div class="col-12 sld__api-field-group" data-show-for="google_sheet">
+                            {% comment %}Custom REST pull — we call the seller's own API with the key
+                            THEIR site issued us. Distinct from everything above, which is either our
+                            key or a platform's.{% endcomment %}
+                            <div class="col-12 sld__api-field-group" data-field="__custom_note__">
+                                <hr class="my-2">
+                                <div class="small fw-semibold text-muted mb-1">
+                                    <i class="fa-solid fa-cloud-arrow-down me-1"></i>Pull orders from the seller's own API
+                                </div>
+                                <div class="small text-muted mb-2">
+                                    Leave the fetch URL empty for a push-only integration (their site posts to us).
+                                </div>
+                            </div>
+                            <div class="col-12 sld__api-field-group" data-field="fetch_orders_url">
+                                <label class="form-label small fw-semibold">Order Fetch URL</label>
+                                <input type="url" class="form-control form-control-sm" name="fetch_orders_url" id="sldApiEditFetchUrl" placeholder="e.g. https://yourshop.com/api/orders">
+                            </div>
+                            <div class="col-12 col-md-4 sld__api-field-group" data-field="fetch_auth_style">
+                                <label class="form-label small fw-semibold">Send key as</label>
+                                <select class="form-select form-select-sm" name="fetch_auth_style" id="sldApiEditFetchAuth" data-no-select2>
+                                    <option value="bearer">Authorization: Bearer</option>
+                                    <option value="header">Custom header</option>
+                                    <option value="query">Query parameter</option>
+                                    <option value="basic">HTTP Basic</option>
+                                    <option value="none">No authentication</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-4 sld__api-field-group" data-field="fetch_auth_name">
+                                <label class="form-label small fw-semibold">Header / parameter name</label>
+                                <input type="text" class="form-control form-control-sm" name="fetch_auth_name" id="sldApiEditFetchAuthName" placeholder="e.g. x-api-key">
+                            </div>
+                            <div class="col-12 col-md-4 sld__api-field-group" data-field="fetch_api_key">
+                                <label class="form-label small fw-semibold">Their API key</label>
+                                <input type="text" class="form-control form-control-sm" name="fetch_api_key" id="sldApiEditFetchKey" autocomplete="off">
+                            </div>
+                            <div class="col-12 col-md-4 sld__api-field-group" data-field="fetch_list_path">
+                                <label class="form-label small fw-semibold">Order list path</label>
+                                <input type="text" class="form-control form-control-sm" name="fetch_list_path" id="sldApiEditFetchPath" placeholder="e.g. orders">
+                            </div>
+                            <div class="col-12 col-md-4 sld__api-field-group" data-field="fetch_status_path">
+                                <label class="form-label small fw-semibold">Status field</label>
+                                <input type="text" class="form-control form-control-sm" name="fetch_status_path" id="sldApiEditFetchStatusPath" placeholder="e.g. status">
+                            </div>
+                            <div class="col-12 col-md-4 sld__api-field-group" data-field="fetch_status_include">
+                                <label class="form-label small fw-semibold">Only these statuses</label>
+                                <input type="text" class="form-control form-control-sm" name="fetch_status_include" id="sldApiEditFetchStatusInc" placeholder="e.g. accepted">
+                            </div>
+                            <div class="col-12 col-md-8 sld__api-field-group" data-field="fetch_products_url">
+                                <label class="form-label small fw-semibold">Product Fetch URL</label>
+                                <input type="url" class="form-control form-control-sm" name="fetch_products_url" id="sldApiEditFetchProdUrl" placeholder="e.g. https://yourshop.com/api/products">
+                            </div>
+                            <div class="col-12 col-md-4 sld__api-field-group" data-field="fetch_products_list_path">
+                                <label class="form-label small fw-semibold">Product list path</label>
+                                <input type="text" class="form-control form-control-sm" name="fetch_products_list_path" id="sldApiEditFetchProdPath" placeholder="e.g. products">
+                            </div>
+                            {% comment %}Product field paths. Nothing is inferred from field names,
+                            so each column the seller wants imported has to be pointed at.{% endcomment %}
+                            <div class="col-12 sld__api-field-group" data-field="__custom_note__">
+                                <div class="small text-muted mb-1">
+                                    Product field paths — where each value sits in one product object.
+                                    Unmapped fields are not imported.
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3 sld__api-field-group" data-field="pm_item_name">
+                                <label class="form-label small fw-semibold">Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm" name="pm_item_name" id="sldApiEditPmName" placeholder="e.g. title">
+                            </div>
+                            <div class="col-6 col-md-3 sld__api-field-group" data-field="pm_item_sku">
+                                <label class="form-label small fw-semibold">SKU</label>
+                                <input type="text" class="form-control form-control-sm" name="pm_item_sku" id="sldApiEditPmSku" placeholder="e.g. sku">
+                            </div>
+                            <div class="col-6 col-md-3 sld__api-field-group" data-field="pm_item_price">
+                                <label class="form-label small fw-semibold">Price</label>
+                                <input type="text" class="form-control form-control-sm" name="pm_item_price" id="sldApiEditPmPrice" placeholder="e.g. price">
+                            </div>
+                            <div class="col-6 col-md-3 sld__api-field-group" data-field="pm_barcode">
+                                <label class="form-label small fw-semibold">Barcode</label>
+                                <input type="text" class="form-control form-control-sm" name="pm_barcode" id="sldApiEditPmBarcode" placeholder="e.g. barcode">
+                            </div>
+                            <div class="col-6 col-md-3 sld__api-field-group" data-field="pm_image_url">
+                                <label class="form-label small fw-semibold">Image URL</label>
+                                <input type="text" class="form-control form-control-sm" name="pm_image_url" id="sldApiEditPmImage" placeholder="e.g. images[].src">
+                            </div>
+                            <div class="col-6 col-md-3 sld__api-field-group" data-field="pm_brand_name">
+                                <label class="form-label small fw-semibold">Brand</label>
+                                <input type="text" class="form-control form-control-sm" name="pm_brand_name" id="sldApiEditPmBrand" placeholder="e.g. vendor">
+                            </div>
+                            <div class="col-6 col-md-3 sld__api-field-group" data-field="pm_inventory_qty">
+                                <label class="form-label small fw-semibold">Stock qty</label>
+                                <input type="text" class="form-control form-control-sm" name="pm_inventory_qty" id="sldApiEditPmQty" placeholder="e.g. stock">
+                            </div>
+                            <div class="col-6 col-md-3 sld__api-field-group" data-field="pm_platform_id">
+                                <label class="form-label small fw-semibold">Product ID</label>
+                                <input type="text" class="form-control form-control-sm" name="pm_platform_id" id="sldApiEditPmPid" placeholder="e.g. id">
+                            </div>
+                            <div class="col-12 sld__api-field-group" data-field="fetch_enabled">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="fetch_enabled" value="1" id="sldApiEditFetchEnabled">
+                                    <label class="form-check-label small" for="sldApiEditFetchEnabled">
+                                        Pull orders automatically every hour
+                                    </label>
+                                </div>
+                                <hr class="my-2">
+                            </div>
+
+                            <div class="col-12 sld__api-field-group" data-field="google_sheet_url">
                                 <label class="form-label small fw-semibold">Google Sheet URL</label>
                                 <input type="url" class="form-control form-control-sm" name="google_sheet_url" id="sldApiEditSheet" placeholder="https://docs.google.com/spreadsheets/d/...">
                             </div>
 
-                            <div class="col-12 col-md-4 sld__api-field-group" data-show-for="tiktokshop">
+                            <div class="col-12 col-md-4 sld__api-field-group" data-field="tiktok_shop_id">
                                 <label class="form-label small fw-semibold">TikTok Shop ID</label>
                                 <input type="text" class="form-control form-control-sm" name="tiktok_shop_id" id="sldApiEditTtShop">
                             </div>
-                            <div class="col-12 col-md-4 sld__api-field-group" data-show-for="tiktokshop">
+                            <div class="col-12 col-md-4 sld__api-field-group" data-field="tiktok_shop_cipher">
                                 <label class="form-label small fw-semibold">TikTok Shop Cipher</label>
                                 <input type="text" class="form-control form-control-sm" name="tiktok_shop_cipher" id="sldApiEditTtCipher">
                             </div>
-                            <div class="col-12 col-md-4 sld__api-field-group" data-show-for="tiktokshop">
+                            <div class="col-12 col-md-4 sld__api-field-group" data-field="tiktok_refresh_token">
                                 <label class="form-label small fw-semibold">TikTok Refresh Token</label>
                                 <input type="text" class="form-control form-control-sm" name="tiktok_refresh_token" id="sldApiEditTtRefresh">
                             </div>
@@ -1621,15 +1870,18 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
 
         {% endif %}
 
-        {% if api_products_platform %}
+        {% if api_products_platform or api_products_pull_source %}
         <div class="sld__ledger-cap sld__ledger-cap--api">
-            <span class="sld__ledger-cap-label">{{ api_products_platform|title }} catalogue</span>
+            <span class="sld__ledger-cap-label">
+                {% if api_products_pull_source %}Seller catalogue{% else %}{{ api_products_platform|title }} catalogue{% endif %}
+            </span>
             <button type="button" class="sld__act" id="seller_btn_show_api_products"
                     hx-get="{% url 'workforce:seller_api_products' business.business_id %}"
                     hx-target="#seller-api-products-container"
                     hx-swap="innerHTML"
                     hx-indicator="#seller-api-products-spinner">
-                <i class="fa-solid fa-cloud-arrow-down"></i> Fetch from {{ api_products_platform|title }}
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+                {% if api_products_pull_source %}Fetch products from their API{% else %}Fetch from {{ api_products_platform|title }}{% endif %}
             </button>
             <span id="seller-api-products-spinner" class="htmx-indicator sld__ledger-cap-count">
                 <i class="fa-solid fa-spinner fa-spin"></i> Loading…
@@ -1638,7 +1890,18 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
         <div id="seller-api-products-container"></div>
         {% endif %}
 
-        {% if not api_products_platform and not products_list %}
+        {% comment %}A custom integration with no product URL is the normal case — a delivery
+        order feed carries no catalogue — so say what is missing rather than hiding the option.{% endcomment %}
+        {% if api_orders_pull_source and not api_products_pull_source %}
+        <div class="alert alert-secondary py-2 small mt-2 mb-0">
+            <i class="fa-solid fa-circle-info me-1"></i>
+            This seller's API serves orders only. To pull their catalogue too, add a
+            <strong>Product Fetch URL</strong> and product field paths on the integration
+            under the Integrations tab.
+        </div>
+        {% endif %}
+
+        {% if not api_products_platform and not api_products_pull_source and not products_list %}
         <div class="sld__empty-msg">
             <i class="fa-solid fa-box-open"></i>
             <p class="sld__empty-msg-title">No products on file</p>
@@ -1780,20 +2043,11 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                 </div>
             </section>
 
-            <!-- Settings -->
-            <section class="sld__fieldset">
-                <h4 class="sld__form-heading">
-                    <i class="fa-solid fa-gear sld__form-heading-icon"></i> Services
-                </h4>
-                <label class="sld__switch" for="sld_f_ffl">
-                    <input type="checkbox" id="sld_f_ffl" name="fulfillment_service_enabled" class="sld__switch-input" {% if business.fulfillment_service_enabled %}checked{% endif %}>
-                    <span class="sld__switch-track" aria-hidden="true"><span class="sld__switch-knob"></span></span>
-                    <span class="sld__switch-text">
-                        <span class="sld__switch-title">Fulfilment service</span>
-                        <span class="sld__switch-sub">Stock for this seller is held and picked in the Ezzy warehouse.</span>
-                    </span>
-                </label>
-            </section>
+            {% comment %}
+            Services (fulfilment switch) now lives on the Store Locations tab — it
+            decides whether the warehouse address is collectable, so it sits with
+            the addresses it governs and saves on its own.
+            {% endcomment %}
 
         </form>
         <div id="updateMessage" class="sld__toast"></div>
@@ -1941,6 +2195,7 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
     <button style="position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:2rem;cursor:pointer;" onclick="document.getElementById('sldProductImgOverlay').style.display='none';">&times;</button>
 </div>
 
+</div><!-- /.wfpage__body -->
 </div>
 {% endblock content %}
 
@@ -2160,6 +2415,52 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
     });
 });
 
+// Fulfilment switch (Store Locations tab) — saves on its own, outside #updateForm,
+// because switching it off also retires the warehouse pickup address on that tab.
+(function() {
+    var sw = document.getElementById('sld_f_ffl');
+    if (!sw) return;
+    var note = document.getElementById('sld-ffl-msg');
+    function say(text) { if (note) { note.hidden = !text; note.textContent = text || ''; } }
+
+    sw.addEventListener('change', function() {
+        var on = sw.checked;
+        if (!on && !confirm('Turn fulfilment off for this seller? The warehouse pickup address stops being offered for collection.')) {
+            sw.checked = true;
+            return;
+        }
+        sw.disabled = true;
+        say('Saving…');
+        var fd = new FormData();
+        fd.append('section', 'fulfilment');
+        if (on) fd.append('fulfillment_service_enabled', 'on');
+        fetch('{% url "workforce:seller_detail" business.business_id %}', {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                // No warehouse could be chosen, so the client is on fulfilment with
+                // nothing collectable at the hub. Staff has to see that before the
+                // reload wipes the note.
+                if (data.warning) alert(data.warning);
+                location.reload();
+                return;
+            }
+            sw.checked = !on;
+            sw.disabled = false;
+            say(data.error || 'Failed to save');
+        })
+        .catch(function() {
+            sw.checked = !on;
+            sw.disabled = false;
+            say('Network error');
+        });
+    });
+})();
+
 // ===== API Integrations: edit / test / approve / delete =====
 (function() {
     var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
@@ -2184,6 +2485,27 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
         tiktok_shop_id: document.getElementById('sldApiEditTtShop'),
         tiktok_shop_cipher: document.getElementById('sldApiEditTtCipher'),
         tiktok_refresh_token: document.getElementById('sldApiEditTtRefresh'),
+        fetch_orders_url: document.getElementById('sldApiEditFetchUrl'),
+        fetch_auth_style: document.getElementById('sldApiEditFetchAuth'),
+        fetch_auth_name: document.getElementById('sldApiEditFetchAuthName'),
+        fetch_api_key: document.getElementById('sldApiEditFetchKey'),
+        fetch_list_path: document.getElementById('sldApiEditFetchPath'),
+        fetch_status_path: document.getElementById('sldApiEditFetchStatusPath'),
+        fetch_status_include: document.getElementById('sldApiEditFetchStatusInc'),
+        fetch_products_url: document.getElementById('sldApiEditFetchProdUrl'),
+        fetch_products_list_path: document.getElementById('sldApiEditFetchProdPath'),
+    };
+    var fetchEnabledChk = document.getElementById('sldApiEditFetchEnabled');
+    // Product field paths are posted as pm_<field> and stored as one JSON mapping.
+    var productMapFields = {
+        item_name: document.getElementById('sldApiEditPmName'),
+        item_sku: document.getElementById('sldApiEditPmSku'),
+        item_price: document.getElementById('sldApiEditPmPrice'),
+        barcode: document.getElementById('sldApiEditPmBarcode'),
+        image_url: document.getElementById('sldApiEditPmImage'),
+        brand_name: document.getElementById('sldApiEditPmBrand'),
+        inventory_qty: document.getElementById('sldApiEditPmQty'),
+        platform_id: document.getElementById('sldApiEditPmPid'),
     };
     var defaultChk = document.getElementById('sldApiEditDefault');
     var editTitle  = document.getElementById('sldApiEditTitle');
@@ -2196,12 +2518,56 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
     function openModal(m) { m.classList.add('show'); document.body.style.overflow = 'hidden'; }
     function closeModal(m) { m.classList.remove('show'); document.body.style.overflow = ''; }
 
+    // Which fields a platform uses is decided by business.integration_fields and
+    // rendered into #api-field-config. Never reintroduce a field list here: this
+    // modal and the client-side form drifted apart precisely because each kept
+    // its own copy.
+    var FIELD_CONFIG = (function() {
+        var el = document.getElementById('api-field-config');
+        if (!el) return { platforms: {}, conditional: {} };
+        try { return JSON.parse(el.textContent); }
+        catch (e) { return { platforms: {}, conditional: {} }; }
+    })();
+
+    function fieldsFor(platform) {
+        var spec = FIELD_CONFIG.platforms[platform] || FIELD_CONFIG.platforms['custom'] || {};
+        return spec.fields || [];
+    }
+
     function applyTypeVisibility() {
         var t = editTypeSel.value;
+        var allowed = fieldsFor(t);
+        // Product field paths only mean something where a product feed exists,
+        // and the section notes belong to the custom pull block.
+        var hasProducts = allowed.indexOf('fetch_products_url') !== -1;
+        var isPull = allowed.indexOf('fetch_orders_url') !== -1;
+
         document.querySelectorAll('#sldApiEditModal .sld__api-field-group').forEach(function(grp) {
-            var allowed = (grp.dataset.showFor || '').split(',').map(function(s) { return s.trim(); });
-            grp.style.display = allowed.indexOf(t) === -1 ? 'none' : '';
+            var field = grp.dataset.field || '';
+            var show;
+            if (field === '__custom_note__') {
+                show = isPull;
+            } else if (field.indexOf('pm_') === 0) {
+                show = hasProducts;
+            } else {
+                show = allowed.indexOf(field) !== -1;
+            }
+            grp.style.display = show ? '' : 'none';
         });
+
+        // A field that depends on another field's value (header/parameter name
+        // is meaningless for Bearer, Basic and None).
+        Object.keys(FIELD_CONFIG.conditional || {}).forEach(function(field) {
+            var rule = FIELD_CONFIG.conditional[field];
+            var grp = document.querySelector('#sldApiEditModal [data-field="' + field + '"]');
+            if (!grp || grp.style.display === 'none') return;
+            var driver = fields[rule.field];
+            if (!driver) return;
+            grp.style.display = (rule.values || []).indexOf(driver.value) !== -1 ? '' : 'none';
+        });
+    }
+    if (fields.fetch_auth_style) {
+        fields.fetch_auth_style.addEventListener('change', applyTypeVisibility);
     }
     editTypeSel.addEventListener('change', applyTypeVisibility);
 
@@ -2228,7 +2594,12 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
             editForm.reset();
             editTypeSel.value = 'shopify';
             if (fields.site_contry) fields.site_contry.value = 'Qatar';
+            if (fields.fetch_auth_style) fields.fetch_auth_style.value = 'bearer';
             defaultChk.checked = false;
+            if (fetchEnabledChk) fetchEnabledChk.checked = false;
+            Object.keys(productMapFields).forEach(function(k) {
+                if (productMapFields[k]) productMapFields[k].value = '';
+            });
             setMode(true);
             applyTypeVisibility();
             editSaveBtn.disabled = false;
@@ -2252,6 +2623,11 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
                         if (fields[k]) fields[k].value = a[k] || '';
                     });
                     defaultChk.checked = !!a.is_default;
+                    if (fetchEnabledChk) fetchEnabledChk.checked = !!a.fetch_enabled;
+                    var pm = a.product_column_mapping || {};
+                    Object.keys(productMapFields).forEach(function(k) {
+                        if (productMapFields[k]) productMapFields[k].value = pm[k] || '';
+                    });
                     applyTypeVisibility();
                     openModal(editModal);
                 })
@@ -2268,6 +2644,9 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
         var apiId = editId.value;
         var isAdd = !apiId;
         var fd = new FormData(editForm);
+        // An unticked checkbox posts nothing, so the server would read "absent"
+        // as "unchanged" and automatic pulling could never be switched off.
+        fd.set('fetch_enabled', (fetchEnabledChk && fetchEnabledChk.checked) ? '1' : '0');
         if (!defaultChk.checked) fd.set('is_default', '0');
         editSaveBtn.disabled = true;
         editSaveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>' + (isAdd ? 'Creating' : 'Saving');
@@ -2955,6 +3334,49 @@ document.body.addEventListener('htmx:responseError', function (e) {
         if (e.key !== 'Escape') return;
         if (editModal.classList.contains('show')) close(editModal);
         else if (infoModal.classList.contains('show')) close(infoModal);
+    });
+})();
+
+/* CRM Leads section (Details tab) — attach a suggested lead to this client.
+   Posts to the same endpoint the verification desk uses, so a link made here
+   marks the lead Won and logs it exactly the same way. */
+(function sldLinkLead() {
+    var rows = document.querySelectorAll('[data-action="link-seller-lead"]');
+    if (!rows.length) return;
+    var linkUrl = '{% url "workforce:crm_lead_link_business" %}';
+    var bizId = '{{ business.business_id }}';
+
+    rows.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var leadId = this.dataset.leadId;
+            var label = this.dataset.leadLabel || ('Lead #' + leadId);
+            if (!confirm('Link lead "' + label + '" to {{ business.business_name|escapejs }}? The lead is marked Won.')) return;
+            var self = this;
+            var original = self.innerHTML;
+            self.disabled = true;
+            self.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Linking...';
+            var fd = new FormData();
+            fd.append('lead_id', leadId);
+            fd.append('business_id', bizId);
+            fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            fetch(linkUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.success) {
+                        window.location.hash = 'details';
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'Failed to link lead'));
+                        self.disabled = false;
+                        self.innerHTML = original;
+                    }
+                })
+                .catch(function (err) {
+                    alert(err.message || 'An error occurred');
+                    self.disabled = false;
+                    self.innerHTML = original;
+                });
+        });
     });
 })();
 </script>

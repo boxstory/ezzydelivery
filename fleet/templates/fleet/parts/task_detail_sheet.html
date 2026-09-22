@@ -335,6 +335,58 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
     </div>
 </div>
 
+{% comment %}
+Returned Sub-Sheet — the parcel is coming back, not just an attempt that failed.
+Same reason vocabulary as Failed (delivery/pod.py puts both on the failed rule, so
+the photo requirement is shared), plus the destination the driver has to take it to.
+{% endcomment %}
+<div id="tdReturnedOverlay" class="td-overlay" onclick="closeTdReturned()"></div>
+<div id="tdReturnedSheet" class="td-sub-sheet">
+    <div class="td-sheet__handle"></div>
+    <div class="td-sheet__header">
+        <strong style="color:var(--fleet-warning)"><i class="fa-solid fa-rotate-left me-2"></i>Returning Parcel</strong>
+        <button class="td-sheet__close" onclick="closeTdReturned()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="td-sub-sheet__body">
+        <div class="td-nr-help__note" id="tdReturnDestNote">
+            <i class="fa-solid fa-warehouse"></i>
+            <span id="tdReturnDestText">You are keeping this parcel — hand it in at the hub.</span>
+        </div>
+        <div class="td-form-group">
+            <label class="td-form-label"><i class="fa-solid fa-triangle-exclamation me-1"></i>Why is it coming back? <span style="color:var(--fleet-danger)">*</span></label>
+            <div class="td-reason-grid" id="tdReturnReasonGrid">
+                <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="customer_refused" onclick="selectReturnReason(this)">Refused</button>
+                <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="customer_unreachable" onclick="selectReturnReason(this)">Not Reachable</button>
+                <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="customer_not_home" onclick="selectReturnReason(this)">Not Home</button>
+                <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="wrong_address" onclick="selectReturnReason(this)">Wrong Address</button>
+                <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="address_not_found" onclick="selectReturnReason(this)">Address Not Found</button>
+                <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="cod_amount_dispute" onclick="selectReturnReason(this)">No COD Cash</button>
+                <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="other" onclick="selectReturnReason(this)">Other</button>
+            </div>
+            <input type="hidden" id="tdReturnReasonKey" value="">
+            <textarea id="tdReturnNotes" class="td-form-textarea" placeholder="Add extra notes (optional)..." rows="2"></textarea>
+        </div>
+        <div class="td-form-group" id="tdReturnProofGroup" hidden>
+            <label class="td-form-label"><i class="fa-solid fa-camera me-1"></i>Parcel Photo
+                <span class="td-pod-flag td-pod-flag--req">required</span></label>
+            <div class="td-photo-upload" id="tdReturnProofBox" onclick="document.getElementById('tdReturnProofInput').click()">
+                <i class="fa-solid fa-cloud-arrow-up td-photo-upload__icon"></i>
+                <span class="td-photo-upload__text">Tap to photograph the parcel you are taking back</span>
+                <img id="tdReturnProofPreview" class="td-photo-preview" style="display:none;" alt="Returned parcel photo">
+            </div>
+            <input type="file" id="tdReturnProofInput" accept="image/*" capture="environment" hidden
+                   onchange="tdPreviewInto(this, 'tdReturnProofPreview', 'tdReturnProofBox')">
+            <span class="td-nr-help__note"><i class="fa-solid fa-triangle-exclamation"></i>
+                This client requires evidence. Photograph the parcel in your hand — it proves
+                you still hold the goods and settles any later dispute.</span>
+        </div>
+
+        <button id="tdReturnedBtn" class="fleet-btn td-confirm-btn td-confirm-btn--warning" onclick="submitReturned()">
+            <i class="fa-solid fa-rotate-left me-2"></i>Confirm Returning
+        </button>
+    </div>
+</div>
+
 <!-- ── Postpone Sub-Sheet ────────────────────────────────── -->
 <div id="tdPostponeOverlay" class="td-overlay" onclick="closeTdPostpone()"></div>
 <div id="tdPostponeSheet" class="td-sub-sheet">
@@ -511,10 +563,11 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         contacted: 'Contacted', non_reachable: 'Non Reachable',
         delivered: 'Delivered', partial_delivery: 'Partial Delivery',
         failed: 'Failed', cancelled: 'Cancelled',
+        returned_to_shipper: 'Returned',
     };
     const STATUS_CLASS = {
         delivered: 'fleet-badge--success', partial_delivery: 'fleet-badge--warning',
-        failed: 'fleet-badge--danger',
+        failed: 'fleet-badge--danger', returned_to_shipper: 'fleet-badge--warning',
         cancelled: 'fleet-badge--danger', accepted: 'fleet-badge--warning',
         assigned: 'fleet-badge--warning', out_for_delivery: 'fleet-badge--info',
         in_transit: 'fleet-badge--info', start_ride: 'fleet-badge--info',
@@ -543,7 +596,9 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
     };
 
     window.openTaskDetail = function(e, card) {
-        if (e.target.closest('.task-card__action-btn')) return;
+        // Opened programmatically (map pin, ?open_task= link) there is no real
+        // target to test — only a genuine tap can land on an inline action button.
+        if (e && e.target && e.target.closest && e.target.closest('.task-card__action-btn')) return;
         if (typeof haptic === 'function') haptic([5]);
         const d = card.dataset;
 
@@ -800,7 +855,8 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
 
     // Statuses where actions are available
     const ACTIVE_STATUSES = ['accepted','picked_up','start_ride','out_for_delivery','in_transit','contacted','non_reachable'];
-    const DONE_STATUSES   = ['delivered','partial_delivery','failed','cancelled'];
+    const DONE_STATUSES   = ['delivered','partial_delivery','failed','cancelled','returned_to_shipper'];
+    const POOL_STATUSES   = ['pending','for_review'];
 
     function _renderActionPanel(d) {
         const panel     = document.getElementById('tdActionPanel');
@@ -808,6 +864,16 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const outcomeBtns = document.getElementById('tdOutcomeBtns');
         const tid = d.id;
         const st  = d.status;
+
+        // Still in the pool: the only thing a driver can do is claim it.
+        if (POOL_STATUSES.includes(st) && d.takeable === '1') {
+            panel.style.display = '';
+            statusBtns.innerHTML = '';
+            outcomeBtns.innerHTML =
+                '<button class="td-outcome-btn td-outcome-btn--take" onclick="tdTakeTask(this)">' +
+                '<i class="fa-solid fa-hand"></i>Take This Task</button>';
+            return;
+        }
 
         if (!ACTIVE_STATUSES.includes(st)) { panel.style.display = 'none'; return; }
         panel.style.display = '';
@@ -847,6 +913,9 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             <button class="td-outcome-btn td-outcome-btn--failed" onclick="openTdFailed()">
                 <i class="fa-solid fa-circle-xmark"></i>Failed
             </button>
+            <button class="td-outcome-btn td-outcome-btn--returned" onclick="openTdReturned()">
+                <i class="fa-solid fa-rotate-left"></i>Returned
+            </button>
             <button class="td-outcome-btn td-outcome-btn--postpone" onclick="openTdPostpone()">
                 <i class="fa-regular fa-calendar"></i>Postpone
             </button>`;
@@ -883,6 +952,55 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
     // Current task id (set when sheet opens)
     let _tdCurrentTaskId = null;
     let _tdCurrentTaskNum = null;
+
+    // Take an unclaimed pool task straight from the sheet. Same endpoint the
+    // Tasks page Take button uses — the task number stands in for the label scan.
+    window.tdTakeTask = function(btn) {
+        window.tdTakeTaskById(_tdCurrentTaskId, _tdCurrentTaskNum, btn);
+    };
+
+    // Exposed so any surface with a task id can claim it — the map popup uses
+    // this directly rather than carrying a second copy of the request.
+    window.tdTakeTaskById = function(taskId, taskNum, btn) {
+        if (!taskId) { showToast('No task selected', 'danger'); return; }
+        if (typeof haptic === 'function') haptic([10]);
+        const original = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>Taking…';
+
+        // The server pins the status change to the driver's latest fix.
+        if (window.EzzyGPS && EzzyGPS.stamp) EzzyGPS.stamp();
+
+        fetch('{% url "fleet:fleet_task_take_scan" %}', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            },
+            body: JSON.stringify({
+                task_id: taskId,
+                code: taskNum || String(taskId)
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                if (typeof haptic === 'function') haptic([10, 50, 10]);
+                showToast('Task taken — it is yours now', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(data.error || 'Could not take this task', 'danger');
+                btn.disabled = false;
+                btn.innerHTML = original;
+            }
+        })
+        .catch(() => {
+            showToast('Network error. Please try again.', 'danger');
+            btn.disabled = false;
+            btn.innerHTML = original;
+        });
+    };
 
     // Update Location via browser GPS
     window.tdUpdateLocation = function() {
@@ -945,7 +1063,18 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         document.getElementById('tdCodAmountRow').style.display = 'none';
         document.getElementById('tdFailReason').value = '';
         document.getElementById('tdFailReasonKey').value = '';
+        document.getElementById('tdReturnNotes').value = '';
+        document.getElementById('tdReturnReasonKey').value = '';
+        _tdResetPhoto('tdReturnProofInput', 'tdReturnProofPreview', 'tdReturnProofBox');
         document.querySelectorAll('.td-reason-btn').forEach(b => b.classList.remove('selected'));
+        // Where this parcel has to be handed in. Resolved server-side per client
+        // (hub or back to the merchant) and rendered onto the card.
+        const destText = document.getElementById('tdReturnDestText');
+        if (destText) {
+            destText.textContent = card.dataset.returnDest
+                ? ('If it comes back, hand it in at: ' + card.dataset.returnDest)
+                : 'You are keeping this parcel — hand it in at the hub.';
+        }
         // Pre-select payment method from task data (clear all first — no silent default)
         document.querySelectorAll('input[name="tdPaymentMethod"]').forEach(r => r.checked = false);
         const pm = card.dataset.paymentMethod;
@@ -1136,6 +1265,9 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         };
         set('tdSignGroup', !_tdNeedSign());
         set('tdFailProofGroup', !_tdPod.failed);
+        // A returned parcel is on the failed rule (delivery/pod.py FAILED_OUTCOMES),
+        // so it shows its photo box under exactly the same client setting.
+        set('tdReturnProofGroup', !_tdPod.failed);
         set('tdPartProofGroup', !needPhoto);
         set('tdPartSignGroup', !_tdNeedSign());
     }
@@ -1381,6 +1513,68 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             setTimeout(() => { window.closeTaskDetail(); window.location.reload(); }, 900);
         })
         .catch(() => { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-xmark me-2"></i>Confirm Failed'; });
+    };
+
+    // ── Returned Sub-Sheet ─────────────────────────────────
+    // The parcel is coming back with the driver. Distinct from Failed: the goods
+    // stay in the driver's hands, so the server opens a custody row and the RMA.
+    window.openTdReturned = function() {
+        document.getElementById('tdReturnedOverlay').classList.add('open');
+        document.getElementById('tdReturnedSheet').classList.add('open');
+    };
+    window.closeTdReturned = function() {
+        document.getElementById('tdReturnedOverlay').classList.remove('open');
+        document.getElementById('tdReturnedSheet').classList.remove('open');
+    };
+
+    // Scoped to this sheet's own grid: selectReason() clears every .td-reason-btn
+    // on the page, so sharing it would wipe the Failed sheet's choice behind you.
+    window.selectReturnReason = function(btn) {
+        document.querySelectorAll('#tdReturnReasonGrid .td-reason-btn')
+            .forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.getElementById('tdReturnReasonKey').value =
+            btn.getAttribute('data-reason-key') || '';
+    };
+
+    window.submitReturned = function() {
+        const reasonKey = document.getElementById('tdReturnReasonKey').value.trim();
+        const notes = document.getElementById('tdReturnNotes').value.trim();
+        if (!reasonKey) { showToast('Please say why the parcel is coming back', 'warning'); return; }
+        const photo = document.getElementById('tdReturnProofInput').files[0];
+        // delivery/pod.py puts a returned parcel on the same rule as a failed
+        // attempt, so this reads _tdPod.failed rather than a flag of its own.
+        if (_tdPod.failed && !photo) {
+            showToast('⚠️ This client requires a photo of the returned parcel.', 'error');
+            return;
+        }
+        const btn = document.getElementById('tdReturnedBtn');
+        const restore = '<i class="fa-solid fa-rotate-left me-2"></i>Confirm Returning';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Submitting...';
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const fd = new FormData();
+        fd.append('status', 'returned_to_shipper');
+        fd.append('failure_reason', reasonKey);
+        fd.append('failure_notes', notes);
+        const selectedBtn = document.querySelector('#tdReturnReasonGrid .td-reason-btn.selected');
+        const reasonLabel = selectedBtn ? selectedBtn.textContent.trim() : reasonKey;
+        fd.append('notes', notes ? (reasonLabel + ' — ' + notes) : reasonLabel);
+        if (photo) fd.append('delivery_proof', photo);
+        _tdFetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf },
+            body: fd
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { showToast(data.error, 'error'); btn.disabled = false; btn.innerHTML = restore; return; }
+            if (typeof haptic === 'function') haptic([10, 50, 10]);
+            showToast('Parcel marked for return — hand it in', 'warning');
+            window.closeTdReturned();
+            setTimeout(() => { window.closeTaskDetail(); window.location.reload(); }, 900);
+        })
+        .catch(() => { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = restore; });
     };
 
     // ── Postpone Sub-Sheet ─────────────────────────────────

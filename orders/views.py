@@ -4575,12 +4575,20 @@ def customer_tracking(request, token):
         'assigned': 2, 'accepted': 2,
         'picked_up': 3, 'start_ride': 3,
         'out_for_delivery': 4, 'in_transit': 4, 'contacted': 4, 'non_reachable': 4,
-        'delivered': 5,
+        'delivered': 5, 'returned_to_shipper': 5,
     }
+    # Default 1 ("Processing") is only right for a status that has not reached the
+    # road yet. Every closing status must be mapped explicitly or the customer
+    # watches a progress bar that never moves.
     current_step = STATUS_MAP.get(task.dl_task_status, 1)
 
     # Failed/cancelled get special treatment
     is_failed = task.dl_task_status in ('failed', 'cancelled', 'rejected')
+
+    # The parcel went back to the sender. Not a failure in the customer's eyes —
+    # they are usually the ones who sent it back — but the timeline must stop
+    # pretending the delivery is still coming.
+    is_returned = task.dl_task_status == 'returned_to_shipper'
 
     # Active delivery statuses where we show map
     ACTIVE_STATUSES = ['assigned', 'accepted', 'picked_up', 'start_ride',
@@ -4620,6 +4628,7 @@ def customer_tracking(request, token):
         'status_steps': STATUS_STEPS,
         'current_step': current_step,
         'is_failed': is_failed,
+        'is_returned': is_returned,
         'show_map': show_map,
         'driver_lat': driver_lat,
         'driver_lng': driver_lng,

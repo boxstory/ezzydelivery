@@ -38,6 +38,9 @@ _DL_STATUS_MAP = {
     'contacted': ('transit', 'Contacted', 'fa-phone'),
     'non_reachable': ('failed', 'Non Reachable', 'fa-phone-slash'),
     'failed': ('failed', 'Failed', 'fa-times-circle'),
+    # An unmapped status falls through to the order-status badge, which would show
+    # a returned parcel as whatever the order still says — usually "Published".
+    'returned_to_shipper': ('failed', 'Returned', 'fa-rotate-left'),
     'rejected': ('cancelled', 'Rejected', 'fa-ban'),
     'cancelled': ('cancelled', 'Cancelled', 'fa-ban'),
     'pending': ('pending', 'Pending', 'fa-hourglass'),

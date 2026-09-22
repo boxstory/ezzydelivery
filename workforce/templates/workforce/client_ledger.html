@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'workforce/css/cod_business_settlement.css' %}?v=20260909b" type="text/css" />
-<link rel="stylesheet" href="{% static 'workforce/css/client_ledger.css' %}?v=20260907a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_ledger.css' %}?v=20260916a" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -143,6 +143,19 @@
         <span class="clg__balance-value">QAR {{ account_balance|floatformat:2|intcomma|cut:"-" }}</span>
         <span class="clg__balance-sub">{{ entries_total|intcomma }} entr{{ entries_total|pluralize:"y,ies" }}{% if segment or status or direction or date_from or date_to or q %} matching the filter{% endif %}</span>
       </div>
+
+      {# Deliberately not the balance. A refund at a customer's door spends the
+         client's money, so it is allowed only against float this account can
+         evidence — a narrower set of segments than the balance sums. #}
+      <div class="clg__float {% if refund_credit <= 0 %}clg__float--empty{% endif %}">
+        <span class="clg__float-label">Refundable float</span>
+        <span class="clg__float-value">QAR {{ refund_credit|floatformat:2|intcomma }}</span>
+        <span class="clg__float-sub">
+          {% if refund_credit > 0 %}Available to pay back at a customer's door
+          {% else %}No prefunded float — door-step refunds are blocked{% endif %}
+        </span>
+      </div>
+
       {% if not has_opening %}
       <div class="clg__open-account">
         <p class="clg__open-text">
@@ -153,6 +166,74 @@
                 data-business="{{ selected_business.business_id }}">Post opening balance</button>
       </div>
       {% endif %}
+    </section>
+
+    {# Record a money event by hand. This is the only route that posts a client
+       payment: the COD, charge and payout legs do not write to this ledger, so
+       without it an account is seeded once and then frozen. #}
+    <section class="clg__postbox" aria-label="Record an entry">
+      <div class="clg__postbox-head">
+        <h2 class="clg__postbox-title">Record an entry</h2>
+        <p class="clg__postbox-note">
+          A credit is money in from the client; a debit is money out to them or
+          spent on their behalf. Settlement segments are posted by their own legs
+          and cannot be typed here.
+        </p>
+      </div>
+      <form class="row g-2 align-items-end" id="workforce_client_ledger_form_post_entry"
+            data-business="{{ selected_business.business_id }}">
+        <div class="col-6 col-lg-2">
+          <label class="clg__field-label" for="workforce_client_ledger_select_segment">Segment</label>
+          <select class="form-select clg__field" id="workforce_client_ledger_select_segment" name="segment" required>
+            {% for value, label in hand_postable_segments %}
+            <option value="{{ value }}"{% if value == 'payment' %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-lg-2">
+          <label class="clg__field-label" for="workforce_client_ledger_select_side">Direction</label>
+          <select class="form-select clg__field" id="workforce_client_ledger_select_side" name="side" required>
+            <option value="credit" selected>Credit — money in</option>
+            <option value="debit">Debit — money out</option>
+          </select>
+        </div>
+        <div class="col-6 col-lg-2">
+          <label class="clg__field-label" for="workforce_client_ledger_input_amount">Amount (QAR)</label>
+          <input type="number" class="form-control clg__field" id="workforce_client_ledger_input_amount"
+                 name="amount" min="0.01" step="0.01" inputmode="decimal" required>
+        </div>
+        <div class="col-6 col-lg-2">
+          <label class="clg__field-label" for="workforce_client_ledger_input_date">Date</label>
+          <input type="date" class="form-control clg__field" id="workforce_client_ledger_input_date"
+                 name="occurred_on">
+        </div>
+        <div class="col-6 col-lg-2">
+          <label class="clg__field-label" for="workforce_client_ledger_select_method">Method</label>
+          <select class="form-select clg__field" id="workforce_client_ledger_select_method" name="payment_method">
+            <option value="">—</option>
+            {% for m in payment_method_choices %}
+            <option value="{{ m }}">{{ m|title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-lg-2">
+          <label class="clg__field-label" for="workforce_client_ledger_input_reference">Reference</label>
+          <input type="text" class="form-control clg__field" id="workforce_client_ledger_input_reference"
+                 name="reference" maxlength="120" placeholder="Transfer no.">
+        </div>
+        <div class="col-12 col-lg-9">
+          <label class="clg__field-label" for="workforce_client_ledger_input_description">Description</label>
+          <input type="text" class="form-control clg__field" id="workforce_client_ledger_input_description"
+                 name="description" maxlength="200" required
+                 placeholder="What this row is — it shows on the client's statement">
+        </div>
+        <div class="col-12 col-lg-3 d-grid">
+          <button type="submit" class="bcp__primary" id="workforce_client_ledger_btn_post_entry">Post entry</button>
+        </div>
+        <div class="col-12">
+          <p class="clg__postbox-msg" id="workforce_client_ledger_msg_post_entry" role="status" aria-live="polite"></p>
+        </div>
+      </form>
     </section>
 
     {% if summary %}
@@ -272,6 +353,46 @@
         window.location.reload();
       })
       .catch(() => { alert('Could not post the opening balance.'); btn.disabled = false; });
+  });
+})();
+
+// Hand-post a money event. The server re-validates every field — this only
+// keeps the operator from waiting on a round trip to learn the amount is blank.
+(function () {
+  const form = document.getElementById('workforce_client_ledger_form_post_entry');
+  if (!form) return;
+
+  const btn = document.getElementById('workforce_client_ledger_btn_post_entry');
+  const msg = document.getElementById('workforce_client_ledger_msg_post_entry');
+
+  function say(text, ok) {
+    msg.textContent = text;
+    msg.classList.toggle('clg__postbox-msg--error', !ok);
+    msg.classList.toggle('clg__postbox-msg--ok', !!ok);
+  }
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+
+    const body = new FormData(form);
+    body.append('business_id', form.dataset.business);
+
+    btn.disabled = true;
+    say('Posting…', true);
+
+    fetch("{% url 'workforce:client_ledger_post_entry' %}", {
+      method: 'POST',
+      headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content},
+      body: body,
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { say(data.error, false); btn.disabled = false; return; }
+        // Reload rather than splice a row in: the Balance column is the whole
+        // account summed to each row, so every row above the new one changes.
+        window.location.reload();
+      })
+      .catch(() => { say('Could not post the entry.', false); btn.disabled = false; });
   });
 })();
 </script>

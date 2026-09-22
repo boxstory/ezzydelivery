@@ -1167,7 +1167,8 @@ class WfDriverManagementTest(WorkforceTestMixin, TestCase):
         """#92: Drivers list loads"""
         resp = self.client.get(reverse('workforce:drivers_list'))
         self.assertEqual(resp.status_code, 200)
-        self.assertIn('total_count', resp.context)
+        # The roster is active-only, so the hero tally is the approved count.
+        self.assertIn('active_count', resp.context)
 
     def test_drivers_pending_loads(self):
         """#93: Pending drivers loads"""
@@ -1882,8 +1883,270 @@ class CrmDriverMapTests(WorkforceTestMixin, TestCase):
         point = self.client.get(self.url).context['map_points'][0]
         self.assertEqual(point['url'], reverse('workforce:crm_lead_detail', args=[lead.id]))
 
+    def test_several_stages_can_be_mapped_together(self):
+        # The picker is a multi-select: "Applied + Uploads Done" is one pool, and a
+        # single ?stage= still has to behave exactly as it did before.
+        self._lead('A', self._driver(7971, 25.28, 51.53), stage='applied')
+        self._lead('B', self._driver(7972, 25.29, 51.54), stage='uploads_done')
+        self._lead('C', self._driver(7973, 25.30, 51.55), stage='new_app')
+        both = self.client.get(self.url, {'stage': ['applied', 'uploads_done']})
+        self.assertEqual(sorted(p['name'] for p in both.context['map_points']), ['A', 'B'])
+        self.assertEqual(both.context['stage_filters'], ['applied', 'uploads_done'])
+        one = self.client.get(self.url, {'stage': 'applied'})
+        self.assertEqual([p['name'] for p in one.context['map_points']], ['A'])
+
+    def test_vehicle_filter_uses_the_newest_registration(self):
+        # A driver who re-registered on a car is a car applicant everywhere — the pin,
+        # the popup label and this filter must not disagree.
+        rider = self._driver(7981, 25.28, 51.53)
+        switcher = self._driver(7982, 25.29, 51.54)
+        fleet_models.DriverVehicle.objects.create(driver=rider, vehicle_type='bike')
+        fleet_models.DriverVehicle.objects.create(driver=switcher, vehicle_type='bike')
+        fleet_models.DriverVehicle.objects.create(driver=switcher, vehicle_type='car')
+        self._lead('Rider', rider)
+        self._lead('Switcher', switcher)
+
+        bikes = self.client.get(self.url, {'vehicle': 'bike'}).context['map_points']
+        self.assertEqual([p['name'] for p in bikes], ['Rider'])
+        cars = self.client.get(self.url, {'vehicle': 'car'}).context['map_points']
+        self.assertEqual([(p['name'], p['vehicle']) for p in cars], [('Switcher', 'Car')])
+
+    def test_no_vehicle_on_file_is_its_own_filter(self):
+        with_bike = self._driver(7991, 25.28, 51.53)
+        fleet_models.DriverVehicle.objects.create(driver=with_bike, vehicle_type='bike')
+        self._lead('Has one', with_bike)
+        self._lead('Has none', self._driver(7992, 25.29, 51.54))
+        points = self.client.get(self.url, {'vehicle': 'none'}).context['map_points']
+        self.assertEqual([p['name'] for p in points], ['Has none'])
+
+    def test_account_status_filter_narrows_the_pins(self):
+        approved = self.create_driver(did=7995, status='approved', code='MAP7995')
+        approved.driver_meta = {'registration_location': {'lat': 25.28, 'lng': 51.53}}
+        approved.save(update_fields=['driver_meta'])
+        pending = self.create_driver(did=7996, status='pending', code='MAP7996')
+        pending.driver_meta = {'registration_location': {'lat': 25.29, 'lng': 51.54}}
+        pending.save(update_fields=['driver_meta'])
+        self._lead('Approved one', approved)
+        self._lead('Pending one', pending)
+        points = self.client.get(self.url, {'account': 'approved'}).context['map_points']
+        self.assertEqual([p['name'] for p in points], ['Approved one'])
+
+    def test_a_vehicle_pick_can_include_no_vehicle_on_file(self):
+        # Every facet on this bar is a checklist, so "Bike + no vehicle on file" is
+        # one OR'd question. Chained filters would ask for a lead that is both, and
+        # return nothing at all.
+        with_bike = self._driver(7997, 25.28, 51.53)
+        fleet_models.DriverVehicle.objects.create(driver=with_bike, vehicle_type='bike')
+        with_car = self._driver(7998, 25.29, 51.54)
+        fleet_models.DriverVehicle.objects.create(driver=with_car, vehicle_type='car')
+        self._lead('Bike', with_bike)
+        self._lead('Car', with_car)
+        self._lead('Nothing', self._driver(7999, 25.30, 51.55))
+        points = self.client.get(self.url, {'vehicle': ['bike', 'none']}).context['map_points']
+        self.assertEqual(sorted(p['name'] for p in points), ['Bike', 'Nothing'])
+
+    def test_several_account_statuses_can_be_mapped_together(self):
+        for did, status, name in ((7801, 'approved', 'Approved one'),
+                                  (7802, 'pending', 'Pending one'),
+                                  (7803, 'rejected', 'Rejected one')):
+            driver = self.create_driver(did=did, status=status, code=f'MAP{did}')
+            driver.driver_meta = {'registration_location': {'lat': 25.28, 'lng': 51.53}}
+            driver.save(update_fields=['driver_meta'])
+            self._lead(name, driver)
+        resp = self.client.get(self.url, {'account': ['approved', 'pending']})
+        self.assertEqual(sorted(p['name'] for p in resp.context['map_points']),
+                         ['Approved one', 'Pending one'])
+        self.assertEqual(resp.context['account_filter'], ['approved', 'pending'])
+
+    def test_several_sources_can_be_mapped_together(self):
+        made = []
+        for did, source, name in ((7811, self.Lead.SOURCE_MANUAL, 'Manual'),
+                                  (7812, self.Lead.SOURCE_WA_INBOUND, 'WhatsApp')):
+            lead = self._lead(name, self._driver(did, 25.28, 51.53))
+            lead.source = source
+            lead.save(update_fields=['source'])
+            made.append(lead)
+        resp = self.client.get(self.url, {'source': [self.Lead.SOURCE_MANUAL]})
+        self.assertEqual([p['name'] for p in resp.context['map_points']], ['Manual'])
+        both = self.client.get(self.url, {'source': [l.source for l in made]})
+        self.assertEqual(len(both.context['map_points']), 2)
+
+    def test_assignee_picks_are_ored_not_chained(self):
+        # "Mine + unassigned" is a real question a recruiter asks. AND'd it is a
+        # contradiction and the map would come back empty.
+        mine = self._lead('Mine', self._driver(7821, 25.28, 51.53))
+        mine.assigned_to = User.objects.get(username='staffuser')
+        mine.save(update_fields=['assigned_to'])
+        self._lead('Nobody\'s', self._driver(7822, 25.29, 51.54))
+        other = self._lead('Someone else', self._driver(7823, 25.30, 51.55))
+        other.assigned_to = User.objects.create_user(
+            username='otherstaff', password='Staff@123', is_staff=True)
+        other.save(update_fields=['assigned_to'])
+        resp = self.client.get(self.url, {'assigned': ['me', 'none']})
+        self.assertEqual(sorted(p['name'] for p in resp.context['map_points']),
+                         ["Mine", "Nobody's"])
+
     def test_non_staff_cannot_open_the_map(self):
         self.client.logout()
         self.create_non_staff_user()
         self.client.login(username='regularuser', password='Regular@123')
         self.assertEqual(self.client.get(self.url).status_code, 302)
+
+
+# =============================================================================
+# CLIENT LEDGER — HAND-POSTED ENTRIES
+# =============================================================================
+
+class WfClientLedgerPostEntryTest(WorkforceTestMixin, TestCase):
+    """The only route that records a client payment.
+
+    Nothing else posts one: the COD, charge and payout legs do not write to the
+    ledger, so without this an account is seeded once and then frozen, and a
+    client can never build the float a door-step refund is paid out of.
+    """
+
+    def setUp(self):
+        from fleet import ledger_service
+        self.ls = ledger_service
+        self.client = Client()
+        self.user, self.profile = self.create_staff_user()
+        self.staff_login()
+        self.business = self.create_business(bid=9401, code='LEDG')
+        self.url = reverse('workforce:client_ledger_post_entry')
+
+    def _post(self, **overrides):
+        payload = {
+            'business_id': self.business.business_id,
+            'segment': 'payment',
+            'side': 'credit',
+            'amount': '500.00',
+            'description': 'Bank transfer received',
+        }
+        payload.update(overrides)
+        return self.client.post(self.url, payload)
+
+    def test_a_payment_posts_and_becomes_refundable_float(self):
+        resp = self._post()
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+        self.assertEqual(self.ls.balance(self.business), Decimal('500.00'))
+        self.assertEqual(
+            self.ls.available_refund_credit(self.business), Decimal('500.00'))
+
+    def test_a_settlement_segment_cannot_be_typed_by_hand(self):
+        """The double-count guard.
+
+        The COD leg posts against specific tasks. A typed COD row would credit
+        money that leg will post again the moment it is wired in.
+        """
+        resp = self._post(segment='cod')
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(self.ls.balance(self.business), Decimal('0.00'))
+
+    def test_opening_balance_cannot_be_typed_by_hand(self):
+        """It has its own route, which derives the figure instead of trusting one."""
+        resp = self._post(segment='opening')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_amount_must_be_positive(self):
+        for bad in ('0', '-50.00'):
+            with self.subTest(amount=bad):
+                self.assertEqual(self._post(amount=bad).status_code, 400)
+        self.assertEqual(self.ls.balance(self.business), Decimal('0.00'))
+
+    def test_a_slipped_decimal_is_refused(self):
+        resp = self._post(amount='99999999.00')
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(self.ls.balance(self.business), Decimal('0.00'))
+
+    def test_description_is_required(self):
+        """It is what the client reads on their statement."""
+        self.assertEqual(self._post(description='  ').status_code, 400)
+
+    def test_side_must_be_stated(self):
+        self.assertEqual(self._post(side='').status_code, 400)
+        self.assertEqual(self._post(side='sideways').status_code, 400)
+
+    def test_a_debit_moves_the_balance_the_other_way(self):
+        self._post()
+        self._post(side='debit', amount='120.00', description='Advance paid out')
+        self.assertEqual(self.ls.balance(self.business), Decimal('380.00'))
+
+    def test_unknown_account_is_a_404(self):
+        self.assertEqual(self._post(business_id=987654).status_code, 404)
+
+    def test_get_is_refused(self):
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+
+    def test_a_non_staff_user_cannot_post(self):
+        self.client.logout()
+        self.create_non_staff_user(username='outsider')
+        self.client.login(username='outsider', password='Regular@123')
+        resp = self._post()
+        self.assertNotEqual(resp.status_code, 200)
+        self.assertEqual(self.ls.balance(self.business), Decimal('0.00'))
+
+
+class LeadWaLidIdentifierTests(TestCase):
+    """A lead's `wa_chat_override` holds either a phone or a WhatsApp LID.
+
+    A LID is a 14-15 digit privacy id. Expanding one through the phone-variant
+    helper invented '974' + its last 8 digits — a perfectly plausible Qatar
+    number belonging to somebody else — which then matched a stranger's chat and
+    asked WAHA for a thread that does not exist ("WhatsApp bridge did not
+    answer" on a bridge that was perfectly healthy).
+    """
+
+    LID = '91380261105783'      # 14 digits -> last8 '61105783' -> phantom '97461105783'
+    PHONE = '97450011192'
+
+    def setUp(self):
+        from crm.models import Lead
+        self.lead = Lead.objects.create(
+            source=Lead.SOURCE_MANUAL,
+            company_name='Lid Override Co',
+            phone=self.PHONE,
+            wa_chat_override=self.LID,
+        )
+
+    def test_is_lid_value_splits_lids_from_phones(self):
+        from crm import services
+        self.assertTrue(services.is_lid_value(self.LID))
+        self.assertTrue(services.is_lid_value('123456789012345'))
+        self.assertFalse(services.is_lid_value(self.PHONE))
+        self.assertFalse(services.is_lid_value('50011192'))
+        self.assertFalse(services.is_lid_value('+974 5001 1192'))
+        self.assertFalse(services.is_lid_value(''))
+
+    def test_a_lid_override_never_becomes_a_phone_number(self):
+        from workforce.crm_views import _lead_wa_identifiers
+        idents, _lid_pairs = _lead_wa_identifiers(self.lead)
+        self.assertNotIn('97461105783', idents)
+        self.assertNotIn('61105783', idents)
+        # The lid itself and the lead's real number both still match.
+        self.assertIn(self.LID, idents)
+        self.assertIn(f'{self.LID}@lid', idents)
+        self.assertIn(self.PHONE, idents)
+
+    def test_a_phone_override_is_still_expanded(self):
+        from workforce.crm_views import _lead_wa_identifiers
+        self.lead.wa_chat_override = '97433322211'
+        self.lead.save(update_fields=['wa_chat_override'])
+        idents, _ = _lead_wa_identifiers(self.lead)
+        self.assertIn('33322211', idents)
+        self.assertIn('97433322211@c.us', idents)
+
+    def test_fallback_chat_target_uses_the_phone_on_a_foreign_session(self):
+        """A lid only addresses a chat on the session whose device issued it."""
+        from workforce.crm_views import _lead_wa_chat_targets
+        targets = _lead_wa_chat_targets(self.lead, 'FleetAdmin4545')
+        self.assertEqual(targets, [('FleetAdmin4545', f'{self.PHONE}@c.us')])
+
+    def test_fallback_chat_target_uses_the_lid_where_it_is_known(self):
+        from whatsapp.models import WhatsAppContact
+        from workforce.crm_views import _lead_wa_chat_targets
+        WhatsAppContact.objects.create(
+            session='FleetAdmin4545', phone=self.PHONE, lid=self.LID,
+        )
+        targets = _lead_wa_chat_targets(self.lead, 'FleetAdmin4545')
+        self.assertEqual(targets, [('FleetAdmin4545', f'{self.LID}@lid')])

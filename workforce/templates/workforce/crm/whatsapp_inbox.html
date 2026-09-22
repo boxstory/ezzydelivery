@@ -1,13 +1,15 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{# Purpose: WAHA WhatsApp inbox — unknown inbound senders; staff promotes real prospects to leads or dismisses noise. #}
+{# Purpose: WAHA WhatsApp inbox — unknown inbound senders; staff sends them the driver or pricing form link, or dismisses noise. #}
 {# Used by: workforce.crm_views.crm_whatsapp_inbox #}
-{# Notes: crmi__ namespace; promote/dismiss are fetch-POST JSON actions handled by inline delegated JS. #}
+{# Notes: crmi__ namespace; send-link/promote/dismiss are fetch-POST JSON actions handled by inline delegated JS. #}
+{#        A conversation is NOT a lead: the link buttons are the primary action and create nothing. The two Add-Lead #}
+{#        buttons are a manual staff override for a sender who will clearly never fill a form in. #}
 {#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260827c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260922a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -18,7 +20,7 @@
       <div class="crm__head-title">
         <div class="crm__eyebrow">Sales Pipeline</div>
         <h1 class="crm__title">WhatsApp Inbox</h1>
-        <p class="crm__subtitle">Unknown senders who messaged the business WhatsApp — promote real prospects to leads</p>
+        <p class="crm__subtitle">Unknown senders who messaged the business WhatsApp — send them the form link; the lead is created when they fill it in</p>
       </div>
       <div class="crmi__session" id="workforce_crm_inbox_div_session">
         {% if waha_session %}
@@ -100,7 +102,7 @@
                  placeholder="Search phone number…"
                  hx-get="" hx-target="#main-content" hx-select="#main-content"
                  hx-swap="outerHTML" hx-push-url="true"
-                 hx-trigger="keyup changed delay:350ms, search"
+                 hx-trigger="keyup changed delay:350ms, search" data-search-min="3"
                  hx-include="#workforce_crm_inbox_form_filter">
         </div>
         {% if wa_session_filter %}<input type="hidden" name="session" value="{{ wa_session_filter }}">{% endif %}
@@ -207,19 +209,28 @@
         </button>
       </div>
       <div class="crmi__dialog-body crmd__chat crmd__chat--full" id="workforce_crm_inbox_div_chat_body"></div>
-      <div class="crmi__dialog-ft">
+      <div class="crmi__dialog-ft flex-wrap">
         <a class="crm__btn crm__btn--primary" id="workforce_crm_inbox_a_chat_lead" href="#" hidden>
           <i class="fa-solid fa-arrow-right"></i> Open Lead
         </a>
         <button type="button" class="crm__btn" id="workforce_crm_inbox_btn_chat_dismiss">
           <i class="fa-solid fa-ban"></i> Not a lead
         </button>
-        <button type="button" class="crm__btn" id="workforce_crm_inbox_btn_chat_driver"
-                title="This sender is a driver applicant, not a business client">
-          <i class="fa-solid fa-motorcycle"></i> Driver Lead
+        <button type="button" class="crm__btn crm__btn--primary" id="workforce_crm_inbox_btn_chat_link_driver"
+                title="WhatsApp them the driver application form. No CRM card is created — the driver board picks them up when they submit it.">
+          <i class="fa-solid fa-link"></i> Send Driver Form
         </button>
-        <button type="button" class="crm__btn crm__btn--primary" id="workforce_crm_inbox_btn_chat_promote">
-          <i class="fa-solid fa-user-plus"></i> Promote to Lead
+        <button type="button" class="crm__btn crm__btn--primary" id="workforce_crm_inbox_btn_chat_link_pricing"
+                title="WhatsApp them the pricing enquiry form. No CRM card is created — the lead appears when they submit it.">
+          <i class="fa-solid fa-link"></i> Send Pricing Link
+        </button>
+        <button type="button" class="crm__btn" id="workforce_crm_inbox_btn_chat_driver"
+                title="Manual override — file a driver card without a submitted form">
+          <i class="fa-solid fa-motorcycle"></i> Add Driver Lead
+        </button>
+        <button type="button" class="crm__btn" id="workforce_crm_inbox_btn_chat_promote"
+                title="Manual override — file a business card without a submitted enquiry">
+          <i class="fa-solid fa-user-plus"></i> Add Business Lead
         </button>
       </div>
     </div>
@@ -234,15 +245,37 @@
     var CSRF = "{{ csrf_token }}";
     var URL_PROMOTE = "{% url 'workforce:crm_wa_promote' %}";
     var URL_DISMISS = "{% url 'workforce:crm_wa_dismiss' %}";
+    var URL_SEND_LINK = "{% url 'workforce:crm_wa_send_link' %}";
     var URL_RESYNC = "{% url 'workforce:crm_wa_resync' %}";
     var URL_CHAT = "{% url 'workforce:crm_wa_chat_preview' %}";
+    // Which number the operator is looking at ('' = the All tab).
+    var SESSION = "{{ wa_session_filter|escapejs }}";
+
+    // A gateway timeout or a login redirect answers with an HTML page, and a
+    // bare r.json() then dies with an opaque "Unexpected token '<'". Turn that
+    // into something an operator can act on.
+    function readJson(r) {
+      var ct = r.headers.get('content-type') || '';
+      if (ct.indexOf('json') !== -1) { return r.json(); }
+      return r.text().then(function () {
+        if (r.status === 502 || r.status === 504) {
+          throw new Error('the server took too long to answer (gateway timeout)');
+        }
+        if (r.status === 401 || r.status === 403 || r.redirected) {
+          throw new Error('your session expired \u2014 reload the page and sign in again');
+        }
+        throw new Error('server returned ' + r.status + ' instead of JSON');
+      });
+    }
 
     function post(url, phone, extra) {
       var fd = new FormData();
       fd.append('phone', phone);
       fd.append('csrfmiddlewaretoken', CSRF);
       Object.keys(extra || {}).forEach(function (k) { fd.append(k, extra[k]); });
-      return fetch(url, { method: 'POST', body: fd }).then(function (r) { return r.json(); });
+      return fetch(url, { method: 'POST', body: fd })
+        .then(readJson)
+        .catch(function (err) { return { success: false, error: err.message }; });
     }
 
     function chatEl(id) { return document.getElementById(id); }
@@ -365,6 +398,17 @@
       if (promoteBtn) { promoteBtn.hidden = hasLead; promoteBtn.disabled = false; }
       if (driverBtn) { driverBtn.hidden = hasLead; driverBtn.disabled = false; }
       if (dismissBtn) { dismissBtn.hidden = hasLead; dismissBtn.disabled = false; }
+      // The link buttons stay available even for a sender who already has a
+      // card: re-sending the form to someone who never finished it is the whole
+      // point of this page.
+      ['workforce_crm_inbox_btn_chat_link_driver',
+       'workforce_crm_inbox_btn_chat_link_pricing'].forEach(function (id) {
+        var b = chatEl(id);
+        if (!b) { return; }
+        b.disabled = false;
+        b.innerHTML = b.dataset.label || b.innerHTML;
+        if (!b.dataset.label) { b.dataset.label = b.innerHTML; }
+      });
       if (leadLink) {
         leadLink.hidden = !hasLead;
         if (hasLead) {
@@ -420,6 +464,28 @@
           });
           return;
         }
+        var linkBtn = e.target.closest('#workforce_crm_inbox_btn_chat_link_driver, '
+                                     + '#workforce_crm_inbox_btn_chat_link_pricing');
+        if (linkBtn) {
+          var isDriver = linkBtn.id === 'workforce_crm_inbox_btn_chat_link_driver';
+          if (!linkBtn.dataset.label) { linkBtn.dataset.label = linkBtn.innerHTML; }
+          linkBtn.disabled = true;
+          linkBtn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Sending…';
+          post(URL_SEND_LINK, overlay.dataset.promote || overlay.dataset.sender, {
+            kind: isDriver ? 'driver' : 'business',
+            session: overlay.dataset.session || ''
+          }).then(function (data) {
+            if (data.success) {
+              linkBtn.innerHTML = '<i class="fa-solid fa-check"></i> Sent'
+                + (data.sent_from ? ' from ' + data.sent_from : '');
+            } else {
+              linkBtn.disabled = false;
+              linkBtn.innerHTML = linkBtn.dataset.label;
+              alert(data.error || 'Failed to send the link');
+            }
+          });
+          return;
+        }
         if (e.target.closest('#workforce_crm_inbox_btn_chat_dismiss')) {
           var db = chatEl('workforce_crm_inbox_btn_chat_dismiss');
           db.disabled = true;
@@ -442,12 +508,21 @@
         resyncBtn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Syncing…';
         var fd = new FormData();
         fd.append('csrfmiddlewaretoken', CSRF);
+        // Scope the sweep to the tab in view; the All tab sends nothing and
+        // the server then sweeps every linked number.
+        if (SESSION) { fd.append('session', SESSION); }
         fetch(URL_RESYNC, { method: 'POST', body: fd })
-          .then(function (r) { return r.json(); })
+          .then(readJson)
           .then(function (data) {
             if (data.success) {
               resyncBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' +
-                data.new_messages + ' new · reloading…';
+                data.new_messages + ' new \u00b7 reloading\u2026';
+              // A partial sweep ran out of its time budget, so the count below
+              // is not the whole picture \u2014 say so instead of looking complete.
+              if (data.partial) {
+                alert('Synced ' + data.new_messages + ' new message(s), but the sweep ran '
+                  + 'out of time before finishing. Click Resync again to pick up the rest.');
+              }
               window.location.reload();
             } else {
               resyncBtn.disabled = false;
@@ -458,7 +533,7 @@
           .catch(function (err) {
             resyncBtn.disabled = false;
             resyncBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Resync';
-            alert('Resync error: ' + err);
+            alert('Resync failed: ' + (err.message || err));
           });
         return;
       }

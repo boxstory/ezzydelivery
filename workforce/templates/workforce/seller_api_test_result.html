@@ -69,10 +69,22 @@
 {% endif %}
 
 {% if api_stats.endpoint %}
+{% comment %}A custom integration runs in either direction, so say which one this test just proved.{% endcomment %}
 <div class="alert alert-info py-2 small mb-3">
+    {% if api_stats.direction == 'pull' %}
+    <i class="fa-solid fa-arrow-right-from-bracket me-1"></i>
+    Outbound pull — EzzyDelivery fetches orders from
+    <strong>{{ api_stats.endpoint }}</strong>{% if api_stats.fetch_auth %}, authenticating with {{ api_stats.fetch_auth }}{% endif %}.
+    Automatic hourly pull is <strong>{{ api_stats.auto_pull }}</strong>.
+    {% if api_stats.skipped_status %}
+    {{ api_stats.skipped_status }} order{{ api_stats.skipped_status|pluralize }} ignored by the status filter
+    {% if api_stats.skipped_detail %}({{ api_stats.skipped_detail }}){% endif %}.
+    {% endif %}
+    {% else %}
     <i class="fa-solid fa-arrow-right-to-bracket me-1"></i>
     Inbound integration — the seller's website pushes orders to
     <strong>{{ api_stats.endpoint }}</strong>. Nothing is fetched from their site.
+    {% endif %}
 </div>
 {% endif %}
 

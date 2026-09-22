@@ -89,6 +89,13 @@ _OPS = [
     'hub_batch_list', 'hub_batch_create', 'hub_batch_detail',
     'hub_batch_assign_driver', 'hub_batch_update_status',
 
+    # Returns custody — receiving goods back is warehouse/ops work; the money leg
+    # of a return settles separately under FIN via process_cod_return.
+    'returns_custody_list', 'returns_custody_set_status', 'returns_custody_receive',
+    'returns_custody_set_destination', 'returns_custody_bulk_receive',
+    'returns_custody_open', 'returns_custody_forward',
+    'returns_requests_list', 'returns_request_set_status',
+
     # Dispatch & batching (config lives under ADMIN)
     'dispatch_dashboard', 'dispatch_batch_list', 'dispatch_batch_detail',
     'dispatch_release_batch', 'dispatch_cancel_batch',
@@ -99,6 +106,7 @@ _OPS = [
     # Drivers
     'drivers_list', 'drivers_pending', 'drivers_active', 'drivers_inactive', 'driver_detail',
     'driver_timeline',
+    'driver_request_location',
     'driver_toggle_status', 'driver_set_status', 'driver_set_work_pref',
     'driver_vehicle_add', 'driver_vehicle_edit', 'driver_vehicle_delete',
     'driver_document_add', 'driver_document_edit', 'driver_document_delete',
@@ -120,6 +128,9 @@ _OPS = [
     'team_verification_list', 'update_verification_status', 'update_team_status',
     'view_user_driver_profile', 'view_user_business_profile', 'check_business_code_unique',
     'driver_documents_list', 'driver_document_detail',
+    # Same scans, reached from the recruitment table instead of the documents
+    # list — so it answers to the same desk, not to marketing.
+    'crm_driver_leads_documents',
     'vehicle_documents_list', 'vehicle_document_detail',
     'store_documents_list', 'store_document_detail',
     'business_licenses_list', 'business_license_detail', 'workforce_pickup_location_add',
@@ -167,6 +178,10 @@ _FIN = [
     # Driver leg
     'fleet_drivers_earnings', 'earnings_verification', 'earnings_verification_action',
     'driver_payout_worksheet', 'driver_payout_overview', 'driver_payout_create', 'driver_payout_invoice',
+    # The column picker on that invoice. Same trap as the client-charge controls
+    # below: it shipped unclassified, so the fail-closed middleware bounced
+    # finance staff off a control on a page they are allowed to be on.
+    'driver_payout_invoice_columns',
     # Driver salary leg — agreements, monthly runs, slips
     'salary_register', 'salary_structure_save', 'salary_structure_end',
     'salary_runs', 'salary_run_create', 'salary_run_detail',
@@ -179,7 +194,9 @@ _FIN = [
     # Client leg
     'client_charge_verification', 'client_charge_verification_action',
     # The client account itself — every other finance screen posts into it.
-    'client_ledger', 'client_ledger_open_account',
+    # post_entry writes real money onto an account (it is how a client payment
+    # is recorded at all), so it stays finance-only alongside the seeding route.
+    'client_ledger', 'client_ledger_open_account', 'client_ledger_post_entry',
     # Business -> Ezzy receivable (charges to collect)
     'client_charges_collect', 'client_charge_invoice_create',
     'client_charge_invoices', 'client_charge_invoice_detail',
@@ -216,10 +233,12 @@ _MKT = [
     'crm_lead_add_activity', 'crm_lead_delete_activity', 'crm_lead_link_business',
     'crm_lead_ai_summary',
     # CRM WhatsApp
-    'crm_lead_link_chat', 'crm_lead_wa_media', 'crm_wa_contact_search',
+    'crm_lead_link_chat', 'crm_lead_wa_media', 'crm_lead_chat_refresh',
+    'crm_wa_contact_search',
     'crm_whatsapp_inbox', 'crm_wa_chat_preview', 'crm_wa_media',
-    'crm_wa_promote', 'crm_wa_dismiss', 'crm_wa_resync',
+    'crm_wa_promote', 'crm_wa_send_link', 'crm_wa_dismiss', 'crm_wa_resync',
     'crm_contacts', 'crm_reports', 'crm_driver_reports', 'crm_leads_export_google',
+    'crm_leads_export_csv', 'crm_driver_leads_export_csv',
     'crm_driver_map',
     # CRM board column configuration
     'crm_stages_manage', 'crm_driver_stages_manage',
@@ -308,6 +327,8 @@ _MULTI = {
     'crm_leads_list': [OPS, MKT, ADMIN],
     'crm_driver_leads_list': [OPS, MKT, ADMIN],
     'crm_leads_export_google': [OPS, MKT, ADMIN],
+    'crm_leads_export_csv': [OPS, MKT, ADMIN],
+    'crm_driver_leads_export_csv': [OPS, MKT, ADMIN],
     'crm_lead_detail': [OPS, MKT, ADMIN],
     'crm_lead_update': [OPS, MKT, ADMIN],
     'crm_lead_update_stage': [OPS, MKT, ADMIN],
@@ -315,6 +336,9 @@ _MULTI = {
     'crm_lead_merge': [OPS, MKT, ADMIN],
     'crm_lead_unmerge': [OPS, MKT, ADMIN],
     'crm_lead_add_activity': [OPS, MKT, ADMIN],
+    # Ops works the driver funnel on the same detail page, so the chat panel's
+    # Refresh has to open for them too — it only re-reads what that page shows.
+    'crm_lead_chat_refresh': [OPS, MKT, ADMIN],
     'crm_stages_manage': [OPS, MKT, ADMIN],
     'crm_driver_stages_manage': [OPS, MKT, ADMIN],
     # The driver funnel is co-owned with operations, like its board and list —

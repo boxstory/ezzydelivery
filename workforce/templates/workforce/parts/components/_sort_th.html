@@ -1,0 +1,19 @@
+{# Purpose: One sortable table header cell — toggles ?sort=key / -key and keeps the page's filters. #}
+{# Used by: workforce/crm/leads_list.html, workforce/forms/pricing_inquiries_list.html #}
+{# Notes: Needs `key` + `label` per cell, and `sort` (workforce.sorting.Sort), `sort_url` and `sort_params` #}
+{#        (the filters WITHOUT sort) from the page context. Pass first_desc=True on dates and amounts, where #}
+{#        the first click should read biggest/newest first; th_class for any column width or alignment class. #}
+<th{% if th_class %} class="{{ th_class }}"{% endif %}{% if sort.key == key %} aria-sort="{% if sort.descending %}descending{% else %}ascending{% endif %}"{% endif %}>
+  <a class="wfsort{% if sort.key == key %} wfsort--on{% endif %}"
+     href="{{ sort_url }}?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={% if sort.key == key %}{% if sort.descending %}{{ key }}{% else %}-{{ key }}{% endif %}{% else %}{% if first_desc %}-{% endif %}{{ key }}{% endif %}"
+     hx-get="{{ sort_url }}?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={% if sort.key == key %}{% if sort.descending %}{{ key }}{% else %}-{{ key }}{% endif %}{% else %}{% if first_desc %}-{% endif %}{{ key }}{% endif %}"
+     hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+     title="Sort by {{ label|lower }}">
+    <span>{{ label }}</span>
+    {% if sort.key == key %}
+    <i class="fa-solid {% if sort.descending %}fa-arrow-down-wide-short{% else %}fa-arrow-up-short-wide{% endif %} wfsort__icon" aria-hidden="true"></i>
+    {% else %}
+    <i class="fa-solid fa-sort wfsort__icon wfsort__icon--idle" aria-hidden="true"></i>
+    {% endif %}
+  </a>
+</th>

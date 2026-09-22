@@ -1401,3 +1401,143 @@ class SeparateBoardStageTests(TestCase):
         rail = self.rail('/workforce/crm/contacts/')
         self.assertIn('/workforce/crm/leads/board/', rail)
         self.assertIn('/workforce/crm/leads/board/drivers/', rail)
+
+
+class WaTriageTests(TestCase):
+    """The daily inbox triage: what it refuses to do matters more than what it does."""
+
+    def setUp(self):
+        cache.clear()
+
+    def test_promotable_phone_rejects_unusable_ids(self):
+        from . import wa_triage
+        self.assertEqual(wa_triage.promotable_phone('+974 5555-1234'), '97455551234')
+        self.assertEqual(wa_triage.promotable_phone('55551234'), '55551234')
+        # A lid that never resolved, and the stray '0' the lid map sometimes returns.
+        self.assertEqual(wa_triage.promotable_phone('123456789012345@lid'), '')
+        self.assertEqual(wa_triage.promotable_phone('0'), '')
+        self.assertEqual(wa_triage.promotable_phone(''), '')
+
+    def test_existing_open_lead_blocks_a_second_card(self):
+        from . import wa_triage
+        lead = Lead.objects.create(
+            category=Lead.CATEGORY_BUSINESS, stage=Lead.STAGE_NEW, phone='97455551234')
+        # Same number, written the other way round.
+        blocked = wa_triage.existing_board_record('55551234', driver_keys={})
+        self.assertIn(str(lead.pk), blocked)
+
+    def test_closed_lead_still_blocks_a_second_card(self):
+        """create_lead_from_wa_number only dedupes against OPEN leads, so a rejected
+        applicant writing in again would otherwise get a brand-new card."""
+        from . import wa_triage
+        lead = Lead.objects.create(
+            category=Lead.CATEGORY_DRIVER, stage='rejected', phone='97455559999')
+        blocked = wa_triage.existing_board_record('97455559999', driver_keys={})
+        self.assertIn(str(lead.pk), blocked)
+
+    def test_driver_application_blocks_promotion(self):
+        """The driver board builds that card itself in reconcile_driver_leads."""
+        from . import wa_triage
+        keys = services._driver_match_keys('97455558888')
+        blocked = wa_triage.existing_board_record(
+            '97455558888', driver_keys={k: 42 for k in keys})
+        self.assertIn('driver application #42', blocked)
+
+    def test_unknown_number_is_not_blocked(self):
+        from . import wa_triage
+        self.assertEqual(wa_triage.existing_board_record('97455557777', driver_keys={}), '')
+
+    def test_failed_driver_lookup_refuses_rather_than_duplicates(self):
+        from . import wa_triage
+        with patch.object(wa_triage, 'driver_phone_keys', return_value=None):
+            blocked = wa_triage.existing_board_record('97455557777')
+        self.assertIn('left for a human', blocked)
+
+    def test_verdict_parsing(self):
+        from .wa_triage import _parse_verdict
+        self.assertEqual(
+            _parse_verdict('{"category":"driver","confidence":0.9,"reason":"wants a job"}'),
+            ('driver', 0.9, 'wants a job'))
+        # Fenced output is still read.
+        cat, conf, _ = _parse_verdict('```json\n{"category":"business","confidence":1}\n```')
+        self.assertEqual((cat, conf), ('business', 1.0))
+        # Anything unreadable, out of range or off-menu means "leave it in the inbox".
+        self.assertEqual(_parse_verdict('maybe a driver?')[0], '')
+        self.assertEqual(_parse_verdict('')[0], '')
+        self.assertEqual(_parse_verdict('{"category":"driver","confidence":7}')[1], 1.0)
+        self.assertEqual(_parse_verdict('{"category":"supplier","confidence":1}')[0], '')
+
+    def test_thin_conversation_is_never_classified(self):
+        """No AI call at all when there is nothing to read."""
+        from . import wa_triage
+        with patch.object(wa_triage, 'conversation_text', return_value=('Them: hi', 2)), \
+                patch.object(wa_triage, '_ask') as ask:
+            verdict = wa_triage.classify('default', '97455551234@c.us')
+        ask.assert_not_called()
+        self.assertEqual(verdict['category'], '')
+
+    def test_verdict_is_cached_against_the_last_message(self):
+        from django.utils import timezone
+        from . import wa_triage
+        stamp = timezone.now()
+        answer = '{"category":"driver","confidence":0.95,"reason":"asks for a driver job"}'
+        with patch.object(wa_triage, 'conversation_text',
+                          return_value=('Them: I want a driver job please', 40)), \
+                patch.object(wa_triage, '_ask', return_value=(answer, '')) as ask:
+            first = wa_triage.classify('default', '974555@c.us', last_at=stamp)
+            second = wa_triage.classify('default', '974555@c.us', last_at=stamp)
+            # A new message moves the key, so the chat is read again.
+            wa_triage.classify('default', '974555@c.us',
+                               last_at=stamp + timezone.timedelta(minutes=1))
+        self.assertEqual(first['category'], Lead.CATEGORY_DRIVER)
+        self.assertFalse(first['cached'])
+        self.assertTrue(second['cached'])
+        self.assertEqual(ask.call_count, 2)
+
+    def test_ai_failure_is_not_cached(self):
+        from . import wa_triage
+        with patch.object(wa_triage, 'conversation_text',
+                          return_value=('Them: I want a driver job please', 40)), \
+                patch.object(wa_triage, '_ask', return_value=('', 'AI error (429)')) as ask:
+            wa_triage.classify('default', '974999@c.us')
+            wa_triage.classify('default', '974999@c.us')
+        self.assertEqual(ask.call_count, 2)
+
+    def test_driver_promotion_starts_in_the_no_driver_column(self):
+        """A WhatsApp enquiry has not filled the form at all, so it must not land in
+        the board's fallback 'Incomplete' column, which means 'registered but never
+        submitted'."""
+        from . import wa_triage
+        cache.delete(STAGE_CACHE_KEY)
+        lead, created = wa_triage.promote(
+            '97455554444', Lead.CATEGORY_DRIVER,
+            {'confidence': 0.9, 'reason': 'wants driver work'})
+        self.assertTrue(created)
+        self.assertEqual(lead.stage, wa_triage._unregistered_driver_stage())
+        self.assertNotEqual(lead.stage, services.initial_stage_key(Lead.CATEGORY_DRIVER))
+
+    def test_promote_pins_the_conversation_it_came_from(self):
+        from . import wa_triage
+        with patch.object(wa_triage, 'conversation_text',
+                          return_value=('Them (01 Jan 09:00): I need delivery pricing', 30)):
+            lead, _ = wa_triage.promote(
+                '97455553333', Lead.CATEGORY_BUSINESS,
+                {'confidence': 0.9, 'reason': 'asks for pricing'},
+                session='ezzy6000', from_number='123456789012345@lid')
+        self.assertEqual(lead.wa_session, 'ezzy6000')
+        self.assertEqual(lead.wa_chat_override, '123456789012345')
+        self.assertIn('I need delivery pricing', lead.notes)
+
+    def test_promote_files_the_lead_and_records_why(self):
+        from . import wa_triage
+        lead, created = wa_triage.promote(
+            '97455556666', Lead.CATEGORY_DRIVER,
+            {'confidence': 0.97, 'reason': 'asks about driver salary'})
+        self.assertTrue(created)
+        self.assertEqual(lead.category, Lead.CATEGORY_DRIVER)
+        self.assertEqual(lead.source, Lead.SOURCE_WA_INBOUND)
+        note = lead.activities.filter(
+            activity_type=LeadActivity.TYPE_NOTE).order_by('pk').last()
+        self.assertIn('97%', note.body)
+        self.assertIn('asks about driver salary', note.body)
+        self.assertIn('Driver board', note.body)

@@ -877,6 +877,8 @@ class OrderStatusHistory(models.Model):
         ('item_deleted', 'Item Deleted'),
         ('cod_correction', 'COD Correction'),
         ('location_update', 'Location Updated'),
+        ('parcel_custody', 'Parcel Custody'),
+        ('return_status', 'Return Request'),
     ]
 
     order = models.ForeignKey(
@@ -1454,6 +1456,9 @@ class ReturnRequest(models.Model):
         ('not_as_described', 'Not As Described'),
         ('customer_changed_mind', 'Customer Changed Mind'),
         ('duplicate_order', 'Duplicate Order'),
+        # The customer never took the goods at all. Distinct from every reason
+        # above, which describe something they received and sent back.
+        ('undelivered', 'Never delivered — returned to shipper'),
         ('other', 'Other'),
     ]
     RETURN_STATUS_CHOICES = [

@@ -4,6 +4,7 @@ AI Agent Admin Configuration
 
 from django.contrib import admin
 from django.utils.html import format_html
+from ai_agent import models as ai_agent_models
 from ai_agent.models import (
     Conversation,
     ConversationMessage,
@@ -37,7 +38,8 @@ class ConversationAdmin(admin.ModelAdmin):
         'last_activity',
     ]
     list_filter = ['channel', 'status', 'started_at']
-    search_fields = ['conversation_id', 'user__username', 'phone_number']
+    search_fields = ('phone_number', 'status', 'conversation_id', 'channel', 'external_id',
+                     'user__username', 'business__business_name')
     readonly_fields = [
         'conversation_id',
         'total_messages',
@@ -71,8 +73,8 @@ class AgentToolAdmin(admin.ModelAdmin):
         rate = (obj.total_errors / obj.total_calls) * 100
         color = 'green' if rate < 5 else 'orange' if rate < 20 else 'red'
         return format_html(
-            '<span style="color: {};">{:.1f}%</span>',
-            color, rate
+            '<span style="color: {};">{}%</span>',
+            color, f'{rate:.1f}'
         )
     error_rate.short_description = 'Error Rate'
 
@@ -90,7 +92,9 @@ class UsageLogAdmin(admin.ModelAdmin):
         'user',
     ]
     list_filter = ['api_call_type', 'model', 'success', 'created_at']
-    search_fields = ['user__username', 'conversation__conversation_id']
+    search_fields = ('api_call_type', 'model', 'error_message', 'conversation__phone_number',
+                     'user__username', 'business__business_name',
+                     'conversation__conversation_id')
     readonly_fields = [
         'conversation',
         'user',
@@ -129,7 +133,19 @@ class ZoneTrainingDataAdmin(admin.ModelAdmin):
         'is_verified',
     ]
     list_filter = ['input_type', 'language', 'is_verified', 'zone']
-    search_fields = ['text_input', 'zone__zone_name']
+    search_fields = ('input_type', 'text_input', 'language', 'zone__zone_name')
     autocomplete_fields = ['zone']
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Tables that had no admin page. Registered so every model is reachable and
+# searchable from /dj-admin/. Related rows use raw id fields so a changelist
+# never renders a dropdown of the whole table.
+# ─────────────────────────────────────────────────────────────────────────────
 
+@admin.register(ai_agent_models.ConversationMessage)
+class ConversationMessageAdmin(admin.ModelAdmin):
+    list_display = ('conversation', 'role', 'tool_name', 'tokens_input', 'tokens_output', 'latency_ms', 'created_at')
+    search_fields = ('role', 'content', 'tool_name', 'conversation__phone_number')
+    list_filter = ('role',)
+    list_select_related = ('conversation',)
+    raw_id_fields = ('conversation',)

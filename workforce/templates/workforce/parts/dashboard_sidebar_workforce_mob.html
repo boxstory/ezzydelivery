@@ -47,33 +47,15 @@
                 <a id="workforce_sidebar_mob_link_all_orders" href="{% url 'workforce:wf_orders_all' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Orders</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_wf_p2p_new" href="{% url 'workforce:wf_p2p_new' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-plus"></i><span>New P2P Booking</span>
-                </a>
                 <a id="workforce_sidebar_mob_link_orders_print_labels" href="{% url 'workforce:wf_orders_print_labels' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-print"></i><span>Print Labels</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_orders_by_seller" href="{% url 'workforce:wf_orders_by_seller' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-store"></i><span>By Seller</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_wf_orders_p2p" href="{% url 'workforce:wf_orders_p2p' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-route"></i><span>P2P Orders{% if p2p_pending_count %} ({{ p2p_pending_count }}){% endif %}</span>
                 </a>
-                <a id="workforce_sidebar_mob_link_wf_p2p_rate_card" href="{% url 'workforce:wf_p2p_rate_card' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-tags"></i><span>P2P Rate Card</span>
-                </a>
                 <a id="workforce_sidebar_mob_link_orders_to_publish" href="{% url 'workforce:wf_orders_to_publish' %}" class="wsm__nav-link d-flex align-items-center">
                     <i class="fa-solid fa-spinner"></i><span>Publish to Task</span>
                     <span class="badge ms-auto" style="background:var(--brand-primary);color:#000;font-size:0.6rem;" data-badge="pending_publish">{{ pending_publish_count|default:"0" }}</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_orders_published" href="{% url 'workforce:wf_orders_published' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-circle-check"></i><span>Published Orders</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_orders_fulfilled" href="{% url 'workforce:wf_orders_fulfilled_clients' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-box-open"></i><span>Fulfilled Clients</span>
-                </a>
-                <a id="workforce_sidebar_mob_link_orders_non_fulfilled" href="{% url 'workforce:wf_orders_non_fulfilled_clients' %}" class="wsm__nav-link">
-                    <i class="fa-solid fa-box"></i><span>Non-Fulfilled Clients</span>
                 </a>
                 <a id="workforce_sidebar_mob_link_orders_reported" href="{% url 'workforce:wf_orders_reported' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-flag"></i><span>Reported</span>
@@ -156,6 +138,35 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_pickup_fleets" href="{% url 'workforce:pickup_automation_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-users-gear"></i><span>Client Driver List</span>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Returns — parcel custody coming back -->
+        {% if wf_dept_ops %}
+        <div id="workforce_sidebar_mob_section_returns" class="wsm__nav-section">
+            <div class="wsm__nav-header" onclick="toggleMobileSection('returns')">
+                <div class="wsm__nav-header-title">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>Returns</span>
+                </div>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="wsm__nav-submenu" id="mobile-section-returns">
+                <a id="workforce_sidebar_mob_link_returns_open" href="{% url 'workforce:returns_custody_list' %}" class="wsm__nav-link d-flex align-items-center">
+                    <i class="fa-solid fa-box-open"></i><span>Coming Back</span>
+                    <span class="badge wf-sidebar__badge ms-auto" data-badge="returns_open">{{ returns_open_count|default:"0" }}</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_returns_triage" href="{% url 'workforce:returns_custody_list' %}?status=triage" class="wsm__nav-link">
+                    <i class="fa-solid fa-triangle-exclamation"></i><span>Needs Triage</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_returns_shelf" href="{% url 'workforce:returns_custody_list' %}?status=to_forward" class="wsm__nav-link d-flex align-items-center">
+                    <i class="fa-solid fa-boxes-stacked"></i><span>On the Shelf</span>
+                    <span class="badge wf-sidebar__badge ms-auto" data-badge="returns_shelf">{{ returns_shelf_count|default:"0" }}</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_return_requests" href="{% url 'workforce:returns_requests_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-file-invoice"></i><span>Return Requests</span>
                 </a>
             </div>
         </div>
@@ -369,6 +380,9 @@
                 </a>
                 <a id="workforce_sidebar_mob_link_finance_charge_invoices" href="{% url 'workforce:client_charge_invoices' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-invoice-dollar"></i><span>Charge Invoices</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_wf_p2p_rate_card" href="{% url 'workforce:wf_p2p_rate_card' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-tags"></i><span>P2P Rate Card</span>
                 </a>
             </div>
         </div>
@@ -852,6 +866,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Map path prefixes to {section, highlight link} for sub-pages (longer prefixes first)
     var subpageMap = [
+        // Returns
+        {re: /^\/workforce\/returns\/requests/,                section: 'returns',       link: 'workforce_sidebar_mob_link_return_requests'},
+        {re: /^\/workforce\/returns\//,                        section: 'returns',       link: 'workforce_sidebar_mob_link_returns_open'},
         // Import
         {re: /^\/workforce\/orders\/temp\/auto-stages/,         section: 'import',        link: 'workforce_sidebar_mob_link_temp_auto_stages'},
         {re: /^\/workforce\/orders\/temp\/verify-queue/,        section: 'import',        link: 'workforce_sidebar_mob_link_temp_verify_queue'},
@@ -863,7 +880,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/import-history\//,                  section: 'import',        link: 'workforce_sidebar_mob_link_import_history'},
         {re: /^\/workforce\/webhook-imports\//,                  section: 'triggers',      link: 'workforce_sidebar_mob_link_webhook_imports'},
         // Orders
-        {re: /^\/workforce\/orders\/p2p\/rate-card/,             section: 'orders',        link: 'workforce_sidebar_mob_link_wf_p2p_rate_card'},
+        {re: /^\/workforce\/orders\/p2p\/rate-card/,             section: 'finance',       link: 'workforce_sidebar_mob_link_wf_p2p_rate_card'},
         {re: /^\/workforce\/orders\/p2p/,                       section: 'orders',        link: 'workforce_sidebar_mob_link_wf_orders_p2p'},
         {re: /^\/workforce\/orders\/pending-verification\//,    section: 'orders',        link: 'workforce_sidebar_mob_link_all_orders'},
         {re: /^\/workforce\/orders\/\d+/,                       section: 'orders',        link: 'workforce_sidebar_mob_link_all_orders'},

@@ -20,15 +20,17 @@ User = get_user_model()
 
 
 class FulfilmentConsolidationTestCase(TestCase):
-    def make_business(self, idx):
+    def make_business(self, idx, **kwargs):
         user = User.objects.create_user(username=f'fcbiz{idx}', password='x')
         profile = Profile.objects.create(
             user=user, first_name='Fc', last_name=f'B{idx}', phone=70000000 + idx)
-        return Business.objects.create(
+        defaults = dict(
             business_id=7000 + idx, user=user, profile=profile,
             business_name=f'FC Biz {idx}', business_code=f'FCB{idx:03d}',
             business_status='active',
         )
+        defaults.update(kwargs)
+        return Business.objects.create(**defaults)
 
     def make_placeholder(self, business):
         """The legacy coordless 'Fulfillment Store' row, as old data still carries."""
@@ -41,15 +43,16 @@ class FulfilmentConsolidationTestCase(TestCase):
     def test_new_business_gets_no_fulfilment_row(self):
         """A new business is never auto-stamped with a fulfilment pickup location.
 
-        `fulfillment_service_enabled` defaults to True, so the old post_save
-        receiver fired for every client and left a stale is_fulfilment_center row
-        that made first-mile pickup refuse with 'fulfilment_center'.
+        The old post_save receiver fired whenever the flag was on and left a stale
+        is_fulfilment_center row that made first-mile pickup refuse with
+        'fulfilment_center'. Arm the flag explicitly rather than leaning on the
+        model default — the default is now False and this guard must hold either way.
         """
         Warehouse.objects.create(
             name='EzzyDelivery FC- Doha', is_default=True,
             latitude=Decimal('25.28'), longitude=Decimal('51.53'),
         )
-        business = self.make_business(1)
+        business = self.make_business(1, fulfillment_service_enabled=True)
         self.assertTrue(business.fulfillment_service_enabled)
         self.assertFalse(
             PickupLocation.objects.filter(business=business).exists(),

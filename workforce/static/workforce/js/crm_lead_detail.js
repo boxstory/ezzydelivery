@@ -116,6 +116,26 @@
       return;
     }
 
+    // Re-file this card on the other pipeline (Business <-> Driver)
+    var moveBoardBtn = e.target.closest && e.target.closest('[data-move-board]');
+    if (moveBoardBtn) {
+      var boardLabel = moveBoardBtn.getAttribute('data-move-label') || 'the other';
+      if (!confirm('Move this card to the ' + boardLabel + ' board?\n\n'
+                   + 'The two pipelines have separate columns, so it starts again at the '
+                   + boardLabel + ' board\'s first column. Nothing is sent to the lead.')) {
+        return;
+      }
+      post(cfg().urlMoveBoard, { category: moveBoardBtn.getAttribute('data-move-board') })
+        .then(function (data) {
+          if (!data.success) { alert(data.error || 'Could not move this card'); return; }
+          // Full reload, not a patch: the board this page belongs to decides the back
+          // link, the driver panel, the stage grid and which WhatsApp line sends.
+          flash('workforce_crm_detail_div_feedback', 'Moved to the ' + boardLabel + ' board — reloading');
+          setTimeout(function () { window.location.reload(); }, 700);
+        });
+      return;
+    }
+
     // Resume automatic filing for a pinned driver card
     var unpinBtn = e.target.closest && e.target.closest('#workforce_crm_detail_btn_unpin');
     if (unpinBtn) {
@@ -226,6 +246,51 @@
       return;
     }
 
+    // Refresh the WhatsApp thread — pulls this chat from WAHA server-side, then
+    // swaps in the re-rendered bubbles. No page reload: staff lose the scroll
+    // position, the open linker and any half-typed note on a full reload.
+    if (e.target.closest && e.target.closest('#workforce_crm_detail_btn_chat_refresh')) {
+      var refBtn = document.getElementById('workforce_crm_detail_btn_chat_refresh');
+      var chatBox = document.getElementById('workforce_crm_detail_div_chat');
+      if (!refBtn || !chatBox || refBtn.disabled) return;
+      var refLabel = refBtn.innerHTML;
+      refBtn.disabled = true;
+      refBtn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Refreshing…';
+      post(cfg().urlChatRefresh, { session: refBtn.getAttribute('data-session') || '' })
+        .then(function (data) {
+          refBtn.disabled = false;
+          if (!data || !data.success) {
+            refBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Retry';
+            flash('workforce_crm_detail_span_chat_feedback',
+                  (data && data.error) || 'Refresh failed', true);
+            return;
+          }
+          chatBox.innerHTML = data.html || '';
+          chatBox.classList.toggle('d-none', !data.count);
+          var countEl = document.getElementById('workforce_crm_detail_span_chat_count');
+          if (countEl) countEl.textContent = data.count;
+          var emptyNote = document.getElementById('workforce_crm_detail_div_chat_empty');
+          if (emptyNote) emptyNote.classList.toggle('d-none', !!data.count);
+          scrollChatToEnd();
+          // Say what the pull actually did: "nothing new" and "the bridge is
+          // down" look identical on a silent button.
+          if (data.error) {
+            refBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Refresh';
+            flash('workforce_crm_detail_span_chat_feedback', data.error, true);
+          } else {
+            refBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' +
+              (data.new ? data.new + ' new' : 'Up to date');
+            setTimeout(function () { refBtn.innerHTML = refLabel; }, 2500);
+          }
+        })
+        .catch(function () {
+          refBtn.disabled = false;
+          refBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Retry';
+          flash('workforce_crm_detail_span_chat_feedback', 'Refresh failed — try again', true);
+        });
+      return;
+    }
+
     // Show/hide the manual chat linker. It lives inside the conversation panel and
     // starts open only when there is no matched chat to read.
     var linkToggle = e.target.closest && e.target.closest('[data-chatlink-toggle]');
@@ -314,6 +379,78 @@
     resultsEl.classList.add('show');
   }
 
+  // ── CONTACT CARD ───────────────────────────────────────────────────────────
+  // The panel shows a read record by default; Edit swaps in the form, Cancel puts
+  // the inputs back to what is on screen, and a successful save repaints the read
+  // rows from the server's values (the phone is normalised there).
+  function contactPanel() { return document.getElementById('workforce_crm_detail_div_contact'); }
+
+  function setContactMode(editing) {
+    var panel = contactPanel();
+    if (!panel) return;
+    var form = document.getElementById('workforce_crm_detail_form_contact');
+    var read = document.getElementById('workforce_crm_detail_div_contact_read');
+    var btn = document.getElementById('workforce_crm_detail_btn_contact_edit');
+    panel.classList.toggle('is-editing', editing);
+    if (form) form.hidden = !editing;
+    if (read) read.hidden = editing;
+    if (btn) btn.setAttribute('aria-expanded', editing ? 'true' : 'false');
+    if (editing && form) {
+      var first = form.querySelector('input');
+      if (first) first.focus();
+    } else if (btn) {
+      btn.focus();
+    }
+  }
+
+  // Cancel restores the inputs from the read rows, so reopening Edit never shows
+  // an abandoned edit as if it had been saved.
+  function resetContactInputs() {
+    var form = document.getElementById('workforce_crm_detail_form_contact');
+    if (!form) return;
+    form.querySelectorAll('input[name]').forEach(function (input) {
+      var cell = document.querySelector('[data-contact-read="' + input.name + '"]');
+      if (!cell) return;
+      var text = (cell.textContent || '').trim();
+      input.value = cell.classList.contains('crmd__crow-val--empty') || text === 'Not set' ? '' : text;
+    });
+  }
+
+  function paintContactRead(contact) {
+    if (!contact) return;
+    ['company_name', 'contact_name', 'product_category'].forEach(function (name) {
+      var cell = document.querySelector('[data-contact-read="' + name + '"]');
+      if (!cell) return;
+      var value = contact[name] || '';
+      cell.textContent = value || 'Not set';
+      cell.classList.toggle('crmd__crow-val--empty', !value);
+    });
+    var wrap = document.querySelector('[data-contact-read-phone]');
+    if (!wrap) return;
+    var phone = contact.phone || '';
+    wrap.textContent = '';
+    var el;
+    if (phone) {
+      el = document.createElement('a');
+      el.className = 'crmd__crow-tel';
+      el.href = 'tel:' + phone;
+    } else {
+      el = document.createElement('span');
+      el.className = 'crmd__crow-val--empty';
+    }
+    el.setAttribute('data-contact-read', 'phone');
+    el.textContent = phone || 'Not set';
+    wrap.appendChild(el);
+    var phoneInput = document.getElementById('workforce_crm_detail_input_phone');
+    if (phoneInput) phoneInput.value = phone;
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return;
+    if (e.target.closest('[data-contact-edit]')) { setContactMode(true); return; }
+    if (e.target.closest('[data-contact-cancel]')) { resetContactInputs(); setContactMode(false); }
+  });
+
   document.addEventListener('submit', function (e) {
     var form = e.target.closest && e.target.closest('#workforce_crm_detail_form_contact');
     if (!form) return;
@@ -321,6 +458,10 @@
     var fields = {};
     new FormData(form).forEach(function (value, key) { fields[key] = value; });
     post(cfg().urlUpdate, fields).then(function (data) {
+      if (data.success) {
+        paintContactRead(data.contact);
+        setContactMode(false);
+      }
       flash('workforce_crm_detail_span_contact_feedback',
             data.success ? (data.changes > 0 ? 'Saved.' : 'No changes.') : (data.error || 'Failed'),
             !data.success);

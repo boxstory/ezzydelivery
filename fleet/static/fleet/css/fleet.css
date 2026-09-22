@@ -2917,3 +2917,93 @@ details.fhp__faq-item[open] .fhp__faq-chevron {
     font-weight: 700;
     color: var(--brand-success, #28a745);
 }
+
+/* ==========================================================================
+   fpush__ — Web Push opt-in bar (driver PWA)
+   Shown by ezzy-push.js only when the browser has neither granted nor refused
+   notifications. Restrained on purpose: it sits above the driver's task list
+   every load until they answer, so it reads as a row of the page, not a banner.
+   ========================================================================== */
+
+.fpush__prompt {
+    display: none;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+    background: var(--fleet-white);
+    border: 1px solid var(--fleet-grey-200);
+    border-left: 3px solid var(--fleet-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.fpush__prompt--visible {
+    display: flex;
+}
+
+.fpush__prompt-icon {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    color: var(--fleet-primary);
+    font-size: var(--font-size-base);
+}
+
+.fpush__prompt-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.fpush__prompt-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--fleet-grey-900);
+}
+
+.fpush__prompt-body {
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    color: var(--fleet-grey-600);
+}
+
+.fpush__prompt-actions {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+/* 44px floor on both: these sit under a driver's thumb in a moving vehicle. */
+.fpush__btn-enable,
+.fpush__btn-later {
+    min-height: 36px;
+    padding: 0 var(--spacing-md);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+}
+
+.fpush__btn-enable {
+    background: var(--fleet-primary);
+    color: var(--fleet-white);
+    border: 1px solid var(--fleet-primary);
+}
+
+.fpush__btn-later {
+    background: transparent;
+    color: var(--fleet-grey-500);
+    border: 1px solid var(--fleet-grey-200);
+}
+
+/* Side by side once there is width for it — stacked buttons waste a phone's
+   vertical space, but on a narrow screen they would squeeze the message out. */
+@media (min-width: 420px) {
+    .fpush__prompt-actions {
+        flex-direction: row;
+        align-items: center;
+    }
+}

@@ -70,6 +70,7 @@ urlpatterns = [
     path('drivers/inactive/', workforce_views.drivers_inactive, name='drivers_inactive'),
     path('drivers/<int:driver_id>/', workforce_views.driver_detail, name='driver_detail'),
     path('drivers/<int:driver_id>/timeline/', workforce_views.driver_timeline, name='driver_timeline'),
+    path('drivers/<int:driver_id>/request-location/', workforce_views.driver_request_location, name='driver_request_location'),
     path('drivers/<int:driver_id>/toggle-status/', workforce_views.driver_toggle_status, name='driver_toggle_status'),
     path('drivers/<int:driver_id>/work-pref/', workforce_views.driver_set_work_pref, name='driver_set_work_pref'),
     path('drivers/<int:driver_id>/set-status/', workforce_views.driver_set_status, name='driver_set_status'),
@@ -209,6 +210,17 @@ urlpatterns = [
     path('pickup-automation/fleet/search/', workforce_views.pickup_fleet_driver_search, name='pickup_fleet_driver_search'),
     path('pickup-automation/fleet/update/', workforce_views.pickup_fleet_update, name='pickup_fleet_update'),
 
+    # Returns custody — the desk that signs a returned parcel back in
+    path('returns/', workforce_views.returns_custody_list, name='returns_custody_list'),
+    path('returns/<int:custody_id>/status/', workforce_views.returns_custody_set_status, name='returns_custody_set_status'),
+    path('returns/<int:custody_id>/receive/', workforce_views.returns_custody_receive, name='returns_custody_receive'),
+    path('returns/<int:custody_id>/destination/', workforce_views.returns_custody_set_destination, name='returns_custody_set_destination'),
+    path('returns/<int:custody_id>/forward/', workforce_views.returns_custody_forward, name='returns_custody_forward'),
+    path('returns/requests/', workforce_views.returns_requests_list, name='returns_requests_list'),
+    path('returns/requests/<int:return_id>/status/', workforce_views.returns_request_set_status, name='returns_request_set_status'),
+    path('returns/bulk-receive/', workforce_views.returns_custody_bulk_receive, name='returns_custody_bulk_receive'),
+    path('returns/open/<int:task_id>/', workforce_views.returns_custody_open, name='returns_custody_open'),
+
     # Delivery app control — per-client rules the driver app must satisfy
     path('delivery-app-control/', workforce_views.delivery_app_control, name='delivery_app_control'),
     path('delivery-app-control/save/', workforce_views.delivery_app_control_save,
@@ -314,6 +326,7 @@ urlpatterns = [
     # Client Ledger (the account every other finance screen posts into)
     path('client-ledger/', workforce_views.client_ledger, name='client_ledger'),
     path('client-ledger/open-account/', workforce_views.client_ledger_open_account, name='client_ledger_open_account'),
+    path('client-ledger/post-entry/', workforce_views.client_ledger_post_entry, name='client_ledger_post_entry'),
 
     # Charges to Collect (receivable leg — Business → EzzyDelivery)
     path('client-charges/collect/', workforce_views.client_charges_collect, name='client_charges_collect'),
@@ -344,6 +357,7 @@ urlpatterns = [
     path('receipt-templates/<int:template_id>/delete/', workforce_views.receipt_template_delete, name='receipt_template_delete'),
     path('settlement/<int:settlement_id>/receipt/', workforce_views.settlement_receipt_print, name='settlement_receipt_print'),
     path('settlement/<int:settlement_id>/payout-invoice/', workforce_views.driver_payout_invoice, name='driver_payout_invoice'),
+    path('settlement/<int:settlement_id>/payout-invoice/columns/', workforce_views.driver_payout_invoice_columns, name='driver_payout_invoice_columns'),
     path('fleet/task-sheets/', workforce_views.fleet_task_sheets_list, name='fleet_task_sheets_list'),
     path('fleet/task-sheet/<int:driver_id>/', workforce_views.fleet_task_sheet, name='fleet_task_sheet'),
 
@@ -435,10 +449,14 @@ urlpatterns = [
     path('crm/leads/', crm_views.crm_leads_list, name='crm_leads_list'),
     path('crm/leads/drivers/', crm_views.crm_driver_leads_list, name='crm_driver_leads_list'),
     path('crm/leads/export/google-contacts/', crm_views.crm_leads_export_google, name='crm_leads_export_google'),
+    path('crm/leads/export/csv/', crm_views.crm_leads_export_csv, name='crm_leads_export_csv'),
+    path('crm/leads/drivers/export/csv/', crm_views.crm_driver_leads_export_csv, name='crm_driver_leads_export_csv'),
+    path('crm/leads/drivers/documents/', crm_views.crm_driver_leads_documents, name='crm_driver_leads_documents'),
     path('crm/leads/new/', crm_views.crm_lead_create, name='crm_lead_create'),
     path('crm/leads/<int:lead_id>/', crm_views.crm_lead_detail, name='crm_lead_detail'),
     path('crm/leads/<int:lead_id>/update-stage/', crm_views.crm_lead_update_stage, name='crm_lead_update_stage'),
     path('crm/leads/<int:lead_id>/unpin-stage/', crm_views.crm_lead_unpin_stage, name='crm_lead_unpin_stage'),
+    path('crm/leads/<int:lead_id>/move-board/', crm_views.crm_lead_move_board, name='crm_lead_move_board'),
     path('crm/leads/<int:lead_id>/merge/', crm_views.crm_lead_merge, name='crm_lead_merge'),
     path('crm/leads/<int:lead_id>/unmerge/', crm_views.crm_lead_unmerge, name='crm_lead_unmerge'),
     path('crm/leads/<int:lead_id>/update/', crm_views.crm_lead_update, name='crm_lead_update'),
@@ -446,6 +464,7 @@ urlpatterns = [
     path('crm/leads/<int:lead_id>/delete-activity/<int:activity_id>/', crm_views.crm_lead_delete_activity, name='crm_lead_delete_activity'),
     path('crm/leads/link-business/', crm_views.crm_lead_link_business, name='crm_lead_link_business'),
     path('crm/leads/<int:lead_id>/ai-summary/', crm_views.crm_lead_ai_summary, name='crm_lead_ai_summary'),
+    path('crm/leads/<int:lead_id>/chat-refresh/', crm_views.crm_lead_chat_refresh, name='crm_lead_chat_refresh'),
     path('crm/leads/<int:lead_id>/wa-media/<int:msg_id>/', crm_views.crm_lead_wa_media, name='crm_lead_wa_media'),
     path('crm/leads/<int:lead_id>/link-chat/', crm_views.crm_lead_link_chat, name='crm_lead_link_chat'),
     path('crm/wa-contacts/search/', crm_views.crm_wa_contact_search, name='crm_wa_contact_search'),
@@ -453,6 +472,7 @@ urlpatterns = [
     path('crm/whatsapp-inbox/chat/', crm_views.crm_wa_chat_preview, name='crm_wa_chat_preview'),
     path('crm/wa-media/<int:msg_id>/', crm_views.crm_wa_media, name='crm_wa_media'),
     path('crm/whatsapp-inbox/promote/', crm_views.crm_wa_promote, name='crm_wa_promote'),
+    path('crm/whatsapp-inbox/send-link/', crm_views.crm_wa_send_link, name='crm_wa_send_link'),
     path('crm/whatsapp-inbox/dismiss/', crm_views.crm_wa_dismiss, name='crm_wa_dismiss'),
     path('crm/whatsapp-inbox/resync/', crm_views.crm_wa_resync, name='crm_wa_resync'),
     path('crm/contacts/', crm_views.crm_contacts, name='crm_contacts'),

@@ -6,6 +6,7 @@
 from django.contrib import admin
 
 from p2p.models import P2PBooking, P2PBoxTier, P2PRateBand
+from p2p import models as p2p_models
 
 
 @admin.register(P2PRateBand)
@@ -17,6 +18,7 @@ class P2PRateBandAdmin(admin.ModelAdmin):
     )
     list_editable = ('price', 'needs_quote', 'priority', 'is_active')
     list_filter = ('is_active', 'needs_quote', 'size', 'vehicle', 'speed')
+    search_fields = ('size', 'vehicle', 'speed', 'up_to_km', 'price')
     ordering = ('-priority', 'up_to_km', 'id')
     fieldsets = (
         ('When this row applies', {
@@ -42,6 +44,7 @@ class P2PBoxTierAdmin(admin.ModelAdmin):
     list_display = ('id', 'min_boxes', 'max_boxes', 'uplift', 'needs_quote', 'is_active')
     list_editable = ('uplift', 'needs_quote', 'is_active')
     list_filter = ('is_active', 'needs_quote')
+    search_fields = ('min_boxes', 'max_boxes', 'uplift')
     ordering = ('min_boxes', 'id')
 
 
@@ -54,7 +57,12 @@ class P2PBookingAdmin(admin.ModelAdmin):
     )
     list_filter = ('status', 'needs_quote', 'return_trip', 'fee_status', 'speed',
                    'size', 'vehicle')
-    search_fields = ('token', 'from_label', 'to_label', 'sender_name', 'sender_phone')
+    search_fields = ('from_label', 'to_label', 'sender_name', 'receiver_name', 'sender_phone',
+                     'booker_phone', 'receiver_phone', 'pickup_locality', 'pickup_zone',
+                     'pickup_street', 'pickup_building', 'status', 'fee_status', 'token',
+                     'category', 'size', 'vehicle', 'order__order_number',
+                     'fee_txn__transaction_code', 'return_order__order_number',
+                     'customer__username', 'priced_by__username')
     date_hierarchy = 'created_at'
     autocomplete_fields = ('customer', 'order', 'return_order', 'priced_by')
     # The quote is what the customer was shown and agreed to. Editing it after the
@@ -66,3 +74,29 @@ class P2PBookingAdmin(admin.ModelAdmin):
         'customer_agreed_at', 'fee_txn', 'source_ip', 'user_agent',
         'created_at', 'updated_at',
     )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tables that had no admin page. Registered so every model is reachable and
+# searchable from /dj-admin/. Related rows use raw id fields so a changelist
+# never renders a dropdown of the whole table.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@admin.register(p2p_models.P2PBookingLine)
+class P2PBookingLineAdmin(admin.ModelAdmin):
+    list_display = ('booking', 'size', 'count', 'created_at')
+    search_fields = ('size', 'booking__from_label')
+    list_filter = ('size',)
+    list_select_related = ('booking',)
+    raw_id_fields = ('booking',)
+
+@admin.register(p2p_models.P2PVehicleBoxLimit)
+class P2PVehicleBoxLimitAdmin(admin.ModelAdmin):
+    list_display = ('vehicle', 'size', 'max_boxes', 'is_active', 'created_at', 'updated_at')
+    search_fields = ('vehicle', 'size')
+    list_filter = ('vehicle', 'size', 'is_active')
+
+@admin.register(p2p_models.P2PVehicleCapacity)
+class P2PVehicleCapacityAdmin(admin.ModelAdmin):
+    list_display = ('vehicle', 'capacity_cbm', 'min_cbm', 'is_active', 'created_at', 'updated_at')
+    search_fields = ('vehicle',)
+    list_filter = ('vehicle', 'is_active')

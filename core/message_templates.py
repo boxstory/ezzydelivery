@@ -27,12 +27,15 @@ QUOTE_AGREED_ALERT = 'quote_agreed_alert'
 P2P_BOOKING_CONFIRM = 'p2p_booking_confirm'
 P2P_COMMENT_OPS_ALERT = 'p2p_comment_ops_alert'
 CLIENT_INVOICE_MANUAL = 'client_invoice_manual'
+CRM_WA_DRIVER_LINK = 'crm_wa_driver_link'
+CRM_WA_PRICING_LINK = 'crm_wa_pricing_link'
 
 KIND_AUTO = 'auto'
 KIND_COMPOSER = 'composer'
 
 TEMPLATE_DEFAULTS = {
     DRIVER_APPLICATION_THANKS: {
+        'msg_id': 'M01',
         'label': 'Driver application — thank you',
         'description': (
             'Sent once from the fleet number when an applicant submits the driver '
@@ -58,6 +61,7 @@ Best regards,
     },
 
     CRM_LEAD_MANUAL: {
+        'msg_id': 'M02',
         'label': 'CRM business lead — composer starter',
         'description': (
             'Pre-fills the "Send from EZZY" composer on a business lead page. Staff '
@@ -85,6 +89,7 @@ Happy to answer anything on this chat.
     },
 
     CRM_DRIVER_LEAD_MANUAL: {
+        'msg_id': 'M03',
         'label': 'Driver lead — composer starter',
         'description': (
             'Pre-fills the "Send from EZZY" composer on driver lead and driver profile '
@@ -110,6 +115,7 @@ Reply here if anything is unclear.
     },
 
     PRICING_INQUIRY_MANUAL: {
+        'msg_id': 'M04',
         'label': 'Pricing inquiry — composer starter',
         'description': (
             'Pre-fills the "Send from EZZY" composer on a pricing inquiry page, for the '
@@ -135,7 +141,64 @@ Once confirmed I will share your pricing on this chat.
 *EZZY Delivery* 🚚""",
     },
 
+    CRM_WA_DRIVER_LINK: {
+        'msg_id': 'M14',
+        'label': 'WhatsApp inbox — send driver join form',
+        'description': (
+            'Sent by a staff member from the CRM WhatsApp Inbox when an unknown sender '
+            'is asking about driving work. Goes out from the same number they wrote to. '
+            'No CRM lead is created by this — the driver board card appears once they '
+            'actually submit the form.'
+        ),
+        'placeholders': 'contact_name',
+        'sender': 'fleet',
+        'kind': KIND_AUTO,
+        'section': 'driver_onboarding',
+        'toggle_owner': '',
+        'body': """Hello{if contact_name} {contact_name}{endif}, this is *EZZY Delivery* 🚚
+
+Thank you for your interest in driving with us.
+
+To be considered, please complete the driver application form here:
+https://ezzydelivery.qa/join_us/driver/
+
+Keep your QID, driving licence and vehicle papers ready — the form asks for photos of them.
+
+Our fleet team reviews every completed application and replies on this number.
+
+*EZZY Delivery Fleet Team*""",
+    },
+
+    CRM_WA_PRICING_LINK: {
+        'msg_id': 'M15',
+        'label': 'WhatsApp inbox — send pricing enquiry link',
+        'description': (
+            'Sent by a staff member from the CRM WhatsApp Inbox when an unknown sender '
+            'is asking about delivery for their shop or business. Goes out from the same '
+            'number they wrote to. No CRM lead is created by this — the lead appears once '
+            'they actually submit the enquiry.'
+        ),
+        'placeholders': 'contact_name',
+        'sender': 'default',
+        'kind': KIND_AUTO,
+        'section': 'crm_leads',
+        'toggle_owner': '',
+        'body': """Hello{if contact_name} {contact_name}{endif}, this is *EZZY Delivery* 🚚
+
+Thank you for asking about our delivery service.
+
+So we can send you accurate pricing, please fill in your requirements here:
+https://ezzydelivery.qa/3pl/pricing/
+
+It takes about two minutes — pickup area, delivery areas, order volume and whether you need Cash on Delivery.
+
+As soon as it reaches us our team will prepare your quotation and reply on this chat.
+
+*EZZY Delivery*""",
+    },
+
     ORDER_VERIFY_MANUAL: {
+        'msg_id': 'M05',
         'label': 'Order location verification — message body',
         'description': (
             'The customer address-verification message. Used by the WhatsApp composer on '
@@ -146,7 +209,8 @@ Once confirmed I will share your pricing on this chat.
         'placeholders': (
             'customer_name, order_number, client_order_code, items_line, verify_url, '
             'business_name, business_phone, seller_line, customer_phone, '
-            'customer_address, delivery_area, cod_amount, cod_line'
+            'customer_address, delivery_area, cod_amount, cod_line, '
+            'delivery_charge, delivery_charge_line, total_amount, total_line'
         ),
         'required': 'verify_url',
         'sender': 'default',
@@ -155,9 +219,10 @@ Once confirmed I will share your pricing on this chat.
         'toggle_owner': 'wa_location_verification',
         'body': """Hi {customer_name}, this is regarding your order {order_number}. Please confirm your delivery details and availability.
 
-{items_line}📌 Verify your location: {verify_url}""",
+{items_line}{total_line}📌 Verify your location: {verify_url}""",
     },
     ORDER_DELIVERY_RECOVERY: {
+        'msg_id': 'M06',
         'label': 'Delivery failed — recovery message',
         'description': (
             'Sent to the customer 10 minutes after a driver marks a delivery failed, '
@@ -181,6 +246,7 @@ Or reply with your live WhatsApp location pin.""",
     },
 
     CLIENT_INVOICE_MANUAL: {
+        'msg_id': 'M07',
         'label': 'Delivery charge invoice — composer starter',
         'description': (
             'Pre-fills the WhatsApp button on a client delivery-charge invoice, so the '
@@ -204,6 +270,7 @@ Invoice: {invoice_url}""",
     },
 
     P2P_BOOKING_CONFIRM: {
+        'msg_id': 'M08',
         'label': 'P2P booking — confirm your delivery',
         'description': (
             'Sent to whoever booked a point-to-point delivery, with what was booked and '
@@ -235,6 +302,7 @@ Tap to confirm and we will assign a driver:
     },
 
     P2P_COMMENT_OPS_ALERT: {
+        'msg_id': 'M09',
         'label': 'P2P customer comment — desk alert',
         'description': (
             'Internal. Tells the ops desk that a P2P sender replied on their order. '
@@ -253,6 +321,7 @@ Tap to confirm and we will assign a driver:
     },
 
     PRICING_INQUIRY_THANKS: {
+        'msg_id': 'M10',
         'label': '3PL quote request — thank you',
         'description': (
             'Sent automatically to the lead the moment they finish the delivery pricing '
@@ -280,6 +349,7 @@ Best regards,
     },
 
     PRICING_INQUIRY_RESUME_NUDGE: {
+        'msg_id': 'M11',
         'label': '3PL quote request — half-finished nudge',
         'description': (
             'Sent the morning after a lead started the pricing form and never finished '
@@ -309,6 +379,7 @@ If you would rather just talk it through, reply to this message and someone from
     },
 
     QUOTE_ADMIN_ALERT: {
+        'msg_id': 'M12',
         'label': '3PL quote request — desk alert',
         'description': (
             'Internal. Tells the sales desk a new pricing inquiry arrived, with the '
@@ -347,6 +418,7 @@ If you would rather just talk it through, reply to this message and someone from
     },
 
     QUOTE_AGREED_ALERT: {
+        'msg_id': 'M13',
         'label': '3PL quote — customer picked a plan',
         'description': (
             'Internal. Fires when a prospect accepts a plan on their quote page, or asks '
@@ -406,11 +478,15 @@ PLACEHOLDER_HINTS = {
     'delivery_area': 'Neighbourhood resolved from the delivery pin',
     'order_number': 'EZZY order number',
     'client_order_code': "Seller's own order reference",
-    'cod_amount': 'Amount to collect, e.g. 250.00 — blank when prepaid',
+    'cod_amount': 'Goods COD only, e.g. 250.00 — blank when prepaid',
+    'delivery_charge': 'Delivery charge, e.g. 25.00 — blank until the order is priced',
+    'total_amount': 'Everything due at the door: COD + delivery, e.g. 275.00',
     'verify_url': 'One-time link the customer taps to pin their location',
     'seller_line': 'Whole line: 🏬 Order from: <store> — blank if unknown',
     'items_line': 'Whole line: 🛒 Items: … — blank when nothing is itemised',
     'cod_line': 'Whole line: 💵 Cash on delivery: QAR … — blank when prepaid',
+    'delivery_charge_line': 'Whole line: 🚚 Delivery charge: QAR … — blank when unpriced',
+    'total_line': 'Whole line: 💵 To pay on delivery: QAR … (with the breakdown) — blank when prepaid',
     # Delivery recovery
     'reason': 'What the driver said went wrong',
     'reason_line': 'Whole line: Reason: … — blank when the driver left no note',
@@ -690,8 +766,8 @@ def apply_conditionals(body, context):
 def get_template(key):
     """Return the effective template for ``key`` as a dict.
 
-    Keys: label, description, placeholders, body, is_enabled, is_customised,
-    kind, section, toggle_owner.
+    Keys: msg_id, label, description, placeholders, body, is_enabled,
+    is_customised, kind, section, toggle_owner.
     Falls back to the code default when no staff-edited row exists.
     """
     from core.models import MessageTemplate
@@ -699,6 +775,10 @@ def get_template(key):
     default = TEMPLATE_DEFAULTS.get(key, {})
     data = {
         'key': key,
+        # Short human ID (M01…): what a staff member reads off a button and matches
+        # against a card on the Messages page. Written down per entry, never derived
+        # from position, so adding a message cannot renumber the others.
+        'msg_id': default.get('msg_id', ''),
         'label': default.get('label', key),
         'description': default.get('description', ''),
         'placeholders': default.get('placeholders', ''),
@@ -747,6 +827,21 @@ def validate_body(key, body):
 def list_templates():
     """All registered templates with their current staff overrides applied."""
     return [get_template(key) for key in TEMPLATE_DEFAULTS]
+
+
+def msg_id(key):
+    """Short ID for a template key, or '' for an unregistered one.
+
+    Cheap enough to call from a template tag on a button: it reads the shipped
+    registry only, never the database, because the ID belongs to the message
+    itself and no staff edit can change it.
+    """
+    return TEMPLATE_DEFAULTS.get(key, {}).get('msg_id', '')
+
+
+def id_index():
+    """{msg_id: key} for every registered message."""
+    return {v['msg_id']: k for k, v in TEMPLATE_DEFAULTS.items() if v.get('msg_id')}
 
 
 def get_body(key, **context):

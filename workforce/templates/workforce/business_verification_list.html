@@ -38,37 +38,10 @@ Notes: Approving posts to update_verification_status, which also activates the b
 <div class="wfnote" id="workforce_business_verification_list_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_business_verification_list_card_notes' %}" hidden></div>
 
-<!-- Search + Sort -->
-<form method="get" class="d-flex gap-2 mb-3 flex-wrap">
-    {% if current_filter and current_filter != 'all' %}
-    <input type="hidden" name="status" value="{{ current_filter }}">
-    {% endif %}
-    <input type="hidden" name="sort" value="{{ sort }}">
-    <input type="text" name="search" value="{{ search }}" class="form-control" placeholder="Search business name, email, phone...">
-    <button type="submit" class="btn btn-outline-secondary"><i class="fa-solid fa-magnifying-glass"></i></button>
-    {% if search %}
-    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}&{% endif %}sort={{ sort }}" class="btn btn-outline-danger"><i class="fa-solid fa-xmark"></i></a>
-    {% endif %}
-</form>
-<!-- Sort Pills -->
-<div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
-    <span class="text-muted small"><i class="fa-solid fa-arrow-up-wide-short"></i> Sort:</span>
-    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}&{% endif %}{% if search %}search={{ search }}&{% endif %}sort=applied"
-       class="btn btn-sm {% if sort == 'applied' or not sort %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-        Applied Date
-    </a>
-    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}&{% endif %}{% if search %}search={{ search }}&{% endif %}sort=joined_newest"
-       class="btn btn-sm {% if sort == 'joined_newest' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-        <i class="fa-solid fa-arrow-down-1-9"></i> Joined: Newest
-    </a>
-    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}&{% endif %}{% if search %}search={{ search }}&{% endif %}sort=joined_oldest"
-       class="btn btn-sm {% if sort == 'joined_oldest' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-        <i class="fa-solid fa-arrow-up-1-9"></i> Joined: Oldest
-    </a>
-</div>
-
-<!-- Filter Pills -->
-<div class="uvl__filters">
+{# The queue reads in two lines: the status buckets you triage by, then the #}
+{# bar you search and order the bucket with. #}
+<!-- Line 1 — status buckets -->
+<div class="uvl__filters uvl__filters--tight">
     <a href="?{% if search %}search={{ search }}&{% endif %}{% if sort %}sort={{ sort }}&{% endif %}status=all" class="uvl__pill {% if current_filter == 'all' %}uvl__pill--active{% endif %}">
         <i class="fa-solid fa-layer-group"></i> All
         <span class="uvl__pill__count">{{ total_count }}</span>
@@ -94,6 +67,36 @@ Notes: Approving posts to update_verification_status, which also activates the b
         <span class="uvl__pill__count">{{ status_counts.incomplete|default:"0" }}</span>
     </a>
 </div>
+
+<!-- Line 2 — search and order -->
+<form method="get" class="uvl__toolbar uvl__toolbar--lean">
+    {% if current_filter and current_filter != 'all' %}
+    <input type="hidden" name="status" value="{{ current_filter }}">
+    {% endif %}
+    <div class="uvl__search">
+        <i class="fa-solid fa-magnifying-glass uvl__search__icon"></i>
+        <input type="text" name="search" value="{{ search }}"
+               class="uvl__search__input"
+               id="workforce_verification_input_search"
+               placeholder="Search business name, email or phone…"
+               autocomplete="off">
+    </div>
+    <select name="sort" class="uvl__select" aria-label="Order the queue"
+            id="workforce_verification_select_sort">
+        {% for value, label in sort_choices %}
+        <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="uvl__btn uvl__btn--apply" title="Search this queue">
+        <i class="fa-solid fa-magnifying-glass"></i><span class="uvl__btn__label"> Search</span>
+    </button>
+    {% if search %}
+    <a href="?{% if current_filter and current_filter != 'all' %}status={{ current_filter }}&amp;{% endif %}sort={{ sort }}"
+       class="uvl__btn uvl__btn--clear" title="Clear the search">
+        <i class="fa-solid fa-xmark"></i><span class="uvl__btn__label"> Clear</span>
+    </a>
+    {% endif %}
+</form>
 
 <!-- Business Verification Cards -->
 {% if page_obj.object_list %}
@@ -532,6 +535,18 @@ on <body> outside the overlay. The combobox above is the real control.{% endcomm
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    /* ---------- SORT ---------- */
+    // The picker is the whole control, so it applies on pick — a separate Apply
+    // button beside it would be ceremony. Select2 fires `change` on the native
+    // element it hides, so this catches the enhanced picker too. Submitting the
+    // form carries whatever is already typed in the search box along with it.
+    var sortSelect = document.getElementById('workforce_verification_select_sort');
+    if (sortSelect) {
+        sortSelect.addEventListener('change', function() {
+            if (this.form) this.form.submit();
+        });
+    }
+
     /* ---------- CSRF ---------- */
     function getCookie(name) {
         let v = null;

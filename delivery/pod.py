@@ -8,7 +8,10 @@ from django.db.models import Q
 # The outcomes a client can demand evidence for. 'partial_delivery' rides on the
 # delivered rule: goods changed hands, so the same contract applies.
 DELIVERED_OUTCOMES = ('delivered', 'partial_delivery')
-FAILED_OUTCOMES = ('failed',)
+# A parcel going back is a failed handover that happens to still have the goods in
+# it, so it rides the failed rule: the same clients who want evidence of a failed
+# attempt want evidence of the box coming back, and it is always a photo.
+FAILED_OUTCOMES = ('failed', 'returned_to_shipper')
 
 PHOTO = 'photo'
 SIGNATURE = 'signature'
@@ -32,9 +35,10 @@ def requirement_for(task, outcome):
     """What this client demands before `outcome` may be written: 'photo', 'signature',
     'both', or None when nothing is required.
 
-    A failed attempt always resolves to a photo. There is no customer standing there
-    to sign for a parcel they did not take, so a signature requirement would be
-    impossible to satisfy and drivers would be stuck on the doorstep.
+    A failed attempt always resolves to a photo — and so does a parcel returned to
+    the shipper. There is no customer standing there to sign for a parcel they did
+    not take, so a signature requirement would be impossible to satisfy and drivers
+    would be stuck on the doorstep.
     """
     business = business_for(task)
     if not business:

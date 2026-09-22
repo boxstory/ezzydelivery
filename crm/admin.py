@@ -12,7 +12,12 @@ class LeadAdmin(admin.ModelAdmin):
     list_display = ('id', 'company_name', 'contact_name', 'phone', 'source',
                     'stage', 'assigned_to', 'next_followup_at', 'created_at')
     list_filter = ('stage', 'source', 'assigned_to')
-    search_fields = ('company_name', 'contact_name', 'phone')
+    search_fields = ('company_name', 'contact_name', 'phone', 'source', 'category',
+                     'product_category', 'wa_chat_override', 'wa_session', 'stage', 'notes',
+                     'ai_summary', 'whatsapp_inquiry__contact_number',
+                     'pricing_enquiry__business_name', 'assigned_to__username',
+                     'converted_business__business_name', 'merged_into__company_name',
+                     'merged_by__username')
     readonly_fields = ('created_at', 'updated_at', 'stage_changed_at', 'closed_at')
     list_per_page = 50
 
@@ -22,7 +27,8 @@ class LeadStageAdmin(admin.ModelAdmin):
     list_display = ('category', 'position', 'label', 'key', 'is_closed', 'is_fallback',
                     'write_back', 'is_active', 'is_system')
     list_filter = ('category', 'is_closed', 'is_active', 'is_system')
-    search_fields = ('key', 'label')
+    search_fields = ('label', 'crm_status', 'key', 'category', 'outcome', 'write_back',
+                     'confirm_text', 'dot_swatch')
     ordering = ('category', 'position')
     readonly_fields = ('created_at', 'updated_at')
 
@@ -31,11 +37,11 @@ class LeadStageAdmin(admin.ModelAdmin):
 class LeadActivityAdmin(admin.ModelAdmin):
     list_display = ('id', 'lead', 'activity_type', 'created_by', 'created_at')
     list_filter = ('activity_type',)
-    search_fields = ('lead__company_name', 'body')
+    search_fields = ('activity_type', 'body', 'lead__company_name', 'created_by__username')
     list_per_page = 50
 
 
 @admin.register(InboxDismissal)
 class InboxDismissalAdmin(admin.ModelAdmin):
     list_display = ('phone', 'dismissed_by', 'created_at')
-    search_fields = ('phone',)
+    search_fields = ('phone', 'dismissed_by__username')

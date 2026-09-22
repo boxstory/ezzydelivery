@@ -194,6 +194,10 @@
           width: '100%',
           minimumResultsForSearch: SEARCH_FROM,
           placeholder: $el.data('placeholder') || undefined,
+          // A multi-select is a checklist: closing it after the first tick made
+          // picking three stages three trips through the bar. Single pickers keep
+          // Select2's default, where closing IS the answer.
+          closeOnSelect: !el.multiple,
           dropdownParent: $modal.length ? $modal : undefined
         });
 
@@ -203,6 +207,14 @@
         var inst = $el.data('select2');
         if (inst && inst.$container) inst.$container.addClass('ez-filter-select');
         if (inst && inst.$dropdown) inst.$dropdown.addClass('ez-filter-select__menu');
+        // The dropdown is parented to <body>, so a stylesheet cannot tell a
+        // checklist's menu from a one-of-many one — Select2 marks the current
+        // value of a single select as "selected" too, and drawing a ticked box
+        // beside it would read as a checkbox that cannot be unticked. The class
+        // is the only honest signal, and it has to be set here.
+        if (inst && inst.$dropdown && el.multiple) {
+          inst.$dropdown.addClass('ez-filter-select__menu--multi');
+        }
 
         // The dropdown is parented to <body>, so CSS cannot see which bar it
         // came from — and the bars are not one height (28px on the console
@@ -227,13 +239,59 @@
           $el.on('select2:close', function () { $pickerBody.removeClass('picker-modal__body--open'); });
         }
 
+        // A facet that names itself shows a summary instead of tags once it holds
+        // a pick: a console filter row is six tracks wide, and three tags in one
+        // of them collapse to "Ap…" "Up…" "Un…", which says nothing. One pick
+        // shows its own label; several show the count. The text rides on the
+        // selection element as an attribute because Select2 rebuilds the tag list
+        // on every change, and CSS draws it with content: attr().
+        if (el.multiple && $el.is('[data-facet-label]')) {
+          var plural = $el.data('facet-plural') || ($el.data('facet-label') + 's');
+          var syncSummary = function () {
+            // .$container, not .$selection: the Select2 instance holds the
+            // container and hands the selection element to its adapter, so the
+            // shorter-looking path is undefined and the summary never appears.
+            var node = inst && inst.$container ? inst.$container.find('.select2-selection')[0] : null;
+            if (!node) return;
+            var chosen = $el.val() || [];
+            if (!chosen.length) node.removeAttribute('data-facet-summary');
+            else if (chosen.length === 1) {
+              var opt = el.querySelector('option[value="' + CSS.escape(chosen[0]) + '"]');
+              node.setAttribute('data-facet-summary', opt ? opt.textContent.trim() : chosen[0]);
+            } else {
+              node.setAttribute('data-facet-summary', chosen.length + ' ' + plural);
+            }
+          };
+          syncSummary();
+          $el.on('change', syncSummary);
+        }
+
+        // A multi-select on a bar with no Apply button cannot submit per pick:
+        // the page would reload after the first driver and throw the rest of
+        // the selection away. `data-submit-on-close` waits for the dropdown to
+        // be dismissed and submits once, and only if the pick actually moved.
+        if (el.multiple && $el.is('[data-submit-on-close]')) {
+          var openedWith = null;
+          var picked = function () { return ($el.val() || []).join(','); };
+          $el.on('select2:open', function () { openedWith = picked(); });
+          $el.on('select2:close', function () {
+            var before = openedWith;
+            openedWith = null;
+            if (before !== null && picked() !== before && el.form) el.form.submit();
+          });
+          return;
+        }
+
         // Bridge Select2 -> native change. Select2 announces a pick with
         // jQuery's .trigger('change'), which only runs jQuery-bound handlers;
         // it never dispatches a real DOM event. HTMX (hx-get on the select)
         // and inline onchange="this.form.submit()" both listen natively, so
         // without this the control looks like it works — the value updates —
         // while the filter never actually runs.
-        $el.on('select2:select select2:clear', function () {
+        // select2:unselect rides along for the checklists — unticking a box is a
+        // filter change exactly as much as ticking one is, and without it an HTMX
+        // bar kept showing results for a facet the staffer had just cleared.
+        $el.on('select2:select select2:unselect select2:clear', function () {
           el.dispatchEvent(new Event('change', { bubbles: true }));
         });
       });

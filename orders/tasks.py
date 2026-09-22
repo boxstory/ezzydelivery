@@ -151,8 +151,20 @@ def _convert_excel_date(value):
 def sync_all_temp_orders(self, source_type=None, source_id=None):
     """Sync rows from all external sources into TempOrder table.
 
+    'webhook' sellers PUSH their orders to us (ezzy_api.views.webhook_import), so
+    their TempOrder rows are written the moment the checkout happens and there is
+    nothing for this task to fetch — asking for one by name returns a note rather
+    than a silent zero, which used to read as "the sync is broken for this seller".
+
+    'custom_api' is either: a seller whose site POSTs to store_api.
+    store_create_order (push, nothing to fetch), or one whose integration has a
+    fetch URL filled in, in which case we call THEIR endpoint and pull. One
+    seller can be both; the idempotency check in stage_order_payload is what
+    keeps a pushed order from being staged twice when the pull sees it again.
+
     Args:
-        source_type: 'onedrive', 'google_sheet', 'shopify', 'woocommerce' or None for all.
+        source_type: 'onedrive', 'google_sheet', 'shopify', 'woocommerce',
+            'public_link', 'custom_api', or None for all.
         source_id: specific OneDriveSource.id or BusinessApiSettings.id
     """
     from django.utils import timezone
@@ -160,6 +172,23 @@ def sync_all_temp_orders(self, source_type=None, source_id=None):
     total_created = 0
     total_updated = 0
     errors = []
+    notes = []
+
+    # --- Push sources (nothing to pull) ---
+    if source_type == 'webhook':
+        notes.append(
+            'Webhook sellers push orders to EzzyDelivery as they are placed — '
+            'their rows are already in this list and there is nothing to fetch.'
+        )
+
+    # --- Custom REST pull (the seller's own site, fetched by us) ---
+    if source_type in (None, 'custom_api'):
+        c, u, e, n = _sync_all_custom_pull(source_id if source_type == 'custom_api' else None,
+                                           named=source_type == 'custom_api')
+        total_created += c
+        total_updated += u
+        errors.extend(e)
+        notes.extend(n)
 
     # --- OneDrive ---
     if source_type in (None, 'onedrive'):
@@ -195,6 +224,7 @@ def sync_all_temp_orders(self, source_type=None, source_id=None):
         'created': total_created,
         'updated': total_updated,
         'errors': errors,
+        'notes': notes,
         'synced_at': timezone.now().isoformat(),
     }
     logger.info("Temp orders sync complete: %s", result)
@@ -1002,6 +1032,123 @@ def _sync_api_source(api_settings):
     _stamp_source_sync(api_settings, len(seen_pids))
 
     return created, updated
+
+
+# =============================================================================
+# Custom REST pull — we fetch orders FROM the seller's own site
+# =============================================================================
+
+def _sync_all_custom_pull(api_settings_id=None, named=False):
+    """Pull every custom integration that has a fetch URL configured.
+
+    Returns (created, updated, errors, notes). ``named`` means staff asked for
+    this source by name, so a push-only seller gets told why nothing was
+    fetched instead of reading a silent zero as a broken sync.
+    """
+    from business.models import BusinessApiSettings
+    from ezzy_api.store_pull import is_pull_source
+
+    qs = BusinessApiSettings.objects.filter(api_type='custom').select_related('business')
+    if api_settings_id:
+        qs = qs.filter(id=api_settings_id)
+    else:
+        # Bulk cron run: only sources staff switched on, and never a suspended
+        # seller — pulling orders for an account that may not trade would stage
+        # rows that the import step then refuses one by one.
+        qs = qs.filter(fetch_enabled=True).exclude(
+            business__business_status__in=SUSPENDED_STATUSES)
+
+    total_c, total_u, errors, notes = 0, 0, [], []
+    push_only = 0
+
+    for api_settings in qs:
+        if not is_pull_source(api_settings):
+            push_only += 1
+            continue
+        try:
+            c, u = _sync_custom_pull_source(api_settings)
+            total_c += c
+            total_u += u
+        except Exception as exc:
+            logger.warning("Custom pull error for %s: %s", api_settings.business, exc, exc_info=True)
+            errors.append(f"custom api {api_settings.business.business_name}: {exc}")
+
+    if named and push_only and not total_c and not total_u and not errors:
+        notes.append(
+            'This seller pushes orders to EzzyDelivery as they are placed — their rows '
+            'are already in this list. Add a fetch URL on the integration to pull instead.'
+        )
+    return total_c, total_u, errors, notes
+
+
+def _sync_custom_pull_source(api_settings):
+    """Fetch the seller's orders and stage each one as a TempOrder.
+
+    Staging goes through ezzy_api.store_api.stage_order_payload — the exact
+    function the push endpoint uses — so a pulled order and a pushed one produce
+    the same row, honour the same saved mapping, and hit the same idempotency
+    check. That check is what makes this safe to run hourly against an endpoint
+    that keeps returning the same open orders.
+    """
+    if is_business_suspended(api_settings.business):
+        raise RuntimeError(SUSPENSION_MESSAGE)
+
+    from ezzy_api.store_api import stage_order_payload, _store_mapping
+    from ezzy_api.store_pull import fetch_orders
+
+    business = api_settings.business
+    payloads, meta = fetch_orders(api_settings)
+
+    if not payloads:
+        # Fetch succeeded, the store just had nothing waiting — still a real sync.
+        _stamp_source_sync(api_settings, 0)
+        return 0, 0
+
+    # This row's OWN mapping wins. A seller can run both directions at once, and
+    # the two payloads need not match — Gooey's push carries items[] and totals
+    # while their lookup endpoint returns address fields only — so reading the
+    # business-wide mapping here would judge pulled orders by the push's rules.
+    # Fall back to the business lookup only when this row has none of its own.
+    mapping = api_settings.column_mapping
+    if not isinstance(mapping, dict) or not mapping:
+        mapping = _store_mapping(business)
+
+    created, skipped, refused, failed = 0, 0, 0, []
+    for payload in payloads:
+        result = stage_order_payload(business, payload, mapping=mapping, api_settings=api_settings)
+        state = result['status']
+        if state == 'created':
+            created += 1
+        elif state in ('duplicate_order', 'duplicate_staged'):
+            skipped += 1
+        elif state == 'refused':
+            refused += 1
+            break  # same answer for every remaining order — stop asking
+        else:
+            failed.append(f"{result.get('code') or '?'}: {result['error']}")
+
+    _stamp_source_sync(api_settings, meta.get('count', len(payloads)))
+    _enforce_temp_order_limit({'source_type': 'custom_api', 'api_settings': api_settings})
+
+    logger.info('Custom pull for %s: fetched=%s created=%s duplicate=%s rejected=%s',
+                business.business_name, len(payloads), created, skipped, len(failed))
+
+    if refused:
+        raise RuntimeError(SUSPENSION_MESSAGE)
+    if failed and not created:
+        # Every order was unusable — that is a mapping problem staff must see,
+        # not a quiet zero.
+        raise RuntimeError(
+            f'{len(failed)} order(s) fetched but none could be staged. '
+            f'First: {failed[0]}'
+        )
+    if failed:
+        logger.warning('Custom pull for %s rejected %s of %s orders: %s',
+                       business.business_name, len(failed), len(payloads), failed[:3])
+
+    # Pulled orders are never "updated": a staged row staff may have edited must
+    # not be silently overwritten by the next fetch of the same order.
+    return created, 0
 
 
 def _business_mapping(api_settings, platform=None):

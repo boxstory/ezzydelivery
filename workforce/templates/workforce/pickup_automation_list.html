@@ -3,7 +3,8 @@
 {% comment %}
 Purpose: Staff config — per-business first-mile pickup automation (enabled, pool mode, disposition)
 Used by: workforce_views.pickup_automation_list at /workforce/pickup-automation/
-Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are audit-logged.
+Notes: Rows are edited in place; the floating save bar at the bottom appears only once a
+       rule actually changed and saves each edited row separately (audit-logged per business).
        The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
        help button toggles it via the delegated handler in workforce.js.
 {% endcomment %}
@@ -50,7 +51,6 @@ Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are au
                     <th class="pau__th">Pool mode</th>
                     <th class="pau__th">After collection</th>
                     <th class="pau__th">Fleet drivers</th>
-                    <th class="pau__th text-end">Save</th>
                 </tr>
             </thead>
             <tbody>
@@ -88,12 +88,9 @@ Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are au
                         </div>
                         <span class="pau__fleet-names pa-fleet-names">{% for dd in biz.active_fleet %}{{ dd.driver }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
                     </td>
-                    <td class="pau__td text-end">
-                        <button type="button" class="btn btn-sm pau__save pa-save">Save</button>
-                    </td>
                 </tr>
                 <tr class="pa-fleet-row" data-business-id="{{ biz.business_id }}" hidden>
-                    <td colspan="6" class="pau__td p-0">
+                    <td colspan="5" class="pau__td p-0">
                         <div class="pau__panel">
                             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                                 <span class="pau__panel-title me-2">Pickup-allowed drivers — {{ biz.business_name|default:biz.business_code }}</span>
@@ -108,12 +105,23 @@ Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are au
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="pau__td text-center text-muted py-4">No active businesses found.</td></tr>
+                <tr><td colspan="5" class="pau__td text-center text-muted py-4">No active businesses found.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
     {% include "includes/components/_pagination.html" with page_obj=businesses_page per_page=per_page pagination_id="pickup_automation" %}
+
+    <div class="pau__savebar" id="workforce_pickup_automation_bar_save" role="region" aria-label="Unsaved pickup rules">
+        <span class="pau__savebar-count" aria-live="polite">
+            <strong class="pa-dirty-count">0</strong> <span class="pa-dirty-word">rules</span> changed
+        </span>
+        <span class="pau__savebar-msg pa-save-msg"></span>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+            <button type="button" class="pau__savebar-discard pa-discard">Discard</button>
+            <button type="button" class="pau__savebar-save pa-save-all">Save changes</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -121,37 +129,110 @@ Notes: Per-row save (avoids the unchecked-checkbox bulk footgun); changes are au
     'use strict';
     const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    // Dim the routing cells while a business's auto-pickup rule is off
-    document.querySelectorAll('#workforce_pickup_automation_table_view .pa-enabled').forEach(cb => {
-        cb.addEventListener('change', () =>
-            cb.closest('tr').classList.toggle('pau__row--off', !cb.checked));
-    });
+    // ---- Dirty tracking: the save bar only exists once a rule actually changed ----
 
-    document.querySelectorAll('#workforce_pickup_automation_table_view .pa-save').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const row = btn.closest('tr');
-            const form = new FormData();
-            form.append('csrfmiddlewaretoken', csrf);
-            form.append('business_id', row.dataset.businessId);
-            form.append('enabled', row.querySelector('.pa-enabled').checked ? '1' : '0');
-            form.append('mode', row.querySelector('.pa-mode').value);
-            form.append('disposition', row.querySelector('.pa-disposition').value);
-            btn.disabled = true;
-            fetch("{% url 'workforce:pickup_automation_save' %}", { method: 'POST', body: form })
-                .then(r => r.json())
-                .then(res => {
-                    btn.disabled = false;
-                    btn.classList.toggle('pau__save--done', res.success);
-                    btn.classList.toggle('pau__save--fail', !res.success);
-                    btn.textContent = res.success ? 'Saved' : (res.error || 'Failed');
-                    if (res.success) setTimeout(() => {
-                        btn.classList.remove('pau__save--done');
-                        btn.textContent = 'Save';
-                    }, 1600);
-                })
-                .catch(() => { btn.disabled = false; btn.classList.add('pau__save--fail'); btn.textContent = 'Failed'; });
+    const rows = Array.from(document.querySelectorAll('#workforce_pickup_automation_table_view .pau__row'));
+    const bar = document.getElementById('workforce_pickup_automation_bar_save');
+    const barCount = bar.querySelector('.pa-dirty-count');
+    const barMsg = bar.querySelector('.pa-save-msg');
+    const barSave = bar.querySelector('.pa-save-all');
+
+    function rowState(row) {
+        return {
+            enabled: row.querySelector('.pa-enabled').checked ? '1' : '0',
+            mode: row.querySelector('.pa-mode').value,
+            disposition: row.querySelector('.pa-disposition').value,
+        };
+    }
+
+    function baseline(row) {
+        const s = rowState(row);
+        row.dataset.baseEnabled = s.enabled;
+        row.dataset.baseMode = s.mode;
+        row.dataset.baseDisposition = s.disposition;
+    }
+
+    function isDirty(row) {
+        const s = rowState(row);
+        return s.enabled !== row.dataset.baseEnabled ||
+               s.mode !== row.dataset.baseMode ||
+               s.disposition !== row.dataset.baseDisposition;
+    }
+
+    function refreshBar() {
+        let dirty = 0;
+        rows.forEach(row => {
+            const d = isDirty(row);
+            row.classList.toggle('pau__row--dirty', d);
+            if (d) dirty += 1;
+        });
+        barCount.textContent = dirty;
+        bar.querySelector('.pa-dirty-word').textContent = dirty === 1 ? 'rule' : 'rules';
+        bar.classList.toggle('pau__savebar--visible', dirty > 0);
+        bar.parentElement.classList.toggle('pau__page--barpad', dirty > 0);
+        if (dirty > 0) barMsg.textContent = '';
+        return dirty;
+    }
+
+    rows.forEach(row => {
+        baseline(row);
+        row.querySelectorAll('.pa-enabled, .pa-mode, .pa-disposition').forEach(field => {
+            field.addEventListener('change', () => {
+                // Dim the routing cells while a business's auto-pickup rule is off
+                row.classList.toggle('pau__row--off', !row.querySelector('.pa-enabled').checked);
+                refreshBar();
+            });
         });
     });
+
+    function saveRow(row) {
+        const s = rowState(row);
+        const form = new FormData();
+        form.append('csrfmiddlewaretoken', csrf);
+        form.append('business_id', row.dataset.businessId);
+        form.append('enabled', s.enabled);
+        form.append('mode', s.mode);
+        form.append('disposition', s.disposition);
+        return fetch("{% url 'workforce:pickup_automation_save' %}", { method: 'POST', body: form })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) baseline(row);
+                return res;
+            })
+            .catch(() => ({ success: false, error: 'Network error' }));
+    }
+
+    barSave.addEventListener('click', () => {
+        const dirtyRows = rows.filter(isDirty);
+        if (!dirtyRows.length) return;
+        barSave.disabled = true;
+        barSave.textContent = 'Saving…';
+        barMsg.textContent = '';
+        Promise.all(dirtyRows.map(saveRow)).then(results => {
+            barSave.disabled = false;
+            barSave.textContent = 'Save changes';
+            const failed = results.filter(r => !r.success);
+            refreshBar();
+            if (failed.length) {
+                barMsg.classList.add('pau__savebar-msg--fail');
+                barMsg.textContent = failed.length + ' failed — ' + (failed[0].error || 'try again');
+            } else {
+                // Hold the bar open for a beat so the confirmation is actually seen
+                barMsg.classList.remove('pau__savebar-msg--fail');
+                barMsg.textContent = 'Saved';
+                bar.classList.add('pau__savebar--visible');
+                setTimeout(() => { barMsg.textContent = ''; refreshBar(); }, 1500);
+            }
+        });
+    });
+
+    bar.querySelector('.pa-discard').addEventListener('click', () => location.reload());
+
+    window.addEventListener('beforeunload', e => {
+        if (rows.some(isDirty)) { e.preventDefault(); e.returnValue = ''; }
+    });
+
+    refreshBar();
 
     // ---- Per-business pickup fleet management (list / add / toggle / remove) ----
 

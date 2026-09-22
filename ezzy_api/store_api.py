@@ -1,6 +1,7 @@
 # Purpose: REST endpoints a seller's own website posts orders into (custom storefronts, no Shopify/Woo plugin).
 # Used by: ezzy_api/urls.py — /api/v1/store/ping|orders/ ; authenticated by ClientApiKey (Bearer / X-API-Key).
-# Notes: Tenant is ALWAYS the key's own business, never a body field. Idempotent on
+# Notes: stage_order_payload() is shared by the push endpoint AND the pull sync, so one
+#        payload means one thing. Tenant is ALWAYS the key's own business, never a body field. Idempotent on
 #        (business, client_order_code) so a storefront retry cannot double-create an order.
 
 import logging
@@ -19,7 +20,6 @@ from ezzy_api.json_paths import path_get
 from ezzy_api.models import ClientApiKey
 from ezzy_api.permissions import ApiKeyScopePermission
 from orders import models as orders_models
-from product import models as product_models
 
 logger = logging.getLogger('ezzy_api')
 
@@ -64,6 +64,22 @@ def _store_mapping(business):
     )
     mapping = getattr(api, 'column_mapping', None)
     return mapping if isinstance(mapping, dict) else {}
+
+
+def _store_api_settings(business):
+    """The seller's custom-API source row, or None.
+
+    Staged rows hang off this FK the way a Shopify row hangs off its own
+    settings: the Temp Orders page hides any row whose source FK is missing, so
+    a seller with no custom source configured would post orders into a list
+    that never shows them.
+    """
+    return (
+        business_models.BusinessApiSettings.objects
+        .filter(business=business, api_type='custom')
+        .order_by('-is_default', 'id')
+        .first()
+    )
 
 
 def _apply_mapping(payload, mapping):
@@ -183,13 +199,29 @@ def _normalize_phone(raw):
 
 
 def _compose_address(cust):
-    """One human address line out of the storefront's separate address fields."""
+    """One human address line out of the storefront's separate address fields.
+
+    A Qatar address is Zone / Street / Building, and storefronts send those as
+    bare numbers. An unlabelled number is not an address — "House 4, 911, Al
+    Wakrah" gives a driver nothing — so a purely numeric street or zone is
+    labelled. A street sent as a name ("Al Wahat Street") is already self
+    describing and is left exactly as it was.
+    """
     parts = []
     building = str(cust.get('buildingNumber') or cust.get('building') or '').strip()
     btype = str(cust.get('buildingType') or '').strip()
     if building:
         parts.append(f"{btype or 'Building'} {building}".strip())
-    for key in ('street', 'address', 'address1', 'block', 'area', 'zone_name', 'city'):
+
+    street = str(cust.get('street') or '').strip()
+    if street:
+        parts.append(f'Street {street}' if street.isdigit() else street)
+
+    zone = str(cust.get('zone') or cust.get('zoneNumber') or '').strip()
+    if zone and zone.isdigit():
+        parts.append(f'Zone {zone}')
+
+    for key in ('address', 'address1', 'block', 'area', 'zone_name', 'city'):
         val = str(cust.get(key) or '').strip()
         if val and val not in parts:
             parts.append(val)
@@ -208,24 +240,17 @@ def _is_cod(payload):
     return False
 
 
-def _match_product(business, name, sku):
-    """Link the line to the seller's catalogue when it is unambiguous.
+def _digits(value):
+    """Zone / street / building as the digits-only string TempOrder stores.
 
-    Exact SKU / barcode / name only — a fuzzy guess here would silently move
-    stock for the wrong product, and an unlinked line still delivers fine.
+    Those columns are CharFields on TempOrder and integers on Order; the import
+    step does the int() conversion, so anything non-numeric ("Apartment") is
+    dropped here rather than failing the import later.
     """
-    qs = product_models.Product.objects.filter(business=business)
-    for lookup in (
-        {'item_sku__iexact': sku} if sku else None,
-        {'barcode__iexact': sku} if sku else None,
-        {'item_name__iexact': name} if name else None,
-    ):
-        if not lookup:
-            continue
-        found = qs.filter(**lookup).first()
-        if found:
-            return found
-    return None
+    if value in (None, ''):
+        return ''
+    text = ''.join(ch for ch in str(value) if ch.isdigit())
+    return text
 
 
 def _parse_date(value):
@@ -245,6 +270,29 @@ def _parse_date(value):
     if timezone.is_aware(parsed):
         parsed = timezone.localtime(parsed)
     return parsed.date()
+
+
+def _staged_state(temp):
+    """Status snapshot for an order that is still waiting in Temp Orders.
+
+    Same keys as `_order_state` so a storefront reads one shape throughout:
+    order_number stays null until staff import the row, at which point the
+    status endpoint starts answering from the real Order instead.
+    """
+    return {
+        'order_number': None,
+        'client_order_code': temp.client_order_code,
+        'order_status': 'received',
+        'order_status_label': 'Received — awaiting review',
+        'cod_amount': temp.cod_amount or '0',
+        'cod_status': 'online_paid' if (temp.financial_status or '').lower() == 'paid' else 'unpaid',
+        'delivery_status': '',
+        'delivery_status_label': '',
+        'driver_name': '',
+        'tracking_url': '',
+        'delivered_at': None,
+        'created_at': temp.created_at.isoformat() if temp.created_at else None,
+    }
 
 
 def _order_state(order):
@@ -345,35 +393,35 @@ def store_ping(request):
         'server_time': timezone.now().isoformat(),
     })
 
+def stage_order_payload(business, payload, mapping=None, api_settings=None):
+    """Turn one storefront order payload into a staged TempOrder.
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated, ApiKeyScopePermission])
-def store_create_order(request):
-    """Create one delivery order from a storefront checkout.
+    The single place a custom-storefront order becomes a row, shared by both
+    legs: the push endpoint below, and the pull sync that fetches the same JSON
+    off the seller's own site (orders.tasks._sync_custom_pull_source). The
+    payload shape and the saved mapping are identical either way — whoever
+    moved the bytes does not change what the order means — so these must never
+    become two copies that drift apart.
 
-    Accepts the storefront's own camelCase shape (orderNumber / customer{} /
-    items[]) as well as our snake_case field names. The order lands in
-    'to_review' like every other imported order — staff confirm it before it
-    becomes a delivery task.
+    Returns exactly one of:
+        {'status': 'created',          'temp': TempOrder, 'code': str}
+        {'status': 'duplicate_order',  'order': Order,    'code': str}
+        {'status': 'duplicate_staged', 'temp': TempOrder, 'code': str}
+        {'status': 'refused', 'error': str, 'refusal': str}   -- seller may not trade
+        {'status': 'error',   'error': str, 'http': int}      -- payload is unusable
     """
-    business = _resolve_business(request)
-    if not business:
-        return Response({'success': False, 'error': 'No business is associated with this key'},
-                        status=status.HTTP_403_FORBIDDEN)
-
     refusal = write_refusal_code(business)
     if refusal:
-        return Response({'success': False, 'error': REFUSAL_MESSAGES[refusal], 'code': refusal},
-                        status=status.HTTP_403_FORBIDDEN)
+        return {'status': 'refused', 'error': REFUSAL_MESSAGES[refusal], 'refusal': refusal}
 
-    payload = request.data
     if not isinstance(payload, dict):
-        return Response({'success': False, 'error': 'Body must be a single JSON order object'},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return {'status': 'error', 'error': 'Body must be a single JSON order object',
+                'http': status.HTTP_400_BAD_REQUEST}
 
     # A saved mapping wins wherever staff set one; the built-in guesses below
     # fill everything they left unmapped.
-    mapping = _store_mapping(business)
+    if mapping is None:
+        mapping = _store_mapping(business)
     mapped = _apply_mapping(payload, mapping) if mapping else {}
 
     code = str(
@@ -385,8 +433,8 @@ def store_create_order(request):
         or ''
     ).strip()
     if not code:
-        return Response({'success': False, 'error': 'orderNumber is required'},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return {'status': 'error', 'error': 'orderNumber is required',
+                'http': status.HTTP_400_BAD_REQUEST}
 
     cust = payload.get('customer')
     if not isinstance(cust, dict):
@@ -397,11 +445,11 @@ def store_create_order(request):
         mapped.get('customer_phone') or cust.get('phone') or payload.get('customer_phone')
     )
     if not name:
-        return Response({'success': False, 'error': 'customer.name is required'},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return {'status': 'error', 'error': 'customer.name is required', 'code': code,
+                'http': status.HTTP_400_BAD_REQUEST}
     if len(phone) < 7:
-        return Response({'success': False, 'error': 'customer.phone must be a valid Qatar mobile number'},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return {'status': 'error', 'error': 'customer.phone must be a valid Qatar mobile number',
+                'code': code, 'http': status.HTTP_400_BAD_REQUEST}
 
     address = str(mapped.get('customer_address') or '').strip()
     if not address:
@@ -410,19 +458,24 @@ def store_create_order(request):
     if landmark and landmark not in address:
         address = f'{address}, {landmark}'.strip(', ')
     if not address:
-        return Response({'success': False, 'error': 'customer address (area/street/building) is required'},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return {'status': 'error', 'error': 'customer address (area/street/building) is required',
+                'code': code, 'http': status.HTTP_400_BAD_REQUEST}
 
     # Idempotency: a storefront that retries a timed-out POST must not create a
-    # second delivery for the same checkout.
+    # second delivery for the same checkout, and a pull re-reading the seller's
+    # open-orders list must not re-stage every order on every run. Two places to
+    # look — the row may still be staged, or staff may already have imported it.
     existing = orders_models.Order.objects.filter(
         business=business, client_order_code=code,
     ).order_by('-id').first()
     if existing:
-        body = _order_state(existing)
-        body.update({'success': True, 'duplicate': True,
-                     'message': 'Order already received'})
-        return Response(body, status=status.HTTP_200_OK)
+        return {'status': 'duplicate_order', 'order': existing, 'code': code}
+
+    staged = orders_models.TempOrder.objects.filter(
+        business=business, source_type='custom_api', client_order_code=code,
+    ).order_by('-id').first()
+    if staged:
+        return {'status': 'duplicate_staged', 'temp': staged, 'code': code}
 
     items = _mapped_lines(payload, mapping) if mapping else []
     if not items:
@@ -446,86 +499,124 @@ def store_create_order(request):
     else:
         is_cod = _is_cod(payload)
 
-    desc_parts, qty_total = [], 0
+    desc_parts, basket, qty_total = [], [], 0
     for it in items:
         item_name = str(it.get('name') or it.get('title') or it.get('product_name') or '').strip()
         qty = _int_or_none(it.get('qty') if it.get('qty') is not None else it.get('quantity')) or 1
         qty_total += qty
         if item_name:
             desc_parts.append(f'{item_name} x{qty}')
+            basket.append((item_name, qty))
     package_desc = (
         str(mapped.get('package_desc') or '').strip()
         or ', '.join(desc_parts)
         or str(payload.get('package_description') or '').strip()
     )
-    if 'package_qty' in mapped:
-        qty_total = _int_or_none(mapped['package_qty']) or qty_total
-
     notes = str(
         mapped.get('seller_notes')
         or cust.get('notes') or payload.get('notes') or payload.get('order_notes') or ''
     ).strip()
 
-    try:
-        with transaction.atomic():
-            order = orders_models.Order.objects.create(
-                business=business,
-                client_order_code=_fit(orders_models.Order, 'client_order_code', code),
-                customer_name=_fit(orders_models.Order, 'customer_name', name),
-                customer_phone=_fit(orders_models.Order, 'customer_phone', phone),
-                customer_whatsapp=_fit(
-                    orders_models.Order, 'customer_whatsapp',
-                    _normalize_phone(mapped.get('customer_whatsapp') or cust.get('whatsapp')) or phone),
-                customer_address=_fit(orders_models.Order, 'customer_address', address),
-                dl_zone=_int_or_none(mapped.get('dl_zone') or cust.get('zone') or cust.get('zoneNumber')),
-                dl_street=_int_or_none(mapped.get('dl_street') or cust.get('streetNumber') or cust.get('street_no')),
-                dl_building=_int_or_none(
-                    mapped.get('dl_building') or cust.get('buildingNumber') or cust.get('building')),
-                order_notes=_fit(orders_models.Order, 'order_notes', notes),
-                package_description=_fit(orders_models.Order, 'package_description', package_desc),
-                package_qty=qty_total,
-                cod_amount=total if is_cod else Decimal('0'),
-                cod_status_by_client='unpaid' if is_cod else 'online_paid',
-                dl_amount=_decimal(
-                    mapped.get('dl_amount') or payload.get('deliveryFee') or payload.get('delivery_fee')),
-                order_status='to_review',
-                platform='api',
-                platform_id=_fit(orders_models.Order, 'platform_id', mapped.get('platform_id') or code),
-                original_order_data=payload,
-            )
-
-            for it in items:
-                item_name = str(it.get('name') or it.get('title') or it.get('product_name') or '').strip()
-                if not item_name:
-                    continue
-                sku = str(it.get('sku') or it.get('id') or '').strip()
-                qty = _int_or_none(it.get('qty') if it.get('qty') is not None else it.get('quantity')) or 1
-                unit = _decimal(it.get('price') if it.get('price') is not None else it.get('unit_price'), None)
-                if unit is None:
-                    line = _decimal(it.get('lineTotal') or it.get('total'))
-                    unit = (line / qty) if qty else line
-                orders_models.OrderItem.objects.create(
-                    order=order,
-                    product=_match_product(business, item_name, sku),
-                    quantity=qty,
-                    unit_price=unit,
-                    notes=_fit(orders_models.OrderItem, 'notes', item_name),
-                )
-    except Exception as exc:
-        logger.exception('Store order create failed for business %s (code %s): %s',
-                         business.business_id, code, exc)
-        return Response({'success': False, 'error': 'Could not create the order. Please retry.'},
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    # order_date is auto_now_add; the storefront's own timestamp is kept in
-    # original_order_data, and backdates the record only when it is a real date.
+    # The seller's own checkout timestamp, kept as text like every other staged
+    # source; the import step parses it into Order.order_date.
     ordered_on = _parse_date(
         mapped.get('order_date') or payload.get('createdAt') or payload.get('created_at'))
-    if ordered_on and ordered_on != order.order_date:
-        orders_models.Order.objects.filter(pk=order.pk).update(order_date=ordered_on)
-        order.order_date = ordered_on
 
-    body = _order_state(order)
+    # 'paid' is the word both import paths read to set cod_status_by_client =
+    # 'online_paid' (workforce.views.temp_orders_transfer / _auto_import). Get
+    # this wrong and a prepaid ApplePay checkout is imported as a COD delivery
+    # and the driver asks the customer to pay a second time.
+    financial_status = 'pending' if is_cod else 'paid'
+
+    staged_row = dict(payload)
+    for idx, (item_name, qty) in enumerate(basket[:MAX_MAPPED_LINES], 1):
+        staged_row.setdefault(f'product_{idx}', item_name)
+        staged_row.setdefault(f'count_{idx}', qty)
+    if qty_total:
+        staged_row.setdefault('package_qty', qty_total)
+    if notes:
+        staged_row.setdefault('seller_notes', notes)
+
+    if api_settings is None:
+        api_settings = _store_api_settings(business)
+
+    _TO = orders_models.TempOrder
+    try:
+        with transaction.atomic():
+            temp = _TO.objects.create(
+                business=business,
+                source_type='custom_api',
+                api_settings=api_settings,
+                platform_id=_fit(_TO, 'platform_id', mapped.get('platform_id') or code),
+                client_order_code=_fit(_TO, 'client_order_code', code),
+                customer_name=_fit(_TO, 'customer_name', name),
+                customer_phone=_fit(_TO, 'customer_phone', phone),
+                customer_address=_fit(_TO, 'customer_address', address),
+                dl_zone=_fit(_TO, 'dl_zone', _digits(
+                    mapped.get('dl_zone') or cust.get('zone') or cust.get('zoneNumber'))),
+                dl_street=_fit(_TO, 'dl_street', _digits(
+                    mapped.get('dl_street') or cust.get('streetNumber') or cust.get('street_no'))),
+                dl_building=_fit(_TO, 'dl_building', _digits(
+                    mapped.get('dl_building') or cust.get('buildingNumber') or cust.get('building'))),
+                cod_amount=_fit(_TO, 'cod_amount', str(total) if is_cod else '0'),
+                order_date=_fit(_TO, 'order_date', ordered_on.isoformat() if ordered_on else ''),
+                package_desc=_fit(_TO, 'package_desc', package_desc),
+                financial_status=_fit(_TO, 'financial_status', financial_status),
+                # The whole checkout, so staff can read anything the mapping
+                # did not pick up, plus the product_N / count_N pairs the import
+                # step reads to rebuild the basket into OrderItems. Without
+                # those the line quantities are lost whenever a seller maps
+                # package_desc to bare item names (gooey maps items[].name, so
+                # "S'more x2" would import as "S'more", qty 1, no order items).
+                raw_row=staged_row,
+                status='new',
+            )
+    except Exception as exc:
+        logger.exception('Store order staging failed for business %s (code %s): %s',
+                         business.business_id, code, exc)
+        return {'status': 'error', 'error': 'Could not receive the order. Please retry.',
+                'code': code, 'http': status.HTTP_500_INTERNAL_SERVER_ERROR}
+
+    logger.info('Store order staged: business=%s code=%s temp_order=%s items=%s cod=%s',
+                business.business_id, code, temp.pk, len(items), is_cod)
+    return {'status': 'created', 'temp': temp, 'code': code}
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
+def store_create_order(request):
+    """Stage one delivery order from a storefront checkout.
+
+    Accepts the storefront's own camelCase shape (orderNumber / customer{} /
+    items[]) as well as our snake_case field names. The checkout lands in the
+    staff Temp Orders list as a TempOrder(source_type='custom_api'), the same
+    queue OneDrive, Google Sheet and webhook sellers arrive in; staff Import or
+    Auto-import it there and that is what creates the Order. Until then the
+    response carries no order_number — the storefront identifies the order by
+    the code it sent.
+    """
+    business = _resolve_business(request)
+    if not business:
+        return Response({'success': False, 'error': 'No business is associated with this key'},
+                        status=status.HTTP_403_FORBIDDEN)
+
+    result = stage_order_payload(business, request.data)
+
+    if result['status'] == 'refused':
+        return Response({'success': False, 'error': result['error'], 'code': result['refusal']},
+                        status=status.HTTP_403_FORBIDDEN)
+    if result['status'] == 'error':
+        return Response({'success': False, 'error': result['error']}, status=result['http'])
+    if result['status'] == 'duplicate_order':
+        body = _order_state(result['order'])
+        body.update({'success': True, 'duplicate': True, 'message': 'Order already received'})
+        return Response(body, status=status.HTTP_200_OK)
+    if result['status'] == 'duplicate_staged':
+        body = _staged_state(result['temp'])
+        body.update({'success': True, 'duplicate': True, 'message': 'Order already received'})
+        return Response(body, status=status.HTTP_200_OK)
+
+    body = _staged_state(result['temp'])
     body.update({'success': True, 'duplicate': False, 'message': 'Order received'})
     return Response(body, status=status.HTTP_201_CREATED)
 
@@ -547,6 +638,16 @@ def store_order_status(request, code):
     if not order:
         order = base.filter(business=business, order_number=str(code).strip()).first()
     if not order:
+        # Still waiting in Temp Orders: answer 'received' rather than 404, or a
+        # storefront polling right after checkout reads its own order as lost.
+        staged = orders_models.TempOrder.objects.filter(
+            business=business, source_type='custom_api',
+            client_order_code=str(code).strip(), imported_order__isnull=True,
+        ).order_by('-id').first()
+        if staged:
+            body = _staged_state(staged)
+            body.update({'success': True, 'items': [], 'items_total': _money(0)})
+            return Response(body)
         return Response({'success': False, 'error': 'Order not found'},
                         status=status.HTTP_404_NOT_FOUND)
 

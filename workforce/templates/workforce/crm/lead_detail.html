@@ -1,6 +1,7 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 {% load custom_filters %}
+{% load workforce_tags %}
 
 {# Purpose: CRM lead detail — source summary, stage/assignee/follow-up editors, activity timeline, WA chat snippet. Linking to a Business happens on the Business Verification page. #}
 {# Used by: workforce.crm_views.crm_lead_detail #}
@@ -8,7 +9,7 @@
 {#        Carries the shared wfnote__ page-notes card under the hero, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260827c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260922d" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -58,7 +59,7 @@
               {# 8-digit form, and WhatsApp resolves 55397661@s.whatsapp.net to nothing. #}
               data-wasend-to="{{ lead.phone|whatsapp_number }}"
               data-wasend-name="{{ lead_wa_name|escape }}">
-        <i class="fa-brands fa-whatsapp"></i> WhatsApp
+        <i class="fa-brands fa-whatsapp"></i> WhatsApp{% if lead.category == 'driver' %}{% msgid 'crm_driver_lead_manual' %}{% else %}{% msgid 'crm_lead_manual' %}{% endif %}
       </button>
       {% endif %}
       {# Back goes to the board this lead actually lives on — the two pipelines are #}
@@ -130,11 +131,53 @@
           </div>
         </div>
 
-        <!-- CONTACT (editable) -->
-        <div class="crm__panel">
-          <div class="crm__panel-hd"><i class="fa-solid fa-address-card"></i><h3>Contact</h3></div>
+        {% comment %} Contact reads as a record first and an editor second: the four
+           values are what staff come here for, so they stay on the surface and the
+           inputs live behind the header's Edit button. Nothing is hidden — the read
+           rows carry every field the form writes. {% endcomment %}
+        <!-- CONTACT (read card + inline editor) -->
+        <div class="crm__panel crmd__contact" id="workforce_crm_detail_div_contact">
+          <div class="crm__panel-hd">
+            <i class="fa-solid fa-address-card"></i><h3>Contact</h3>
+            <button type="button" class="crm__btn crmd__contact-edit"
+                    id="workforce_crm_detail_btn_contact_edit" data-contact-edit
+                    aria-controls="workforce_crm_detail_form_contact" aria-expanded="false">
+              <i class="fa-solid fa-pen" aria-hidden="true"></i> Edit
+            </button>
+          </div>
           <div class="crm__panel-body">
-            <form id="workforce_crm_detail_form_contact">
+
+            <!-- READ VIEW -->
+            <dl class="crmd__crec" id="workforce_crm_detail_div_contact_read">
+              <div class="crmd__crow">
+                <dt class="crmd__crow-lbl">Company</dt>
+                <dd class="crmd__crow-val{% if not lead.company_name %} crmd__crow-val--empty{% endif %}"
+                    data-contact-read="company_name">{{ lead.company_name|default:"Not set" }}</dd>
+              </div>
+              <div class="crmd__crow">
+                <dt class="crmd__crow-lbl">Contact person</dt>
+                <dd class="crmd__crow-val{% if not lead.contact_name %} crmd__crow-val--empty{% endif %}"
+                    data-contact-read="contact_name">{{ lead.contact_name|default:"Not set" }}</dd>
+              </div>
+              <div class="crmd__crow">
+                <dt class="crmd__crow-lbl">Phone</dt>
+                <dd class="crmd__crow-val" data-contact-read-phone>
+                  {% if lead.phone %}
+                  <a class="crmd__crow-tel" href="tel:{{ lead.phone }}" data-contact-read="phone">{{ lead.phone }}</a>
+                  {% else %}
+                  <span class="crmd__crow-val--empty" data-contact-read="phone">Not set</span>
+                  {% endif %}
+                </dd>
+              </div>
+              <div class="crmd__crow">
+                <dt class="crmd__crow-lbl">Category</dt>
+                <dd class="crmd__crow-val{% if not lead.product_category %} crmd__crow-val--empty{% endif %}"
+                    data-contact-read="product_category">{{ lead.product_category|default:"Not set" }}</dd>
+              </div>
+            </dl>
+
+            <!-- EDIT VIEW -->
+            <form id="workforce_crm_detail_form_contact" class="crmd__cform" hidden>
               <div class="crmd__editrow">
                 <label class="crmd__field-lbl" for="workforce_crm_detail_input_company">Company</label>
                 <input class="form-control form-control-sm" id="workforce_crm_detail_input_company"
@@ -155,9 +198,15 @@
                 <input class="form-control form-control-sm" id="workforce_crm_detail_input_category"
                        name="product_category" value="{{ lead.product_category }}">
               </div>
-              <button type="submit" class="crm__btn mt-2"><i class="fa-solid fa-floppy-disk"></i> Save contact</button>
-              <span class="crmd__feedback" id="workforce_crm_detail_span_contact_feedback"></span>
+              <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+                <button type="submit" class="crm__btn crm__btn--ink"><i class="fa-solid fa-floppy-disk"></i> Save contact</button>
+                <button type="button" class="crm__btn" data-contact-cancel>Cancel</button>
+              </div>
             </form>
+
+            {# Outside the form: the save confirmation has to survive the form closing. #}
+            <span class="crmd__feedback" id="workforce_crm_detail_span_contact_feedback"></span>
+
           </div>
         </div>
       </div>
@@ -399,7 +448,17 @@
       <div class="crm__panel">
         <div class="crm__panel-hd">
           <i class="fa-brands fa-whatsapp"></i><h3>WhatsApp Conversation</h3>
-          <span class="crmd__count">{{ wa_messages|length }}</span>
+          <span class="crmd__count" id="workforce_crm_detail_span_chat_count">{{ wa_messages|length }}</span>
+          {# Refresh reports here, not in the linker's feedback slot — that box is #}
+          {# collapsed whenever there is a thread, so its messages were invisible. #}
+          <span class="crmd__chat-feedback" id="workforce_crm_detail_span_chat_feedback"></span>
+          {# Pulls this one chat straight from WAHA before re-rendering: the webhook #}
+          {# can miss a message while the bridge is down, and staff must be able to #}
+          {# ask for the live thread without a full page reload. #}
+          <button type="button" class="crm__btn crmd__chat-refresh" id="workforce_crm_detail_btn_chat_refresh"
+                  data-session="{{ wa_session }}" title="Pull the latest messages from WhatsApp">
+            <i class="fa-solid fa-rotate" aria-hidden="true"></i> Refresh
+          </button>
           <button type="button" class="crm__btn crmd__linker-btn" data-chatlink-toggle
                   aria-controls="workforce_crm_detail_div_chat_link"
                   aria-expanded="{% if wa_messages %}false{% else %}true{% endif %}">
@@ -427,7 +486,9 @@
         </div>
         {% endif %}
         {% if not wa_messages %}
-        <div class="crm__panel-body crmd__sess-empty">
+        {# Kept addressable: a successful Refresh that finally pulls the thread in #}
+        {# has to retire this "nothing here" note, not leave it above the messages. #}
+        <div class="crm__panel-body crmd__sess-empty" id="workforce_crm_detail_div_chat_empty">
           No messages with this lead on this number.
           {% if wa_total_messages %}Their {{ wa_total_messages }} message{{ wa_total_messages|pluralize }} {{ wa_total_messages|pluralize:"is,are" }} on another number — switch tabs above.
           {% else %}Nothing has been exchanged on any of our numbers yet.{% endif %}
@@ -449,29 +510,7 @@
         </div>
 
         <div class="crm__panel-body crmd__chat crmd__chat--full{% if not wa_messages %} d-none{% endif %}" id="workforce_crm_detail_div_chat">
-          {% for msg in wa_messages %}
-          <div class="crmd__msg crmd__msg--{{ msg.direction }}">
-            {% if msg.media_proxy %}
-              {% if msg.media_kind == 'image' %}
-              <a href="{{ msg.media_proxy }}" target="_blank" rel="noopener" class="crmd__msg-imglink">
-                <img src="{{ msg.media_proxy }}" alt="Shared photo" loading="lazy" class="crmd__msg-img">
-              </a>
-              {% elif msg.media_kind == 'audio' %}
-              <audio controls preload="none" src="{{ msg.media_proxy }}" class="crmd__msg-audio"></audio>
-              {% elif msg.media_kind == 'video' %}
-              <video controls preload="metadata" src="{{ msg.media_proxy }}" class="crmd__msg-video"></video>
-              {% else %}
-              <a href="{{ msg.media_proxy }}" target="_blank" rel="noopener" class="crmd__msg-doc">
-                <i class="fa-solid fa-paperclip"></i> {{ msg.get_message_type_display }} attachment
-              </a>
-              {% endif %}
-            {% elif msg.message_type != 'text' %}
-              <div class="crmd__msg-doc"><i class="fa-solid fa-paperclip"></i> {{ msg.get_message_type_display }} (media unavailable)</div>
-            {% endif %}
-            {% if msg.body %}<div class="crmd__msg-body">{{ msg.body }}</div>{% endif %}
-            <div class="crmd__msg-time">{{ msg.received_at|date:"d M, H:i" }}</div>
-          </div>
-          {% endfor %}
+          {% include "workforce/crm/parts/_lead_chat_messages.html" %}
         </div>
       </div>
 
@@ -567,6 +606,28 @@
               {% endfor %}
             </div>
             {% include "workforce/crm/parts/_lead_merge_panel.html" %}
+
+            {% comment %} Wrong board. The two pipelines share no stage keys, so this is a
+               re-filing, not a stage move — the card restarts at the other board's entry
+               column. Hidden once the card is a converted client or merged into another,
+               because the move stops being meaningful; crm_lead_move_board refuses both. {% endcomment %}
+            {% if not lead.converted_business_id and not lead.merged_into_id %}
+            <div class="crmd__boardmove">
+              <span class="crmd__boardmove-note">
+                {% if lead.category == 'driver' %}
+                Filed on the <strong>Driver</strong> board. A business prospect belongs on Business Leads.
+                {% else %}
+                Filed on the <strong>Business</strong> board. A driver applicant belongs on Driver Leads.
+                {% endif %}
+              </span>
+              <button type="button" class="crm__btn crm__btn--sm" id="workforce_crm_detail_btn_moveboard"
+                      data-move-board="{% if lead.category == 'driver' %}business{% else %}driver{% endif %}"
+                      data-move-label="{% if lead.category == 'driver' %}Business{% else %}Driver{% endif %}">
+                <i class="fa-solid fa-right-left"></i>
+                Move to {% if lead.category == 'driver' %}Business{% else %}Driver{% endif %} board
+              </button>
+            </div>
+            {% endif %}
 
             {% if lead.category == 'driver' %}
             <div class="crmd__pinbar" id="workforce_crm_detail_div_pinbar"
@@ -692,10 +753,12 @@
 {# given us yet, listed for them — the driver's unfinished application sections, #}
 {# or the quote answers still open. Blank when there is nothing outstanding, and #}
 {# the composer then simply does not offer the option. #}
+{% msgid_text 'crm_driver_lead_manual' as driver_lead_msg_id %}
+{% msgid_text 'crm_lead_manual' as business_lead_msg_id %}
 {% if lead.category == 'driver' %}
-{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="driver_onboarding" wa_session=wa_send_session wa_message=wa_send_message wa_reminder=wa_reminder_message wa_reminder_label=wa_reminder_label %}
+{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="driver_onboarding" wa_message_id=driver_lead_msg_id wa_session=wa_send_session wa_message=wa_send_message wa_reminder=wa_reminder_message wa_reminder_label=wa_reminder_label %}
 {% else %}
-{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="crm_leads" wa_session=wa_send_session wa_message=wa_send_message wa_reminder=wa_reminder_message wa_reminder_label=wa_reminder_label %}
+{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="crm_leads" wa_message_id=business_lead_msg_id wa_session=wa_send_session wa_message=wa_send_message wa_reminder=wa_reminder_message wa_reminder_label=wa_reminder_label %}
 {% endif %}
 
 <!-- Scripts INSIDE #main-content so HTMX re-executes them on every swap -->
@@ -703,15 +766,17 @@
   window.CRMD_CONFIG = {
     leadId: {{ lead.pk }},
     urlUpdateStage: "{% url 'workforce:crm_lead_update_stage' lead.pk %}",
+    urlMoveBoard: "{% url 'workforce:crm_lead_move_board' lead.pk %}",
     urlUpdate: "{% url 'workforce:crm_lead_update' lead.pk %}",
     urlAddActivity: "{% url 'workforce:crm_lead_add_activity' lead.pk %}",
     urlAiSummary: "{% url 'workforce:crm_lead_ai_summary' lead.pk %}",
     urlDeleteBase: "/workforce/crm/leads/{{ lead.pk }}/delete-activity/",
     urlLinkChat: "{% url 'workforce:crm_lead_link_chat' lead.pk %}",
+    urlChatRefresh: "{% url 'workforce:crm_lead_chat_refresh' lead.pk %}",
     urlWaSearch: "{% url 'workforce:crm_wa_contact_search' %}",
     leadName: "{{ lead.contact_name|default:lead.company_name|default:lead.phone|default:'this lead'|escapejs }}",
     csrfToken: "{{ csrf_token }}"
   };
 </script>
-<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260824a"></script>
+<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260922c"></script>
 {% endblock %}

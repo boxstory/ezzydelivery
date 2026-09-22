@@ -11,7 +11,7 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260722i" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260920c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -91,6 +91,23 @@
     </div>
     <form method="POST" id="inquiryForm" novalidate>
       {% csrf_token %}
+
+      {% if trimmed_labels %}
+      {% comment %} An over-long answer never costs the seller their submission: it is
+         saved cut to fit and the full text is kept on the record. This asks them
+         to correct it while they are still on the form. {% endcomment %}
+      <div class="alert wppi__trim-notice" role="status" id="wppi_trim_notice">
+        <i class="fa-solid fa-scissors"></i>
+        <div>
+          <strong>We shortened {{ trimmed_labels|length }} answer{{ trimmed_labels|length|pluralize }} to fit:</strong>
+          {{ trimmed_labels|join:", " }}.
+          <span class="wppi__trim-notice__sub">
+            Your inquiry is saved either way — please go back and shorten
+            {{ trimmed_labels|length|pluralize:"it,them" }} so we reach you with the right details.
+          </span>
+        </div>
+      </div>
+      {% endif %}
 
       <!-- ─────────────────────────────────────────────────────────────────
            STEP 1 — Company & Product Details
@@ -855,9 +872,18 @@
             </div>
 
             <div class="col-md-6">
-              <label class="form-label" for="pickup_Location_area_name">Pickup Location Area</label>
+              <label class="form-label" for="pickup_Location_area_name">Pickup Location Area <span class="wppi__req">*</span></label>
               <input type="text" class="form-control" name="pickup_Location_area_name" id="pickup_Location_area_name"
                      value="{{ saved_data.pickup_Location_area_name }}" placeholder="e.g., Al Sadd, West Bay">
+              <div class="wppi__field-hint mt-1" id="pickup_area_hint">
+                <i class="fa-solid fa-circle-info"></i>
+                <span id="pickup_area_hint_text">Which area do we collect from? Area name is enough.</span>
+              </div>
+              <button type="button" class="wppi__suggest" id="pickup_area_suggest" hidden
+                      data-value="Ezzy Fulfillment Center">
+                <i class="fa-solid fa-warehouse wppi__ico--navy"></i>
+                No store in Qatar? Use <strong>Ezzy Fulfillment Center</strong>
+              </button>
             </div>
             <div class="col-md-6">
               <label class="form-label">Preferred Pickup Time</label>
@@ -1165,6 +1191,60 @@ function showBubbleError(fieldId, message) {
 function clearBubbleErrors() {
   document.querySelectorAll('.wppi__field-error').forEach(function (el) { el.remove(); });
 }
+// ── Length guard ────────────────────────────────────────────────
+// Each answer is stored in a column of a fixed width, and a pasted tracking URL
+// can run past it. Deliberately a warning and not an error: the step still
+// submits, the server saves the answer cut to fit and keeps the full text, and
+// the seller is told here so they can shorten it themselves rather than hear it
+// later from sales. Mirrors ANSWER_LABELS / column widths in webpages/views.py.
+(function () {
+  var LIMITS = {
+    full_name: 100,
+    business_name: 100,
+    business_contact_number: 100,
+    operation_team_contact_number: 100,
+    email: 254,
+    website_url: 200,
+    instagram_profile: 200,
+    facebook_profile: 200,
+    pickup_Location_area_name: 200,
+    additional_notes: 5000
+  };
+
+  Object.keys(LIMITS).forEach(function (id) {
+    var input = document.getElementById(id);
+    // Picker answers are our own strings and live on hidden inputs — they
+    // always fit, and a warning under an invisible field helps nobody.
+    if (!input || input.type === 'hidden') return;
+
+    var limit = LIMITS[id];
+    var warn = null;
+
+    function update() {
+      var over = (input.value || '').length - limit;
+      if (over > 0) {
+        if (!warn) {
+          warn = document.createElement('div');
+          warn.className = 'wppi__field-warn';
+          warn.id = id + '_length_warn';
+          input.parentElement.insertBefore(warn, input.nextSibling);
+        }
+        warn.textContent = over + ' character' + (over === 1 ? '' : 's') +
+          ' over the ' + limit + ' we can store — please shorten it, or we will save the first ' +
+          limit + '.';
+        input.classList.add('wppi__input--over');
+      } else {
+        if (warn) { warn.remove(); warn = null; }
+        input.classList.remove('wppi__input--over');
+      }
+    }
+
+    input.addEventListener('input', update);
+    input.addEventListener('blur', update);
+    update();  // a value restored from the session can already be over
+  });
+})();
+
 // Conditional fields (COD share, handling detail) are hidden by an inline
 // display:none on their wrapper, so a hidden one must never block the step.
 function isFieldVisible(wrapperId) {
@@ -1261,6 +1341,14 @@ function validateStep(step) {
       showBubbleError('type_of_pickup_location', 'Please select type of pickup location.');
       errors.push('type_of_pickup_location');
     }
+    // Where we collect from decides the route and the rate band, so it can no
+    // longer be left blank. Sellers with nothing in Qatar answer "Ezzy
+    // Fulfillment Center" — the suggestion button below the field fills it in.
+    if (!document.getElementById('pickup_Location_area_name').value.trim()) {
+      showBubbleError('pickup_Location_area_name',
+        'Please tell us the pickup area. No store in Qatar? Write "Ezzy Fulfillment Center".');
+      errors.push('pickup_Location_area_name');
+    }
     if (!document.getElementById('order_management_system').value) {
       showBubbleError('order_management_system', 'Please select how you manage orders.');
       errors.push('order_management_system');
@@ -1279,9 +1367,21 @@ function validateStep(step) {
     }
   }
   if (errors.length > 0) {
-    var firstId = errors[0];
-    var firstEl = document.getElementById(firstId);
-    if (firstEl) firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // The first offender is usually a hidden input sitting behind a custom
+    // picker (product_category, average_order_value_qar, ...), and
+    // scrollIntoView on a display:none element is a no-op: the message rendered
+    // fine but stayed above the fold, so tapping Next Step looked like nothing
+    // happened at all. Anchor on the message we just inserted, which is always
+    // visible, and only focus the field when it has a layout box of its own.
+    var anchor = document.querySelector('.wppi__field-error');
+    var firstEl = document.getElementById(errors[0]);
+    if (!anchor && firstEl) {
+      anchor = firstEl.offsetParent !== null ? firstEl : firstEl.parentElement;
+    }
+    if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (firstEl && firstEl.offsetParent !== null && typeof firstEl.focus === 'function') {
+      firstEl.focus({ preventScroll: true });
+    }
   }
   return errors.length === 0;
 }
@@ -1397,6 +1497,52 @@ bindRadioToggle('is_special_handling_required', 'special_handling_detail_field')
     // run after the generic bubble handler has updated the hidden input
     b.addEventListener('click', function () { setTimeout(update, 0); });
   });
+  update();
+})();
+
+// ── Pickup area: "Ezzy Fulfillment Center" suggestion ───────────────────────
+// Offered to sellers who have no address of their own in Qatar, so they don't
+// stall on a mandatory field they cannot answer with a real area name.
+(function () {
+  var input   = document.getElementById('pickup_Location_area_name');
+  var suggest = document.getElementById('pickup_area_suggest');
+  var hintTxt = document.getElementById('pickup_area_hint_text');
+  var pickupType = document.getElementById('type_of_pickup_location');
+  var typeGroup  = document.getElementById('wppi_bubbles_pickuptype');
+  if (!input || !suggest) return;
+
+  var DEFAULT_HINT = 'Which area do we collect from? Area name is enough.';
+  var FULFILMENT_HINT = 'No address of your own in Qatar? We pick up from our own hub — tap below.';
+
+  function noQatarAddress() {
+    var outside = document.getElementById('located_no');
+    return (outside && outside.checked) ||
+           (pickupType && pickupType.value === 'Fulfillment');
+  }
+
+  function update() {
+    var show = noQatarAddress();
+    suggest.hidden = !show;
+    if (hintTxt) hintTxt.textContent = show ? FULFILMENT_HINT : DEFAULT_HINT;
+  }
+
+  suggest.addEventListener('click', function () {
+    input.value = this.getAttribute('data-value');
+    // Clear the "please fill this in" message the same way typing would.
+    var err = input.parentElement.querySelector('.wppi__field-error');
+    if (err) err.remove();
+    input.focus();
+  });
+
+  document.querySelectorAll('input[name="is_located_in_qatar"]').forEach(function (r) {
+    r.addEventListener('change', update);
+  });
+  if (typeGroup) {
+    typeGroup.querySelectorAll('.wppi__bubble').forEach(function (b) {
+      // after the generic bubble handler has written the hidden input
+      b.addEventListener('click', function () { setTimeout(update, 0); });
+    });
+  }
   update();
 })();
 

@@ -1,0 +1,26 @@
+{# Purpose: The message bubbles inside the lead's WhatsApp conversation panel. #}
+{# Used by: workforce/crm/lead_detail.html and workforce.crm_views.crm_lead_chat_refresh (Refresh button re-renders this alone). #}
+{# Notes: Expects `wa_messages` (oldest first, annotated with media_kind/media_proxy by _lead_wa_conversation) and `lead`. #}
+{% for msg in wa_messages %}
+<div class="crmd__msg crmd__msg--{{ msg.direction }}">
+  {% if msg.media_proxy %}
+    {% if msg.media_kind == 'image' %}
+    <a href="{{ msg.media_proxy }}" target="_blank" rel="noopener" class="crmd__msg-imglink">
+      <img src="{{ msg.media_proxy }}" alt="Shared photo" loading="lazy" class="crmd__msg-img">
+    </a>
+    {% elif msg.media_kind == 'audio' %}
+    <audio controls preload="none" src="{{ msg.media_proxy }}" class="crmd__msg-audio"></audio>
+    {% elif msg.media_kind == 'video' %}
+    <video controls preload="metadata" src="{{ msg.media_proxy }}" class="crmd__msg-video"></video>
+    {% else %}
+    <a href="{{ msg.media_proxy }}" target="_blank" rel="noopener" class="crmd__msg-doc">
+      <i class="fa-solid fa-paperclip"></i> {{ msg.get_message_type_display }} attachment
+    </a>
+    {% endif %}
+  {% elif msg.message_type != 'text' %}
+    <div class="crmd__msg-doc"><i class="fa-solid fa-paperclip"></i> {{ msg.get_message_type_display }} (media unavailable)</div>
+  {% endif %}
+  {% if msg.body %}<div class="crmd__msg-body">{{ msg.body }}</div>{% endif %}
+  <div class="crmd__msg-time">{{ msg.received_at|date:"d M, H:i" }}</div>
+</div>
+{% endfor %}

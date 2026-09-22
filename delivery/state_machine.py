@@ -13,7 +13,8 @@ Stage order (forward flow):
     Stage 6: in_transit / out_for_delivery
     Stage 7: contacted / non_reachable / address_pending /
              customer_confirmation_pending / customer_delaying / dl_pending_payment
-    Stage 8: delivered / failed / rejected / cancelled  (terminal)
+    Stage 8: delivered / failed / rejected / cancelled /
+             returned_to_shipper  (terminal)
 
 Rules:
     - Staff: forward transitions only + cancel from any stage
@@ -47,6 +48,7 @@ STATUS_STAGE = {
     'dl_pending_payment': 7,
     'delivered':     8,
     'partial_delivery': 8,
+    'returned_to_shipper': 8,
     'failed':        8,
     'rejected':      8,
     'cancelled':     8,
@@ -72,7 +74,8 @@ def _build_staff_transitions():
                 forward.add(target)
         transitions[status] = forward
     # Terminal statuses — no forward moves for staff
-    for terminal in ('delivered', 'partial_delivery', 'failed', 'rejected', 'cancelled', 'dropsownlost'):
+    for terminal in ('delivered', 'partial_delivery', 'returned_to_shipper',
+                     'failed', 'rejected', 'cancelled', 'dropsownlost'):
         transitions[terminal] = set()
     return transitions
 
@@ -87,26 +90,37 @@ ADMIN_TRANSITIONS = {status: _ALL_STATUSES - {status} for status in _ALL_STATUSE
 
 DRIVER_TRANSITIONS = {
     'assigned':   {'accepted', 'rejected'},
-    'accepted':   {'picked_up', 'out_for_delivery', 'delivered', 'partial_delivery', 'failed', 'rejected'},
-    'picked_up':  {'start_ride', 'in_transit', 'out_for_delivery', 'delivered', 'partial_delivery', 'failed'},
-    'start_ride': {'in_transit', 'out_for_delivery', 'delivered', 'partial_delivery', 'failed'},
+    'accepted':   {'picked_up', 'out_for_delivery', 'delivered', 'partial_delivery', 'failed', 'rejected',
+                   'returned_to_shipper'},
+    'picked_up':  {'start_ride', 'in_transit', 'out_for_delivery', 'delivered', 'partial_delivery', 'failed',
+                   'returned_to_shipper'},
+    'start_ride': {'in_transit', 'out_for_delivery', 'delivered', 'partial_delivery', 'failed',
+                   'returned_to_shipper'},
     'in_transit': {'out_for_delivery', 'delivered', 'partial_delivery', 'contacted', 'non_reachable', 'address_pending',
-                   'customer_confirmation_pending', 'customer_delaying', 'dl_pending_payment', 'failed'},
+                   'customer_confirmation_pending', 'customer_delaying', 'dl_pending_payment', 'failed',
+                   'returned_to_shipper'},
     'out_for_delivery': {'delivered', 'partial_delivery', 'contacted', 'non_reachable', 'address_pending',
-                         'customer_confirmation_pending', 'customer_delaying', 'dl_pending_payment', 'failed'},
-    'contacted':          {'delivered', 'partial_delivery', 'non_reachable', 'failed', 'dl_pending_payment'},
-    'non_reachable':      {'contacted', 'customer_delaying', 'address_pending', 'failed'},
+                         'customer_confirmation_pending', 'customer_delaying', 'dl_pending_payment', 'failed',
+                         'returned_to_shipper'},
+    'contacted':          {'delivered', 'partial_delivery', 'non_reachable', 'failed', 'dl_pending_payment',
+                           'returned_to_shipper'},
+    'non_reachable':      {'contacted', 'customer_delaying', 'address_pending', 'failed',
+                           'returned_to_shipper'},
     'address_pending':    {'contacted', 'non_reachable', 'failed'},
     'customer_confirmation_pending': {'contacted', 'non_reachable', 'failed'},
     'customer_delaying':  {'contacted', 'failed'},
-    'dl_pending_payment': {'delivered', 'partial_delivery', 'failed'},
+    'dl_pending_payment': {'delivered', 'partial_delivery', 'failed', 'returned_to_shipper'},
     # Self-assign from pool
     'pending':    {'accepted'},
     'for_review': {'accepted'},
+    # A driver who already filed the failed attempt may still be carrying the
+    # parcel. Saying so is the only way the box gets back on the books, so this
+    # is deliberately the one way out of an otherwise terminal state.
+    'failed':          {'returned_to_shipper'},
     # Terminal
     'delivered':       set(),
     'partial_delivery': set(),
-    'failed':          set(),
+    'returned_to_shipper': set(),
     'rejected':        set(),
     'cancelled':       set(),
     'dropsownlost':    set(),
@@ -133,6 +147,13 @@ def can_transition(old_status, new_status, actor='driver'):
 
     # Special case: allow failed → accepted for staff/admin (task retry)
     if old_status == 'failed' and new_status == 'accepted' and actor in ('staff', 'admin'):
+        return True, ''
+
+    # A parcel can come back after the attempt was already closed out — the driver
+    # hands it in days later, or ops find it on the van. Staff need the same door
+    # the driver has, and the stage-8 forward-only rule would shut it.
+    if (old_status in ('failed', 'non_reachable', 'dropsownlost')
+            and new_status == 'returned_to_shipper' and actor in ('staff', 'admin')):
         return True, ''
 
     if actor == 'admin':

@@ -10,6 +10,54 @@ from django.utils import timezone
 logger = logging.getLogger('delivery')
 
 
+def delivery_origin(task):
+    """Where the driver holding `task` picked the parcel up, in one word.
+
+    ``('self' | 'hub' | 'transfer' | '', note)`` — they collected it from the
+    client themselves, they took it off a hub shelf, another driver handed it to
+    them, or there is no first-mile record at all.
+
+    Self outranks everything: a driver who went to the client's door did that
+    work even if the parcel sat at a hub in between, and that is the fact a
+    payout is argued over. Read off the pickup's status rather than its
+    disposition, because a hand-off filed as 'self_deliver' and then claimed by
+    somebody else is a hand-off. A cancelled pickup collected nothing and is
+    credited to nobody.
+
+    The single definition — the payout worksheet's Pickup column and the driver
+    payout invoice both call it, so the two documents cannot disagree.
+    """
+    first_mile = getattr(task, 'source_pickup_task', None)
+    if first_mile is not None and first_mile.status == 'cancelled':
+        first_mile = None
+    driver = getattr(first_mile, 'driver', None) if first_mile else None
+
+    if driver and task.driver_id and driver.pk == task.driver_id:
+        return 'self', 'This driver collected it from the client'
+    if getattr(task, 'task_leg', '') == 'hub_delivery':
+        hub = getattr(task, 'hub_warehouse', None)
+        return 'hub', ('Collected from ' + (getattr(hub, 'name', '') or 'the hub')
+                       + ' — the run to the client started there')
+    if driver:
+        if first_mile.status == 'dropped':
+            where = getattr(first_mile.drop_warehouse, 'name', '') or 'the hub'
+            return 'hub', f'Another driver collected it and dropped it at {where}'
+        return 'transfer', 'Another driver collected it and handed it over'
+    return '', ''
+
+
+def first_mile_driver(task):
+    """The driver who collected `task` from the client, or None.
+
+    None for a cancelled pickup and for a task with no first-mile leg — the same
+    exclusions ``delivery_origin`` applies, so the two never disagree.
+    """
+    first_mile = getattr(task, 'source_pickup_task', None)
+    if first_mile is None or first_mile.status == 'cancelled':
+        return None
+    return first_mile.driver
+
+
 def log_pickup_history(pickup, old_status, new_status, actor=None, notes=''):
     """
     Write a pickup transition into the order's OrderStatusHistory so the

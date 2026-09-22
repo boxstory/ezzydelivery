@@ -70,7 +70,7 @@ from django.contrib import messages
 from core.decorators import business_required
 from business.decorators import business_permission_required
 from business.permissions import BusinessPermissions
-from business.suspension import business_active_required, is_business_suspended
+from business.suspension import business_active_required, is_business_suspended, is_business_write_blocked
 from core.pagination import paginate, other_params
 from decouple import config
 from django.core.files.storage import default_storage
@@ -81,6 +81,7 @@ from woocommerce import API as WooAPI
 
 from django.db.models import Sum, Q
 
+from business import integration_fields
 from business import models as business_models
 from core import models as core_models
 from delivery import models as delivery_models
@@ -178,7 +179,8 @@ def business_dashboard(request):
 
         # Follow up required (failed, rejected, or non-reachable delivery tasks)
         followup_count = delivery_tasks.filter(
-            Q(dl_task_status__in=['failed', 'rejected', 'non_reachable'])
+            Q(dl_task_status__in=['failed', 'rejected', 'non_reachable',
+                                  'returned_to_shipper'])
         ).exclude(
             dl_task_status_client__in=['2', '9']
         ).count()
@@ -198,7 +200,8 @@ def business_dashboard(request):
 
         # Failed/Follow up orders (latest 5) - via delivery tasks with bad status
         followup_task_order_ids = delivery_tasks.filter(
-            dl_task_status__in=['failed', 'rejected', 'non_reachable']
+            dl_task_status__in=['failed', 'rejected', 'non_reachable',
+                                'returned_to_shipper']
         ).exclude(
             dl_task_status_client__in=['2', '9']
         ).values_list('order_id', flat=True)[:5]
@@ -915,16 +918,23 @@ def business_settings(request, business_id):
     # so they cannot each carry a ?page=. Each section shows a preview and links
     # to its own paginated page (stores, teams, APIs) for the full set.
     preview = 6
+    # Each panel header states how much of the set is actually working, not just
+    # how many rows exist — a store that is closed or an integration that has
+    # never verified is the thing the merchant came here to find.
     context = {
         'business': business,
         'business_apis': business_apis[:preview],
         'business_apis_total': business_apis.count(),
+        'business_apis_verified': business_apis.filter(is_verify_api=True).count(),
         'teams': teams[:preview],
         'teams_total': teams.count(),
+        'teams_active': teams.filter(team_status='active').count(),
         'stores': stores[:preview],
         'stores_total': stores.count(),
+        'stores_active': stores.filter(pickup_status='active').count(),
         'preview_size': preview,
         'is_business_owner': is_business_owner,
+        'write_blocked': is_business_write_blocked(business),
     }
     return render(request, 'business/parts/business_settings.html', context)
 
@@ -974,6 +984,7 @@ def business_settings_api_update(request, business_id, api_id):
         'form_title': 'Business API Settings Add',
         'shopify_oauth_redirect_uri': shopify_oauth_redirect_uri(),
         'shopify_oauth_app_url': shopify_oauth_app_url(),
+        'api_field_config': integration_fields.as_dict(),
     }
 
     return render(request, 'business/parts/business_settings_api_update.html', context)
@@ -1025,6 +1036,7 @@ def business_settings_api_add(request, business_id):
         'form_title': 'Business API Settings Adding Form',
         'shopify_oauth_redirect_uri': shopify_oauth_redirect_uri(),
         'shopify_oauth_app_url': shopify_oauth_app_url(),
+        'api_field_config': integration_fields.as_dict(),
     }
 
     return render(request, 'business/parts/business_settings_api_add.html', context)
@@ -1198,9 +1210,12 @@ def business_settings_api_test_result(request, business_id, api_id):
     BASE_API_ORDER_ENDPINT = business_api.order_api_endpoint
     BASE_API_PRODUCT_ENDPINT = business_api.product_api_endpoint
 
-    if not BASE_API_STORE_NAME:
+    # A pull integration carries its own fetch URL, so the store URL is optional
+    # for it — requiring one would block the very test that proves the pull works.
+    from ezzy_api.store_pull import is_pull_source as _is_pull_source
+    if not BASE_API_STORE_NAME and not _is_pull_source(business_api):
         return _htmx_error("API store URL is not configured. Please update your API settings.")
-    BASE_API_STORE_NAME = BASE_API_STORE_NAME.replace('https://', '')
+    BASE_API_STORE_NAME = (BASE_API_STORE_NAME or '').replace('https://', '')
 
     # Initialize variables with defaults to prevent undefined variable errors
     order_response = None
@@ -1323,6 +1338,42 @@ def business_settings_api_test_result(request, business_id, api_id):
                         'detail': f'{product_count} sheets, {order_count} rows',
                     })
 
+        elif business_api.api_type == 'custom':
+            # Two different integrations wear this type. A pull source has an
+            # endpoint of its own, so the honest test is to call it; a push-only
+            # source has nothing to call and says so instead of failing.
+            from ezzy_api.store_pull import PullError, fetch_orders
+
+            if not _is_pull_source(business_api):
+                return _htmx_error(
+                    "This integration is inbound only — your website sends orders to "
+                    "<code>https://ezzydelivery.qa/api/v1/store/orders/</code> using your "
+                    "EzzyDelivery API key, so there is nothing for us to call. To have us "
+                    "fetch orders from your site instead, fill in <strong>Order Fetch URL</strong> "
+                    "on this integration."
+                )
+
+            try:
+                fetched, meta = fetch_orders(business_api)
+            except PullError as exc:
+                error_message = str(exc)
+                logger.info('Custom pull test failed for business %s: %s', business_id, exc)
+            else:
+                order_count = meta['count']
+                status = meta['status']
+                from urllib.parse import urlparse as _urlparse
+                BASE_API_STORE_NAME = BASE_API_STORE_NAME or _urlparse(meta['url']).hostname or ''
+                probes.append({
+                    'label': 'Orders',
+                    'path': meta['url'],
+                    'status': meta['status'],
+                    'ms': meta['ms'],
+                    'detail': f'{order_count} returned ({meta["bytes"]:,} bytes)',
+                })
+                # What the mapping would make of the first one, so the merchant
+                # sees their own order rather than a bare count they must trust.
+                result = {'orders': order_count, 'sample': fetched[0] if fetched else None}
+
         else:
             error_message = f'API type "{business_api.api_type}" is not yet supported for testing.'
 
@@ -1356,6 +1407,10 @@ def business_settings_api_test_result(request, business_id, api_id):
         except ValueError:
             result = {'error': 'Invalid JSON response from API'}
             status = order_response.status_code if order_response else 0
+    elif result:
+        # A custom pull already resolved its own payload (order count + a real
+        # sample order); the generic branches below would overwrite it.
+        pass
     elif status == 200:
         result = {'rows': order_count, 'sheets': product_count}
     else:
@@ -3441,21 +3496,73 @@ def warehouse_request(request):
 
 @login_required(login_url='/accounts/login/')
 def business_search_ajax(request):
-    """AJAX search for active businesses by name or code."""
+    """AJAX search for businesses by name or code.
+
+    Only the rows matching what the caller typed are returned - the full
+    business list is never shipped to the browser. Businesses the user cannot
+    actually join (their own, one they already belong to, one with a live
+    request, one not yet activated or suspended) come back flagged so the picker
+    can grey them out instead of letting the pick fail on submit, or - worse -
+    looking to the caller as though their employer does not exist.
+    """
     q = request.GET.get('q', '').strip()
-    if len(q) < 2:
+    # Minimum 4 characters: a 2-char query matched almost every business on the
+    # platform, so the dropdown was noise. Kept in sync with the JS/minlength
+    # guard on core/join_us_team.html.
+    if len(q) < 4:
         return JsonResponse({'results': []})
 
-    businesses = business_models.Business.objects.filter(
-        business_status='active'
+    # Every status the caller could plausibly be looking for, not just 'active'.
+    # Filtering to active alone hid 38 of 62 businesses, so anyone whose employer
+    # had not been approved yet typed their exact name, saw nothing, and concluded
+    # the search was broken. A business they cannot join is flagged below and
+    # greyed out — the same contract every other un-joinable case already uses.
+    businesses = list(business_models.Business.objects.filter(
+        business_status__in=('active', 'pending', 'suspended')
+    ).exclude(
+        user_id=request.user.id
     ).filter(
         Q(business_name__icontains=q) | Q(business_code__icontains=q)
-    ).values('business_id', 'business_name', 'business_code')[:10]
+    ).order_by('business_name').values(
+        'business_id', 'business_name', 'business_code', 'business_status')[:10])
 
-    results = [
-        {'id': b['business_id'], 'name': b['business_name'], 'code': b['business_code'] or ''}
-        for b in businesses
-    ]
+    matched_ids = [b['business_id'] for b in businesses]
+
+    member_ids = set(
+        business_models.BusinessTeamProfile.objects.filter(
+            user=request.user, business_id__in=matched_ids
+        ).values_list('business_id', flat=True)
+    )
+    requested = {
+        r.business_id: r.get_status_display()
+        for r in business_models.BusinessTeamJoinRequest.objects.filter(
+            user=request.user, business_id__in=matched_ids, status__in=['pending', 'accepted']
+        )
+    }
+
+    # An account that cannot trade yet cannot take on team members either, so the
+    # row is shown with the reason rather than silently dropped. Mirrors
+    # WRITE_BLOCKED_STATUSES in the client write gate.
+    STATUS_BLOCKED = {
+        'pending': 'Not activated yet',
+        'suspended': 'Account suspended',
+    }
+
+    results = []
+    for b in businesses:
+        bid = b['business_id']
+        if bid in member_ids:
+            blocked = 'Already a team member'
+        elif bid in requested:
+            blocked = f'Request {requested[bid].lower()}'
+        else:
+            blocked = STATUS_BLOCKED.get(b['business_status'], '')
+        results.append({
+            'id': bid,
+            'name': b['business_name'],
+            'code': b['business_code'] or '',
+            'blocked': blocked,
+        })
     return JsonResponse({'results': results})
 
 
@@ -3477,10 +3584,18 @@ def business_join_request_submit(request):
     if not business_id:
         return JsonResponse({'success': False, 'error': 'Business ID is required.'})
 
+    # Looked up without the status filter so a real business that simply is not
+    # activated yet gets told so, instead of "not found" — the picker now shows
+    # those rows, so "we cannot find it" would flatly contradict what is on screen.
     try:
-        business = business_models.Business.objects.get(business_id=business_id, business_status='active')
+        business = business_models.Business.objects.get(business_id=business_id)
     except business_models.Business.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Business not found or not active.'})
+        return JsonResponse({'success': False, 'error': 'Business not found.'})
+
+    if business.business_status != 'active':
+        return JsonResponse({'success': False, 'error': (
+            f'{business.business_name} is not active yet, so it cannot take team '
+            f'members. Ask them to finish setting up their Ezzy account first.')})
 
     # Cannot request to join own business
     if business.user_id == request.user.id:
@@ -3879,6 +3994,20 @@ def export_performance_csv(request):
 
 # ─── WhatsApp Notification Triggers ─────────────────────────────────
 
+# Characters that fit on one line of the message box at its column width. Used
+# only to pick a row count, so an approximation is fine — it errs generous.
+_MESSAGE_LINE_CHARS = 46
+
+
+def _message_rows(body):
+    """Rows that show ``body`` whole, counting wrapped lines. 3 when empty."""
+    if not body:
+        return 3
+    wrapped = sum(max(1, -(-len(line) // _MESSAGE_LINE_CHARS))
+                  for line in body.split('\n'))
+    return min(max(wrapped, 3), 16)
+
+
 @login_required(login_url='/accounts/login/')
 @business_required
 def whatsapp_triggers_list(request):
@@ -3887,16 +4016,36 @@ def whatsapp_triggers_list(request):
 
     default_whatsapp = (request.current_business.business_whatsapp or '').strip()
 
+    from core.trigger_tokens import TOKEN_GROUPS, TRIGGER_TO_EVENT, default_message
+
+    # The six triggers are the stages of one parcel's run, in order, and the last
+    # two are the alternative endings rather than a fifth and sixth step. The page
+    # draws them on a rail that branches, so it needs to know which is which.
+    outcomes = ('delivered', 'failed')
+
     triggers = {}
     for status, label in WhatsAppNotificationTrigger.TRIGGER_STATUS_CHOICES:
         trigger = WhatsAppNotificationTrigger.objects.filter(
             business=request.current_business, trigger_status=status
         ).first()
+        # The box is pre-filled with the message that actually goes out: the
+        # client's own wording when they have written one, otherwise our built-in
+        # text, editable in place. An empty custom_message still means "follow the
+        # default", so clearing the box hands the trigger back to us.
+        built_in = default_message(status)
+        saved = (trigger.custom_message if trigger else '') or ''
         triggers[status] = {
             'label': label,
             'is_active': trigger.is_active if trigger else False,
-            'custom_message': trigger.custom_message if trigger else '',
+            'message': saved or built_in,
             'notification_phone': (trigger.notification_phone if trigger else '') or '',
+            'default_message': built_in,
+            'is_customised': bool(saved),
+            'rows': _message_rows(saved or built_in),
+            # No lifecycle event fires 'picked_up' or 'start_ride', so the page
+            # says so instead of offering a box that quietly never sends.
+            'is_live': status in TRIGGER_TO_EVENT,
+            'is_outcome': status in outcomes,
         }
 
     return render(request, 'business/whatsapp_triggers.html', {
@@ -3904,39 +4053,86 @@ def whatsapp_triggers_list(request):
         'user_business': request.current_business,
         'is_business_owner': request.access_type == 'owner',
         'default_whatsapp': default_whatsapp,
+        'token_groups': TOKEN_GROUPS,
     })
 
 
 @login_required(login_url='/accounts/login/')
 @business_required
 @business_active_required
-def whatsapp_trigger_toggle(request):
-    """HTMX POST endpoint to toggle a WhatsApp trigger."""
+def whatsapp_triggers_save(request):
+    """Save every changed trigger in one POST, from the header Save button.
+
+    The page shows our built-in wording as the textarea's value, so an unedited
+    box arrives here holding that exact text. Storing it would freeze a copy and
+    cut the client off from any later improvement to the default, so a message
+    equal to the current default is stored as '' — the existing "follow the
+    default" state. Clearing the box does the same thing, deliberately: the way
+    to stop a message going out is the Active switch, not an empty body.
+    """
     from business.models import WhatsAppNotificationTrigger
+    from core.trigger_tokens import default_message, unknown_tokens
+    from django.db import transaction
 
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    status = request.POST.get('trigger_status')
-    is_active = request.POST.get('is_active') == 'true'
-    custom_message = request.POST.get('custom_message', '')
-    notification_phone = request.POST.get('notification_phone', '').strip()
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({'error': 'Malformed JSON'}, status=400)
 
-    valid_statuses = [s[0] for s in WhatsAppNotificationTrigger.TRIGGER_STATUS_CHOICES]
-    if status not in valid_statuses:
-        return JsonResponse({'error': 'Invalid status'}, status=400)
+    rows = payload.get('triggers')
+    if not isinstance(rows, list) or not rows:
+        return JsonResponse({'error': 'No triggers supplied'}, status=400)
+    if len(rows) > len(WhatsAppNotificationTrigger.TRIGGER_STATUS_CHOICES):
+        return JsonResponse({'error': 'Too many triggers'}, status=400)
 
-    trigger, created = WhatsAppNotificationTrigger.objects.update_or_create(
-        business=request.current_business,
-        trigger_status=status,
-        defaults={
-            'is_active': is_active,
-            'custom_message': custom_message,
-            'notification_phone': notification_phone,
-        }
-    )
+    valid_statuses = {s[0] for s in WhatsAppNotificationTrigger.TRIGGER_STATUS_CHOICES}
+    cleaned = []
+    for row in rows:
+        if not isinstance(row, dict):
+            return JsonResponse({'error': 'Malformed trigger'}, status=400)
+        status = row.get('trigger_status')
+        if status not in valid_statuses:
+            return JsonResponse({'error': 'Invalid status'}, status=400)
 
-    return JsonResponse({'success': True, 'is_active': trigger.is_active})
+        # A WhatsApp body longer than this is a paste accident, not a notification.
+        message = str(row.get('custom_message') or '')[:1500].strip()
+        if message == (default_message(status) or '').strip():
+            message = ''
+        cleaned.append({
+            'status': status,
+            'is_active': bool(row.get('is_active')),
+            'custom_message': message,
+            'notification_phone': str(row.get('notification_phone') or '').strip()[:30],
+        })
+
+    with transaction.atomic():
+        for row in cleaned:
+            WhatsAppNotificationTrigger.objects.update_or_create(
+                business=request.current_business,
+                trigger_status=row['status'],
+                defaults={
+                    'is_active': row['is_active'],
+                    'custom_message': row['custom_message'],
+                    'notification_phone': row['notification_phone'],
+                },
+            )
+
+    # Saved either way — an unfillable token prints as-is rather than breaking the
+    # send — but the client is told which ones we will not be able to fill.
+    stray = {}
+    for row in cleaned:
+        found = unknown_tokens(row['custom_message'])
+        if found:
+            stray[row['status']] = found
+
+    return JsonResponse({
+        'success': True,
+        'saved': len(cleaned),
+        'unknown_tokens': stray,
+    })
 
 
 @login_required
@@ -3997,6 +4193,7 @@ def print_waybill(request):
     from django.utils.safestring import mark_safe
     from orders.models import Order
     from delivery.models import ZoneName
+    from delivery.charges import collect_totals
     from delivery.label_utils import generate_qr_svg
 
     raw_ids = request.GET.getlist('order_ids') or request.POST.getlist('order_ids')
@@ -4025,6 +4222,10 @@ def print_waybill(request):
             return zone_names.get(int(zone_no), '')
         return ''
 
+    # One query for the whole run — the delivery charge is not on Order for a
+    # normal delivery, it lives on the task.
+    totals = collect_totals(orders)
+
     waybills = []
     for order in orders:
         # Vector, not PNG: the label stretches the barcode to the full label
@@ -4036,6 +4237,7 @@ def print_waybill(request):
             'qr_svg': qr_svg,
             'from_zone_name': _zone_name(pickup_zone),
             'to_zone_name': _zone_name(order.dl_zone),
+            'collect_total': totals.get(order.id),
         })
 
     return render(request, 'business/print_waybill.html', {

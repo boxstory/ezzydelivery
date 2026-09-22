@@ -179,71 +179,109 @@ def _derive_business_status(saved):
     return saved
 
 
+# An over-long answer is not worth an inquiry. The form used to write POST
+# strings straight onto the model, so a pasted tracking URL longer than its
+# column raised DataError in PostgreSQL, 500'd the step and threw the whole
+# submission away. Everything now goes through webpages.pricing.answers: the
+# answer is saved cut to fit, the full text is kept on the record, and the seller
+# is asked to shorten it themselves. Nothing is ever rejected for being too long.
+from webpages.pricing.answers import apply_answers as _apply_answers
+from webpages.pricing.answers import trimmed_labels as _trimmed_labels
+
+
+def _remember_trimmed(request, inquiry, trimmed=None):
+    """Keep the shortened-answer notice in step with the record.
+
+    Held in the session rather than passed along, because every step ends in a
+    redirect: the notice has to survive it and stay up until the seller has
+    actually shortened the answer.
+    """
+    if trimmed:
+        logger.warning('PricingEnquiry %s: shortened over-long answers %s',
+                       inquiry.pk, ', '.join(sorted(trimmed)))
+    labels = _trimmed_labels(inquiry)
+    if labels:
+        request.session['inquiry_trimmed'] = labels
+    else:
+        request.session.pop('inquiry_trimmed', None)
+    request.session.modified = True
+
+
 def _save_step1_to_db(inquiry, data):
     """Save step 1 fields to a PricingEnquiry instance."""
-    inquiry.full_name = data.get('full_name', '')
-    inquiry.business_name = data.get('business_name', '')
-    inquiry.business_contact_number = data.get('business_contact_number', '')
-    inquiry.operation_team_contact_number = data.get('operation_team_contact_number', '')
-    inquiry.email = (data.get('email') or '').strip()
-    inquiry.website_url = data.get('website_url', '')
-    inquiry.instagram_profile = data.get('instagram_profile', '')
-    inquiry.facebook_profile = data.get('facebook_profile', '')
-    inquiry.social_profile = data.get('social_profile', '')  # legacy
-    inquiry.product_category = data.get('product_category', '')
-    inquiry.is_personalized_product = data.get('is_personalized_product', 'False') == 'True'
-    inquiry.is_located_in_qatar = data.get('is_located_in_qatar', 'False') == 'True'
-    inquiry.is_registered_company_in_qatar = data.get('is_registered_company_in_qatar', 'False') == 'True'
-    inquiry.business_location_country = data.get('business_location_country', '')
-    inquiry.is_team_available_in_qatar = data.get('is_team_available_in_qatar', 'False') == 'True'
-    inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar = data.get('is_required_fulfillment_service_for_operate_from_outside_qatar', 'False') == 'True'
-    inquiry.is_required_fulfillment_service_for_make_hub_in_doha = data.get('is_required_fulfillment_service_for_make_hub_in_doha', 'False') == 'True'
-    inquiry.fulfillment_storage_volume = data.get('fulfillment_storage_volume', '')
-    inquiry.average_order_value_qar = data.get('average_order_value_qar', '')
-    inquiry.business_operating_age = data.get('business_operating_age', '')
-    inquiry.save()
+    return _apply_answers(inquiry, {
+        'full_name': data.get('full_name', ''),
+        'business_name': data.get('business_name', ''),
+        'business_contact_number': data.get('business_contact_number', ''),
+        'operation_team_contact_number': data.get('operation_team_contact_number', ''),
+        'email': data.get('email', ''),
+        'website_url': data.get('website_url', ''),
+        'instagram_profile': data.get('instagram_profile', ''),
+        'facebook_profile': data.get('facebook_profile', ''),
+        'social_profile': data.get('social_profile', ''),  # legacy
+        'product_category': data.get('product_category', ''),
+        'business_location_country': data.get('business_location_country', ''),
+        'fulfillment_storage_volume': data.get('fulfillment_storage_volume', ''),
+        'average_order_value_qar': data.get('average_order_value_qar', ''),
+        'business_operating_age': data.get('business_operating_age', ''),
+    }, {
+        'is_personalized_product': data.get('is_personalized_product', 'False') == 'True',
+        'is_located_in_qatar': data.get('is_located_in_qatar', 'False') == 'True',
+        'is_registered_company_in_qatar': data.get('is_registered_company_in_qatar', 'False') == 'True',
+        'is_team_available_in_qatar': data.get('is_team_available_in_qatar', 'False') == 'True',
+        'is_required_fulfillment_service_for_operate_from_outside_qatar':
+            data.get('is_required_fulfillment_service_for_operate_from_outside_qatar', 'False') == 'True',
+        'is_required_fulfillment_service_for_make_hub_in_doha':
+            data.get('is_required_fulfillment_service_for_make_hub_in_doha', 'False') == 'True',
+    })
 
 
 def _save_step2_to_db(inquiry, data):
     """Save step 2 fields to a PricingEnquiry instance."""
-    inquiry.avarage_number_of_order_last_week = data.get('avarage_number_of_order_last_week', '')
-    inquiry.avarage_number_of_order_done_last_month = data.get('avarage_number_of_order_done_last_month', '')
-    inquiry.avarage_number_of_order_expect_next_month = data.get('avarage_number_of_order_expect_next_month', '')
-    inquiry.orders_expected_in_next_3_months_milestone = data.get('orders_expected_in_next_3_months_milestone', '')
-    inquiry.is_required_COD_service = data.get('is_required_COD_service', 'False') == 'True'
-    inquiry.current_courier_provider = data.get('current_courier_provider', '')
-    inquiry.delivery_coverage = data.get('delivery_coverage', '')
-    inquiry.is_return_logistics_required = data.get('is_return_logistics_required', 'False') == 'True'
-    inquiry.preferred_start_date = data.get('preferred_start_date', '')
-    inquiry.typical_delivery_distance = data.get('typical_delivery_distance', '')
-    inquiry.cod_orders_share = data.get('cod_orders_share', '')
-    inquiry.current_delivery_cost = data.get('current_delivery_cost', '')
-    inquiry.save()
+    return _apply_answers(inquiry, {
+        'avarage_number_of_order_last_week': data.get('avarage_number_of_order_last_week', ''),
+        'avarage_number_of_order_done_last_month': data.get('avarage_number_of_order_done_last_month', ''),
+        'avarage_number_of_order_expect_next_month': data.get('avarage_number_of_order_expect_next_month', ''),
+        'orders_expected_in_next_3_months_milestone': data.get('orders_expected_in_next_3_months_milestone', ''),
+        'current_courier_provider': data.get('current_courier_provider', ''),
+        'delivery_coverage': data.get('delivery_coverage', ''),
+        'preferred_start_date': data.get('preferred_start_date', ''),
+        'typical_delivery_distance': data.get('typical_delivery_distance', ''),
+        'cod_orders_share': data.get('cod_orders_share', ''),
+        'current_delivery_cost': data.get('current_delivery_cost', ''),
+    }, {
+        'is_required_COD_service': data.get('is_required_COD_service', 'False') == 'True',
+        'is_return_logistics_required': data.get('is_return_logistics_required', 'False') == 'True',
+    })
 
 
 def _save_step3_to_db(inquiry, data):
     """Save step 3 fields to a PricingEnquiry instance."""
-    inquiry.speed_delivery_offer_to_customers = data.get('speed_delivery_offer_to_customers', '')
-    inquiry.is_frequent_same_day_pick_and_delivery_required = data.get('is_frequent_same_day_pick_and_delivery_required', 'False') == 'True'
-    inquiry.preferred_delivery_time_window = data.get('preferred_delivery_time_window', '')
-    inquiry.typical_package_size = data.get('typical_package_size', '')
-    inquiry.is_special_handling_required = data.get('is_special_handling_required', 'False') == 'True'
-    inquiry.type_of_pickup_location = data.get('type_of_pickup_location', '')
-    inquiry.pickup_Location_area_name = data.get('pickup_Location_area_name', '')
-    # Single "Preferred Pickup Time" question feeds both columns (merged duplicate fields)
-    inquiry.pickup_location_time_slab = data.get('pickup_location_time_slab', '')
-    inquiry.number_of_pickup_times_in_day = data.get('number_of_pickup_times_in_day', '1')
-    inquiry.order_management_system = data.get('order_management_system', '')
-    inquiry.preferred_communication_channel = data.get('preferred_communication_channel', '')
-    inquiry.is_delivery_free_to_customers = data.get('is_delivery_free_to_customers', '')
-    inquiry.preferred_pickup_time = data.get('preferred_pickup_time', '') or data.get('pickup_location_time_slab', '')
-    inquiry.preferred_payment_method = data.get('preferred_payment_method', '')
-    inquiry.special_handling_detail = data.get('special_handling_detail', '')
-    inquiry.average_package_weight = data.get('average_package_weight', '')
-    inquiry.number_of_pickup_locations = data.get('number_of_pickup_locations', '')
-    inquiry.additional_notes = data.get('additional_notes', '')
-    inquiry.contact_consent = data.get('contact_consent') == 'on'
-    inquiry.save()
+    return _apply_answers(inquiry, {
+        'speed_delivery_offer_to_customers': data.get('speed_delivery_offer_to_customers', ''),
+        'preferred_delivery_time_window': data.get('preferred_delivery_time_window', ''),
+        'typical_package_size': data.get('typical_package_size', ''),
+        'type_of_pickup_location': data.get('type_of_pickup_location', ''),
+        'pickup_Location_area_name': data.get('pickup_Location_area_name', ''),
+        # Single "Preferred Pickup Time" question feeds both columns (merged duplicate fields)
+        'pickup_location_time_slab': data.get('pickup_location_time_slab', ''),
+        'number_of_pickup_times_in_day': data.get('number_of_pickup_times_in_day', '1'),
+        'order_management_system': data.get('order_management_system', ''),
+        'preferred_communication_channel': data.get('preferred_communication_channel', ''),
+        'is_delivery_free_to_customers': data.get('is_delivery_free_to_customers', ''),
+        'preferred_pickup_time': (data.get('preferred_pickup_time', '')
+                                  or data.get('pickup_location_time_slab', '')),
+        'preferred_payment_method': data.get('preferred_payment_method', ''),
+        'special_handling_detail': data.get('special_handling_detail', ''),
+        'average_package_weight': data.get('average_package_weight', ''),
+        'number_of_pickup_locations': data.get('number_of_pickup_locations', ''),
+        'additional_notes': data.get('additional_notes', ''),
+    }, {
+        'is_frequent_same_day_pick_and_delivery_required':
+            data.get('is_frequent_same_day_pick_and_delivery_required', 'False') == 'True',
+        'is_special_handling_required': data.get('is_special_handling_required', 'False') == 'True',
+        'contact_consent': data.get('contact_consent') == 'on',
+    })
 
 
 # Answers the rate card needs to price a lead properly. Enforced here as well as
@@ -259,6 +297,11 @@ PRICING_REQUIRED_FIELDS = {
         ('speed_delivery_offer_to_customers', 'Please select the delivery speed you offer.'),
         ('typical_package_size', 'Please select your typical package size.'),
         ('average_package_weight', 'Please select your average package weight.'),
+        ('type_of_pickup_location', 'Please select type of pickup location.'),
+        # Where we collect from decides the route and the rate band. Sellers with
+        # no address of their own in Qatar answer "Ezzy Fulfillment Center".
+        ('pickup_Location_area_name',
+         'Please tell us the pickup area. No store in Qatar? Write "Ezzy Fulfillment Center".'),
     ],
 }
 
@@ -378,6 +421,7 @@ def _render_inquiry_step(request, step, all_data, error):
         'saved_data': _derive_business_status(all_data),
         'total_steps': 3,
         'inquiry_error': error,
+        'trimmed_labels': request.session.get('inquiry_trimmed', []),
     })
 
 
@@ -499,15 +543,16 @@ def delivery_inquiry(request):
                 if inquiry is None:
                     # Create new partial record
                     inquiry = PricingEnquiry(is_complete=False)
-                _save_step1_to_db(inquiry, all_data)
+                trimmed = _save_step1_to_db(inquiry, all_data)
                 request.session['inquiry_id'] = inquiry.id
+                _remember_trimmed(request, inquiry, trimmed)
                 request.session.modified = True
             elif current_step == 2:
                 error = _missing_pricing_answer(2, all_data)
                 if error:
                     return _render_inquiry_step(request, 2, all_data, error)
                 if inquiry:
-                    _save_step2_to_db(inquiry, all_data)
+                    _remember_trimmed(request, inquiry, _save_step2_to_db(inquiry, all_data))
 
             next_step = current_step + 1
             return redirect(f'/3pl/inquiry/?step={next_step}')
@@ -515,10 +560,12 @@ def delivery_inquiry(request):
         elif 'prev_step' in request.POST:
             # Save current step data to DB before going back
             if inquiry:
+                trimmed = {}
                 if current_step == 2:
-                    _save_step2_to_db(inquiry, all_data)
+                    trimmed = _save_step2_to_db(inquiry, all_data)
                 elif current_step == 3:
-                    _save_step3_to_db(inquiry, all_data)
+                    trimmed = _save_step3_to_db(inquiry, all_data)
+                _remember_trimmed(request, inquiry, trimmed)
 
             prev_step = max(1, current_step - 1)
             return redirect(f'/3pl/inquiry/?step={prev_step}')
@@ -568,6 +615,9 @@ def delivery_inquiry(request):
             request.session.pop('inquiry_data', None)
             request.session.pop('inquiry_step', None)
             request.session.pop('inquiry_id', None)
+            # The shortened-answer notice carries on from the record itself on
+            # the quote page, so it does not need to survive here.
+            request.session.pop('inquiry_trimmed', None)
 
             # Straight to the price table. The token carries identity from here,
             # not the session, so the link survives the clear above and can be
@@ -591,6 +641,7 @@ def delivery_inquiry(request):
         'current_step': current_step,
         'saved_data': _derive_business_status(saved_data),
         'total_steps': 3,
+        'trimmed_labels': request.session.get('inquiry_trimmed', []),
     }
     return render(request, 'webpages/delivery_pricing_inquiry.html', data)
 
@@ -731,6 +782,9 @@ def inquiry_quote(request, token):
         'inquiry': inquiry,
         'plans': plans,
         'quote_error': error,
+        # Last place we can ask the sender themselves for an answer we had to
+        # shorten — after this page the correction has to come from a sales call.
+        'trimmed_labels': _trimmed_labels(inquiry),
         # Pre-select what they picked last time when they come back to change it.
         'selected_key': (request.POST.get('plan')
                          or (inquiry.selected_plan.key if inquiry.selected_plan else '')),

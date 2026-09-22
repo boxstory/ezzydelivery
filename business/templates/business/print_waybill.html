@@ -8,7 +8,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Waybill - {{ user_business.business_name }}</title>
-  <link rel="stylesheet" href="{% static 'business/css/business-waybill.css' %}?v=20260910c">
+  <link rel="stylesheet" href="{% static 'business/css/business-waybill.css' %}?v=20260921b">
 </head>
 <body>
   <div class="bwb__toolbar">
@@ -103,9 +103,11 @@
           <div class="bwb__writespace"></div>
         </div>
 
-        <div class="bwb__cod{% if not order.cod_amount or order.cod_amount <= 0 %} bwb__cod--paid{% endif %}">
-          <span class="bwb__cod-label">COD to collect</span>
-          <span class="bwb__cod-amt">QAR {{ order.cod_amount|default:0 }}</span>
+        {# One figure only: goods COD plus the delivery charge. Two numbers on a #}
+        {# package invited the wrong one being taken at the door. #}
+        <div class="bwb__cod{% if not w.collect_total or w.collect_total <= 0 %} bwb__cod--paid{% endif %}">
+          <span class="bwb__cod-label">Collect</span>
+          <span class="bwb__cod-amt">QAR {{ w.collect_total|default:0|floatformat:2 }}</span>
         </div>
 
         <div class="bwb__items">
@@ -168,9 +170,8 @@
             {% endif %}
             <div class="bwb__detail"><span class="bwb__detail-cap">Date</span>{{ order.order_date|date:"d M Y" }}</div>
             <div class="bwb__detail"><span class="bwb__detail-cap">Pieces</span>{{ order.package_qty|default:order.order_items.count|default:1 }}</div>
-            {% if order.cod_amount and order.cod_amount > 0 %}
-            <div class="bwb__detail"><span class="bwb__detail-cap">COD</span>QAR {{ order.cod_amount }}</div>
-            {% endif %}
+            {# No COD figure down here: the Collect box above is the one money #}
+            {# number on the label, and a smaller second one reopened the doubt. #}
           </div>
           <div class="bwb__footer-code">
             {% if w.qr_svg %}

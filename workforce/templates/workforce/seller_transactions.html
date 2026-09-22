@@ -13,7 +13,7 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
 {% block title %}Seller Transactions - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/seller_roster.css' %}?v=20260831f" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/seller_roster.css' %}?v=20260916d" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -62,6 +62,31 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
         <div class="sro__head">
             <h2 class="sro__title" id="workforce_seller_roster_heading">Active sellers</h2>
             <span class="sro__count">{{ seller_roster|length }} account{{ seller_roster|length|pluralize }}</span>
+            {% comment %}
+            The book, at the top of the page: every riyal Ezzy is holding that
+            belongs to a seller, and the delivery count behind the account base.
+
+            COD to pay is the sum of the COD in Ezzy leg across the cards below,
+            never a separate query, so the header and the column under it cannot
+            drift. Cash still in a driver's pocket is deliberately out of it — it
+            has not reached us to be owed yet, and a payout run cannot touch it
+            (only cod_settled tasks are candidates).
+            {% endcomment %}
+            <div class="sro__book">
+                <div class="sro__book-item">
+                    <span class="sro__book-label">COD to pay sellers</span>
+                    <span class="sro__book-value{% if not roster_totals.owed %} sro__book-value--nil{% endif %}">
+                        {{ roster_totals.owed|floatformat:0|intcomma }}<span class="sro__book-unit">QAR</span>
+                    </span>
+                </div>
+                <div class="sro__book-item">
+                    <span class="sro__book-label">Total deliveries</span>
+                    <span class="sro__book-value sro__book-value--count{% if not roster_totals.deliveries %} sro__book-value--nil{% endif %}">
+                        {{ roster_totals.deliveries|intcomma }}
+                    </span>
+                </div>
+            </div>
+
             <label class="sro__search">
                 <span class="visually-hidden">Filter sellers</span>
                 <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
@@ -100,7 +125,7 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
                         </div>
                         <div class="sro__figure-part sro__figure-part--end">
                             <span class="sro__figure-value{% if not row.pending_orders %} sro__figure-value--nil{% endif %}">
-                                <span class="sro__figure-sum">{{ row.unsettled_orders|intcomma }} + {{ row.zero_cod_uncharged|intcomma }}</span>{{ row.pending_orders|intcomma }}<span class="visually-hidden"> pending orders</span>
+                                <span class="sro__figure-sum">({{ row.unsettled_orders|intcomma }} + {{ row.zero_cod_uncharged|intcomma }})</span>{{ row.pending_orders|intcomma }}<span class="visually-hidden"> pending orders</span>
                             </span>
                         </div>
                     </div>
@@ -629,7 +654,7 @@ Notes: Landing state is the roster of cards ordered by money owed; picking one o
 
 <!-- Export column picker -->
 {% include "workforce/parts/components/_export_columns_modal.html" %}
-<script src="{% static 'workforce/js/export-columns.js' %}?v=20260807b"></script>
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260921e"></script>
 <script src="{% static 'workforce/js/seller-roster.js' %}?v=20260728a"></script>
 
 {% endblock content %}

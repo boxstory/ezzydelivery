@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 # A task carrying completed_at must be sitting on one of these.
 TERMINAL_STATUSES = {
     'delivered', 'partial_delivery', 'failed', 'rejected', 'cancelled', 'dropsownlost',
+    'returned_to_shipper',
 }
 
 # Mirrors STATUS_TO_CLIENT in workforce.views.update_task_status
@@ -28,6 +29,7 @@ STATUS_TO_CLIENT = {
     'rejected': 'rejected',
     'cancelled': '9',
     'dropsownlost': 'rejected',
+    'returned_to_shipper': 'rejected',
 }
 
 

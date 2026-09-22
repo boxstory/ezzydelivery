@@ -19,9 +19,9 @@
 
     <!-- PWA Modern CSS -->
     {% load static %}
-    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260912a">
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260921r">
     <!-- Fleet Component CSS - fth__ ffs__ fpm__ BEM blocks -->
-    <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260630a">
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260919a">
 
     <!-- AI Tools CSS (shared modal, results, progress) -->
     <link rel="stylesheet" href="{% static 'ai_agent/css/ai-tools.css' %}?v=20260317k" type="text/css" />
@@ -78,6 +78,23 @@
 
         <!-- Main Content -->
         <main class="fleet-pwa__content">
+            {% comment %}
+            Dispatch can only reach a phone that has said yes once. Asked as a
+            bar with a button, never as an automatic permission call on load —
+            a prompt with no gesture behind it is what gets an origin blocked
+            for good. Hidden until ezzy-push.js decides it is worth showing.
+            {% endcomment %}
+            <div class="fpush__prompt" id="fleet_push_prompt">
+                <i class="fa-solid fa-bell fpush__prompt-icon"></i>
+                <div class="fpush__prompt-text">
+                    <strong class="fpush__prompt-title">Turn on alerts</strong>
+                    <span class="fpush__prompt-body">So dispatch can reach you for new tasks and location checks.</span>
+                </div>
+                <div class="fpush__prompt-actions">
+                    <button type="button" class="btn fpush__btn-enable" id="fleet_push_enable">Enable</button>
+                    <button type="button" class="btn fpush__btn-later" id="fleet_push_later">Not now</button>
+                </div>
+            </div>
             {% block content %}{% endblock %}
         </main>
 
@@ -251,6 +268,11 @@
     <script>window.EZZY_GPS_CONFIG = { onDuty: {{ driver_on_duty|yesno:"true,false" }} };</script>
     <script src="{% static 'fleet/js/ezzy-gps-queue.js' %}?v=20260802a"></script>
     <script src="{% static 'fleet/js/ezzy-gps.js' %}?v=20260903c"></script>
+
+    <!-- EzzyPush — Web Push registration + the fix taken when a driver answers
+         a "where are you?" notification. Loaded after EzzyGPS: it calls stamp(). -->
+    <script>window.EZZY_PUSH_CONFIG = { publicKey: '{{ vapid_public_key|default:"" }}' };</script>
+    <script src="{% static 'fleet/js/ezzy-push.js' %}?v=20260919a"></script>
 
     <!-- AI Address Parse (global utility) -->
     <script src="{% static 'ai_agent/js/ai-address-parse.js' %}?v=20260317k"></script>

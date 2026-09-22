@@ -1,0 +1,248 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff returns desk — every return request (RMA paperwork) across all clients, with decisions
+Used by: workforce_views.returns_requests_list at /workforce/returns/requests/
+Notes: Sibling of the custody console at /workforce/returns/, and deliberately a separate page: custody
+       tracks where the physical parcel is, this tracks the claim against the goods, and the two do not
+       close together — a box can be back on our shelf while the refund is still being argued about.
+       Where a return does have a custody leg, its whereabouts show in the Parcel column.
+       'refunded' is staff-only (business/views.py STAFF_ONLY_RETURN_STATUSES) because it asserts
+       EzzyDelivery paid money back out; before this page existed nobody could set it at all.
+       The default filter hides closed/refunded/rejected — the page is a work queue, not an archive.
+       "COD owed" is the money view: a refund promised to a customer that nobody has paid yet.
+{% endcomment %}
+
+{% block title %}Return Requests - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+{% comment %}crm.css carries the shared staff filter bar (crm__facets / crm__facet-select).{% endcomment %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260922a" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+{% csrf_token %}
+<div class="col-12">
+  <div class="wfpage">
+
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Reverse logistics &middot; Paperwork</span>
+        <h1 class="wfhero__title">Return Requests</h1>
+        <span class="wfhero__sub">
+          The claim against the goods
+          <span class="wfhero__sep">&middot;</span> where the parcel physically is lives on
+          <a href="{% url 'workforce:returns_custody_list' %}">Coming Back</a>
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <div class="wfhero__tallies">
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ open_count }}</span>
+            <span class="wfhero__tally-lbl">Open</span>
+          </div>
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ cod_owed_count }}</span>
+            <span class="wfhero__tally-lbl">COD owed</span>
+          </div>
+        </div>
+        <nav class="wfhero__actions">
+          <a href="?status=cod_owed" class="wfhero__ghost{% if cod_owed_count %} wfhero__ghost--alert{% endif %}">
+            QAR {{ cod_owed_total }} unrefunded &#9656;
+          </a>
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_returns_requests_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wfnote" id="workforce_returns_requests_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_returns_requests_card_notes' %}" hidden></div>
+
+    <form method="GET" class="crm__facets" id="workforce_returns_requests_form_filters">
+      <select name="status" class="crm__facet-select" data-no-select2 onchange="this.form.submit()">
+        <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open — needs a decision</option>
+        <option value="cod_owed" {% if status_filter == 'cod_owed' %}selected{% endif %}>COD owed back</option>
+        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+        {% for value, label in status_choices %}
+        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="business" class="crm__facet-select" data-no-select2 onchange="this.form.submit()">
+        <option value="">All clients</option>
+        {% for b in businesses %}
+        <option value="{{ b.business_id }}" {% if business_filter == b.business_id|stringformat:"s" %}selected{% endif %}>{{ b.business_name }}</option>
+        {% endfor %}
+      </select>
+      <select name="days" class="crm__facet-select" data-no-select2 onchange="this.form.submit()">
+        <option value="7" {% if days_filter == '7' %}selected{% endif %}>Last 7 days</option>
+        <option value="30" {% if days_filter == '30' %}selected{% endif %}>Last 30 days</option>
+        <option value="90" {% if days_filter == '90' %}selected{% endif %}>Last 90 days</option>
+        <option value="all" {% if days_filter == 'all' %}selected{% endif %}>All time</option>
+      </select>
+      <input type="search" name="search" value="{{ search }}" class="crm__facet-select"
+             placeholder="Return no., order, customer…">
+      <button type="submit" class="btn btn-sm btn-outline-secondary">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Filter
+      </button>
+    </form>
+
+    {% if hidden_open %}
+    <div class="alert alert-warning py-2 rtn__windownote" id="workforce_returns_requests_note_hidden">
+      <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>
+      {{ hidden_open }} open return{{ hidden_open|pluralize }} {{ hidden_open|pluralize:"is,are" }} older than this date window.
+      <a href="?status={{ status_filter }}&amp;days=all">Show all time</a>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header">
+        <strong><i class="fa-solid fa-file-invoice me-2" aria-hidden="true"></i>Return requests</strong>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0" id="workforce_returns_table_requests">
+          <thead>
+            <tr>
+              <th scope="col">Return</th>
+              <th scope="col">Order</th>
+              <th scope="col">Client</th>
+              <th scope="col">Reason</th>
+              <th scope="col">Items</th>
+              <th scope="col">Refund owed</th>
+              <th scope="col">Parcel</th>
+              <th scope="col">Raised</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in returns %}
+            <tr data-return-id="{{ r.id }}">
+              <td class="fw-semibold">{{ r.return_number }}</td>
+              <td>
+                {% if r.order %}
+                <a href="{% url 'workforce:order_detail' r.order.id %}">{{ r.order.order_number }}</a>
+                <div class="text-muted small">{{ r.order.customer_name }}</div>
+                {% else %}—{% endif %}
+              </td>
+              <td>{{ r.business.business_name|default:"—" }}</td>
+              <td>
+                {{ r.get_reason_display }}
+                {% if r.reason_notes %}
+                <div class="text-muted small">{{ r.reason_notes|truncatechars:60 }}</div>
+                {% endif %}
+              </td>
+              <td>
+                {% for ri in r.return_items.all %}
+                <span class="badge bg-secondary">{{ ri.order_item.display_name|truncatechars:22 }} &times;{{ ri.quantity_returned }}</span>
+                {% empty %}
+                <span class="text-muted">whole order</span>
+                {% endfor %}
+              </td>
+              <td>
+                {% if r.cod_reversal_amount %}
+                QAR {{ r.cod_reversal_amount }}
+                {% if r.cod_reversal_processed %}
+                <span class="badge bg-success">paid back</span>
+                {% else %}
+                <span class="badge bg-warning text-dark">owed</span>
+                {% endif %}
+                {% else %}
+                <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if r.custody %}
+                <span class="status-badge status-badge--{{ r.custody.status }}">{{ r.custody.get_status_display }}</span>
+                <div class="text-muted small">{{ r.custody.destination_label }}</div>
+                {% else %}
+                <span class="text-muted small">no custody leg</span>
+                {% endif %}
+              </td>
+              <td>
+                <span title="{{ r.created_at }}">{{ r.created_at|date:"d M, H:i" }}</span>
+                {% if r.reviewed_by %}
+                <div class="text-muted small">by {{ r.reviewed_by.get_full_name|default:r.reviewed_by.username }}</div>
+                {% endif %}
+              </td>
+              <td>
+                <select class="form-select form-select-sm rtn__status-select" data-no-select2
+                        data-id="{{ r.id }}" aria-label="Status for {{ r.return_number }}">
+                  {% for value, label in status_choices %}
+                  <option value="{{ value }}" {% if r.status == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9">
+                <div class="empty-state">
+                  <i class="fa-solid fa-file-circle-check empty-state__icon" aria-hidden="true"></i>
+                  <p class="empty-state__title">No return requests here</p>
+                  <p class="empty-state__text">Returns are raised by a seller, by a driver marking a partial delivery, or when a task closes as Returned to Shipper.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params="status="|add:status_filter|add:"&business="|add:business_filter|add:"&days="|add:days_filter|add:"&search="|add:search pagination_id="return_requests" %}
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    const table = document.getElementById('workforce_returns_table_requests');
+    if (!table) return;
+
+    table.addEventListener('change', function (e) {
+        const sel = e.target.closest('.rtn__status-select');
+        if (!sel) return;
+        const id = sel.getAttribute('data-id');
+        const previous = sel.dataset.previous || '';
+        const value = sel.value;
+        // 'refunded' says our cash went back out the door. Never on one click.
+        if (value === 'refunded' &&
+            !confirm('Mark this return REFUNDED? That records that EzzyDelivery has paid the customer back.')) {
+            if (previous) sel.value = previous;
+            return;
+        }
+        sel.disabled = true;
+        fetch('/workforce/returns/requests/' + id + '/status/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify({ status: value })
+        })
+        .then(r => r.json())
+        .then(data => {
+            sel.disabled = false;
+            if (!data.success) {
+                alert(data.error || 'Could not update this return');
+                if (previous) sel.value = previous;
+                return;
+            }
+            sel.dataset.previous = data.status;
+        })
+        .catch(() => {
+            sel.disabled = false;
+            alert('Network error');
+            if (previous) sel.value = previous;
+        });
+    });
+
+    // Remember the starting value so a refused change can be put back.
+    table.querySelectorAll('.rtn__status-select').forEach(s => { s.dataset.previous = s.value; });
+})();
+</script>
+{% endblock extra_js %}

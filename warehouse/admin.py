@@ -8,7 +8,11 @@ from warehouse import models as warehouse_models
 class WarehouseAdmin(admin.ModelAdmin):
     list_display = ('code', 'name', 'city', 'is_active', 'is_default', 'manager', 'created_at')
     list_filter = ('is_active', 'is_default', 'city', 'created_at')
-    search_fields = ('code', 'name', 'address', 'city')
+    search_fields = ('code', 'postal_code', 'name', 'phone', 'email', 'address',
+                     'racks_per_zone', 'zone_naming_pattern', 'city', 'description', 'state',
+                     'country', 'rack_naming_pattern', 'shelf_naming_pattern',
+                     'bin_naming_pattern', 'capacity_configured_by__username',
+                     'manager__username', 'created_by__username')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         ('Fulfillment Center Info', {
@@ -34,7 +38,8 @@ class WarehouseAdmin(admin.ModelAdmin):
 class WarehouseLocationAdmin(admin.ModelAdmin):
     list_display = ('full_code', 'name', 'warehouse', 'zone_number', 'is_active', 'is_default')
     list_filter = ('warehouse', 'is_active', 'is_default', 'zone_number')
-    search_fields = ('name', 'code', 'warehouse__name', 'warehouse__code', 'address')
+    search_fields = ('code', 'zone_number', 'name', 'address', 'operating_hours', 'notes',
+                     'warehouse__code', 'warehouse__name')
     readonly_fields = ('created_at', 'updated_at', 'full_code')
     fieldsets = (
         ('Location Info', {
@@ -57,7 +62,8 @@ class WarehouseLocationAdmin(admin.ModelAdmin):
 class SellerWarehouseLinkAdmin(admin.ModelAdmin):
     list_display = ('business', 'warehouse', 'default_location', 'is_default', 'is_active', 'priority', 'linked_at')
     list_filter = ('is_default', 'is_active', 'warehouse', 'linked_at')
-    search_fields = ('business__business_name', 'warehouse__name', 'warehouse__code')
+    search_fields = ('notes', 'warehouse__code', 'default_location__code',
+                     'business__business_name', 'warehouse__name', 'linked_by__username')
     readonly_fields = ('linked_at', 'updated_at')
     raw_id_fields = ('business', 'warehouse', 'default_location', 'linked_by')
     fieldsets = (
@@ -81,7 +87,8 @@ class SellerWarehouseLinkAdmin(admin.ModelAdmin):
 class StorageLocationAdmin(admin.ModelAdmin):
     list_display = ('code', 'name', 'warehouse', 'location_type', 'parent', 'is_pickable', 'is_active')
     list_filter = ('warehouse', 'location_type', 'is_pickable', 'is_active')
-    search_fields = ('code', 'name', 'barcode', 'warehouse__code')
+    search_fields = ('code', 'barcode', 'name', 'location_type', 'warehouse__code',
+                     'parent__code')
     readonly_fields = ('created_at', 'updated_at')
     raw_id_fields = ('parent',)
     fieldsets = (
@@ -105,7 +112,8 @@ class StockLevelAdmin(ImportExportModelAdmin):
         'quantity_reserved', 'get_quantity_available', 'get_is_low_stock', 'abc_classification'
     )
     list_filter = ('warehouse', 'abc_classification', 'location__location_type')
-    search_fields = ('product__item_name', 'product__item_sku', 'warehouse__code')
+    search_fields = ('abc_classification', 'product__item_sku', 'warehouse__code',
+                     'location__code', 'product__item_name')
     readonly_fields = ('created_at', 'updated_at', 'get_quantity_available', 'get_is_low_stock')
     raw_id_fields = ('product', 'location')
     fieldsets = (
@@ -147,7 +155,9 @@ class InventoryTransactionAdmin(admin.ModelAdmin):
         'quantity', 'reference_type', 'reference_id', 'created_at'
     )
     list_filter = ('transaction_type', 'warehouse', 'created_at')
-    search_fields = ('transaction_number', 'product__item_sku', 'reference_id')
+    search_fields = ('transaction_number', 'transaction_type', 'reference_type', 'reference_id',
+                     'notes', 'product__item_sku', 'warehouse__code', 'location__code',
+                     'created_by__username')
     readonly_fields = (
         'transaction_number', 'quantity_before', 'quantity_after', 'created_at'
     )
@@ -174,7 +184,7 @@ class InventoryTransactionAdmin(admin.ModelAdmin):
 class StockReservationAdmin(admin.ModelAdmin):
     list_display = ('id', 'order', 'order_item', 'quantity', 'status', 'reserved_at')
     list_filter = ('status', 'reserved_at')
-    search_fields = ('order__order_number', 'order_item__product__item_sku')
+    search_fields = ('status', 'order__order_number', 'order_item__product__item_sku')
     readonly_fields = ('reserved_at', 'created_at', 'updated_at')
     raw_id_fields = ('order', 'order_item', 'stock_level')
     fieldsets = (
@@ -195,7 +205,8 @@ class PickListAdmin(admin.ModelAdmin):
         'assigned_to', 'total_items', 'picked_items', 'get_progress', 'created_at'
     )
     list_filter = ('status', 'warehouse', 'created_at')
-    search_fields = ('pick_number', 'wave_number')
+    search_fields = ('pick_number', 'wave_number', 'status', 'warehouse__code', 'zone__code',
+                     'business__business_name', 'assigned_to__username', 'created_by__username')
     readonly_fields = ('pick_number', 'created_at', 'updated_at', 'get_progress')
     raw_id_fields = ('assigned_to', 'created_by')
     fieldsets = (
@@ -226,7 +237,8 @@ class PickListItemAdmin(admin.ModelAdmin):
         'quantity_to_pick', 'quantity_picked', 'is_picked'
     )
     list_filter = ('is_picked', 'pick_list__status')
-    search_fields = ('pick_list__pick_number', 'product__item_sku', 'order__order_number')
+    search_fields = ('pick_list__pick_number', 'product__item_sku', 'order__order_number',
+                     'location__code', 'picked_by__username')
     readonly_fields = ('created_at',)
     raw_id_fields = ('pick_list', 'order', 'order_item', 'product', 'location', 'picked_by')
 
@@ -238,7 +250,8 @@ class CycleCountAdmin(admin.ModelAdmin):
         'scheduled_date', 'assigned_to', 'get_total_items', 'get_counted_items'
     )
     list_filter = ('status', 'warehouse', 'scheduled_date')
-    search_fields = ('count_number', 'warehouse__code')
+    search_fields = ('count_number', 'status', 'notes', 'warehouse__code', 'location__code',
+                     'assigned_to__username', 'approved_by__username', 'created_by__username')
     readonly_fields = ('count_number', 'created_at', 'updated_at')
     raw_id_fields = ('location', 'assigned_to', 'approved_by', 'created_by')
     date_hierarchy = 'scheduled_date'
@@ -274,7 +287,8 @@ class CycleCountItemAdmin(admin.ModelAdmin):
         'counted_quantity', 'variance', 'is_counted'
     )
     list_filter = ('is_counted', 'cycle_count__status')
-    search_fields = ('cycle_count__count_number', 'product__item_sku')
+    search_fields = ('variance_reason', 'cycle_count__count_number', 'product__item_sku',
+                     'location__code', 'counted_by__username')
     readonly_fields = ('created_at', 'variance')
     raw_id_fields = ('cycle_count', 'product', 'location', 'counted_by')
 
@@ -286,7 +300,8 @@ class LowStockAlertAdmin(admin.ModelAdmin):
         'status', 'created_at'
     )
     list_filter = ('status', 'warehouse', 'created_at')
-    search_fields = ('product__item_sku', 'product__item_name', 'warehouse__code')
+    search_fields = ('status', 'product__item_sku', 'warehouse__code', 'product__item_name',
+                     'acknowledged_by__username')
     readonly_fields = ('created_at',)
     raw_id_fields = ('stock_level', 'product', 'warehouse', 'acknowledged_by')
     fieldsets = (
@@ -318,7 +333,9 @@ class InboundProductRequestAdmin(admin.ModelAdmin):
         'expected_delivery_date', 'created_at', 'approved_at'
     )
     list_filter = ('status', 'warehouse', 'created_at', 'approved_at')
-    search_fields = ('request_number', 'business__business_name', 'warehouse__name')
+    search_fields = ('request_number', 'request_type', 'status', 'notes', 'warehouse__code',
+                     'business__business_name', 'warehouse__name', 'created_by__username',
+                     'approved_by__username', 'completed_by__username')
     readonly_fields = ('request_number', 'created_at', 'updated_at')
     raw_id_fields = ('business', 'warehouse', 'created_by', 'approved_by', 'completed_by')
     date_hierarchy = 'created_at'
@@ -349,7 +366,9 @@ class OutboundProductRequestAdmin(admin.ModelAdmin):
         'priority', 'created_at', 'approved_at'
     )
     list_filter = ('status', 'priority', 'warehouse', 'created_at', 'approved_at')
-    search_fields = ('request_number', 'business__business_name', 'warehouse__name')
+    search_fields = ('request_number', 'request_type', 'status', 'notes', 'priority',
+                     'warehouse__code', 'business__business_name', 'warehouse__name',
+                     'created_by__username', 'approved_by__username', 'completed_by__username')
     readonly_fields = ('request_number', 'created_at', 'updated_at')
     raw_id_fields = ('business', 'warehouse', 'created_by', 'approved_by', 'completed_by')
     date_hierarchy = 'created_at'
@@ -377,12 +396,9 @@ class OutboundProductRequestAdmin(admin.ModelAdmin):
 class ProductRequestItemAdmin(admin.ModelAdmin):
     list_display = ('get_request_number', 'product', 'quantity_requested', 'quantity_fulfilled', 'created_at')
     list_filter = ('created_at',)
-    search_fields = (
-        'inbound_request__request_number',
-        'outbound_request__request_number',
-        'product__item_sku',
-        'product__item_name'
-    )
+    search_fields = ('notes', 'inbound_request__request_number',
+                     'outbound_request__request_number', 'product__item_sku',
+                     'product__item_name')
     readonly_fields = ('created_at', 'updated_at')
     raw_id_fields = ('inbound_request', 'outbound_request', 'product')
 
@@ -393,3 +409,82 @@ class ProductRequestItemAdmin(admin.ModelAdmin):
         elif obj.outbound_request:
             return obj.outbound_request.request_number
         return '-'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tables that had no admin page. Registered so every model is reachable and
+# searchable from /dj-admin/. Related rows use raw id fields so a changelist
+# never renders a dropdown of the whole table.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@admin.register(warehouse_models.CustomerReturn)
+class CustomerReturnAdmin(admin.ModelAdmin):
+    list_display = ('rma_number', 'order', 'business', 'warehouse', 'status', 'reason', 'created_at')
+    search_fields = ('rma_number', 'status', 'reason', 'customer_notes', 'staff_notes',
+                     'order__order_number', 'warehouse__code', 'business__business_name',
+                     'requested_by__username')
+    list_filter = ('status', 'reason')
+    list_select_related = ('order', 'business', 'warehouse')
+    raw_id_fields = ('order', 'business', 'warehouse', 'requested_by')
+
+@admin.register(warehouse_models.CustomerReturnItem)
+class CustomerReturnItemAdmin(admin.ModelAdmin):
+    list_display = ('customer_return', 'product', 'quantity', 'reason', 'condition', 'disposition', 'created_at')
+    search_fields = ('reason', 'condition', 'disposition', 'customer_return__rma_number', 'product__item_sku', 'location__code')
+    list_filter = ('reason', 'condition', 'disposition', 'is_received')
+    list_select_related = ('customer_return', 'product')
+    raw_id_fields = ('customer_return', 'product', 'location')
+
+@admin.register(warehouse_models.DispatchBatch)
+class DispatchBatchAdmin(admin.ModelAdmin):
+    list_display = ('batch_number', 'warehouse', 'driver', 'status', 'total_orders', 'total_cod_amount', 'created_at')
+    search_fields = ('batch_number', 'status', 'notes', 'total_cod_amount', 'warehouse__code',
+                     'driver__driver_code', 'created_by__username')
+    list_filter = ('status',)
+    list_select_related = ('warehouse', 'driver')
+    raw_id_fields = ('warehouse', 'driver', 'created_by')
+
+@admin.register(warehouse_models.DispatchItem)
+class DispatchItemAdmin(admin.ModelAdmin):
+    list_display = ('batch', 'order', 'pick_list', 'is_handed_over', 'handed_over_at', 'cod_amount', 'created_at')
+    search_fields = ('cod_amount', 'batch__batch_number', 'order__order_number',
+                     'pick_list__pick_number')
+    list_filter = ('is_handed_over',)
+    list_select_related = ('batch', 'order', 'pick_list')
+    raw_id_fields = ('batch', 'order', 'pick_list')
+
+@admin.register(warehouse_models.PutAwayTask)
+class PutAwayTaskAdmin(admin.ModelAdmin):
+    list_display = ('task_number', 'warehouse', 'status', 'priority', 'assigned_to', 'inbound_request', 'created_at')
+    search_fields = ('task_number', 'status', 'priority', 'notes', 'warehouse__code',
+                     'inbound_request__request_number', 'assigned_to__username',
+                     'created_by__username')
+    list_filter = ('status', 'priority')
+    list_select_related = ('warehouse', 'assigned_to', 'inbound_request')
+    raw_id_fields = ('warehouse', 'assigned_to', 'inbound_request', 'created_by')
+
+@admin.register(warehouse_models.PutAwayTaskItem)
+class PutAwayTaskItemAdmin(admin.ModelAdmin):
+    list_display = ('put_away_task', 'product', 'quantity', 'source_location', 'suggested_location', 'actual_location', 'created_at')
+    search_fields = ('put_away_task__task_number', 'product__item_sku', 'source_location__code',
+                     'suggested_location__code', 'actual_location__code',
+                     'completed_by__username')
+    list_filter = ('is_completed',)
+    list_select_related = ('put_away_task', 'product', 'source_location', 'suggested_location', 'actual_location')
+    raw_id_fields = ('put_away_task', 'product', 'source_location', 'suggested_location', 'actual_location', 'completed_by')
+
+@admin.register(warehouse_models.ReturnTask)
+class ReturnTaskAdmin(admin.ModelAdmin):
+    list_display = ('return_number', 'warehouse', 'order', 'pick_list', 'status', 'assigned_to', 'created_at')
+    search_fields = ('return_number', 'status', 'reason', 'notes', 'warehouse__code',
+                     'order__order_number', 'pick_list__pick_number', 'assigned_to__username')
+    list_filter = ('status',)
+    list_select_related = ('warehouse', 'order', 'pick_list', 'assigned_to')
+    raw_id_fields = ('warehouse', 'order', 'pick_list', 'assigned_to')
+
+@admin.register(warehouse_models.ReturnTaskItem)
+class ReturnTaskItemAdmin(admin.ModelAdmin):
+    list_display = ('return_task', 'product', 'location', 'quantity', 'is_returned', 'returned_at')
+    search_fields = ('return_task__return_number', 'product__item_sku', 'location__code')
+    list_filter = ('is_returned',)
+    list_select_related = ('return_task', 'product', 'location')
+    raw_id_fields = ('return_task', 'product', 'location')

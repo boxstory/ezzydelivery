@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 # Terminal order statuses — don't overwrite these
 TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled']
 
+# The leg that carries a returned parcel from a hub shelf back out to the client.
+# Several customer-facing side effects below are deliberately skipped for it.
+from delivery.services.returns import RETURN_LEG  # noqa: E402
+
 
 @receiver(pre_save, sender=DeliveryTask)
 def delivery_task_pre_save(sender, instance, **kwargs):
@@ -87,6 +91,13 @@ def _sync_order_status_from_task(task):
         if not order:
             return
 
+        # A return run reaching the client is the opposite of a delivery: the
+        # customer never got the goods. Letting this leg write 'delivered' would
+        # overwrite the returned outcome on the order and stamp delivered_at with
+        # the day we handed the parcel BACK.
+        if task.task_leg == RETURN_LEG:
+            return
+
         # Don't overwrite terminal order statuses
         if order.order_status in TERMINAL_ORDER_STATUSES:
             logger.debug(f"Order {order.order_number} already in terminal status '{order.order_status}', skipping sync")
@@ -125,7 +136,8 @@ ACTIVE_TASK_STATUSES = [
 ]
 
 # Terminal DL task statuses that mean the task is done
-TERMINAL_TASK_STATUSES = ['delivered', 'failed', 'cancelled', 'rejected']
+TERMINAL_TASK_STATUSES = ['delivered', 'failed', 'cancelled', 'rejected',
+                          'returned_to_shipper']
 
 
 def _sync_driver_availability(task):
@@ -178,6 +190,12 @@ def _send_customer_notification(task, old_status, new_status):
         'delivered':        ('delivered', 'wa_delivered'),
         'failed':           ('delivery_failed', 'wa_delivery_failed'),
     }
+    # The recipient of every message in EVENT_MAP is the end customer. On a return
+    # run the parcel is going back to the MERCHANT, so "your order is on its way"
+    # and "delivered" would both be lies told to the person who never got it.
+    if task.task_leg == RETURN_LEG:
+        return
+
     entry = EVENT_MAP.get(new_status)
     if not entry:
         return
@@ -567,6 +585,18 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
             except Exception as e:
                 logger.error(f"Error creating TaskStatusPoint for task {instance.pk}: {e}")
 
+    # A return run's custody row follows its task — the driver taking it off the
+    # shelf and handing it to the client IS the custody move, so the returns
+    # console must not need staff to repeat it. Runs on every non-creation save,
+    # not just status changes, because claiming a task writes the driver first.
+    if not created and instance.task_leg == RETURN_LEG:
+        try:
+            from delivery.services.returns import sync_return_leg_custody
+            sync_return_leg_custody(
+                instance, actor=getattr(instance, '_status_changed_by', None))
+        except Exception as e:
+            logger.warning(f"Return-leg custody sync failed for task {instance.pk}: {e}")
+
     # Sync delivery task status → order status (for all non-creation saves)
     if not created:
         old_status = getattr(instance, '_old_dl_task_status', None)
@@ -577,10 +607,13 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
             # The delivery leg ended — pull any first-mile pickup still sitting in the
             # driver pool. 'failed'/'rejected' are left alone: those can be retried.
             # An already-collected pickup is closed as handed off, never cancelled.
-            if new_status in ('cancelled', 'delivered', 'partial_delivery'):
+            if new_status in ('cancelled', 'delivered', 'partial_delivery',
+                              'returned_to_shipper'):
                 try:
                     from delivery.services.pickup import cancel_pickup_for_order
-                    label = 'cancelled' if new_status == 'cancelled' else 'delivered'
+                    label = {'cancelled': 'cancelled',
+                             'returned_to_shipper': 'returned to the shipper'}.get(
+                                 new_status, 'delivered')
                     cancel_pickup_for_order(
                         instance.order, reason=f"Delivery task was {label}",
                         delivery_task=instance)
@@ -678,7 +711,9 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
                     'failed': 'wa_delivery_failed',
                 }
                 wa_key = wa_trigger_map.get(new_status)
-                if wa_key:
+                # Same reasoning as _send_customer_notification: these reach the
+                # customer, and a return run has nothing to tell them.
+                if wa_key and instance.task_leg != RETURN_LEG:
                     execute_flows_for_trigger(wa_key, task=instance)
             except Exception as e:
                 logger.warning(f"Auto flow execution failed for status change {instance.pk}: {e}")
@@ -686,7 +721,8 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
     # Send WhatsApp location verification when task is published
     if not created:
         old_publish = getattr(instance, '_old_dl_task_publish', None)
-        if old_publish is False and instance.dl_task_publish is True:
+        if (old_publish is False and instance.dl_task_publish is True
+                and instance.task_leg != RETURN_LEG):
             _send_location_verification_on_publish(instance)
 
             # Fire auto flows for task publish and location verification triggers

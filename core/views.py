@@ -41,9 +41,7 @@ Constants:
 
 import logging
 import os
-import random
 import secrets
-import string
 from datetime import datetime, timedelta
 from django.utils import timezone as dj_timezone
 from functools import wraps
@@ -69,6 +67,7 @@ from core import models as core_models
 from core import signup_origin
 from core.context_processors import get_cached_profile, get_cached_business
 from fleet import forms as fleet_forms
+from fleet.codes import generate_driver_code
 from fleet import models as fleet_models
 from core.validators import safe_int
 
@@ -627,9 +626,7 @@ def join_driver(request):
                     new_id = profile.id
                     if fleet_models.Driver.objects.filter(pk=new_id).exists():
                         new_id = (fleet_models.Driver.objects.aggregate(m=Max('driver_id'))['m'] or 0) + 1
-                    code = ''.join(random.choice(string.digits) for _ in range(6))
-                    while fleet_models.Driver.objects.filter(driver_code=code).exists():
-                        code = ''.join(random.choice(string.digits) for _ in range(6))
+                    code = generate_driver_code()
                     driver = fleet_models.Driver(
                         user=request.user,
                         profile=profile,
@@ -1240,6 +1237,9 @@ def join_us_team(request):
 
     completion_percentage = profile.get_profile_completion_percentage()
 
+    # No browsable list: the page ships zero business names and asks the user to
+    # type at least 4 characters, which /business/search/ answers with the
+    # matching rows only (already flagged for membership / live requests).
     context = {
         'profile': profile,
         'profile_picture': profile_picture,
@@ -1912,7 +1912,7 @@ def driver_register(request):
             if not is_update:
                 driver.driver_id = profile.id
                 driver.driver_status = DRIVER_STATUS_PENDING
-                driver.driver_code = ''.join(random.choice(string.digits) for _ in range(6))
+                driver.driver_code = generate_driver_code()
                 driver.driver_rating = 0
                 driver.driver_rating_count = 0
                 driver.driver_reviews_count = 0

@@ -7,7 +7,8 @@ from django.db.models import Exists, OuterRef, Q, Subquery
 
 # The delivery leg is over for good — a first-mile pickup on it is dead work.
 # 'failed'/'rejected' are NOT here: a failed task can be retried, so its pickup stays live.
-TERMINAL_DL_STATUSES = ['cancelled', 'delivered', 'partial_delivery']
+TERMINAL_DL_STATUSES = ['cancelled', 'delivered', 'partial_delivery',
+                        'returned_to_shipper']
 TERMINAL_ORDER_STATUSES = ['cancelled', 'delivered']
 
 

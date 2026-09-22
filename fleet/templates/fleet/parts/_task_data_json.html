@@ -1,0 +1,36 @@
+{% comment %}
+Purpose: The application/json payloads a .task-card carries (items, address/verification, products).
+Used by: fleet/driver_tasks_pwa.html task cards, fleet/tasks_map_pwa.html hidden map stubs.
+Notes: Include as the first children of the .task-card div. Expects `card` (DeliveryTask) and `addr`.
+{% endcomment %}
+<script type="application/json" class="task-products-data">{% spaceless %}[{% for item in card.order.order_items.all %}{"name":"{{ item.display_name|escapejs }}","brand":"{% if item.product %}{{ item.product.brand_name|default:''|escapejs }}{% endif %}","sku":"{% if item.product %}{{ item.product.item_sku|default:''|escapejs }}{% endif %}","qty":{{ item.quantity }}{% if item.unit_price %},"price":"{{ item.unit_price }}"{% endif %}{% if item.product and item.notes %},"note":"{{ item.notes|escapejs }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]{% endspaceless %}
+</script>
+{% with av=card.order.address_verifications.first %}
+<script type="application/json" class="task-address-data">{% spaceless %}{
+  {% if av %}
+  "result":"{{ av.verification_result }}",
+  "verified_address":"{{ av.verified_address|default:''|escapejs }}",
+  "zone":"{{ av.zone_number|default:'' }}",
+  "street":"{{ av.street_number|default:'' }}",
+  "building":"{{ av.building_number|default:'' }}",
+  "lat":"{{ av.latitude|default:'' }}",
+  "lng":"{{ av.longitude|default:'' }}",
+  "notes":"{{ av.notes|default:''|escapejs }}",
+  "verified_at":"{{ av.verified_at|date:'M d, Y H:i'|default:'' }}",
+  {% else %}
+  "result":"",
+  {% endif %}
+  "dl_lat":"{% if addr %}{{ addr.dl_latitude|default:'' }}{% endif %}",
+  "dl_lng":"{% if addr %}{{ addr.dl_longitude|default:'' }}{% endif %}",
+  "dl_pluscode":"{% if addr %}{{ addr.dl_pluscode|default:''|escapejs }}{% endif %}",
+  "order_lat":"{{ card.order.latitude|default:'' }}",
+  "order_lng":"{{ card.order.longitude|default:'' }}",
+  "order_zone":"{{ card.order.dl_zone|default:'' }}",
+  "order_street":"{{ card.order.dl_street|default:'' }}",
+  "order_building":"{{ card.order.dl_building|default:'' }}",
+  "coords_accuracy":"{{ card.order.coords_accuracy|default:'' }}",
+  "qnas_status":"{{ card.order.qnas_status|default:'' }}"
+}{% endspaceless %}
+</script>
+<script type="application/json" class="task-items-data">[{% for item in card.order.order_items.all %}{"id":{{ item.id }},"name":"{{ item.display_name|escapejs }}","qty":{{ item.quantity }}}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
+{% endwith %}

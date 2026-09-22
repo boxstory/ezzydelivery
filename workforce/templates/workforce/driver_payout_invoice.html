@@ -12,6 +12,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'workforce/css/cod_payout_invoice.css' %}?v=20260815a" type="text/css" />
+{# The column picker reuses the charge invoice's modal furniture — the file is entirely .ccc__ scoped, so it cannot reach the bpi__ sheet. #}
+<link rel="stylesheet" href="{% static 'workforce/css/client_charges.css' %}?v=20260909a" type="text/css" />
 <link rel="stylesheet" href="{% static 'workforce/css/invoice_preview.css' %}?v=20260815a" type="text/css" />
 {% endblock %}
 
@@ -23,6 +25,8 @@
     <button type="button" class="bpi__ghost" id="workforce_driver_payout_btn_print">Print invoice</button>
     <button type="button" class="bpi__ghost" id="workforce_driver_payout_btn_preview"
             data-bpi-preview-toggle aria-pressed="false">A4 preview</button>
+    <button type="button" class="bpi__ghost" id="workforce_driver_payout_btn_columns"
+            data-bs-toggle="modal" data-bs-target="#dpiColumnsModal">Columns</button>
     <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
             aria-expanded="false" aria-controls="workforce_driver_payout_invoice_card_notes"
             title="About this page">
@@ -83,36 +87,39 @@
     </header>
 
     <!-- Payout lines -->
+    {% comment %}
+    The lines being paid. Columns are chosen per driver (fleet/payout_columns.py)
+    and arrive pre-rendered as `columns` / `rows` / `totals_cells`, the same way
+    the client charge invoice builds its table — the set is picked at run time,
+    so resolving it here would mean a template tag per column.
+    {% endcomment %}
     <div class="bpi__table-wrap">
-      <table class="bpi__table">
+      <table class="bpi__table {{ table_size_class }}">
         <thead>
+          <tr class="bpi__hgroup">
+            <th class="bpi__col-idx" rowspan="2">#</th>
+            {% for g in header_groups %}<th colspan="{{ g.count }}">{{ g.label }}</th>{% endfor %}
+          </tr>
           <tr>
-            <th class="bpi__col-idx">#</th>
-            <th>Task</th>
-            <th>Details</th>
-            <th>Date</th>
-            <th class="bpi__num">Earning</th>
+            {% for c in columns %}<th class="{{ c.css }}">{{ c.label }}</th>{% endfor %}
           </tr>
         </thead>
         <tbody>
-          {% for l in lines %}
+          {% for row in rows %}
           <tr>
-            <td class="bpi__col-idx">{{ forloop.counter }}</td>
-            <td class="bpi__order">{% if l.task %}{{ l.task.dl_task_number|default:l.task.id }}{% else %}—{% endif %}</td>
-            <td>{{ l.txn.description|default:l.txn.get_transaction_type_display }}</td>
-            <td class="bpi__date">{{ l.txn.created_at|date:"d M Y" }}</td>
-            <td class="bpi__num bpi__num--cod">{{ l.amount|floatformat:2|intcomma }}</td>
+            <td class="bpi__col-idx">{{ row.index }}</td>
+            {% for cell in row.cells %}<td class="{{ cell.css }}">{{ cell.value }}{% if cell.sub %}<span class="bpi__cell-sub">{{ cell.sub }}</span>{% endif %}</td>{% endfor %}
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" class="bpi__empty">No payout lines are linked to this settlement.</td>
+            <td colspan="{{ col_count }}" class="bpi__empty">No payout lines are linked to this settlement.</td>
           </tr>
           {% endfor %}
         </tbody>
         <tfoot>
           <tr class="bpi__totals-row">
-            <td colspan="4">Total · {{ lines|length }} line{{ lines|length|pluralize }}</td>
-            <td class="bpi__num bpi__num--cod">{{ total_earnings|floatformat:2|intcomma }}</td>
+            <td colspan="{{ totals_label_span }}">Total · {{ lines|length }} line{{ lines|length|pluralize }}</td>
+            {% for cell in totals_cells %}<td class="{{ cell.css }}">{{ cell.value }}</td>{% endfor %}
           </tr>
         </tfoot>
       </table>
@@ -160,6 +167,48 @@
    </table>
   </article>
 
+  {# Choose the columns this payout's line table carries — screen only, never printed #}
+  <div class="modal fade" id="dpiColumnsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content ccc__paybox">
+        <div class="modal-header">
+          <h5 class="modal-title ccc__paybox-title">Payout columns · {{ settlement.settlement_code }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="ccc__cols-help">
+            Pick what each payout line shows. Beyond about nine columns the sheet stops fitting an
+            A4 page. COD is not on offer by design — it is money the driver hands in, not money
+            they are owed, and it settles on its own leg.
+          </p>
+          {% for group in picker_groups %}
+          <div class="ccc__cols-group">
+            <p class="ccc__cols-group-title">{{ group.label }}</p>
+            {% for col in group.items %}
+            <label class="ccc__cols-item">
+              <input type="checkbox" class="form-check-input dpi__cols-box" value="{{ col.key }}"
+                     {% if col.checked %}checked{% endif %} {% if col.pinned %}disabled{% endif %}>
+              <span>{{ col.label }}{% if col.pinned %} <em class="ccc__cols-pin">always shown</em>{% endif %}</span>
+            </label>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="modal-footer">
+          <label class="ccc__cols-default">
+            <input type="checkbox" class="form-check-input mt-0" id="dpi_cols_default" checked>
+            Save as the default for {{ driver.user.get_full_name|default:driver.driver_code|default:"this driver" }}
+          </label>
+          {% if has_settlement_override %}
+          <button type="button" class="bpi__ghost" id="dpi_cols_reset">Reset to driver default</button>
+          {% endif %}
+          <button type="button" class="bpi__ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="ccc__primary" id="dpi_cols_save">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   {# A4 sheet preview — screen only, built from the sheet above by invoice_preview.js #}
   <section class="bprev" aria-label="A4 page preview">
     <p class="bprev__meta">Building preview…</p>
@@ -174,5 +223,47 @@
   document.getElementById('workforce_driver_payout_btn_print')?.addEventListener('click', function () {
     window.print();
   });
+
+  // The column picker. Same shape as the charge invoice's: POST the chosen keys,
+  // reload so the printed sheet restates rather than being patched in place.
+  (function () {
+    const csrftoken = document.querySelector('meta[name="csrf-token"]')?.content
+                      || document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    const url = '{% url "workforce:driver_payout_invoice_columns" settlement.settlement_id %}';
+
+    async function post(body, btn) {
+      if (btn) btn.disabled = true;
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        });
+        const data = await resp.json();
+        if (data.success) { window.location.reload(); return; }
+        alert(data.error || 'That did not go through');
+      } catch (e) { alert('Network error'); }
+      if (btn) btn.disabled = false;
+    }
+
+    document.getElementById('dpi_cols_save')?.addEventListener('click', function () {
+      // Disabled boxes are the pinned columns — checked in spirit, so they are
+      // read back in rather than being dropped by the filter.
+      const picked = Array.from(document.querySelectorAll('.dpi__cols-box'))
+                          .filter(b => b.checked || b.disabled)
+                          .map(b => b.value);
+      if (!picked.length) { alert('Pick at least one column'); return; }
+      const body = new URLSearchParams();
+      body.append('columns', picked.join(','));
+      body.append('save_default', document.getElementById('dpi_cols_default').checked ? '1' : '0');
+      post(body, this);
+    });
+
+    document.getElementById('dpi_cols_reset')?.addEventListener('click', function () {
+      const body = new URLSearchParams();
+      body.append('reset', '1');
+      post(body, this);
+    });
+  })();
 </script>
 {% endblock %}

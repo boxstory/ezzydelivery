@@ -84,6 +84,7 @@ from django.core.paginator import (
 from django.urls import reverse
 from django.db.models import Count, F, Q
 
+from business import integration_fields
 from business import models as business_models
 from core import message_templates
 from core import models as core_models
@@ -546,6 +547,90 @@ def filter_display_labels(c_status, dl_task_status, date_preset):
     }
 
 
+# --- Driver filter (shared by every staff task and order list) ---------------
+# The fleet is 130+ names, so a driver picker has to be searchable, and ops
+# routinely chase a pair of drivers at once ("who has today's Al Wakrah runs?").
+# One multi-select, one set of helpers, so the control means the same thing on
+# every list instead of each page re-inventing it.
+
+# Sentinel option. Real ids are integers, so this cannot collide with one.
+DRIVER_FILTER_UNASSIGNED = 'none'
+
+
+def driver_filter_choices():
+    """Approved drivers for the picker, in reading order."""
+    return fleet_models.Driver.objects.filter(
+        driver_status='approved'
+    ).select_related('user').order_by('user__first_name', 'user__last_name')
+
+
+def driver_filter_values(request):
+    """The picked driver ids off the querystring, as strings.
+
+    Anything that is neither a number nor the Unassigned sentinel is dropped —
+    filtering on junk returns an empty page with no hint that the value was
+    bogus, and int() on it would 500 the list outright.
+    """
+    picked, seen = [], set()
+    for raw in request.GET.getlist('driver'):
+        value = (raw or '').strip()
+        if not value or value in seen:
+            continue
+        if value != DRIVER_FILTER_UNASSIGNED and not value.isdigit():
+            continue
+        seen.add(value)
+        picked.append(value)
+    return picked
+
+
+def apply_driver_filter(queryset, picked, field='driver'):
+    """OR the picked drivers together on `field` (a path to the driver FK).
+
+    `field` is 'driver' on a task queryset and 'delivery_task__driver' on an
+    order one. Unassigned is part of the same OR, so "Unassigned + Ali" reads
+    as one pool rather than two filters that cancel out.
+    """
+    if not picked:
+        return queryset
+    ids = [int(v) for v in picked if v != DRIVER_FILTER_UNASSIGNED]
+    condition = Q()
+    if ids:
+        condition |= Q(**{f'{field}__in': ids})
+    if DRIVER_FILTER_UNASSIGNED in picked:
+        condition |= Q(**{f'{field}__isnull': True})
+    queryset = queryset.filter(condition)
+    # A multi-valued path (an order's delivery_task) joins one row per task, so
+    # an order with two tasks on two picked drivers would otherwise list twice.
+    if '__' in field:
+        queryset = queryset.distinct()
+    return queryset
+
+
+def driver_filter_params(picked):
+    """`driver=..` pairs for a filter_params query string (no leading `&`)."""
+    return [f'driver={v}' for v in picked]
+
+
+def driver_filter_labels(picked, drivers=None):
+    """Human names for the picked drivers, for the applied-filter chips.
+
+    Without this the chip prints the raw primary key at the operator, which
+    tells them nothing about who they are looking at.
+    """
+    if not picked:
+        return []
+    if drivers is None:
+        drivers = driver_filter_choices()
+    names = {}
+    for d in drivers:
+        full = f'{d.user.first_name} {d.user.last_name}'.strip() if d.user_id else ''
+        names[str(d.driver_id)] = full or d.driver_code or f'Driver {d.driver_id}'
+    return [
+        'Unassigned' if v == DRIVER_FILTER_UNASSIGNED else names.get(v, f'Driver {v}')
+        for v in picked
+    ]
+
+
 def apply_order_list_filters(request, orders):
     """
     Apply the shared filter bar of workforce/parts/lists/orders_list_view.html
@@ -568,6 +653,7 @@ def apply_order_list_filters(request, orders):
     date_from = _parse_date_param(request.GET.get('dateFrom', '').strip())
     date_to = _parse_date_param(request.GET.get('dateTo', '').strip())
     date_preset = request.GET.get('datePreset', '').strip()
+    drivers_picked = driver_filter_values(request)
 
     # Fallback: resolve a named preset server-side when JS didn't fill the dates
     if date_preset and not date_from and not date_to:
@@ -581,6 +667,8 @@ def apply_order_list_filters(request, orders):
 
     if business_id:
         orders = orders.filter(business_id=business_id)
+    # The driver sits on the order's delivery task, not the order itself.
+    orders = apply_driver_filter(orders, drivers_picked, field='delivery_task__driver')
     if dl_code:
         orders = orders.filter(delivery_task__dl_task_number__icontains=dl_code)
     if search:
@@ -610,6 +698,7 @@ def apply_order_list_filters(request, orders):
     if date_preset:
         filter_params_list.append(f'datePreset={date_preset}')
 
+    drivers = driver_filter_choices()
     context = {
         'all_businesses': business_models.Business.objects.all().order_by('business_name'),
         'filters': {
@@ -618,12 +707,16 @@ def apply_order_list_filters(request, orders):
             'cStatus': c_status,
             'dlTaskStatus': dl_task_status,
             'business': business_id,
+            'driver': drivers_picked,
+            'driverLabels': driver_filter_labels(drivers_picked, drivers),
             'dateFrom': date_from,
             'dateTo': date_to,
             'datePreset': date_preset,
             **filter_display_labels(c_status, dl_task_status, date_preset),
         },
-        'filter_params': '&'.join(filter_params_list),
+        'driver_choices': drivers,
+        'driver_selected': drivers_picked,
+        'filter_params': '&'.join(filter_params_list + driver_filter_params(drivers_picked)),
         'per_page': request.GET.get('per_page', '50'),
     }
     return orders, context
@@ -760,6 +853,7 @@ def wf_dashboard(request):
         Q(source_type='onedrive', onedrive_source__isnull=True) |
         Q(source_type='google_sheet', api_settings__isnull=True) |
         Q(source_type__in=['shopify', 'woocommerce'], api_settings__isnull=True) |
+        Q(source_type='custom_api', api_settings__isnull=True) |
         Q(source_type='public_link', public_link_source__isnull=True)
     ).count()
 
@@ -823,7 +917,7 @@ def wf_dashboard(request):
             max_orders = peak
         orders_trend.append({
             'date': date.strftime('%a'),
-            'day_label': date.strftime('%d %b'),
+            'day_label': date.strftime('%d'),
             'orders': o_count,
             'deliveries': d_count,
             'failed_cancelled': f_count,
@@ -903,6 +997,7 @@ def _apply_all_orders_filters(request, orders):
     date_from = _parse_date_param(request.GET.get('dateFrom', '').strip())
     date_to = _parse_date_param(request.GET.get('dateTo', '').strip())
     date_preset = request.GET.get('datePreset', '').strip()
+    drivers_picked = driver_filter_values(request)
 
     # Fallback: resolve a named preset server-side when JS didn't fill the dates
     if date_preset and not date_from and not date_to:
@@ -917,6 +1012,9 @@ def _apply_all_orders_filters(request, orders):
     # Filter by Business ID
     if business_id:
         orders = orders.filter(business_id=business_id)
+
+    # Filter by driver — the driver sits on the order's delivery task
+    orders = apply_driver_filter(orders, drivers_picked, field='delivery_task__driver')
 
     # Filter by DL Code (delivery task code)
     if dl_code:
@@ -949,7 +1047,7 @@ def _apply_all_orders_filters(request, orders):
         'dl_code': dl_code, 'search': search, 'c_status': c_status,
         'dl_task_status': dl_task_status, 'business_id': business_id,
         'date_from': date_from, 'date_to': date_to, 'date_preset': date_preset,
-        'order_type': order_type,
+        'order_type': order_type, 'drivers': drivers_picked,
     }
     return orders, picked
 
@@ -998,19 +1096,25 @@ def all_orders(request):
     if sort and sort != 'date_desc':
         filter_params_list.append(f'sort={sort}')
 
-    filter_params = '&'.join(filter_params_list)
+    drivers_picked = picked['drivers']
+    all_drivers = driver_filter_choices()
+    filter_params = '&'.join(filter_params_list + driver_filter_params(drivers_picked))
 
     wa_data = _apply_wa_route(_fetch_whatsapp_instances(), 'orders_tasks')
 
     data = {
         'orders': orders,
         'all_businesses': all_businesses,
+        'driver_choices': all_drivers,
+        'driver_selected': drivers_picked,
         'filters': {
             'dlCode': dl_code,
             'search': search,
             'cStatus': c_status,
             'dlTaskStatus': dl_task_status,
             'business': business_id,
+            'driver': drivers_picked,
+            'driverLabels': driver_filter_labels(drivers_picked, all_drivers),
             'dateFrom': date_from,
             'dateTo': date_to,
             'datePreset': date_preset,
@@ -1260,6 +1364,7 @@ def wf_print_waybill(request):
     """
     from django.db.models import F
     from django.utils.safestring import mark_safe
+    from delivery.charges import collect_totals
     from delivery.label_utils import generate_qr_svg
 
     src = request.POST if request.method == 'POST' else request.GET
@@ -1279,12 +1384,17 @@ def wf_print_waybill(request):
     if src.get('select_all') in ('1', 'true', 'True'):
         orders = orders[:SELECT_ALL_PRINT_CAP]
 
+    # Evaluate once — the charge lookup and the render loop both walk the set.
+    orders = list(orders)
+    totals = collect_totals(orders)
+
     waybills = []
     printed_ids = []
     for order in orders:
         waybills.append({
             'order': order,
             'qr_svg': mark_safe(generate_qr_svg(order.order_number)),
+            'collect_total': totals.get(order.id),
         })
         printed_ids.append(order.id)
 
@@ -6343,6 +6453,10 @@ def dl_task_filter_values(request):
     return {
         'code': (request.GET.get('code', '') or request.GET.get('dlCode', '') or request.GET.get('cCode', '')).strip(),
         'customer': (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip(),
+        # Multi-select driver picker. `driverName` is the free-text box it
+        # replaced — still honoured so an old bookmark or saved link keeps
+        # working, but nothing on the page writes it any more.
+        'driver': driver_filter_values(request),
         'driverName': request.GET.get('driverName', ''),
         'cStatus': request.GET.get('cStatus', ''),
         'dlStatus': request.GET.get('dlStatus', ''),
@@ -6386,6 +6500,7 @@ def apply_dl_task_filters(dl_tasks, f):
             Q(driver__user__last_name__icontains=driver_name) |
             Q(driver__user__username__icontains=driver_name)
         )
+    dl_tasks = apply_driver_filter(dl_tasks, f.get('driver') or [])
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
     if dl_status:
@@ -6420,6 +6535,24 @@ def apply_dl_task_filters(dl_tasks, f):
             | Q(order__coords_accuracy__isnull=True) | Q(order__coords_accuracy='')
         )
     return dl_tasks
+
+
+def dl_task_filter_params(code='', customer='', driver_name='', drivers_picked=(),
+                          c_status='', dl_status='', date_from='', date_to='',
+                          business_id=''):
+    """`filter_params` for the task lists that read the bar by hand.
+
+    Without it the pagination links carry nothing but ?page=, so page 2 of a
+    filtered list silently shows the unfiltered set.
+    """
+    parts = []
+    for key, value in (('code', code), ('customer', customer),
+                       ('driverName', driver_name), ('cStatus', c_status),
+                       ('dlStatus', dl_status), ('dateFrom', date_from),
+                       ('dateTo', date_to), ('business', business_id)):
+        if value:
+            parts.append(f'{key}={value}')
+    return '&'.join(parts + driver_filter_params(list(drivers_picked)))
 
 
 @login_required(login_url='/accounts/login/')
@@ -6492,6 +6625,7 @@ def dl_list_all(request):
     if code: filter_params_list.append(f'code={code}')
     if customer: filter_params_list.append(f'customer={customer}')
     if driver_name: filter_params_list.append(f'driverName={driver_name}')
+    filter_params_list += driver_filter_params(filters['driver'])
     if c_status: filter_params_list.append(f'cStatus={c_status}')
     if dl_status: filter_params_list.append(f'dlStatus={dl_status}')
     if date_from: filter_params_list.append(f'dateFrom={date_from}')
@@ -6533,6 +6667,8 @@ def dl_list_all(request):
         'filter_params': filter_params,
         'per_page': request.GET.get('per_page', '50'),
         'filters': filters,
+        'driver_choices': driver_filter_choices(),
+        'driver_selected': filters['driver'],
         # Print-sheet export: CSV via the shared column picker, plus the A4 sheet.
         'sheet_print_url': reverse('workforce:dl_tasks_print_sheet'),
         **sheet_export_ctx,
@@ -6879,6 +7015,7 @@ def fulfilled_clients_tasks(request):
     code = (request.GET.get('code', '') or request.GET.get('dlCode', '') or request.GET.get('cCode', '')).strip()
     customer = (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip()
     driver_name = request.GET.get('driverName', '')
+    drivers_picked = driver_filter_values(request)
     c_status = request.GET.get('cStatus', '')
     dl_status = request.GET.get('dlStatus', '') or request.GET.get('dmsStatus', '')
     date_from = request.GET.get('dateFrom', '')
@@ -6903,6 +7040,7 @@ def fulfilled_clients_tasks(request):
             Q(driver__user__last_name__icontains=driver_name) |
             Q(driver__user__username__icontains=driver_name)
         )
+    dl_tasks = apply_driver_filter(dl_tasks, drivers_picked)
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
     if dl_status:
@@ -6932,10 +7070,16 @@ def fulfilled_clients_tasks(request):
         'page_icon': 'fa-truck-ramp-box',
         'list_type': 'fulfilled',
         'show_filters': True,
+        'driver_choices': driver_filter_choices(),
+        'driver_selected': drivers_picked,
+        'filter_params': dl_task_filter_params(
+            code, customer, driver_name, drivers_picked,
+            c_status, dl_status, date_from, date_to, business_id),
         'filters': {
             'code': code,
             'customer': customer,
             'driverName': driver_name,
+            'driver': drivers_picked,
             'cStatus': c_status,
             'dlStatus': dl_status,
             'dateFrom': date_from,
@@ -6966,6 +7110,7 @@ def non_fulfilled_clients_tasks(request):
     code = (request.GET.get('code', '') or request.GET.get('dlCode', '') or request.GET.get('cCode', '')).strip()
     customer = (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip()
     driver_name = request.GET.get('driverName', '')
+    drivers_picked = driver_filter_values(request)
     c_status = request.GET.get('cStatus', '')
     dl_status = request.GET.get('dlStatus', '') or request.GET.get('dmsStatus', '')
     date_from = request.GET.get('dateFrom', '')
@@ -6990,6 +7135,7 @@ def non_fulfilled_clients_tasks(request):
             Q(driver__user__last_name__icontains=driver_name) |
             Q(driver__user__username__icontains=driver_name)
         )
+    dl_tasks = apply_driver_filter(dl_tasks, drivers_picked)
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
     if dl_status:
@@ -7019,10 +7165,16 @@ def non_fulfilled_clients_tasks(request):
         'page_icon': 'fa-truck-fast',
         'list_type': 'non_fulfilled',
         'show_filters': True,
+        'driver_choices': driver_filter_choices(),
+        'driver_selected': drivers_picked,
+        'filter_params': dl_task_filter_params(
+            code, customer, driver_name, drivers_picked,
+            c_status, dl_status, date_from, date_to, business_id),
         'filters': {
             'code': code,
             'customer': customer,
             'driverName': driver_name,
+            'driver': drivers_picked,
             'cStatus': c_status,
             'dlStatus': dl_status,
             'dateFrom': date_from,
@@ -7052,6 +7204,7 @@ def dl_list_incompleted_details(request):
     code = (request.GET.get('code', '') or request.GET.get('dlCode', '') or request.GET.get('cCode', '')).strip()
     customer = (request.GET.get('customer', '') or request.GET.get('mobile', '')).strip()
     driver_name = request.GET.get('driverName', '')
+    drivers_picked = driver_filter_values(request)
     c_status = request.GET.get('cStatus', '')
     dl_status = request.GET.get('dlStatus', '') or request.GET.get('dmsStatus', '')
     date_from = request.GET.get('dateFrom', '')
@@ -7075,6 +7228,7 @@ def dl_list_incompleted_details(request):
             Q(driver__user__last_name__icontains=driver_name) |
             Q(driver__user__username__icontains=driver_name)
         )
+    dl_tasks = apply_driver_filter(dl_tasks, drivers_picked)
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
     if dl_status:
@@ -7119,9 +7273,15 @@ def dl_list_incompleted_details(request):
         'list_type': 'incompleted',
         'show_filters': True,
         'show_failure_reason': True,
+        'driver_choices': driver_filter_choices(),
+        'driver_selected': drivers_picked,
+        'filter_params': dl_task_filter_params(
+            code, customer, driver_name, drivers_picked,
+            c_status, dl_status, date_from, date_to, business_id),
         'filters': {
             'code': code, 'customer': customer,
-            'driverName': driver_name, 'cStatus': c_status, 'dlStatus': dl_status,
+            'driverName': driver_name, 'driver': drivers_picked,
+            'cStatus': c_status, 'dlStatus': dl_status,
             'dateFrom': date_from, 'dateTo': date_to, 'business': business_id,
         }
     }
@@ -7507,7 +7667,10 @@ def _build_order_whatsapp_message(order):
     ``wa_location_verification`` trigger — a template switch must never leave
     the automatic verification pipeline with nothing to send.
     """
+    from decimal import Decimal
+
     from core.templatetags.custom_filters import generate_order_verify_key
+    from delivery.charges import waybill_charges
     from orders.cod_status import CLIENT_STATES_NOT_DERIVED
 
     items = list(
@@ -7541,11 +7704,40 @@ def _build_order_whatsapp_message(order):
     business_phone = (getattr(business, 'business_phone', '') or '').strip()
     seller_line = f"🏬 Order from: {business_name}\n" if business_name else ''
 
+    # What the customer actually hands over at the door is the goods COD PLUS
+    # the delivery charge, so {total_amount} is the figure to quote — the same
+    # one collect_totals() prints as "Collect" on the waybill. A message that
+    # named a different number from the label in the driver's hand would be
+    # worse than either number alone, so the charge is resolved here with the
+    # label's own waybill_charges(): the verified/system task charge, else the
+    # Delivery Fee the seller supplied on import. Most orders are not priced
+    # this early in their life, and then the charge is 0 and the total is the
+    # COD by itself — the same fallback the label takes.
+    cod_value = Decimal(str(order.cod_amount or 0))
+    charge_value = waybill_charges([order]).get(order.id) or Decimal('0')
+    # Deliberately NOT gated on the prepaid COD states: a seller who marks an
+    # order online_paid and still supplies a delivery fee is telling us the
+    # customer settled the goods online and pays the delivery in cash, and the
+    # label already sends the driver to collect it. Only the goods-COD line
+    # below honours that ladder — the total mirrors collect_totals() exactly.
+    total_value = cod_value + charge_value
+
     cod_amount, cod_line = '', ''
-    if (order.cod_amount or 0) > 0 and \
-            order.cod_status_by_client not in CLIENT_STATES_NOT_DERIVED:
-        cod_amount = f"{order.cod_amount:.2f}"
+    if cod_value > 0 and order.cod_status_by_client not in CLIENT_STATES_NOT_DERIVED:
+        cod_amount = f"{cod_value:.2f}"
         cod_line = f"💵 Cash on delivery: QAR {cod_amount}\n"
+
+    delivery_charge, delivery_charge_line = '', ''
+    if charge_value > 0:
+        delivery_charge = f"{charge_value:.2f}"
+        delivery_charge_line = f"🚚 Delivery charge: QAR {delivery_charge}\n"
+
+    total_amount, total_line = '', ''
+    if total_value > 0:
+        total_amount = f"{total_value:.2f}"
+        breakdown = (f" (order {cod_value:.2f} + delivery {charge_value:.2f})"
+                     if cod_value > 0 and charge_value > 0 else '')
+        total_line = f"💵 To pay on delivery: QAR {total_amount}{breakdown}\n"
 
     verify_key = generate_order_verify_key(order.order_number, order.customer_phone)
     return message_templates.get_body(
@@ -7564,6 +7756,10 @@ def _build_order_whatsapp_message(order):
         delivery_area=order.delivery_area_name or '',
         cod_amount=cod_amount,
         cod_line=cod_line,
+        delivery_charge=delivery_charge,
+        delivery_charge_line=delivery_charge_line,
+        total_amount=total_amount,
+        total_line=total_line,
     )
 
 
@@ -8808,6 +9004,7 @@ _GPS_CORROBORATE_MINUTES = 10
 # only judged — not flagged — outside this set.
 _GPS_PROXIMITY_STATUSES = {
     'delivered', 'partial_delivery', 'failed', 'non_reachable', 'dropsownlost',
+    'returned_to_shipper',
 }
 
 
@@ -9744,6 +9941,9 @@ def delivery_task_detail(request, task_id):
     context = {
         'page_title': f'Delivery Task #{task.dl_task_number}',
         'task': task,
+        # Default for the Update Status modal's Delivered Date field — without
+        # it the input rendered blank and the date silently went unrecorded.
+        'today': timezone.localdate(),
         'status_history': status_history,
         'verification_logs': verification_logs,
         'driver_status_updates': driver_status_updates,
@@ -10045,7 +10245,7 @@ def update_task_status(request, task_id):
         'for_review', 'pending', 'assigned', 'accepted', 'picked_up',
         'start_ride', 'out_for_delivery', 'in_transit', 'contacted',
         'non_reachable', 'delivered', 'failed', 'rejected', 'cancelled',
-        'dropsownlost',
+        'dropsownlost', 'returned_to_shipper',
     ]
     try:
         task = get_object_or_404(
@@ -10122,6 +10322,7 @@ def update_task_status(request, task_id):
             'rejected': 'rejected',
             'cancelled': '9',
             'dropsownlost': 'rejected',
+            'returned_to_shipper': 'rejected',
         }
 
         # Optional fields
@@ -10151,7 +10352,8 @@ def update_task_status(request, task_id):
         # A close-out status has to carry a reason, exactly as the driver app
         # demands one on its Failed sheet — otherwise the task ends with no
         # explanation on the record.
-        REASON_REQUIRED_STATUSES = {'failed', 'rejected', 'cancelled', 'dropsownlost'}
+        REASON_REQUIRED_STATUSES = {'failed', 'rejected', 'cancelled', 'dropsownlost',
+                                    'returned_to_shipper'}
         REASON_STATUSES = REASON_REQUIRED_STATUSES | {'non_reachable'}
         valid_reason_keys = {k for k, _ in delivery_models.DeliveryTask.FAILURE_REASON_CHOICES}
         if status in REASON_REQUIRED_STATUSES and not failure_reason:
@@ -10302,11 +10504,45 @@ def update_task_status(request, task_id):
             except Exception as e:
                 logger.warning(f"COD wallet update failed for task {task.id}: {e}")
 
+        # The pre_save guard reverts a transition it does not like without raising,
+        # so the only honest answer is the value the database kept. Reporting the
+        # requested status here is what made a blocked change look like a success.
+        task.refresh_from_db(fields=['dl_task_status'])
+        reverted = task.dl_task_status != status
+        if reverted:
+            return JsonResponse({
+                'success': False,
+                'error': (f"The status change to '{status}' was refused — the task is "
+                          f"still '{task.get_dl_task_status_display()}'."),
+                'task_id': task.id,
+                'new_status': task.dl_task_status,
+                'reverted': True,
+            }, status=400)
+
+        # A parcel coming back is more than a label: it restores stock, opens the
+        # RMA and hands back any COD. Run it only once the status has actually
+        # stuck, and never let it turn a completed status change into a 500.
+        warnings = []
+        if task.dl_task_status == 'returned_to_shipper':
+            try:
+                from delivery.services.returns import open_return_for_task
+                outcome = open_return_for_task(
+                    task, actor=request.user,
+                    reason=failure_reason or 'other',
+                    reason_notes=failure_notes,
+                )
+                warnings = list(outcome.warnings)
+            except Exception as e:
+                logger.exception("Return paperwork failed for task %s: %s", task_id, e)
+                warnings = ['the status was saved but the return paperwork failed — '
+                            'open it by hand from the Returns console']
+
         return JsonResponse({
             'success': True,
-            'message': f'Task status updated to {status} successfully',
+            'message': f'Task status updated to {task.dl_task_status} successfully',
             'task_id': task.id,
-            'new_status': status
+            'new_status': task.dl_task_status,
+            'warnings': warnings,
         })
     except Exception as e:
         logger.exception("Error updating task %s status: %s", task_id, str(e))
@@ -10398,6 +10634,59 @@ def _crm_suggest_leads(biz_name, biz_phones, lead_rows, limit=5):
     return suggestions[:limit]
 
 
+def _seller_crm_leads(business):
+    """CRM origin of one client: the lead card(s) it was converted from, plus —
+    only when nothing is attached yet — the open business leads that look like
+    this client. The ranking is the same phone/name test the verification desk
+    uses, so the two pages never disagree about what a likely match is."""
+    from crm import services as crm_services
+    from crm.models import Lead
+
+    linked = list(
+        Lead.objects
+        .filter(converted_business=business, merged_into__isnull=True)
+        .select_related('assigned_to')
+        .prefetch_related('merged_children')
+        .order_by('-created_at')
+    )
+    if linked:
+        return linked, []
+
+    # Every number this client is reachable on — the lead may have been taken
+    # against the WhatsApp number rather than the switchboard one.
+    variants = set()
+    profile_phone = getattr(getattr(business, 'profile', None), 'phone', '')
+    for value in (business.business_phone, business.business_whatsapp, profile_phone):
+        normalized = crm_services.normalize_phone(value)
+        if normalized:
+            variants.update(crm_services._phone_variants(normalized))
+
+    lead_rows = []
+    for lead in Lead.objects.filter(
+        category=Lead.CATEGORY_BUSINESS,
+        converted_business__isnull=True,
+        merged_into__isnull=True,
+    ).only('id', 'company_name', 'contact_name', 'phone', 'source', 'stage'):
+        normalized = crm_services.normalize_phone(lead.phone)
+        company = (lead.company_name or '').strip()
+        contact = (lead.contact_name or '').strip()
+        label = company or contact or lead.phone or f'Lead #{lead.pk}'
+        sub = ' · '.join([p for p in (
+            contact if contact != label else '', lead.phone,
+            lead.get_source_display(), lead.stage_label,
+        ) if p])
+        lead_rows.append({
+            'pk': lead.pk,
+            'label': label,
+            'sub': sub,
+            'variants': set(crm_services._phone_variants(normalized)) if normalized else set(),
+            'norm_company': _crm_norm_name(company),
+            'norm_contact': _crm_norm_name(contact),
+        })
+
+    return [], _crm_suggest_leads(_crm_norm_name(business.business_name), variants, lead_rows)
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 @ensure_csrf_cookie
@@ -10433,12 +10722,47 @@ def business_verification_list(request):
             Q(profile__user__email__icontains=search)
         )
 
+    # Sort presets. Named rather than column-toggled: this is a card queue, not a
+    # table, so one option is a whole reading of the list. The three original keys
+    # keep working — they are the ones already in staff bookmarks and links.
+    from django.db.models import Case, IntegerField, Value, When
+    from django.db.models.functions import Lower, NullIf
+    applied = F('profile__verification_applied_at')
+    joined = F('profile__created_at')
+    # Work first: what the desk still has to act on, before what it has closed.
+    status_rank = Case(
+        *[When(profile__verification_status=value, then=Value(index))
+          for index, value in enumerate(
+              ['pending', 'under_review', 'incomplete', 'verified', 'rejected'])],
+        default=Value(9), output_field=IntegerField(),
+    )
     sort_options = {
-        'applied':       ('-profile__verification_applied_at', '-business_id'),
-        'joined_newest': ('-profile__created_at', '-business_id'),
-        'joined_oldest': ('profile__created_at', 'business_id'),
+        # A business that never applied has no application date. It belongs at the
+        # end of the queue, not the head of it — Postgres sorts NULLs first on a
+        # DESC, so the default view used to open on rows that never applied.
+        'applied':        (applied.desc(nulls_last=True), '-business_id'),
+        'applied_oldest': (applied.asc(nulls_last=True), 'business_id'),
+        'status':         (status_rank.asc(), applied.desc(nulls_last=True), '-business_id'),
+        'joined_newest':  (joined.desc(nulls_last=True), '-business_id'),
+        'joined_oldest':  (joined.asc(nulls_last=True), 'business_id'),
+        'name':           (Lower(NullIf('business_name', Value(''))).asc(nulls_last=True),
+                           'business_id'),
     }
-    businesses = businesses.order_by(*sort_options.get(sort, sort_options['applied']))
+    # Normalize before it reaches the template, or a hand-edited ?sort= leaves the
+    # picker showing nothing while the rows are ordered by something else.
+    if sort not in sort_options:
+        sort = 'applied'
+    businesses = businesses.order_by(*sort_options[sort])
+
+    # Plain-language option labels — what the staff member gets, not the column.
+    sort_choices = [
+        ('applied', 'Newest applications'),
+        ('applied_oldest', 'Longest waiting'),
+        ('status', 'Needs action first'),
+        ('joined_newest', 'Newest accounts'),
+        ('joined_oldest', 'Oldest accounts'),
+        ('name', 'Business name A–Z'),
+    ]
 
     # Paginate
     page_obj = paginate_queryset(request, businesses, items_per_page=50)
@@ -10529,6 +10853,7 @@ def business_verification_list(request):
         'current_filter': verification_filter,
         'search': search,
         'sort': sort,
+        'sort_choices': sort_choices,
         'per_page': get_per_page(request),
         'filter_params': filter_params,
         'total_count': sum(status_counts.values()),
@@ -11518,12 +11843,11 @@ def tasks_followup_list(request):
 
     # Optional filters
     status_filters = request.GET.getlist('status')
-    driver_filter = request.GET.get('driver', '')
+    driver_filter = driver_filter_values(request)
 
     if status_filters:
         tasks_list = tasks_list.filter(dl_task_status__in=status_filters)
-    if driver_filter:
-        tasks_list = tasks_list.filter(driver_id=driver_filter)
+    tasks_list = apply_driver_filter(tasks_list, driver_filter)
 
     # Sorting
     sort_param = request.GET.get('sort', 'updated')
@@ -11548,9 +11872,7 @@ def tasks_followup_list(request):
     current_sort = sort_param.replace('-desc', '').replace('-asc', '')
 
     # Get active drivers for filter dropdown
-    active_drivers = fleet_models.Driver.objects.filter(
-        driver_status='approved'
-    ).select_related('user').order_by('user__first_name')
+    active_drivers = driver_filter_choices()
 
     # Staleness ("chase") tiers — how long since the last update. Drives the hero
     # backlog-shape strip and the per-row urgency gutter. Fresh <24h, Aging 1-3d, Stale 3d+.
@@ -11579,8 +11901,8 @@ def tasks_followup_list(request):
     filter_params_nosort = ''
     for s in status_filters:
         filter_params_nosort += f'&status={s}'
-    if driver_filter:
-        filter_params_nosort += f'&driver={driver_filter}'
+    for _d in driver_filter:
+        filter_params_nosort += f'&driver={_d}'
     if request.GET.get('dateFrom'):
         filter_params_nosort += f"&dateFrom={request.GET.get('dateFrom')}"
     if request.GET.get('dateTo'):
@@ -11688,13 +12010,12 @@ def tasks_upcoming_list(request):
 
     # Optional filters
     status_filters = request.GET.getlist('status')
-    driver_filter = request.GET.get('driver', '')
+    driver_filter = driver_filter_values(request)
     reason_filter = request.GET.get('reason', '')
 
     if status_filters:
         tasks_list = tasks_list.filter(dl_task_status__in=status_filters)
-    if driver_filter:
-        tasks_list = tasks_list.filter(driver_id=driver_filter)
+    tasks_list = apply_driver_filter(tasks_list, driver_filter)
 
     if reason_filter == 'postponed':
         tasks_list = tasks_list.filter(was_postponed=True)
@@ -11782,16 +12103,14 @@ def tasks_upcoming_list(request):
         else:
             _t.upcoming_reason = 'future'
 
-    active_drivers = fleet_models.Driver.objects.filter(
-        driver_status='approved'
-    ).select_related('user').order_by('user__first_name')
+    active_drivers = driver_filter_choices()
 
     # Build filter params for pagination
     filter_params_nosort = ''
     for s in status_filters:
         filter_params_nosort += f'&status={s}'
-    if driver_filter:
-        filter_params_nosort += f'&driver={driver_filter}'
+    for _d in driver_filter:
+        filter_params_nosort += f'&driver={_d}'
     if reason_filter:
         filter_params_nosort += f'&reason={reason_filter}'
     if request.GET.get('dateFrom'):
@@ -12798,6 +13117,27 @@ def fleet_drivers_earnings(request):
         settlement__isnull=True,
     ).values('driver').annotate(total=Sum('amount')).values('total')
 
+    # Money verified on the worksheet but not yet published. It is deliberately
+    # NOT folded into pending_payout: publishing is what writes the earning
+    # transaction, and pending_payout has to keep matching the payout invoice
+    # line for line. Until then this is work the desk has agreed a figure for
+    # and simply not released — invisible on this page before now, so a driver
+    # with a fully verified month still read as owed nothing.
+    #
+    # Priced through delivery.earnings.fee_expr rather than Sum(verified_earnings):
+    # a verified row with a NULL fee would otherwise be summed as nothing, and
+    # fee_expr already prefers the staff figure before falling back to the cards.
+    from delivery.earnings import fee_expr as driver_fee_expr, rate_rows
+    _verified_fee = driver_fee_expr(rate_rows(None))
+    verified_value_sub = delivery_models.DeliveryTask.objects.filter(
+        driver_id=OuterRef('driver_id'),
+        earnings_verification_status='verified',
+    ).values('driver').annotate(total=Sum(_verified_fee)).values('total')
+    verified_count_sub = delivery_models.DeliveryTask.objects.filter(
+        driver_id=OuterRef('driver_id'),
+        earnings_verification_status='verified',
+    ).values('driver').annotate(cnt=Count('id')).values('cnt')
+
     drivers = fleet_models.Driver.objects.filter(
         driver_status='approved'
     ).select_related('user').annotate(
@@ -12809,12 +13149,21 @@ def fleet_drivers_earnings(request):
         pending_payout=Coalesce(
             Subquery(payout_sub), Value(0), output_field=DecimalField()
         ),
+        verified_value=Coalesce(
+            Subquery(verified_value_sub), Value(0),
+            output_field=DecimalField(max_digits=12, decimal_places=2)
+        ),
+        verified_count=Coalesce(
+            Subquery(verified_count_sub), Value(0), output_field=IntegerField()
+        ),
     ).order_by('user__first_name')
 
     # Totals for summary stats
     agg = drivers.aggregate(
         total_payout=Sum('pending_payout'),
         total_deliveries=Sum('deliveries_after_settlement'),
+        total_verified=Sum('verified_value'),
+        total_verified_count=Sum('verified_count'),
     )
 
     drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=50)
@@ -12851,6 +13200,8 @@ def fleet_drivers_earnings(request):
         'page_title': 'Driver Payouts',
         'total_payout': agg['total_payout'] or 0,
         'total_deliveries': agg['total_deliveries'] or 0,
+        'total_verified': agg['total_verified'] or 0,
+        'total_verified_count': agg['total_verified_count'] or 0,
         'salaried_count': salaried_count,
         'driver_count': drivers.count(),
     }
@@ -12968,6 +13319,249 @@ def _earnings_verification_queue(driver, from_date=None, to_date=None, only=''):
     return queue
 
 
+def _driver_display_name(driver):
+    """A driver's name for a table cell — their own name, else the fleet code."""
+    if not driver:
+        return ''
+    user = getattr(driver, 'user', None)
+    name = (user.get_full_name() or user.username) if user else ''
+    return (name or driver.driver_code or str(driver.driver_id)).strip()
+
+
+def _payout_leg(task, zone_coords=None, zone_names=None):
+    """Where a delivery started, where it ended, and how far apart the two are.
+
+    Qatar addresses are zone numbers rather than street names, so each end reads
+    as a zone and the name of the place that zone number stands for. The drop
+    side goes through ``delivery.selectors.task_address`` because the live
+    address can sit on either of the task's two address FKs.
+
+    Naming a zone takes two sources, not one. ``delivery_area_name`` is the
+    neighbourhood the pin actually fell in and is the better answer when it
+    exists, but it is deliberately left blank whenever the neighbourhood merely
+    repeats the zone — a third of all orders — so the zone's own name is the
+    fallback that keeps those rows from printing a bare number.
+
+    The distance is the one stored on the order, never recomputed here, so this
+    desk, the order detail and every export quote the same kilometre figure. It
+    can be a road distance or an approximation; ``km_estimate`` says which, and
+    the desk marks the approximations rather than passing them off as measured.
+    """
+    from delivery.geo import stored_route_distance, zone_name_map
+    from delivery.selectors import task_address
+
+    if zone_names is None:
+        zone_names = zone_name_map()
+
+    order = task.order
+    pickup = task.pickup_location
+    addr = task_address(task)
+
+    # Where this driver's run started, in one word. Owned by delivery.services
+    # .pickup so the payout invoice's own Pickup column cannot say something
+    # different about the same delivery.
+    from delivery.services.pickup import delivery_origin, first_mile_driver
+    picked, picked_note = delivery_origin(task)
+    collector = first_mile_driver(task)
+
+    zone = getattr(addr, 'dl_zone', None) or getattr(order, 'dl_zone', None)
+    street = getattr(addr, 'dl_street', None) or getattr(order, 'dl_street', None)
+    area = (getattr(order, 'delivery_area_name', '') or
+            getattr(addr, 'area_name', '') or '')
+    zone_label = zone_names.get(zone, '') if zone is not None else ''
+
+    # 51 of 60 pickup locations carry no zone number, so the zone map alone would
+    # leave this end unnamed on most rows. `locality` is the area the seller
+    # typed for the pickup point and is populated everywhere, so it stands in —
+    # a stated area beats a blank column, and the tooltip says which one it is.
+    from_zone = getattr(pickup, 'pickup_zone_no', None)
+    from_zone_label = zone_names.get(from_zone, '') if from_zone is not None else ''
+    from_area_stated = not from_zone_label
+    if from_area_stated:
+        from_zone_label = (getattr(pickup, 'locality', '') or '').strip()
+
+    # Stored figure first; the live fallback only covers orders saved before the
+    # field existed, and it never calls the routing service, so a page render
+    # cannot end up waiting on OSRM.
+    km, exact, source = (None, False, '')
+    if order is not None:
+        km, exact, source = stored_route_distance(order, zone_coords)
+    source = source or ''
+    return {
+        'from_name': getattr(pickup, 'pickup_location_title', '') or '',
+        'from_zone': from_zone,
+        'from_area': from_zone_label,
+        # True when the area is the seller's own free-text locality rather than a
+        # zone name off the zone table.
+        'from_area_stated': from_area_stated and bool(from_zone_label),
+        'from_street': getattr(pickup, 'pickup_street_no', None),
+        # The neighbourhood when the pin resolved one, the zone's own name when
+        # it did not. Never a bare number.
+        'to_name': area or zone_label,
+        'to_zone': zone,
+        # Kept apart from `to_name` so the tooltip can show both when the pin
+        # named a neighbourhood inside a differently-named zone.
+        'to_area': zone_label,
+        'to_street': street,
+        'km': km,
+        'km_source': source,
+        # Straight-line and zone-centre figures are approximations; only OSRM is
+        # a measured road distance.
+        'km_estimate': bool(km is not None and (source != 'osrm' or not exact)),
+        # 'self', 'hub', 'transfer' or empty — the whole of what the column says.
+        'picked': picked,
+        'picked_note': picked_note,
+        # Who handed it over, named rather than coded: on a transfer the desk has
+        # to know whose sheet the first mile belongs on, and a code alone means
+        # looking it up. Falls back to the code when the driver has no user row.
+        'picked_who': _driver_display_name(collector),
+        # Not shown on screen, but the export keeps the audit trail: which
+        # driver went to the client, and what the pickup leg was set to do.
+        'picked_by': ((collector.driver_code or str(collector.driver_id))
+                      if collector else ''),
+        'picked_how': (task.source_pickup_task.get_disposition_display()
+                       if collector else ''),
+        'picked_at': getattr(task.source_pickup_task, 'collected_at', None) if collector else None,
+    }
+
+
+# Which column key orders by what, and which direction a first click should
+# take. Text reads best A→Z; dates, money and distance read best biggest-first,
+# because on a payout desk the outlier is the row worth looking at. Every
+# derived column orders by the same expression the cell renders from, so the
+# arrow never disagrees with the column under it.
+PAYOUT_SORT_COLUMNS = {
+    'task': ('task_asc', 'task_desc', 'asc'),
+    'driver': ('driver_asc', 'driver_desc', 'asc'),
+    'date': ('oldest', 'recent', 'desc'),
+    'business': ('business_asc', 'business_desc', 'asc'),
+    # Biggest-first: the first click brings the rows this driver picked up
+    # themselves to the top, which is the question the column exists to answer.
+    'pickup': ('pickup_asc', 'pickup_desc', 'desc'),
+    'from': ('from_asc', 'from_desc', 'asc'),
+    'to': ('to_asc', 'to_desc', 'asc'),
+    'km': ('km_asc', 'km_desc', 'desc'),
+    'charge': ('charge_asc', 'charge_desc', 'desc'),
+    'cod': ('cod_asc', 'cod_desc', 'desc'),
+    'fee': ('fee_asc', 'fee_desc', 'desc'),
+    'status': ('status_asc', 'status_desc', 'asc'),
+}
+
+
+def _sort_payout_queue(queue, sort_key, fee_expr):
+    """Order the verification queue, and describe the header arrows.
+
+    Returns ``(queue, sort_key, columns)``. ``columns`` maps each column to the
+    sort key its header should link to next and the arrow it should be wearing,
+    so clicking the active column reverses it.
+
+    Three of the columns are not plain fields and are ordered by the expression
+    their cell is rendered from, not by an approximation of it: the drop zone
+    coalesces the task's two address FKs ahead of the order in the same
+    precedence ``delivery.selectors.task_address`` uses, the driver fee reuses
+    the page's own rate-card expression (which already prefers a staff override),
+    and the distance is the stored figure. Nulls sort last in every direction —
+    a row with no distance is not the nearest delivery of the day.
+    """
+    from decimal import Decimal
+
+    from django.db.models import Case, F, IntegerField, Value, When, DecimalField
+    from django.db.models.functions import Coalesce, NullIf
+    from delivery.ordering import annotate_task_sequence
+
+    # The drop zone as the row displays it: the live address FK first, the order
+    # last, matching task_address()'s order of preference.
+    #
+    # NullIf on each leg, not a bare Coalesce. 108 address rows carry dl_zone=0
+    # as a placeholder while the order holds the real zone; the cell renders
+    # `addr.dl_zone or order.dl_zone`, so Python falls through the 0 and prints
+    # zone 70. A plain Coalesce would keep the 0 and file those rows at the top
+    # of an ascending sort, under a column visibly reading 70 — the arrow has to
+    # agree with what is under it.
+    drop_zone = Coalesce(
+        NullIf('dl_address_update__dl_zone', Value(0)),
+        NullIf('dl_to_address__dl_zone', Value(0)),
+        NullIf('order__dl_zone', Value(0)),
+    )
+
+    # The Pickup column ranked the way the desk reads it: this driver collected
+    # it (3), it came off a hub shelf (2), another driver handed it over (1), no
+    # first-mile record at all (0). The self test comes first for the same
+    # reason it does in _payout_leg — a driver who collected from the client did
+    # that work even if the parcel went via a hub — and a cancelled pickup is
+    # excluded there too, so the arrow cannot disagree with the cell.
+    mile_rank = Case(
+        When(source_pickup_task__driver=F('driver'), then=Value(3)),       # self
+        When(task_leg='hub_delivery', then=Value(2)),                      # hub
+        When(source_pickup_task__status='dropped', then=Value(2)),         # hub
+        When(source_pickup_task__status='cancelled', then=Value(0)),
+        When(source_pickup_task__driver__isnull=False, then=Value(1)),     # transfer
+        default=Value(0),
+        output_field=IntegerField(),
+    )
+
+    _completed_desc = F('completed_at').desc(nulls_last=True)
+    _completed_asc = F('completed_at').asc(nulls_last=True)
+    _km_desc = F('order__route_distance_km').desc(nulls_last=True)
+    _km_asc = F('order__route_distance_km').asc(nulls_last=True)
+    _pickup_desc = F('pickup_location__pickup_zone_no').desc(nulls_last=True)
+    _pickup_asc = F('pickup_location__pickup_zone_no').asc(nulls_last=True)
+
+    options = {
+        'recent': (_completed_desc, '-id'),
+        'oldest': (_completed_asc, 'id'),
+        'task_asc': ('task_seq', 'id'),
+        'task_desc': ('-task_seq', '-id'),
+        'driver_asc': ('driver__driver_code', _completed_desc),
+        'driver_desc': ('-driver__driver_code', _completed_desc),
+        'business_asc': ('order__business__business_name', _completed_desc),
+        'business_desc': ('-order__business__business_name', _completed_desc),
+        # Pickups group by zone, then by the locality the seller typed — 51 of 60
+        # pickup locations carry no zone number, so zone alone would leave most
+        # of the column in one undifferentiated block.
+        'pickup_asc': ('_mile_rank', _completed_desc, '-id'),
+        'pickup_desc': ('-_mile_rank', _completed_desc, '-id'),
+        'from_asc': (_pickup_asc, 'pickup_location__locality', '-id'),
+        'from_desc': (_pickup_desc, '-pickup_location__locality', '-id'),
+        'to_asc': (F('_drop_zone').asc(nulls_last=True), '-id'),
+        'to_desc': (F('_drop_zone').desc(nulls_last=True), '-id'),
+        'km_asc': (_km_asc, '-id'),
+        'km_desc': (_km_desc, '-id'),
+        'charge_asc': (F('dl_price').asc(nulls_last=True), '-id'),
+        'charge_desc': (F('dl_price').desc(nulls_last=True), '-id'),
+        'cod_asc': (F('cod_collected_amount').asc(nulls_last=True), '-id'),
+        'cod_desc': (F('cod_collected_amount').desc(nulls_last=True), '-id'),
+        'fee_asc': ('_fee_sort', '-id'),
+        'fee_desc': ('-_fee_sort', '-id'),
+        'status_asc': ('earnings_verification_status', _completed_desc),
+        'status_desc': ('-earnings_verification_status', _completed_desc),
+    }
+    if sort_key not in options:
+        sort_key = 'recent'
+
+    queue = annotate_task_sequence(queue).annotate(
+        _drop_zone=drop_zone,
+        _mile_rank=mile_rank,
+        _fee_sort=Coalesce(fee_expr, Value(Decimal('0.00')),
+                           output_field=DecimalField(max_digits=12, decimal_places=2)),
+    ).order_by(*options[sort_key])
+
+    columns = {}
+    for column, (asc_key, desc_key, first) in PAYOUT_SORT_COLUMNS.items():
+        if sort_key == asc_key:
+            columns[column] = {'key': desc_key, 'dir': 'asc'}
+        elif sort_key == desc_key:
+            columns[column] = {'key': asc_key, 'dir': 'desc'}
+        else:
+            columns[column] = {'key': asc_key if first == 'asc' else desc_key,
+                               'dir': ''}
+    # The default order is the Date column's descending state without anyone
+    # having clicked it, so its header wears the arrow that says so.
+    if sort_key == 'recent':
+        columns['date'] = {'key': 'oldest', 'dir': 'desc'}
+    return queue, sort_key, columns
+
+
 def _payout_queue_csv(queue):
     """The verification queue as a spreadsheet, exactly as filtered on screen.
 
@@ -12980,9 +13574,11 @@ def _payout_queue_csv(queue):
 
     from core.exports import set_export_filename
     from delivery.earnings import CardResolver
+    from delivery.geo import zone_coord_map, zone_name_map
 
     rows = list(queue[:5000])
     card_for = CardResolver({t.driver_id for t in rows})
+    zone_coords, zone_names = zone_coord_map(), zone_name_map()
 
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     set_export_filename(response, 'driver-payout-queue', ext='csv')
@@ -12990,12 +13586,16 @@ def _payout_queue_csv(queue):
     response.write('sep=,\r\n')
     writer = safe_csv_writer(response)
     writer.writerow([
-        'Task', 'Date', 'Driver code', 'Driver', 'Business', 'Order type',
-        'Pickup zone', 'Drop zone', 'Client charge', 'COD collected',
+        'Task', 'Delivered', 'Task date', 'Driver code', 'Driver', 'Business', 'Order type',
+        'Pickup origin', 'Collected by', 'Pickup leg',
+        'From', 'Pickup zone', 'Pickup area', 'To', 'Drop zone', 'Drop zone area',
+        'Distance km', 'Distance source',
+        'Client charge', 'COD collected',
         'COD method', 'Calculated fee', 'Staff fee', 'Fee paid', 'Status',
         'Verified by',
     ])
     for t in rows:
+        leg = _payout_leg(t, zone_coords, zone_names)
         calculated = t.calculate_driver_earnings(card=card_for.for_task(t))
         # `is not None`, never truthiness — a fee overridden to 0.00 is a real
         # figure and has to reach the sheet as 0.00, not as the flat rate.
@@ -13003,13 +13603,33 @@ def _payout_queue_csv(queue):
         driver_user = getattr(t.driver, 'user', None)
         writer.writerow([
             t.dl_task_number,
-            (t.dl_task_date or (t.completed_at.date() if t.completed_at else '')) or '',
+            # The delivered date, in Qatar time — localtime() matters here because
+            # completed_at is stored UTC and a delivery closed after 21:00 Qatar
+            # falls on the previous UTC day, which would file it in the wrong
+            # month on a month-end payout sheet.
+            (timezone.localtime(t.completed_at).date() if t.completed_at else ''),
+            # Kept alongside rather than folded in: the two differ on roughly half
+            # the delivered rows, and this sheet is what a fee dispute is argued
+            # from, so which date is which has to be readable.
+            t.dl_task_date or '',
             getattr(t.driver, 'driver_code', '') or '',
             (driver_user.get_full_name() if driver_user else '') or '',
             getattr(getattr(t.order, 'business', None), 'business_name', '') or '',
             getattr(t.order, 'order_type', '') or '',
-            getattr(t.pickup_location, 'pickup_zone_no', '') or '',
-            getattr(t.dl_to_address, 'dl_zone', None) or getattr(t.order, 'dl_zone', '') or '',
+            # The column order follows the screen: how the run started, then
+            # the detail behind it. The word is what the desk reads; the code
+            # and the disposition are what a disputed row is reconciled from.
+            leg['picked'],
+            leg['picked_by'],
+            leg['picked_how'],
+            leg['from_name'],
+            leg['from_zone'] if leg['from_zone'] is not None else '',
+            leg['from_area'],
+            leg['to_name'],
+            leg['to_zone'] if leg['to_zone'] is not None else '',
+            leg['to_area'],
+            leg['km'] if leg['km'] is not None else '',
+            leg['km_source'],
             t.dl_price if t.dl_price is not None else '',
             t.cod_collected_amount if t.cod_collected else '',
             (t.get_payment_method_display() if t.cod_collected else '') or '',
@@ -13135,10 +13755,19 @@ def driver_payout_worksheet(request, driver_id=None):
     only = request.GET.get('only', '').strip()
     if only not in QUEUE_ONLY_CHOICES:
         only = ''
+    # Both address FKs are joined, not just dl_to_address: the From/To columns go
+    # through delivery.selectors.task_address, which reads dl_address_update first.
     queue = _earnings_verification_queue(driver, from_date, to_date, only).select_related(
         'driver', 'driver__user', 'order', 'order__business', 'pickup_location',
-        'dl_to_address', 'earnings_verified_by',
-    ).order_by('-completed_at', '-id')
+        'dl_to_address', 'dl_address_update', 'earnings_verified_by',
+        # The Pickup column credits the first mile and names the driver who
+        # handed a parcel over, so the pickup leg, its driver and that driver's
+        # user row are joined here — read per row it is three queries a line.
+        'source_pickup_task', 'source_pickup_task__driver',
+        'source_pickup_task__driver__user',
+    )
+    queue, sort_key, sort_columns = _sort_payout_queue(
+        queue, request.GET.get('sort', ''), fee_expr)
 
     # Who the backlog actually belongs to. A fleet-wide queue of several
     # hundred rows is unworkable as one list — staff pay one driver at a time,
@@ -13211,7 +13840,13 @@ def driver_payout_worksheet(request, driver_id=None):
     # a card that started in August must not restate a delivery made in June.
     card_for = CardResolver({t.driver_id for t in queue_paginated})
 
+    # One zone-centre map for the whole page, not one per row — the From/To/KM
+    # columns fall back to it for any order saved before the distance field.
+    from delivery.geo import zone_coord_map, zone_name_map
+    zone_coords, zone_names = zone_coord_map(), zone_name_map()
+
     for task in queue_paginated:
+        task.leg = _payout_leg(task, zone_coords, zone_names)
         task.activity_log = logs_by_task.get(task.id, [])
         rank_target = salary_preview.get(task.id)
         task.salary_covered = rank_target is not None
@@ -13265,9 +13900,30 @@ def driver_payout_worksheet(request, driver_id=None):
     else:
         money_at = 'clear'
 
+    # What a header link or a pager must carry so a click never silently throws
+    # away the period, the rail filter or the driver cut. `sort_params` drops
+    # `sort` because each header appends its own; `page_params` keeps it.
+    # The raw echoes (`date_from`/`date_to`), never the parsed dates: a preset
+    # period computes `from_date` to an actual date, and emitting that as `from=`
+    # would silently convert the staff member's "last 90 days" into a fixed
+    # custom range the moment they clicked a header.
+    from urllib.parse import urlencode
+    _carried = ([('from', date_from), ('to', date_to)] if custom_range
+                else [('days', days)])
+    _carried.append(('only', only))
+    if fleet_wide and driver is not None:
+        _carried.append(('driver', driver.driver_id))
+    sort_params = urlencode([(k, v) for k, v in _carried if v not in ('', None)])
+    page_params = urlencode(
+        [(k, v) for k, v in _carried + [('sort', sort_key)] if v not in ('', None)])
+
     context = {
         'page_title': f'Payout · {display_name}',
         'driver': driver,
+        'sort_key': sort_key,
+        'sort_columns': sort_columns,
+        'sort_params': sort_params,
+        'page_params': page_params,
         'driver_display_name': display_name,
         'payable_lines': payable_lines,
         'earnings_total': earnings_total,
@@ -13529,6 +14185,7 @@ def earnings_verification_action(request):
 
     updated_count = 0
     salary_covered = 0
+    skipped_locked = 0
     errors = []
 
     # Fetch all tasks at once to avoid N+1 queries
@@ -13556,6 +14213,14 @@ def earnings_verification_action(request):
             task = tasks_dict.get(str(task_id))
             if not task:
                 errors.append(f"Task {task_id} not found")
+                continue
+
+            # A bare fee save must never touch a published row: that figure is
+            # already credited to the driver's wallet, and rewriting it here
+            # would leave the ledger saying one thing and the payout another.
+            # The status actions have their own guards further down.
+            if action == 'update' and task.earnings_verification_status == 'published':
+                skipped_locked += 1
                 continue
 
             # Update earnings amount if provided
@@ -13637,7 +14302,12 @@ def earnings_verification_action(request):
                 updated_count += 1
 
             elif action == 'update':
-                # Just update the earnings amount
+                # Save the fee and leave the verification status alone — this is
+                # the "I corrected a figure, I am not ready to verify it yet" step
+                # the desk needs between the two. A plain save(), not
+                # update_fields: delivery_task_pre_save repairs the task's two
+                # address FKs on the way through, and narrowing the write would
+                # silently drop that.
                 task.save()
                 updated_count += 1
 
@@ -13655,6 +14325,19 @@ def earnings_verification_action(request):
             })
         except Exception as e:
             logger.warning(f"Auto flow failed for earnings approved: {e}")
+
+    if action == 'update':
+        message = f'{updated_count} fee(s) saved'
+        if skipped_locked:
+            message += (f' — {skipped_locked} already published and left '
+                        f'unchanged')
+        return JsonResponse({
+            'success': True,
+            'updated': updated_count,
+            'skipped_published': skipped_locked,
+            'errors': errors,
+            'message': message,
+        })
 
     message = f'{updated_count} task(s) updated successfully'
     if salary_covered:
@@ -17157,6 +17840,10 @@ def seller_transactions(request):
     # count come from DeliveryTask (the money truth), and the uncharged prepaid
     # count from the billing gate.
     seller_roster = []
+    # Both are only built for the landing state, but the context dict at the end
+    # of this view runs on every request — so they need a value out here or the
+    # selected-seller path raises UnboundLocalError.
+    roster_totals = None
     if not selected_seller:
         # NB: no `from delivery import models as delivery_models` here — a local
         # import inside this branch would make the name local to the *whole*
@@ -17248,6 +17935,30 @@ def seller_transactions(request):
         # sorting those alphabetically buried them under empty cards.
         seller_roster.sort(key=lambda r: (-r['unsettled'], -r['pending_orders'],
                                           r['business'].business_name or ''))
+
+        # The book totals, for the header.
+        #
+        # COD to pay is summed from the rows just built rather than queried
+        # again, so the header can never disagree with the cards under it — it
+        # is by construction the sum of that column. It is the Ezzy leg alone,
+        # because the question the header answers is "how much do we owe
+        # sellers", and cash still in a driver's pocket has not reached us to be
+        # owed yet; a payout run cannot touch it either, since only cod_settled
+        # tasks are candidates.
+        #
+        # Deliveries cannot come from those rows: they are built from a
+        # cod_collected=True queryset and so cannot see a prepaid job. One
+        # aggregate over every completed task instead — counted over tasks, not
+        # orders, because a delivery is a task and a job re-attempted on a
+        # second task was worked twice.
+        from fleet.billing_service import BILLABLE_STATUSES
+        roster_totals = {
+            'owed': sum((r['owed'] for r in seller_roster), Decimal('0.00')),
+            'deliveries': delivery_models.DeliveryTask.objects.filter(
+                order__business__business_status='active',
+                dl_task_status__in=BILLABLE_STATUSES,
+            ).count(),
+        }
 
     # Date filters
     date_preset = request.GET.get('date_preset', '')
@@ -17582,6 +18293,7 @@ def seller_transactions(request):
         'page_title': 'Seller Transactions',
         'all_sellers': all_sellers,
         'seller_roster': seller_roster,
+        'roster_totals': roster_totals,
         'selected_seller': selected_seller,
         'orders': orders_paginated,
         'zone_name_map': zone_name_map,
@@ -18488,9 +19200,18 @@ def driver_payout_invoice(request, settlement_id):
 
     # Payout lines only. Bonuses are money owed too, so they belong here;
     # COD collections/deposits are deliberately excluded.
+    #
+    # The optional columns reach past the transaction — the client, the customer,
+    # the zone, and who did the first mile — so everything they read is joined
+    # here rather than once per line.
     txns = fleet_models.DriverTransaction.objects.filter(
         settlement=settlement, transaction_type__in=['earning', 'bonus'],
-    ).select_related('delivery_task', 'delivery_task__order').order_by('created_at', 'id')
+    ).select_related(
+        'delivery_task', 'delivery_task__order', 'delivery_task__order__business',
+        'delivery_task__source_pickup_task', 'delivery_task__source_pickup_task__driver',
+        'delivery_task__source_pickup_task__drop_warehouse',
+        'delivery_task__hub_warehouse',
+    ).order_by('created_at', 'id')
 
     lines = []
     total_earnings = Decimal('0')
@@ -18505,6 +19226,12 @@ def driver_payout_invoice(request, settlement_id):
     total_deductions = sum(
         (abs(d.amount or Decimal('0')) for d in deductions), Decimal('0'))
 
+    # Which columns the document carries, and the picker that changes them.
+    # Same shape as the client charge invoice: the table arrives pre-rendered as
+    # `columns` / `rows` / `totals_cells` rather than being assembled in the
+    # template, because the column set is chosen at run time.
+    from fleet import payout_columns as pc
+
     context = {
         'page_title': f'Driver Payout {settlement.settlement_code}',
         'settlement': settlement,
@@ -18514,8 +19241,60 @@ def driver_payout_invoice(request, settlement_id):
         'deductions': deductions,
         'total_deductions': total_deductions,
         'net_paid': total_earnings - total_deductions,
+        'picker_groups': pc.picker_groups(pc.resolve_keys(settlement)),
+        # The reset control only means something when this payout is actually
+        # overriding the driver's default.
+        'has_settlement_override': bool(settlement.column_keys),
     }
+    context.update(pc.render_table(settlement, lines))
     return render(request, 'workforce/driver_payout_invoice.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_payout_invoice_columns(request, settlement_id):
+    """Choose which columns the payout document carries.
+
+    The choice lives on the driver by default, so every payout for them reads
+    alike; ``save_default`` off keeps it to this one payout, and ``reset`` drops
+    the override so the payout follows the driver again. The mirror of
+    ``client_charge_invoice_columns`` for the money-out leg.
+    """
+    from django.http import JsonResponse
+    from fleet import payout_columns as pc
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    settlement = fleet_models.DriverSettlement.objects.select_related('driver').filter(
+        settlement_id=settlement_id
+    ).first()
+    if not settlement:
+        return JsonResponse({'error': 'Payout not found'}, status=404)
+
+    if (request.POST.get('reset') or '') in ('1', 'true', 'on'):
+        settlement.column_keys = []
+        settlement.save(update_fields=['column_keys'])
+        return JsonResponse({'success': True, 'columns': pc.resolve_keys(settlement)})
+
+    # Validated before the pinned columns are forced in, not after: clean_keys()
+    # always returns at least the pinned key, so testing its result would accept
+    # a payload of pure nonsense and quietly render a one-column document.
+    raw = [k.strip() for k in (request.POST.get('columns') or '').split(',') if k.strip()]
+    if not [k for k in raw if k in pc.VALID_KEYS]:
+        return JsonResponse({'error': 'Pick at least one column'}, status=400)
+    keys = pc.clean_keys(raw)
+
+    settlement.column_keys = keys
+    settlement.save(update_fields=['column_keys'])
+
+    if (request.POST.get('save_default') or '') in ('1', 'true', 'on'):
+        driver = settlement.driver
+        if driver:
+            driver.payout_columns = keys
+            driver.save(update_fields=['payout_columns'])
+
+    return JsonResponse({'success': True, 'columns': keys})
 
 
 @login_required(login_url='/accounts/login/')
@@ -19537,6 +20316,48 @@ def wf_approve_api_config(request, api_id):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+def _product_mapping_from_post(post, existing=None):
+    """Build product_column_mapping from the modal's pm_<field> inputs.
+
+    Returns None when the caller posted no pm_ fields at all, so an API client
+    that does not manage the mapping cannot wipe it by omission.
+    """
+    from ezzy_api.store_pull import PRODUCT_FIELDS
+
+    posted = {f: post.get(f'pm_{f}') for f in PRODUCT_FIELDS if f'pm_{f}' in post}
+    if not posted:
+        return None
+    mapping = dict(existing) if isinstance(existing, dict) else {}
+    for field, raw in posted.items():
+        path = (raw or '').strip()
+        if path:
+            mapping[field] = path
+        else:
+            mapping.pop(field, None)
+    return mapping
+
+
+# The pull columns are NOT NULL with a '' default, unlike the older credential
+# columns which are null=True. The staff modal coerces every blank to None, so
+# they need their own empty value or saving a blank row raises IntegrityError.
+PULL_TEXT_FIELDS = frozenset({
+    'fetch_orders_url', 'fetch_auth_style', 'fetch_auth_name', 'fetch_api_key',
+    'fetch_list_path', 'fetch_status_path', 'fetch_status_include',
+    'fetch_products_url', 'fetch_products_list_path',
+})
+
+
+def _api_field_value(name, raw):
+    """Blank as '' for the pull columns, None for the older nullable ones."""
+    text = (raw or '').strip()
+    if name in PULL_TEXT_FIELDS:
+        # fetch_auth_style is a choice column; '' is not one of them.
+        if name == 'fetch_auth_style' and not text:
+            return 'bearer'
+        return text
+    return text or None
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def wf_get_api_config(request, api_id):
@@ -19562,6 +20383,20 @@ def wf_get_api_config(request, api_id):
             'tiktok_shop_id': api.tiktok_shop_id or '',
             'tiktok_shop_cipher': api.tiktok_shop_cipher or '',
             'tiktok_refresh_token': api.tiktok_refresh_token or '',
+            # Custom REST pull. fetch_api_key is the seller's own credential and
+            # is echoed back the same way api_secret already is — the modal has
+            # to round-trip it or saving any other field would blank it.
+            'fetch_orders_url': api.fetch_orders_url or '',
+            'fetch_auth_style': api.fetch_auth_style or 'bearer',
+            'fetch_auth_name': api.fetch_auth_name or '',
+            'fetch_api_key': api.fetch_api_key or '',
+            'fetch_list_path': api.fetch_list_path or '',
+            'fetch_status_path': api.fetch_status_path or '',
+            'fetch_status_include': api.fetch_status_include or '',
+            'fetch_products_url': api.fetch_products_url or '',
+            'fetch_products_list_path': api.fetch_products_list_path or '',
+            'fetch_enabled': api.fetch_enabled,
+            'product_column_mapping': api.product_column_mapping or {},
             'is_verify_api': api.is_verify_api,
             'is_default': api.is_default,
         },
@@ -19586,6 +20421,9 @@ def wf_update_api_config(request, api_id):
         'api_type', 'api_key', 'api_secret', 'api_access_token', 'api_version',
         'site_api_url', 'site_contry', 'order_api_endpoint', 'product_api_endpoint',
         'google_sheet_url', 'tiktok_shop_id', 'tiktok_shop_cipher', 'tiktok_refresh_token',
+        'fetch_orders_url', 'fetch_auth_style', 'fetch_auth_name', 'fetch_api_key',
+        'fetch_list_path', 'fetch_status_path', 'fetch_status_include',
+        'fetch_products_url', 'fetch_products_list_path',
     ]
     cred_fields = {'api_key', 'api_secret', 'api_access_token', 'site_api_url', 'google_sheet_url'}
 
@@ -19594,12 +20432,26 @@ def wf_update_api_config(request, api_id):
     try:
         for f in editable:
             if f in request.POST:
-                new_val = (request.POST.get(f) or '').strip() or None
+                new_val = _api_field_value(f, request.POST.get(f))
                 if getattr(api, f) != new_val:
                     setattr(api, f, new_val)
                     changed.append(f)
                     if f in cred_fields:
                         creds_changed = True
+
+        # The modal posts this explicitly as '1'/'0' (an unticked checkbox sends
+        # nothing at all), so "absent" here means a caller that does not manage
+        # the flag, not "switch it off".
+        if 'fetch_enabled' in request.POST:
+            new_pull = request.POST.get('fetch_enabled') in ('1', 'true', 'on', 'yes')
+            if api.fetch_enabled != new_pull:
+                api.fetch_enabled = new_pull
+                changed.append('fetch_enabled')
+
+        new_pm = _product_mapping_from_post(request.POST, api.product_column_mapping)
+        if new_pm is not None and new_pm != (api.product_column_mapping or {}):
+            api.product_column_mapping = new_pm or None
+            changed.append('product_column_mapping')
 
         if 'is_default' in request.POST:
             new_default = request.POST.get('is_default') in ('1', 'true', 'on', 'yes')
@@ -19658,6 +20510,9 @@ def wf_create_api_config(request, business_id):
         'api_key', 'api_secret', 'api_access_token', 'api_version',
         'site_api_url', 'site_contry', 'order_api_endpoint', 'product_api_endpoint',
         'google_sheet_url', 'tiktok_shop_id', 'tiktok_shop_cipher', 'tiktok_refresh_token',
+        'fetch_orders_url', 'fetch_auth_style', 'fetch_auth_name', 'fetch_api_key',
+        'fetch_list_path', 'fetch_status_path', 'fetch_status_include',
+        'fetch_products_url', 'fetch_products_list_path',
     ]
 
     # A row with neither a source URL nor a key is an empty shell that shows up
@@ -19672,8 +20527,10 @@ def wf_create_api_config(request, business_id):
         api = business_models.BusinessApiSettings(business=business, api_type=api_type)
         for f in editable:
             if f in request.POST:
-                setattr(api, f, (request.POST.get(f) or '').strip() or None)
+                setattr(api, f, _api_field_value(f, request.POST.get(f)))
 
+        api.fetch_enabled = request.POST.get('fetch_enabled') in ('1', 'true', 'on', 'yes')
+        api.product_column_mapping = _product_mapping_from_post(request.POST) or None
         api.is_default = request.POST.get('is_default') in ('1', 'true', 'on', 'yes')
         api.is_verify_api = False
         api.save()
@@ -20065,46 +20922,87 @@ def wf_test_api_config_result(request, api_id):
                 })
 
         elif api.api_type == 'custom':
-            # An inbound integration: the seller's own site POSTs to us, so there
-            # is nothing to call out to. The meaningful test is whether a live
-            # API key exists and whether orders are actually arriving.
+            # This type covers BOTH directions. Push: the seller's site POSTs to
+            # us, nothing to call out to. Pull: a fetch URL is configured and we
+            # call their endpoint. The test has to say which one it just proved.
             from ezzy_api.models import ClientApiKey as _CAK
+            from ezzy_api.store_pull import PullError, fetch_orders, is_pull_source
 
-            keys = list(_CAK.objects.filter(business=business).order_by('-created_at'))
-            live = [k for k in keys if k.is_valid()]
-            if not keys:
-                raise ValueError(
-                    'No client API key issued for this seller yet. The custom site '
-                    'cannot authenticate until one is created.'
+            # A pull source is the mirror image: the credential lives on the
+            # seller's side and there IS something to call, so call it. A row can
+            # be both, in which case the live fetch is the more useful verdict.
+            if is_pull_source(api):
+                api_stats['direction'] = 'pull'
+                api_stats['fetch_url'] = api.fetch_orders_url
+                api_stats['fetch_auth'] = api.get_fetch_auth_style_display()
+                api_stats['auto_pull'] = 'on' if api.fetch_enabled else 'off (manual only)'
+                try:
+                    fetched, meta = fetch_orders(api)
+                except PullError as exc:
+                    raise ValueError(str(exc))
+                api_stats['order_count'] = meta['count']
+                api_stats['response_bytes'] = meta['bytes']
+                api_stats['response_ms'] = meta['ms']
+                api_stats['skipped_status'] = meta.get('skipped_status', 0)
+                api_stats['skipped_detail'] = meta.get('skipped_detail', '')
+                api_stats['endpoint'] = f'GET {meta["url"]}'
+                order_status_code = meta['status']
+                order_response = [
+                    {
+                        'order_number': '',
+                        'client_order_code': str(
+                            o.get('orderNumber') or o.get('order_number') or o.get('id') or ''),
+                        'customer_name': str(
+                            (o.get('customer') or {}).get('name')
+                            if isinstance(o.get('customer'), dict) else o.get('customer_name') or ''),
+                        'cod_amount': str(o.get('total') or o.get('cod_amount') or ''),
+                        'order_status': str(o.get('status') or ''),
+                        'created_at': str(o.get('createdAt') or o.get('created_at') or ''),
+                    }
+                    for o in fetched[:5]
+                ]
+                product_response = None
+
+            else:
+                # Push-only: nothing to call out to, so the meaningful test is
+                # whether a live API key exists and whether orders are arriving.
+                api_stats['direction'] = 'push'
+
+                keys = list(_CAK.objects.filter(business=business).order_by('-created_at'))
+                live = [k for k in keys if k.is_valid()]
+                if not keys:
+                    raise ValueError(
+                        'No client API key issued for this seller yet. The custom site '
+                        'cannot authenticate until one is created.'
+                    )
+                if not live:
+                    raise ValueError(
+                        'This seller has API keys, but every one of them is inactive or expired.'
+                    )
+
+                newest = live[0]
+                api_stats['key_prefix'] = newest.key_prefix or '(legacy)'
+                api_stats['key_scope'] = newest.get_scope_display()
+                api_stats['key_last_used'] = (
+                    dj_timezone.localtime(newest.last_used).strftime('%d %b %Y %H:%M')
+                    if newest.last_used else 'never'
                 )
-            if not live:
-                raise ValueError(
-                    'This seller has API keys, but every one of them is inactive or expired.'
-                )
+                api_stats['endpoint'] = 'POST https://ezzydelivery.qa/api/v1/store/orders/'
 
-            newest = live[0]
-            api_stats['key_prefix'] = newest.key_prefix or '(legacy)'
-            api_stats['key_scope'] = newest.get_scope_display()
-            api_stats['key_last_used'] = (
-                dj_timezone.localtime(newest.last_used).strftime('%d %b %Y %H:%M')
-                if newest.last_used else 'never'
-            )
-            api_stats['endpoint'] = 'POST https://ezzydelivery.qa/api/v1/store/orders/'
-
-            pushed = orders_models.Order.objects.filter(business=business, platform='api')
-            api_stats['order_count'] = pushed.count()
-            order_status_code = 200
-            order_response = [
-                {
-                    'order_number': o.order_number,
-                    'client_order_code': o.client_order_code,
-                    'customer_name': o.customer_name,
-                    'cod_amount': str(o.cod_amount or 0),
-                    'order_status': o.get_order_status_display(),
-                    'created_at': dj_timezone.localtime(o.created_at).strftime('%d %b %Y %H:%M') if o.created_at else '',
-                }
-                for o in pushed.order_by('-id')[:5]
-            ]
+                pushed = orders_models.Order.objects.filter(business=business, platform='api')
+                api_stats['order_count'] = pushed.count()
+                order_status_code = 200
+                order_response = [
+                    {
+                        'order_number': o.order_number,
+                        'client_order_code': o.client_order_code,
+                        'customer_name': o.customer_name,
+                        'cod_amount': str(o.cod_amount or 0),
+                        'order_status': o.get_order_status_display(),
+                        'created_at': dj_timezone.localtime(o.created_at).strftime('%d %b %Y %H:%M') if o.created_at else '',
+                    }
+                    for o in pushed.order_by('-id')[:5]
+                ]
 
         else:
             error_message = f"Test not implemented for api_type={api.api_type}"
@@ -20333,40 +21231,127 @@ def sellers_inactive(request):
 def _retire_fulfilment_pickup_locations(business):
     """Switching a client off fulfilment: settle its FC-flagged pickup rows.
 
-    Two very different rows wear `is_fulfilment_center=True`:
+    Two very different rows wear `is_fulfilment_center=True`, and what separates
+    them is whether a warehouse sits behind the row — NOT whether the link is
+    still active:
 
       * A real warehouse address, created by `warehouse.signals
-        .seller_warehouse_link_post_save` and backed by an active
-        SellerWarehouseLink. The client no longer uses that warehouse, so the
-        address stops being offered for collection — but the flag stays, because
-        the row genuinely IS a warehouse and un-flagging it would send drivers
-        to collect goods that are already at the hub.
+        .seller_warehouse_link_post_save`, carrying a warehouse_id. The client no
+        longer uses that warehouse, so the address stops being offered for
+        collection — but the flag stays, because the row genuinely IS a warehouse
+        and un-flagging it would send drivers to collect goods that are already at
+        the hub. This holds however stale the link: an inactive or deleted
+        SellerWarehouseLink does not turn a hub into a shop.
 
       * The client's own shop address wearing a stale stamp from the old
-        `create_fulfillment_store_on_service_enable` signal, with no link behind
-        it (see the note in business/signals.py). Deactivating that one leaves
-        the client with no collectable address at all and first-mile pickup
+        `create_fulfillment_store_on_service_enable` signal, with no warehouse
+        behind it (see the note in business/signals.py). Deactivating that one
+        leaves the client with no collectable address at all and first-mile pickup
         refuses forever on 'fulfilment_center'. Clear the flag instead and keep
         the address usable.
     """
     from business.models import PickupLocation
-    from warehouse.models import SellerWarehouseLink
 
-    linked_warehouse_ids = set(
-        SellerWarehouseLink.objects.filter(business=business, is_active=True)
-        .values_list('warehouse_id', flat=True)
-    )
     for loc in PickupLocation.objects.filter(business=business, is_fulfilment_center=True):
-        if loc.warehouse_id and loc.warehouse_id in linked_warehouse_ids:
+        if loc.warehouse_id:
             if loc.pickup_status != 'inactive':
                 loc.pickup_status = 'inactive'
                 loc.save(update_fields=['pickup_status'])
+                logger.info(
+                    "[fulfilment-off] deactivated warehouse pickup location %s "
+                    "(%s) for %s", loc.pk, loc.pickup_location_title, business.business_name)
         else:
             loc.is_fulfilment_center = False
             loc.save(update_fields=['is_fulfilment_center'])
             logger.info(
                 "[fulfilment-off] cleared stale FC flag on pickup location %s "
                 "(%s) for %s", loc.pk, loc.pickup_location_title, business.business_name)
+
+
+def _provision_fulfilment_pickup_location(business, user=None):
+    """Switching a client ON to fulfilment: give it the warehouse pickup address.
+
+    The exact inverse of `_retire_fulfilment_pickup_locations`. Without it the
+    switch only arms the flag — nothing of the client's is collectable at the hub
+    until someone separately remembers to link a warehouse, and a client switched
+    off and back on never gets the address the off-switch retired.
+
+    The row itself is always built by `warehouse.signals
+    .seller_warehouse_link_post_save`, so this only has to make sure a
+    SellerWarehouseLink exists and then re-save it. It never stamps
+    `is_fulfilment_center` onto an address with no warehouse behind it: that was
+    the old `create_fulfillment_store_on_service_enable` bug, which left clients
+    silently refused for first-mile pickup (see business/signals.py).
+
+    Returns `(pickup_location, warning)`. `warning` is set — and the location is
+    None — when no warehouse can be chosen without guessing; the caller shows it
+    to staff rather than picking one at random.
+    """
+    from business.models import PickupLocation
+    from warehouse import models as warehouse_models
+
+    # A warehouse-backed row already on file: the off-switch only deactivated it,
+    # so bring that one back instead of creating a second address for the same hub.
+    existing = list(PickupLocation.objects.filter(
+        business=business, is_fulfilment_center=True, warehouse__isnull=False
+    ).order_by('id'))
+    active = next((loc for loc in existing if loc.pickup_status == 'active'), None)
+    if active:
+        return active, None
+    if existing:
+        loc = existing[0]
+        loc.pickup_status = 'active'
+        loc.save(update_fields=['pickup_status'])
+        logger.info(
+            "[fulfilment-on] reactivated warehouse pickup location %s (%s) for %s",
+            loc.pk, loc.pickup_location_title, business.business_name)
+        return loc, None
+
+    # No warehouse address yet — find the warehouse this client belongs to.
+    link = (warehouse_models.SellerWarehouseLink.objects
+            .filter(business=business)
+            .select_related('warehouse')
+            .order_by('-is_active', '-is_default', '-priority', 'id')
+            .first())
+    if link is not None:
+        # Re-saving fires the post_save receiver that builds the pickup row.
+        link.is_active = True
+        link.save()
+    else:
+        # Only auto-link when there is nothing to choose between. With two hubs
+        # live, which one holds this client's stock is an ops decision, not a
+        # default.
+        candidates = list(warehouse_models.Warehouse.objects.filter(is_active=True)[:2])
+        if len(candidates) != 1:
+            return None, (
+                'Fulfilment is on, but this seller has no warehouse linked and '
+                'there is no single active warehouse to pick. Link one on the '
+                'Fulfilment section so the client gets a collectable warehouse '
+                'address.'
+            )
+        link = warehouse_models.SellerWarehouseLink.objects.create(
+            business=business,
+            warehouse=candidates[0],
+            is_default=True,
+            linked_by=user if (user is not None and user.is_authenticated) else None,
+        )
+        logger.info(
+            "[fulfilment-on] linked %s to warehouse %s",
+            business.business_name, link.warehouse.code)
+
+    loc = PickupLocation.objects.filter(business=business, warehouse=link.warehouse).first()
+    if loc is None:
+        return None, (
+            'Fulfilment is on, but the warehouse pickup address could not be '
+            'created. Link the warehouse again on the Fulfilment section.'
+        )
+    if loc.pickup_status != 'active':
+        loc.pickup_status = 'active'
+        loc.save(update_fields=['pickup_status'])
+    logger.info(
+        "[fulfilment-on] warehouse pickup location %s (%s) is live for %s",
+        loc.pk, loc.pickup_location_title, business.business_name)
+    return loc, None
 
 
 @login_required(login_url='/accounts/login/')
@@ -20479,6 +21464,57 @@ def seller_detail(request, business_id):
 
     # Handle POST for status update
     if request.method == 'POST':
+        # The fulfilment switch now lives on the Store Locations tab and saves on
+        # its own, so it posts `section=fulfilment` and nothing else. It has to be
+        # handled before the edit-form branch below, which rewrites every business
+        # and profile field and would blank them out from this partial payload.
+        if request.POST.get('section') == 'fulfilment':
+            from django.db import transaction as db_transaction
+            try:
+                # The flag, the status, the warehouse link and the pickup row
+                # are one statement about this client; a half-applied switch
+                # leaves a collectable warehouse address on a client that is
+                # not on fulfilment.
+                with db_transaction.atomic():
+                    fulfillment_enabled = request.POST.get('fulfillment_service_enabled') == 'on'
+                    warning = None
+                    if fulfillment_enabled:
+                        if not business.fulfillment_service_enabled:
+                            business.fulfillment_service_enabled = True
+                            business.fulfillment_activated_at = timezone.now()
+                        # Give the client the warehouse pickup address, so the switch
+                        # means the same thing in both directions: off retires it, on
+                        # brings it back.
+                        location, warning = _provision_fulfilment_pickup_location(business, request.user)
+                        # `status` is what the rest of the codebase reads. It may only
+                        # say 'active' once a warehouse address actually exists — which
+                        # is exactly what a returned location proves.
+                        if location is not None:
+                            business.fulfillment_service_status = 'active'
+                        elif business.fulfillment_service_status == 'none':
+                            business.fulfillment_service_status = 'requested'
+                    else:
+                        business.fulfillment_service_enabled = False
+                        # Half the codebase reads `status`, not `enabled`, so leaving a
+                        # disabled client sitting at 'active' keeps it in every
+                        # fulfilment queue and report.
+                        if business.fulfillment_service_status == 'active':
+                            business.fulfillment_service_status = 'none'
+                        _retire_fulfilment_pickup_locations(business)
+                    business.save()
+                    return JsonResponse({
+                        'success': True,
+                        'enabled': business.fulfillment_service_enabled,
+                        'warning': warning,
+                        'message': 'Fulfilment service ' + ('enabled' if business.fulfillment_service_enabled else 'disabled'),
+                    })
+            except Exception:
+                logger.exception("Error updating fulfilment switch for seller %s", business_id)
+                return JsonResponse({
+                    'success': False,
+                    'error': 'An error occurred while updating the fulfilment service'
+                }, status=400)
+
         try:
             # Basic Information
             business.business_code = request.POST.get('business_code', business.business_code) or None
@@ -20508,23 +21544,10 @@ def seller_detail(request, business_id):
             business.business_instagram = request.POST.get('business_instagram', business.business_instagram) or None
             business.business_facebook_page = request.POST.get('business_facebook_page', business.business_facebook_page) or None
 
-            # Handle fulfillment service toggle
-            fulfillment_enabled = request.POST.get('fulfillment_service_enabled') == 'on'
-            if fulfillment_enabled and not business.fulfillment_service_enabled:
-                business.fulfillment_service_enabled = True
-                business.fulfillment_activated_at = timezone.now()
-                # Deliberately NOT setting fulfillment_service_status='active' —
-                # that requires a warehouse, which only the Fulfilment section
-                # (section == 'fulfillment') collects. This switch arms the
-                # service; onboarding it is a separate, explicit step.
-            elif not fulfillment_enabled:
-                business.fulfillment_service_enabled = False
-                # Half the codebase reads `status`, not `enabled`, so leaving a
-                # disabled client sitting at 'active' keeps it in every
-                # fulfilment queue and report.
-                if business.fulfillment_service_status == 'active':
-                    business.fulfillment_service_status = 'none'
-                _retire_fulfilment_pickup_locations(business)
+            # The fulfilment flag is NOT read here: the edit form no longer carries
+            # it, and an absent checkbox is indistinguishable from an unticked one,
+            # so reading it would switch every seller off on an ordinary save.
+            # See the `section == 'fulfilment'` branch at the top of this POST.
 
             business.save()
 
@@ -20624,10 +21647,26 @@ def seller_detail(request, business_id):
     if first_api and first_api.api_type in ('shopify', 'woocommerce'):
         api_products_platform = first_api.api_type
 
+    # A custom integration with a fetch URL is a live order source too, so the
+    # Orders tab gets its fetch buttons. Keyed off its own flag rather than
+    # api_products_platform: we can pull their orders, not their catalogue.
+    from ezzy_api.store_pull import is_pull_source as _is_pull_source
+    api_orders_pull_source = next(
+        (a for a in api_settings if a.api_type == 'custom' and _is_pull_source(a)), None)
+    from ezzy_api.store_pull import is_product_pull_source as _is_prod_pull
+    api_products_pull_source = next(
+        (a for a in api_settings if a.api_type == 'custom' and _is_prod_pull(a)), None)
+
+    # Where this client came from in the CRM. Suggestions are only computed when
+    # no lead is attached, so a converted client costs nothing extra.
+    crm_linked_leads, crm_lead_suggestions = _seller_crm_leads(business)
+
     context = {
         'page_title': f'Seller: {business.business_name}',
         'business': business,
         'business_profile': business_profile,
+        'crm_linked_leads': crm_linked_leads,
+        'crm_lead_suggestions': crm_lead_suggestions,
         'team_members': team_members,
         'api_settings': api_settings,
         'pickup_locations': pickup_locations,
@@ -20647,6 +21686,11 @@ def seller_detail(request, business_id):
         'api_products': api_products,
         'api_products_error': api_products_error,
         'api_products_platform': api_products_platform,
+        'api_orders_pull_source': api_orders_pull_source,
+        'api_products_pull_source': api_products_pull_source,
+        # The platform -> field map the edit modal renders from. Same source as
+        # the client-side form, so the two cannot show different field sets.
+        'api_field_config': integration_fields.as_dict(),
         'team_status_choices': business_models.BusinessTeamProfile.STATUS_CHOICES,
         'team_role_choices': business_models.BusinessTeamProfile.ROLE_CHOICES,
         'now': timezone.now(),
@@ -20679,6 +21723,59 @@ def seller_api_products(request, business_id):
         if s
     )
     import_result = getattr(request, '_seller_api_import_result', None)
+
+    # A custom integration with a product URL is a catalogue source too. Read it
+    # through its mapping only — a product built from guessed field names gets the
+    # wrong SKU or the wrong price, and both are expensive to undo.
+    from ezzy_api.store_pull import (
+        PullError, fetch_products, is_product_pull_source, resolve_product,
+        unmapped_product_fields,
+    )
+    product_pull = next(
+        (a for a in api_settings.filter(api_type='custom').order_by('id')
+         if is_product_pull_source(a)),
+        None,
+    )
+    if product_pull is not None:
+        mapping = product_pull.product_column_mapping
+        mapping = mapping if isinstance(mapping, dict) else {}
+        missing = unmapped_product_fields(mapping)
+        pull_meta = None
+        if missing:
+            api_products_error = (
+                'This integration has no %s mapping, so nothing can be imported. '
+                'Nothing is guessed from field names — set the product paths on the '
+                'integration first.' % ', '.join(missing)
+            )
+        else:
+            try:
+                raw_products, pull_meta = fetch_products(product_pull)
+                for raw in raw_products:
+                    resolved = resolve_product(raw, mapping)
+                    if not resolved:
+                        continue
+                    api_products.append({
+                        'platform_id': str(resolved.get('platform_id') or ''),
+                        'variant_id': str(resolved.get('variant_id') or ''),
+                        'title': str(resolved.get('item_name') or ''),
+                        'variant_title': str(resolved.get('variant_title') or ''),
+                        'sku': str(resolved.get('item_sku') or ''),
+                        'barcode': str(resolved.get('barcode') or ''),
+                        'price': str(resolved.get('item_price') or ''),
+                        'inventory_qty': resolved.get('inventory_qty') or 0,
+                        'image': str(resolved.get('image_url') or ''),
+                        'vendor': str(resolved.get('brand_name') or ''),
+                        'product_type': str(resolved.get('item_category') or ''),
+                    })
+            except PullError as exc:
+                api_products_error = str(exc)
+
+        return render(request, 'workforce/parts/seller_api_products_fragment.html', {
+            'api_products': api_products, 'api_products_error': api_products_error,
+            'api_products_platform': 'custom', 'business': business,
+            'imported_skus': imported_skus, 'import_result': import_result,
+            'product_pull': product_pull, 'pull_meta': pull_meta,
+        })
 
     if not first_api or first_api.api_type not in ('shopify', 'woocommerce'):
         return render(request, 'workforce/parts/seller_api_products_fragment.html', {
@@ -21024,10 +22121,53 @@ def seller_api_products_import(request, business_id):
     return seller_api_products(request, business_id)
 
 
+def _mapped(payload, mapping, field):
+    """One mapped value out of a pulled payload, as trimmed text.
+
+    Mapping-only by design: an unmapped field reads blank rather than being
+    filled from a key that merely looks right. The preview must show what the
+    integration will actually import, and a guess here would make a misconfigured
+    mapping look correct on screen and wrong in Temp Orders.
+    """
+    from ezzy_api.json_paths import path_get as _pg
+
+    path = (mapping or {}).get(field)
+    if not path:
+        return ''
+    value = _pg(payload, path)
+    if isinstance(value, list):
+        value = next((v for v in value if v not in (None, '')), None)
+    return '' if value in (None, '') else str(value).strip()
+
+
+def _pull_preview_address(payload, mapping):
+    """Short address line for the staff preview, built from the mapped fields."""
+    bits = []
+    zone = _mapped(payload, mapping, 'dl_zone')
+    street = _mapped(payload, mapping, 'dl_street')
+    building = _mapped(payload, mapping, 'dl_building')
+    if zone:
+        bits.append(f'Z{zone}')
+    if street:
+        bits.append(f'S{street}' if street.isdigit() else street)
+    if building:
+        bits.append(f'B{building}')
+    for field in ('dl_landmark', 'customer_address'):
+        val = _mapped(payload, mapping, field)
+        if val and val not in bits:
+            bits.append(val)
+    return ' · '.join(bits)
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def seller_api_orders(request, business_id):
-    """HTMX endpoint: fetch the most recent N orders from Shopify/WooCommerce."""
+    """HTMX endpoint: fetch the most recent N orders from the seller's store.
+
+    Shopify and WooCommerce are called through their own clients; a custom
+    integration with a fetch URL is called through store_pull. The custom branch
+    deliberately does NOT apply the status filter, so staff can see the order
+    that is being skipped and why."""
     import signal
 
     business = get_object_or_404(business_models.Business, business_id=business_id)
@@ -21050,6 +22190,83 @@ def seller_api_orders(request, business_id):
     ctx_base = {
         'business': business, 'limit': limit, 'allowed_limits': ALLOWED_LIMITS,
     }
+
+    # A custom integration with a fetch URL is a live order source too. Pick that
+    # row explicitly: a seller can hold both a push row and a pull row, and
+    # api_settings.first() is unordered, so it would otherwise be a coin toss.
+    from ezzy_api.json_paths import path_get
+    from ezzy_api.store_pull import PullError, fetch_orders, is_pull_source
+    pull_source = next(
+        (a for a in api_settings.filter(api_type='custom').order_by('-fetch_enabled', 'id')
+         if is_pull_source(a)),
+        None,
+    )
+    if pull_source is not None:
+        eligible = set()
+        meta = None
+        try:
+            # Unfiltered on purpose — staff need to see the order that is NOT
+            # being staged, and the reason, rather than an unexplained absence.
+            fetched, meta = fetch_orders(pull_source, apply_status_filter=False)
+            wanted = {p.strip().lower()
+                      for p in (pull_source.fetch_status_include or '').split(',') if p.strip()}
+            status_path = (pull_source.fetch_status_path or 'status').strip()
+            # The row's own mapping, exactly as the pull will read it — the
+            # preview has to show what gets imported, not a prettier guess.
+            mapping = pull_source.column_mapping
+            if not isinstance(mapping, dict):
+                mapping = {}
+            for o in fetched[:limit]:
+                code = _mapped(o, mapping, 'client_order_code')
+                order_status = str(path_get(o, status_path) or '')
+                deliverable = (not wanted) or order_status.strip().lower() in wanted
+                if deliverable and code:
+                    eligible.add(code)
+                api_orders.append({
+                    'id': code,
+                    'name': code or '(unmapped)',
+                    'created_at': _mapped(o, mapping, 'order_date'),
+                    'financial_status': _mapped(o, mapping, 'payment_method'),
+                    'fulfillment_status': order_status,
+                    'customer_name': _mapped(o, mapping, 'customer_name'),
+                    'customer_phone': _mapped(o, mapping, 'customer_phone'),
+                    'address': _pull_preview_address(o, mapping),
+                    'deliverable': deliverable,
+                    'unmapped': not code,
+                    'item_count': 0,
+                    'total_price': _mapped(o, mapping, 'cod_amount'),
+                    'currency': '',
+                })
+        except PullError as exc:
+            api_orders_error = str(exc)
+
+        staged = set(
+            orders_models.TempOrder.objects
+            .filter(business=business, source_type='custom_api')
+            .values_list('client_order_code', flat=True)
+        )
+        imported = set(
+            orders_models.Order.objects
+            .filter(business=business)
+            .values_list('client_order_code', flat=True)
+        )
+        for row in api_orders:
+            row['staged'] = row['id'] in staged
+            row['imported'] = row['id'] in imported
+
+        mapping_ok = isinstance(pull_source.column_mapping, dict) and bool(
+            (pull_source.column_mapping or {}).get('client_order_code'))
+        return render(request, 'workforce/parts/seller_api_orders_fragment.html', dict(ctx_base, **{
+            'api_orders': api_orders,
+            'api_orders_error': api_orders_error,
+            'api_orders_platform': 'custom',
+            'resolved_handle': '',
+            'pull_source': pull_source,
+            'pull_meta': meta if not api_orders_error else None,
+            'eligible_count': len(eligible),
+            'mapping_ok': mapping_ok,
+            'business_id': business_id,
+        }))
 
     if not first_api or first_api.api_type not in ('shopify', 'woocommerce'):
         return render(request, 'workforce/parts/seller_api_orders_fragment.html', dict(ctx_base, **{
@@ -21893,11 +23110,10 @@ def drivers_list(request):
 
     _attach_crm_leads(page_obj)
 
-    # Get counts for stats
-    total_count = fleet_models.Driver.objects.count()
+    # The hero carries one tally: active drivers. The old tally strip's total/
+    # pending/inactive counts went with it — those standings are reached through
+    # the Driver Status filter, so counting them every request was dead work.
     active_count = fleet_models.Driver.objects.filter(driver_status='approved').count()
-    pending_count = fleet_models.Driver.objects.filter(driver_status__in=['pending', 'processing']).count()
-    inactive_count = fleet_models.Driver.objects.filter(driver_status__in=['rejected', 'blocked', 'suspended']).count()
 
     context = {
         'page_title': 'All Drivers',
@@ -21935,10 +23151,7 @@ def drivers_list(request):
         'selected_availability': availability_filters,
         'selected_languages': language_filters,
         'selected_verifications': verification_filters,
-        'total_count': total_count,
         'active_count': active_count,
-        'pending_count': pending_count,
-        'inactive_count': inactive_count,
         **export_columns_context(DRIVER_EXPORT_COLUMNS, 'workforce:export_drivers_csv', 'wf_drivers_export_cols'),
     }
 
@@ -22062,6 +23275,11 @@ def drivers_inactive(request):
     return render(request, 'workforce/drivers_inactive.html', context)
 
 
+# How many weeks the driver detail performance chart covers. 12 keeps the bars
+# readable in the overview card while still showing a season's worth of trend.
+PERFORMANCE_WEEKS = 12
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def driver_detail(request, driver_id):
@@ -22158,6 +23376,61 @@ def driver_detail(request, driver_id):
     recent_tasks = delivery_models.DeliveryTask.objects.filter(
         driver=driver
     ).select_related('business').order_by('-created_at')[:10]
+
+    # --- Performance trend: completed vs failed per week, last 12 weeks ---------
+    # Bucketed on dl_task_date (the delivery date), not completed_at: dl_task_date
+    # is set on every row while completed_at is empty on nearly all cancellations,
+    # so a completed_at chart would silently drop them. Grouping matches the
+    # Delivery Summary card below it so the two reconcile.
+    from django.db.models.functions import TruncWeek
+
+    today = timezone.localdate()
+    this_week = today - timedelta(days=today.weekday())          # Monday, like TruncWeek
+    first_week = this_week - timedelta(weeks=PERFORMANCE_WEEKS - 1)
+    week_rows = {
+        r['week']: r
+        for r in delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            dl_task_date__gte=first_week,
+            dl_task_date__lte=today,   # dl_task_date can be scheduled ahead — never chart the future
+        ).annotate(week=TruncWeek('dl_task_date')).values('week').annotate(
+            completed=Count('id', filter=Q(dl_task_status__in=['delivered', 'partial_delivery'])),
+            failed=Count('id', filter=Q(dl_task_status__in=['failed', 'cancelled'])),
+        )
+    }
+    # Every week inside the window gets a bucket — a quiet week is a zero column,
+    # not a missing one that would shift the trend left.
+    weeks = [first_week + timedelta(weeks=i) for i in range(PERFORMANCE_WEEKS)]
+    # ...but a driver who joined six weeks ago should not read as six weeks of
+    # failure, so the empty run before their first task is dropped. Gaps in the
+    # middle and at the end stay — those are real quiet weeks.
+    while weeks and weeks[0] not in week_rows:
+        weeks.pop(0)
+
+    completed_series = [week_rows[w]['completed'] if w in week_rows else 0 for w in weeks]
+    failed_series = [week_rows[w]['failed'] if w in week_rows else 0 for w in weeks]
+    window_completed = sum(completed_series)
+    window_failed = sum(failed_series)
+    window_total = window_completed + window_failed
+    performance_chart = {
+        'weeks': [w.strftime('%-d %b') for w in weeks],
+        'completed': completed_series,
+        'failed': failed_series,
+        'has_data': window_total > 0,
+        'window_completed': window_completed,
+        'window_failed': window_failed,
+        'window_total': window_total,
+        'window_rate': round(window_completed / window_total * 100, 1) if window_total else 0,
+        'window_label': (
+            '%s – %s' % (weeks[0].strftime('%-d %b'), weeks[-1].strftime('%-d %b'))
+            if weeks else ''
+        ),
+        # The trailing column is a week that has not finished yet, so it is
+        # always short. Flagged rather than hidden — dropping it would throw
+        # away this week's work.
+        'current_week_open': bool(weeks) and weeks[-1] == this_week,
+    }
+
 
     # Get COD statistics
     cod_stats = delivery_models.DeliveryTask.objects.filter(
@@ -22297,6 +23570,8 @@ def driver_detail(request, driver_id):
         'preferred_zone_ids': preferred_zone_ids,
         'delivery_stats': delivery_stats,
         'success_rate': success_rate,
+        'performance_chart': performance_chart,
+        'performance_weeks': PERFORMANCE_WEEKS,
         'recent_tasks_count': recent_tasks_count,
         'last_7_days_tasks': last_7_days_tasks,
         'recent_tasks': recent_tasks,
@@ -22898,6 +24173,7 @@ def bulk_print_tasks(request):
 def bulk_print_waybills(request):
     """Label-style waybills (same design as client dashboard Print Labels) for selected tasks."""
     from django.utils.safestring import mark_safe
+    from delivery.charges import collect_totals
     from delivery.label_utils import generate_qr_svg
 
     raw_ids = request.GET.get('ids', '').split(',')
@@ -22934,6 +24210,8 @@ def bulk_print_waybills(request):
             return zone_names.get(int(zone_no), '')
         return ''
 
+    totals = collect_totals(orders)
+
     waybills = []
     for order in orders:
         pickup_zone = order.pickup_location.pickup_zone_no if order.pickup_location else None
@@ -22942,6 +24220,7 @@ def bulk_print_waybills(request):
             'qr_svg': mark_safe(generate_qr_svg(order.order_number)),
             'from_zone_name': _zone_name(pickup_zone),
             'to_zone_name': _zone_name(order.dl_zone),
+            'collect_total': totals.get(order.id),
         })
 
     return render(request, 'business/print_waybill.html', {
@@ -23572,7 +24851,8 @@ def order_edit(request, order_id):
 # --- Order Item AJAX endpoints -----------------------------------------------
 
 # Task statuses where the driver has finished — don't rewrite their snapshot.
-_TASK_TERMINAL_STATUSES = ['delivered', 'partial_delivery', 'cancelled', 'rejected', 'dropsownlost']
+_TASK_TERMINAL_STATUSES = ['delivered', 'partial_delivery', 'cancelled', 'rejected', 'dropsownlost',
+                           'returned_to_shipper']
 
 
 def _push_order_package_to_tasks(order):
@@ -24079,6 +25359,43 @@ def pricing_inquiries_list(request):
         else:
             inquiries = inquiries.filter(agreed_price_value__gt=F('suggested_price_value'))
 
+    # Column sorting. The whitelist is this page's contract with the URL — a
+    # ?sort= naming anything else quietly falls back to newest-first.
+    from django.db.models import Case, CharField, Func, IntegerField, Value, When
+    from django.db.models.functions import Cast, Coalesce, Lower, NullIf
+    from workforce.sorting import apply_sort
+
+    # Monthly volume is a band ("1-25", "101-300", "1000+"), so sorting the text
+    # puts 1000+ between 1-25 and 101-300. Rank on the leading number instead;
+    # a blank answer matches nothing, comes back NULL and sinks to the bottom.
+    volume_rank = Cast(
+        Func(F('avarage_number_of_order_done_last_month'), Value(r'^\d+'),
+             function='substring', output_field=CharField()),
+        IntegerField(),
+    )
+    # Pipeline order, not the alphabet — "New" belongs before "Converted".
+    status_order = [value for value, _label in webpages_models.PricingEnquiry.STATUS_CHOICES]
+    status_rank = Case(
+        *[When(crm_status=value, then=Value(index)) for index, value in enumerate(status_order)],
+        default=Value(len(status_order)), output_field=IntegerField(),
+    )
+    # A blank text answer is missing data, not an empty name that belongs at the
+    # top of A-Z: NULLIF turns it into a NULL so apply_sort can sink it either way.
+    blank = Value('')
+    inquiries, sort = apply_sort(inquiries, request.GET.get('sort'), {
+        'id': (F('pk'),),
+        # The cell shows the business, then the person under it — sort reads the same.
+        'business': (Lower(Coalesce(NullIf('business_name', blank),
+                                    NullIf('full_name', blank))),),
+        'contact': (NullIf('business_contact_number', blank),),
+        'category': (Lower(NullIf('product_category', blank)),),
+        'volume': (volume_rank,),
+        'status': (status_rank,),
+        'suggested': ('suggested_price_value',),
+        'quote': ('agreed_price_value',),
+        'received': ('date_created',),
+    }, default='-received')
+
     total_count = webpages_models.PricingEnquiry.objects.count()
     cod_count = webpages_models.PricingEnquiry.objects.filter(is_required_COD_service=True).count()
     fulfillment_count = webpages_models.PricingEnquiry.objects.filter(
@@ -24100,15 +25417,30 @@ def pricing_inquiries_list(request):
 
     # Filters carried across pages by the shared pagination component. The old
     # hand-rolled pager hardcoded search/cod/fulfillment/status into its hrefs,
-    # so all four must survive here.
-    filter_params = request.GET.copy()
-    filter_params.pop('page', None)
-    filter_params.pop('per_page', None)
+    # so all four must survive here. Rebuilt from the parsed values rather than
+    # copied from request.GET, so a URL that arrived carrying the same key five
+    # times does not hand that pile on to every link on the page.
+    from urllib.parse import urlencode
+    active = {k: v for k, v in {
+        'search': search,
+        'cod': cod_filter,
+        'fulfillment': fulfillment_filter,
+        'status': status_filter,
+        'quote': quote_filter,
+        'variance': variance_filter,
+    }.items() if v}
+    # Two strings, deliberately: pagination has to carry the sort with it, while a
+    # header cell writes its own sort and must not inherit the old one.
+    sort_params = urlencode(active)
+    filter_params = urlencode({**active, 'sort': sort.value})
 
     context = {
         'page_title': 'Pricing Inquiries',
         'page_obj': page_obj,
-        'filter_params': filter_params.urlencode(),
+        'filter_params': filter_params,
+        'sort': sort,
+        'sort_params': sort_params,
+        'sort_url': reverse('workforce:pricing_inquiries_list'),
         'per_page': get_per_page(request, default=50),
         'search': search,
         'cod_filter': cod_filter,
@@ -24147,6 +25479,16 @@ def pricing_inquiry_detail(request, inquiry_id):
     except Exception:
         logger.exception('Price suggestion failed for PricingEnquiry %s', inquiry.pk)
         suggestion_error = 'Could not compute a suggestion — see the error log.'
+
+    # Answers the public form had to cut to fit their column. The record shows
+    # the shortened value everywhere else, so the full text as typed belongs in
+    # front of whoever is about to call them.
+    trimmed_detail = []
+    try:
+        from webpages.pricing.answers import trimmed_detail as _trimmed_detail
+        trimmed_detail = _trimmed_detail(inquiry)
+    except Exception:
+        logger.exception('Trimmed-answer lookup failed for PricingEnquiry %s', inquiry.pk)
 
     # Personal one-off senders land on this form regularly; the 3PL rate card is
     # the wrong product for them, so say so before sales spends a quote on it.
@@ -24190,6 +25532,7 @@ def pricing_inquiry_detail(request, inquiry_id):
         'suggestion': suggestion if (suggestion and suggestion.available) else None,
         'suggestion_error': suggestion_error,
         'p2p': p2p,
+        'trimmed_detail': trimmed_detail,
         # Starter text for the "Send from EZZY" composer, editable on the AI
         # Config Messages tab. '' when that template is switched off.
         'wa_send_message': message_templates.render_template(
@@ -24879,7 +26222,18 @@ def tasks_live_map(request):
     # every driver the map draws, including those with no recent fix at all.
     nav_handoffs = fleet_models.DriverNavHandoff.open_map(all_relevant_driver_ids)
 
-    # Build per-driver active tasks list (excludes terminal statuses) for popup display
+    # Which drivers can be asked to report in. A push needs a device that once
+    # accepted notifications, so the button is only worth offering where one
+    # exists — otherwise the dispatcher presses it and learns nothing.
+    reachable_driver_ids = fleet_models.DriverPushSubscription.driver_ids_reachable(
+        all_relevant_driver_ids)
+
+    # Build per-driver active tasks list (excludes terminal statuses) for popup display.
+    # A driver carrying thirty open tasks used to render all thirty inside the map
+    # popup, which grew taller than the map itself. The popup now carries only the
+    # newest DRIVER_POPUP_TASK_LIMIT; task_count still reports the true total so the
+    # popup can say how many are hidden.
+    DRIVER_POPUP_TASK_LIMIT = 10
     driver_active_tasks_map = {}
     terminal_statuses = {'delivered', 'cancelled', 'rejected'}
     for t in tasks:
@@ -24891,7 +26245,18 @@ def tasks_live_map(request):
             'status': t.dl_task_status,
             'status_display': t.get_dl_task_status_display(),
             'customer_name': t.order.customer_name or '',
+            '_sort': (t.dl_task_date or _dt.date.min, t.updated_at, t.id),
         })
+
+    driver_task_counts = {did: len(rows) for did, rows in driver_active_tasks_map.items()}
+    for did, rows in driver_active_tasks_map.items():
+        rows.sort(key=lambda r: r['_sort'], reverse=True)
+        trimmed = []
+        for row in rows[:DRIVER_POPUP_TASK_LIMIT]:
+            row = dict(row)
+            row.pop('_sort', None)
+            trimmed.append(row)
+        driver_active_tasks_map[did] = trimmed
 
     for loc in latest_locs:
         drivers_with_gps.add(loc.driver_id)
@@ -24915,7 +26280,8 @@ def tasks_live_map(request):
             'fix_minutes_ago': int((timezone.now() - loc.at).total_seconds() / 60),
             'has_gps': True,
             'nav': _nav_handoff_payload(nav_handoffs.get(loc.driver_id)),
-            'task_count': len(active_tasks),
+            'can_ping': loc.driver_id in reachable_driver_ids,
+            'task_count': driver_task_counts.get(loc.driver_id, 0),
             'active_tasks': active_tasks,
         })
 
@@ -24944,7 +26310,8 @@ def tasks_live_map(request):
             'minutes_ago': -1,
             'has_gps': False,
             'nav': _nav_handoff_payload(nav_handoffs.get(driver_id)),
-            'task_count': len(active_tasks),
+            'can_ping': driver_id in reachable_driver_ids,
+            'task_count': driver_task_counts.get(driver_id, 0),
             'active_tasks': active_tasks,
         })
 
@@ -24982,7 +26349,8 @@ def tasks_live_map(request):
                     'minutes_ago': minutes_ago,
                     'has_gps': False,
                     'nav': _nav_handoff_payload(nav_handoffs.get(driver_id)),
-                    'task_count': len(active_tasks),
+                    'can_ping': driver_id in reachable_driver_ids,
+                    'task_count': driver_task_counts.get(driver_id, 0),
                     'active_tasks': active_tasks,
                     'last_status': latest_task.get_dl_task_status_display(),
                     'last_task_number': latest_task.dl_task_number or str(latest_task.id),
@@ -25120,6 +26488,7 @@ def temp_orders(request):
         Q(source_type='onedrive', onedrive_source__isnull=True) |
         Q(source_type='google_sheet', api_settings__isnull=True) |
         Q(source_type__in=['shopify', 'woocommerce'], api_settings__isnull=True) |
+        Q(source_type='custom_api', api_settings__isnull=True) |
         Q(source_type='public_link', public_link_source__isnull=True)
     )
 
@@ -25213,6 +26582,7 @@ def temp_orders(request):
         Q(source_type='onedrive', onedrive_source__isnull=True)
         | Q(source_type='google_sheet', api_settings__isnull=True)
         | Q(source_type__in=['shopify', 'woocommerce'], api_settings__isnull=True)
+        | Q(source_type='custom_api', api_settings__isnull=True)
         | Q(source_type='public_link', public_link_source__isnull=True)
     ).count()
 
@@ -25313,6 +26683,7 @@ def temp_orders_by_date(request):
         Q(source_type='onedrive', onedrive_source__isnull=True) |
         Q(source_type='google_sheet', api_settings__isnull=True) |
         Q(source_type__in=['shopify', 'woocommerce'], api_settings__isnull=True) |
+        Q(source_type='custom_api', api_settings__isnull=True) |
         Q(source_type='public_link', public_link_source__isnull=True)
     )
 
@@ -25415,6 +26786,7 @@ def temp_orders_sync(request):
             'created': result.get('created', 0),
             'updated': result.get('updated', 0),
             'errors': result.get('errors', []),
+            'notes': result.get('notes', []),
         })
     except Exception as e:
         logger.exception("Manual sync error")
@@ -25714,6 +27086,13 @@ def _refetch_temp_orders_by_ids(ids):
                 results.append(_stub(to))
                 continue
             sheet_rows_by_source.setdefault((to.source_type, src_id), []).append(to)
+        elif to.source_type in orders_models.TempOrder.PUSH_SOURCE_TYPES:
+            # Webhook / custom-API rows were pushed to us by the seller's site;
+            # there is no upstream to re-read, so this is a no-op rather than a
+            # failure. Reporting it as an error put a red "refetch failed" on
+            # every auto-import of a pushed row.
+            skipped += 1
+            results.append(_stub(to))
         else:
             skipped += 1
             errors.append({'id': to.id, 'error': f'source_type {to.source_type!r} is not refreshable'})
@@ -30885,6 +32264,9 @@ def whatsapp_composer_templates(request):
             continue
         templates.append({
             'key': key,
+            # The picker prints this in front of the label so the option a staffer
+            # picks names the same message the Messages page edits.
+            'msg_id': tpl['msg_id'],
             'label': tpl['label'],
             'kind': tpl['kind'],
             'body': body,
@@ -31058,7 +32440,9 @@ def wf_driver_tasks(request):
     selected_driver = None
     drivers = fleet_models.Driver.objects.filter(
         driver_status='approved'
-    ).select_related('user').order_by('user__first_name', 'user__last_name')
+    ).select_related('user', 'profile').prefetch_related(
+        'profile__profile_picture'
+    ).order_by('user__first_name', 'user__last_name')
 
     if driver_id:
         try:
@@ -34720,6 +36104,57 @@ def _trail_gap_events(holes, handoffs):
 
 
 @login_required(login_url='/accounts/login/')
+@api_staff_required
+@require_POST
+def driver_request_location(request, driver_id):
+    """Ask a driver's phone to come back to the app and report where it is.
+
+    This is the only lever a browser leaves us while a driver is inside Waze:
+    the PWA is frozen and cannot be called, but the service worker can still be
+    woken with a push, and the notification it shows is what gets the driver to
+    tap back in. The fix arrives on the app's next load — never from this
+    request — so the reply says the ask was delivered, not that anyone moved.
+
+    Rate-limited per driver: a dispatcher watching a stationary marker will
+    press this repeatedly, and every press is a buzz in someone's pocket while
+    they are driving.
+    """
+    from django.core.cache import cache
+    from fleet import push_service
+
+    driver = get_object_or_404(fleet_models.Driver, pk=driver_id)
+
+    cooldown = getattr(settings, 'DRIVER_LOCATION_REQUEST_COOLDOWN', 120)
+    cache_key = f'driver_locreq:{driver_id}'
+    if cache.get(cache_key):
+        return JsonResponse({
+            'ok': False,
+            'message': 'Already asked in the last couple of minutes — give them a moment.',
+        }, status=429)
+
+    summary = push_service.request_location(driver, requested_by=request.user)
+
+    if summary['sent']:
+        cache.set(cache_key, 1, cooldown)
+        devices = summary['sent']
+        return JsonResponse({
+            'ok': True,
+            'message': f'Asked {driver} to report in'
+                       + (f' ({devices} devices)' if devices > 1 else ''),
+            'sent': devices,
+        })
+
+    # Nothing reached the phone. Say which of the two reasons it was, because
+    # they need different follow-ups: an unregistered driver has to enable
+    # notifications in the app, a failed send is ours to chase.
+    return JsonResponse({
+        'ok': False,
+        'message': summary.get('reason') or 'Could not reach this driver',
+        'devices': summary.get('devices', 0),
+    }, status=200)
+
+
+@login_required(login_url='/accounts/login/')
 @staff_required
 def driver_timeline(request, driver_id):
     """One driver's day drawn on a map: where they went, where they stopped,
@@ -34837,6 +36272,7 @@ def client_ledger(request):
     rows = []
     summary = []
     account_balance = Decimal('0.00')
+    refund_credit = Decimal('0.00')
     total_debit = Decimal('0.00')
     total_credit = Decimal('0.00')
     entries_total = 0
@@ -34872,6 +36308,10 @@ def client_ledger(request):
         entries_total = rows.paginator.count
         summary = ledger_service.segment_summary(selected_business)
         account_balance = ledger_service.balance(selected_business)
+        # Not the same figure as the balance, and shown next to it for exactly
+        # that reason: this is the narrower slice a door-step refund may be paid
+        # out of. See ledger_service.PREFUNDED_SEGMENTS.
+        refund_credit = ledger_service.available_refund_credit(selected_business)
         has_opening = BusinessLedgerEntry.objects.filter(
             business=selected_business,
             segment=BusinessLedgerEntry.SEGMENT_OPENING,
@@ -34886,9 +36326,15 @@ def client_ledger(request):
         'entries_total': entries_total,
         'summary': summary,
         'account_balance': account_balance,
+        'refund_credit': refund_credit,
         'total_debit': total_debit,
         'total_credit': total_credit,
         'has_opening': has_opening,
+        'hand_postable_segments': [
+            (s, dict(BusinessLedgerEntry.SEGMENT_CHOICES).get(s, s))
+            for s in ledger_service.HAND_POSTABLE_SEGMENTS
+        ],
+        'payment_method_choices': ['cash', 'bank', 'cheque', 'fawran', 'pos'],
         'board_owed_to_clients': board_owed_to_clients,
         'board_owed_to_us': board_owed_to_us,
         'board_accounts': sum(1 for v in balances.values() if v),
@@ -34968,6 +36414,104 @@ def client_ledger_open_account(request):
     })
 
 
+# A hand-posted row can only ever be this large. Not a business rule — a typo
+# guard, in the same spirit as billing_service.MAX_LINE_AMOUNT, set well above
+# any real client payment so it catches a slipped decimal and nothing else.
+# Kept as a string because this module imports Decimal per-function, never at
+# module level, and a module-level Decimal() here would not resolve at import.
+_LEDGER_MANUAL_MAX = '1000000.00'
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def client_ledger_post_entry(request):
+    """Record a money event on a client account by hand.
+
+    This exists because nothing else posts a client *payment*. The COD, charge
+    and payout legs do not write to this ledger, so without this route an
+    account can only ever be seeded once and then sits frozen — and a client can
+    never build up the float that a door-step refund has to be paid out of.
+
+    Only the segments in HAND_POSTABLE_SEGMENTS are accepted. The rest belong to
+    the settlement legs, which post them against specific tasks; a typed row in
+    those segments would double-count money the leg will post again anyway.
+    """
+    from django.http import JsonResponse
+    from django.utils.dateparse import parse_date
+    from decimal import Decimal, InvalidOperation
+    from fleet import ledger_service
+    from fleet.models import BusinessLedgerEntry
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    business = business_models.Business.objects.filter(
+        business_id=request.POST.get('business_id') or 0
+    ).first()
+    if not business:
+        return JsonResponse({'error': 'Account not found'}, status=404)
+
+    segment = (request.POST.get('segment') or '').strip()
+    if segment not in ledger_service.HAND_POSTABLE_SEGMENTS:
+        labels = dict(BusinessLedgerEntry.SEGMENT_CHOICES)
+        allowed = ', '.join(labels.get(s, s) for s in ledger_service.HAND_POSTABLE_SEGMENTS)
+        return JsonResponse(
+            {'error': f'That segment cannot be posted by hand. Allowed: {allowed}.'},
+            status=400,
+        )
+
+    # Which way the money went. Stored as one side or the other, never as a sign
+    # — the table has a CheckConstraint that a row is single-sided.
+    side = (request.POST.get('side') or '').strip()
+    if side not in ('debit', 'credit'):
+        return JsonResponse({'error': 'Choose whether this is a debit or a credit'}, status=400)
+
+    try:
+        amount = Decimal(str(request.POST.get('amount') or '0')).quantize(Decimal('0.01'))
+    except (InvalidOperation, ValueError, TypeError):
+        return JsonResponse({'error': 'Invalid amount'}, status=400)
+    if amount <= 0:
+        return JsonResponse({'error': 'Amount must be more than zero'}, status=400)
+
+    ceiling = Decimal(_LEDGER_MANUAL_MAX)
+    if amount > ceiling:
+        return JsonResponse(
+            {'error': f'Amount looks wrong — the ceiling for a hand-posted row is {ceiling:,.2f}'},
+            status=400,
+        )
+
+    description = (request.POST.get('description') or '').strip()
+    if not description:
+        return JsonResponse({'error': 'A description is required'}, status=400)
+
+    # parse_date returns None on anything unparseable, and post() falls back to
+    # today on None — so a bad date never silently lands on the wrong day.
+    occurred_on = parse_date((request.POST.get('occurred_on') or '').strip())
+
+    try:
+        entry = ledger_service.post(
+            business=business,
+            segment=segment,
+            debit=amount if side == 'debit' else None,
+            credit=amount if side == 'credit' else None,
+            description=description,
+            occurred_on=occurred_on,
+            status=BusinessLedgerEntry.STATUS_CLEARED,
+            reference=(request.POST.get('reference') or '').strip()[:120] or None,
+            payment_method=(request.POST.get('payment_method') or '').strip()[:20] or None,
+            created_by=request.user,
+        )
+    except ValueError as exc:
+        return JsonResponse({'error': str(exc)}, status=400)
+
+    return JsonResponse({
+        'success': True,
+        'entry_code': entry.entry_code,
+        'balance': str(ledger_service.balance(business)),
+        'available_refund_credit': str(ledger_service.available_refund_credit(business)),
+    })
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def wf_orders_p2p(request):
@@ -35016,11 +36560,17 @@ def wf_orders_p2p(request):
             filter_params_list.append(f'{key}={value}')
     if sort:
         filter_params_list.append(f'sort={sort}')
+    filter_params_list += driver_filter_params(picked['drivers'])
 
+    all_drivers = driver_filter_choices()
     return render(request, 'workforce/parts/lists/orders_p2p_list_view.html', {
         'orders': orders,
         'tally': tally,
-        'filters': {'search': picked['search'], 'cStatus': picked['c_status']},
+        'driver_choices': all_drivers,
+        'driver_selected': picked['drivers'],
+        'filters': {'search': picked['search'], 'cStatus': picked['c_status'],
+                    'driver': picked['drivers'],
+                    'driverLabels': driver_filter_labels(picked['drivers'], all_drivers)},
         'filter_params': '&'.join(filter_params_list),
         'sort': sort,
         'per_page': request.GET.get('per_page', '50'),
@@ -35391,4 +36941,632 @@ def wf_p2p_rate_card(request):
         'size_choices': P2P_SIZE_CHOICES,
         'vehicle_choices': P2P_VEHICLE_CHOICES,
         'speed_choices': P2P_SPEED_CHOICES,
+    })
+
+
+# RETURNS CUSTODY CONSOLE ------------------------------------------------------------------------------------------------------------
+# The desk that signs a returned parcel back in. A task closing as
+# 'returned_to_shipper' opens a ParcelCustody row (delivery/services/returns.py);
+# everything below moves that row to its resting state.
+
+# How long somebody has been holding the box is the fact the desk acts on — a parcel
+# with a driver for nine days is a problem, one collected this morning is not. The
+# detail page already says this in words ("still with driver, 6 days since the
+# delivery failed"); these bands put the same fact in the list, where the triage
+# actually happens.
+CUSTODY_AGE_WARN_DAYS = 3
+CUSTODY_AGE_LATE_DAYS = 7
+
+
+def _custody_age_label(delta):
+    """Compact duration for the console's Age column — '45m', '6h', '12d'."""
+    seconds = max(delta.total_seconds(), 0)
+    if seconds < 3600:
+        return f"{int(seconds // 60)}m"
+    if seconds < 86400:
+        return f"{int(seconds // 3600)}h"
+    return f"{int(seconds // 86400)}d"
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@ensure_csrf_cookie
+def returns_custody_list(request):
+    """Parcels coming back — open custody first, with triage and receive actions."""
+    from django.db.models import Count
+
+    from delivery.models import ParcelCustody
+    from delivery.services.returns import (
+        CUSTODY_OPEN_STATES, CUSTODY_RECEIVED, CUSTODY_STATUS_CHOICES,
+        DESTINATION_CHOICES,
+    )
+    from warehouse.models import WarehouseLocation
+
+    # Default is the live liability: rows somebody still has to account for.
+    # 'triage' narrows that to the ones with nowhere resolved to go, which is the
+    # queue that actually blocks a driver.
+    status_filter = request.GET.get('status', 'open')
+    dest_filter = request.GET.get('destination', 'all')
+    search = (request.GET.get('search') or '').strip()
+
+    days_filter = request.GET.get('days', '30')
+    if days_filter not in ('7', '30', '90', 'all'):
+        days_filter = '30'
+    date_from = (request.GET.get('date_from') or '').strip()
+    date_to = (request.GET.get('date_to') or '').strip()
+    since = until = None
+    if date_from or date_to:
+        days_filter = 'custom'
+        since = _parse_filter_date(date_from)
+        until = _parse_filter_date(date_to, end_of_day=True)
+        if since and until and since > until:
+            since, until = until, since
+        date_from = since.strftime('%Y-%m-%d') if since else ''
+        date_to = until.strftime('%Y-%m-%d') if until else ''
+        if not (since or until):
+            days_filter = '30'
+            since = timezone.now() - timedelta(days=30)
+    elif days_filter != 'all':
+        since = timezone.now() - timedelta(days=int(days_filter))
+
+    # has_forward_leg answers "has a run back out already been raised from this
+    # row?" — without it the console would keep offering to raise a second one.
+    from django.db.models import Exists, OuterRef
+    forward_leg = ParcelCustody.objects.filter(forwarded_from=OuterRef('pk'))
+
+    qs = ParcelCustody.objects.select_related(
+        'task', 'order', 'business', 'driver', 'driver__user',
+        'warehouse_location__warehouse', 'pickup_location', 'return_request',
+    ).annotate(has_forward_leg=Exists(forward_leg)).order_by('-opened_at')
+
+    # Signed in at a hub, no run out raised: the parcel is on our shelf and the
+    # client has not got it back. Invisible under the default "open" filter,
+    # because nobody is liable for it — which is exactly how it gets forgotten.
+    to_forward_q = Q(status=CUSTODY_RECEIVED, destination_kind='hub')
+
+    status_counts = dict(
+        ParcelCustody.objects.values_list('status').annotate(cnt=Count('id')))
+
+    # A parcel with no resolved destination is open work wherever it sits, so the
+    # triage view reads the same columns open() does rather than a status of its own.
+    triage_q = (Q(destination_kind='hub', warehouse_location__isnull=True)
+                | Q(destination_kind='business', pickup_location__isnull=True))
+
+    if status_filter == 'open':
+        qs = qs.filter(status__in=CUSTODY_OPEN_STATES)
+    elif status_filter == 'to_forward':
+        qs = qs.filter(to_forward_q, has_forward_leg=False)
+    elif status_filter == 'triage':
+        qs = qs.filter(triage_q, status__in=CUSTODY_OPEN_STATES)
+    elif status_filter != 'all':
+        qs = qs.filter(status=status_filter)
+
+    if dest_filter in ('hub', 'business'):
+        qs = qs.filter(destination_kind=dest_filter)
+
+    if since:
+        qs = qs.filter(opened_at__gte=since)
+    if until:
+        qs = qs.filter(opened_at__lte=until)
+
+    if search:
+        qs = qs.filter(
+            Q(order__order_number__icontains=search)
+            | Q(task__dl_task_number__icontains=search)
+            | Q(order__customer_name__icontains=search)
+            | Q(business__business_name__icontains=search)
+            | Q(driver__driver_code__icontains=search)
+            | Q(manifest_reference__icontains=search)
+            | Q(return_request__return_number__icontains=search)
+        )
+
+    page_obj = paginate_queryset(request, qs, 25)
+
+    # An open parcel from two months ago is precisely the one staff need, so say
+    # how many the date window is hiding rather than letting it bury them.
+    hidden_open = 0
+    if since or until:
+        outside = Q()
+        if since:
+            outside |= Q(opened_at__lt=since)
+        if until:
+            outside |= Q(opened_at__gt=until)
+        hidden_open = ParcelCustody.objects.filter(
+            outside, status__in=CUSTODY_OPEN_STATES).count()
+
+    open_count = sum(status_counts.get(s, 0) for s in CUSTODY_OPEN_STATES)
+    custodies = list(page_obj.object_list)
+
+    # Age is annotated here rather than on the model because it is a reading of the
+    # row for this console, not a fact about the parcel. An OPEN row ages live —
+    # that is somebody's liability clock still running. A CLOSED row reports the
+    # turnaround it took instead, which is a different span and is never banded:
+    # colouring a finished job red for having taken a week helps nobody.
+    now = timezone.now()
+    for c in custodies:
+        if c.is_open:
+            delta = now - c.opened_at
+            c.age_label = _custody_age_label(delta)
+            c.age_band = ('late' if delta.days >= CUSTODY_AGE_LATE_DAYS
+                          else 'warn' if delta.days >= CUSTODY_AGE_WARN_DAYS
+                          else 'fresh')
+        else:
+            closed = c.closed_at
+            c.age_label = _custody_age_label(closed - c.opened_at) if closed else ''
+            c.age_band = 'closed'
+
+    # The list is newest-first, so the parcel that has been out longest is on the
+    # LAST page — the one row most worth knowing about is the one nobody scrolls to.
+    # Estate-wide like the other tallies, so the date window cannot hide it.
+    oldest_open_at = (ParcelCustody.objects
+                      .filter(status__in=CUSTODY_OPEN_STATES)
+                      .order_by('opened_at')
+                      .values_list('opened_at', flat=True).first())
+
+    # Options for the "Change" control on each row. Only the businesses actually on
+    # THIS page are queried — the console is paginated, and a full PickupLocation
+    # dump would be most of the estate. Two queries whatever the page size.
+    hub_options = [
+        {'id': loc.id, 'label': f'{loc.warehouse.name} — {loc.name}'}
+        for loc in (WarehouseLocation.objects
+                    .select_related('warehouse')
+                    .filter(is_active=True)
+                    .order_by('warehouse__name', '-is_default', 'name'))
+    ]
+
+    # P2P one-offs are hidden: they are a single booking's address, not a saved
+    # merchant location, and they would otherwise be most of the list. The row's
+    # CURRENT location is pinned in regardless, so a P2P return can still be read
+    # back and re-picked rather than vanishing from its own dropdown.
+    pickup_options = {}
+    business_ids = {c.business_id for c in custodies if c.business_id}
+    if business_ids:
+        pinned = {c.pickup_location_id for c in custodies if c.pickup_location_id}
+        for loc in (business_models.PickupLocation.objects
+                    .filter(business_id__in=business_ids)
+                    .filter(Q(is_p2p=False) | Q(id__in=pinned))
+                    .order_by('-is_default', 'pickup_location_title')):
+            label = loc.pickup_location_title or f'Location {loc.id}'
+            # Say WHY a location is a poor choice rather than dropping it: the
+            # resolver refuses these two, but a staff override is a deliberate act
+            # and sometimes the suspended address is genuinely where the goods go.
+            if loc.pickup_status != 'active':
+                label = f'{label} ({loc.get_pickup_status_display()})'
+            elif loc.is_fulfilment_center:
+                label = f'{label} (fulfilment centre)'
+            pickup_options.setdefault(str(loc.business_id), []).append(
+                {'id': loc.id, 'label': label})
+
+    context = {
+        'page_title': 'Returns — Parcel Custody',
+        'page_obj': page_obj,
+        'custodies': custodies,
+        'destination_options': {'hub': hub_options, 'business': pickup_options},
+        'status_filter': status_filter,
+        'dest_filter': dest_filter,
+        'days_filter': days_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+        'search': search,
+        'hidden_open': hidden_open,
+        'status_counts': status_counts,
+        'open_count': open_count,
+        'triage_count': ParcelCustody.objects.filter(
+            triage_q, status__in=CUSTODY_OPEN_STATES).count(),
+        'to_forward_count': ParcelCustody.objects.annotate(
+            has_forward_leg=Exists(forward_leg)).filter(
+                to_forward_q, has_forward_leg=False).count(),
+        'status_choices': CUSTODY_STATUS_CHOICES,
+        'destination_choices': DESTINATION_CHOICES,
+        'oldest_open_label': (_custody_age_label(now - oldest_open_at)
+                              if oldest_open_at else ''),
+        'oldest_open_at': oldest_open_at,
+        'oldest_open_late': bool(
+            oldest_open_at
+            and (now - oldest_open_at).days >= CUSTODY_AGE_LATE_DAYS),
+    }
+    return render(request, 'workforce/returns_custody_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@ensure_csrf_cookie
+def returns_requests_list(request):
+    """Staff view of the RMA paperwork — every return request, all clients.
+
+    Distinct from the custody console next door: that one tracks where a physical
+    parcel is, this one tracks the claim against the goods. They are not the same
+    row and do not close at the same time — a parcel can be back on the shelf
+    while the refund is still being argued about.
+
+    Until this page existed the only staff sight of a ReturnRequest was a single
+    alert buried in one order's detail page, and 'refunded' — reserved for staff
+    precisely because it asserts EzzyDelivery paid money back — could not be set
+    by anyone at all.
+    """
+    from django.db.models import Count, Sum
+
+    from orders.models import ReturnRequest
+
+    status_filter = (request.GET.get('status') or 'open').strip()
+    business_filter = (request.GET.get('business') or '').strip()
+    search = (request.GET.get('search') or '').strip()
+
+    days_filter = request.GET.get('days', '30')
+    if days_filter not in ('7', '30', '90', 'all'):
+        days_filter = '30'
+    since = None
+    if days_filter != 'all':
+        since = timezone.now() - timedelta(days=int(days_filter))
+
+    qs = ReturnRequest.objects.select_related(
+        'order', 'business', 'reviewed_by',
+    ).prefetch_related('return_items__order_item').order_by('-created_at')
+
+    status_counts = dict(
+        ReturnRequest.objects.values_list('status').annotate(cnt=Count('id')))
+
+    # 'closed' and 'refunded' are finished work; everything else still wants a
+    # decision from somebody, which is what staff open this page to find.
+    CLOSED = ('closed', 'refunded', 'rejected')
+    if status_filter == 'open':
+        qs = qs.exclude(status__in=CLOSED)
+    elif status_filter == 'cod_owed':
+        # The money leg: a refund promised to a customer that nobody has paid.
+        qs = qs.filter(cod_reversal_processed=False, cod_reversal_amount__gt=0)
+    elif status_filter != 'all':
+        qs = qs.filter(status=status_filter)
+
+    if business_filter.isdigit():
+        qs = qs.filter(business__business_id=int(business_filter))
+    if since:
+        qs = qs.filter(created_at__gte=since)
+    if search:
+        qs = qs.filter(
+            Q(return_number__icontains=search)
+            | Q(order__order_number__icontains=search)
+            | Q(order__client_order_code__icontains=search)
+            | Q(order__customer_name__icontains=search)
+            | Q(business__business_name__icontains=search)
+        )
+
+    page_obj = paginate_queryset(request, qs, 25)
+    rows = list(page_obj.object_list)
+
+    # The parcel's physical whereabouts, for the rows that have a custody leg.
+    # One query for the page rather than one per row.
+    from delivery.models import ParcelCustody
+    custody_by_return = {
+        c.return_request_id: c
+        for c in ParcelCustody.objects.filter(
+            return_request_id__in=[r.id for r in rows]
+        ).select_related('warehouse_location', 'pickup_location')
+    }
+    for ret in rows:
+        ret.custody = custody_by_return.get(ret.id)
+
+    owed = ReturnRequest.objects.filter(
+        cod_reversal_processed=False, cod_reversal_amount__gt=0,
+    ).aggregate(n=Count('id'), total=Sum('cod_reversal_amount'))
+
+    # The tallies above count every return, the list only counts the window —
+    # so a 30-day default quietly showed 1 row under a header saying 4. Say how
+    # many the window is hiding instead of letting it contradict itself.
+    hidden_open = 0
+    if since:
+        hidden_open = ReturnRequest.objects.filter(
+            created_at__lt=since).exclude(status__in=CLOSED).count()
+
+    context = {
+        'page_title': 'Return Requests',
+        'page_obj': page_obj,
+        'returns': rows,
+        'status_filter': status_filter,
+        'business_filter': business_filter,
+        'days_filter': days_filter,
+        'search': search,
+        'status_counts': status_counts,
+        'open_count': sum(
+            n for st, n in status_counts.items() if st not in CLOSED),
+        'hidden_open': hidden_open,
+        'cod_owed_count': owed['n'] or 0,
+        'cod_owed_total': owed['total'] or 0,
+        'status_choices': ReturnRequest.RETURN_STATUS_CHOICES,
+        'businesses': business_models.Business.objects.filter(
+            return_requests__isnull=False).distinct().order_by('business_name'),
+    }
+    return render(request, 'workforce/returns_requests_list.html', context)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def returns_request_set_status(request, return_id):
+    """Move one return request. Staff may set every status, 'refunded' included —
+    that one is theirs alone because it asserts our cash went back out."""
+    from orders.models import ReturnRequest
+
+    ret = get_object_or_404(
+        ReturnRequest.objects.select_related('order', 'business'), id=return_id)
+    data = _custody_body(request)
+    new_status = (data.get('status') or '').strip()
+    valid = {k for k, _ in ReturnRequest.RETURN_STATUS_CHOICES}
+    if new_status not in valid:
+        return JsonResponse({'success': False, 'error': 'Unknown status'}, status=400)
+
+    old_status = ret.status
+    if old_status == new_status:
+        return JsonResponse({'success': True, 'status': new_status,
+                             'status_display': ret.get_status_display()})
+
+    ret.status = new_status
+    ret.reviewed_by = request.user
+    ret.reviewed_at = timezone.now()
+    notes = (data.get('notes') or '').strip()
+    if notes:
+        ret.review_notes = notes
+    ret.save(update_fields=[
+        'status', 'reviewed_by', 'reviewed_at', 'review_notes', 'updated_at'])
+
+    # Same timeline the seller and the custody desk write to, so one order tells
+    # the whole story rather than three systems each keeping half of it.
+    labels = dict(ReturnRequest.RETURN_STATUS_CHOICES)
+    try:
+        orders_models.OrderStatusHistory.objects.create(
+            order=ret.order,
+            field_name='return_status',
+            old_value=old_status, new_value=new_status,
+            old_display=labels.get(old_status, old_status),
+            new_display=labels.get(new_status, new_status),
+            changed_by=request.user,
+            notes=(f'{ret.return_number}: {notes}'[:255] if notes else ret.return_number),
+        )
+    except Exception as e:
+        logger.warning("Return status history failed for %s: %s", ret.pk, e)
+
+    return JsonResponse({
+        'success': True, 'status': ret.status,
+        'status_display': ret.get_status_display(),
+    })
+
+
+def _custody_body(request):
+    """The JSON body of a console POST, or {} when there is not one.
+
+    safe_json() goes the other way (value -> string) — parsing a request with it
+    returns the literal body text, which then answers .get() for nothing.
+    """
+    try:
+        payload = json.loads(request.body or b'{}')
+    except (ValueError, TypeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _custody_or_404(custody_id):
+    from delivery.models import ParcelCustody
+    return get_object_or_404(
+        ParcelCustody.objects.select_related(
+            'task', 'order', 'business', 'driver',
+            'warehouse_location__warehouse', 'pickup_location'),
+        id=custody_id,
+    )
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def returns_custody_set_status(request, custody_id):
+    """Move one custody row. The service refuses an illegal move rather than
+    logging and carrying on, so a refusal is a real 400 the console can show."""
+    from delivery.services.returns import set_custody_status
+
+    custody = _custody_or_404(custody_id)
+    data = _custody_body(request)
+    new_status = (data.get('status') or '').strip()
+    notes = (data.get('notes') or '').strip()
+    if not new_status:
+        return JsonResponse({'success': False, 'error': 'Status is required'}, status=400)
+
+    ok, reason = set_custody_status(custody, new_status, actor=request.user, notes=notes)
+    if not ok:
+        return JsonResponse({'success': False, 'error': reason}, status=400)
+    return JsonResponse({
+        'success': True,
+        'status': custody.status,
+        'status_display': custody.get_status_display(),
+    })
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def returns_custody_receive(request, custody_id):
+    """Sign one parcel back in."""
+    from delivery.services.returns import CUSTODY_RECEIVED, set_custody_status
+
+    custody = _custody_or_404(custody_id)
+    data = _custody_body(request)
+    ok, reason = set_custody_status(
+        custody, CUSTODY_RECEIVED, actor=request.user,
+        notes=(data.get('notes') or '').strip(),
+    )
+    if not ok:
+        return JsonResponse({'success': False, 'error': reason}, status=400)
+    return JsonResponse({
+        'success': True,
+        'status': custody.status,
+        'status_display': custody.get_status_display(),
+        'received_at': custody.received_at.isoformat() if custody.received_at else '',
+    })
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def returns_custody_bulk_receive(request):
+    """Sign in a whole handed-in bag at once. Rows that cannot move are reported
+    back by id rather than failing the batch — a driver hands in ten parcels and
+    one of them was already signed for."""
+    from delivery.models import ParcelCustody
+    from delivery.services.returns import CUSTODY_RECEIVED, set_custody_status
+
+    data = _custody_body(request)
+    ids = data.get('ids') or []
+    if not isinstance(ids, list) or not ids:
+        return JsonResponse({'success': False, 'error': 'No parcels selected'}, status=400)
+
+    received, refused = 0, []
+    rows = ParcelCustody.objects.select_related('order').filter(id__in=ids[:200])
+    for custody in rows:
+        ok, reason = set_custody_status(
+            custody, CUSTODY_RECEIVED, actor=request.user,
+            notes=(data.get('notes') or '').strip(),
+        )
+        if ok:
+            received += 1
+        else:
+            refused.append({'id': custody.id, 'error': reason})
+
+    return JsonResponse({
+        'success': True, 'received': received, 'refused': refused,
+        'message': f'{received} parcel(s) signed in'
+                   + (f', {len(refused)} refused' if refused else ''),
+    })
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def returns_custody_set_destination(request, custody_id):
+    """Override the snapshotted destination by hand.
+
+    The snapshot is deliberately never re-resolved, so this is the only way to
+    correct a row whose client was misconfigured when the parcel left. Flagged as
+    overridden so the resolver is not blamed for a staff decision.
+    """
+    from warehouse.models import WarehouseLocation
+    from delivery.services.returns import (
+        DEST_BUSINESS, DEST_HUB, log_custody_history,
+    )
+
+    custody = _custody_or_404(custody_id)
+    if not custody.is_open:
+        return JsonResponse({
+            'success': False,
+            'error': 'This parcel is already closed — its destination is history.',
+        }, status=400)
+
+    data = _custody_body(request)
+    kind = (data.get('destination_kind') or '').strip()
+    location_id = data.get('location_id')
+    if kind not in (DEST_HUB, DEST_BUSINESS):
+        return JsonResponse({'success': False, 'error': 'Unknown destination'}, status=400)
+
+    old_label = custody.destination_label
+    custody.destination_kind = kind
+    if kind == DEST_HUB:
+        custody.warehouse_location = WarehouseLocation.objects.filter(
+            id=location_id).first() if location_id else None
+        custody.pickup_location = None
+    else:
+        custody.pickup_location = business_models.PickupLocation.objects.filter(
+            id=location_id, business=custody.business).first() if location_id else None
+        custody.warehouse_location = None
+    custody.destination_overridden = True
+    custody.destination_source = 'staff override'
+    custody.destination_fallback_reason = ''
+    custody.save(update_fields=[
+        'destination_kind', 'warehouse_location', 'pickup_location',
+        'destination_overridden', 'destination_source',
+        'destination_fallback_reason', 'updated_at',
+    ])
+    log_custody_history(
+        custody, custody.status, custody.status, request.user,
+        notes=f'Destination changed: {old_label} → {custody.destination_label}',
+    )
+    return JsonResponse({
+        'success': True,
+        'destination_kind': custody.destination_kind,
+        'destination_label': custody.destination_label,
+    })
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def returns_custody_forward(request, custody_id):
+    """Raise the run that takes a parcel off the hub shelf and back to the client.
+
+    Leg 2 of a return. The service creates a real DeliveryTask so a DIFFERENT
+    driver can claim it from the fleet pool — the driver who brought the parcel
+    in is already paid and released, and re-opening his custody row would put him
+    back on the hook for someone else's trip.
+    """
+    from delivery.services.returns import forward_to_client
+
+    custody = _custody_or_404(custody_id)
+    data = _custody_body(request)
+
+    location = None
+    location_id = data.get('location_id')
+    if location_id:
+        location = business_models.PickupLocation.objects.filter(
+            id=location_id, business=custody.business).first()
+        if location is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'That address does not belong to this client.',
+            }, status=400)
+
+    outcome = forward_to_client(
+        custody, actor=request.user, pickup_location=location,
+        notes=(data.get('notes') or '').strip(),
+    )
+    if outcome.error:
+        return JsonResponse({'success': False, 'error': outcome.error}, status=400)
+    return JsonResponse({
+        'success': True,
+        'custody_id': outcome.custody.id,
+        'task_id': outcome.task.id,
+        'task_number': outcome.task.dl_task_number,
+        'destination_label': outcome.custody.destination_label,
+        'message': (f'Return run {outcome.task.dl_task_number} is in the driver pool '
+                    f'for {outcome.custody.destination_label}'),
+    })
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def returns_custody_open(request, task_id):
+    """Open custody by hand for a task that closed as returned before this desk
+    existed, or whose paperwork failed on the way through."""
+    from delivery.services.returns import RETURNED_TO_SHIPPER, open_return_for_task
+
+    task = get_object_or_404(
+        delivery_models.DeliveryTask.objects.select_related('order'), id=task_id)
+    if task.dl_task_status != RETURNED_TO_SHIPPER:
+        return JsonResponse({
+            'success': False,
+            'error': (f'Task is {task.get_dl_task_status_display()} — only a task '
+                      f'returned to the shipper has a parcel to track back.'),
+        }, status=400)
+
+    data = _custody_body(request)
+    outcome = open_return_for_task(
+        task, actor=request.user,
+        reason=(data.get('reason') or task.failure_reason or 'other'),
+        reason_notes=(data.get('notes') or task.failure_notes or ''),
+    )
+    if outcome.custody is None:
+        return JsonResponse({
+            'success': False,
+            'error': '; '.join(outcome.warnings) or 'Could not open custody',
+        }, status=400)
+    return JsonResponse({
+        'success': True,
+        'custody_id': outcome.custody.id,
+        'created': outcome.created,
+        'warnings': outcome.warnings,
     })

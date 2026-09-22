@@ -1,93 +1,516 @@
+/* Purpose: WhatsApp Notification Alerts (/business/settings/whatsapp-triggers/) — the delivery run as a rail of stages.
+   Used by: business/templates/business/whatsapp_triggers.html
+   Notes:   The six triggers are one parcel's lifecycle, so they are drawn as a sequence, not a list;
+            the rail branches at Delivered/Failed because those are alternative endings, not steps 5 and 6.
+            Yellow appears exactly twice per the Brand Kit: the active node and the header Save button. */
 
-
-.bwt__table-card {
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: var(--radius-md, 0.5rem);
-  overflow: hidden;
+.bwt {
+  --bwt-rail: var(--brand-grey-250, #dee2e6);
+  --bwt-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --bwt-gutter: 1.75rem;      /* rail centre to card edge */
 }
 
-.bwt__table {
-  margin-bottom: 0;
+/* ── Lede ───────────────────────────────────────────────────────────────── */
+
+.bwt__lede {
+  max-width: 40rem;           /* ~76 characters at this size */
+  margin: 0.75rem 0 1.125rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--brand-grey-600, #555);
 }
 
-.bwt__table thead th {
-  background: var(--brand-light, #f8f9fa);
-  color: var(--brand-dark, #1a1a2e);
-  font-size: 0.8rem;
+.bwt__lede-num {
+  font-family: var(--bwt-mono);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  color: var(--brand-grey-800, #1f1f1f);
   white-space: nowrap;
 }
 
-.bwt__table tbody td {
-  vertical-align: middle;
-  font-size: 0.9rem;
+/* ── Two columns: the run, and the parameters beside it ─────────────────── */
+
+.bwt__layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.125rem;
+  align-items: start;
 }
 
-.bwt__row-title {
-  font-weight: 600;
-  color: var(--brand-dark, #1a1a2e);
+@media (min-width: 1200px) {
+  .bwt__layout { grid-template-columns: minmax(0, 1fr) 19rem; }
 }
 
-.bwt__th-phone,
-.bwt__table td.bwt__td-phone {
-  width: 1% !important;
-  white-space: nowrap;
+/* ── The run ────────────────────────────────────────────────────────────── */
+
+.bwt__run {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--bwt-gutter);
+  position: relative;
 }
 
-.bwt__table .bwt__phone-input.form-control,
-.bwt__table .bwt__phone-input {
-  width: 12ch !important;
-  min-width: 12ch !important;
-  max-width: 14ch !important;
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
-  display: inline-block;
+/* One continuous rail behind every stage. It stops at the last junction so the
+   run reads as finished rather than trailing off. */
+.bwt__run::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1.125rem;
+  bottom: 3.25rem;
+  width: 1px;
+  background: var(--bwt-rail);
 }
 
-.bwt__status-icon {
-  width: 32px;
-  height: 32px;
+.bwt__stage {
+  position: relative;
+  padding-bottom: 0.75rem;
+}
+
+.bwt__stage:last-child { padding-bottom: 0; }
+
+/* The node is the state: filled = this stage messages the customer. */
+.bwt__node {
+  position: absolute;
+  left: calc(var(--bwt-gutter) * -1);
+  top: 1.05rem;
+  width: 11px;
+  height: 11px;
+  margin-left: -5px;
   border-radius: 50%;
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-grey-400, #b0b0b0);
+  box-shadow: 0 0 0 3px var(--brand-white, #fff);
+}
+
+/* The spur from rail to card, so a stage reads as hanging off the run. */
+.bwt__node::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: calc(var(--bwt-gutter) - 11px);
+  height: 1px;
+  background: var(--bwt-rail);
+}
+
+.bwt__stage:has(.bwt__toggle:checked) .bwt__node {
+  background: var(--brand-navy, #001f3f);
+  border-color: var(--brand-navy, #001f3f);
+}
+
+/* An ending is not a step: square the node off and set it off the main line, so
+   the two outcomes read as a branch rather than as steps five and six. */
+.bwt__stage--outcome .bwt__node {
+  border-radius: 2px;
+  margin-left: 3px;
+}
+
+.bwt__stage--outcome .bwt__node::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  width: 8px;
+  height: 1px;
+  background: var(--bwt-rail);
+}
+
+.bwt__stage--outcome .bwt__node::after { width: calc(var(--bwt-gutter) - 19px); }
+
+/* ── Stage card ─────────────────────────────────────────────────────────── */
+
+.bwt__stage-card {
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-grey-200, #f0f0f0);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.bwt__stage--delivered .bwt__stage-card { border-left: 2px solid var(--brand-success, #15803d); }
+.bwt__stage--failed .bwt__stage-card { border-left: 2px solid var(--brand-danger, #dc2626); }
+
+/* A stage that does not send recedes, so the plan is readable at a glance. */
+.bwt__stage:not(:has(.bwt__toggle:checked)) .bwt__stage-card {
+  background: var(--brand-grey-100, #fafafa);
+}
+
+.bwt__stage-head {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.75rem 0.375rem;
+}
+
+.bwt__stage-name {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--brand-grey-800, #1f1f1f);
+  line-height: 1.3;
+}
+
+.bwt__stage-when {
+  margin: 0.125rem 0 0;
+  font-size: 0.72rem;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.bwt__stage-when--dormant { color: var(--brand-warning-text, #92400e); }
+
+/* ── Send switch: the state in words, not just a checkbox ───────────────── */
+
+/* The whole label is the hit target, so the house 1rem checkbox (fixed for the
+   client dashboard in templates/static/business_dashboard_base.css — do not
+   fight it here) still gets a comfortable one to click. */
+.bwt__sendswitch {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  font-size: 0.85rem;
-  color: #fff;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0.375rem 0.5rem 0.375rem 0.375rem;
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.bwt__sendswitch:hover { background: var(--brand-grey-100, #fafafa); }
+
+.bwt__toggle {
+  margin: 0;
+  cursor: pointer;
   flex-shrink: 0;
 }
 
-.bwt__status-icon--assigned { background: #0d6efd; }
-.bwt__status-icon--picked_up { background: #6f42c1; }
-.bwt__status-icon--start_ride { background: #fd7e14; }
-.bwt__status-icon--out_for_delivery { background: #20c997; }
-.bwt__status-icon--delivered { background: #198754; }
-.bwt__status-icon--failed { background: #dc3545; }
+.bwt__toggle:focus-visible {
+  outline: 2px solid var(--brand-navy, #001f3f);
+  outline-offset: 2px;
+}
 
-.bwt__toggle {
-  width: 3rem;
-  height: 1.5rem;
+.bwt__sendswitch-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-grey-500, #6c757d);
+  min-width: 4.75rem;         /* holds its width as the word changes */
+}
+
+.bwt__stage:has(.bwt__toggle:checked) .bwt__sendswitch-text {
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+/* ── The message ────────────────────────────────────────────────────────── */
+
+.bwt__stage-body {
+  padding: 0 0.75rem 0.75rem;
+}
+
+/* Mono because this is a template, not prose: the {tokens} read as the code
+   they are, and the line breaks match what lands in WhatsApp. */
+textarea.bwt__textarea {
+  font-family: var(--bwt-mono);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--brand-grey-800, #1f1f1f);
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-grey-250, #dee2e6);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  padding: 0.75rem;
+  resize: vertical;
+  min-height: 4.5rem;
+  white-space: pre-wrap;
+}
+
+textarea.bwt__textarea:focus {
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
+}
+
+/* A border-colour change alone is a weak focus signal on a light field. */
+textarea.bwt__textarea:focus-visible,
+input.bwt__phone-input:focus-visible {
+  outline: 2px solid var(--brand-navy, #001f3f);
+  outline-offset: 1px;
+}
+
+textarea.bwt__textarea::placeholder {
+  font-family: var(--brand-font-primary, "Inter", sans-serif);
+  color: var(--brand-grey-500, #6c757d);
+  opacity: 1;
+}
+
+/* ── Stage footer: the copy-to number and the two tools ─────────────────── */
+
+.bwt__stage-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.bwt__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.bwt__copy-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-grey-500, #6c757d);
+  white-space: nowrap;
+}
+
+input.bwt__phone-input {
+  width: 11rem;
+  height: 2.1rem;
+  font-family: var(--bwt-mono);
+  font-size: 0.78rem;
+  color: var(--brand-grey-800, #1f1f1f);
+  border: 1px solid var(--brand-grey-250, #dee2e6);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  padding: 0 0.5rem;
+}
+
+input.bwt__phone-input:focus {
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: none;
+}
+
+.bwt__stage-tools {
+  display: inline-flex;
+  gap: 0.375rem;
+}
+
+/* A row action is a bordered control, never an underlined word. */
+.bwt__tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2.1rem;
+  padding: 0 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-grey-800, #1f1f1f);
+  background: var(--brand-grey-100, #fafafa);
+  border: 1px solid var(--brand-grey-400, #b0b0b0);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+}
+
+.bwt__tool i { font-size: 0.7rem; color: var(--brand-grey-500, #6c757d); }
+
+.bwt__tool:hover {
+  background: var(--brand-secondary, #fff7d6);
+  border-color: var(--brand-primary, #f7c000);
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+.bwt__tool:focus-visible {
+  outline: 2px solid var(--brand-navy, #001f3f);
+  outline-offset: 1px;
+}
+
+/* ── Dormant stage: present and editable, but honest about not sending ──── */
+
+.bwt__stage--dormant .bwt__stage-card {
+  border-style: dashed;
+  border-color: var(--brand-grey-300, #dcdcdc);
+}
+
+.bwt__stage--dormant .bwt__node {
+  border-style: dashed;
+  background: var(--brand-white, #fff);
+}
+
+.bwt__stage--dormant .bwt__stage-name { color: var(--brand-grey-500, #6c757d); }
+
+/* ── Order parameters ───────────────────────────────────────────────────── */
+
+.bwt__params {
+  display: block;
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-grey-250, #dee2e6);
+  border-radius: var(--brand-radius-sm, 0.5rem);
+  overflow: hidden;
+}
+
+@media (min-width: 1200px) {
+  /* Beside the box being edited, and it stays there while the run scrolls. */
+  .bwt__params { position: sticky; top: 1rem; }
+  .bwt__params-body { max-height: calc(100vh - 7rem); overflow-y: auto; }
+}
+
+.bwt__params-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: var(--brand-grey-50, #f8f9fa);
+  color: var(--brand-navy, #001f3f);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+}
+
+.bwt__params-toggle:hover,
+.bwt__params-toggle:focus {
+  background: var(--brand-grey-150, #e9ecef);
+  color: var(--brand-navy, #001f3f);
+}
+
+.bwt__params-title { display: inline-flex; align-items: center; gap: 0.5rem; }
+.bwt__params-title i { font-size: 0.75rem; color: var(--brand-grey-500, #6c757d); }
+
+.bwt__params-chevron {
+  font-size: 0.7rem;
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.bwt__params-toggle[aria-expanded="true"] .bwt__params-chevron { transform: rotate(180deg); }
+
+.bwt__params-body {
+  border-top: 1px solid var(--brand-grey-250, #dee2e6);
+  padding: 0.75rem;
+}
+
+.bwt__params-hint {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--brand-grey-600, #555);
+  margin-bottom: 0.75rem;
+}
+
+.bwt__params-hint code {
+  font-family: var(--bwt-mono);
+  font-size: 0.7rem;
+  color: var(--brand-grey-800, #1f1f1f);
+  background: var(--brand-grey-100, #fafafa);
+  border: 1px solid var(--brand-grey-250, #dee2e6);
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.25rem;
+}
+
+/* Below the sticky breakpoint the groups flow into columns instead of one
+   very long strip. */
+@media (min-width: 768px) and (max-width: 1199.98px) {
+  .bwt__params-body { column-count: 2; column-gap: 1.5rem; }
+  .bwt__params-hint { column-span: all; }
+}
+
+.bwt__param-group {
+  break-inside: avoid;
+  margin-bottom: 0.875rem;
+}
+
+.bwt__param-group:last-child { margin-bottom: 0; }
+
+.bwt__param-group-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500, #6c757d);
+  border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.375rem;
+}
+
+.bwt__param-group-title i { color: var(--brand-grey-450, #9ca3af); margin-right: 0.15rem; }
+
+.bwt__param { padding: 0.15rem 0; line-height: 1.3; }
+
+.bwt__param-token {
+  border: 1px solid var(--brand-grey-250, #dee2e6);
+  border-radius: 0.25rem;
+  background: var(--brand-grey-100, #fafafa);
+  color: var(--brand-navy, #001f3f);
+  font-family: var(--bwt-mono);
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
   cursor: pointer;
 }
 
-textarea.bwt__textarea {
-  font-size: 0.85rem;
-  resize: vertical;
-  min-height: 5rem;
-  padding: 0.5rem 0.75rem;
+/* Shade change only — no transition, no border shift. */
+.bwt__param-token:hover { background: var(--brand-white, #fff); }
+
+.bwt__param-token:focus-visible {
+  outline: 2px solid var(--brand-navy, #001f3f);
+  outline-offset: 1px;
 }
 
-.bwt__msg-toggle {
-  font-size: 0.8rem;
+.bwt__param-token--inserted {
+  background: var(--brand-primary, #f7c000);
+  border-color: var(--brand-primary, #f7c000);
 }
 
-.bwt__save-status {
-  font-size: 0.8rem;
-  margin-top: 0.5rem;
-  text-align: right;
+.bwt__param-help {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--brand-grey-500, #6c757d);
+  margin-top: 0.05rem;
 }
 
-.bwt__save-status--success { color: #198754; }
-.bwt__save-status--error { color: #dc3545; }
+/* ── Save state, in the header band ─────────────────────────────────────── */
+
+.bwt__save-state {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+}
+
+.bwt__save-state--dirty { color: var(--brand-primary, #f7c000); }
+.bwt__save-state--ok { color: var(--brand-success-bright, #22c55e); }
+.bwt__save-state--warn { color: var(--brand-warning-alt, #f59e0b); }
+.bwt__save-state--error { color: #fca5a5; }
+
+.bwt .bcon__actions { align-items: center; flex-wrap: wrap; }
+
+/* The Brand Kit lifts every button on hover. On a settings page that reads as
+   the row twitching under the cursor, so controls here stay put. */
+.bwt .btn:hover,
+.bwt .btn:focus,
+.bwt .btn:active,
+.bwt .bcon__btn:hover,
+.bwt .bcon__btn:focus,
+.bwt .bcon__btn:active {
+  transform: none;
+}
+
+/* ── Phone ──────────────────────────────────────────────────────────────── */
+
+@media (max-width: 575.98px) {
+  .bwt { --bwt-gutter: 1.125rem; }
+
+  /* Name first, then its state underneath — reading order, not control order. */
+  .bwt__stage-head { flex-wrap: wrap; }
+  .bwt__sendswitch { width: 100%; margin-left: -0.375rem; }
+  .bwt__sendswitch-text { min-width: 0; }
+
+  .bwt__stage-foot { align-items: stretch; }
+  .bwt__copy { width: 100%; }
+  input.bwt__phone-input { width: 100%; }
+  .bwt__stage-tools { width: 100%; }
+  .bwt__tool { flex: 1; justify-content: center; }
+}
+
+/* ── Browsers without :has() keep a usable, if flatter, page ────────────── */
+
+@supports not selector(:has(*)) {
+  .bwt__node { background: var(--brand-grey-400, #b0b0b0); }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+/* The only motion here answers a click — the panel opening, the jump to it.
+   Honour a request for none by making both instant rather than removing them. */
+
+@media (prefers-reduced-motion: reduce) {
+  .bwt .collapsing {
+    transition: none;
+    height: auto;
+  }
+  .bwt * { scroll-behavior: auto; }
+}

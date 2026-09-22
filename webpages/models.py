@@ -524,6 +524,14 @@ class PricingEnquiry(EmailNormalizedModel, models.Model):
     additional_notes = models.TextField(blank=True, null=True)
     contact_consent = models.BooleanField(default=False)
 
+    # Answers that arrived longer than their column and were saved cut to fit.
+    # An over-long answer used to reach PostgreSQL untouched and raise DataError,
+    # which threw the whole submission away — losing a lead over a pasted
+    # tracking URL. The shortened value goes in its own field, the full text is
+    # kept here as {field_name: full value}, and the seller is asked to correct
+    # it. An answer they shorten themselves drops back out.
+    trimmed_answers = models.JSONField(default=dict, blank=True)
+
     # Completion status — False for partial (in-progress), True for fully submitted
     is_complete = models.BooleanField(default=False)
     # Set when the "you left the form half-finished" WhatsApp nudge goes out, so

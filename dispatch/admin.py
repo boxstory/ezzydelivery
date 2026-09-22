@@ -45,7 +45,9 @@ class OrderBatchAdmin(admin.ModelAdmin):
         'hold_timer_display', 'created_at'
     )
     list_filter = ('status', 'pickup_location', 'destination_zone', 'created_at')
-    search_fields = ('batch_code', 'assigned_rider__driver_code')
+    search_fields = ('batch_code', 'destination_zone', 'status', 'release_reason',
+                     'assigned_rider__driver_code', 'assigned_shift__shift_code',
+                     'pickup_location__pickup_location_title')
     readonly_fields = (
         'batch_code', 'created_at', 'updated_at', 'order_count',
         'total_cod', 'hold_remaining_seconds'
@@ -136,7 +138,9 @@ class RiderShiftAdmin(admin.ModelAdmin):
         'batches_completed', 'orders_delivered'
     )
     list_filter = ('status', 'shift_type', 'pickup_location', 'scheduled_start')
-    search_fields = ('shift_code', 'rider__driver_code', 'rider__user__username')
+    search_fields = ('shift_code', 'shift_type', 'status', 'rider__driver_code',
+                     'rider__user__username', 'pickup_location__pickup_location_title',
+                     'created_by__username')
     readonly_fields = (
         'shift_code', 'created_at', 'updated_at',
         'batches_completed', 'orders_delivered'
@@ -204,7 +208,8 @@ class RiderKPIAdmin(admin.ModelAdmin):
         'sla_compliance_display'
     )
     list_filter = ('date', 'pickup_location')
-    search_fields = ('rider__driver_code', 'rider__user__username')
+    search_fields = ('rider__driver_code', 'rider__user__username',
+                     'pickup_location__pickup_location_title')
     readonly_fields = (
         'created_at', 'updated_at', 'orders_per_hour',
         'batching_percentage', 'sla_compliance_rate'
@@ -243,8 +248,8 @@ class RiderKPIAdmin(admin.ModelAdmin):
         else:
             color = 'red'
         return format_html(
-            '<span style="color: {};">{:.1f}%</span>',
-            color, pct
+            '<span style="color: {};">{}%</span>',
+            color, f'{pct:.1f}'
         )
     batching_pct_display.short_description = 'Batching %'
 
@@ -257,8 +262,8 @@ class RiderKPIAdmin(admin.ModelAdmin):
         else:
             color = 'red'
         return format_html(
-            '<span style="color: {};">{:.1f}%</span>',
-            color, pct
+            '<span style="color: {};">{}%</span>',
+            color, f'{pct:.1f}'
         )
     sla_compliance_display.short_description = 'SLA Compliance'
 
@@ -316,10 +321,8 @@ class DispatchLogAdmin(admin.ModelAdmin):
     """Admin interface for dispatch audit logs."""
     list_display = ('action', 'batch', 'rider', 'performed_by', 'created_at')
     list_filter = ('action', 'created_at')
-    search_fields = (
-        'batch__batch_code', 'rider__driver_code',
-        'order__order_number', 'performed_by__username'
-    )
+    search_fields = ('action', 'batch__batch_code', 'rider__driver_code', 'order__order_number',
+                     'shift__shift_code', 'performed_by__username')
     readonly_fields = (
         'action', 'batch', 'order', 'rider', 'shift',
         'details', 'performed_by', 'created_at'

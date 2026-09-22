@@ -172,3 +172,71 @@
         window.location.href = u.pathname + '?' + u.searchParams.toString();
     }
 })();
+
+// --- Selection links ---------------------------------------------------------
+// A plain link that has to carry the ticked rows with it — "download these
+// applicants' documents" rather than "export these rows". Its href is rebuilt at
+// click time from the page's own query string plus the ticked ids, so it always
+// matches what is on screen after an HTMX filter swap. Kept outside the modal's
+// IIFE on purpose: a page may offer this without offering a column picker.
+(function () {
+    if (document.body.hasAttribute('data-selection-links-bound')) return;
+    document.body.setAttribute('data-selection-links-bound', '1');
+
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest && e.target.closest('[data-selection-link]');
+        if (!link) return;
+        e.preventDefault();
+
+        var ids = Array.prototype.slice
+            .call(document.querySelectorAll('[data-export-row]'))
+            .filter(function (b) { return b.checked; })
+            .map(function (b) { return b.value; });
+
+        // Same merge rule as the export: keep repeated multi-select keys, drop
+        // paging and any ids already on the URL.
+        var u = new URL(link.getAttribute('href'), window.location.origin);
+        var skip = ['page', 'per_page', 'export', 'columns', 'ids'];
+        var cleared = {};
+        new URLSearchParams(window.location.search).forEach(function (v, k) {
+            if (skip.indexOf(k) !== -1) return;
+            if (!cleared[k]) { u.searchParams.delete(k); cleared[k] = true; }
+            u.searchParams.append(k, v);
+        });
+        if (ids.length) u.searchParams.set('ids', ids.join(','));
+        else u.searchParams.delete('ids');
+
+        // A chooser dialog can add its own answers: every ticked control inside
+        // the named container rides along (?types=QID&types=Selfie&format=pdf).
+        var options = link.getAttribute('data-selection-options');
+        if (options) {
+            Array.prototype.slice
+                .call(document.querySelectorAll(options + ' input[name]:checked'))
+                .forEach(function (input) { u.searchParams.append(input.name, input.value); });
+        }
+
+        window.location.href = u.pathname + '?' + u.searchParams.toString();
+    });
+
+    // Whoever opens a chooser wants to know what it is about to act on, and a
+    // dialog with nothing ticked behind it can only disappoint.
+    document.addEventListener('show.bs.modal', function (e) {
+        var scope = e.target.querySelector && e.target.querySelector('[data-selection-scope]');
+        if (!scope) return;
+        var n = document.querySelectorAll('[data-export-row]:checked').length;
+        scope.textContent = n
+            ? 'Downloading for the ' + n + ' ticked ' + (n === 1 ? 'applicant' : 'applicants') + '.'
+            : 'Nothing is ticked yet — close this and tick the rows you want.';
+        var go = e.target.querySelector('[data-selection-link]');
+        if (go) go.classList.toggle('disabled', n === 0);
+    });
+
+    // Tick-all / clear inside a chooser's own checkbox grid.
+    document.addEventListener('click', function (e) {
+        var t = e.target.closest && e.target.closest('[data-docs-all],[data-docs-none]');
+        if (!t) return;
+        var on = t.hasAttribute('data-docs-all');
+        t.closest('.modal').querySelectorAll('.wfx__cols input[type=checkbox]')
+            .forEach(function (b) { b.checked = on; });
+    });
+})();

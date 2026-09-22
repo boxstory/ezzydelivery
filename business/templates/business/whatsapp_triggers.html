@@ -7,111 +7,148 @@
 {% block content %}
 <div class="col-12 bwt" id="business_whatsapp_triggers_container">
 
-  {% bconheader eyebrow="Settings" live="WhatsApp" icon="fa-brands fa-whatsapp" title="WhatsApp Notification Alerts" subtitle="Configure which delivery status changes auto-send WhatsApp messages to your customers." %}{% endbconheader %}
+  {% bconheader eyebrow="Settings" live="WhatsApp" icon="fa-brands fa-whatsapp" title="WhatsApp Notification Alerts" %}
+    <span class="bwt__save-state" id="business_whatsapp_save_state" role="status" aria-live="polite"></span>
+    <button type="button" class="bcon__btn bcon__btn--primary d-none"
+            id="business_whatsapp_btn_save">
+      <i class="fa-solid fa-floppy-disk me-1"></i>Save changes
+    </button>
+  {% endbconheader %}
 
-  <!-- Info Banner -->
-  <div class="alert alert-info d-flex align-items-start gap-2 mb-4" role="alert">
-    <i class="fa-solid fa-circle-info mt-1"></i>
-    <div>
-      <strong>How it works:</strong> When a delivery status changes, we automatically send a WhatsApp message to the customer.
-      Toggle on the statuses you want to notify. An <strong>extra notification number</strong> also receives the same alert —
-      if left blank it defaults to your business WhatsApp{% if default_whatsapp %} (<strong>{{ default_whatsapp }}</strong>){% else %} (not yet set — <a href="{% url 'business:business_profile' %}">add it to your business profile</a>){% endif %}.
-      Customise messages using placeholders:
-      <code>{customer_name}</code>, <code>{order_number}</code>, <code>{driver_name}</code>, <code>{driver_phone}</code>.
-    </div>
-  </div>
+  <p class="bwt__lede">
+    Each stage below is a moment in one delivery. Switch on the ones worth a message and word them
+    yourself; clear a box to go back to our wording. Every message can copy someone on your team as
+    well{% if default_whatsapp %} — leave that blank and the copy goes to your business WhatsApp,
+    <span class="bwt__lede-num">{{ default_whatsapp }}</span>{% else %}, once you
+    <a href="{% url 'business:business_profile' %}">add a business WhatsApp number</a>{% endif %}.
+  </p>
 
-  <!-- Trigger Table -->
-  <div class="card bwt__table-card">
-    <div class="table-responsive">
-      <table class="table bwt__table align-middle mb-0" id="business_whatsapp_triggers_table">
-        <thead>
-          <tr>
-            <th scope="col">Trigger Event</th>
-            <th scope="col" class="text-center">Active</th>
-            <th scope="col" class="bwt__th-phone">Notification Phone</th>
-            <th scope="col">Custom Message</th>
-            <th scope="col" class="text-end">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for status_key, trigger in triggers.items %}
-          <tr id="business_whatsapp_trigger_row_{{ status_key }}">
-            <!-- Trigger Event -->
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <span class="bwt__status-icon bwt__status-icon--{{ status_key }}">
-                  {% if status_key == 'assigned' %}
-                    <i class="fa-solid fa-user-check"></i>
-                  {% elif status_key == 'picked_up' %}
-                    <i class="fa-solid fa-box"></i>
-                  {% elif status_key == 'start_ride' %}
-                    <i class="fa-solid fa-motorcycle"></i>
-                  {% elif status_key == 'out_for_delivery' %}
-                    <i class="fa-solid fa-truck-fast"></i>
-                  {% elif status_key == 'delivered' %}
-                    <i class="fa-solid fa-circle-check"></i>
-                  {% elif status_key == 'failed' %}
-                    <i class="fa-solid fa-circle-exclamation"></i>
+  <div class="bwt__layout">
+
+    <!-- The run: one card per stage, hung off a rail that branches at the ending -->
+    <ol class="bwt__run" id="business_whatsapp_run">
+      {% for status_key, trigger in triggers.items %}
+      <li class="bwt__stage{% if trigger.is_outcome %} bwt__stage--outcome bwt__stage--{{ status_key }}{% endif %}{% if not trigger.is_live %} bwt__stage--dormant{% endif %}"
+          id="business_whatsapp_stage_{{ status_key }}"
+          data-status="{{ status_key }}">
+
+        <span class="bwt__node" aria-hidden="true"></span>
+
+        <div class="bwt__stage-card">
+          <div class="bwt__stage-head">
+            <div class="bwt__stage-ident">
+              <h2 class="bwt__stage-name">{{ trigger.label }}</h2>
+              {% if trigger.is_live %}
+                <p class="bwt__stage-when">
+                  {% if status_key == 'assigned' %}When a driver takes the job
+                  {% elif status_key == 'out_for_delivery' %}When the driver sets off to the customer
+                  {% elif status_key == 'delivered' %}When the parcel is handed over
+                  {% elif status_key == 'failed' %}When an attempt does not succeed
                   {% endif %}
-                </span>
-                <span class="bwt__row-title">{{ trigger.label }}</span>
-              </div>
-            </td>
+                </p>
+              {% else %}
+                <p class="bwt__stage-when bwt__stage-when--dormant">
+                  We do not report this stage yet, so nothing is sent.
+                </p>
+              {% endif %}
+            </div>
 
-            <!-- Active Toggle -->
-            <td class="text-center">
-              <div class="form-check form-switch d-inline-flex m-0">
-                <input class="form-check-input bwt__toggle"
-                       type="checkbox"
-                       role="switch"
-                       id="bwt_toggle_{{ status_key }}"
-                       data-status="{{ status_key }}"
-                       {% if trigger.is_active %}checked{% endif %}>
-              </div>
-            </td>
-
-            <!-- Notification Phone -->
-            <td class="bwt__td-phone">
-              <input type="tel"
-                     class="form-control form-control-sm bwt__phone-input"
-                     id="bwt_phone_{{ status_key }}"
+            <label class="bwt__sendswitch" for="bwt_toggle_{{ status_key }}">
+              <input class="form-check-input bwt__toggle"
+                     type="checkbox"
+                     id="bwt_toggle_{{ status_key }}"
                      data-status="{{ status_key }}"
-                     value="{{ trigger.notification_phone }}"
-                     placeholder="{% if default_whatsapp %}{{ default_whatsapp }}{% else %}+974 5xxx xxxx{% endif %}"
-                     aria-label="Notification phone number for {{ trigger.label }}">
-            </td>
+                     {% if trigger.is_active %}checked{% endif %}>
+              <span class="bwt__sendswitch-text" data-on="Sending" data-off="Not sending">
+                {% if trigger.is_active %}Sending{% else %}Not sending{% endif %}
+              </span>
+            </label>
+          </div>
 
-            <!-- Custom Message -->
-            <td>
-              <textarea class="form-control form-control-sm bwt__textarea"
-                        id="bwt_message_{{ status_key }}"
-                        rows="2"
-                        placeholder="Leave blank for default. Use {customer_name}, {order_number}, {driver_name}, {driver_phone}."
-                        data-status="{{ status_key }}">{{ trigger.custom_message }}</textarea>
-            </td>
+          <div class="bwt__stage-body">
+            <textarea class="form-control bwt__textarea"
+                      id="bwt_message_{{ status_key }}"
+                      rows="{{ trigger.rows }}"
+                      maxlength="1500"
+                      aria-label="Message sent at {{ trigger.label }}"
+                      placeholder="{% if trigger.default_message %}Empty — we send our default message.{% else %}Nothing is sent for this stage yet.{% endif %}"
+                      data-status="{{ status_key }}">{{ trigger.message }}</textarea>
 
-            <!-- Save -->
-            <td class="text-end">
-              <button class="btn btn-sm btn-primary bwt__save-btn"
-                      data-status="{{ status_key }}"
-                      id="bwt_save_{{ status_key }}">
-                <i class="fa-solid fa-floppy-disk me-1"></i> Save
-              </button>
-              <div class="bwt__save-status d-none mt-1" id="bwt_status_{{ status_key }}"></div>
-            </td>
-          </tr>
+            <div class="bwt__stage-foot">
+              <label class="bwt__copy" for="bwt_phone_{{ status_key }}">
+                <span class="bwt__copy-label">Copy to</span>
+                <input type="tel"
+                       class="form-control bwt__phone-input"
+                       id="bwt_phone_{{ status_key }}"
+                       data-status="{{ status_key }}"
+                       value="{{ trigger.notification_phone }}"
+                       placeholder="{% if default_whatsapp %}{{ default_whatsapp }}{% else %}+974 5xxx xxxx{% endif %}">
+              </label>
+
+              <div class="bwt__stage-tools">
+                <button type="button" class="btn bwt__tool" data-params-for="{{ status_key }}">
+                  <i class="fa-solid fa-code"></i><span>Parameter</span>
+                </button>
+                {% if trigger.default_message %}
+                <button type="button" class="btn bwt__tool bwt__tool--reset"
+                        data-reset-for="{{ status_key }}"
+                        data-default="{{ trigger.default_message }}">
+                  <i class="fa-solid fa-rotate-left"></i><span>Our wording</span>
+                </button>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+
+    <!-- Order parameters: beside the box you are editing on a wide screen -->
+    <aside class="bwt__params" id="business_whatsapp_params_card">
+      <button class="btn bwt__params-toggle" type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#business_whatsapp_params_body"
+              aria-expanded="false"
+              aria-controls="business_whatsapp_params_body"
+              id="business_whatsapp_btn_params">
+        <span class="bwt__params-title"><i class="fa-solid fa-code"></i> Order parameters</span>
+        <i class="fa-solid fa-chevron-down bwt__params-chevron" aria-hidden="true"></i>
+      </button>
+
+      <div class="collapse" id="business_whatsapp_params_body">
+        <div class="bwt__params-body">
+          <p class="bwt__params-hint">
+            Click one to drop it into the message you are editing. We swap it for the real value
+            when the message goes out, and leave it blank when we do not know it. Wrap a line in
+            <code>{if cod_amount}…{endif}</code> to drop the line entirely instead.
+          </p>
+
+          {% for group in token_groups %}
+          <div class="bwt__param-group">
+            <h3 class="bwt__param-group-title"><i class="{{ group.icon }}"></i> {{ group.label }}</h3>
+            <ul class="bwt__param-list list-unstyled mb-0">
+              {% for name, help_text in group.tokens %}
+              <li class="bwt__param">
+                <button type="button" class="bwt__param-token" data-token="{{ name }}"
+                        title="Insert into the message you are editing">{{ '{' }}{{ name }}{{ '}' }}</button>
+                <span class="bwt__param-help">{{ help_text }}</span>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
+        </div>
+      </div>
+    </aside>
+
   </div>
 
 </div>
 {% endblock content %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-whatsapp.css' %}?v=20260514a">
+<link rel="stylesheet" href="{% static 'business/css/business-whatsapp.css' %}?v=20260922g">
 {% endblock extra_css %}
 
 {% block extra_js %}
@@ -121,48 +158,213 @@ document.addEventListener('DOMContentLoaded', function() {
     || document.querySelector('meta[name="csrf-token"]')?.content
     || '{{ csrf_token }}';
 
-  document.querySelectorAll('.bwt__save-btn').forEach(function(btn) {
+  // --- Fit each box to the message it shows --------------------------------
+  // The placeholder holds the full default message, and a placeholder cannot be
+  // scrolled — so a box that is too short simply hides the end of it. The `rows`
+  // attribute is sized server-side for a wide screen; re-measure here because the
+  // real column width (and therefore the wrapping) is only known in the browser.
+  function fitMessageBox(ta) {
+    const keep = ta.value;
+    ta.value = keep || ta.placeholder;   // same frame, so nothing is painted
+    ta.style.height = 'auto';
+    ta.style.height = (ta.scrollHeight + 2) + 'px';
+    ta.value = keep;
+  }
+
+  const messageBoxes = document.querySelectorAll('.bwt__textarea');
+  messageBoxes.forEach(fitMessageBox);
+  messageBoxes.forEach(function(ta) {
+    ta.addEventListener('input', function() { fitMessageBox(ta); });
+  });
+
+  let refitTimer = null;
+  window.addEventListener('resize', function() {
+    clearTimeout(refitTimer);
+    refitTimer = setTimeout(function() { messageBoxes.forEach(fitMessageBox); }, 150);
+  });
+
+  // --- Stage state ---------------------------------------------------------
+  // The switch says what it does in words, so the label has to follow it.
+  document.querySelectorAll('.bwt__toggle').forEach(function(toggle) {
+    const text = toggle.closest('.bwt__sendswitch').querySelector('.bwt__sendswitch-text');
+    toggle.addEventListener('change', function() {
+      text.textContent = toggle.checked ? text.dataset.on : text.dataset.off;
+    });
+  });
+
+  // --- Back to our wording --------------------------------------------------
+  // Once the box holds an edit, our default is off screen; this puts it back.
+  // Saving that text stores '' server-side, so the stage follows the default again.
+  document.querySelectorAll('[data-reset-for]').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      const status = this.dataset.status;
-      const toggle = document.getElementById('bwt_toggle_' + status);
-      const textarea = document.getElementById('bwt_message_' + status);
-      const phoneInput = document.getElementById('bwt_phone_' + status);
-      const statusEl = document.getElementById('bwt_status_' + status);
+      const box = document.getElementById('bwt_message_' + this.dataset.resetFor);
+      if (!box || box.value === this.dataset.default) return;
+      box.value = this.dataset.default;
+      fitMessageBox(box);
+      refreshSaveButton();
+      box.focus();
+    });
+  });
 
-      const isActive = toggle.checked;
-      const customMessage = textarea ? textarea.value : '';
-      const notificationPhone = phoneInput ? phoneInput.value : '';
+  // --- Parameter insertion -------------------------------------------------
+  // One shared token panel serves every stage, so we track which message box the
+  // client touched last and insert at its caret.
+  const paramsPanel = document.getElementById('business_whatsapp_params_body');
+  let activeTextarea = null;
 
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving...';
+  // Wide enough for the panel to have its own column: open it, because a
+  // collapsed bar leaves a third of the page empty. Narrower, it stays shut so
+  // it does not push the run down the page.
+  if (paramsPanel && window.matchMedia('(min-width: 1200px)').matches) {
+    bootstrap.Collapse.getOrCreateInstance(paramsPanel, { toggle: false }).show();
+  }
 
-      const formData = new FormData();
-      formData.append('trigger_status', status);
-      formData.append('is_active', isActive ? 'true' : 'false');
-      formData.append('custom_message', customMessage);
-      formData.append('notification_phone', notificationPhone);
+  document.querySelectorAll('.bwt__textarea').forEach(function(ta) {
+    ta.addEventListener('focus', function() { activeTextarea = ta; });
+  });
 
-      fetch('{% url "business:whatsapp_trigger_toggle" %}', {
-        method: 'POST',
-        headers: { 'X-CSRFToken': csrfToken },
-        body: formData,
-      })
-      .then(function(resp) { return resp.json(); })
-      .then(function(data) {
-        statusEl.classList.remove('d-none', 'bwt__save-status--error');
-        statusEl.classList.add('bwt__save-status--success');
-        statusEl.textContent = 'Saved';
-        setTimeout(function() { statusEl.classList.add('d-none'); }, 2500);
-      })
-      .catch(function(err) {
-        statusEl.classList.remove('d-none', 'bwt__save-status--success');
-        statusEl.classList.add('bwt__save-status--error');
-        statusEl.textContent = 'Error saving.';
-      })
-      .finally(function() {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save';
-      });
+  document.querySelectorAll('[data-params-for]').forEach(function(link) {
+    link.addEventListener('click', function() {
+      activeTextarea = document.getElementById('bwt_message_' + this.dataset.paramsFor);
+      if (paramsPanel && !paramsPanel.classList.contains('show')) {
+        bootstrap.Collapse.getOrCreateInstance(paramsPanel).show();
+      }
+      // On a wide screen the panel is already parked beside the run.
+      if (paramsPanel && !window.matchMedia('(min-width: 1200px)').matches) {
+        const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        paramsPanel.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'nearest' });
+      }
+    });
+  });
+
+  document.querySelectorAll('.bwt__param-token').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const snippet = '{' + this.dataset.token + '}';
+      const target = activeTextarea || document.querySelector('.bwt__textarea');
+      if (!target) return;
+
+      const start = target.selectionStart ?? target.value.length;
+      const end = target.selectionEnd ?? target.value.length;
+      target.value = target.value.slice(0, start) + snippet + target.value.slice(end);
+      const caret = start + snippet.length;
+      target.focus();
+      target.setSelectionRange(caret, caret);
+      fitMessageBox(target);
+      refreshSaveButton();
+      activeTextarea = target;
+
+      // Momentary confirmation — the panel may be scrolled away from the box.
+      this.classList.add('bwt__param-token--inserted');
+      setTimeout(() => this.classList.remove('bwt__param-token--inserted'), 600);
+    });
+  });
+
+  // --- Unsaved changes ------------------------------------------------------
+  // There is one Save button, in the header, and it only appears once something
+  // actually differs from what is stored. Everything is compared against the
+  // state the page loaded with, so undoing an edit by hand hides it again.
+  const saveBtn = document.getElementById('business_whatsapp_btn_save');
+  const saveState = document.getElementById('business_whatsapp_save_state');
+  const rows = Array.from(document.querySelectorAll('.bwt__toggle')).map(function(toggle) {
+    const status = toggle.dataset.status;
+    return {
+      status: status,
+      toggle: toggle,
+      message: document.getElementById('bwt_message_' + status),
+      phone: document.getElementById('bwt_phone_' + status),
+    };
+  });
+
+  function readRow(row) {
+    return {
+      trigger_status: row.status,
+      is_active: row.toggle.checked,
+      custom_message: row.message ? row.message.value : '',
+      notification_phone: row.phone ? row.phone.value.trim() : '',
+    };
+  }
+
+  let saved = rows.map(readRow);
+
+  function changedRows() {
+    return rows.map(readRow).filter(function(now, i) {
+      const was = saved[i];
+      return now.is_active !== was.is_active
+          || now.custom_message !== was.custom_message
+          || now.notification_phone !== was.notification_phone;
+    });
+  }
+
+  function refreshSaveButton() {
+    const dirty = changedRows().length;
+    saveBtn.classList.toggle('d-none', dirty === 0);
+    if (dirty) {
+      saveState.textContent = dirty === 1 ? '1 unsaved change' : dirty + ' unsaved changes';
+      saveState.className = 'bwt__save-state bwt__save-state--dirty';
+    } else if (saveState.classList.contains('bwt__save-state--dirty')) {
+      // Only the unsaved-changes count is ours to clear. A "Saved" line or a
+      // warning about a token we cannot fill has to survive this call, which
+      // runs right after the save completes.
+      saveState.textContent = '';
+      saveState.className = 'bwt__save-state';
+    }
+  }
+
+  rows.forEach(function(row) {
+    ['input', 'change'].forEach(function(evt) {
+      row.toggle.addEventListener(evt, refreshSaveButton);
+      row.message && row.message.addEventListener(evt, refreshSaveButton);
+      row.phone && row.phone.addEventListener(evt, refreshSaveButton);
+    });
+  });
+
+  window.addEventListener('beforeunload', function(e) {
+    if (changedRows().length) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  saveBtn.addEventListener('click', function() {
+    const changed = changedRows();
+    if (!changed.length) return;
+
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving\u2026';
+    saveState.textContent = '';
+
+    fetch('{% url "business:whatsapp_triggers_save" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ triggers: changed }),
+    })
+    .then(function(resp) {
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.json();
+    })
+    .then(function(data) {
+      saved = rows.map(readRow);
+      saveBtn.classList.add('d-none');
+
+      // Saved, but these placeholders will print literally to the customer.
+      const stray = Object.values((data && data.unknown_tokens) || {}).flat();
+      if (stray.length) {
+        saveState.className = 'bwt__save-state bwt__save-state--warn';
+        saveState.textContent = 'Saved \u2014 we cannot fill ' +
+          stray.map(function(t) { return '{' + t + '}'; }).join(', ');
+      } else {
+        saveState.className = 'bwt__save-state bwt__save-state--ok';
+        saveState.textContent = 'Saved';
+        setTimeout(function() {
+          if (!changedRows().length) { saveState.textContent = ''; }
+        }, 3000);
+      }
+    })
+    .catch(function() {
+      saveState.className = 'bwt__save-state bwt__save-state--error';
+      saveState.textContent = 'Not saved. Check your connection and try again.';
+    })
+    .finally(function() {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i>Save changes';
+      refreshSaveButton();
     });
   });
 });

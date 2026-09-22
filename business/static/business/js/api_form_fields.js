@@ -1,102 +1,24 @@
-// Show/hide API form fields based on selected platform type
+// Purpose: Show only the fields the selected integration platform actually uses.
+// Used by: business_settings_api_add.html / business_settings_api_update.html.
+// Notes: The platform -> field map is NOT defined here. It is rendered by
+//        business.integration_fields into #api-field-config, so this file and the
+//        staff modal cannot drift from each other or from the form.
 (function () {
-    // Fields grouped by platform with auto-fill URLs
-    var FIELD_CONFIG = {
-        google_sheet: {
-            show: ['site_api_url'],
-            labels: { site_api_url: 'Google Sheet URL' },
-            placeholders: { site_api_url: 'https://docs.google.com/spreadsheets/d/...' },
-            autofill: { site_api_url: '' },
-        },
-        // Shopify has two mutually-exclusive setup paths. Showing all three
-        // credential boxes at once is what let merchants save a Client ID +
-        // Secret, never run OAuth, and get a 401 with no token. Each mode now
-        // shows only the fields that mode actually needs.
-        shopify: {
-            show: ['api_key', 'api_secret', 'site_api_url', 'order_api_endpoint', 'product_api_endpoint', 'site_contry'],
-            labels: {
-                api_key: 'Client ID (Shopify Custom App API key)',
-                api_secret: 'Client Secret (Shopify Custom App API secret key)',
-                api_access_token: 'Admin API Access Token (starts with shpat_)',
-                site_api_url: 'Store URL (e.g. mystore.myshopify.com)',
-            },
-            autofill: {
-                order_api_endpoint: '/admin/api/2024-01/orders.json',
-                product_api_endpoint: '/admin/api/2024-01/products.json',
-                site_contry: 'Qatar',
-            },
-        },
-        shopify_custom_app: {
-            show: ['api_access_token', 'site_api_url', 'order_api_endpoint', 'product_api_endpoint', 'site_contry'],
-            labels: {
-                api_access_token: 'Admin API Access Token (starts with shpat_)',
-                site_api_url: 'Store URL (e.g. mystore.myshopify.com)',
-            },
-            autofill: {
-                order_api_endpoint: '/admin/api/2024-01/orders.json',
-                product_api_endpoint: '/admin/api/2024-01/products.json',
-                site_contry: 'Qatar',
-            },
-        },
-        woocommerce: {
-            show: ['api_key', 'api_secret', 'site_api_url', 'order_api_endpoint', 'product_api_endpoint', 'site_contry'],
-            labels: { site_api_url: 'Store URL (with https://)' },
-            autofill: {
-                order_api_endpoint: '/wp-json/wc/v3/orders',
-                product_api_endpoint: '/wp-json/wc/v3/products',
-                site_contry: 'Qatar',
-            },
-        },
-        tiktokshop: {
-            show: ['api_key', 'api_secret', 'api_access_token', 'api_version', 'tiktok_shop_id', 'tiktok_shop_cipher', 'tiktok_refresh_token'],
-            autofill: { api_version: '202309' },
-        },
-        magento: {
-            show: ['api_access_token', 'site_api_url', 'order_api_endpoint', 'product_api_endpoint', 'site_contry'],
-            autofill: {
-                order_api_endpoint: '/rest/V1/orders',
-                product_api_endpoint: '/rest/V1/products',
-                site_contry: 'Qatar',
-            },
-        },
-        opencart: {
-            show: ['api_key', 'api_secret', 'site_api_url', 'order_api_endpoint', 'product_api_endpoint', 'site_contry'],
-            autofill: {
-                order_api_endpoint: '/index.php?route=api/order',
-                product_api_endpoint: '/index.php?route=api/product',
-                site_contry: 'Qatar',
-            },
-        },
-        prestashop: {
-            show: ['api_key', 'site_api_url', 'order_api_endpoint', 'product_api_endpoint', 'site_contry'],
-            autofill: {
-                order_api_endpoint: '/api/orders',
-                product_api_endpoint: '/api/products',
-                site_contry: 'Qatar',
-            },
-        },
-        bigcommerce: {
-            show: ['api_key', 'api_access_token', 'api_secret', 'site_api_url', 'order_api_endpoint', 'product_api_endpoint', 'site_contry'],
-            autofill: {
-                order_api_endpoint: '/stores/api/v3/orders',
-                product_api_endpoint: '/stores/api/v3/catalog/products',
-                site_contry: 'Qatar',
-            },
-        },
-        custom: {
-            show: ['api_key', 'api_secret', 'api_access_token', 'api_version', 'site_api_url', 'order_api_endpoint', 'product_api_endpoint', 'site_contry'],
-            autofill: { site_contry: 'Qatar' },
-        },
-    };
+    var CONFIG = (function () {
+        var el = document.getElementById('api-field-config');
+        if (!el) return null;
+        try {
+            return JSON.parse(el.textContent);
+        } catch (e) {
+            return null;
+        }
+    })();
 
-    var ALL_FIELDS = ['api_key', 'api_secret', 'api_access_token', 'api_version',
-                        'site_api_url', 'order_api_endpoint', 'product_api_endpoint',
-                        'site_contry', 'tiktok_shop_id', 'tiktok_shop_cipher', 'tiktok_refresh_token'];
+    if (!CONFIG) return;
 
-    // Default labels from the form
-    var DEFAULT_LABELS = {
-        site_api_url: 'Site URL (with https://)',
-    };
+    var PLATFORMS = CONFIG.platforms || {};
+    var ALL_FIELDS = CONFIG.all_fields || [];
+    var CONDITIONAL = CONFIG.conditional || {};
 
     function getWrapper(fieldName) {
         return document.getElementById('div_id_' + fieldName);
@@ -126,21 +48,36 @@
         el.classList.toggle('bapi__guide--muted', !active);
     }
 
+    // A field can depend on another field's value (the header/parameter name is
+    // meaningless for Bearer, Basic and None). The rule lives in the server map.
+    function applyConditionalFields(visibleFields) {
+        Object.keys(CONDITIONAL).forEach(function (field) {
+            var wrapper = getWrapper(field);
+            if (!wrapper || visibleFields.indexOf(field) === -1) return;
+            var rule = CONDITIONAL[field];
+            var driver = document.getElementById('id_' + rule.field);
+            if (!driver) return;
+            var show = (rule.values || []).indexOf(driver.value) !== -1;
+            wrapper.style.display = show ? '' : 'none';
+        });
+    }
+
+    function resolveConfigKey(apiType) {
+        // Shopify is the one platform whose field set depends on a second choice.
+        if (apiType === 'shopify' && getShopifyMode() === 'custom_app') {
+            return 'shopify_custom_app';
+        }
+        return apiType;
+    }
+
     function applyFieldVisibility(apiType) {
         var isShopify = (apiType === 'shopify');
         var mode = isShopify ? getShopifyMode() : null;
 
-        // Shopify resolves to a per-mode field set; every other platform keys
-        // straight off apiType.
-        var configKey = apiType;
-        if (isShopify && mode === 'custom_app') {
-            configKey = 'shopify_custom_app';
-        }
-
-        var config = FIELD_CONFIG[configKey] || FIELD_CONFIG['custom'];
-        var showFields = config.show || [];
-        var labelOverrides = config.labels || {};
-        var autofillValues = config.autofill || {};
+        var spec = PLATFORMS[resolveConfigKey(apiType)] || PLATFORMS['custom'] || {};
+        var showFields = spec.fields || [];
+        var labelOverrides = spec.labels || {};
+        var autofillValues = spec.autofill || {};
 
         // The mode radio itself is Shopify-only.
         var modeWrapper = getWrapper('shopify_setup_mode');
@@ -170,13 +107,12 @@
             if (!wrapper) return;
             if (showFields.indexOf(field) !== -1) {
                 wrapper.style.display = '';
-                // Restore/override label
                 var label = getLabelEl(field);
                 if (label) {
-                    label.textContent = labelOverrides[field] || DEFAULT_LABELS[field] || label.dataset.defaultLabel || label.textContent;
                     if (!label.dataset.defaultLabel) {
                         label.dataset.defaultLabel = label.textContent;
                     }
+                    label.textContent = labelOverrides[field] || label.dataset.defaultLabel;
                 }
                 // Auto-fill known endpoints (only if empty)
                 var input = wrapper.querySelector('input');
@@ -187,6 +123,8 @@
                 wrapper.style.display = 'none';
             }
         });
+
+        applyConditionalFields(showFields);
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -208,12 +146,20 @@
             submitLabel.dataset.defaultText = submitLabel.textContent.trim();
         }
 
-        // Apply on load
         applyFieldVisibility(select.value);
 
-        // Apply on change
         select.addEventListener('change', function () {
             applyFieldVisibility(this.value);
+        });
+
+        // Any field another field depends on re-runs the conditional pass.
+        Object.keys(CONDITIONAL).forEach(function (field) {
+            var driver = document.getElementById('id_' + CONDITIONAL[field].field);
+            if (driver) {
+                driver.addEventListener('change', function () {
+                    applyFieldVisibility(select.value);
+                });
+            }
         });
 
         // Switching setup mode re-resolves the Shopify field set.

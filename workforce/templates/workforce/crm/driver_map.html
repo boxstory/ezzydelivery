@@ -11,8 +11,8 @@ Notes: crmm__ namespace. Leaflet ships with wf_dashboard_base. Pins are coloured
 {% block title %}Driver Map - Staff Dashboard{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260827c" rel="stylesheet" type="text/css" />
-<link href="{% static 'workforce/css/crm-driver-map.css' %}?v=20260913c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260922a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm-driver-map.css' %}?v=20260922c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -43,8 +43,6 @@ Notes: crmm__ namespace. Leaflet ships with wf_dashboard_base. Pins are coloured
 
     <div class="crm__body">
 
-    {% include "workforce/parts/_marketing_desk_rail.html" %}
-
     <div class="wfnote" id="workforce_crm_driver_map_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_crm_driver_map_card_notes' %}" hidden></div>
 
@@ -63,39 +61,71 @@ Notes: crmm__ namespace. Leaflet ships with wf_dashboard_base. Pins are coloured
         </div>
 
         <div class="crm__facets">
-          <select name="stage" class="crm__facet-select {% if stage_filter %}crm__facet-select--on{% endif %}"
+          {% comment %}Every facet is a checkbox multi-select. A recruiter reads
+          "Uploads Done + Applied" or "Bike + Car" as one pool, so each picker OR's
+          its ticks rather than forcing a second trip through the bar. The closed
+          control shows the pick when there is one and "N stages" when there are
+          more — tags would not survive this row's width. With nothing ticked the
+          placeholder reads All …, so nothing is lost without JS either.
+          {% endcomment %}
+          <select name="stage" multiple data-placeholder="All stages"
+                  data-facet-label="stage" data-facet-plural="stages"
+                  class="crm__facet-select crmm__facet--multi {% if stage_filters %}crm__facet-select--on{% endif %}"
                   id="workforce_crm_driver_map_select_stage" aria-label="Filter by stage">
-            <option value="">All stages</option>
             {% for st in stages %}
-            <option value="{{ st.key }}" {% if stage_filter == st.key %}selected{% endif %}>{{ st.label }}</option>
+            <option value="{{ st.key }}" {% if st.key in stage_filters %}selected{% endif %}>{{ st.label }}</option>
             {% endfor %}
           </select>
 
-          <select name="source" class="crm__facet-select {% if source_filter %}crm__facet-select--on{% endif %}"
+          <select name="source" multiple data-placeholder="All sources"
+                  data-facet-label="source" data-facet-plural="sources"
+                  class="crm__facet-select crmm__facet--multi {% if source_filter %}crm__facet-select--on{% endif %}"
                   id="workforce_crm_driver_map_select_source" aria-label="Filter by source">
-            <option value="">All sources</option>
             {% for value, label in source_choices %}
-            <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ label }}</option>
+            <option value="{{ value }}" {% if value in source_filter %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
 
-          <select name="assigned" class="crm__facet-select {% if assigned_filter %}crm__facet-select--on{% endif %}"
+          <select name="assigned" multiple data-placeholder="All assignees"
+                  data-facet-label="assignee" data-facet-plural="assignees"
+                  class="crm__facet-select crmm__facet--multi {% if assigned_filter %}crm__facet-select--on{% endif %}"
                   id="workforce_crm_driver_map_select_assigned" aria-label="Filter by assignee">
-            <option value="">All assignees</option>
-            <option value="me" {% if assigned_filter == 'me' %}selected{% endif %}>Assigned to me</option>
-            <option value="none" {% if assigned_filter == 'none' %}selected{% endif %}>Unassigned</option>
+            <option value="me" {% if 'me' in assigned_filter %}selected{% endif %}>Assigned to me</option>
+            <option value="none" {% if 'none' in assigned_filter %}selected{% endif %}>Unassigned</option>
           </select>
 
-          <button type="submit" class="crm__btn crmm__btn--go">Apply</button>
-          {% if search or stage_filter or source_filter or assigned_filter %}
-            <a href="{% url 'workforce:crm_driver_map' %}" class="crmm__clear">Clear</a>
-          {% endif %}
+          <select name="vehicle" multiple data-placeholder="All vehicles"
+                  data-facet-label="vehicle" data-facet-plural="vehicles"
+                  class="crm__facet-select crmm__facet--multi {% if vehicle_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_driver_map_select_vehicle" aria-label="Filter by vehicle type">
+            {% for value, label in vehicle_choices %}
+            <option value="{{ value }}" {% if value in vehicle_filter %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            <option value="none" {% if 'none' in vehicle_filter %}selected{% endif %}>No vehicle on file</option>
+          </select>
+
+          <select name="account" multiple data-placeholder="All accounts"
+                  data-facet-label="account" data-facet-plural="accounts"
+                  class="crm__facet-select crmm__facet--multi {% if account_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_driver_map_select_account" aria-label="Filter by account status">
+            {% for value, label in account_choices %}
+            <option value="{{ value }}" {% if value in account_filter %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
         </div>
 
-        <span class="crmm__tally">
-          <strong class="wfmono">{{ pin_count }}</strong> on the map
+        <button type="submit" class="crm__btn crmm__btn--go">Apply</button>
+        {% if search or stage_filters or source_filter or assigned_filter or vehicle_filter or account_filter %}
+          <a href="{% url 'workforce:crm_driver_map' %}" class="crmm__clear">Clear</a>
+        {% endif %}
+
+        {% comment %}Short form so the readout never costs the row its single line —
+        the full sentence is on the tooltip.{% endcomment %}
+        <span class="crmm__tally" title="{{ pin_count }} pinned on the map · {{ lead_total }} leads in this filter">
+          <strong class="wfmono">{{ pin_count }}</strong> pins
           <span class="crmm__dot">·</span>
-          <strong class="wfmono">{{ lead_total }}</strong> in this filter
+          <strong class="wfmono">{{ lead_total }}</strong> leads
         </span>
       </form>
     </div>
@@ -172,6 +202,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function popupHtml(p) {
         var rows = [
             ['Stage', p.stage_label],
+            ['Vehicle', p.vehicle],
             ['Phone', p.phone],
             ['Account', p.account],
             ['Code', p.code],
@@ -186,7 +217,10 @@ document.addEventListener('DOMContentLoaded', function () {
             body + '<a class="crmm__pop-link" href="' + p.url + '">Open lead</a></div>';
     }
 
-    var map = L.map('workforce_crm_driver_map_canvas', { scrollWheelZoom: false });
+    // Wheel zoom is live with no click first. The page does scroll past the map, so
+    // the wheel is captured while the pointer is over the canvas — scroll past it on
+    // the margins, or use the page scrollbar.
+    var map = L.map('workforce_crm_driver_map_canvas', { scrollWheelZoom: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
     }).addTo(map);

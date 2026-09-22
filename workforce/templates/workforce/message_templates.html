@@ -8,7 +8,7 @@
 {% block title %}Message Templates - Staff Dashboard{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/message-templates.css' %}?v=1" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/message-templates.css' %}?v=20260921a" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -58,6 +58,15 @@
     <div class="wfnote" id="workforce_message_templates_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_message_templates_card_notes' %}" hidden></div>
 
+    {# The IDs are only worth anything if staff know they are the same token on the #}
+    {# buttons, so the page says it once rather than leaving it to be discovered. #}
+    <p class="wmt__idnote">
+      <span class="wmt__id">M00</span>
+      Every message has an ID. The same ID is printed on each button that sends it —
+      on an order, a task, a lead, a driver or an invoice — and on the template picker
+      inside the send window, so you can tell from the button which message it will use.
+    </p>
+
     <!-- Global toast -->
     <div class="wmt__toast" id="wmt_toast" role="status" aria-live="polite"></div>
 
@@ -89,6 +98,9 @@
       {% for tpl in group.templates %}
       <form class="wmt__card card mb-3" data-msg-form id="msg-{{ tpl.key }}">
         <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+          {# The ID is the handle staff carry between this page and the buttons that #}
+          {# send the body — it is printed on every one of them. #}
+          <span class="wmt__id" title="Message ID — shown on every button that sends this message">{{ tpl.msg_id }}</span>
           <i class="fa-brands fa-whatsapp"></i><strong>{{ tpl.label }}</strong>
           {% if tpl.kind == 'composer' %}
             <span class="wmt__state wmt__state--kind">Composer starter</span>
@@ -123,6 +135,10 @@
             <span class="wmt__plate wmt__plate--quiet">
               <span class="wmt__plate-method">FROM</span>
               <span class="wmt__plate-text">{{ tpl.sender_label }}</span>
+            </span>
+            <span class="wmt__plate wmt__plate--quiet">
+              <span class="wmt__plate-method">ID</span>
+              <span class="wmt__plate-text">{{ tpl.msg_id }}</span>
             </span>
             <span class="wmt__plate wmt__plate--quiet">
               <span class="wmt__plate-method">KEY</span>
@@ -160,10 +176,11 @@
               {% endif %}
 
               {% if tpl.used_by %}
-              <p class="wmt__side-title">Opens on</p>
+              <p class="wmt__side-title">Buttons that send {{ tpl.msg_id }}</p>
               <ul class="wmt__uses">
                 {% for use in tpl.used_by %}
                 <li class="wmt__use">
+                  <span class="wmt__id wmt__id--sm">{{ tpl.msg_id }}</span>
                   <span class="wmt__use-label">{{ use.label }}</span>
                   {% for name, href in use.links %}
                   <a class="wmt__use-link" href="{{ href }}">{{ name }}<i class="fa-solid fa-arrow-up-right-from-square ms-1"></i></a>
@@ -183,7 +200,9 @@
           <button type="button" class="btn btn-sm wmt__btn-ghost" data-tpl-preview="#wmt_tpl_{{ tpl.key }}">
             <i class="fa-solid fa-eye me-1"></i>Preview
           </button>
-          <button type="submit" class="btn btn-sm wmt__btn-save ms-auto"><i class="fa-solid fa-floppy-disk me-1"></i>Save message</button>
+          <button type="submit" class="btn btn-sm wmt__btn-save ms-auto">
+            <i class="fa-solid fa-floppy-disk me-1"></i>Save <span class="wmt__id wmt__id--onbtn">{{ tpl.msg_id }}</span>
+          </button>
         </div>
         <div class="wmt__preview" data-preview hidden></div>
         <div class="wmt__feedback" data-feedback></div>
@@ -286,6 +305,10 @@
     delivery_area: 'Al Sadd',
     cod_amount: '250.00',
     cod_line: '💵 Cash on delivery: QAR 250.00\n',
+    delivery_charge: '25.00',
+    delivery_charge_line: '🚚 Delivery charge: QAR 25.00\n',
+    total_amount: '275.00',
+    total_line: '💵 To pay on delivery: QAR 275.00 (order 250.00 + delivery 25.00)\n',
     verify_url: 'https://ezzydelivery.qa/v/8f3a2c',
   };
   function escapeHtml(s) {

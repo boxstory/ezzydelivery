@@ -1,6 +1,7 @@
 {% extends "wf_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% load workforce_tags %}
 {% load custom_filters %}
 {% comment %}
 Purpose: Staff detail record for one last-mile delivery task (address, COD, driver, timeline, proof)
@@ -104,7 +105,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                                         </a>
                                         <button type="button"
                                                 class="odp__btn-wa-send"
-                                                title="Send WhatsApp via Evolution API"
+                                                title="Send WhatsApp via Evolution API — message {% msgid_text 'order_verify_manual' %}"
                                                 onclick="EzzyOrderDetail.openWhatsAppModal()">
                                             <i class="fa-solid fa-paper-plane"></i>
                                         </button>
@@ -1119,6 +1120,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                         <option value="contacted">Contacted & Confirmed</option>
                         <option value="non_reachable">Non Reachable</option>
                         <option value="delivered">Delivered</option>
+                        <option value="returned_to_shipper">Returned to Shipper</option>
                         <option value="failed">Failed</option>
                         <option value="rejected">Rejected</option>
                         <option value="cancelled">Cancelled</option>
@@ -1283,10 +1285,19 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
         const errBox = document.getElementById('passToDriverError');
         const okBox = document.getElementById('passToDriverSuccess');
         const sendBtn = document.getElementById('passToDriverSend');
-        const modal = new bootstrap.Modal(modalEl);
+        // Built on first open, never here: this inline block runs while the page
+        // is still parsing and bootstrap.bundle.js only loads further down, so a
+        // constructor call at this point threw "bootstrap is not defined" and
+        // aborted the WHOLE script — every const below it (STATUS_REASON_REQUIRED)
+        // stayed in its temporal dead zone and the Update Status button died.
+        let modal = null;
 
         function syncCount() { count.textContent = box.value.length; }
         function open(prefill) {
+            if (!modal) {
+                if (!window.bootstrap) return;
+                modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            }
             errBox.classList.add('d-none');
             okBox.classList.add('d-none');
             if (typeof prefill === 'string') box.value = prefill.slice(0, 1000);
@@ -1582,7 +1593,8 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
 
     // Statuses that must carry a reason, and the ones where it is optional —
     // same split the driver app uses (Failed sheet is mandatory, the rest free).
-    const STATUS_REASON_REQUIRED = ['failed', 'rejected', 'cancelled', 'dropsownlost'];
+    const STATUS_REASON_REQUIRED = ['failed', 'rejected', 'cancelled', 'dropsownlost',
+                                    'returned_to_shipper'];
     const STATUS_REASON_OPTIONAL = ['non_reachable'];
 
     (function initStatusReason() {
@@ -1665,7 +1677,8 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
             if (data.success) {
                 showStatusSuccess('Status updated successfully!');
                 setTimeout(() => {
-                    bootstrap.Modal.getInstance(document.getElementById('updateStatusModal')).hide();
+                    const statusModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('updateStatusModal'));
+                    if (statusModal) { statusModal.hide(); }
                     location.reload();
                 }, 3000);
             } else {

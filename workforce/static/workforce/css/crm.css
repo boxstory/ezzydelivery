@@ -36,9 +36,9 @@
 .crm__head {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.65rem 1rem;
   align-items: center;
-  padding: 1.35rem 1.5rem;
+  padding: 0.6rem 0.85rem;
   border-bottom: 1px solid var(--crm-line);
 }
 .crm__head-title { flex: 1 1 260px; min-width: 220px; }
@@ -124,7 +124,7 @@
   gap: 0.75rem 0.75rem;
   align-items: center;
 }
-.crm__search { position: relative; flex: 1 1 18rem; min-width: 14rem; max-width: 28rem; }
+.crm__search { position: relative; flex: 1 1 13rem; min-width: 11.5rem; max-width: 22rem; }
 .crm__search-icon {
   position: absolute;
   left: 0.75rem;
@@ -221,7 +221,12 @@
   /* A fixed track, not minmax(): Select2's percentage width contributes nothing to
      intrinsic sizing, so a flexible track measures short and the shrink-to-fit form
      around it wrapped the search field onto its own line. */
-  grid-auto-columns: 11.5rem;
+  /* 8.25rem, not 11.5: the row now also carries the two download buttons, and a
+     fixed track is the only kind Select2 measures correctly (see above). Measured
+     against the longest label ("Any follow-up" at 0.82rem) plus the chevron tile,
+     so every facet still reads in full — the slack came off the tracks, which were
+     set when this row held nothing but filters. */
+  grid-auto-columns: 8.25rem;
   justify-content: start;
 }
 
@@ -881,6 +886,53 @@
 .crmd__field-val { font-size: 0.8rem; color: var(--crm-ink); text-align: right; }
 .crmd__editrow { margin-bottom: 0.6rem; }
 .crmd__editrow .crmd__field-lbl { display: block; margin-bottom: 0.2rem; }
+
+/* ── CONTACT CARD (crmd__contact) ─────────────────────────────────────────── */
+/* A record on the surface, an editor on demand. The four values sit in the same
+   label-left / value-right ledger rows as the Source panel beside it, so the two
+   halves of the row share one baseline grid; the inputs only appear when Edit is
+   pressed, and every field the form writes has a read row here. */
+/* Header action, still a real control: 0.8rem text on the 2.1rem console floor. */
+.crmd__contact-edit { margin-left: auto; padding: 0.42rem 0.75rem; font-size: 0.8rem; }
+.crmd__contact.is-editing .crmd__contact-edit { display: none; }
+.crmd__contact.is-editing .crm__panel-hd { background: var(--crm-well); }
+.crmd__crec { margin: 0; }
+.crmd__crow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--crm-line);
+}
+.crmd__crow:last-child { border-bottom: 0; }
+.crmd__crow-lbl { font-size: 0.74rem; font-weight: 400; color: var(--crm-muted); }
+.crmd__crow-val {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--crm-ink);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+/* An unfilled field is a fact worth reading, not a blank — it stays quiet but present. */
+.crmd__crow-val--empty { font-weight: 400; color: var(--crm-muted); }
+/* The number is a dialable figure: tabular mono so digits line up, dotted rule so it
+   reads as actionable without spending an underline-blue link on a console sheet. */
+.crmd__crow-tel {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--crm-ink);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--crm-line-2);
+}
+.crmd__crow-tel:hover { color: var(--crm-ink); border-bottom-color: var(--crm-ink-2); }
+/* The save confirmation lives outside the form so it survives the editor closing —
+   which means it must take no room at all on a card that is only being read. */
+.crmd__contact .crmd__feedback:empty { min-height: 0; margin-top: 0; }
+/* Console floor: Bootstrap's -sm control is 0.775rem on a 31px box, under the staff
+   minimum, and these are the fields a phone number gets retyped into. */
+.crmd__cform .form-control-sm { font-size: 0.82rem; min-height: 2.1rem; padding: 0.3rem 0.6rem; }
 .crmd__section { margin-bottom: 1rem; }
 .crmd__section-lbl {
   font-size: 0.68rem;
@@ -1027,6 +1079,12 @@
    instead of two saying the same thing */
 .crmd__linker { border-bottom: 1px solid var(--crm-line); background: var(--crm-canvas); }
 .crmd__linker-btn { margin-left: auto; font-size: 0.72rem; padding: 0.25rem 0.6rem; }
+
+/* Refresh sits ahead of the linker, so it takes over pushing the pair right. */
+.crmd__chat-refresh { margin-left: auto; font-size: 0.72rem; padding: 0.25rem 0.6rem; }
+.crmd__chat-refresh + .crmd__linker-btn { margin-left: 0; }
+.crmd__chat-refresh[disabled] { opacity: 0.6; cursor: default; }
+.crmd__chat-feedback { font-size: 0.7rem; color: var(--crm-ink-2); }
 
 .crmd__link-search-wrap { position: relative; }
 .crmd__link-results {
@@ -1513,6 +1571,22 @@
 .crmd__pinnote i { margin-right: 0.25rem; }
 .crmr__panel-note { margin-left: 0.375rem; font-size: 0.7rem; font-weight: 400; color: var(--crm-muted); }
 
+/* ── BOARD MOVE: a card filed on the wrong pipeline ────────────────────────── */
+/* Business ⇄ Driver is a re-filing, not a stage move — the card restarts at the
+   other board's entry column. Kept quiet and below a hairline so it reads as
+   housekeeping sitting under the stage grid, not as another stage to click. */
+.crmd__boardmove {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--crm-line);
+}
+.crmd__boardmove-note { flex: 1 1 11rem; font-size: 0.72rem; color: var(--crm-muted); }
+.crmd__boardmove-note strong { color: var(--crm-ink-2); font-weight: 600; }
+
 /* ── MERGED DUPLICATES: two cards in one (crmb__submerge / crmd__merge) ────── */
 /* One prospect that arrived twice is one board card, with the absorbed card shown
    nested inside it so the second origin is visible rather than flattened away. */
@@ -1724,3 +1798,41 @@
 .crmd__val-table th:nth-child(2), .crmd__val-table td:nth-child(2) { width: 38%; }
 .crmd__val-table th:last-child, .crmd__val-table td:last-child { width: 22%; }
 .crmd__val-ans { overflow-wrap: anywhere; }
+
+/* Sortable header widths — the id column used to carry an inline width. */
+.crm__table thead th.crm__th-id { width: 3rem; }
+
+/* ── ROW DOWNLOADS ────────────────────────────────────────────────────────── */
+/* The download controls share the filter row rather than opening a second one:
+   they act on the view those filters produce. Search already carries the row's
+   margin-left:auto, so the two buttons after it just sit alongside (see the
+   `~ .crm__btn` rule above). The .wfsel__/.wfx chrome itself is shared
+   furniture from workforce.css. */
+.crm__filters > .wfsel__count,
+.crm__filters > .wfsel__all {
+  display: inline-flex;
+  align-items: center;
+  height: var(--crm-ctl-h);
+}
+/* Both are hidden until rows are ticked, so neither may hold a gap open. */
+.crm__filters > .wfsel__count[hidden],
+.crm__filters > .wfsel__all[hidden] { display: none; }
+
+/* Tick column: as narrow as the box, and never the target of a row click. */
+.crm__table th.wfsel__cell,
+.crm__table td.wfsel__cell {
+  width: 2.25rem;
+  padding-right: 0;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* The Documents dialog's two shape choices each carry a sentence, so they stack
+   instead of sharing the .wfx__cols two-column grid the checkbox list uses. */
+.crmdoc__shapes { grid-template-columns: 1fr; }
+.crmdoc__shapes .wfx__col { align-items: flex-start; }
+.crmdoc__shapes .wfx__col input { margin-top: 0.15rem; }
+/* brandkit.css squares EVERY .form-check-input to 3px with !important, radios
+   included, so these two mutually-exclusive choices read as "tick both". Matching
+   !important is the only way past it without touching the brand sheet. */
+.crmdoc__shapes input[type="radio"] { border-radius: 50% !important; }

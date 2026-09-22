@@ -1,136 +1,288 @@
 {% extends "base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
 
+{% comment %}
+  Purpose: Privacy policy — filed-document layout (navy record band, sticky clause index, numbered clauses)
+  Used by: webpages:privacy (webpages/views.py privacy)
+  Notes: clause ids c1..c8 are cited by the index and the scroll-spy in extra_js; styles live in legal.css (wplg__)
+{% endcomment %}
 
 {% block extra_css %}
-<!-- extra css -->
+<link href="{% static 'webpages/css/legal.css' %}?v=20260921c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
-{% block title %}
-<!-- Title -->
- Privacy Policy - Ezzy Delivery
- {% endblock title %}
 
+{% block title %}Privacy Policy - Ezzy Delivery{% endblock title %}
 
 {% block content %}
 
+<!-- Cover band: the document and its record -->
+<section id="webpages_privacy_section_masthead" class="wplg__masthead">
+  <div class="container">
+    <h1 id="webpages_privacy_header_main" class="wplg__title mb-2">Privacy Policy</h1>
+    <p class="wplg__lede mb-0">
+      How Ezzy Delivery WLL collects, uses and protects information when you use ezzydelivery.qa.
+    </p>
 
-<h1 class="fw-bold mb-3">Privacy Policy</h1>
-<p>
-    Ezzy Delivery WLL operates the website "Ezzydelivery Qatar" at ezzydelivery.qa.
-    We take your privacy seriously. To better protect your privacy,
-    we provide this privacy policy notice explaining the way your personal information
-    is collected and used.
-</p>
-<p><strong>Collection of Routine Information</strong></p>
-<p>
-    This website track basic information about its visitors.
-    This information includes, but is not limited to, IP addresses, browser details,
-    timestamps and referring pages. None of this information can personally identify specific
-    visitors to this website. The information is tracked for routine
-    administration and maintenance purposes.
-</p>
-<p><strong>Cookies</strong></p>
-<p>
-    Where necessary, this website uses cookies to store information about a visitor’s
-    preferences and history to better serve the visitor and/or present the
-    visitor with customized content.
-</p>
-<p><strong>Advertisement and Other Third Parties</strong></p>
-<p>
-    Advertising partners and other third parties may use cookies, scripts and/or web beacons to track
-    visitor activities on this website to display advertisements
-    and other useful information. Such tracking is done directly by the third parties through their
-    servers and is subject to their privacy policies. This website has no access or
-    control over these cookies, scripts and/or web beacons that may be used by third parties.
-</p>
-<div>
-    <p>
-        We have included links on this website for your use and reference.
-        We are not responsible for the privacy policies on these websites. You
-        should be aware
-        that the privacy policies of these websites may differ from our own.
-    </p>
-    <p>
-        Link to the privacy policy of third-party service providers used
-        by the website
-    </p>
-    <ul>
-        <li><a
-                href="https://policies.google.com/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-            >Google Analytics</a></li>
-        <!---->
-        <li><a
-                href="https://policies.google.com/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-            >YouTube</a></li>
-        <!---->
-        <li><a
-                href="https://www.facebook.com/about/privacy/"
-                target="_blank"
-                rel="noopener noreferrer"
-            >Facebook</a></li>
-        <li><a
-                href="https://www.whatsapp.com/legal/privacy-policy/"
-                target="_blank"
-                rel="noopener noreferrer"
-            >WhatsApp</a></li>
-        <li><a
-                href="https://help.instagram.com/519522125107875"
-                target="_blank"
-                rel="noopener noreferrer"
-            >Instagram</a></li>
-        <li><a
-                href="https://www.messenger.com/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-            >Messenger</a></li>
-        <!---->
-        <!---->
-        <!---->
-        <!---->
-        <!---->
-        <!---->
-        <!---->
-        <!---->
-    </ul>
+    <div class="wplg__record d-flex flex-wrap mt-4">
+      <div class="wplg__record-cell">
+        <span class="wplg__record-k">Effective</span>
+        <span class="wplg__record-v">01 Jan 2022</span>
+      </div>
+      <div class="wplg__record-cell">
+        <span class="wplg__record-k">Entity</span>
+        <span class="wplg__record-v">Ezzy Delivery WLL</span>
+      </div>
+      <div class="wplg__record-cell">
+        <span class="wplg__record-k">Website</span>
+        <span class="wplg__record-v">ezzydelivery.qa</span>
+      </div>
+      <div class="wplg__record-cell">
+        <span class="wplg__record-k">Registered</span>
+        <span class="wplg__record-v">Doha, Qatar</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wplg__page">
+  <div class="container">
+    <div class="row g-4 g-lg-5">
+
+      <!-- Clause index: phone and tablet, above the document -->
+      <div class="col-12 d-lg-none">
+        <nav class="wplg__rail--inline" aria-label="Contents">
+          <p class="wplg__rail-label mb-2">Contents</p>
+          <ol class="wplg__rail-list row g-0" id="webpages_privacy_list_contents_mobile">
+            <li class="col-12 col-sm-6"><a class="wplg__rail-link" href="#c1"><span class="wplg__rail-n">1</span> About this notice</a></li>
+            <li class="col-12 col-sm-6"><a class="wplg__rail-link" href="#c2"><span class="wplg__rail-n">2</span> Information collected automatically</a></li>
+            <li class="col-12 col-sm-6"><a class="wplg__rail-link" href="#c3"><span class="wplg__rail-n">3</span> Cookies</a></li>
+            <li class="col-12 col-sm-6"><a class="wplg__rail-link" href="#c4"><span class="wplg__rail-n">4</span> Advertising and other third parties</a></li>
+            <li class="col-12 col-sm-6"><a class="wplg__rail-link" href="#c5"><span class="wplg__rail-n">5</span> Links to other websites</a></li>
+            <li class="col-12 col-sm-6"><a class="wplg__rail-link" href="#c6"><span class="wplg__rail-n">6</span> Security</a></li>
+            <li class="col-12 col-sm-6"><a class="wplg__rail-link" href="#c7"><span class="wplg__rail-n">7</span> Changes to this notice</a></li>
+            <li class="col-12 col-sm-6"><a class="wplg__rail-link" href="#c8"><span class="wplg__rail-n">8</span> How to contact us</a></li>
+          </ol>
+        </nav>
+      </div>
+
+      <!-- Clause index: desktop, sticky beside the document -->
+      <div class="col-lg-3 d-none d-lg-block wplg__rail">
+        <nav class="wplg__rail--sticky" aria-label="Contents">
+          <p class="wplg__rail-label mb-2">Contents</p>
+          <ol class="wplg__rail-list" id="webpages_privacy_list_contents">
+            <li><a class="wplg__rail-link" href="#c1"><span class="wplg__rail-n">1</span> About this notice</a></li>
+            <li><a class="wplg__rail-link" href="#c2"><span class="wplg__rail-n">2</span> Information collected automatically</a></li>
+            <li><a class="wplg__rail-link" href="#c3"><span class="wplg__rail-n">3</span> Cookies</a></li>
+            <li><a class="wplg__rail-link" href="#c4"><span class="wplg__rail-n">4</span> Advertising and other third parties</a></li>
+            <li><a class="wplg__rail-link" href="#c5"><span class="wplg__rail-n">5</span> Links to other websites</a></li>
+            <li><a class="wplg__rail-link" href="#c6"><span class="wplg__rail-n">6</span> Security</a></li>
+            <li><a class="wplg__rail-link" href="#c7"><span class="wplg__rail-n">7</span> Changes to this notice</a></li>
+            <li><a class="wplg__rail-link" href="#c8"><span class="wplg__rail-n">8</span> How to contact us</a></li>
+          </ol>
+        </nav>
+      </div>
+
+      <!-- The document -->
+      <div class="col-12 col-lg-9">
+        <article class="wplg__doc" id="webpages_privacy_article_policy">
+
+          <section class="wplg__clause wplg__clause--first" id="c1">
+            <div class="wplg__clause-head mb-2">
+              <span class="wplg__clause-n" aria-hidden="true">1</span>
+              <h2 class="wplg__clause-title">About this notice</h2>
+            </div>
+            <div class="wplg__clause-body">
+              <p>
+                Ezzy Delivery WLL operates the website &ldquo;Ezzydelivery Qatar&rdquo; at ezzydelivery.qa.
+                We take your privacy seriously. To better protect your privacy, we provide this privacy
+                policy notice explaining the way your personal information is collected and used.
+              </p>
+            </div>
+          </section>
+
+          <section class="wplg__clause" id="c2">
+            <div class="wplg__clause-head mb-2">
+              <span class="wplg__clause-n" aria-hidden="true">2</span>
+              <h2 class="wplg__clause-title">Information collected automatically</h2>
+            </div>
+            <div class="wplg__clause-body">
+              <p>
+                This website tracks basic information about its visitors. This information includes, but is
+                not limited to, IP addresses, browser details, timestamps and referring pages. None of this
+                information can personally identify specific visitors to this website. The information is
+                tracked for routine administration and maintenance purposes.
+              </p>
+            </div>
+          </section>
+
+          <section class="wplg__clause" id="c3">
+            <div class="wplg__clause-head mb-2">
+              <span class="wplg__clause-n" aria-hidden="true">3</span>
+              <h2 class="wplg__clause-title">Cookies</h2>
+            </div>
+            <div class="wplg__clause-body">
+              <p>
+                Where necessary, this website uses cookies to store information about a visitor&rsquo;s
+                preferences and history to better serve the visitor and/or present the visitor with
+                customized content.
+              </p>
+            </div>
+          </section>
+
+          <section class="wplg__clause" id="c4">
+            <div class="wplg__clause-head mb-2">
+              <span class="wplg__clause-n" aria-hidden="true">4</span>
+              <h2 class="wplg__clause-title">Advertising and other third parties</h2>
+            </div>
+            <div class="wplg__clause-body">
+              <p>
+                Advertising partners and other third parties may use cookies, scripts and/or web beacons to
+                track visitor activities on this website to display advertisements and other useful
+                information. Such tracking is done directly by the third parties through their servers and is
+                subject to their privacy policies. This website has no access or control over these cookies,
+                scripts and/or web beacons that may be used by third parties.
+              </p>
+              <p class="wplg__srv-caption mb-2">
+                Privacy policies of the third-party services used by this website:
+              </p>
+              <div class="wplg__srv" id="webpages_privacy_list_thirdparty">
+                <a class="wplg__srv-row" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
+                  <span class="wplg__srv-name">Google Analytics</span>
+                  <span class="wplg__srv-host">policies.google.com</span>
+                </a>
+                <a class="wplg__srv-row" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
+                  <span class="wplg__srv-name">YouTube</span>
+                  <span class="wplg__srv-host">policies.google.com</span>
+                </a>
+                <a class="wplg__srv-row" href="https://www.facebook.com/about/privacy/" target="_blank" rel="noopener noreferrer">
+                  <span class="wplg__srv-name">Facebook</span>
+                  <span class="wplg__srv-host">facebook.com</span>
+                </a>
+                <a class="wplg__srv-row" href="https://www.whatsapp.com/legal/privacy-policy/" target="_blank" rel="noopener noreferrer">
+                  <span class="wplg__srv-name">WhatsApp</span>
+                  <span class="wplg__srv-host">whatsapp.com</span>
+                </a>
+                <a class="wplg__srv-row" href="https://help.instagram.com/519522125107875" target="_blank" rel="noopener noreferrer">
+                  <span class="wplg__srv-name">Instagram</span>
+                  <span class="wplg__srv-host">help.instagram.com</span>
+                </a>
+                <a class="wplg__srv-row" href="https://www.messenger.com/privacy" target="_blank" rel="noopener noreferrer">
+                  <span class="wplg__srv-name">Messenger</span>
+                  <span class="wplg__srv-host">messenger.com</span>
+                </a>
+              </div>
+            </div>
+          </section>
+
+          <section class="wplg__clause" id="c5">
+            <div class="wplg__clause-head mb-2">
+              <span class="wplg__clause-n" aria-hidden="true">5</span>
+              <h2 class="wplg__clause-title">Links to other websites</h2>
+            </div>
+            <div class="wplg__clause-body">
+              <p>
+                We have included links on this website for your use and reference. We are not responsible for
+                the privacy policies on these websites. You should be aware that the privacy policies of
+                these websites may differ from our own.
+              </p>
+            </div>
+          </section>
+
+          <section class="wplg__clause" id="c6">
+            <div class="wplg__clause-head mb-2">
+              <span class="wplg__clause-n" aria-hidden="true">6</span>
+              <h2 class="wplg__clause-title">Security</h2>
+            </div>
+            <div class="wplg__clause-body">
+              <p>
+                The security of your personal information is important to us, but remember that no method of
+                transmission over the Internet, or method of electronic storage, is 100% secure. While we
+                strive to use commercially acceptable means to protect your personal information, we cannot
+                guarantee its absolute security.
+              </p>
+            </div>
+          </section>
+
+          <section class="wplg__clause" id="c7">
+            <div class="wplg__clause-head mb-2">
+              <span class="wplg__clause-n" aria-hidden="true">7</span>
+              <h2 class="wplg__clause-title">Changes to this notice</h2>
+            </div>
+            <div class="wplg__clause-body">
+              <p>
+                This Privacy Policy is effective as of 2022-01-01 and will remain in effect except concerning
+                any changes in its provisions in the future, which will be in effect immediately after being
+                posted on this page. We reserve the right to update or change our Privacy Policy at any time
+                and you should check this Privacy Policy periodically. If we make any material changes to
+                this Privacy Policy, we will notify you either through the email address you have provided us
+                or by placing a prominent notice on our website.
+              </p>
+            </div>
+          </section>
+
+          <section class="wplg__clause" id="c8">
+            <div class="wplg__clause-head mb-2">
+              <span class="wplg__clause-n" aria-hidden="true">8</span>
+              <h2 class="wplg__clause-title">How to contact us</h2>
+            </div>
+            <div class="wplg__clause-body">
+              <p>
+                For any questions or concerns regarding the privacy policy, write to us and we will respond.
+              </p>
+              <div class="wplg__contact">
+                <div class="wplg__contact-row">
+                  <span class="wplg__contact-k">Email</span>
+                  <a class="wplg__contact-v" href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#105;&#110;&#102;&#111;&#64;&#101;&#122;&#122;&#121;&#100;&#101;&#108;&#105;&#118;&#101;&#114;&#121;&#46;&#113;&#97;">&#105;&#110;&#102;&#111;&#64;&#101;&#122;&#122;&#121;&#100;&#101;&#108;&#105;&#118;&#101;&#114;&#121;&#46;&#113;&#97;</a>
+                </div>
+                <div class="wplg__contact-row">
+                  <span class="wplg__contact-k">Address</span>
+                  <span class="wplg__contact-v">Al Sadd, Doha, Qatar</span>
+                </div>
+                <div class="wplg__contact-row">
+                  <span class="wplg__contact-k">Entity</span>
+                  <span class="wplg__contact-v">Ezzy Delivery WLL</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </article>
+      </div>
+
+    </div>
+  </div>
 </div>
-<p><strong>Security</strong></p>
-<p>
-    The security of your personal information is important to us, but remember that no
-    method of transmission over the Internet, or method of electronic storage, is 100% secure.
-    While we strive to use commercially acceptable means to protect your personal information,
-    we cannot guarantee its absolute security.
-</p>
-<p><strong>Changes To This Privacy Policy</strong></p>
-<p>
-    This Privacy Policy is effective as of 2022-01-01 and will remain in effect except concerning
-    any
-    changes in its provisions in the future, which will be in effect immediately after being posted on this
-    page.
-    We reserve the right to update or change our Privacy Policy at any time and
-    you
-    should check this Privacy Policy periodically. If we make any material changes to this Privacy
-    Policy,
-    we will notify you either through the email address you have provided us or by
-    placing a prominent notice on our website.
-</p>
-<p><strong>Contact Information</strong></p>
-<p>
-    For any questions or concerns regarding the privacy policy,
-    please send us an email at <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#105;&#110;&#102;&#111;&#64;&#101;&#122;&#122;&#121;&#100;&#101;&#108;&#105;&#118;&#101;&#114;&#121;&#46;&#113;&#97;">&#105;&#110;&#102;&#111;&#64;&#101;&#122;&#122;&#121;&#100;&#101;&#108;&#105;&#118;&#101;&#114;&#121;&#46;&#113;&#97;</a>.
-</p>
-<p>
-    Our Address: Alsadd Doha Qatar
-</p><br>
-
-
 
 {% endblock content %}
 
 {% block extra_js %}
-<!-- extra js -->
+<script>
+// Clause index: mark the clause currently in view. No globals, no page-load motion.
+(function () {
+  var links = document.querySelectorAll('#webpages_privacy_list_contents .wplg__rail-link');
+  if (!links.length || !('IntersectionObserver' in window)) { return; }
+
+  var byId = {};
+  links.forEach(function (link) { byId[link.getAttribute('href').slice(1)] = link; });
+
+  var visible = [];
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      var id = entry.target.id;
+      var at = visible.indexOf(id);
+      if (entry.isIntersecting && at === -1) { visible.push(id); }
+      if (!entry.isIntersecting && at !== -1) { visible.splice(at, 1); }
+    });
+    if (!visible.length) { return; }
+    // Topmost visible clause wins, so the marker tracks reading position.
+    var current = visible.slice().sort(function (a, b) {
+      return document.getElementById(a).offsetTop - document.getElementById(b).offsetTop;
+    })[0];
+    links.forEach(function (link) { link.classList.remove('wplg__rail-link--active'); });
+    if (byId[current]) { byId[current].classList.add('wplg__rail-link--active'); }
+  }, { rootMargin: '-10% 0px -60% 0px' });
+
+  document.querySelectorAll('.wplg__clause').forEach(function (clause) { observer.observe(clause); });
+})();
+</script>
 {% endblock extra_js %}

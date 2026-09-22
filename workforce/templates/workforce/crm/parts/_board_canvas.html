@@ -2,6 +2,7 @@
 {# Used by: workforce/crm/leads_board.html (business) and workforce/crm/driver_leads_board.html (driver). #}
 {# Notes: Board-agnostic — everything specific to one pipeline (title, tabs, help notes) lives in the page template that includes this. Expects `columns`, `board_url` and the filter context from workforce.crm_views._render_leads_board. #}
 
+{% load workforce_tags %}
     {# TOOLBAR — controls on the left, scope readout on the right. A kanban gives no #}
     {# row count, so a filter's only visible effect is cards quietly disappearing; the #}
     {# scope line states how much of the board is on screen and what is narrowing it. #}
@@ -18,7 +19,7 @@
                  placeholder="Search company, contact, phone…"
                  hx-get="" hx-target="#main-content" hx-select="#main-content"
                  hx-swap="outerHTML" hx-push-url="true"
-                 hx-trigger="keyup changed delay:350ms, search"
+                 hx-trigger="keyup changed delay:350ms, search" data-search-min="3"
                  hx-include="#workforce_crm_board_form_filter">
         </div>
 
@@ -145,7 +146,13 @@
               <span class="crm__source crm__source--{{ badge.key }}">{{ badge.label }}</span>
               {% endfor %}
               {% if lead.category == 'driver' %}
-              <span class="crm__cat crm__cat--driver"><i class="fa-solid fa-motorcycle"></i> Driver</span>
+              <span class="crm__cat crm__cat--driver"
+                    title="Driver applicant{% if lead.vehicle_label %} — {{ lead.vehicle_label }}{% endif %}">
+                {# Icon and word follow the registered vehicle; a lead with no #}
+                {# application bound yet keeps the generic driver chip. #}
+                <i class="fa-solid {% if lead.vehicle_type %}{{ lead.vehicle_type|vehicle_icon }}{% else %}fa-motorcycle{% endif %}"></i>
+                {{ lead.vehicle_label|default:"Driver" }}
+              </span>
               {% endif %}
               {% if lead.next_followup_at %}
               <span class="crmb__card-due {% if lead.is_overdue %}crm__overdue-text{% endif %}">

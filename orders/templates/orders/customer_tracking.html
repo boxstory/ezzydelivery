@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +12,9 @@
   {% if show_map %}
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   {% endif %}
-  <link rel="stylesheet" href="/static/orders/css/customer-tracking.css">
+  {% comment %}Cache-busted like every other stylesheet — Cloudflare will otherwise serve
+  the old file and the returned-to-sender badge renders unstyled.{% endcomment %}
+  <link rel="stylesheet" href="{% static 'orders/css/customer-tracking.css' %}?v=20260921r">
   <style>
     :root {
       --trk-primary: {{ primary_color|default:"#f7c000" }};
@@ -51,6 +54,10 @@
     {% if is_failed %}
     <span class="trk-status-badge trk-status-badge--failed">
       <i class="fa-solid fa-circle-xmark"></i> {{ task.get_dl_task_status_display }}
+    </span>
+    {% elif is_returned %}
+    <span class="trk-status-badge trk-status-badge--returned">
+      <i class="fa-solid fa-rotate-left"></i> Returned to sender
     </span>
     {% else %}
     <span class="trk-status-badge">

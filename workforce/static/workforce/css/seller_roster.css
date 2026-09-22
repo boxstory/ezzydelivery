@@ -45,11 +45,60 @@
     color: var(--brand-grey-500, #6c757d);
 }
 
+/* ── Book total ───────────────────────────────────────────── */
+/* What Ezzy owes sellers, in one figure, at the top of the page. It reads as a
+   ledger balance rather than a stat tile: no panel, no fill, just a hairline
+   rule separating it from the title and the largest monospace figure in the
+   view. Right-aligned so the digits sit against the search control's edge and
+   the eye lands on them on the way in. */
+.sro__book {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin-left: auto;
+    padding-left: 1rem;
+    border-left: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+.sro__book-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.0625rem;
+    text-align: right;
+}
+.sro__book-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+}
+.sro__book-value {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    color: var(--brand-navy, #001f3f);
+}
+/* An empty book is a real state — nothing is owed — not a missing figure. */
+.sro__book-value--nil { color: var(--brand-grey-400, #b0b0b0); }
+/* The delivery count is scale, not money: same size so the pair reads as one
+   row of figures, but ink rather than navy so the payable total still leads. */
+.sro__book-value--count { color: var(--brand-grey-800, #1f1f1f); }
+.sro__book-unit {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+    margin-left: 0.375rem;
+}
 .sro__search {
     display: flex;
     align-items: center;
     gap: 0.375rem;
-    margin: 0 0 0 auto;
+    margin: 0 0 0 0.875rem;
     padding: 0 0.375rem;
     border: 1px solid var(--brand-grey-300, #dcdcdc);
     border-radius: var(--brand-radius-sm, 0.5rem);
@@ -172,14 +221,19 @@
     color: var(--brand-grey-500, #6c757d);
     margin-left: 0.375rem;
 }
-/* The addends, set small and quiet ahead of their total — "55 + 9  64". They
+/* The addends, set small and quiet ahead of their total — "(55 + 9) 64". They
    are working, not the answer, so they sit at unit weight and never compete
-   with the figure they add up to. */
+   with the figure they add up to.
+
+   The brackets are load-bearing, not decoration. Unlike the QAR unit on the
+   left half, both sides of this pair are digits, so size and colour alone did
+   not separate them — "82 + 9" beside "91" was being read as "82 + 991". The
+   brackets close the working so the total can only start after them. */
 .sro__figure-sum {
     font-size: 0.65rem;
     font-weight: 600;
     color: var(--brand-grey-500, #6c757d);
-    margin-right: 0.375rem;
+    margin-right: 0.5rem;
     white-space: nowrap;
 }
 
@@ -252,6 +306,18 @@
        keeps its own left edge rather than shrinking the QAR figure. */
     .sro__figure { flex-direction: column; align-items: stretch; gap: 0.5rem; }
     .sro__figure-part--end { align-items: flex-start; text-align: left; }
+    /* The pair drops to its own full-width line under the title and spreads
+       across it, rather than being squeezed against the search box. */
+    .sro__book {
+        margin-left: 0;
+        width: 100%;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.5rem 0 0;
+        border-left: 0;
+        border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+    }
+    .sro__book-item:first-child { align-items: flex-start; text-align: left; }
     .sro__search { margin-left: 0; width: 100%; }
     .sro__search-input { min-width: 0; flex: 1; }
 }

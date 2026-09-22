@@ -7,4 +7,5 @@ urlpatterns = [
     path('',         wa_chats_view.wa_chats,         name='wa_chats'),
     path('send/',    wa_chats_view.wa_chats_send,    name='wa_chats_send'),
     path('resync/',  wa_chats_view.wa_chats_resync,  name='wa_chats_resync'),
+    path('media/<int:msg_id>/', wa_chats_view.wa_chats_media, name='wa_chats_media'),
 ]

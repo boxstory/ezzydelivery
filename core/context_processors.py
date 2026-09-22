@@ -7,6 +7,9 @@ Also provides utility functions for views to get cached user data:
     - get_cached_business(request) -> Business or None
 """
 import datetime
+
+from django.conf import settings
+
 from core.seo import SEOMetadata
 import json
 from core.json_utils import safe_json
@@ -292,6 +295,11 @@ def driver_pending_tasks(request):
             # screens, so the GPS module is loaded on the strength of this
             # rather than the URL: only someone with a driver row is tracked.
             'is_fleet_driver': True,
+            # Handed to the page so it can subscribe to Web Push. Public half
+            # of the VAPID pair only — it is meant to be given away, and it is
+            # supplied here rather than fetched so the PWA does not spend a
+            # round trip on every load to learn a constant.
+            'vapid_public_key': getattr(settings, 'VAPID_PUBLIC_KEY', '') or '',
         }
         request._driver_pending_tasks = ctx
         return ctx

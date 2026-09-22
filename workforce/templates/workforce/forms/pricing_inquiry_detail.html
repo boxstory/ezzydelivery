@@ -1,6 +1,7 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 {% load custom_filters %}
+{% load workforce_tags %}
 {% comment %}
 Purpose: Full CRM record for one 3PL pricing inquiry — read, edit, stage, assign and log activity
 Used by: workforce.views.pricing_inquiry_detail at /workforce/forms/pricing-inquiries/<id>/
@@ -22,6 +23,7 @@ pricing_inquiry_console.css loads last and is authoritative over the two above i
 {% endcomment %}
 <link href="{% static 'workforce/css/pricing_suggestion.css' %}?v=30260817a" rel="stylesheet" type="text/css" />
 <link href="{% static 'workforce/css/pricing_inquiry_console.css' %}?v=20260817b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/pricing_inquiry_trim.css' %}?v=20260920a" rel="stylesheet" type="text/css" />
 <div class="pid col-12" id="pricing-inquiry-detail">
 
   <!-- ══════════════════════════════════════
@@ -82,14 +84,14 @@ pricing_inquiry_console.css loads last and is authoritative over the two above i
           <i class="fa-solid fa-phone" aria-hidden="true"></i>Call
         </a>
         <a href="https://wa.me/{{ inquiry.business_contact_number|cut:'+' }}" target="_blank" rel="noopener" class="pid__hero__btn pid__hero__btn--wa">
-          <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>WhatsApp
+          <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>WhatsApp{% msgid_own %}
         </a>
         {# Business lead: sends from the CRM — Business Leads number/channel. #}
         <button type="button" class="pid__hero__btn pid__hero__btn--wa"
                 data-wasend-open
                 data-wasend-to="{{ inquiry.business_contact_number|whatsapp_number }}"
                 data-wasend-name="{{ inquiry.business_name|escape }}">
-          <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>Send from EZZY
+          <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>Send from EZZY{% msgid 'pricing_inquiry_manual' %}
         </button>
         {# Rate sheet: the token URL the customer picks their plan on. #}
         {% if quote_url %}
@@ -548,6 +550,34 @@ pricing_inquiry_console.css loads last and is authoritative over the two above i
 
     <!-- READ-ONLY panels (shown by default, hidden in edit mode) -->
     <div id="pid-view-panels">
+
+      {% if trimmed_detail %}
+      {% comment %}
+      The seller typed more than the column holds. Every other panel shows the
+      shortened value, so what they actually wrote is printed here in full —
+      first, because it is usually the link sales needs to open.
+      {% endcomment %}
+      <div class="pid__panel pid__trim" id="pid_trim_panel">
+        <div class="pid__panel__hd">
+          <i class="fa-solid fa-scissors"></i>
+          <h3>Shortened on save</h3>
+          <span class="pid__trim__chip">{{ trimmed_detail|length }}</span>
+        </div>
+        <div class="pid__panel__body">
+          <p class="pid__trim__note">
+            These answers were too long for their field, so the record above holds a cut-down
+            copy. What the seller actually submitted is below — use this, and ask them to
+            confirm it when you call.
+          </p>
+          {% for label, value in trimmed_detail %}
+          <div class="pid__trim__item">
+            <span class="pid__trim__lbl">{{ label }}</span>
+            <span class="pid__trim__val">{{ value }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
 
       <!-- CONTACT & BUSINESS -->
       <div class="pid__panel">
@@ -1361,6 +1391,7 @@ pricing_inquiry_console.css loads last and is authoritative over the two above i
 </script>
 <script src="{% static 'workforce/js/pricing_inquiry_detail.js' %}"></script>
 
-{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="crm_leads" wa_message=wa_send_message %}
+{% msgid_text 'pricing_inquiry_manual' as inquiry_msg_id %}
+{% include "workforce/parts/components/_wa_send_modal.html" with wa_section="crm_leads" wa_message=wa_send_message wa_message_id=inquiry_msg_id %}
 
 {% endblock %}

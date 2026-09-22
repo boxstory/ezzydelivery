@@ -9,7 +9,7 @@
 
 {% block extra_css %}
 {# workforce.css already loaded in wf_dashboard_base.html #}
-<link href="{% static 'workforce/css/pricing_inquiries_list.css' %}?v=20260817a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/pricing_inquiries_list.css' %}?v=20260919a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -60,7 +60,7 @@
     <!-- TOOLBAR / FACETED SEARCH -->
     <div class="pil__toolbar">
       <form method="get"
-            hx-get=""
+            hx-get="{{ sort_url }}"
             hx-target="#main-content"
             hx-select="#main-content"
             hx-swap="outerHTML"
@@ -74,9 +74,9 @@
           <input type="text" name="search" value="{{ search }}" id="pil-search"
                  class="pil__search-input" autocomplete="off"
                  placeholder="Search business, contact, phone or category…"
-                 hx-get="" hx-target="#main-content" hx-select="#main-content"
+                 hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                  hx-swap="outerHTML" hx-push-url="true"
-                 hx-trigger="keyup changed delay:350ms, search"
+                 hx-trigger="keyup changed delay:350ms, search" data-search-min="3"
                  hx-include="#workforce_forms_pricing_form_filter">
           <button type="button" class="pil__search-clear" data-pil-clear="pil-search"
                   aria-label="Clear search"{% if not search %} hidden{% endif %}>
@@ -88,7 +88,7 @@
         <div class="pil__facets">
           <div class="pil__facet {% if cod_filter %}is-active{% endif %}">
             <select name="cod" class="pil__facet-select" aria-label="Filter by COD"
-                    hx-get="" hx-target="#main-content" hx-select="#main-content"
+                    hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                     hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                     hx-include="#workforce_forms_pricing_form_filter">
               <option value="">All COD</option>
@@ -99,7 +99,7 @@
 
           <div class="pil__facet {% if fulfillment_filter %}is-active{% endif %}">
             <select name="fulfillment" class="pil__facet-select" aria-label="Filter by fulfillment"
-                    hx-get="" hx-target="#main-content" hx-select="#main-content"
+                    hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                     hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                     hx-include="#workforce_forms_pricing_form_filter">
               <option value="">All fulfillment</option>
@@ -109,7 +109,7 @@
 
           <div class="pil__facet {% if status_filter %}is-active{% endif %}">
             <select name="status" class="pil__facet-select" aria-label="Filter by pipeline stage"
-                    hx-get="" hx-target="#main-content" hx-select="#main-content"
+                    hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                     hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                     hx-include="#workforce_forms_pricing_form_filter">
               <option value="">All stages</option>
@@ -125,7 +125,7 @@
 
           <div class="pil__facet {% if quote_filter %}is-active{% endif %}">
             <select name="quote" class="pil__facet-select" aria-label="Filter by plan selection"
-                    hx-get="" hx-target="#main-content" hx-select="#main-content"
+                    hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                     hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                     hx-include="#workforce_forms_pricing_form_filter">
               <option value="">All quotes</option>
@@ -136,7 +136,7 @@
 
           <div class="pil__facet {% if variance_filter %}is-active{% endif %}">
             <select name="variance" class="pil__facet-select" aria-label="Filter by agreed vs suggested"
-                    hx-get="" hx-target="#main-content" hx-select="#main-content"
+                    hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                     hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                     hx-include="#workforce_forms_pricing_form_filter">
               <option value="">Agreed vs suggested</option>
@@ -145,6 +145,9 @@
             </select>
           </div>
         </div>
+
+        {# Changing a filter must not throw the column sort away #}
+        <input type="hidden" name="sort" value="{{ sort.value }}">
 
         <button type="submit" class="pil__btn pil__btn--primary">Search</button>
 
@@ -167,18 +170,20 @@
     <div class="pil__scroll">
       <table class="pil__table" id="workforce_forms_pricing_table_list">
         <thead>
+          {# Sortable headers — each cell writes ?sort= itself and keeps the current filters. #}
+          {# The expand chevron and the Needs tag cloud are not columns you can order by. #}
           <tr>
-            <th style="width:2.5rem"></th>
-            <th style="width:3rem">#</th>
-            <th>Business</th>
-            <th>Contact</th>
-            <th>Category</th>
-            <th class="pil__col-center">Orders/Mo</th>
+            <th class="pil__th-toggle"></th>
+            {% include "workforce/parts/components/_sort_th.html" with key="id" label="#" th_class="pil__th-id" first_desc=True %}
+            {% include "workforce/parts/components/_sort_th.html" with key="business" label="Business" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="contact" label="Contact" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="category" label="Category" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="volume" label="Orders/Mo" th_class="pil__col-center" first_desc=True %}
             <th class="pil__col-center">Needs</th>
-            <th>Pipeline</th>
-            <th>Suggested</th>
-            <th>Quote</th>
-            <th>Received</th>
+            {% include "workforce/parts/components/_sort_th.html" with key="status" label="Pipeline" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="suggested" label="Suggested" first_desc=True %}
+            {% include "workforce/parts/components/_sort_th.html" with key="quote" label="Quote" first_desc=True %}
+            {% include "workforce/parts/components/_sort_th.html" with key="received" label="Received" first_desc=True %}
             <th></th>
           </tr>
         </thead>

@@ -1,7 +1,7 @@
 // EzzyDriver Service Worker
-const CACHE_NAME = 'ezzydriver-v8';
-const STATIC_CACHE = 'ezzydriver-static-v8';
-const DYNAMIC_CACHE = 'ezzydriver-dynamic-v8';
+const CACHE_NAME = 'ezzydriver-v9';
+const STATIC_CACHE = 'ezzydriver-static-v9';
+const DYNAMIC_CACHE = 'ezzydriver-dynamic-v9';
 
 // Shared GPS queue implementation — the same module the page uses, so a ping
 // queued in the tab and one replayed here go through identical code.
@@ -148,28 +148,65 @@ self.addEventListener('sync', event => {
   );
 });
 
-// Handle push notifications
+// Handle push notifications.
+//
+// This is the only code of ours the browser will run once the PWA has lost the
+// foreground — a driver inside Waze has a frozen page, and nothing on it can be
+// called. It still cannot take a GPS fix: a service worker has no geolocation.
+// All a push can do is put a notification in front of the driver so they come
+// back to the app themselves, and Chrome requires that notification to be shown
+// (userVisibleOnly), so there is no silent variant to reach for either.
 self.addEventListener('push', event => {
+  let payload = {};
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch (err) {
+      payload = { body: event.data.text() };
+    }
+  }
+
+  const title = payload.title || 'EzzyDriver';
   const options = {
-    body: event.data ? event.data.text() : 'New notification',
+    body: payload.body || 'Open the app',
     icon: '/static/webpages/img/ezzy-logo-512-512.png',
     badge: '/static/webpages/img/ezzy-logo-sqr-round.png',
     vibrate: [100, 50, 100],
+    // Same tag replaces rather than stacks: three location requests should
+    // leave one notification on the phone, not a pile to swipe away.
+    tag: payload.tag || 'ezzy-driver',
+    renotify: true,
+    requireInteraction: !!payload.requireInteraction,
     data: {
-      dateOfArrival: Date.now(),
-      primaryKey: 1
+      url: payload.url || '/fleet/dashboard/',
+      sentAt: payload.sentAt || null,
+      payload: payload.data || {}
     }
   };
 
-  event.waitUntil(
-    self.registration.showNotification('EzzyDriver', options)
-  );
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Handle notification click
+// Handle notification click — the tap that brings the PWA back to the
+// foreground, which is what actually restarts GPS.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/fleet/dashboard/';
+
+  // Prefer an existing window: opening a second one leaves the driver with two
+  // copies of the app, and on Android the new one may not come to the front at
+  // all. focus() on a client we already hold always does.
   event.waitUntil(
-    clients.openWindow('/fleet/dashboard/')
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      for (const client of windowClients) {
+        if (client.url.includes('/fleet/') && 'focus' in client) {
+          if ('navigate' in client) {
+            return client.navigate(target).then(c => (c || client).focus());
+          }
+          return client.focus();
+        }
+      }
+      return clients.openWindow(target);
+    })
   );
 });

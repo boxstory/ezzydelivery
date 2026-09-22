@@ -15,7 +15,7 @@ Notes: Continues the consignment-note voice of delivery_pricing_inquiry.html as 
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260816a" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/delivery_pricing_inquiry.css' %}?v=20260920c" rel="stylesheet" type="text/css" />
 <link href="{% static 'webpages/css/inquiry_quote.css' %}?v=20260817a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
@@ -97,6 +97,25 @@ Notes: Continues the consignment-note voice of delivery_pricing_inquiry.html as 
     {% if quote_error %}
     <div class="wpq__alert" id="wpq_error" role="alert">
       <i class="fa-solid fa-triangle-exclamation"></i><span>{{ quote_error }}</span>
+    </div>
+    {% endif %}
+
+    {% if trimmed_labels %}
+    {% comment %}
+    Their submission is already saved — this is the last surface they see, so it
+    is the last chance to get the full answer from them rather than from a sales
+    call. The full text is on the record either way.
+    {% endcomment %}
+    <div class="wppi__trim-notice" id="wpq_trim_notice" role="status">
+      <i class="fa-solid fa-scissors"></i>
+      <div>
+        <strong>We shortened {{ trimmed_labels|length }} of your answer{{ trimmed_labels|length|pluralize }} to fit:</strong>
+        {{ trimmed_labels|join:", " }}.
+        <span class="wppi__trim-notice__sub">
+          Your inquiry is safe. Please send us the full
+          {{ trimmed_labels|length|pluralize:"version,versions" }} on WhatsApp when our team messages you.
+        </span>
+      </div>
     </div>
     {% endif %}
 

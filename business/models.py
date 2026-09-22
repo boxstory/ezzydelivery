@@ -43,6 +43,10 @@ from core import models as core_models
 from fleet import models as fleet_models
 from core.email_normalize import EmailNormalizedModel
 from core.validators import image_validators
+# Return destinations live in the delivery service that resolves them, so the
+# merchant's preference and the resolver can never drift apart. Safe to import
+# here: delivery/services/returns.py pulls in no models of its own.
+from delivery.services.returns import DESTINATION_CHOICES as RETURN_DESTINATION_CHOICES
 
 
 def upload_path_handler(instance, filename):
@@ -216,6 +220,17 @@ class Business(EmailNormalizedModel, models.Model):
         max_length=20, choices=POD_KIND_CHOICES, default='photo',
         help_text="What counts as proof on a successful delivery. A failed attempt always "
                   "takes a photo — there is no customer present to sign for it."
+    )
+
+    # Where an undelivered parcel goes back to. Read by
+    # delivery.services.returns.resolve_return_destination(), which snapshots the
+    # answer onto ParcelCustody at open time — changing this never re-routes a
+    # parcel that is already on its way back.
+    return_destination = models.CharField(
+        max_length=20, choices=RETURN_DESTINATION_CHOICES, default='hub',
+        help_text="Where undelivered parcels for this client are returned to. "
+                  "'Back to the business' falls back to the hub when the pickup "
+                  "location is inactive or is itself a fulfilment centre."
     )
 
     # Live tracking — lets this client follow their driver's GPS position on a map
@@ -990,7 +1005,7 @@ class WhatsAppNotificationTrigger(models.Model):
     business = models.ForeignKey('Business', on_delete=models.CASCADE, related_name='whatsapp_triggers')
     trigger_status = models.CharField(max_length=30, choices=TRIGGER_STATUS_CHOICES)
     is_active = models.BooleanField(default=True)
-    custom_message = models.TextField(blank=True, default='', help_text="Custom message template. Use {customer_name}, {order_number}, {driver_name}, {driver_phone}.")
+    custom_message = models.TextField(blank=True, default='', help_text="Custom message template. Placeholders are defined in core/trigger_tokens.py (TOKEN_GROUPS) — add one there, not here.")
     notification_phone = models.CharField(max_length=30, blank=True, default='', help_text="Additional phone number (with country code, e.g. 97455512345) that should also receive this notification. Leave blank to notify customer only.")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -123,7 +123,7 @@ urlpatterns = [
 
     # WhatsApp notification triggers
     path('settings/whatsapp-triggers/', business_views.whatsapp_triggers_list, name='whatsapp_triggers_list'),
-    path('settings/whatsapp-triggers/toggle/', business_views.whatsapp_trigger_toggle, name='whatsapp_trigger_toggle'),
+    path('settings/whatsapp-triggers/save/', business_views.whatsapp_triggers_save, name='whatsapp_triggers_save'),
 
     # Reports & CSV Export
     path('reports/', business_views.reports_dashboard, name='reports_dashboard'),

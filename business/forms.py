@@ -317,6 +317,15 @@ class businessApiSettingsForm(SanitizedModelForm):
             'order_api_endpoint',
             'product_api_endpoint',
             'site_contry',
+            # Custom REST pull — we fetch orders from the seller's own site
+            'fetch_orders_url',
+            'fetch_auth_style',
+            'fetch_auth_name',
+            'fetch_api_key',
+            'fetch_list_path',
+            'fetch_status_path',
+            'fetch_status_include',
+            'fetch_enabled',
             # TikTok Shop specific fields
             'tiktok_shop_id',
             'tiktok_shop_cipher',
@@ -335,6 +344,14 @@ class businessApiSettingsForm(SanitizedModelForm):
             "order_api_endpoint": "Order API URL",
             "product_api_endpoint": "Product API URL",
             "site_contry": "Country",
+            "fetch_orders_url": "Order Fetch URL (we call this)",
+            "fetch_auth_style": "How to send your API key",
+            "fetch_auth_name": "Header / parameter name",
+            "fetch_api_key": "Your site's API key",
+            "fetch_list_path": "Order list path",
+            "fetch_status_path": "Status field",
+            "fetch_status_include": "Only fetch these statuses",
+            "fetch_enabled": "Pull orders automatically every hour",
             "tiktok_shop_id": "TikTok Shop ID",
             "tiktok_shop_cipher": "TikTok Shop Cipher",
             "tiktok_refresh_token": "TikTok Refresh Token",
@@ -347,6 +364,21 @@ class businessApiSettingsForm(SanitizedModelForm):
             "api_access_token": "OAuth access token (obtained after authorization)",
             "api_version": "For TikTok Shop: use 202309 or later",
             "site_api_url": "Your store URL or API endpoint base URL",
+            "fetch_orders_url": "The full URL on YOUR site that returns pending orders as JSON, "
+                                "e.g. https://yourshop.com/api/orders. Leave empty if your site "
+                                "pushes orders to us instead.",
+            "fetch_auth_style": "Bearer suits most APIs. Pick 'Custom header' for X-API-Key, "
+                                "'Query parameter' for ?api_key=...",
+            "fetch_auth_name": "Only for 'Custom header' or 'Query parameter' — e.g. X-API-Key or api_key.",
+            "fetch_api_key": "The key YOUR site expects from us. This is not the EzzyDelivery key "
+                             "on the previous page.",
+            "fetch_list_path": "Where the order array sits in your response, e.g. data.orders. "
+                               "Leave empty if the response is the array itself.",
+            "fetch_status_path": "Where each order's status sits, e.g. status. Leave empty to use 'status'.",
+            "fetch_status_include": "Comma-separated, e.g. accepted. Orders in any other status "
+                                    "are ignored — this is what stops us booking a delivery for an "
+                                    "order you already delivered or cancelled. Empty takes every order.",
+            "fetch_enabled": "When off, the connection can still be tested and pulled by hand.",
             "tiktok_shop_id": "Obtained from TikTok Shop OAuth authorization",
             "tiktok_shop_cipher": "Obtained from TikTok Shop OAuth authorization",
             "tiktok_refresh_token": "Used to refresh access token before expiry",
@@ -362,6 +394,20 @@ class businessApiSettingsForm(SanitizedModelForm):
             'order_api_endpoint': forms.TextInput(attrs={'class': 'form-control'}),
             'product_api_endpoint': forms.TextInput(attrs={'class': 'form-control'}),
             'site_contry': forms.TextInput(attrs={'class': 'form-control'}),
+            'fetch_orders_url': forms.URLInput(attrs={
+                'class': 'form-control', 'placeholder': 'https://yourshop.com/api/orders'}),
+            'fetch_auth_style': forms.Select(attrs={'class': 'form-select', 'id': 'fetch_auth_style_select'}),
+            'fetch_auth_name': forms.TextInput(attrs={
+                'class': 'form-control', 'placeholder': 'X-API-Key'}),
+            'fetch_api_key': forms.PasswordInput(attrs={
+                'class': 'form-control', 'autocomplete': 'off'}, render_value=True),
+            'fetch_list_path': forms.TextInput(attrs={
+                'class': 'form-control', 'placeholder': 'data.orders'}),
+            'fetch_status_path': forms.TextInput(attrs={
+                'class': 'form-control', 'placeholder': 'status'}),
+            'fetch_status_include': forms.TextInput(attrs={
+                'class': 'form-control', 'placeholder': 'accepted'}),
+            'fetch_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'tiktok_shop_id': forms.TextInput(attrs={'class': 'form-control tiktok-field'}),
             'tiktok_shop_cipher': forms.TextInput(attrs={'class': 'form-control tiktok-field'}),
             'tiktok_refresh_token': forms.TextInput(attrs={'class': 'form-control tiktok-field'}),
@@ -373,6 +419,13 @@ class businessApiSettingsForm(SanitizedModelForm):
         self.fields['tiktok_shop_id'].required = False
         self.fields['tiktok_shop_cipher'].required = False
         self.fields['tiktok_refresh_token'].required = False
+
+        # The pull is opt-in on top of a push integration: every one of these may
+        # stay empty and the row still works as an inbound endpoint.
+        for name in ('fetch_orders_url', 'fetch_auth_style', 'fetch_auth_name',
+                     'fetch_api_key', 'fetch_list_path', 'fetch_status_path',
+                     'fetch_status_include', 'fetch_enabled'):
+            self.fields[name].required = False
 
         # Open an existing Shopify integration in the mode it was actually set up
         # in: a pasted token with no Client ID can only have come from a custom app.
@@ -410,9 +463,54 @@ class businessApiSettingsForm(SanitizedModelForm):
             raise forms.ValidationError(f'Store URL is not reachable as a public address: {reason}')
         return url
 
+    def clean_fetch_orders_url(self):
+        """Same SSRF reasoning as clean_site_api_url, and it matters more here.
+
+        This URL is called on a schedule with a credential attached, so an
+        unchecked value is a standing server-side request forgery lever rather
+        than a one-off during a manual test.
+        """
+        url = (self.cleaned_data.get('fetch_orders_url') or '').strip()
+        if not url:
+            return url
+
+        if self.instance and self.instance.pk and 'fetch_orders_url' not in self.changed_data:
+            return url
+
+        if '://' not in url:
+            url = 'https://' + url
+
+        ok, reason = validate_public_url(url)
+        if not ok:
+            raise forms.ValidationError(f'Fetch URL is not reachable as a public address: {reason}')
+        return url
+
     def clean(self):
         cleaned_data = super().clean()
         api_type = cleaned_data.get('api_type')
+
+        # A pull is only half-configured until the key can actually be sent. Catch
+        # it here rather than as a 401 from the seller's own server an hour later.
+        fetch_url = (cleaned_data.get('fetch_orders_url') or '').strip()
+        if fetch_url:
+            style = cleaned_data.get('fetch_auth_style') or 'bearer'
+            if style in ('header', 'query') and not (cleaned_data.get('fetch_auth_name') or '').strip():
+                self.add_error(
+                    'fetch_auth_name',
+                    'Give the header or parameter name your API expects the key in '
+                    '(for example X-API-Key).',
+                )
+            if style != 'none' and not (cleaned_data.get('fetch_api_key') or '').strip():
+                self.add_error(
+                    'fetch_api_key',
+                    'Enter the API key your own site expects from us, or set '
+                    'authentication to "No authentication".',
+                )
+        elif cleaned_data.get('fetch_enabled'):
+            self.add_error(
+                'fetch_enabled',
+                'There is no fetch URL to pull from. Add one, or leave automatic pulling off.',
+            )
 
         # Shopify: enforce the credentials the chosen setup path actually needs,
         # so a half-filled form fails here instead of as a 401 from Shopify later.

@@ -564,10 +564,6 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             min: 0
         },
-        grid: {
-            borderColor: '#e9ecef',
-            strokeDashArray: 4
-        },
         legend: {
             position: 'top',
             horizontalAlign: 'right',
@@ -579,7 +575,32 @@ document.addEventListener('DOMContentLoaded', function() {
         tooltip: {
             shared: true,
             intersect: false
-        }
+        },
+        grid: {
+            borderColor: '#e9ecef',
+            strokeDashArray: 4,
+            padding: { left: 4, right: 8 }
+        },
+        // Phone screens: edge-to-edge plot, smaller labels, centred legend
+        responsive: [{
+            breakpoint: 576,
+            options: {
+                chart: { height: 250 },
+                stroke: { width: 2 },
+                grid: { padding: { left: 0, right: 2, top: 0, bottom: 0 } },
+                xaxis: {
+                    labels: { style: { fontSize: '10px' } },
+                    tickPlacement: 'on'
+                },
+                yaxis: { labels: { style: { fontSize: '10px' } } },
+                legend: {
+                    position: 'top',
+                    horizontalAlign: 'center',
+                    fontSize: '11px',
+                    itemMargin: { horizontal: 6, vertical: 0 }
+                }
+            }
+        }]
     };
 
     const chartElement = document.querySelector("#wf_dashboard_chart_orders_trend");

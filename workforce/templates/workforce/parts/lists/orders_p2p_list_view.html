@@ -58,8 +58,9 @@ Notes: Uses the shared wfhero/wfstat furniture rather than a per-page masthead. 
   <form method="get" class="d-flex flex-wrap gap-2 my-3" id="workforce_p2p_form_filter">
     <input type="text" name="search" value="{{ filters.search }}" class="form-control"
            style="max-width:260px" placeholder="Customer name or phone" id="workforce_p2p_input_search">
+    {% include "workforce/parts/components/_driver_filter.html" with driver_class="form-select p2pf__driver" driver_id="workforce_p2p_select_driver" %}
     <button type="submit" class="btn btn-dark" id="workforce_p2p_btn_filter">Filter</button>
-    {% if filters.search %}
+    {% if filters.search or filters.driver %}
       <a href="{% url 'workforce:wf_orders_p2p' %}" class="btn btn-outline-secondary" id="workforce_p2p_link_clear">Clear</a>
     {% endif %}
   </form>

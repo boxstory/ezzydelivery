@@ -37,6 +37,12 @@ from orders import models as orders_models
 from business import models as business_models
 from fleet import models as fleet_models
 from core.validators import document_validators, image_validators
+# The custody vocabulary lives in the service that resolves and logs it, so the
+# model choices, the resolver and the history logger all read one list.
+from delivery.services.returns import (
+    CUSTODY_STATUS_CHOICES, CUSTODY_WITH_DRIVER, CUSTODY_OPEN_STATES,
+    DESTINATION_CHOICES, DEST_HUB,
+)
 from core.validators import image_validators
 
 
@@ -235,6 +241,7 @@ class DeliveryTask(models.Model):
         ('non_reachable', 'Non Reachable'),
         ('delivered', 'Delivered'),
         ('partial_delivery', 'Partial Delivery'),
+        ('returned_to_shipper', 'Returned to Shipper'),
         ('failed', 'Failed'),
         ('rejected', 'Rejected'),
         ('cancelled', 'Cancelled'),
@@ -554,6 +561,10 @@ class DeliveryTask(models.Model):
         # takes the original away. Priced on its own rate card line rather than as
         # a normal drop, because it is two handovers and often a cash settlement.
         ('exchange',     'Exchange — Collect Old, Deliver New'),
+        # The run back OUT of a hub: a parcel that came back undelivered and now
+        # has to reach the client, usually with a different driver from the one
+        # who brought it in. Raised by delivery.services.returns.forward_to_client.
+        ('return_to_client', 'Return — Hub to Client'),
     ]
     task_leg = models.CharField(
         max_length=20, choices=TASK_LEG_CHOICES, default='single',
@@ -662,6 +673,12 @@ class DeliveryTask(models.Model):
         """Delivery charge to bill the business — verified figure, else dl_price."""
         from delivery.charges import billable_charge
         return billable_charge(self)
+
+    @property
+    def known_charge(self):
+        """Delivery charge to SHOW, or None when the task is not priced yet."""
+        from delivery.charges import known_charge
+        return known_charge(self)
 
     @property
     def charge_paid(self):
@@ -1195,6 +1212,161 @@ class PickupTask(models.Model):
         indexes = [
             models.Index(fields=['status', 'pickup_mode'], name='pickup_pool_idx'),
             models.Index(fields=['driver', 'status'], name='pickup_driver_idx'),
+        ]
+
+
+class ParcelCustody(models.Model):
+    """
+    Chain of custody for a parcel coming BACK — opened when a delivery task closes
+    as 'returned_to_shipper', closed when the hub (or the merchant) signs for it.
+
+    The destination is SNAPSHOTTED at open time from
+    delivery.services.returns.resolve_return_destination() and never re-resolved on
+    read: merchants change their config while the parcel is already on a van. Staff
+    may override the snapshot from the returns console; the resolver is only ever
+    the opening default.
+    """
+
+    task = models.ForeignKey(
+        'delivery.DeliveryTask', on_delete=models.CASCADE,
+        related_name='parcel_custodies')
+    # Denormalised so returns.log_custody_history can read custody.order without a
+    # join, and so the audit trail survives the task being re-pointed.
+    order = models.ForeignKey(
+        orders_models.Order, on_delete=models.CASCADE,
+        related_name='parcel_custodies')
+    business = models.ForeignKey(
+        business_models.Business, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='parcel_custodies')
+    driver = models.ForeignKey(
+        fleet_models.Driver, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='parcel_custodies',
+        help_text="Who is physically liable for the parcel while custody is open")
+
+    status = models.CharField(
+        max_length=20, choices=CUSTODY_STATUS_CHOICES,
+        default=CUSTODY_WITH_DRIVER, db_index=True)
+
+    # --- Destination snapshot (never re-resolved on read) --------------------
+    destination_kind = models.CharField(
+        max_length=20, choices=DESTINATION_CHOICES, default=DEST_HUB)
+    warehouse_location = models.ForeignKey(
+        'warehouse.WarehouseLocation', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='return_custodies',
+        help_text="Set when destination_kind is 'hub'")
+    pickup_location = models.ForeignKey(
+        business_models.PickupLocation, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='return_custodies',
+        help_text="Set when destination_kind is 'business'")
+    destination_source = models.CharField(
+        max_length=64, blank=True, default='',
+        help_text="Which rule chose this destination (ReturnDestination.source)")
+    destination_fallback_reason = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text="Why the configured destination could not be used, if it could not")
+    destination_overridden = models.BooleanField(
+        default=False,
+        help_text="Staff changed the snapshot by hand from the returns console")
+
+    # Leg 1 of the same parcel, when this row is the run back out of a hub. The
+    # inbound row is left CLOSED — re-opening it would put the driver who handed
+    # the parcel in back on the hook for a second driver's job — so this FK is
+    # what keeps the two halves readable as one chain.
+    forwarded_from = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='forward_legs',
+        help_text="The hub custody this return run was raised from")
+
+    return_request = models.ForeignKey(
+        'orders.ReturnRequest', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='parcel_custodies')
+    manifest_reference = models.CharField(
+        max_length=64, blank=True, default='',
+        help_text="Return-manifest or bag number the driver hands in with")
+
+    notes = models.TextField(blank=True, default='')
+
+    opened_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    opened_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='opened_parcel_custodies')
+    received_at = models.DateTimeField(null=True, blank=True)
+    received_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='received_parcel_custodies')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Custody {self.order.order_number} [{self.status}]"
+
+    @property
+    def is_open(self):
+        """Whether someone is still liable for the parcel. Reads the same tuple the
+        partial unique constraint keys off, so the two cannot drift."""
+        return self.status in CUSTODY_OPEN_STATES
+
+    @property
+    def stage_index(self):
+        """Position on the 3-step return rail; the exception states are -1
+        (rendered flat, no rail). Mirrors PickupTask.stage_index."""
+        return {'with_driver': 0, 'in_manifest': 1, 'received': 2}.get(self.status, -1)
+
+    @property
+    def closed_at(self):
+        """When the parcel stopped being anyone's open liability, or None.
+
+        Only 'received' carries a dedicated stamp; the exception closes write no
+        timestamp of their own, so updated_at stands in — the same compromise
+        PickupTask.closed_at makes, and it only drifts if staff touch the row after.
+        """
+        if self.status == 'received':
+            return self.received_at or self.updated_at
+        if self.status in ('not_in_custody', 'lost', 'voided'):
+            return self.updated_at
+        return None
+
+    @property
+    def needs_triage(self):
+        """No destination could be resolved — staff must route this by hand.
+
+        A missing location is never "no return required": the parcel exists and is
+        in someone's hands regardless of how the estate is configured.
+        """
+        if self.destination_kind == DEST_HUB:
+            return self.warehouse_location_id is None
+        return self.pickup_location_id is None
+
+    @property
+    def destination_label(self):
+        """One line for the console. Never re-resolves the destination."""
+        if self.destination_kind == DEST_HUB:
+            return getattr(self.warehouse_location, 'name', '') or 'Hub — needs triage'
+        return (getattr(self.pickup_location, 'pickup_location_title', '')
+                or 'Merchant — needs triage')
+
+    class Meta:
+        verbose_name = "Parcel Custody"
+        verbose_name_plural = "Parcel Custody"
+        app_label = 'delivery'
+        ordering = ['-opened_at']
+        constraints = [
+            # One live custody row per task, exactly as delivery/services/returns.py
+            # promises. The states are written out rather than interpolated from
+            # CUSTODY_OPEN_STATES because Django freezes this condition into the
+            # migration — a name here would re-serialise on every makemigrations.
+            # delivery/tests_parcel_custody.py asserts the two still agree.
+            models.UniqueConstraint(
+                fields=['task'],
+                condition=models.Q(status__in=['with_driver', 'in_manifest',
+                                               'at_hub', 'disputed']),
+                name='uniq_open_parcel_custody_per_task',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['status', 'destination_kind'], name='custody_status_dest_idx'),
+            models.Index(fields=['driver', 'status'], name='custody_driver_idx'),
+            models.Index(fields=['warehouse_location', 'status'], name='custody_hub_idx'),
+            models.Index(fields=['order'], name='custody_order_idx'),
         ]
 
 

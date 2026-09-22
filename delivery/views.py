@@ -200,7 +200,8 @@ def all_delivery_tasks(request):
         dl_task_status__in=['pending', 'for_review'],
         order__verification_status='verified',
     ).exclude(
-        dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed']
+        dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed',
+                            'returned_to_shipper']
     ).exclude(
         order__order_status='cancelled'
     ).order_by('-id')
@@ -223,10 +224,11 @@ def all_delivery_tasks(request):
         order__order_status='cancelled'
     ).order_by('-id')
 
-    # History tasks: Completed tasks (delivered, failed, cancelled)
+    # History tasks: Completed tasks (delivered, failed, cancelled, returned)
     history_tasks = base_qs.filter(
         driver=driver,
-        dl_task_status__in=['delivered', 'partial_delivery', 'failed', 'cancelled']
+        dl_task_status__in=['delivered', 'partial_delivery', 'failed', 'cancelled',
+                            'returned_to_shipper']
     ).order_by('-id')
 
     # Apply area filter to all querysets

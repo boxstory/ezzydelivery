@@ -4373,6 +4373,23 @@
   color: #fff;
 }
 
+/* Returning the parcel: an outline, not a fill. It sits beside Failed and must not
+   read as the same button — the driver keeps the goods on this one. */
+.td-outcome-btn--returned {
+  background: transparent;
+  color: var(--fleet-warning, #e67e22);
+  border: 1.5px solid var(--fleet-warning, #e67e22);
+}
+
+/* Claiming a pool task — the one action an unassigned task offers, so it
+   takes the whole row rather than sitting in the four-up outcome grid. */
+.td-outcome-btn--take {
+  background: var(--fleet-primary);
+  color: #fff;
+  padding: 14px;
+  font-size: var(--font-size-base);
+}
+
 /* Partial Delivery item rows */
 .td-partial-item {
   padding: 0.6rem 0;
@@ -5416,6 +5433,11 @@
     gap: 6px;
     pointer-events: none;
 }
+body.map-popup-open .map-summary {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .15s ease;
+}
 .map-summary__count {
     background: var(--fleet-warning);
     color: var(--fleet-primary);
@@ -5429,22 +5451,35 @@
     font-weight: 800;
 }
 
+/* Data-only task cards behind the map. The detail sheet reads them; nothing
+   renders them, and [hidden] alone loses to .task-card's own display rule. */
+.map-task-cards {
+    display: none !important;
+}
+
 .task-popup {
     min-width: 200px;
+    max-width: 100%;
     font-family: inherit;
 }
 .task-popup__header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 8px;
     padding-bottom: 6px;
     border-bottom: 2px solid var(--fleet-grey-100);
 }
+/* Task numbers run to 18 characters. Let one wrap rather than push the status
+   badge off the edge of the popup. */
 .task-popup__task-num {
     font-size: 14px;
     font-weight: 800;
     color: var(--fleet-primary);
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 .task-popup__badge {
     font-size: 10px;
@@ -5522,6 +5557,50 @@
 }
 .task-popup__nav-btn:hover {
     background: var(--fleet-primary-dark);
+}
+
+/* Pin popup action row — Details always, then Navigate (mine) or Take (pool).
+   44px tall because these are thumb targets on a moving map. */
+.task-popup__actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+}
+.task-popup__btn {
+    flex: 1;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none !important;
+    cursor: pointer;
+}
+.task-popup__btn:active {
+    opacity: .85;
+}
+.task-popup__btn--detail {
+    background: var(--fleet-grey-100);
+    color: var(--fleet-dark) !important;
+    border: 1.5px solid var(--fleet-grey-200);
+}
+.task-popup__btn--nav {
+    background: var(--fleet-primary);
+    color: #fff !important;
+}
+.task-popup__btn--take {
+    background: var(--fleet-success);
+    color: #fff !important;
+}
+.task-popup__btn[disabled] {
+    opacity: .6;
+    cursor: not-allowed;
 }
 
 .task-marker {

@@ -8,7 +8,7 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
 {% endcomment %}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/live-map.css' %}?v=20260903a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/live-map.css' %}?v=20260921a" rel="stylesheet" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -39,6 +39,13 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
             drivers <i class="fa-solid fa-chevron-down ms-1" style="font-size:9px;"></i>
         </div>
     </div>
+
+    {% comment %}
+    Result of a "Ask for location" press. A popup closes the moment the map
+    refreshes underneath it, so the outcome is reported outside the popup or it
+    is not reported at all.
+    {% endcomment %}
+    <div class="wf-map-toast" id="wf-map-toast" role="status" aria-live="polite"></div>
 
     <!-- Pickup location filter dropdown -->
     <div class="map-pickup-filter" id="wf-pickup-filter">
@@ -148,9 +155,13 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
             attributionControl: false
         });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19
-        }).addTo(map);
+        {% comment %} OSM raster tiles label Qatar in Arabic only, so the basemap comes from the
+           shared English helper (vector tiles, Latin labels) with the raster layer as fallback. {% endcomment %}
+        if (window.wfEnglishBasemap) {
+            window.wfEnglishBasemap(map);
+        } else {
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        }
 
         L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
@@ -271,8 +282,11 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
         function activeTasksList(d) {
             var tasks = d.active_tasks || [];
             if (!tasks.length) return '';
+            // The server sends only the newest few; task_count is the real total.
+            var total = (typeof d.task_count === 'number' && d.task_count > tasks.length) ? d.task_count : tasks.length;
+            var hidden = total - tasks.length;
             var h = '<div class="wf-dpopup__tasks">';
-            h += '<div class="wf-dpopup__tasks-title"><i class="fa-solid fa-list-check me-1"></i>' + tasks.length + ' active task' + (tasks.length > 1 ? 's' : '') + '</div>';
+            h += '<div class="wf-dpopup__tasks-title"><i class="fa-solid fa-list-check me-1"></i>' + total + ' active task' + (total > 1 ? 's' : '') + (hidden > 0 ? ' &middot; latest ' + tasks.length : '') + '</div>';
             tasks.forEach(function(t) {
                 h += '<a href="/workforce/delivery-task/' + t.id + '/" target="_blank" rel="noopener" class="wf-dpopup__task">';
                 h += '<span class="wf-dpopup__task-num">#' + escHtml(t.task_number) + '</span>';
@@ -282,6 +296,10 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
                 }
                 h += '</a>';
             });
+            if (hidden > 0 && d.driver_id) {
+                h += '<a href="/workforce/fleet/driver-tasks/?driver_id=' + d.driver_id + '" target="_blank" rel="noopener" class="wf-dpopup__task-more">'
+                    + '+' + hidden + ' more &mdash; open task list</a>';
+            }
             h += '</div>';
             return h;
         }
@@ -334,8 +352,80 @@ Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay
             } else {
                 h += '<div class="wf-dpopup__meta" style="color:#10b981;margin-top:4px;"><i class="fa-solid fa-wifi me-1"></i>No active tasks</div>';
             }
+            h += locationRequestControl(d);
             h += '</div>';
             return h;
+        }
+
+        // Ask the driver's phone to report in.
+        //
+        // Worth saying plainly, because the button invites the opposite reading:
+        // this does not fetch a position. The driver's app is frozen behind Waze
+        // and cannot be called at all. All that travels is a notification; the
+        // driver taps it, the app comes forward, and the fix lands on the next
+        // refresh like any other. A driver with no registered device gets no
+        // button, only the reason there isn't one.
+        function locationRequestControl(d) {
+            if (!d.driver_id) return '';
+            if (!d.can_ping) {
+                return '<div class="wf-dpopup__meta wf-dpopup__ping-note">'
+                    + '<i class="fa-solid fa-bell-slash me-1"></i>Alerts off on this driver\'s phone</div>';
+            }
+            return '<button type="button" class="wf-dpopup__ping" data-driver-id="' + d.driver_id + '">'
+                + '<i class="fa-solid fa-location-crosshairs me-1"></i>Ask for location</button>';
+        }
+
+        function requestDriverLocation(btn) {
+            var driverId = btn.getAttribute('data-driver-id');
+            if (!driverId || btn.disabled) return;
+            btn.disabled = true;
+            var original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Asking\u2026';
+
+            fetch('/workforce/drivers/' + driverId + '/request-location/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                var body = res.body || {};
+                // The button stays spent either way: a refused send is not an
+                // invitation to press again, and a delivered one is waiting on
+                // a driver, not on us.
+                btn.innerHTML = body.ok
+                    ? '<i class="fa-solid fa-check me-1"></i>Asked \u2014 waiting'
+                    : '<i class="fa-solid fa-triangle-exclamation me-1"></i>Not sent';
+                btn.classList.add(body.ok ? 'wf-dpopup__ping--sent' : 'wf-dpopup__ping--failed');
+                if (body.message) showMapToast(body.message, body.ok);
+            })
+            .catch(function () {
+                btn.disabled = false;
+                btn.innerHTML = original;
+                showMapToast('Request failed \u2014 check your connection', false);
+            });
+        }
+
+        // Popups are rebuilt by Leaflet on every open, so the handler is bound
+        // once on the map container rather than to a button that will not exist
+        // by the time the next refresh finishes.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest ? e.target.closest('.wf-dpopup__ping') : null;
+            if (btn) requestDriverLocation(btn);
+        });
+
+        function showMapToast(message, ok) {
+            var el = document.getElementById('wf-map-toast');
+            if (!el) return;
+            el.textContent = message;
+            el.className = 'wf-map-toast wf-map-toast--visible' + (ok ? '' : ' wf-map-toast--error');
+            clearTimeout(showMapToast._t);
+            showMapToast._t = setTimeout(function () {
+                el.className = 'wf-map-toast';
+            }, 4000);
         }
 
         function buildDriverFilterList(driverList) {

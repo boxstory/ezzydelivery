@@ -187,6 +187,8 @@ Notes: Rows are grouped per business, 10 at a time. Carries the shared wfnote__ 
                 {% if source_type_counts.shopify %}<option value="shopify" {% if filters.source_type == 'shopify' %}selected{% endif %}>Shopify ({{ source_type_counts.shopify }})</option>{% endif %}
                 {% if source_type_counts.woocommerce %}<option value="woocommerce" {% if filters.source_type == 'woocommerce' %}selected{% endif %}>WooCommerce ({{ source_type_counts.woocommerce }})</option>{% endif %}
                 {% if source_type_counts.public_link %}<option value="public_link" {% if filters.source_type == 'public_link' %}selected{% endif %}>Public Link ({{ source_type_counts.public_link }})</option>{% endif %}
+                {% if source_type_counts.custom_api %}<option value="custom_api" {% if filters.source_type == 'custom_api' %}selected{% endif %}>Custom API ({{ source_type_counts.custom_api }})</option>{% endif %}
+                {% if source_type_counts.webhook %}<option value="webhook" {% if filters.source_type == 'webhook' %}selected{% endif %}>Webhook ({{ source_type_counts.webhook }})</option>{% endif %}
             </select>
         </label>
         <label class="wf-temp-orders__filter-field">
@@ -297,6 +299,10 @@ Notes: Rows are grouped per business, 10 at a time. Carries the shared wfnote__ 
                         <span class="badge text-white" style="font-size:0.55rem;background:#7f54b3;"><i class="fa-brands fa-wordpress me-1"></i>WC</span>
                         {% elif row.source_type == 'public_link' %}
                         <span class="badge bg-primary" style="font-size:0.55rem;"><i class="fa-solid fa-link me-1"></i>PL</span>
+                        {% elif row.source_type == 'custom_api' %}
+                        <span class="badge bg-secondary" style="font-size:0.55rem;" title="Pushed by the seller's own website"><i class="fa-solid fa-code me-1"></i>API</span>
+                        {% elif row.source_type == 'webhook' %}
+                        <span class="badge bg-secondary" style="font-size:0.55rem;" title="Pushed by the seller's platform webhook"><i class="fa-solid fa-bolt me-1"></i>WH</span>
                         {% endif %}
                     </td>
                     <td class="text-muted">{% if row.row_num %}{{ row.row_num }}{% else %}—{% endif %}</td>
@@ -1091,7 +1097,7 @@ function _mappedFieldsFor(r) {
 }
 
 function renderPreviewTable() {
-    const srcLabel = { onedrive:'OneDrive', google_sheet:'Google Sheet', shopify:'Shopify', woocommerce:'WooCommerce', public_link:'Public Link' };
+    const srcLabel = { onedrive:'OneDrive', google_sheet:'Google Sheet', shopify:'Shopify', woocommerce:'WooCommerce', public_link:'Public Link', custom_api:'Custom API', webhook:'Webhook' };
     let html = '';
 
     previewRows.forEach((r, i) => {
@@ -1143,7 +1149,7 @@ function goToVerify() {
     document.getElementById('btnGoVerify').classList.add('d-none');
     document.getElementById('btnTransfer').classList.remove('d-none');
 
-    const srcLabel = { onedrive:'OneDrive', google_sheet:'Google Sheet', shopify:'Shopify', woocommerce:'WooCommerce', public_link:'Public Link' };
+    const srcLabel = { onedrive:'OneDrive', google_sheet:'Google Sheet', shopify:'Shopify', woocommerce:'WooCommerce', public_link:'Public Link', custom_api:'Custom API', webhook:'Webhook' };
     let html = '';
 
     previewRows.forEach((r, i) => {

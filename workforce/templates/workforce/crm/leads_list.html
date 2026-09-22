@@ -1,5 +1,6 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% load workforce_tags %}
 
 {# Purpose: CRM leads table — one pipeline per page (business clients or driver applicants). #}
 {# Used by: workforce.crm_views.crm_leads_list (business) and crm_driver_leads_list (driver) #}
@@ -7,7 +8,7 @@
 {#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260827c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260922a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -86,7 +87,7 @@
     <!-- TOOLBAR -->
     <div class="crm__toolbar">
       <form method="get"
-            hx-get="" hx-target="#main-content" hx-select="#main-content"
+            hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
             hx-swap="outerHTML" hx-push-url="true"
             id="workforce_crm_leads_form_filter" class="crm__filters">
 
@@ -94,16 +95,17 @@
           <i class="fa-solid fa-magnifying-glass crm__search-icon"></i>
           <input type="text" name="search" value="{{ search }}" id="workforce_crm_leads_input_search"
                  class="crm__search-input" autocomplete="off"
-                 placeholder="Search company, contact, phone or category…"
-                 hx-get="" hx-target="#main-content" hx-select="#main-content"
+                 placeholder="{% if is_driver_list %}Search name or phone — paste several numbers separated by commas{% else %}Search company, contact, phone or category — commas for several at once{% endif %}"
+                 title="A comma-separated list is searched as a list: 33123456, 55667788 pulls up exactly those two."
+                 hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                  hx-swap="outerHTML" hx-push-url="true"
-                 hx-trigger="keyup changed delay:350ms, search"
+                 hx-trigger="keyup changed delay:350ms, search" data-search-min="3"
                  hx-include="#workforce_crm_leads_form_filter">
         </div>
 
         <div class="crm__facets">
           <select name="stage" class="crm__facet-select {% if stage_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by stage"
-                  hx-get="" hx-target="#main-content" hx-select="#main-content"
+                  hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                   hx-include="#workforce_crm_leads_form_filter">
             <option value="">All stages</option>
@@ -113,7 +115,7 @@
           </select>
 
           <select name="source" class="crm__facet-select {% if source_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by source"
-                  hx-get="" hx-target="#main-content" hx-select="#main-content"
+                  hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                   hx-include="#workforce_crm_leads_form_filter">
             <option value="">All sources</option>
@@ -124,9 +126,11 @@
 
           {# Category is driven by the tabs above; kept here so other filters preserve the active tab #}
           <input type="hidden" name="category" value="{{ category_filter }}">
+          {# Same reason for the column sort: changing a filter must not throw the sort away #}
+          <input type="hidden" name="sort" value="{{ sort.value }}">
 
           <select name="assigned" class="crm__facet-select {% if assigned_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by assignee"
-                  hx-get="" hx-target="#main-content" hx-select="#main-content"
+                  hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                   hx-include="#workforce_crm_leads_form_filter">
             <option value="">All assignees</option>
@@ -140,7 +144,7 @@
           </select>
 
           <select name="overdue" class="crm__facet-select {% if overdue_filter %}crm__facet-select--on{% endif %}" aria-label="Filter overdue"
-                  hx-get="" hx-target="#main-content" hx-select="#main-content"
+                  hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
                   hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
                   hx-include="#workforce_crm_leads_form_filter">
             <option value="">Any follow-up</option>
@@ -148,9 +152,26 @@
           </select>
         </div>
 
+        {# ROW DOWNLOADS — one instrument row with the filters, since both read #}
+        {# the same view. The readout and the all-matching offer stay left, next #}
+        {# to what they are counting; the actions pin right with Search. #}
+        <span class="wfsel__count" data-export-count hidden></span>
+        {% include "workforce/parts/components/_export_selectall.html" with total=page_obj.paginator.count noun="leads" limit=5000 %}
+
         <button type="submit" class="crm__btn crm__btn--ink">
           <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Search
         </button>
+        <button type="button" class="crm__btn" data-bs-toggle="modal" data-bs-target="#wfExportModal"
+                title="Download these rows as a spreadsheet — the ticked ones, or everything matching the filter">
+          <i class="fa-solid fa-file-csv"></i> Export
+        </button>
+        {% if can_download_documents %}
+        {# Needs ticks: "everyone's documents" is not a file anyone can send on. #}
+        <button type="button" class="crm__btn" data-bs-toggle="modal" data-bs-target="#crmDocsModal"
+                title="Download the ticked applicants' uploaded ID documents">
+          <i class="fa-solid fa-file-zipper"></i> Documents
+        </button>
+        {% endif %}
 
         {# The category is fixed by the URL now, so it is not one of the filters a #}
         {# Reset can clear — Reset returns to this same page, unfiltered. #}
@@ -175,22 +196,32 @@
     <div class="crm__scroll">
       <table class="crm__table" id="workforce_crm_leads_table_list">
         <thead>
+          {# Sortable headers — each cell writes ?sort= itself and keeps the current filters. #}
           <tr>
-            <th style="width:3rem">#</th>
-            <th>Lead</th>
-            <th>Phone</th>
-            <th>Category</th>
-            <th>Source</th>
-            <th>Stage</th>
-            <th>Assignee</th>
-            <th>Follow-up</th>
-            <th>Created</th>
+            <th class="wfsel__cell">
+              <input type="checkbox" class="form-check-input wfsel__box" data-export-row-all
+                     aria-label="Select every lead on this page">
+            </th>
+            {% include "workforce/parts/components/_sort_th.html" with key="id" label="#" th_class="crm__th-id" first_desc=True %}
+            {% include "workforce/parts/components/_sort_th.html" with key="lead" label="Lead" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="phone" label="Phone" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="category" label="Category" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="source" label="Source" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="stage" label="Stage" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="assignee" label="Assignee" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="followup" label="Follow-up" %}
+            {% include "workforce/parts/components/_sort_th.html" with key="created" label="Created" first_desc=True %}
             <th></th>
           </tr>
         </thead>
         <tbody>
           {% for lead in page_obj %}
           <tr class="crml__row {% if lead.is_overdue %}crml__row--overdue{% endif %}">
+            <td class="wfsel__cell">
+              <input type="checkbox" class="form-check-input wfsel__box" data-export-row
+                     value="{{ lead.pk }}"
+                     aria-label="Select lead {{ lead.pk }}">
+            </td>
             <td class="crm__id">{{ lead.pk }}</td>
             <td>
               <div class="crm__lead-company">{{ lead.company_name|default:"—" }}</div>
@@ -201,7 +232,13 @@
             <td>
               <span class="crm__source crm__source--{{ lead.source }}">{{ lead.get_source_display }}</span>
               {% if lead.category == 'driver' %}
-              <span class="crm__cat crm__cat--driver"><i class="fa-solid fa-motorcycle"></i> Driver</span>
+              <span class="crm__cat crm__cat--driver"
+                    title="Driver applicant{% if lead.vehicle_label %} — {{ lead.vehicle_label }}{% endif %}">
+                {# Icon and word follow the registered vehicle; a lead with no #}
+                {# application bound yet keeps the generic driver chip. #}
+                <i class="fa-solid {% if lead.vehicle_type %}{{ lead.vehicle_type|vehicle_icon }}{% else %}fa-motorcycle{% endif %}"></i>
+                {{ lead.vehicle_label|default:"Driver" }}
+              </span>
               {% endif %}
             </td>
             <td><span class="crm__stage crm__stage--sw-{{ lead.stage_swatch }}"><i class="fa-solid fa-circle"></i>{{ lead.stage_label }}</span></td>
@@ -222,7 +259,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="10">
+            <td colspan="11">
               <div class="crm__empty">
                 <i class="fa-solid fa-inbox"></i>
                 No leads match your filters yet.
@@ -243,4 +280,9 @@
     </div><!-- /.crm__body -->
   </div>
 </div>
+
+{# Column picker + row-tick wiring, shared with every other staff list page. #}
+{% include "workforce/parts/components/_export_columns_modal.html" %}
+{% if can_download_documents %}{% include "workforce/crm/parts/_documents_modal.html" %}{% endif %}
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260921e"></script>
 {% endblock %}

@@ -930,6 +930,12 @@ try:
 except Exception:
     AI_WA_FALLBACK_MODEL = ''
 
+# CRM WhatsApp-inbox triage picks its own model rather than riding AI_CHAT_PROVIDER:
+# that one points at a free router which rate-limits, and a nightly classifier that
+# silently decides nothing is worse than none at all. Falls back to the chat stack.
+CRM_TRIAGE_AI_PROVIDER = config('CRM_TRIAGE_AI_PROVIDER', default='groq')
+CRM_TRIAGE_AI_MODEL    = config('CRM_TRIAGE_AI_MODEL',    default='openai/gpt-oss-120b')
+
 AI_AGENT_MODEL = config('AI_AGENT_MODEL', default='claude-sonnet-4-6')
 AI_AGENT_MAX_TOKENS = config('AI_AGENT_MAX_TOKENS', default=4096, cast=int)
 
@@ -1044,3 +1050,26 @@ SHOPIFY_OAUTH_REDIRECT_URI = config(
     default='https://ezzydelivery.qa/business/shopify/oauth/callback/',
 )
 
+
+
+# ==========================================
+# WEB PUSH (driver PWA notifications)
+# ==========================================
+# VAPID keypair identifying this server to the browsers' push services. A push
+# can only wake the driver PWA's service worker — it cannot read GPS — so this
+# exists to get a driver's attention (e.g. "where are you?" while they are in
+# Waze), never to track a closed app. See fleet/push_service.py.
+#
+# Regenerate with an EC P-256 keypair, base64url, unpadded:
+#   private = raw 32-byte scalar, public = uncompressed point (65 bytes).
+# Changing the public key invalidates every stored DriverPushSubscription.
+VAPID_PUBLIC_KEY = config('VAPID_PUBLIC_KEY', default='')
+VAPID_PRIVATE_KEY = config('VAPID_PRIVATE_KEY', default='')
+VAPID_CLAIM_EMAIL = config('VAPID_CLAIM_EMAIL', default='admin@ezzydelivery.qa')
+# Seconds a push service should hold an undelivered message. Ten minutes: a
+# location request that arrives an hour late is worse than one that never does.
+PUSH_TTL_SECONDS = config('PUSH_TTL_SECONDS', default=600, cast=int)
+# Seconds before the same driver can be asked for their location again. The ask
+# is a notification on a phone in a moving vehicle, and a dispatcher watching a
+# frozen marker will press the button far more often than the driver can answer.
+DRIVER_LOCATION_REQUEST_COOLDOWN = config('DRIVER_LOCATION_REQUEST_COOLDOWN', default=120, cast=int)

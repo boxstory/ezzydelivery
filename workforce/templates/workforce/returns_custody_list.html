@@ -1,0 +1,577 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff returns desk — every parcel coming back, how long someone has held it, and where it goes
+Used by: workforce_views.returns_custody_list at /workforce/returns/
+Notes: A row appears here when a delivery task closes as 'returned_to_shipper'; the row is opened by
+       delivery/services/returns.py, never by this page. The destination is a SNAPSHOT taken when the
+       parcel left — it is deliberately not re-resolved on read, because a merchant who changes their
+       config must not silently re-route a box already on a van. "Change" writes an override and says
+       so in the timeline. The status filter defaults to "open" (with_driver/in_manifest/at_hub/
+       disputed — the states where somebody is still liable); "Needs triage" narrows that to rows
+       whose destination resolved to nothing, which is the queue that actually blocks a driver. The
+       three headline figures ARE the filters: each card links to the view it counts and lights up
+       when that view is showing, so the number and the way into it are one target. Age comes from
+       the view (age_label / age_band), not template arithmetic — open rows age live, closed rows
+       report turnaround and are never banded. Receiving is one-way: CUSTODY_TRANSITIONS makes every
+       closing state a dead end, so a second receive is refused rather than silently repeated. Bulk
+       receive reports per-row refusals instead of failing the batch — a driver hands in ten parcels
+       and one was already signed for.
+{% endcomment %}
+
+{% block title %}Returns - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+{% comment %}crm.css carries the shared staff filter bar (crm__facets / crm__facet-select and
+the --crm-ctl-h touch floor). A filter select styled by hand instead collapses to a sliver,
+so this stylesheet is the canonical one to load rather than re-rolling the layout.{% endcomment %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260922a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/returns-console.css' %}?v=20260921g" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+{% csrf_token %}
+<div class="col-12">
+
+  <div class="wfpage rtn">
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Reverse logistics &middot; Custody</span>
+        <h1 class="wfhero__title">Returns</h1>
+        <span class="wfhero__sub">
+          Parcels on their way back
+          <span class="wfhero__sep">&middot;</span> the destination is the one snapshotted when it left
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <nav class="wfhero__actions">
+          <button type="button" class="wfnote__btn" data-wfnote-toggle
+                  aria-expanded="false" aria-controls="workforce_returns_custody_card_notes"
+                  title="About this page">
+            <i class="fa-solid fa-question" aria-hidden="true"></i>
+            <span class="visually-hidden">Show notes</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wfnote" id="workforce_returns_custody_card_notes"
+         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_returns_custody_card_notes' %}" hidden></div>
+
+    <div class="wfpage__body">
+
+      {% comment %}Each figure links to the view it counts and carries --on when that view is
+      showing, so the count and the way into it are one target rather than a number in the
+      masthead beside a separate ghost link that set the same filter.{% endcomment %}
+      <div class="wfstat">
+        <a href="?status=open&amp;days=all"
+           class="wfstat__card{% if status_filter == 'open' %} wfstat__card--on{% endif %}{% if not open_count %} rtn__stat-none{% endif %}">
+          <span class="wfstat__label">Open</span>
+          <span class="wfstat__value">{{ open_count }}</span>
+          <span class="wfstat__sub">Somebody is still holding these</span>
+        </a>
+        <a href="?status=triage&amp;days=all"
+           class="wfstat__card{% if status_filter == 'triage' %} wfstat__card--on{% endif %}{% if not triage_count %} rtn__stat-none{% endif %}">
+          <span class="wfstat__label">Needs triage</span>
+          <span class="wfstat__value">{{ triage_count }}</span>
+          <span class="wfstat__sub">No destination resolved — a driver is blocked</span>
+        </a>
+        <a href="?status=to_forward&amp;days=all"
+           class="wfstat__card{% if status_filter == 'to_forward' %} wfstat__card--on{% endif %}{% if not to_forward_count %} rtn__stat-none{% endif %}">
+          <span class="wfstat__label">On the shelf</span>
+          <span class="wfstat__value">{{ to_forward_count }}</span>
+          <span class="wfstat__sub">Signed in at a hub, no run to the client yet</span>
+        </a>
+        {% comment %}The list is newest-first, so the parcel that has been out longest sits on the
+        last page. This is the one row nobody scrolls to and the one most worth knowing about.{% endcomment %}
+        <div class="wfstat__card{% if not oldest_open_at %} rtn__stat-none{% elif oldest_open_late %} rtn__stat--late{% endif %}">
+          <span class="wfstat__label">Longest held</span>
+          <span class="wfstat__value">{{ oldest_open_label|default:"—" }}</span>
+          <span class="wfstat__sub">
+            {% if oldest_open_at %}Open since {{ oldest_open_at|date:"d M Y" }}{% else %}Nothing is outstanding{% endif %}
+          </span>
+        </div>
+      </div>
+
+      <form method="GET" class="crm__facets" id="workforce_returns_form_filters">
+        <select name="status" class="crm__facet-select" data-no-select2 onchange="this.form.submit()"
+                aria-label="Custody state">
+          <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open — still out there</option>
+          <option value="triage" {% if status_filter == 'triage' %}selected{% endif %}>Needs triage</option>
+          <option value="to_forward" {% if status_filter == 'to_forward' %}selected{% endif %}>At hub — needs a run to the client</option>
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+          {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select name="destination" class="crm__facet-select" data-no-select2 onchange="this.form.submit()"
+                aria-label="Destination">
+          <option value="all" {% if dest_filter == 'all' %}selected{% endif %}>Any destination</option>
+          {% for value, label in destination_choices %}
+          <option value="{{ value }}" {% if dest_filter == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select name="days" class="crm__facet-select" data-no-select2 onchange="this.form.submit()"
+                aria-label="Date window">
+          <option value="7" {% if days_filter == '7' %}selected{% endif %}>Last 7 days</option>
+          <option value="30" {% if days_filter == '30' %}selected{% endif %}>Last 30 days</option>
+          <option value="90" {% if days_filter == '90' %}selected{% endif %}>Last 90 days</option>
+          <option value="all" {% if days_filter == 'all' %}selected{% endif %}>All time</option>
+        </select>
+        <input type="search" name="search" value="{{ search }}" class="crm__facet-select"
+               placeholder="Order, task, driver, manifest…" aria-label="Search parcels">
+        <button type="submit" class="rtn__btn rtn__btn--quiet">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Filter
+        </button>
+      </form>
+
+      {% if hidden_open %}
+      <div class="alert alert-warning py-2 rtn__windownote" id="workforce_returns_note_hidden">
+        <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>
+        {{ hidden_open }} open parcel{{ hidden_open|pluralize }} sit outside this date window.
+        <a href="?status=open&amp;days=all">Show all time</a>
+      </div>
+      {% endif %}
+
+      <div class="wfcard">
+        <div class="wfcard__header">
+          <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+          Parcels coming back
+          <div class="rtn__toolbar ms-auto">
+            <span class="rtn__count" id="workforce_returns_text_selected" aria-live="polite"></span>
+            <button type="button" class="rtn__btn rtn__btn--go" id="workforce_returns_btn_bulk_receive" disabled>
+              <i class="fa-solid fa-inbox" aria-hidden="true"></i>
+              <span id="workforce_returns_text_bulk_label">Receive selected</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table align-middle rtn__table" id="workforce_returns_table_custody">
+            <thead>
+              <tr>
+                <th scope="col" class="rtn__th-check">
+                  <input type="checkbox" class="form-check-input" id="workforce_returns_check_all"
+                         aria-label="Select all parcels">
+                </th>
+                <th scope="col">Parcel</th>
+                <th scope="col">Client</th>
+                {% comment %}Names both halves of the cell below, so neither the holder nor the
+                destination reads as a column that went missing when they were joined up.{% endcomment %}
+                <th scope="col">Holder <span class="rtn__th-arrow" aria-hidden="true">&rarr;</span> Goes back to</th>
+                <th scope="col" class="rtn__th-age">Age</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="rtn__th-actions text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in custodies %}
+              <tr data-custody-id="{{ c.id }}"
+                  data-business-id="{{ c.business_id|default_if_none:'' }}"
+                  data-dest-kind="{{ c.destination_kind }}"
+                  data-location-id="{% if c.destination_kind == 'hub' %}{{ c.warehouse_location_id|default_if_none:'' }}{% else %}{{ c.pickup_location_id|default_if_none:'' }}{% endif %}"
+                  data-order="{{ c.order.order_number }}"
+                  class="{% if not c.is_open %}rtn__row--closed{% endif %}">
+                <td>
+                  {% if c.is_open %}
+                  <input type="checkbox" class="form-check-input rtn__check" value="{{ c.id }}"
+                         aria-label="Select parcel for order {{ c.order.order_number }}">
+                  {% endif %}
+                </td>
+
+                <td>
+                  <a href="{% url 'workforce:delivery_task_detail' c.task_id %}" class="rtn__code wfmono">
+                    {{ c.order.order_number }}
+                  </a>
+                  {% comment %}Unlabelled, these three codes look alike and staff cannot tell the
+                  delivery from the claim. The word in front is what makes the cell readable.{% endcomment %}
+                  <div class="rtn__refs">
+                    <span class="rtn__ref">
+                      <span class="rtn__ref-key">task</span>
+                      <span class="rtn__ref-val wfmono">{{ c.task.dl_task_number }}</span>
+                    </span>
+                    {% if c.return_request %}
+                    <span class="rtn__ref">
+                      <span class="rtn__ref-key">return</span>
+                      <span class="rtn__ref-val wfmono">{{ c.return_request.return_number }}</span>
+                    </span>
+                    {% endif %}
+                    {% if c.manifest_reference %}
+                    <span class="rtn__ref">
+                      <span class="rtn__ref-key">manifest</span>
+                      <span class="rtn__ref-val wfmono">{{ c.manifest_reference }}</span>
+                    </span>
+                    {% endif %}
+                  </div>
+                </td>
+
+                <td class="rtn__td-client">
+                  {% if c.business %}
+                  <span class="rtn__client">{{ c.business.business_name }}</span>
+                  {% else %}
+                  <span class="rtn__client rtn__client--none">No client on record</span>
+                  {% endif %}
+                </td>
+
+                <td class="rtn__td-chain">
+                  {% comment %}The handover in one line: who has the box, and where it is going.
+                  Driver.__str__ is the login username, which is not what staff identify drivers
+                  by — the person's name leads and the fleet code follows it.{% endcomment %}
+                  <div class="rtn__chain">
+                    {% if c.driver %}
+                    <span class="rtn__hand rtn__hand--from"
+                          title="{{ c.driver.user.username }}{% if c.driver.driver_phone %} · {{ c.driver.driver_phone }}{% endif %}">
+                      <i class="fa-solid fa-user" aria-hidden="true"></i>
+                      <span class="rtn__hand-name">{{ c.driver.user.get_full_name|default:c.driver.driver_phone|default:c.driver.user.username }}</span>
+                      {% if c.driver.driver_code %}
+                      <span class="rtn__hand-code wfmono">{{ c.driver.driver_code }}</span>
+                      {% endif %}
+                    </span>
+                    {% else %}
+                    <span class="rtn__hand rtn__hand--from rtn__hand--none">
+                      <i class="fa-solid fa-circle-question" aria-hidden="true"></i>
+                      <span class="rtn__hand-name">Holder unknown</span>
+                    </span>
+                    {% endif %}
+
+                    <i class="rtn__chain-arrow fa-solid fa-arrow-right-long" aria-hidden="true"></i>
+                    <span class="visually-hidden">goes back to</span>
+
+                    <span class="rtn__hand rtn__hand--to">
+                      {% if c.destination_kind == 'hub' %}
+                      <i class="fa-solid fa-warehouse" aria-hidden="true"></i>
+                      {% else %}
+                      <i class="fa-solid fa-store" aria-hidden="true"></i>
+                      {% endif %}
+                      <span class="rtn__hand-name">{{ c.destination_label }}</span>
+                    </span>
+                  </div>
+
+                  {% comment %}Flags and the override control share one line: on a 25-row
+                  ledger each extra line per row costs most of a screen.{% endcomment %}
+                  {% if c.needs_triage or c.destination_overridden or c.forwarded_from_id or c.is_open %}
+                  <div class="rtn__flags">
+                    {% if c.needs_triage %}
+                    <span class="rtn__flag rtn__flag--triage">
+                      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>needs triage
+                    </span>
+                    {% endif %}
+                    {% if c.destination_overridden %}
+                    <span class="rtn__flag rtn__flag--override">set by staff</span>
+                    {% endif %}
+                    {% if c.forwarded_from_id %}
+                    <span class="rtn__flag rtn__flag--leg">
+                      <i class="fa-solid fa-arrow-turn-up fa-rotate-90" aria-hidden="true"></i>run back out
+                    </span>
+                    {% endif %}
+                    {% if c.is_open %}
+                    <button type="button" class="rtn__btn rtn__btn--quiet rtn__btn--edit rtn__btn-dest" data-id="{{ c.id }}">
+                      <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>Change
+                    </button>
+                    {% endif %}
+                  </div>
+                  {% endif %}
+
+                  {% if c.destination_fallback_reason %}
+                  <div class="rtn__why">{{ c.destination_fallback_reason }}</div>
+                  {% endif %}
+                </td>
+
+                {% comment %}Open rows age live — that is a liability clock still running, and the
+                margin tick marks the ones that have run long. A closed row reports the turnaround
+                it took, which is a different span and is never banded.{% endcomment %}
+                <td class="rtn__td-age{% if c.age_band == 'warn' %} rtn__td-age--warn{% elif c.age_band == 'late' %} rtn__td-age--late{% endif %}">
+                  {% if c.is_open %}
+                  <span class="rtn__age rtn__age--{{ c.age_band }}">{{ c.age_label }}</span>
+                  <span class="rtn__age-note">since {{ c.opened_at|date:"d M" }}</span>
+                  {% else %}
+                  <span class="rtn__age rtn__age--closed">took {{ c.age_label|default:"—" }}</span>
+                  <span class="rtn__age-note">opened {{ c.opened_at|date:"d M" }}</span>
+                  {% endif %}
+                </td>
+
+                <td>
+                  <span class="rtn__state rtn__state--{{ c.status }}">{{ c.get_status_display }}</span>
+                </td>
+
+                <td>
+                  <div class="rtn__actions">
+                    {% if c.is_open %}
+                    <button type="button" class="rtn__btn rtn__btn--primary rtn__btn-receive" data-id="{{ c.id }}">
+                      <i class="fa-solid fa-check" aria-hidden="true"></i>Receive
+                    </button>
+                    <button type="button" class="rtn__btn rtn__btn--quiet rtn__btn-manifest" data-id="{{ c.id }}">
+                      In manifest
+                    </button>
+                    {% elif c.status == 'received' and c.destination_kind == 'hub' and not c.has_forward_leg %}
+                    {% comment %}Signed in at the hub and nobody has taken it out again. This raises a
+                    REAL delivery task into the driver pool — a second driver claims it in the PWA —
+                    rather than re-opening the closed leg of the driver who brought it in.{% endcomment %}
+                    <button type="button" class="rtn__btn rtn__btn--primary rtn__btn-forward" data-id="{{ c.id }}">
+                      <i class="fa-solid fa-truck-fast" aria-hidden="true"></i>Send to client
+                    </button>
+                    {% else %}
+                    <span class="rtn__closed">Closed {{ c.closed_at|date:"d M" }}</span>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="7">
+                  <div class="empty-state">
+                    <i class="fa-solid fa-box-open empty-state__icon" aria-hidden="true"></i>
+                    <p class="empty-state__title">Nothing matches this view</p>
+                    <p class="empty-state__text">
+                      A parcel lands here when a delivery closes as Returned to Shipper.
+                    </p>
+                    {% comment %}The default view can be empty while parcels sit two filters away —
+                    the figures above say so, and dead-ending here made staff guess.{% endcomment %}
+                    {% if open_count or triage_count or to_forward_count %}
+                    <div class="rtn__empty-links">
+                      {% if open_count %}
+                      <a href="?status=open&amp;days=all" class="rtn__btn rtn__btn--quiet">
+                        See {{ open_count }} still out there
+                      </a>
+                      {% endif %}
+                      {% if triage_count %}
+                      <a href="?status=triage&amp;days=all" class="rtn__btn rtn__btn--quiet">
+                        See {{ triage_count }} needing triage
+                      </a>
+                      {% endif %}
+                      {% if to_forward_count %}
+                      <a href="?status=to_forward&amp;days=all" class="rtn__btn rtn__btn--quiet">
+                        See {{ to_forward_count }} on the shelf
+                      </a>
+                      {% endif %}
+                    </div>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params="status="|add:status_filter|add:"&destination="|add:dest_filter|add:"&days="|add:days_filter|add:"&search="|add:search pagination_id="returns" %}
+    </div>
+  </div>
+</div>
+
+{% comment %}Hub locations are estate-wide; merchant locations are keyed by business id and
+only cover the businesses on this page. json_script escapes the payload properly — a bare
+{{ ... }} into a <script> would not.{% endcomment %}
+{{ destination_options|json_script:"workforce_returns_data_destinations" }}
+
+{% comment %}data-no-select2 on both selects: main_dashboard_scripts.html enhances EVERY
+select on a staff page, and a Select2 inside a Bootstrap modal loses its dropdown to the
+modal's focus trap.{% endcomment %}
+<div class="modal fade" id="workforce_returns_modal_destination" tabindex="-1"
+     aria-hidden="true" aria-labelledby="workforce_returns_modal_destination_title">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="workforce_returns_modal_destination_title">Where does this parcel go back to?</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3" id="workforce_returns_modal_destination_order"></p>
+        <div class="mb-3">
+          <label class="form-label" for="workforce_returns_select_dest_kind">Send it back to</label>
+          <select class="form-select" id="workforce_returns_select_dest_kind" data-no-select2>
+            {% for value, label in destination_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label" for="workforce_returns_select_dest_location">Exact address</label>
+          <select class="form-select" id="workforce_returns_select_dest_location" data-no-select2></select>
+          <div class="form-text" id="workforce_returns_text_dest_hint"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="workforce_returns_btn_dest_save">Save destination</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    const table = document.getElementById('workforce_returns_table_custody');
+    if (!table) return;
+    const bulkBtn = document.getElementById('workforce_returns_btn_bulk_receive');
+    const bulkLabel = document.getElementById('workforce_returns_text_bulk_label');
+    const countText = document.getElementById('workforce_returns_text_selected');
+    const checkAll = document.getElementById('workforce_returns_check_all');
+
+    const selected = () => [...table.querySelectorAll('.rtn__check:checked')].map(c => c.value);
+
+    // The button says what it will do to how many, so the count is never something
+    // staff have to hold in their head between ticking boxes and pressing it.
+    function syncBulk() {
+        const n = selected().length;
+        bulkBtn.disabled = n === 0;
+        bulkLabel.textContent = n === 0
+            ? 'Receive selected'
+            : 'Receive ' + n + ' parcel' + (n === 1 ? '' : 's');
+        countText.textContent = n === 0 ? '' : n + ' selected';
+    }
+
+    function post(url, body) {
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify(body || {})
+        }).then(r => r.json());
+    }
+
+    table.addEventListener('change', function (e) {
+        if (e.target.classList.contains('rtn__check')) syncBulk();
+    });
+    if (checkAll) {
+        checkAll.addEventListener('change', function () {
+            table.querySelectorAll('.rtn__check').forEach(c => { c.checked = checkAll.checked; });
+            syncBulk();
+        });
+    }
+
+    // --- Destination override -------------------------------------------------
+    // The snapshot is never re-resolved, so this control is the only way to correct
+    // a row whose client was misconfigured when the parcel left the depot.
+    const destModalEl = document.getElementById('workforce_returns_modal_destination');
+    const kindSel = document.getElementById('workforce_returns_select_dest_kind');
+    const locSel = document.getElementById('workforce_returns_select_dest_location');
+    const destHint = document.getElementById('workforce_returns_text_dest_hint');
+    const destOrder = document.getElementById('workforce_returns_modal_destination_order');
+    const destSave = document.getElementById('workforce_returns_btn_dest_save');
+    let destOptions = { hub: [], business: {} };
+    try {
+        destOptions = JSON.parse(
+            document.getElementById('workforce_returns_data_destinations').textContent);
+    } catch (err) { /* no options rendered — the modal simply offers none */ }
+
+    let destRow = null;
+
+    function optionsFor(kind, businessId) {
+        if (kind === 'hub') return destOptions.hub || [];
+        return (destOptions.business || {})[String(businessId || '')] || [];
+    }
+
+    function fillLocations(selectedId) {
+        const kind = kindSel.value;
+        const opts = optionsFor(kind, destRow && destRow.dataset.businessId);
+        locSel.innerHTML = '';
+        if (!opts.length) {
+            locSel.innerHTML = '<option value="">— none available —</option>';
+            locSel.disabled = true;
+            destHint.textContent = kind === 'hub'
+                ? 'No active warehouse location exists to receive this parcel.'
+                : 'This client has no saved pickup address to return the parcel to.';
+            // Saving with no address writes a destination that still needs triage,
+            // which is worse than leaving the row as it is.
+            destSave.disabled = true;
+            return;
+        }
+        locSel.disabled = false;
+        destSave.disabled = false;
+        opts.forEach(function (o) {
+            const opt = document.createElement('option');
+            opt.value = o.id;
+            opt.textContent = o.label;
+            if (String(o.id) === String(selectedId)) opt.selected = true;
+            locSel.appendChild(opt);
+        });
+        destHint.textContent = kind === 'hub'
+            ? 'The parcel is signed back in at this hub.'
+            : 'A driver takes the parcel back to the client at this address.';
+    }
+
+    if (kindSel) kindSel.addEventListener('change', function () { fillLocations(null); });
+
+    if (destSave) {
+        destSave.addEventListener('click', function () {
+            if (!destRow) return;
+            destSave.disabled = true;
+            post('/workforce/returns/' + destRow.dataset.custodyId + '/destination/', {
+                destination_kind: kindSel.value,
+                location_id: locSel.value || null
+            }).then(data => {
+                if (!data.success) {
+                    alert(data.error || 'Could not change the destination');
+                    destSave.disabled = false;
+                    return;
+                }
+                window.location.reload();
+            }).catch(() => { alert('Network error'); destSave.disabled = false; });
+        });
+    }
+
+    table.addEventListener('click', function (e) {
+        const dest = e.target.closest('.rtn__btn-dest');
+        if (dest) {
+            destRow = dest.closest('tr');
+            destOrder.textContent = 'Order ' + (destRow.dataset.order || '');
+            kindSel.value = destRow.dataset.destKind || 'hub';
+            fillLocations(destRow.dataset.locationId);
+            bootstrap.Modal.getOrCreateInstance(destModalEl).show();
+            return;
+        }
+        const fwd = e.target.closest('.rtn__btn-forward');
+        if (fwd) {
+            if (!confirm('Raise a return run for this parcel? It goes into the driver '
+                       + 'pool for any driver to take.')) return;
+            fwd.disabled = true;
+            post('/workforce/returns/' + fwd.getAttribute('data-id') + '/forward/', {})
+                .then(data => {
+                    if (!data.success) {
+                        alert(data.error || 'Could not raise the return run');
+                        fwd.disabled = false;
+                        return;
+                    }
+                    alert(data.message);
+                    window.location.reload();
+                })
+                .catch(() => { alert('Network error'); fwd.disabled = false; });
+            return;
+        }
+        const recv = e.target.closest('.rtn__btn-receive');
+        const manifest = e.target.closest('.rtn__btn-manifest');
+        const btn = recv || manifest;
+        if (!btn) return;
+        const id = btn.getAttribute('data-id');
+        const url = recv
+            ? '/workforce/returns/' + id + '/receive/'
+            : '/workforce/returns/' + id + '/status/';
+        btn.disabled = true;
+        post(url, recv ? {} : { status: 'in_manifest' })
+            .then(data => {
+                if (!data.success) { alert(data.error || 'Could not update this parcel'); btn.disabled = false; return; }
+                window.location.reload();
+            })
+            .catch(() => { alert('Network error'); btn.disabled = false; });
+    });
+
+    bulkBtn.addEventListener('click', function () {
+        const ids = selected();
+        if (!ids.length) return;
+        if (!confirm('Sign in ' + ids.length + ' parcel(s)?')) return;
+        bulkBtn.disabled = true;
+        post('/workforce/returns/bulk-receive/', { ids: ids })
+            .then(data => {
+                if (!data.success) { alert(data.error || 'Could not sign these in'); bulkBtn.disabled = false; return; }
+                if (data.refused && data.refused.length) { alert(data.message); }
+                window.location.reload();
+            })
+            .catch(() => { alert('Network error'); bulkBtn.disabled = false; });
+    });
+})();
+</script>
+{% endblock extra_js %}

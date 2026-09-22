@@ -190,3 +190,47 @@ def vehicle_icon(vehicle_type):
         'pickup3ton': 'fa-truck',
         'pickup_big': 'fa-truck-moving',
     }.get((vehicle_type or '').strip().lower(), 'fa-car-side')
+
+
+@register.simple_tag
+def msgid(key):
+    """Badge carrying a message's short ID (M05 …) for a button that sends it.
+
+    The same token is printed on the card at /workforce/auto-triggers/messages/,
+    so a staffer looking at a button can tell which body it will use — and which
+    card to edit — without opening anything. Reads the shipped registry only, so
+    it costs no query; an unregistered key renders nothing rather than an empty
+    box.
+    """
+    from django.utils.html import format_html
+    from core.message_templates import TEMPLATE_DEFAULTS
+
+    entry = TEMPLATE_DEFAULTS.get(key) or {}
+    ident = entry.get('msg_id', '')
+    if not ident:
+        return ''
+    return format_html(
+        '<span class="wmsg-id" title="Message {} — {}. Edit it on Auto Triggers → Messages.">{}</span>',
+        ident, entry.get('label', key), ident,
+    )
+
+
+@register.simple_tag
+def msgid_text(key):
+    """Bare ID ("M05") for places a badge cannot go — a title attribute, an
+    aria-label, an icon-only button in a crowded table cell."""
+    from core.message_templates import TEMPLATE_DEFAULTS
+    return (TEMPLATE_DEFAULTS.get(key) or {}).get('msg_id', '')
+
+
+@register.simple_tag
+def msgid_own():
+    """Marker for a wa.me button: it opens the staffer's own WhatsApp with text
+    written into the page, so no registered message governs it. Shown so a
+    button with no M-code reads as a deliberate fact, not a missed one."""
+    from django.utils.html import format_html
+    return format_html(
+        '<span class="wmsg-id wmsg-id--own" title="Opens your own WhatsApp with text '
+        'from this page — not one of the saved messages, so nothing on the Messages '
+        'page changes it.">own</span>'
+    )

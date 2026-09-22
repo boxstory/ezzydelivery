@@ -1,460 +1,313 @@
-/**
- * Business Settings — Premium Design
- * BEM block: bset__
- * Variables: --brand-* from brandkit.css
+/*
+ * Purpose: Page layer for the client settings hub — the account record plate plus the small bits the shared console layer does not cover (panel counts, compact empty rows, the More settings tiles).
+ * Used by: business/templates/business/parts/business_settings.html (BEM prefix bset__).
+ * Notes: Panels, ledgers, badges and buttons all come from business-console.css (bcon__), which the dashboard base loads globally — never re-declare them here. Yellow appears exactly twice on this page: the command band's bottom rule and the record plate's left index edge.
  */
 
 /* ══════════════════════════════════════════
-   CONTAINER
+   PAGE
+   The gutter comes from .bcon__page; the ledgers want the full width, so
+   there is no max-width holding the content into a column any more.
 ══════════════════════════════════════════ */
-.bset {
-  padding: 1.5rem 1.75rem 3rem;
-  max-width: 1100px;
+.bset__panel {
+  margin-bottom: 0.75rem;
 }
 
 /* ══════════════════════════════════════════
-   HEADER
+   ACCOUNT RECORD
+   The merchant's own standing with us: name, the codes we file them under,
+   and whether the account may trade. The yellow index edge marks it as the
+   one identity object on the page — everything below belongs to it.
+   `border-left` must stay after `border`, or the shorthand resets it.
 ══════════════════════════════════════════ */
-.bset__header {
-  margin-bottom: 2rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 2px solid var(--brand-grey-200);
-}
-
-.bset__header-content {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.bset__header-icon {
-  width: 3rem;
-  height: 3rem;
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  border-radius: var(--brand-radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.25rem;
-  color: var(--brand-navy);
-  flex-shrink: 0;
-  box-shadow: var(--brand-shadow-sm);
-}
-
-.bset__title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--brand-grey-800);
-  margin: 0 0 0.1rem;
-  letter-spacing: -0.02em;
-}
-
-.bset__subtitle {
-  font-size: 0.8125rem;
-  color: var(--brand-grey-500);
-  margin: 0;
-}
-
-/* ══════════════════════════════════════════
-   SECTION
-══════════════════════════════════════════ */
-.bset__section {
-  background: var(--brand-white);
-  border: 1px solid var(--brand-grey-200);
-  border-radius: var(--brand-radius-lg);
-  box-shadow: var(--brand-shadow-sm);
-  margin-bottom: 1.5rem;
-  overflow: hidden;
-}
-
-.bset__section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.875rem 1.25rem;
-  background: var(--brand-grey-100);
-  border-bottom: 1px solid var(--brand-grey-200);
-  gap: 0.75rem;
-}
-
-.bset__section-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--brand-grey-700);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.bset__section-label i {
-  color: var(--brand-primary-dark);
-  font-size: 0.875rem;
-}
-
-.bset__count-badge {
-  background: var(--brand-primary);
-  color: var(--brand-navy);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  padding: 0.1rem 0.45rem;
-  border-radius: 1rem;
-  line-height: 1.5;
-}
-
-.bset__section-body {
-  padding: 1.25rem;
-}
-
-/* Preview overflow link — each section shows the first few rows, the rest live
-   on that section's own paginated page. */
-.bset__view-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 1rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--brand-navy);
-  text-decoration: none;
-  transition: gap 0.15s ease, color 0.15s ease;
-}
-
-.bset__view-all:hover {
-  gap: 0.6rem;
-  color: var(--brand-primary-dark);
-}
-
-/* ══════════════════════════════════════════
-   GRID
-══════════════════════════════════════════ */
-.bset__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
-}
-
-/* ══════════════════════════════════════════
-   CARD
-══════════════════════════════════════════ */
-.bset__card {
-  background: var(--brand-white);
-  border: 1px solid var(--brand-grey-200);
-  border-radius: var(--brand-radius-md);
-  display: flex;
-  flex-direction: column;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-  overflow: hidden;
-}
-
-.bset__card:hover {
-  box-shadow: var(--brand-shadow-md);
-  transform: translateY(-2px);
-}
-
-/* Verified API accent */
-.bset__card--verified {
-  border-left: 3px solid #22c55e;
-}
-
-.bset__card--unverified {
-  border-left: 3px solid #f59e0b;
-}
-
-/* Card top row */
-.bset__card-top {
+.bset__record {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 1rem 1rem 0.75rem;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  background: var(--brand-white);
+  border: 1px solid var(--brand-grey-200);
+  border-left: var(--bcon-edge) solid var(--brand-primary);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
 }
 
-.bset__card-icon {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: var(--brand-radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.875rem;
-  flex-shrink: 0;
-}
-
-.bset__card-icon--store {
-  background: rgba(247, 192, 0, 0.15);
-  color: var(--brand-primary-dark);
-}
-
-.bset__card-icon--team {
-  background: rgba(0, 31, 63, 0.08);
-  color: var(--brand-navy);
-}
-
-.bset__card-icon--verified {
-  background: rgba(34, 197, 94, 0.12);
-  color: #16a34a;
-}
-
-.bset__card-icon--unverified {
-  background: rgba(245, 158, 11, 0.12);
-  color: #d97706;
-}
-
-.bset__card-info {
-  flex: 1;
+.bset__record-main {
   min-width: 0;
 }
 
-.bset__card-name {
-  font-size: 0.9rem;
+.bset__record-name {
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--brand-grey-800);
-  margin: 0 0 0.3rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+  margin: 0;
 }
 
-/* ── STATUS BADGES ── */
-.bset__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 0.15rem 0.5rem;
-  border-radius: 2rem;
-  line-height: 1.5;
-}
-
-.bset__badge--active {
-  background: rgba(34, 197, 94, 0.1);
-  color: #15803d;
-}
-
-.bset__badge--active i {
-  color: #22c55e;
-  font-size: 0.5rem;
-}
-
-.bset__badge--inactive {
-  background: var(--brand-grey-200);
-  color: var(--brand-grey-500);
-}
-
-.bset__badge--verified {
-  background: rgba(34, 197, 94, 0.1);
-  color: #15803d;
-}
-
-.bset__badge--warn {
-  background: rgba(245, 158, 11, 0.12);
-  color: #b45309;
-}
-
-/* ── CARD ROWS ── */
-.bset__card-rows {
-  padding: 0 1rem 0.75rem;
+.bset__record-side {
   display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
-.bset__row {
+/* Filed facts — a label and its value, read across. Sentence-case labels keep
+   this reading as a record sheet rather than a row of chrome. */
+.bset__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1.25rem;
+  margin: 0.35rem 0 0;
+}
+
+.bset__fact {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
-  font-size: 0.7875rem;
-}
-
-.bset__row-label {
-  color: var(--brand-grey-400);
-  font-size: 0.7rem;
-  font-weight: 600;
-  white-space: nowrap;
-  min-width: 5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.bset__row-label i {
-  font-size: 0.65rem;
-  width: 0.75rem;
-  text-align: center;
-}
-
-.bset__row-value {
-  color: var(--brand-grey-700);
-  font-weight: 500;
-}
-
-.bset__row-value--truncate {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
-}
-
-.bset__row-link {
-  color: var(--brand-navy);
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.15s ease;
-}
-
-.bset__row-link:hover {
-  color: var(--brand-primary-dark);
-  text-decoration: underline;
-}
-
-/* ── CARD FOOTER ── */
-.bset__card-footer {
-  padding: 0.625rem 1rem;
-  border-top: 1px solid var(--brand-grey-200);
-  background: var(--brand-grey-100);
-  display: flex;
-  gap: 0.5rem;
-}
-
-.bset__btn-edit,
-.bset__btn-test {
-  display: inline-flex;
-  align-items: center;
   gap: 0.35rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--brand-radius-sm);
-  text-decoration: none;
-  transition: all 0.15s ease;
 }
 
-.bset__btn-edit {
-  background: var(--brand-white);
-  color: var(--brand-grey-700);
-  border: 1px solid var(--brand-grey-300);
-}
-
-.bset__btn-edit:hover {
-  background: var(--brand-primary);
-  color: var(--brand-navy);
-  border-color: var(--brand-primary-dark);
-}
-
-.bset__btn-test {
-  background: var(--brand-navy);
-  color: var(--brand-white);
-  border: 1px solid var(--brand-navy);
-}
-
-.bset__btn-test:hover {
-  background: var(--brand-navy-light);
-  color: var(--brand-white);
-}
-
-/* ══════════════════════════════════════════
-   BUTTONS (section header)
-══════════════════════════════════════════ */
-.bset__btn-add {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.4rem 0.875rem;
-  border-radius: var(--brand-radius-sm);
-  background: var(--brand-primary);
-  color: var(--brand-navy);
-  text-decoration: none;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  border: 1px solid var(--brand-primary-dark);
-}
-
-.bset__btn-add:hover {
-  background: var(--brand-primary-dark);
-  color: var(--brand-navy);
-  box-shadow: var(--brand-shadow-sm);
-}
-
-/* ══════════════════════════════════════════
-   EMPTY STATE
-══════════════════════════════════════════ */
-.bset__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2.5rem 1rem;
-  text-align: center;
-  gap: 0.75rem;
-}
-
-.bset__empty-icon {
-  width: 3.5rem;
-  height: 3.5rem;
-  background: var(--brand-grey-100);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.375rem;
-  color: var(--brand-grey-400);
-}
-
-.bset__empty-text {
-  font-size: 0.875rem;
+.bset__fact-label {
+  font-size: 0.72rem;
+  font-weight: 500;
   color: var(--brand-grey-500);
   margin: 0;
 }
 
-.bset__btn-add-first {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  padding: 0.5rem 1.125rem;
-  border-radius: var(--brand-radius-md);
-  background: var(--brand-primary);
-  color: var(--brand-navy);
-  text-decoration: none;
-  border: 1px solid var(--brand-primary-dark);
-  transition: all 0.15s ease;
+.bset__fact-value {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  margin: 0;
 }
 
-.bset__btn-add-first:hover {
-  background: var(--brand-primary-dark);
-  box-shadow: var(--brand-shadow-md);
+/* Codes and numbers carry the console's tabular figures so a merchant finds
+   the one they want by shape, not by reading. */
+.bset__mono {
+  font-family: var(--bcon-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ══════════════════════════════════════════
+   PANEL META
+   How much of the set is actually working, stated next to the section name.
+══════════════════════════════════════════ */
+.bset__meta {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--brand-grey-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.bset__locked {
+  cursor: not-allowed;
+  color: var(--brand-grey-450);
+}
+
+/* ══════════════════════════════════════════
+   LEDGER CELLS
+══════════════════════════════════════════ */
+/* Row actions sit tighter than a section action so the rows stay compact. */
+.bset__ledger .bcon__btn {
+  padding: 0.3rem 0.625rem;
+  font-size: 0.72rem;
+}
+
+/* The shared `thead th` rule sets text-align on two classes, so the right-hand
+   modifier needs the same reach or the action head drifts off its column. */
+.bset__ledger thead th.bcon__td--right {
+  text-align: right;
+}
+
+/* Column rhythm. A zone number and a status chip need only their own width;
+   `width: 1%` on an auto table shrinks them to their content and hands the
+   slack to the name and address columns, so a "—" sits beside its label
+   instead of floating in the middle of an empty column. */
+.bset__ledger th.bset__col--tight {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.bset__link {
+  color: var(--brand-navy);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bset__link:hover {
+  color: var(--brand-primary-text);
+  text-decoration: underline;
+}
+
+.bset__none {
+  font-size: 0.75rem;
+  color: var(--brand-grey-450);
+}
+
+.bset__endpoint {
+  display: inline-block;
+  max-width: 20rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  font-family: var(--bcon-mono);
+  font-size: 0.72rem;
+  color: var(--brand-grey-700);
+}
+
+/* ══════════════════════════════════════════
+   EMPTY SECTION
+   A section with nothing in it is one sentence and a way forward — the
+   section's own Add control is already a few pixels above it, so this is a
+   text link rather than a second filled button.
+══════════════════════════════════════════ */
+.bset__blank {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  flex-wrap: wrap;
+}
+
+.bset__blank-text {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--brand-grey-500);
+  max-width: 62ch;
+}
+
+.bset__blank-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s ease, gap 0.15s ease;
+}
+
+.bset__blank-link:hover {
+  color: var(--brand-primary-text);
+  gap: 0.55rem;
+}
+
+.bset__blank-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(247, 192, 0, 0.35);
+  border-radius: 0.2rem;
+}
+
+/* ══════════════════════════════════════════
+   MORE SETTINGS
+   The two settings areas that otherwise exist only in the sidebar.
+══════════════════════════════════════════ */
+.bset__more {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 0.5rem;
+}
+
+.bset__more-item {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr;
+  column-gap: 0.5rem;
+  align-items: start;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-sm);
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.bset__more-item:hover {
+  background: var(--brand-grey-100);
+  border-color: var(--brand-grey-400);
+}
+
+.bset__more-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(247, 192, 0, 0.35);
+}
+
+.bset__more-item i {
+  grid-row: 1 / span 2;
+  font-size: 0.95rem;
+  color: var(--brand-navy);
+  margin-top: 0.15rem;
+  justify-self: center;
+}
+
+.bset__more-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+}
+
+.bset__more-note {
+  font-size: 0.72rem;
+  color: var(--brand-grey-500);
+  line-height: 1.4;
 }
 
 /* ══════════════════════════════════════════
    RESPONSIVE
+   The ledgers stack themselves (business-console.css); this only unstacks the
+   record plate and gives the phone view its gutter back.
 ══════════════════════════════════════════ */
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
   .bset {
     padding: 0 0.75rem 1.5rem;
   }
 
-  .bset__grid {
-    grid-template-columns: 1fr;
+  .bset__record {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .bset__section-header {
+  .bset__record-side {
+    justify-content: space-between;
+  }
+
+  .bset__endpoint {
+    max-width: 14rem;
+  }
+
+  /* The section name, its count and its action cannot share one 390px line.
+     Give the name the full width and bank the action under it. */
+  .bset__panel .bcon__panel-head {
     flex-wrap: wrap;
-    gap: 0.5rem;
+    row-gap: 0.375rem;
   }
 
-  .bset__section {
-    padding: 0.875rem 0;
+  .bset__panel .bcon__panel-title {
+    flex: 1 1 100%;
   }
 
-  .bset__card-footer {
-    padding: 0.5rem 0.875rem;
+  .bset__panel .bcon__panel-head > :not(.bcon__panel-title) {
+    margin-left: auto;
+  }
+
+  /* Stacked rows lay each cell out as `label … value`. A two-line cell has two
+     values, so the second one takes its own line instead of being squeezed
+     off the right edge. */
+  .bset__ledger td {
+    flex-wrap: wrap;
+  }
+
+  .bset__ledger td .bcon__party-sub,
+  .bset__ledger td .bcon__ref-sub {
+    flex: 1 0 100%;
+    text-align: right;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bset__blank-link,
+  .bset__more-item {
+    transition: none;
   }
 }

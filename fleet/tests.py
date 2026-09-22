@@ -3183,3 +3183,108 @@ class BusinessLedgerOpeningBalanceTest(ClientPayoutMixin, TestCase):
         self.ls.post_opening_balance(self.business)
         with self.assertRaises(ValueError):
             self.ls.post_opening_balance(self.business)
+
+
+class BusinessLedgerRefundCreditTest(ClientPayoutMixin, TestCase):
+    """The float a door-step refund may be paid out of.
+
+    Deliberately narrower than the balance: the COD, charge and payout legs do
+    not post to this ledger yet, so counting their segments would credit a
+    client for money the account has no record of receiving.
+    """
+
+    def setUp(self):
+        from fleet import ledger_service
+        self.ls = ledger_service
+        self.LE = fleet_models.BusinessLedgerEntry
+        self.user, self.profile = self.create_driver_user()
+        self.driver = self.create_driver(self.user, self.profile)
+        self.business, self.pickup, self.order = self.create_business_and_order(
+            self.user, self.profile)
+        self.day = date(2026, 9, 1)
+
+    def test_a_client_payment_becomes_refundable_float(self):
+        self.ls.post(self.business, self.LE.SEGMENT_PAYMENT, credit=Decimal('500.00'),
+                     description='Bank transfer', occurred_on=self.day)
+        self.assertEqual(self.ls.available_refund_credit(self.business), Decimal('500.00'))
+
+    def test_cod_credit_is_not_refundable_float(self):
+        """The whole reason this is not balance().
+
+        COD we are holding shows on the balance, but nothing posts the COD leg
+        into this ledger today. Treating it as float would let staff authorise a
+        refund against money the account never recorded arriving.
+        """
+        self.ls.post(self.business, self.LE.SEGMENT_COD, credit=Decimal('900.00'),
+                     description='COD collected', occurred_on=self.day)
+        self.assertEqual(self.ls.balance(self.business), Decimal('900.00'))
+        self.assertEqual(self.ls.available_refund_credit(self.business), Decimal('0.00'))
+
+    def test_a_pending_hold_reduces_the_float_immediately(self):
+        """What makes two simultaneous refunds safe without a lock held open."""
+        self.ls.post(self.business, self.LE.SEGMENT_PAYMENT, credit=Decimal('300.00'),
+                     description='Prefund', occurred_on=self.day)
+        self.ls.post(self.business, self.LE.SEGMENT_ADVANCE, debit=Decimal('120.00'),
+                     description='Refund float held', occurred_on=self.day,
+                     status=self.LE.STATUS_PENDING)
+        self.assertEqual(self.ls.available_refund_credit(self.business), Decimal('180.00'))
+
+    def test_reversing_a_payment_takes_its_float_back(self):
+        entry = self.ls.post(self.business, self.LE.SEGMENT_PAYMENT, credit=Decimal('400.00'),
+                             description='Cheque, later bounced', occurred_on=self.day)
+        self.ls.reverse(entry, reason='Cheque bounced')
+        self.assertEqual(self.ls.available_refund_credit(self.business), Decimal('0.00'))
+
+    def test_reversing_a_non_prefunded_entry_does_not_touch_the_float(self):
+        """The trap that keeps SEGMENT_REVERSAL out of PREFUNDED_SEGMENTS.
+
+        A blanket include would let the contra of a COD row subtract from the
+        float while the COD row it cancels was never counted in the first place,
+        driving a client's refundable balance negative on a no-op.
+        """
+        self.ls.post(self.business, self.LE.SEGMENT_PAYMENT, credit=Decimal('250.00'),
+                     description='Prefund', occurred_on=self.day)
+        cod = self.ls.post(self.business, self.LE.SEGMENT_COD, credit=Decimal('600.00'),
+                           description='COD collected', occurred_on=self.day)
+        self.ls.reverse(cod, reason='Posted to the wrong account')
+        self.assertEqual(self.ls.available_refund_credit(self.business), Decimal('250.00'))
+
+
+class BusinessLedgerMarkClearedTest(ClientPayoutMixin, TestCase):
+    """Closing out a hold once the money it stood for has actually moved."""
+
+    def setUp(self):
+        from fleet import ledger_service
+        self.ls = ledger_service
+        self.LE = fleet_models.BusinessLedgerEntry
+        self.user, self.profile = self.create_driver_user()
+        self.driver = self.create_driver(self.user, self.profile)
+        self.business, self.pickup, self.order = self.create_business_and_order(
+            self.user, self.profile)
+
+    def _hold(self):
+        return self.ls.post(self.business, self.LE.SEGMENT_ADVANCE, debit=Decimal('75.00'),
+                            description='Refund float held',
+                            status=self.LE.STATUS_PENDING)
+
+    def test_a_hold_clears(self):
+        entry = self.ls.mark_cleared(self._hold())
+        self.assertEqual(entry.status, self.LE.STATUS_CLEARED)
+
+    def test_clearing_never_moves_the_balance(self):
+        """Clearing is a status change, not a money event."""
+        hold = self._hold()
+        before = self.ls.balance(self.business)
+        self.ls.mark_cleared(hold)
+        self.assertEqual(self.ls.balance(self.business), before)
+
+    def test_clearing_twice_is_a_no_op(self):
+        hold = self.ls.mark_cleared(self._hold())
+        self.assertEqual(self.ls.mark_cleared(hold).status, self.LE.STATUS_CLEARED)
+
+    def test_a_void_entry_cannot_be_cleared(self):
+        hold = self._hold()
+        self.ls.reverse(hold, reason='Refund abandoned')
+        hold.refresh_from_db()
+        with self.assertRaises(ValueError):
+            self.ls.mark_cleared(hold)

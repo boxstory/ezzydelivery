@@ -33,6 +33,17 @@ Notes: COD is deliberately absent — it is the driver's hand-in leg, not money 
             <div class="fde__stat-value fde__num">QAR {{ total_payout|floatformat:2 }}</div>
             <div class="fde__stat-desc">Earnings and bonuses not yet paid</div>
         </div>
+        {% comment %}Verified money sits between the queue and the payout: a figure the desk has agreed but not released. It is kept out of Pending payout on purpose — publishing is what writes the earning transaction that the payout invoice itemises — but it was invisible here before, so a driver with a fully verified month read as owed nothing.{% endcomment %}
+        {% if total_verified_count %}
+        <div class="fde__stat fde__stat--verified">
+            <div class="fde__stat-top">
+                <span class="fde__stat-label">Verified, not published</span>
+                <i class="fa-solid fa-circle-check fde__stat-icon"></i>
+            </div>
+            <div class="fde__stat-value fde__num">QAR {{ total_verified|floatformat:2 }}</div>
+            <div class="fde__stat-desc">{{ total_verified_count }} deliver{{ total_verified_count|pluralize:"y,ies" }} awaiting publish</div>
+        </div>
+        {% endif %}
         <div class="fde__stat">
             <div class="fde__stat-top">
                 <span class="fde__stat-label">Deliveries since payout</span>
@@ -114,6 +125,13 @@ Notes: COD is deliberately absent — it is the driver's hand-in leg, not money 
                     <span class="fde__detail-label">Pending payout</span>
                     <span class="fde__detail-value fde__num {% if driver.pending_payout %}fde__detail-value--highlight{% else %}fde__detail-value--muted{% endif %}">QAR {{ driver.pending_payout|floatformat:2 }}</span>
                 </div>
+                {% if driver.verified_count %}
+                <div class="fde__detail">
+                    <span class="fde__detail-label">Verified, not published</span>
+                    <span class="fde__detail-value fde__num fde__detail-value--verified"
+                          title="{{ driver.verified_count }} deliver{{ driver.verified_count|pluralize:'y,ies' }} verified on the worksheet — publish them to turn this into a pending payout">QAR {{ driver.verified_value|floatformat:2 }}</span>
+                </div>
+                {% endif %}
                 <div class="fde__detail">
                     <span class="fde__detail-label">Deliveries since payout</span>
                     <span class="fde__detail-value fde__num{% if driver.deliveries_after_settlement and not driver.pending_payout %} fde__detail-value--highlight{% endif %}">{{ driver.deliveries_after_settlement|default:"0" }}</span>

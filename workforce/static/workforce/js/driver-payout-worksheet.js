@@ -109,6 +109,7 @@
     const btnVerify = document.getElementById('workforce_verify_btn_verify');
     const btnPublish = document.getElementById('workforce_verify_btn_publish');
     const btnReject = document.getElementById('workforce_verify_btn_reject');
+    const btnSave = document.getElementById('workforce_verify_btn_save');
     const bulkAmount = document.getElementById('workforce_verify_bulk_amount');
     const tools = document.querySelector('.dpw__tools');
     const allPagesBar = document.getElementById('workforce_verify_allpages');
@@ -122,6 +123,9 @@
        filter. It survives nothing: any change to the checkboxes drops it. */
     const matchCount = tools ? (parseInt(tools.dataset.matchCount, 10) || 0) : 0;
     let allPages = false;
+    /* Set while a save or a bulk action is in flight, so the unsaved-work
+       warning below does not fire on the reload those actions trigger. */
+    let dirtyGuardOff = false;
 
     /* Rows on this page that are selected and priced at nothing. Read off the
        fee box, not the server figure, so a zero typed a second ago counts. */
@@ -137,6 +141,28 @@
     function selectedCount() {
       return allPages ? matchCount
                       : document.querySelectorAll('.workforce_verify_task:checked').length;
+    }
+
+    /* A fee box counts as edited when it differs from the figure the server
+       rendered. Compared as numbers, not strings: "15" and "15.00" are the same
+       fee, and a re-typed identical value is not an edit anyone needs to save. */
+    function isEdited(input) {
+      return (parseFloat(input.value) || 0) !== (parseFloat(input.dataset.original) || 0);
+    }
+    function editedInputs() {
+      return Array.prototype.filter.call(
+        document.querySelectorAll('.dpw__fee-input'), isEdited);
+    }
+    /* Only the edited rows that are also ticked. Save is a "with selected"
+       action like every other button on this bar, so an edit on an unticked row
+       is deliberately not saved — the row is ticked for you the moment you type
+       in it, so the only way to be here is to have unticked it again. */
+    function editedSelected() {
+      return editedInputs().filter(function (input) {
+        const cb = document.querySelector(
+          '.workforce_verify_task[value="' + input.id.replace('workforce_verify_input_', '') + '"]');
+        return cb && cb.checked;
+      });
     }
 
     function renderAllPages(pageChecked) {
@@ -163,6 +189,19 @@
       [btnSet, btnVerify, btnPublish, btnReject].forEach(function (b) {
         if (b) b.disabled = selectedCount() === 0;
       });
+      if (btnSave) {
+        const anyEdit = editedInputs().length;
+        const n = editedSelected().length;
+        // Appears only once something has actually been corrected, and then
+        // says how many rows it would write rather than making staff count.
+        btnSave.hidden = !anyEdit;
+        btnSave.disabled = n === 0;
+        btnSave.textContent = n ? 'Save ' + n + ' fee' + (n === 1 ? '' : 's')
+                                : 'Save fees';
+        btnSave.title = anyEdit && !n
+          ? 'Tick the rows whose fee you want to save'
+          : 'Write these fees without changing their verification status';
+      }
       if (selectAll) {
         selectAll.checked = checked.length === boxes.length && checked.length > 0;
         selectAll.indeterminate = checked.length > 0 && checked.length < boxes.length;
@@ -193,9 +232,15 @@
     const fees = Array.prototype.slice.call(document.querySelectorAll('.dpw__fee-input'));
     fees.forEach(function (input, i) {
       input.addEventListener('input', function () {
-        const original = parseFloat(this.dataset.original) || 0;
-        const current = parseFloat(this.value) || 0;
-        this.classList.toggle('dpw__fee-input--modified', original !== current);
+        this.classList.toggle('dpw__fee-input--modified', isEdited(this));
+        // Typing a fee is the clearest possible statement that this row is one
+        // of the rows you mean, so it ticks itself — otherwise Save would be
+        // permanently greyed out for the staff member who edited three rows and
+        // never thought to also tick them.
+        const cb = document.querySelector(
+          '.workforce_verify_task[value="' + this.id.replace('workforce_verify_input_', '') + '"]');
+        if (cb && isEdited(this) && !cb.checked) { cb.checked = true; allPages = false; }
+        update();
       });
       // Typing down a column beats reaching for the mouse on every row.
       input.addEventListener('keydown', function (e) {
@@ -288,12 +333,54 @@
       });
       body.append('earnings_updates', JSON.stringify(updates));
       body.append('csrfmiddlewaretoken', csrf());
+      dirtyGuardOff = true;
       post(body);
+      window.setTimeout(function () { dirtyGuardOff = false; }, 10000);
+    }
+
+    /* Save writes the typed fees and nothing else — no status change, no
+       wallet entry. It is the step between "that figure is wrong" and "I am
+       ready to verify it", which the desk previously had no way to express:
+       the only way to persist a fee was to verify or publish in the same
+       click. Published rows are refused server-side, not here, because the
+       page's idea of what is published can be a minute stale. */
+    if (btnSave) {
+      btnSave.addEventListener('click', function () {
+        const edits = editedSelected();
+        if (!edits.length) return;
+        const updates = {};
+        const body = new FormData();
+        body.append('action', 'update');
+        edits.forEach(function (input) {
+          const id = input.id.replace('workforce_verify_input_', '');
+          body.append('task_ids[]', id);
+          updates[id] = input.value;
+        });
+        body.append('earnings_updates', JSON.stringify(updates));
+        body.append('csrfmiddlewaretoken', csrf());
+        btnSave.disabled = true;
+        btnSave.textContent = 'Saving\u2026';
+        // The reload inside post() is what clears the dirty flag; on a failure
+        // the page stays as it is, so the edits are still on screen to retry.
+        dirtyGuardOff = true;
+        post(body);
+        window.setTimeout(function () { dirtyGuardOff = false; }, 10000);
+      });
     }
 
     if (btnVerify) btnVerify.addEventListener('click', function () { bulkAction('verify', 'verify'); });
     if (btnPublish) btnPublish.addEventListener('click', function () { bulkAction('publish', 'verify and publish'); });
     if (btnReject) btnReject.addEventListener('click', function () { bulkAction('reject', 'reject'); });
+
+    /* The headers are sort links and the task codes are links now, so leaving
+       this page mid-edit is one stray click away. A typed fee lives only in the
+       DOM until Save, so the browser is asked to confirm first. */
+    window.addEventListener('beforeunload', function (e) {
+      if (dirtyGuardOff || !editedInputs().length) return;
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    });
 
     if (btnSet) {
       btnSet.addEventListener('click', function () {
@@ -319,7 +406,9 @@
           checked.forEach(function (cb) { body.append('task_ids[]', cb.value); });
         }
         body.append('csrfmiddlewaretoken', csrf());
+        dirtyGuardOff = true;
         post(body);
+        window.setTimeout(function () { dirtyGuardOff = false; }, 10000);
       });
     }
 

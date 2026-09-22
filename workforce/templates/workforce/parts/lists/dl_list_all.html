@@ -113,8 +113,8 @@ Notes: The hero title/subtitle and the filter/column flags come from the view, s
                         <input type="text" class="pgf__input" name="customer" id="customer" placeholder="Name or mobile" value="{{ filters.customer }}" autocomplete="off">
                     </div>
                     <div class="pgf__field">
-                        <label class="pgf__label" for="driverName"><i class="fa-solid fa-user-tie"></i> DRIVER</label>
-                        <input type="text" class="pgf__input" name="driverName" id="driverName" placeholder="Driver name" value="{{ filters.driverName }}" autocomplete="off">
+                        <label class="pgf__label" for="pgf_driver"><i class="fa-solid fa-user-tie"></i> DRIVER</label>
+                        {% include "workforce/parts/components/_driver_filter.html" with driver_class="pgf__select pgf__select--multi" driver_id="pgf_driver" %}
                     </div>
                     <div class="pgf__field pgf__field--daterange">
                         <label class="pgf__label"><i class="fa-solid fa-calendar-days"></i> DATE RANGE</label>
@@ -214,13 +214,13 @@ Notes: The hero title/subtitle and the filter/column flags come from the view, s
         </div>
         <h4 class="text-muted mb-3">No Tasks Found</h4>
         <p class="text-muted mb-4">
-            {% if show_filters and filters.dlCode or filters.cCode or filters.mobile or filters.cStatus or filters.dmsStatus or filters.business %}
+            {% if show_filters and filters.code or filters.customer or filters.driver or filters.cStatus or filters.dlStatus or filters.business or filters.dateFrom or filters.dateTo %}
             No tasks match your current filters. Try adjusting your search criteria.
             {% else %}
             There are no tasks matching this view.
             {% endif %}
         </p>
-        {% if show_filters and filters.dlCode or filters.cCode or filters.mobile or filters.cStatus or filters.dmsStatus or filters.business %}
+        {% if show_filters and filters.code or filters.customer or filters.driver or filters.cStatus or filters.dlStatus or filters.business or filters.dateFrom or filters.dateTo %}
         <button type="button" class="btn btn-primary" id="clearFilterEmpty">
             <i class="fa fa-times me-2"></i>Clear All Filters
         </button>
@@ -234,7 +234,7 @@ Notes: The hero title/subtitle and the filter/column flags come from the view, s
 
 {% if export_columns %}
 {% include "workforce/parts/components/_export_columns_modal.html" %}
-<script src="{% static 'workforce/js/export-columns.js' %}?v=20260807b"></script>
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260921e"></script>
 <script>
 // Print sheet follows the row ticks the same way the CSV export does: ticked rows
 // win, none ticked prints the whole filter set. It also inherits the column pick
@@ -273,7 +273,7 @@ Notes: The hero title/subtitle and the filter/column flags come from the view, s
 (function() {
     var FIELD_LABELS = {
         code: 'Code', customer: 'Customer',
-        driverName: 'Driver', dateFrom: 'From', dateTo: 'To',
+        driver: 'Driver', dateFrom: 'From', dateTo: 'To',
         business: 'Client', cStatus: 'Client Status', dlStatus: 'DL Status'
     };
 
@@ -281,16 +281,24 @@ Notes: The hero title/subtitle and the filter/column flags come from the view, s
         var form = document.getElementById('filterForm');
         if (!form) return {};
         var vals = {};
-        ['code','customer','driverName','dateFrom','dateTo'].forEach(function(n) {
+        ['code','customer','dateFrom','dateTo'].forEach(function(n) {
             var el = form.querySelector('[name="'+n+'"]');
             if (el && el.value.trim()) vals[n] = el.value.trim();
         });
         ['business','cStatus','dlStatus'].forEach(function(n) {
             var el = form.querySelector('[name="'+n+'"]');
-            if (el && el.value) {
+            // selectedIndex is -1 with nothing picked, so options[-1] would throw.
+            if (el && el.value && el.selectedIndex >= 0) {
                 vals[n] = el.options[el.selectedIndex].text;
             }
         });
+        // Driver is a multi-select: one chip listing every name picked.
+        var driverEl = form.querySelector('[name="driver"]');
+        if (driverEl) {
+            var names = Array.prototype.filter.call(driverEl.options, function (o) { return o.selected; })
+                             .map(function (o) { return o.text.trim(); });
+            if (names.length) vals.driver = names.join(', ');
+        }
         return vals;
     }
 

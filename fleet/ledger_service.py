@@ -20,6 +20,21 @@ ZERO = Decimal('0.00')
 # with thousands of rows can total past what one entry could hold.
 BALANCE_FIELD = DecimalField(max_digits=14, decimal_places=2)
 
+# Segments a human may post by hand from the ledger console.
+#
+# Everything absent is machine-owned and must stay that way: 'cod', 'payout' and
+# 'delivery_charge' are written by the settlement legs against specific tasks, so
+# a typed row would double-count money those legs will post again; 'opening' has
+# its own one-shot route that derives the figure; 'reversal' is only ever written
+# by reverse(), which pairs the contra with its original.
+HAND_POSTABLE_SEGMENTS = [
+    BusinessLedgerEntry.SEGMENT_PAYMENT,
+    BusinessLedgerEntry.SEGMENT_ADVANCE,
+    BusinessLedgerEntry.SEGMENT_CREDIT,
+    BusinessLedgerEntry.SEGMENT_EXPENSE,
+    BusinessLedgerEntry.SEGMENT_ADJUSTMENT,
+]
+
 # Money a client has paid in that we may pay back out at a customer's door.
 #
 # Deliberately NOT balance(): the COD, charge and payout legs do not post to this
@@ -191,6 +206,42 @@ def post_refund(business, amount, order=None, reason='', created_by=None,
         delivery_task=delivery_task,
         created_by=created_by,
     )
+
+
+@transaction.atomic
+def mark_cleared(entry, delivery_task=None, occurred_on=None):
+    """Close out a pending entry once the money it stood for has actually moved.
+
+    A hold is posted at STATUS_PENDING the moment a payment is committed to, so
+    the balance reflects the promise before the cash leaves. This flips it to
+    cleared when it has.
+
+    The amount is deliberately NOT editable here. A hold that turns out to be
+    wrong is reversed and re-posted, so the account carries both rows and the
+    trail of the correction; letting this restate the figure in place would make
+    a cleared entry mean two different things depending on when it was read.
+
+    The task is stamped now rather than at hold time because the hold is raised
+    before anyone knows which task will discharge it.
+    """
+    if entry.status == BusinessLedgerEntry.STATUS_VOID:
+        raise ValueError(f"{entry.entry_code} is void and cannot be cleared")
+    if entry.status == BusinessLedgerEntry.STATUS_CLEARED:
+        return entry
+
+    fields = ['status']
+    entry.status = BusinessLedgerEntry.STATUS_CLEARED
+
+    if delivery_task is not None:
+        entry.delivery_task = delivery_task
+        entry.task_number = delivery_task.dl_task_number
+        fields += ['delivery_task', 'task_number']
+    if occurred_on is not None:
+        entry.occurred_on = occurred_on
+        fields.append('occurred_on')
+
+    entry.save(update_fields=fields)
+    return entry
 
 
 @transaction.atomic

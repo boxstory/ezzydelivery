@@ -46,6 +46,43 @@ def _safe_count_pickup_pending():
         return 0
 
 
+def _safe_count_returns_open():
+    """Count parcels somebody is still liable for. Returns 0 defensively.
+
+    Reads CUSTODY_OPEN_STATES rather than a list of its own, so the badge, the
+    console's default filter and the partial unique constraint cannot disagree.
+    """
+    try:
+        from delivery.models import ParcelCustody
+        from delivery.services.returns import CUSTODY_OPEN_STATES
+        return ParcelCustody.objects.filter(status__in=CUSTODY_OPEN_STATES).count()
+    except Exception:
+        return 0
+
+
+def _safe_count_returns_on_shelf():
+    """Parcels signed in at a hub with no run back out raised yet. Returns 0 defensively.
+
+    Deliberately NOT part of the open-custody badge: nobody is liable for these, which
+    is exactly why they get forgotten on the shelf. Mirrors the console's 'to_forward'
+    filter (workforce.views.returns_custody_list) so the badge and the queue agree.
+    """
+    try:
+        from django.db.models import Exists, OuterRef
+
+        from delivery.models import ParcelCustody
+        from delivery.services.returns import CUSTODY_RECEIVED, DEST_HUB
+
+        forward_leg = ParcelCustody.objects.filter(forwarded_from=OuterRef('pk'))
+        return (ParcelCustody.objects
+                .annotate(has_forward_leg=Exists(forward_leg))
+                .filter(status=CUSTODY_RECEIVED, destination_kind=DEST_HUB,
+                        has_forward_leg=False)
+                .count())
+    except Exception:
+        return 0
+
+
 def _safe_count_crm_overdue(category=None):
     """Count open CRM leads whose follow-up date has passed. `category` scopes the
     count to one pipeline — the sidebar carries a separate badge for CRM Business
@@ -95,7 +132,7 @@ def _safe_count_upcoming_tasks():
             order__business__business_status='active',
         ).exclude(
             dl_task_status__in=['delivered', 'partial_delivery', 'cancelled',
-                                'rejected', 'dropsownlost'],
+                                'rejected', 'dropsownlost', 'returned_to_shipper'],
         ).annotate(
             due_date=Greatest('dl_task_date', 'reschedule_date', scheduled_expr),
         ).filter(due_date__gt=today).count()
@@ -194,6 +231,12 @@ def workforce_sidebar_counts(request):
 
         # Unclaimed first-mile pickups (Pickup sidebar badge)
         'pickup_pending_count': _safe_count_pickup_pending(),
+
+        # Parcels on their way back that nobody has signed for (Returns badge)
+        'returns_open_count': _safe_count_returns_open(),
+
+        # Signed in at a hub and still waiting for the run out to the client
+        'returns_shelf_count': _safe_count_returns_on_shelf(),
 
         # Open tasks dated after today — postponed or future-dated deliveries
         'upcoming_tasks_count': _safe_count_upcoming_tasks(),

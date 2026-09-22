@@ -339,6 +339,14 @@
 .dpw__btn--go:hover:not(:disabled) { color: var(--tlr-good); border-color: var(--tlr-good); }
 .dpw__btn--void:hover:not(:disabled) { color: var(--tlr-void); border-color: var(--tlr-void); }
 .dpw__btn:disabled { color: var(--tlr-muted); border-color: var(--tlr-rule); cursor: not-allowed; }
+/* Save only exists while a fee is actually edited, so when it is on screen it is
+   the one thing on the bar with unsaved work behind it — a solid ink button
+   against the outlined ones, which is enough without spending the yellow.
+   `[hidden]` needs the override because the rule above sets display. */
+.dpw__btn--save { background: var(--tlr-ink); border-color: var(--tlr-ink); color: var(--tlr-card); }
+.dpw__btn--save:hover:not(:disabled) { background: var(--tlr-ink-soft); border-color: var(--tlr-ink-soft); }
+.dpw__btn--save:disabled { background: var(--tlr-card); color: var(--tlr-muted); border-color: var(--tlr-rule); }
+.dpw__btn--save[hidden] { display: none; }
 
 /* ── Tables ───────────────────────────────────────────────── */
 .dpw__scroll { overflow-x: auto; }
@@ -441,8 +449,87 @@
 .dpw__kind--bonus::before { background: var(--tlr-mark); }
 .dpw__kind--deduction::before { background: var(--tlr-void); }
 
-.dpw__route { font-size: 0.7rem; }
-.dpw__route-arrow { color: var(--tlr-rule-strong); margin: 0 0.25rem; }
+/* A task date standing in for a delivered date. It is still a real date, so it
+   is not struck through — just marked, so nobody reads it as a delivery. */
+.dpw__date--fallback { border-bottom: 1px dotted var(--tlr-void); }
+
+/* ── Sortable headers ──
+   The whole label is the link and the glyph carries the state: a faint double
+   arrow while the column is idle, a solid single arrow when it is the active
+   order. Deliberately colourless: this file spends Ezzy yellow exactly twice —
+   the fee marker and the create-payout action — and a column header is neither. */
+.dpw__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: inherit;
+  text-decoration: none;
+}
+.dpw__sort::after { content: "\2195"; font-size: 0.66rem; line-height: 1; opacity: 0.3; }
+.dpw__sort:hover { color: var(--tlr-ink); }
+.dpw__sort:hover::after { opacity: 0.7; }
+.dpw__sort:focus-visible { outline: 1px solid var(--tlr-ink); outline-offset: 2px; }
+.dpw__sort--asc, .dpw__sort--desc { color: var(--tlr-ink); }
+.dpw__sort--asc::after { content: "\2191"; opacity: 1; }
+.dpw__sort--desc::after { content: "\2193"; opacity: 1; }
+/* Right-aligned figures keep the glyph outside the number edge, so the column
+   of digits still lines up against the cell wall. */
+.dpw__table thead th.dpw__num .dpw__sort { flex-direction: row-reverse; }
+
+/* The task code opens the task. It stays ink-coloured rather than turning into
+   a blue link — fifty underlined codes would be the loudest column on a page
+   whose subject is the fee beside them. A dotted rule is enough to say it is
+   clickable; the hover makes it solid. */
+.dpw__task-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--tlr-rule-strong); }
+.dpw__task-link:hover { color: var(--tlr-ink); border-bottom: 1px solid var(--tlr-ink); }
+.dpw__task-link:focus-visible { outline: 1px solid var(--tlr-ink); outline-offset: 2px; }
+
+/* ── From / To / KM: where the delivery ran and how far ── */
+/* The zone number is the address in Qatar, so it leads in mono — but a bare
+   number tells a reader nothing, so the zone area name sits right behind it at
+   full strength. The pickup point's own title trails both, a size down and
+   greyed: it identifies the door, while the zone area is the geography that has
+   to make the KM column believable. */
+.dpw__leg { font-size: 0.7rem; max-width: 11rem; overflow: hidden; text-overflow: ellipsis; }
+.dpw__leg-area { color: var(--tlr-ink); margin-left: 0.3rem; }
+/* The seller's own free-text locality standing in for a zone name the pickup
+   location never had. It is a claim, not a lookup, so it does not get to look
+   like one. */
+.dpw__leg-area--stated { color: var(--tlr-muted); font-style: italic; }
+.dpw__leg-name { color: var(--tlr-muted); font-size: 0.64rem; margin-left: 0.3rem; }
+/* Where the run started — its own column, ahead of where the client is. Narrow
+   on purpose: one word, with a driver name under it only on a transfer. */
+.dpw__mile { width: 5.5rem; }
+/* Quiet by default — a hub shelf and a hand-over are context. 'self' is the one
+   that changes what this row is worth, so only that variant takes the info
+   colour, the same way the salary caption does in the fee column. */
+.dpw__mile-tag {
+  display: block;
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+}
+.dpw__mile-tag--self { color: var(--tlr-info); font-weight: 600; }
+/* The driver who handed the parcel over. A name, so it is set in the body face
+   rather than the mono caps above it, and a step down — it answers "whose first
+   mile was this", which is a follow-up question, not the column's answer. */
+.dpw__mile-who {
+  display: block;
+  font-size: 0.6rem;
+  line-height: 1.25;
+  color: var(--tlr-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Distance is reference, not a figure anyone decides on, so it sits quieter than
+   the money columns to its right. An approximation carries a tilde and drops
+   another step, so a measured road distance is the one that reads as solid. */
+.dpw__km { font-size: 0.7rem; color: var(--tlr-ink); }
+.dpw__km--est { color: var(--tlr-muted); }
+.dpw__km-est { font-size: 0.56rem; margin-left: 0.1rem; color: var(--brand-grey-400); }
 
 /* COD stays quiet — context, never money owed. It also carries the largest
    figures on the page, and long numbers pull the eye on their own, so it is set

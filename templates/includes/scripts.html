@@ -43,26 +43,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Also handle .text-danger.small error divs used in some templates
-    document.querySelectorAll('.text-danger.small').forEach(function(errDiv) {
-        var parent = errDiv.parentElement;
-        if (parent) {
+    // Hand-written error divs are often rendered empty and hidden, as a placeholder for a
+    // message the page's own JS fills in later. An empty one is NOT an error, so only mark
+    // the field when the div actually carries text and is not hidden.
+    function markFieldsWithMessage(selector) {
+        document.querySelectorAll(selector).forEach(function(errDiv) {
+            if (!errDiv.textContent.trim()) return;
+            if (errDiv.offsetParent === null && getComputedStyle(errDiv).display === 'none') return;
+            var parent = errDiv.parentElement;
+            if (!parent) return;
             var input = parent.querySelector('input, select, textarea');
             if (input && !input.classList.contains('is-invalid')) {
                 input.classList.add('is-invalid');
             }
-        }
-    });
+        });
+    }
 
-    // Handle ou__error class used in order_update
-    document.querySelectorAll('.ou__error').forEach(function(errDiv) {
-        var parent = errDiv.parentElement;
-        if (parent) {
-            var input = parent.querySelector('input, select, textarea');
-            if (input && !input.classList.contains('is-invalid')) {
-                input.classList.add('is-invalid');
-            }
-        }
-    });
+    // .text-danger.small error divs used in some templates
+    markFieldsWithMessage('.text-danger.small');
+
+    // ou__error class used in order_update
+    markFieldsWithMessage('.ou__error');
 });
 </script>

@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/driver_payout_worksheet.css' %}?v=20260909p" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/driver_payout_worksheet.css' %}?v=20260914h" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -419,7 +419,7 @@
       {% if only %}
       <a href="?{{ range_qs }}" class="dpw__rail-clear">Show all</a>
       {% endif %}
-      <a href="?{{ range_qs }}{% if only %}&amp;only={{ only }}{% endif %}&amp;export=csv"
+      <a href="?{{ page_params }}&amp;export=csv"
          class="dpw__rail-export">Export CSV</a>
     </div>
 
@@ -464,7 +464,9 @@
         </div>
       </div>
 
+      {% comment %}Save is the step between editing a fee and committing to it: it writes the figure and leaves the verification status alone. Hidden until a fee is actually edited, so the bar carries no dead control on the ordinary pass where nothing is being corrected.{% endcomment %}
       <div class="dpw__acts">
+        <button type="button" class="dpw__btn dpw__btn--save" id="workforce_verify_btn_save" hidden disabled>Save fees</button>
         <button type="button" class="dpw__btn" id="workforce_verify_btn_verify" disabled>Verify</button>
         <button type="button" class="dpw__btn dpw__btn--go" id="workforce_verify_btn_publish" disabled>Verify &amp; publish</button>
         <button type="button" class="dpw__btn dpw__btn--void" id="workforce_verify_btn_reject" disabled>Reject</button>
@@ -474,17 +476,64 @@
     <div class="dpw__scroll dpw__scroll--queue">
       <table class="dpw__table dpw__table--queue">
         <thead>
+          {% comment %}Every header but the checkbox and the log count is a sort link. sort_columns carries where each one points next and which arrow it wears, so clicking the column already sorted reverses it. sort_params holds the period, the rail filter and the driver cut, minus `sort` — otherwise a header click would throw the staff member's filters away.{% endcomment %}
           <tr>
             <th class="dpw__col-check"></th>
-            <th>Task</th>
-            {% if fleet_wide %}<th>Driver</th>{% endif %}
-            <th>Date</th>
-            <th class="dpw__col-flex">Business</th>
-            <th>Route</th>
-            <th class="dpw__num dpw__col-money">Charge</th>
-            <th class="dpw__num dpw__col-cod">COD</th>
-            <th class="dpw__num">Driver fee</th>
-            <th>Status</th>
+            <th class="dpw__th-sort">
+              <a class="dpw__sort{% if sort_columns.task.dir %} dpw__sort--{{ sort_columns.task.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.task.key }}">Task</a>
+            </th>
+            {% if fleet_wide %}
+            <th class="dpw__th-sort">
+              <a class="dpw__sort{% if sort_columns.driver.dir %} dpw__sort--{{ sort_columns.driver.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.driver.key }}">Driver</a>
+            </th>
+            {% endif %}
+            <th class="dpw__th-sort">
+              <a class="dpw__sort{% if sort_columns.date.dir %} dpw__sort--{{ sort_columns.date.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.date.key }}"
+                 title="When the driver completed the delivery">Delivered</a>
+            </th>
+            <th class="dpw__th-sort dpw__col-flex">
+              <a class="dpw__sort{% if sort_columns.business.dir %} dpw__sort--{{ sort_columns.business.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.business.key }}">Business</a>
+            </th>
+            {% comment %}Who went to the client's door, ahead of where that door is: on a payout desk the question "did this driver do the first mile too" is asked before the geography is. Sorts self-pickup rows to the top on a first click.{% endcomment %}
+            <th class="dpw__th-sort">
+              <a class="dpw__sort{% if sort_columns.pickup.dir %} dpw__sort--{{ sort_columns.pickup.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.pickup.key }}"
+                 title="Who collected the parcel from the client. Sorts the rows this driver picked up themselves to the top.">Pickup</a>
+            </th>
+            <th class="dpw__th-sort">
+              <a class="dpw__sort{% if sort_columns.from.dir %} dpw__sort--{{ sort_columns.from.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.from.key }}"
+                 title="Groups by pickup zone, then by the area the seller stated">From</a>
+            </th>
+            <th class="dpw__th-sort">
+              <a class="dpw__sort{% if sort_columns.to.dir %} dpw__sort--{{ sort_columns.to.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.to.key }}"
+                 title="Groups by drop zone number">To</a>
+            </th>
+            <th class="dpw__th-sort dpw__num">
+              <a class="dpw__sort{% if sort_columns.km.dir %} dpw__sort--{{ sort_columns.km.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.km.key }}">KM</a>
+            </th>
+            <th class="dpw__th-sort dpw__num dpw__col-money">
+              <a class="dpw__sort{% if sort_columns.charge.dir %} dpw__sort--{{ sort_columns.charge.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.charge.key }}">Charge</a>
+            </th>
+            <th class="dpw__th-sort dpw__num dpw__col-cod">
+              <a class="dpw__sort{% if sort_columns.cod.dir %} dpw__sort--{{ sort_columns.cod.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.cod.key }}">COD</a>
+            </th>
+            <th class="dpw__th-sort dpw__num">
+              <a class="dpw__sort{% if sort_columns.fee.dir %} dpw__sort--{{ sort_columns.fee.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.fee.key }}">Driver fee</a>
+            </th>
+            <th class="dpw__th-sort">
+              <a class="dpw__sort{% if sort_columns.status.dir %} dpw__sort--{{ sort_columns.status.dir }}{% endif %}"
+                 href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.status.key }}">Status</a>
+            </th>
             <th class="dpw__num">Log</th>
           </tr>
         </thead>
@@ -495,7 +544,10 @@
               <input type="checkbox" class="form-check-input workforce_verify_task" value="{{ task.id }}"
                      {% if task.salary_covered %}data-salary="1"{% endif %}>
             </td>
-            <td class="dpw__mono">{{ task.dl_task_number }}</td>
+            {% comment %}A fee that looks wrong is settled on the task page, not here — the code is the way in. New tab on purpose: the queue holds unsaved fee edits.{% endcomment %}
+            <td class="dpw__mono"><a class="dpw__task-link" target="_blank" rel="noopener"
+                   href="{% url 'workforce:delivery_task_detail' task.id %}"
+                   title="Open task {{ task.dl_task_number }} in a new tab">{{ task.dl_task_number }}</a></td>
             {% if fleet_wide %}
             <td class="dpw__mono">
               <a href="{% url 'workforce:driver_payout_worksheet' task.driver.driver_id %}"
@@ -504,18 +556,41 @@
               </a>
             </td>
             {% endif %}
-            {# Not `|date|default:…|date` and not `{% firstof … as %}` — both hand the second date filter a string, which is why this column rendered blank. #}
-            <td class="dpw__mono dpw__dim">{% if task.completed_at %}{{ task.completed_at|date:"d M y" }}{% elif task.dl_task_date %}{{ task.dl_task_date|date:"d M y" }}{% else %}—{% endif %}</td>
+            {% comment %}The delivered date — completed_at, the moment the driver closed the task, rendered in Qatar time by TIME_ZONE. dl_task_date is the task's own date and differs on 678 of 1,416 delivered rows, so when it stands in it is marked: a payout is argued about per delivery date, and a task date quietly presented as one is the kind of thing that loses the argument.
+
+            Not `|date|default:…|date` and not `{% firstof … as %}` — both hand the second date filter a string, which is why this column rendered blank.{% endcomment %}
+            <td class="dpw__mono dpw__dim">{% if task.completed_at %}<span title="Delivered {{ task.completed_at|date:"d M Y, H:i" }}">{{ task.completed_at|date:"d M y" }}</span>
+              {% elif task.dl_task_date %}<span class="dpw__date--fallback" title="No delivery timestamp on this task — showing its task date instead">{{ task.dl_task_date|date:"d M y" }}</span>
+              {% else %}—{% endif %}</td>
             <td class="dpw__truncate dpw__col-flex" title="{{ task.order.business.business_name|default:'' }}">{{ task.order.business.business_name|default:"—" }}</td>
-            {% comment %}Qatar addresses read as zone numbers, so the route is a zone pair. The drop zone lives on the order (QNAS), not on the address record.{% endcomment %}
-            <td class="dpw__dim dpw__route"
-                title="{{ task.pickup_location.pickup_location_title|default:'No pickup' }} → zone {{ task.order.dl_zone|default:'?' }}{% if task.order.dl_street %}, street {{ task.order.dl_street }}{% endif %}">
-              {% if task.pickup_location.pickup_zone_no %}<span class="dpw__mono">Z{{ task.pickup_location.pickup_zone_no }}</span>
-              {% else %}<span class="dpw__mono">{{ task.pickup_location.pickup_location_title|default:"—"|truncatechars:9 }}</span>{% endif %}
-              <span class="dpw__route-arrow">→</span>
-              {% firstof task.dl_to_address.dl_zone task.order.dl_zone as drop_zone %}
-              {% if drop_zone %}<span class="dpw__mono">Z{{ drop_zone }}</span>
-              {% else %}<span class="dpw__mono">—</span>{% endif %}
+            {% comment %}Qatar addresses read as zone numbers, so each end leads with its zone and then names the place that number stands for — the zone area. The pickup point's own title follows it a shade down, because the zone area is the geography that explains the KM column while the title only identifies the door. Both ends come from the view's _payout_leg, which reads the live address FK rather than guessing between the task's two.{% endcomment %}
+            {% comment %}Where this driver's run started, in one word. 'self' is the case the fee already covers — they collected from the client themselves — and it is the one a payout is argued over. 'hub' means they took it off a shelf; 'transfer' means another driver put it in their hands, and that driver is named underneath because the first mile belongs on their sheet, not this one. An em dash is the honest answer for the rows with no first-mile record, which is still most of them.{% endcomment %}
+            <td class="dpw__mile">
+              {% if task.leg.picked %}
+                <span class="dpw__mile-tag dpw__mile-tag--{{ task.leg.picked }}"
+                      title="{{ task.leg.picked_note }}{% if task.leg.picked_at %} — collected {{ task.leg.picked_at|date:"d M y, H:i" }}{% endif %}">{{ task.leg.picked }}</span>
+                {% if task.leg.picked == 'transfer' and task.leg.picked_who %}
+                <span class="dpw__mile-who" title="{{ task.leg.picked_who }} collected this from the client{% if task.leg.picked_by %} ({{ task.leg.picked_by }}){% endif %}">{{ task.leg.picked_who }}</span>
+                {% endif %}
+              {% else %}<span class="dpw__mono dpw__dim">—</span>{% endif %}
+            </td>
+            <td class="dpw__leg" title="{% if task.leg.from_zone %}Zone {{ task.leg.from_zone }}{% if task.leg.from_area %} ({{ task.leg.from_area }}){% endif %}{% else %}Zone not set on this pickup location{% if task.leg.from_area %} — area stated as &quot;{{ task.leg.from_area }}&quot;{% endif %}{% endif %}{% if task.leg.from_street %}, street {{ task.leg.from_street }}{% endif %}{% if task.leg.from_name %} — {{ task.leg.from_name }}{% endif %}">
+              {% if task.leg.from_zone %}<span class="dpw__mono">Z{{ task.leg.from_zone }}</span>{% endif %}
+              {% if task.leg.from_area %}<span class="dpw__leg-area{% if task.leg.from_area_stated %} dpw__leg-area--stated{% endif %}">{{ task.leg.from_area }}</span>{% endif %}
+              {% if task.leg.from_name %}<span class="dpw__leg-name">{{ task.leg.from_name }}</span>
+              {% elif not task.leg.from_zone %}<span class="dpw__mono dpw__dim">—</span>{% endif %}
+            </td>
+            {% comment %}to_name is already the best of the two: the pin's neighbourhood when it resolved one, the zone's own name otherwise. The tooltip carries both, since a pin-resolved area often sits inside a differently-named zone.{% endcomment %}
+            <td class="dpw__leg" title="{% if task.leg.to_zone %}Zone {{ task.leg.to_zone }}{% if task.leg.to_area %} ({{ task.leg.to_area }}){% endif %}{% else %}Zone unknown{% endif %}{% if task.leg.to_street %}, street {{ task.leg.to_street }}{% endif %}{% if task.leg.to_name %} — {{ task.leg.to_name }}{% endif %}">
+              {% if task.leg.to_zone %}<span class="dpw__mono">Z{{ task.leg.to_zone }}</span>{% endif %}
+              {% if task.leg.to_name %}<span class="dpw__leg-area">{{ task.leg.to_name }}</span>
+              {% elif not task.leg.to_zone %}<span class="dpw__mono dpw__dim">—</span>{% endif %}
+            </td>
+            {% comment %}An approximation is marked rather than passed off as measured: only an OSRM road distance between two real pins is a measurement.{% endcomment %}
+            <td class="dpw__num dpw__mono dpw__km{% if task.leg.km_estimate %} dpw__km--est{% endif %}"
+                title="{% if task.leg.km is not None %}{{ task.leg.km }} km — {% if task.leg.km_source == 'osrm' %}road distance{% elif task.leg.km_source == 'straight_line' %}straight line{% else %}zone-centre estimate{% endif %}{% if task.leg.km_estimate %} (approximate){% endif %}{% else %}Distance unknown — one end has no location{% endif %}">
+              {% if task.leg.km is not None %}{{ task.leg.km|floatformat:1 }}{% if task.leg.km_estimate %}<span class="dpw__km-est">~</span>{% endif %}
+              {% else %}<span class="dpw__dim">—</span>{% endif %}
             </td>
             {# Zero renders as an em dash so the row carrying a real charge stands out. #}
             <td class="dpw__num dpw__mono dpw__dim dpw__col-money">{% if task.dl_price %}{{ task.dl_price|floatformat:2 }}{% else %}—{% endif %}</td>
@@ -555,7 +630,7 @@
           </tr>
           {% if task.activity_log %}
           <tr class="dpw__log-row" id="workforce_verify_log_{{ task.id }}" hidden>
-            <td colspan="{% if fleet_wide %}11{% else %}10{% endif %}">
+            <td colspan="{% if fleet_wide %}14{% else %}13{% endif %}">
               <ol class="dpw__log-list">
                 {% for entry in task.activity_log %}
                 <li class="dpw__log-entry">
@@ -575,7 +650,7 @@
 
     {% if tasks.has_other_pages %}
     <div class="dpw__pager">
-      {% include "includes/components/_pagination.html" with page_obj=tasks %}
+      {% include "includes/components/_pagination.html" with page_obj=tasks filter_params=page_params %}
     </div>
     {% endif %}
 
@@ -619,5 +694,5 @@
 <script>
   const workforceEarningsActionUrl = "{% url 'workforce:earnings_verification_action' %}";
 </script>
-<script src="{% static 'workforce/js/driver-payout-worksheet.js' %}?v=20260909h"></script>
+<script src="{% static 'workforce/js/driver-payout-worksheet.js' %}?v=20260914a"></script>
 {% endblock %}

@@ -11,7 +11,7 @@ Notes: Reuses the .wfl navy hero + dl-table from the Follow-Up console; the extr
 {% endcomment %}
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}?v=20260808a" rel="stylesheet" type="text/css" />
-<link href="{% static 'workforce/css/followup-list.css' %}?v=20260729c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/followup-list.css' %}?v=20260921a" rel="stylesheet" type="text/css" />
 <link href="{% static 'workforce/css/upcoming-list.css' %}?v=20260808a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
@@ -48,16 +48,7 @@ Notes: Reuses the .wfl navy hero + dl-table from the Follow-Up console; the extr
         <span class="wfl__hero__div" aria-hidden="true"></span>
         <!-- Driver filter lives here but belongs to the filter form below (HTML form owner) -->
         <label class="visually-hidden" for="workforce_upcoming_select_driver">Driver</label>
-        <select class="form-select form-select-sm wfl__hero__select" name="driver"
-                id="workforce_upcoming_select_driver" form="upcomingFilterForm"
-                onchange="this.form.submit()">
-            <option value="">All Drivers</option>
-            {% for d in active_drivers %}
-            <option value="{{ d.driver_id }}" {% if current_driver == d.driver_id|stringformat:"s" %}selected{% endif %}>
-                {{ d.user.first_name }} {{ d.user.last_name }}
-            </option>
-            {% endfor %}
-        </select>
+        {% include "workforce/parts/components/_driver_filter.html" with driver_choices=active_drivers driver_selected=current_driver driver_class="form-select form-select-sm wfl__hero__select wfl__hero__select--multi" driver_id="workforce_upcoming_select_driver" driver_submit_on_close=True driver_form="upcomingFilterForm" %}
         <button type="button" class="wfnote__btn" data-wfnote-toggle
                 aria-expanded="false" aria-controls="workforce_parts_lists_dl_list_upcoming_card_notes"
                 title="About this page">

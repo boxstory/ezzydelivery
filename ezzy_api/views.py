@@ -866,6 +866,78 @@ def driver_nav_handoff(request):
     }, status=status.HTTP_201_CREATED)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
+def driver_push_subscribe(request):
+    """Register this browser as a push address for the driver.
+
+    The PWA sends the whole ``PushSubscription`` object the browser gave it. The
+    endpoint is the identity, so a device re-subscribing after a permission
+    reset updates its own row instead of accumulating dead ones — and a row that
+    had been retired for failing comes back alive, because the browser handing
+    it out again is proof the device is there.
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    sub = request.data.get('subscription') or request.data
+    if not isinstance(sub, dict):
+        return Response({'error': 'subscription must be an object'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    endpoint = (sub.get('endpoint') or '').strip()
+    keys = sub.get('keys') or {}
+    p256dh = (keys.get('p256dh') or '').strip()
+    auth_key = (keys.get('auth') or '').strip()
+    if not endpoint or not p256dh or not auth_key:
+        return Response({'error': 'endpoint and keys are required'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    if not endpoint.startswith('https://') or len(endpoint) > 2000:
+        return Response({'error': 'Invalid endpoint'}, status=status.HTTP_400_BAD_REQUEST)
+
+    row, created = fleet_models.DriverPushSubscription.objects.update_or_create(
+        endpoint=endpoint,
+        defaults={
+            'driver': driver,
+            'p256dh': p256dh[:255],
+            'auth': auth_key[:255],
+            'user_agent': (request.META.get('HTTP_USER_AGENT') or '')[:300],
+            'is_active': True,
+            'failure_count': 0,
+            'last_failure': '',
+        },
+    )
+    return Response(
+        {'message': 'Subscribed', 'id': row.pk, 'created': created},
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, ApiKeyScopePermission])
+def driver_push_unsubscribe(request):
+    """Drop a push address — the driver turned notifications off on this device.
+
+    Scoped to the caller's own rows: an endpoint is a bearer-ish string, and
+    deleting by endpoint alone would let any driver unregister another's phone.
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    endpoint = (request.data.get('endpoint') or '').strip()
+    if not endpoint:
+        return Response({'error': 'endpoint is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    removed, _ = fleet_models.DriverPushSubscription.objects.filter(
+        driver=driver, endpoint=endpoint).delete()
+    return Response({'message': 'Unsubscribed', 'removed': removed},
+                    status=status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
 def driver_latest_location(request, driver_id):
@@ -1185,11 +1257,13 @@ def driver_complete_task(request, task_id):
             if notes:
                 task._status_notes = notes
 
-            if status_value in ('delivered', 'failed', 'cancelled'):
+            if status_value in ('delivered', 'failed', 'cancelled', 'returned_to_shipper'):
                 task.completed_at = timezone.now()
 
-            # Persist failure reason & driver notes on the task when marking failed
-            if status_value == 'failed':
+            # Persist failure reason & driver notes on the task when marking failed.
+            # A parcel going back carries the same explanation as a failed attempt —
+            # same keys, same fields — so the two close out identically on the record.
+            if status_value in ('failed', 'returned_to_shipper'):
                 valid_reason_keys = {k for k, _ in delivery_models.DeliveryTask.FAILURE_REASON_CHOICES}
                 failure_reason = serializer.validated_data.get('failure_reason', '') or ''
                 failure_notes = serializer.validated_data.get('failure_notes', '') or ''
@@ -1463,6 +1537,23 @@ def driver_complete_task(request, task_id):
             )
             documents_created.append(doc.id)
         
+        # A parcel coming back is more than a status: restore the paperwork, the
+        # RMA and any COD. Read the status back first — delivery/signals.py reverts
+        # a transition it refuses without raising, and opening an RMA against a task
+        # that is still out for delivery would be far worse than doing nothing.
+        task.refresh_from_db(fields=['dl_task_status'])
+        if task.dl_task_status == 'returned_to_shipper':
+            try:
+                from delivery.services.returns import open_return_for_task
+                open_return_for_task(
+                    task, actor=request.user,
+                    reason=(serializer.validated_data.get('failure_reason') or 'other'),
+                    reason_notes=(serializer.validated_data.get('failure_notes') or notes or ''),
+                )
+            except Exception as e:
+                logger.exception(
+                    "Return paperwork failed for task %s: %s", task_id, e)
+
         # Trigger webhooks
         webhook_payload = {
             'task_id': task_id,
@@ -2665,7 +2756,7 @@ def webhook_receive_task_completion(request):
                 task.dl_task_status = status_value
                 if status_value == 'delivered':
                     task.completed_at = timezone.now()
-                elif status_value in ('failed', 'cancelled'):
+                elif status_value in ('failed', 'cancelled', 'returned_to_shipper'):
                     task.completed_at = timezone.now()
                 elif status_value == 'rejected':
                     pass

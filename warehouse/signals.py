@@ -6,6 +6,11 @@ from django.utils import timezone
 
 logger = logging.getLogger('warehouse')
 
+# The leg that carries a returned parcel from a hub shelf back out to the client.
+# It moves stock OFF our shelf without ever being a fulfilment — see the
+# 'delivered' branch of delivery_task_post_save_handler.
+from delivery.services.returns import RETURN_LEG  # noqa: E402
+
 # Store old status values for change detection
 _old_order_status = {}
 _old_delivery_status = {}
@@ -566,39 +571,66 @@ def process_partial_return(order, returned_items):
         returned_order_items.append(item)
 
     # Auto-create CustomerReturn (RMA) for the returned items
-    if returned_order_items:
-        warehouse = None
-        if linked_warehouse_ids:
-            from warehouse.models import Warehouse
-            warehouse = Warehouse.objects.filter(pk__in=linked_warehouse_ids).first()
-
-        if warehouse:
-            rma = CustomerReturn.objects.create(
-                order=order,
-                warehouse=warehouse,
-                reason='refused',
-                status='approved',
-                customer_notes=f"Partial return from delivered order {order.order_number}",
-            )
-
-            for item in returned_order_items:
-                if item.product:
-                    CustomerReturnItem.objects.create(
-                        customer_return=rma,
-                        product=item.product,
-                        quantity=item.quantity_returned,
-                        reason='refused',
-                        condition='good',
-                        disposition='restock',
-                    )
-
-            logger.info(
-                f"Auto-created RMA {rma.rma_number} for partial return on order {order.order_number} "
-                f"({len(returned_order_items)} items)"
-            )
+    create_customer_return_rma(
+        order, returned_order_items,
+        notes=f"Partial return from delivered order {order.order_number}",
+    )
 
     logger.info(f"Partial return processed for order {order.order_number}: {len(returned_order_items)} items returned")
     return returned_order_items
+
+
+def create_customer_return_rma(order, returned_order_items, reason='refused',
+                               status='approved', notes=''):
+    """Open the warehouse RMA for goods coming back. Returns the CustomerReturn or None.
+
+    None means the business has no active SellerWarehouseLink, so there is no shelf
+    of ours to book the goods into — which is what process_partial_return has always
+    done silently. Callers must read None as "not our warehouse", never as a failure.
+
+    Extracted from process_partial_return so the returned-to-shipper path can open
+    the same paperwork without also re-running that function's stock restore, which
+    is owned by delivery_task_post_save_handler for undelivered parcels.
+    """
+    from warehouse.models import (
+        SellerWarehouseLink, Warehouse, CustomerReturn, CustomerReturnItem,
+    )
+
+    if not returned_order_items:
+        return None
+
+    warehouse = Warehouse.objects.filter(
+        pk__in=SellerWarehouseLink.objects.filter(
+            business=order.business, is_active=True,
+        ).values_list('warehouse_id', flat=True)
+    ).first()
+    if not warehouse:
+        return None
+
+    rma = CustomerReturn.objects.create(
+        order=order,
+        warehouse=warehouse,
+        reason=reason,
+        status=status,
+        customer_notes=notes or f"Return on order {order.order_number}",
+    )
+
+    for item in returned_order_items:
+        if item.product:
+            CustomerReturnItem.objects.create(
+                customer_return=rma,
+                product=item.product,
+                quantity=item.quantity_returned,
+                reason=reason,
+                condition='good',
+                disposition='restock',
+            )
+
+    logger.info(
+        f"Auto-created RMA {rma.rma_number} for order {order.order_number} "
+        f"({len(returned_order_items)} items)"
+    )
+    return rma
 
 
 def _reverse_direct_deductions(order):
@@ -1272,15 +1304,31 @@ def delivery_task_post_save_handler(sender, instance, created, *args, **kwargs):
         ship_stock_for_task(instance)
 
     elif old_status != 'delivered' and status == 'delivered':
-        # Already shipped at pickup: the stock has moved, only the paperwork is
-        # left. Deducting again here is what made on-hand fall by twice the order.
-        if _task_has_txn(instance, 'ship'):
+        # A return run ending at the CLIENT is not a fulfilment: the customer
+        # never got these goods, and the order's stock was already restored when
+        # the original leg closed as returned_to_shipper. What did happen is that
+        # the parcel physically left our shelf, so book that movement and nothing
+        # else — fulfill_stock_reservation() would deduct the order a second time
+        # and _mark_items_delivered() would record a delivery that never was.
+        if instance.task_leg == RETURN_LEG:
+            # Keyed on this task's own number, so it is a separate movement from
+            # the original leg's and idempotent if the driver already pressed
+            # picked_up on the way out.
+            ship_stock_for_task(instance)
+        elif _task_has_txn(instance, 'ship'):
+            # Already shipped at pickup: the stock has moved, only the paperwork is
+            # left. Deducting again here is what made on-hand fall by twice the order.
             _mark_items_delivered(instance.order)
         else:
             with transaction.atomic():
                 fulfill_stock_reservation(instance.order)
 
-    elif status == 'failed' and old_status not in (None, 'failed'):
+    # A parcel returned to the shipper never reached the customer, so the goods
+    # come back exactly as they do on a failed attempt. Keeping both outcomes on
+    # this one handler is what stops a second restore: _task_has_txn only sees
+    # reference_type='delivery_task', so a restore booked anywhere else would be
+    # invisible here and the quantity would go back twice.
+    elif status in ('failed', 'returned_to_shipper') and old_status not in (None, status):
         if _task_has_txn(instance, 'ship'):
             return_stock_for_task(instance)
         else:

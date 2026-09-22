@@ -72,6 +72,12 @@ def _waha_base():
     return (getattr(settings, 'WAHA_BASE_URL', 'http://127.0.0.1:3000') or '').rstrip('/')
 
 
+# WAHA builds file URLs from its own container hostname, not from the address we
+# reach it on, so the host it hands back ('localhost:3000') is one the browser
+# cannot resolve and CSP blocks. Any /api/files/ URL is ours whatever the host.
+_WAHA_FILE_URL_RE = re.compile(r'^https?://[^/]+(/api/files/.*)$', re.IGNORECASE)
+
+
 def _rewrite_waha_url(url):
     if not url:
         return url
@@ -80,12 +86,15 @@ def _rewrite_waha_url(url):
     # Idempotent: already same-origin under /waha.
     if s.startswith('/waha/'):
         return s
-    for prefix in (base, 'http://127.0.0.1:3000'):
+    for prefix in (base, 'http://127.0.0.1:3000', 'http://localhost:3000'):
         if prefix and s.startswith(prefix):
             tail = s[len(prefix):]
             if not tail.startswith('/'):
                 tail = '/' + tail
             return '/waha' + tail
+    match = _WAHA_FILE_URL_RE.match(s)
+    if match:
+        return '/waha' + match.group(1)
     return s
 
 
@@ -248,6 +257,14 @@ def _row_to_dict(row, chat_id):
     if mtype == 'unknown' and row.message_type:
         mtype = row.message_type
     media = _extract_media(row)
+    # WAHA drops its own copy of a file within minutes, and our archive of it
+    # lives in private storage that has no public URL — so hand the browser our
+    # streamer, which reads the archive and falls back to WAHA for fresh media.
+    if media or row.media_file:
+        media = {
+            'url': '/waha/wa-chats/media/%d/' % row.pk,
+            'mime': row.media_mime or (media or {}).get('mime', ''),
+        }
     is_group = str(chat_id).endswith('@g.us')
     sender = None
     if is_group:
@@ -735,6 +752,34 @@ def wa_chats_resync(request):
     return JsonResponse({"ok": True, "count": total, "inserted": inserted, "messages": []}, status=200)
 
 
+@require_http_methods(["GET"])
+def wa_chats_media(request, msg_id):
+    """Stream one stored message's attachment to the inbox UI.
+
+    The archive lives in private storage with no public URL — deliberately, so
+    customer photos are not readable off /media/ — and WAHA's own copy is gone
+    within minutes. This is the inbox's only way to show either. Protected by the
+    same nginx htpasswd as the rest of /waha/, and it reuses the CRM streamer so
+    the mimetype hardening stays in one place.
+
+    Deliberately NOT behind crm_services.wa_read_blocked, on the account owner's
+    explicit decision (2026-09-18). That gate stops a Django staff user opening a
+    registered account's conversation from the CRM, where the audience is every
+    staff member. This surface is different: the caller has already passed the
+    htpasswd on /waha/, and the message list sitting beside this endpoint already
+    serves those same conversations in full text. Applying it here hid only the
+    attachments of driver and client chats — the inbox's main traffic — while
+    their messages stayed on screen, so it bought no confidentiality and cost the
+    ops team every photo and voice note. The CRM's own gate is untouched.
+    """
+    from django.shortcuts import get_object_or_404
+
+    from workforce.crm_views import _stream_wa_media
+
+    msg = get_object_or_404(WhatsAppMessage, pk=msg_id)
+    return _stream_wa_media(msg)
+
+
 def _render_page(request):
     session = wa_sessions.from_request(request)
     html = (
@@ -879,7 +924,7 @@ body {
   text-overflow: ellipsis;
   max-width: 11rem;
 }
-.wa-row__time { font-size: 0.6875rem; color: var(--wa-muted); flex: 0 0 auto; }
+.wa-row__time { font-size: 0.6875rem; color: var(--wa-muted); flex: 0 0 auto; white-space: nowrap; }
 .wa-row__time--unread { color: var(--wa-brand); font-weight: 600; }
 .wa-row__pin {
   font-size: 0.625rem;
@@ -907,6 +952,7 @@ body {
   gap: 0.375rem;
   min-width: 0;
 }
+.wa-row__pv-who { color: var(--wa-muted-2); }
 .wa-row__preview {
   color: var(--wa-muted);
   font-size: 0.8125rem;
@@ -1009,7 +1055,18 @@ body {
   line-height: 1.3;
   word-wrap: break-word;
   overflow-wrap: anywhere;
+  /* WhatsApp keeps the sender's own line breaks; without this they collapse
+     and a multi-line notice arrives as one paragraph. */
+  white-space: pre-wrap;
 }
+.wa-fmt-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0 0.1875rem;
+  border-radius: 0.1875rem;
+}
+.wa-link { color: #027eb5; text-decoration: underline; }
 .wa-bubble--out { background: var(--wa-out); }
 .wa-bubble__sender {
   font-size: 0.75rem;
@@ -1227,23 +1284,123 @@ body {
   function avatarColor(id) {
     return SENDER_PALETTE[hashIdx(id, SENDER_PALETTE.length)];
   }
-  function fmtTime(ts) {
-    if (!ts) return '';
-    try { return new Date(ts * 1000).toLocaleString(); }
-    catch (e) { return ''; }
+  function clockOf(d) {
+    var hh = d.getHours();
+    var mm = d.getMinutes();
+    var ampm = hh >= 12 ? 'pm' : 'am';
+    hh = hh % 12; if (!hh) hh = 12;
+    return hh + ':' + (mm < 10 ? '0' + mm : mm) + ' ' + ampm;
   }
+  // The page's one timestamp, used by both the chat list and the message
+  // bubbles. Every stamp carries how many whole days back it was — 0d today,
+  // then 1d, 2d, 3d ... — counted on calendar days, not 24h blocks, and never
+  // rolling over into months or years. Today is stamped 0d rather than left as
+  // a bare clock so that no row is ever read as "just now" by default.
   function fmtShortTime(ts) {
     if (!ts) return '';
     try {
       var d = new Date(ts * 1000);
-      var hh = d.getHours();
-      var mm = d.getMinutes();
-      var ampm = hh >= 12 ? 'pm' : 'am';
-      hh = hh % 12; if (!hh) hh = 12;
-      return hh + ':' + (mm < 10 ? '0' + mm : mm) + ' ' + ampm;
+      var now = new Date();
+      var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      var days = Math.floor((startOfToday - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+      // A clock skew or a message stamped slightly ahead of us must not print '-1d'.
+      if (days < 0) days = 0;
+      return days + 'd ' + clockOf(d);
     } catch (e) { return ''; }
   }
   function chatIsGroup(id) { return String(id || '').endsWith('@g.us'); }
+
+  // WhatsApp's own markup — *bold*, _italic_, ~strikethrough~, `mono` and
+  // ```mono``` — plus clickable links, rendered the way WhatsApp renders it.
+  // Built as DOM nodes and never as an HTML string: a message body is written
+  // by whoever is on the other end, so innerHTML here would be a stored-XSS
+  // hole. Everything user-supplied lands via textContent or .href, and .href
+  // only ever holds a string that already matched http(s)://  or www.
+  function richFind(text) {
+    var best = null;
+    function offer(index, length, kind, inner, href) {
+      if (index < 0 || length <= 0) return;
+      if (!best || index < best.index) {
+        best = { index: index, length: length, kind: kind, inner: inner, href: href || '' };
+      }
+    }
+    var m = /```([\s\S]+?)```/.exec(text);
+    if (m) offer(m.index, m[0].length, 'mono', m[1]);
+    m = /`([^`\n]+)`/.exec(text);
+    if (m) offer(m.index, m[0].length, 'mono', m[1]);
+    m = /\b(?:https?:\/\/|www\.)[^\s]+/i.exec(text);
+    if (m) {
+      // A full stop or bracket after a link belongs to the sentence, not the URL.
+      var raw = m[0].replace(/[.,;:!?)\]}'"]+$/, '');
+      offer(m.index, raw.length, 'link', raw,
+            /^www\./i.test(raw) ? 'https://' + raw : raw);
+    }
+    m = /\*([^\s*](?:[^*]*[^\s*])?)\*/.exec(text);
+    if (m) offer(m.index, m[0].length, 'strong', m[1]);
+    m = /~([^\s~](?:[^~]*[^\s~])?)~/.exec(text);
+    if (m) offer(m.index, m[0].length, 's', m[1]);
+    // Underscores only outside a word, so order_number and file_name.pdf survive.
+    m = /(^|[^A-Za-z0-9_])_([^\s_](?:[^_]*[^\s_])?)_(?![A-Za-z0-9_])/.exec(text);
+    if (m) offer(m.index + m[1].length, m[0].length - m[1].length, 'em', m[2]);
+    return best;
+  }
+  function appendRich(parent, text) {
+    var rest = (text == null) ? '' : String(text);
+    var guard = 0;
+    while (rest && guard++ < 1000) {
+      var hit = richFind(rest);
+      if (!hit) break;
+      if (hit.index > 0) parent.appendChild(document.createTextNode(rest.slice(0, hit.index)));
+      if (hit.kind === 'link') {
+        var a = document.createElement('a');
+        a.className = 'wa-link';
+        a.href = hit.href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = hit.inner;
+        parent.appendChild(a);
+      } else if (hit.kind === 'mono') {
+        var code = document.createElement('code');
+        code.className = 'wa-fmt-mono';
+        code.textContent = hit.inner;   // WhatsApp does not format inside monospace
+        parent.appendChild(code);
+      } else {
+        var el = document.createElement(hit.kind);
+        appendRich(el, hit.inner);      // bold inside italic, links inside bold
+        parent.appendChild(el);
+      }
+      rest = rest.slice(hit.index + hit.length);
+    }
+    if (rest) parent.appendChild(document.createTextNode(rest));
+  }
+  function richText(text) {
+    var frag = document.createDocumentFragment();
+    appendRich(frag, text);
+    return frag;
+  }
+
+  var PREVIEW_TYPE_LABELS = {
+    image: 'Photo', video: 'Video', ptt: 'Voice message', audio: 'Audio',
+    document: 'Document', sticker: 'Sticker', location: 'Location',
+    vcard: 'Contact', contact_card: 'Contact', revoked: 'Message deleted',
+    call_log: 'Call',
+  };
+  // A media message has no body, so the row would otherwise read "You: " and
+  // nothing else once the sender prefix goes on.
+  function previewTypeLabel(type) {
+    return PREVIEW_TYPE_LABELS[String(type || '').toLowerCase()] || '';
+  }
+  // Who spoke last, for the preview line. Only groups need a name — in a 1:1
+  // the other party is the chat itself, so WhatsApp labels our side only.
+  function lastSenderName(lastMsg, chatId) {
+    if (!lastMsg || lastMsg.fromMe || !chatIsGroup(chatId)) return '';
+    var notify = ((lastMsg._data && lastMsg._data.notifyName) || '').trim();
+    if (notify) return notify;
+    var author = String(lastMsg.author || lastMsg.participant || '');
+    // A @lid is device-relative, not a phone number — never print it as one.
+    if (author.indexOf('@c.us') !== -1) return '+' + author.split('@')[0];
+    return '';
+  }
 
   // ---------- Chat list load + render ----------
   // append=true → fetch the NEXT page and append. append=false → reset, fetch first page.
@@ -1288,6 +1445,8 @@ body {
             hasName: hasRealName,
             lastMessage: lastMsg.body || '',
             lastType: lastType,
+            lastFromMe: !!lastMsg.fromMe,
+            lastSender: lastSenderName(lastMsg, id),
             timestamp: c.timestamp || lastMsg.timestamp || 0,
             pinned: !!c.pinned,
             unread: parseInt(c.unreadCount, 10) || 0,
@@ -1444,7 +1603,17 @@ body {
       pvLine.className = 'wa-row__pv-line';
       var pv = document.createElement('div');
       pv.className = 'wa-row__preview';
-      pv.textContent = c.lastMessage || (c.virtual ? 'Tap to start' : '');
+      var pvText = c.lastMessage || previewTypeLabel(c.lastType);
+      var pvWho = c.lastFromMe ? 'You' : (c.lastSender || '');
+      if (pvText && pvWho) {
+        var who = document.createElement('span');
+        who.className = 'wa-row__pv-who';
+        who.textContent = pvWho + ': ';
+        pv.appendChild(who);
+        pv.appendChild(document.createTextNode(pvText));
+      } else {
+        pv.textContent = pvText || (c.virtual ? 'Tap to start' : '');
+      }
       pvLine.appendChild(pv);
       if (c.pinned) {
         var pin = document.createElement('span');
@@ -1747,7 +1916,7 @@ body {
       if (msg.body) {
         var cap = document.createElement('div');
         cap.style.marginTop = '0.25rem';
-        cap.textContent = msg.body;
+        cap.appendChild(richText(msg.body));
         wrap.appendChild(cap);
       }
     } else if (t === 'video' && media && media.url) {
@@ -1758,7 +1927,7 @@ body {
       if (msg.body) {
         var cap2 = document.createElement('div');
         cap2.style.marginTop = '0.25rem';
-        cap2.textContent = msg.body;
+        cap2.appendChild(richText(msg.body));
         wrap.appendChild(cap2);
       }
     } else if (t === 'audio' && media && media.url) {
@@ -1857,7 +2026,7 @@ body {
       wrap.appendChild(st);
     } else {
       var s = document.createElement('span');
-      s.textContent = msg.body || '';
+      s.appendChild(richText(msg.body || ''));
       wrap.appendChild(s);
     }
     return wrap;
@@ -1902,7 +2071,7 @@ body {
 
       var tm = document.createElement('div');
       tm.className = 'wa-bubble__time';
-      tm.textContent = fmtTime(m.timestamp);
+      tm.textContent = fmtShortTime(m.timestamp);
       bubble.appendChild(tm);
 
       row.appendChild(bubble);
@@ -1923,7 +2092,7 @@ body {
     bubble.appendChild(s);
     var tm = document.createElement('div');
     tm.className = 'wa-bubble__time';
-    tm.textContent = fmtTime(Math.floor(Date.now() / 1000));
+    tm.textContent = fmtShortTime(Math.floor(Date.now() / 1000));
     bubble.appendChild(tm);
     row.appendChild(bubble);
     box.appendChild(row);

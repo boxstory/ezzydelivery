@@ -348,10 +348,84 @@
   color: var(--brand-grey-500, #6c757d);
 }
 
+/* One-tap answer for sellers with no address of their own in Qatar.
+   Sits under the pickup-area input and fills it with our hub name. */
+.wppi__suggest {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.375rem;
+  padding: 0.4375rem 0.75rem;
+  border: 1px dashed var(--brand-navy, #001f3f);
+  border-radius: 0.375rem;
+  background: var(--brand-grey-100, #f5f5f5);
+  color: var(--brand-navy, #001f3f);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+
+.wppi__suggest:hover {
+  background: var(--brand-primary, #f7c000);
+  border-style: solid;
+}
+
+.wppi__suggest[hidden] {
+  display: none;
+}
+
 /* Validation message injected by step-validation JS */
 .wppi__field-error {
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+/* Over-length warning injected by the length guard. Amber, not red: the step
+   still submits and the answer is still saved — this only asks for a shorter
+   one, so it must not read like the blocking error above it. */
+.wppi__field-warn {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-warning-text, #92400e);
+}
+
+.wppi__form-card .form-control.wppi__input--over,
+.wppi__form-card textarea.wppi__input--over {
+  border-color: var(--brand-warning, #d97706);
+  background-color: var(--brand-warning-bg, #fef3c7);
+}
+
+/* "We shortened these answers" notice at the top of the form — the same message
+   after the round trip, for answers already saved cut to fit. */
+.wppi__trim-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  /* Padding and radius are set here, not left to Bootstrap's .alert: the quote
+     page renders this same block outside an .alert wrapper. */
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--brand-radius-sm, 6px);
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--brand-warning, #d97706);
+  border-left-width: 4px;
+  background: var(--brand-warning-bg, #fef3c7);
+  color: var(--brand-warning-text, #92400e);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.wppi__trim-notice i {
+  margin-top: 0.125rem;
+  color: var(--brand-warning, #d97706);
+}
+
+.wppi__trim-notice__sub {
+  display: block;
+  font-weight: 500;
+  opacity: 0.85;
 }
 
 .wppi__field-hint i {
@@ -982,6 +1056,12 @@
   .wppi__bubbles,
   .wppi__radio-group {
     gap: 0.5rem;
+  }
+
+  .wppi__suggest {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
   }
 
   .wppi__bubble {

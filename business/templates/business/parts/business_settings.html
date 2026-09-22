@@ -1,13 +1,17 @@
+{# Purpose: Client settings hub — the account's standing record plus a preview ledger of store locations, team members and order integrations. #}
+{# Used by: business/views.py business_settings (URL business:business_settings). #}
+{# Notes: Furniture is the shared bcon__ console layer (business-console.css); only the account record plate and the panel meta bits are page-specific (bset__ in business-settings-pro.css). Each ledger shows the first `preview_size` rows and links to that section's own paginated page. #}
+
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 {% load business_console %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-settings-pro.css' %}?v=20260801a">
+<link rel="stylesheet" href="{% static 'business/css/business-settings-pro.css' %}?v=20260921d">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="bset" id="client_settings_container_main">
+<div class="bset bcon__page" id="client_settings_container_main">
 
   <!-- Mobile Top Bar -->
   <div class="pwa-detail-topbar d-md-none">
@@ -19,211 +23,358 @@
 
   <!-- Page Header (desktop only) -->
   <div class="d-none d-md-block" id="client_settings_section_header">
-    {% bconheader eyebrow="Business" live="Settings" icon="fa-solid fa-gear" title="Business Settings" subtitle=business.business_name %}{% endbconheader %}
+    {% bconheader eyebrow="Business" live="Settings" icon="fa-solid fa-gear" title="Business Settings" subtitle="Where we collect from, who can act for you, and what sends us orders." %}{% endbconheader %}
   </div>
 
-  <!-- ── STORE LOCATIONS ── -->
-  <section class="bset__section" id="client_settings_section_stores">
-    <div class="bset__section-header">
-      <div class="bset__section-label">
-        <i class="fa-solid fa-store"></i>
-        <span>Store Locations</span>
-        {% if stores %}<span class="bset__count-badge">{{ stores_total }}</span>{% endif %}
-      </div>
-      <a href="{% url 'business:pickup_location_add' %}" class="bset__btn-add" id="client_settings_btn_new_store">
-        <i class="fa-solid fa-plus"></i> Add Store
+  <!-- ── ACCOUNT RECORD ──
+       The merchant's own standing with us. Everything below is something
+       attached to this account, so the account itself leads the page. -->
+  <section class="bset__record" id="client_settings_section_account">
+    <div class="bset__record-main">
+      <h2 class="bset__record-name">{{ business.business_name }}</h2>
+      <dl class="bset__facts">
+        <div class="bset__fact">
+          <dt class="bset__fact-label">Account</dt>
+          <dd class="bset__fact-value bset__mono">{{ business.business_id }}</dd>
+        </div>
+        {% if business.business_code %}
+        <div class="bset__fact">
+          <dt class="bset__fact-label">Code</dt>
+          <dd class="bset__fact-value bset__mono">{{ business.business_code }}</dd>
+        </div>
+        {% endif %}
+        {% if business.business_phone %}
+        <div class="bset__fact">
+          <dt class="bset__fact-label">Phone</dt>
+          <dd class="bset__fact-value bset__mono">{{ business.business_phone }}</dd>
+        </div>
+        {% endif %}
+        {% if business.business_qid %}
+        <div class="bset__fact">
+          <dt class="bset__fact-label">QID</dt>
+          <dd class="bset__fact-value bset__mono">{{ business.business_qid }}</dd>
+        </div>
+        {% endif %}
+        <div class="bset__fact">
+          <dt class="bset__fact-label">Trading since</dt>
+          <dd class="bset__fact-value">{% if business.business_since %}{{ business.business_since|date:"M Y" }}{% else %}{{ business.created_at|date:"M Y" }}{% endif %}</dd>
+        </div>
+      </dl>
+    </div>
+    <div class="bset__record-side">
+      {% if business.business_status == 'active' %}
+      <span class="bcon__badge bcon__badge--success"><i class="fa-solid fa-circle-check"></i> Active</span>
+      {% elif business.business_status == 'pending' %}
+      <span class="bcon__badge bcon__badge--warning"><i class="fa-solid fa-hourglass-half"></i> Awaiting approval</span>
+      {% elif business.business_status == 'suspended' %}
+      <span class="bcon__badge bcon__badge--danger"><i class="fa-solid fa-circle-exclamation"></i> Suspended</span>
+      {% else %}
+      <span class="bcon__badge bcon__badge--muted"><i class="fa-solid fa-circle-minus"></i> {{ business.get_business_status_display }}</span>
+      {% endif %}
+      <a href="{% url 'business:business_profile_update' business.business_id %}" class="bcon__btn bcon__btn--secondary" id="client_settings_btn_edit_profile">
+        <i class="fa-solid fa-pen"></i> Edit details
       </a>
+    </div>
+  </section>
+
+  <!-- ── STORE LOCATIONS ── -->
+  <section class="bcon__panel bset__panel" id="client_settings_section_stores">
+    <div class="bcon__panel-head">
+      <h2 class="bcon__panel-title">
+        <i class="fa-solid fa-store"></i>
+        Store locations
+        <span class="bset__meta">{{ stores_active }} of {{ stores_total }} active</span>
+      </h2>
+      {% if write_blocked %}
+      <span class="bcon__btn bcon__btn--ghost bset__locked" aria-disabled="true">
+        <i class="fa-solid fa-lock"></i> Locked
+      </span>
+      {% else %}
+      <a href="{% url 'business:pickup_location_add' %}" class="bcon__btn bcon__btn--secondary" id="client_settings_btn_new_store">
+        <i class="fa-solid fa-plus"></i> Add store
+      </a>
+      {% endif %}
     </div>
 
-    <div class="bset__section-body">
-      {% if stores %}
-      <div class="bset__grid">
-        {% for store in stores %}
-        <div class="bset__card" id="client_settings_card_store_{{ store.id }}">
-          <div class="bset__card-top">
-            <div class="bset__card-icon bset__card-icon--store">
-              <i class="fa-solid fa-{% if store.is_fulfilment_center %}warehouse{% else %}store{% endif %}"></i>
-            </div>
-            <div class="bset__card-info">
-              <h3 class="bset__card-name">{{ store.pickup_location_title }}</h3>
-              {% if store.pickup_status == 'active' %}
-              <span class="bset__badge bset__badge--active"><i class="fa-solid fa-circle-dot"></i> Active</span>
-              {% else %}
-              <span class="bset__badge bset__badge--inactive"><i class="fa-solid fa-circle"></i> {{ store.pickup_status|title }}</span>
-              {% endif %}
-            </div>
-          </div>
-          <div class="bset__card-rows">
-            <div class="bset__row">
-              <span class="bset__row-label"><i class="fa-solid fa-location-dot"></i> Location</span>
-              <a href="https://maps.google.com/?q={{ store.locality }}" target="_blank" class="bset__row-link">
-                {{ store.locality|default:"-" }}
-              </a>
-            </div>
-            <div class="bset__row">
-              <span class="bset__row-label"><i class="fa-solid fa-building"></i> Building</span>
-              <span class="bset__row-value">{{ store.pickup_building_no|default:"—" }}</span>
-            </div>
-            <div class="bset__row">
-              <span class="bset__row-label"><i class="fa-solid fa-map"></i> Zone</span>
-              <span class="bset__row-value">{{ store.pickup_zone_no|default:"—" }}</span>
-            </div>
-          </div>
-          <div class="bset__card-footer">
-            <a href="{% url 'business:pickup_location_update' store.id %}" class="bset__btn-edit">
-              <i class="fa-solid fa-pen-to-square"></i> Edit
-            </a>
-          </div>
-        </div>
-        {% endfor %}
+    {% if stores %}
+    <div class="bcon__panel-body bcon__panel-body--flush">
+      <div class="bcon__ledger-wrap">
+        <table class="bcon__ledger bset__ledger" id="client_settings_table_stores">
+          <thead>
+            <tr>
+              <th scope="col">Store</th>
+              <th scope="col">Location</th>
+              <th scope="col" class="bset__col--tight">Building</th>
+              <th scope="col" class="bset__col--tight">Zone</th>
+              <th scope="col" class="bset__col--tight">Contact</th>
+              <th scope="col" class="bset__col--tight">Status</th>
+              <th scope="col" class="bcon__td--right bset__col--tight">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for store in stores %}
+            <tr id="client_settings_row_store_{{ store.id }}">
+              <td data-label="Store">
+                <span class="bcon__party-name">{{ store.pickup_location_title }}</span>
+                {% if store.is_fulfilment_center %}<span class="bcon__party-sub">Fulfilment centre</span>
+                {% elif store.is_default %}<span class="bcon__party-sub">Default pickup</span>{% endif %}
+              </td>
+              <td data-label="Location">
+                {# A saved pin points at the door; the locality name only ever finds the district. #}
+                {% if store.pickup_lat and store.pickup_lon %}
+                <a href="https://maps.google.com/?q={{ store.pickup_lat }},{{ store.pickup_lon }}" target="_blank" rel="noopener" class="bset__link">
+                  {{ store.locality|default:"View on map" }}
+                </a>
+                {% elif store.locality %}
+                <a href="https://maps.google.com/?q={{ store.locality|urlencode }}" target="_blank" rel="noopener" class="bset__link">
+                  {{ store.locality }}
+                </a>
+                {% else %}<span class="bset__none">&mdash;</span>{% endif %}
+              </td>
+              <td data-label="Building"><span class="bcon__num">{{ store.pickup_building_no|default:"—" }}</span></td>
+              <td data-label="Zone"><span class="bcon__num">{{ store.pickup_zone_no|default:"—" }}</span></td>
+              <td data-label="Contact">
+                {% if store.contact_phone %}
+                <a href="tel:{{ store.contact_phone }}" class="bset__link bcon__num">{{ store.contact_phone }}</a>
+                {% else %}<span class="bset__none">&mdash;</span>{% endif %}
+              </td>
+              <td data-label="Status">
+                {% if store.pickup_status == 'active' %}
+                <span class="bcon__badge bcon__badge--success"><i class="fa-solid fa-circle-check"></i> Active</span>
+                {% else %}
+                <span class="bcon__badge bcon__badge--muted"><i class="fa-solid fa-circle-minus"></i> {{ store.pickup_status|title }}</span>
+                {% endif %}
+              </td>
+              <td data-label="Action" class="bcon__td--right">
+                {% if write_blocked %}
+                <span class="bcon__btn bcon__btn--ghost bset__locked" aria-disabled="true"><i class="fa-solid fa-lock"></i> Locked</span>
+                {% else %}
+                <a href="{% url 'business:pickup_location_update' store.id %}" class="bcon__btn bcon__btn--secondary">
+                  <i class="fa-solid fa-pen-to-square"></i> Edit
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      {% if stores_total > preview_size %}
-      <a href="{% url 'business:pickup_location_list' %}" class="bset__view-all">
-        View all {{ stores_total }} stores <i class="fa-solid fa-arrow-right"></i>
+    </div>
+    {% if stores_total > preview_size %}
+    <a href="{% url 'business:pickup_location_list' %}" class="bcon__panel-foot">
+      All {{ stores_total }} store locations <i class="fa-solid fa-arrow-right"></i>
+    </a>
+    {% endif %}
+    {% else %}
+    <div class="bcon__panel-body bset__blank">
+      <p class="bset__blank-text">No store location yet. Add the address our drivers collect your orders from.</p>
+      {% if not write_blocked %}
+      <a href="{% url 'business:pickup_location_add' %}" class="bset__blank-link" id="client_settings_btn_first_store">
+        Add a store location <i class="fa-solid fa-arrow-right"></i>
       </a>
       {% endif %}
-      {% else %}
-      <div class="bset__empty">
-        <div class="bset__empty-icon"><i class="fa-solid fa-store-slash"></i></div>
-        <p class="bset__empty-text">No store locations added yet</p>
-        <a href="{% url 'business:pickup_location_add' %}" class="bset__btn-add-first">
-          <i class="fa-solid fa-plus"></i> Add Your First Store
-        </a>
-      </div>
-      {% endif %}
     </div>
+    {% endif %}
   </section>
 
   <!-- ── TEAM MEMBERS ── -->
-  <section class="bset__section" id="client_settings_section_teams">
-    <div class="bset__section-header">
-      <div class="bset__section-label">
+  <section class="bcon__panel bset__panel" id="client_settings_section_teams">
+    <div class="bcon__panel-head">
+      <h2 class="bcon__panel-title">
         <i class="fa-solid fa-users"></i>
-        <span>Team Members</span>
-        {% if teams %}<span class="bset__count-badge">{{ teams_total }}</span>{% endif %}
-      </div>
-      <a href="{% url 'business:business_teams_add' business.business_id %}" class="bset__btn-add" id="client_settings_btn_new_team">
-        <i class="fa-solid fa-plus"></i> Add Member
+        Team members
+        <span class="bset__meta">{{ teams_active }} of {{ teams_total }} active</span>
+      </h2>
+      {% if write_blocked %}
+      <span class="bcon__btn bcon__btn--ghost bset__locked" aria-disabled="true">
+        <i class="fa-solid fa-lock"></i> Locked
+      </span>
+      {% else %}
+      <a href="{% url 'business:business_teams_add' business.business_id %}" class="bcon__btn bcon__btn--secondary" id="client_settings_btn_new_team">
+        <i class="fa-solid fa-plus"></i> Add member
       </a>
+      {% endif %}
     </div>
 
-    <div class="bset__section-body">
-      {% if teams %}
-      <div class="bset__grid">
-        {% for team in teams %}
-        <div class="bset__card" id="client_settings_card_team_{{ team.id }}">
-          <div class="bset__card-top">
-            <div class="bset__card-icon bset__card-icon--team">
-              <i class="fa-solid fa-user-tie"></i>
-            </div>
-            <div class="bset__card-info">
-              <h3 class="bset__card-name">{{ team.team_name }}</h3>
-              {% if team.team_status == 'active' %}
-              <span class="bset__badge bset__badge--active"><i class="fa-solid fa-circle-dot"></i> Active</span>
-              {% else %}
-              <span class="bset__badge bset__badge--inactive"><i class="fa-solid fa-circle"></i> {{ team.team_status|title }}</span>
-              {% endif %}
-            </div>
-          </div>
-          <div class="bset__card-rows">
-            <div class="bset__row">
-              <span class="bset__row-label"><i class="fa-solid fa-hashtag"></i> ID</span>
-              <span class="bset__row-value">#{{ team.id }}</span>
-            </div>
-            <div class="bset__row">
-              <span class="bset__row-label"><i class="fa-solid fa-phone"></i> Phone</span>
-              <span class="bset__row-value">{{ team.team_phone|default:"—" }}</span>
-            </div>
-            <div class="bset__row">
-              <span class="bset__row-label"><i class="fa-solid fa-id-badge"></i> Role</span>
-              <span class="bset__row-value">{{ team.get_team_role_display|default:"—" }}</span>
-            </div>
-          </div>
-          <div class="bset__card-footer">
-            <a href="{% url 'business:business_teams_update' business.business_id team.id %}" class="bset__btn-edit">
-              <i class="fa-solid fa-pen-to-square"></i> Edit
-            </a>
-          </div>
-        </div>
-        {% endfor %}
+    {% if teams %}
+    <div class="bcon__panel-body bcon__panel-body--flush">
+      <div class="bcon__ledger-wrap">
+        <table class="bcon__ledger bset__ledger" id="client_settings_table_teams">
+          <thead>
+            <tr>
+              <th scope="col">Member</th>
+              <th scope="col" class="bset__col--tight">Reference</th>
+              <th scope="col" class="bset__col--tight">Phone</th>
+              <th scope="col" class="bset__col--tight">Role</th>
+              <th scope="col" class="bset__col--tight">Status</th>
+              <th scope="col" class="bcon__td--right bset__col--tight">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for team in teams %}
+            <tr id="client_settings_row_team_{{ team.id }}">
+              <td data-label="Member">
+                <span class="bcon__party-name">{{ team.team_name }}</span>
+                {% if team.team_email %}<span class="bcon__party-sub">{{ team.team_email }}</span>{% endif %}
+              </td>
+              <td data-label="Reference">
+                <span class="bcon__ref-main">#{{ team.id }}</span>
+                {% if team.team_code %}<span class="bcon__ref-sub">{{ team.team_code }}</span>{% endif %}
+              </td>
+              <td data-label="Phone">
+                {% if team.team_phone %}
+                <a href="tel:{{ team.team_phone }}" class="bset__link bcon__num">{{ team.team_phone }}</a>
+                {% else %}<span class="bset__none">&mdash;</span>{% endif %}
+              </td>
+              <td data-label="Role">{{ team.get_team_role_display|default:"—" }}</td>
+              <td data-label="Status">
+                {% if team.team_status == 'active' %}
+                <span class="bcon__badge bcon__badge--success"><i class="fa-solid fa-circle-check"></i> Active</span>
+                {% else %}
+                <span class="bcon__badge bcon__badge--muted"><i class="fa-solid fa-circle-minus"></i> {{ team.team_status|title }}</span>
+                {% endif %}
+              </td>
+              <td data-label="Action" class="bcon__td--right">
+                {% if write_blocked %}
+                <span class="bcon__btn bcon__btn--ghost bset__locked" aria-disabled="true"><i class="fa-solid fa-lock"></i> Locked</span>
+                {% else %}
+                <a href="{% url 'business:business_teams_update' business.business_id team.id %}" class="bcon__btn bcon__btn--secondary">
+                  <i class="fa-solid fa-pen-to-square"></i> Edit
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      {% if teams_total > preview_size %}
-      <a href="{% url 'business:business_teams' business.business_id %}" class="bset__view-all">
-        View all {{ teams_total }} team members <i class="fa-solid fa-arrow-right"></i>
+    </div>
+    {% if teams_total > preview_size %}
+    <a href="{% url 'business:business_teams' business.business_id %}" class="bcon__panel-foot">
+      All {{ teams_total }} team members <i class="fa-solid fa-arrow-right"></i>
+    </a>
+    {% endif %}
+    {% else %}
+    <div class="bcon__panel-body bset__blank">
+      <p class="bset__blank-text">Only you can sign in to this account. Add a member to let someone else book and track orders.</p>
+      {% if not write_blocked %}
+      <a href="{% url 'business:business_teams_add' business.business_id %}" class="bset__blank-link" id="client_settings_btn_first_team">
+        Add a team member <i class="fa-solid fa-arrow-right"></i>
       </a>
       {% endif %}
-      {% else %}
-      <div class="bset__empty">
-        <div class="bset__empty-icon"><i class="fa-solid fa-user-plus"></i></div>
-        <p class="bset__empty-text">No team members added yet</p>
-        <a href="{% url 'business:business_teams_add' business.business_id %}" class="bset__btn-add-first">
-          <i class="fa-solid fa-plus"></i> Add Your First Team Member
-        </a>
-      </div>
-      {% endif %}
     </div>
+    {% endif %}
   </section>
 
   <!-- ── API INTEGRATIONS ── -->
-  <section class="bset__section" id="client_settings_section_api">
-    <div class="bset__section-header">
-      <div class="bset__section-label">
+  <section class="bcon__panel bset__panel" id="client_settings_section_api">
+    <div class="bcon__panel-head">
+      <h2 class="bcon__panel-title">
         <i class="fa-solid fa-plug"></i>
-        <span>API Integrations</span>
-        {% if business_apis %}<span class="bset__count-badge">{{ business_apis_total }}</span>{% endif %}
-      </div>
-      <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bset__btn-add" id="client_settings_btn_new_api">
-        <i class="fa-solid fa-plus"></i> Add API
+        Order integrations
+        <span class="bset__meta">{{ business_apis_verified }} of {{ business_apis_total }} verified</span>
+      </h2>
+      {% if write_blocked %}
+      <span class="bcon__btn bcon__btn--ghost bset__locked" aria-disabled="true">
+        <i class="fa-solid fa-lock"></i> Locked
+      </span>
+      {% else %}
+      <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bcon__btn bcon__btn--secondary" id="client_settings_btn_new_api">
+        <i class="fa-solid fa-plus"></i> Add integration
       </a>
+      {% endif %}
     </div>
 
-    <div class="bset__section-body">
-      {% if business_apis %}
-      <div class="bset__grid">
-        {% for api in business_apis %}
-        <div class="bset__card bset__card--api {% if api.is_verify_api %}bset__card--verified{% else %}bset__card--unverified{% endif %}"
-             id="client_settings_card_api_{{ api.id }}">
-          <div class="bset__card-top">
-            <div class="bset__card-icon {% if api.is_verify_api %}bset__card-icon--verified{% else %}bset__card-icon--unverified{% endif %}">
-              <i class="fa-solid fa-code"></i>
-            </div>
-            <div class="bset__card-info">
-              <h3 class="bset__card-name">{{ api.api_type|upper }}</h3>
-              {% if api.is_verify_api %}
-              <span class="bset__badge bset__badge--verified"><i class="fa-solid fa-circle-check"></i> Verified</span>
-              {% else %}
-              <span class="bset__badge bset__badge--warn"><i class="fa-solid fa-triangle-exclamation"></i> Not Verified</span>
-              {% endif %}
-            </div>
-          </div>
-          <div class="bset__card-rows">
-            <div class="bset__row bset__row--endpoint">
-              <span class="bset__row-label"><i class="fa-solid fa-link"></i> Endpoint</span>
-              <span class="bset__row-value bset__row-value--truncate" title="{{ api.site_api_url }}">{{ api.site_api_url }}</span>
-            </div>
-          </div>
-          <div class="bset__card-footer">
-            <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}" class="bset__btn-test">
-              <i class="fa-solid fa-flask-vial"></i> Test & Configure
-            </a>
-          </div>
-        </div>
-        {% endfor %}
+    {% if business_apis %}
+    <div class="bcon__panel-body bcon__panel-body--flush">
+      <div class="bcon__ledger-wrap">
+        <table class="bcon__ledger bset__ledger" id="client_settings_table_api">
+          <thead>
+            <tr>
+              <th scope="col">Platform</th>
+              <th scope="col">Store address</th>
+              <th scope="col" class="bset__col--tight">Last import</th>
+              <th scope="col" class="bset__col--tight">Status</th>
+              <th scope="col" class="bcon__td--right bset__col--tight">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for api in business_apis %}
+            <tr id="client_settings_row_api_{{ api.id }}">
+              <td data-label="Platform">
+                <span class="bcon__party-name">{{ api.api_type|title }}</span>
+                {% if api.is_default %}<span class="bcon__party-sub">Default source</span>{% endif %}
+              </td>
+              <td data-label="Store address">
+                {% if api.site_api_url %}
+                <span class="bset__endpoint" title="{{ api.site_api_url }}">{{ api.site_api_url }}</span>
+                {% else %}<span class="bset__none">&mdash;</span>{% endif %}
+              </td>
+              <td data-label="Last import">
+                {% if api.last_sync_at %}
+                <span class="bcon__num">{{ api.last_sync_at|date:"d M Y" }}</span>
+                {% else %}<span class="bset__none">Never</span>{% endif %}
+              </td>
+              <td data-label="Status">
+                {% if api.is_verify_api %}
+                <span class="bcon__badge bcon__badge--success"><i class="fa-solid fa-circle-check"></i> Verified</span>
+                {% else %}
+                <span class="bcon__badge bcon__badge--warning"><i class="fa-solid fa-triangle-exclamation"></i> Not verified</span>
+                {% endif %}
+              </td>
+              <td data-label="Action" class="bcon__td--right">
+                {% if write_blocked %}
+                <span class="bcon__btn bcon__btn--ghost bset__locked" aria-disabled="true"><i class="fa-solid fa-lock"></i> Locked</span>
+                {% else %}
+                <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}" class="bcon__btn bcon__btn--secondary">
+                  <i class="fa-solid fa-flask-vial"></i> Test &amp; configure
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      {% if business_apis_total > preview_size %}
-      <a href="{% url 'business:business_settings_api_list' business.business_id %}" class="bset__view-all">
-        View all {{ business_apis_total }} integrations <i class="fa-solid fa-arrow-right"></i>
+    </div>
+    {% if business_apis_total > preview_size %}
+    <a href="{% url 'business:business_settings_api_list' business.business_id %}" class="bcon__panel-foot">
+      All {{ business_apis_total }} integrations <i class="fa-solid fa-arrow-right"></i>
+    </a>
+    {% endif %}
+    {% else %}
+    <div class="bcon__panel-body bset__blank">
+      <p class="bset__blank-text">Orders are entered by hand until a store is connected. Connect Shopify, WooCommerce or your own site to import them automatically.</p>
+      {% if not write_blocked %}
+      <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bset__blank-link" id="client_settings_btn_first_api">
+        Add an integration <i class="fa-solid fa-arrow-right"></i>
       </a>
       {% endif %}
-      {% else %}
-      <div class="bset__empty">
-        <div class="bset__empty-icon"><i class="fa-solid fa-plug-circle-plus"></i></div>
-        <p class="bset__empty-text">No API integrations configured yet</p>
-        <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="bset__btn-add-first">
-          <i class="fa-solid fa-plus"></i> Add Your First API
-        </a>
-      </div>
-      {% endif %}
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- ── THE REST OF SETTINGS ──
+       These two live only in the sidebar today, so a merchant who opens this
+       hub never learns they exist. -->
+  <section class="bcon__panel bset__panel" id="client_settings_section_more">
+    <div class="bcon__panel-head">
+      <h2 class="bcon__panel-title">
+        <i class="fa-solid fa-sliders"></i>
+        More settings
+      </h2>
+    </div>
+    <div class="bcon__panel-body bset__more">
+      <a href="{% url 'business:whatsapp_triggers_list' %}" class="bset__more-item" id="client_settings_link_whatsapp">
+        <i class="fa-brands fa-whatsapp"></i>
+        <span class="bset__more-name">WhatsApp alerts</span>
+        <span class="bset__more-note">Choose which order updates your customers receive.</span>
+      </a>
+      <a href="{% url 'business:branded_tracking_settings' %}" class="bset__more-item" id="client_settings_link_tracking">
+        <i class="fa-solid fa-route"></i>
+        <span class="bset__more-name">Tracking page</span>
+        <span class="bset__more-note">Put your own name and colours on the page customers open.</span>
+      </a>
     </div>
   </section>
 

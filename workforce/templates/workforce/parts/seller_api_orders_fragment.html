@@ -11,7 +11,89 @@
 </div>
 {% endif %}
 
-{% if api_orders %}
+{% if pull_source %}
+{% comment %}Pulled orders have their own shape: no basket or totals, but a status
+that decides whether we stage them at all, and a staged/imported state staff need.{% endcomment %}
+<div class="alert alert-info py-2 small mb-3">
+    <i class="fa-solid fa-cloud-arrow-down me-1"></i>
+    Live from <strong>{{ pull_source.fetch_orders_url }}</strong>
+    {% if pull_meta %}— {{ pull_meta.fetched }} returned in {{ pull_meta.ms }} ms,
+    {{ eligible_count }} deliverable{% endif %}.
+    {% if pull_source.fetch_status_include %}
+    Only <strong>{{ pull_source.fetch_status_include }}</strong> orders are staged for delivery.
+    {% else %}
+    No status filter set — every order returned will be staged.
+    {% endif %}
+</div>
+{% endif %}
+
+{% if pull_source and not mapping_ok %}
+<div class="alert alert-warning py-2 small mb-3">
+    <i class="fa-solid fa-triangle-exclamation me-1"></i>
+    This integration has no <strong>order code</strong> mapping, so nothing below can be
+    identified or imported. Nothing is guessed from field names — set the paths in
+    <a href="{% url 'workforce:wf_mapping_manager' %}?business={{ business_id }}">Column Mapping</a>
+    (Custom API tab) first.
+</div>
+{% endif %}
+
+{% if api_orders and pull_source %}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2 mt-3">
+    <h6 class="text-muted mb-0 me-2 d-flex align-items-center gap-2">
+        <i class="fa-solid fa-cloud me-1"></i> Store Orders
+        <span class="badge bg-primary">{{ api_orders|length }} shown</span>
+        <span class="badge bg-light text-muted border">limit {{ limit }}</span>
+    </h6>
+</div>
+<div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+            <tr>
+                <th class="sld-col-num">#</th>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th>In EzzyDelivery</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in api_orders %}
+            <tr{% if not o.deliverable %} class="text-muted"{% endif %}>
+                <td class="text-muted small">{{ forloop.counter }}</td>
+                <td>
+                    {% if o.unmapped %}
+                    <span class="text-warning" title="No client_order_code mapping"><em>{{ o.name }}</em></span>
+                    {% else %}<strong>{{ o.name }}</strong>{% endif %}
+                </td>
+                <td class="small">{{ o.customer_name|default:"-" }}</td>
+                <td class="small"><code>{{ o.customer_phone|default:"-" }}</code></td>
+                <td class="small">{{ o.address|default:"-" }}</td>
+                <td>
+                    <span class="badge {% if o.deliverable %}bg-light text-dark border{% else %}bg-secondary{% endif %}">
+                        {{ o.fulfillment_status|default:"-" }}
+                    </span>
+                </td>
+                <td class="small">{{ o.financial_status|default:"-" }}</td>
+                <td class="small">
+                    {% if o.imported %}
+                    <span class="badge bg-success">Order created</span>
+                    {% elif o.staged %}
+                    <span class="badge bg-primary">In Temp Orders</span>
+                    {% elif o.deliverable %}
+                    <span class="badge bg-warning text-dark">Not yet pulled</span>
+                    {% else %}
+                    <span class="text-muted">Skipped by filter</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% elif api_orders %}
 <div class="d-flex flex-wrap align-items-center gap-2 mb-2 mt-3">
     <h6 class="text-muted mb-0 me-2 d-flex align-items-center gap-2">
         <i class="fa-solid fa-cloud me-1"></i> {{ api_orders_platform|title }} Orders
@@ -54,6 +136,6 @@
 {% elif not api_orders_error and api_orders_platform %}
 <div class="text-center text-muted py-3">
     <i class="fa-solid fa-cloud fa-2x mb-2 d-block"></i>
-    No orders returned by {{ api_orders_platform|title }}.
+    {% if pull_source %}No orders returned by the store.{% else %}No orders returned by {{ api_orders_platform|title }}.{% endif %}
 </div>
 {% endif %}

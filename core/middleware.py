@@ -645,6 +645,7 @@ class SecurityHeadersMiddleware:
                 "media-src 'self' data: blob: mediastream:; "
                 "worker-src 'self' blob:; "
                 "connect-src 'self' https://api.mapbox.com https://events.mapbox.com "
+                "https://tiles.openfreemap.org "
                 "https://www.google-analytics.com https://unpkg.com "
                 "https://*.basemaps.cartocdn.com https://www.google.com/recaptcha/ "
                 "https://cdn.jsdelivr.net https://cdn.datatables.net "

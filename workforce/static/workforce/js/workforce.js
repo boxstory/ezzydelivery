@@ -893,6 +893,7 @@
         add('dlCode',       val('pgf_dlCode'));
         add('search',       val('pgf_search'));
         add('cStatus',      val('pgf_cStatus'));
+        add('orderType',    val('pgf_orderType'));
         add('dlTaskStatus', val('pgf_dlTaskStatus'));
         add('datePreset',   val('pgf_date_preset'));
         add('dateFrom',     val('pgf_dateFrom'));
@@ -934,7 +935,8 @@
 
     document.addEventListener('change', function(e) {
         var id = e.target.id;
-        if (id === 'pgf_business' || id === 'pgf_cStatus' || id === 'pgf_dlTaskStatus'
+        if (id === 'pgf_business' || id === 'pgf_cStatus' || id === 'pgf_orderType'
+            || id === 'pgf_dlTaskStatus'
             || id === 'pgf_sort' || id === 'pgf_per_page') {
             pgFilterSubmit();
         }

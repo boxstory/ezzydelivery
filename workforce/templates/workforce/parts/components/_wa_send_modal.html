@@ -42,6 +42,7 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
      data-wasend-section="{{ wa_section }}"
      data-wasend-session="{{ wa_session|default:'' }}"
      data-wasend-message="{{ wa_message|default:'' }}"
+     data-wasend-message-id="{{ wa_message_id|default:'' }}"
      data-wasend-reminder="{{ wa_reminder|default:'' }}"
      data-wasend-reminder-label="{{ wa_reminder_label|default:'' }}"
      data-wasend-url="{% url 'workforce:whatsapp_send_routed' %}"
@@ -124,6 +125,10 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
           Open on my own phone
         </a>
         <button type="button" class="btn wasend__btn" data-bs-dismiss="modal">Cancel</button>
+        {# Which registered body is in the box right now — it changes with the #}
+        {# picker, and typing over it makes this say "free text", because an edited #}
+        {# body is no longer the message the Messages page would show you. #}
+        <span class="wasend__msgid" data-wasend-msgid hidden></span>
         <button type="button" class="btn wasend__btn wasend__btn--send" data-wasend-submit>
           <i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Send
         </button>
@@ -144,6 +149,8 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
   var session = modalEl.dataset.wasendSession || '';
   // Starter body from the page's MessageTemplate; '' when the template is off.
   var starter = modalEl.dataset.wasendMessage || '';
+  // The ID of that starter, so the badge beside Send names it like any other.
+  var starterId = modalEl.dataset.wasendMessageId || '';
   // "Here is what you still owe us" for this record; '' when nothing is missing.
   var pageReminder = modalEl.dataset.wasendReminder || '';
   var pageReminderLabel = modalEl.dataset.wasendReminderLabel || 'Reminder — what is still missing';
@@ -169,6 +176,7 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
   var fillRemindText = modalEl.querySelector('[data-wasend-reminder-text]');
   var fillClipboardBtn = modalEl.querySelector('[data-wasend-fill="clipboard"]');
   var templateSelect = modalEl.querySelector('[data-wasend-template-select]');
+  var msgIdEl = modalEl.querySelector('[data-wasend-msgid]');
   var templatesUrl = modalEl.dataset.wasendTemplatesUrl || '';
   var templatesLoaded = false;
   // Bodies behind the paste row for the composer currently open.
@@ -246,15 +254,19 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
     var bodies = [];
     // Reminder first: it is the only body written from THIS record's gaps, so it
     // is what a staffer opening the picker on an unfinished lead came for.
-    if (reminderText) bodies.push({label: reminderLabel, body: reminderText});
-    if (templateText) bodies.push({label: 'This page\u2019s starter', body: templateText});
+    if (reminderText) bodies.push({label: reminderLabel, body: reminderText, note: 'reminder'});
+    if (templateText) bodies.push({label: 'This page\u2019s starter', body: templateText, id: starterId});
     (templates || []).forEach(function (t) {
-      if (t.body && t.body !== templateText) bodies.push({label: t.label, body: t.body});
+      if (t.body && t.body !== templateText) {
+        // Prefixed with the message ID (M05 …) — the same token printed on the
+        // Messages page card, so "which body is this" has one answer everywhere.
+        bodies.push({label: t.label, body: t.body, id: t.msg_id || ''});
+      }
     });
     bodies.forEach(function (b, i) {
       var opt = document.createElement('option');
       opt.value = String(i);
-      opt.textContent = b.label;
+      opt.textContent = b.id ? b.id + ' · ' + b.label : b.label;
       opt.title = b.body.slice(0, 300);
       templateSelect.appendChild(opt);
     });
@@ -280,9 +292,40 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
       .catch(function () { buildTemplateSelect([]); });
   }
 
-  function paste(text) {
+  // What is in the box: '' (nothing), an Mxx id, or 'free' for hand-typed text.
+  var loadedId = '', loadedBody = '';
+  function showMsgId(id, body, note) {
+    loadedId = id || '';
+    loadedBody = body || '';
+    if (!msgIdEl) return;
+    if (!loadedId && note) {
+      // A generated body (the reminder) is not a saved message and not typed
+      // either — calling it "free text" would misreport both.
+      msgIdEl.textContent = note;
+      msgIdEl.title = 'Written from this record, not one of the saved messages.';
+      msgIdEl.hidden = false;
+      msgIdEl.classList.add('wasend__msgid--free');
+      return;
+    }
+    if (loadedId) {
+      msgIdEl.textContent = loadedId;
+      msgIdEl.title = 'Sending saved message ' + loadedId + ' — edit it on Auto Triggers → Messages.';
+      msgIdEl.hidden = false;
+      msgIdEl.classList.remove('wasend__msgid--free');
+    } else if ((textarea.value || '').trim()) {
+      msgIdEl.textContent = 'free text';
+      msgIdEl.title = 'Not one of the saved messages — this body was typed or edited here.';
+      msgIdEl.hidden = false;
+      msgIdEl.classList.add('wasend__msgid--free');
+    } else {
+      msgIdEl.hidden = true;
+    }
+  }
+
+  function paste(text, id, note) {
     if (!text) return;
     textarea.value = text;
+    showMsgId(id || '', text, note || '');
     countChars();
     syncDeepLink();
     var gap = text.match(PLACEHOLDER_RE);
@@ -295,7 +338,7 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
   }
 
   if (fillLastBtn) fillLastBtn.addEventListener('click', function () { paste(lastText); });
-  if (fillRemindBtn) fillRemindBtn.addEventListener('click', function () { paste(reminderText); });
+  if (fillRemindBtn) fillRemindBtn.addEventListener('click', function () { paste(reminderText, '', 'reminder'); });
 
   if (templateSelect) {
     templateSelect.addEventListener('change', function () {
@@ -303,7 +346,7 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
       var picked = bodies[parseInt(templateSelect.value, 10)];
       // Back to "Template…" so the same one can be picked again after an edit.
       templateSelect.value = '';
-      if (picked) paste(picked.body);
+      if (picked) paste(picked.body, picked.id || '', picked.note || '');
     });
   }
 
@@ -461,9 +504,11 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
     hideResult();
     recipientName = (opener.dataset.wasendName || '').trim();
     templateText = opener.dataset.wasendMessage || starter;
+    starterId = opener.dataset.wasendMessageId || modalEl.dataset.wasendMessageId || '';
     reminderText = opener.dataset.wasendReminder || pageReminder;
     reminderLabel = opener.dataset.wasendReminderLabel || pageReminderLabel;
     textarea.value = '';
+    showMsgId('', '');
     countChars();
     refreshChips();
     loadTemplates();
@@ -477,6 +522,10 @@ Notes: Sends through workforce:whatsapp_send_routed, so the number AND the chann
   });
 
   textarea.addEventListener('input', function () {
+    // Edited away from the saved body → it is free text now. Staff read this
+    // badge to know whether what they are about to send is still Mxx.
+    if (loadedId && textarea.value !== loadedBody) showMsgId('', '');
+    else if (!loadedId) showMsgId('', '');
     countChars();
     syncDeepLink();
   });

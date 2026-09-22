@@ -180,7 +180,8 @@ def fleet_dashboard(request):
         _task_events = list(
             _dl_act.DeliveryTask.objects.filter(
                 driver=driver,
-                dl_task_status__in=['delivered', 'partial_delivery', 'failed', 'accepted', 'out_for_delivery'],
+                dl_task_status__in=['delivered', 'partial_delivery', 'failed', 'accepted',
+                                    'out_for_delivery', 'returned_to_shipper'],
             ).select_related('order', 'order__business').order_by('-updated_at')[:30]
         )
         _txn_events = list(recent_transactions)
@@ -2872,7 +2873,8 @@ def driver_tasks(request):
             dl_task_publish=True, driver__isnull=True,
             dl_task_status__in=['pending', 'for_review'],
         ).exclude(
-            dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed']
+            dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed',
+                                'returned_to_shipper']
         ).exclude(order__order_status='cancelled'), driver).order_by('-id')
     else:
         from delivery.models import DeliveryTask as _DT
@@ -2888,7 +2890,9 @@ def driver_tasks(request):
     ).exclude(order__order_status='cancelled').order_by('-id')
 
     history_tasks = base_qs.filter(
-        driver=driver, dl_task_publish=True, dl_task_status__in=['delivered', 'partial_delivery', 'failed', 'cancelled']
+        driver=driver, dl_task_publish=True,
+        dl_task_status__in=['delivered', 'partial_delivery', 'failed', 'cancelled',
+                            'returned_to_shipper']
     ).order_by('-id')
 
     # Area filter
@@ -3112,6 +3116,9 @@ def fleet_task_take_scan(request):
             return JsonResponse({'success': False, 'error': 'No scan code provided'})
 
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        if driver.driver_status != 'approved':
+            return JsonResponse({'success': False, 'error': 'Your driver account is not approved yet'})
+
         task = delivery_models.DeliveryTask.objects.select_related(
             'order', 'order__business', 'pickup_location'
         ).get(id=task_id)
@@ -4077,25 +4084,37 @@ def fleet_tasks_map(request):
     ]
     new_statuses = ['for_review', 'pending']
 
-    # Driver's own active tasks
-    active_tasks = annotate_task_sequence(
+    # Tapping a pin opens the same detail sheet the task list uses, so the pins
+    # carry a full task card — pull everything that sheet reads in one go.
+    base_qs = annotate_task_sequence(
         delivery_models.DeliveryTask.objects
     ).select_related(
         'order', 'order__business', 'dl_to_address',
-    ).filter(
+        'order__pickup_location',
+    ).prefetch_related(
+        'order__order_items', 'order__order_items__product',
+        'order__address_verifications',
+    )
+
+    # Driver's own active tasks
+    active_tasks = base_qs.filter(
         driver=driver,
         dl_task_status__in=active_statuses,
     ).exclude(order__order_status='cancelled').order_by(*TASK_SEQ_DESC)
 
-    # New/pending tasks not yet assigned to any driver
-    new_tasks = annotate_task_sequence(
-        delivery_models.DeliveryTask.objects
-    ).select_related(
-        'order', 'order__business', 'dl_to_address',
-    ).filter(
-        dl_task_status__in=new_statuses,
-        driver__isnull=True,
-    ).exclude(order__order_status='cancelled').order_by(*TASK_SEQ_DESC)
+    # Unclaimed pool tasks. Same gate as the Tasks page "New" tab — an
+    # unpublished task or one already in another driver's car is not takeable,
+    # so it has no business showing a Take button on the map.
+    driver_active = (driver.driver_status == 'approved')
+    if driver_active:
+        from delivery.selectors import exclude_held_parcels
+        new_tasks = exclude_held_parcels(base_qs.filter(
+            dl_task_status__in=new_statuses,
+            dl_task_publish=True,
+            driver__isnull=True,
+        ).exclude(order__order_status='cancelled'), driver).order_by(*TASK_SEQ_DESC)
+    else:
+        new_tasks = delivery_models.DeliveryTask.objects.none()
 
     from itertools import chain
     tasks = list(chain(active_tasks, new_tasks))
@@ -4137,6 +4156,8 @@ def fleet_tasks_map(request):
             'status': t.dl_task_status,
             'status_display': t.get_dl_task_status_display(),
             'is_new': t.dl_task_status in new_statuses,
+            'business': t.order.business.business_name if t.order.business else '',
+            'cod': str(t.order.cod_amount) if t.order.cod_amount else '',
             'customer_name': t.order.customer_name or '',
             'customer_phone': t.order.customer_phone or '',
             'zone': zone_val,
@@ -4156,8 +4177,13 @@ def fleet_tasks_map(request):
 
     new_pin_count = len([p for p in pins if p['lat'] and p['is_new']])
     active_pin_count = len([p for p in pins if p['lat'] and not p['is_new']])
+    pinned_ids = {p['id'] for p in pins if p['lat'] and p['lng']}
     context = {
         'driver': driver,
+        'driver_active': driver_active,
+        # Only the pinned tasks get a hidden card — a task with no coordinates
+        # has no pin to open it from.
+        'tasks': [t for t in tasks if t.id in pinned_ids],
         'pins_json': safe_json(pins),
         'pin_count': new_pin_count + active_pin_count,
         'new_pin_count': new_pin_count,

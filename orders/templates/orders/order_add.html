@@ -3,7 +3,7 @@
 {% load crispy_forms_tags %}
 {% load business_console %}
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-mobile.css' %}?v=20260808a">
+<link rel="stylesheet" href="{% static 'business/css/business-mobile.css' %}?v=20260919a">
 {% endblock extra_css %}
 
 {% block content %}
@@ -36,9 +36,31 @@
     {% csrf_token %}
     <!-- Hidden fields -->
     <input type="hidden" name="order_status" value="to_review">
-    <input type="hidden" name="client_order_code" id="mobile_client_order_code" value="">
-    <input type="hidden" name="cod_status_by_client" id="mobile_cod_status" value="online_paid">
     <input type="hidden" name="order_source_text" id="mobile_order_source_text" value="">
+    <!-- Filled by qnasValidateAndFill / whatsappLocationFill, same as desktop -->
+    <input type="hidden" name="coords_accuracy" id="mobile_coords_accuracy" value="">
+
+    <!-- Order Section -->
+    <div class="pwa-form-section">
+      <div class="pwa-form-section__header">
+        <i class="fas fa-hashtag"></i> Order
+      </div>
+      <div class="pwa-form-group" id="fg_client_order_code">
+        <label class="pwa-form-group__label" for="mobile_client_order_code">Your Order Number</label>
+        <input type="text" name="client_order_code" id="mobile_client_order_code"
+          class="pwa-form-group__input" autocomplete="off"
+          placeholder="e.g. #33, OR-1042 or 2291"
+          value="{{ form.client_order_code.value|default_if_none:'' }}">
+        {% if form.client_order_code.errors %}
+        <div class="invalid-feedback d-block">{% for error in form.client_order_code.errors %}{{ error }}{% endfor %}</div>
+        {% endif %}
+        <div class="pwa-form-group__hint">
+          {% if form.client_order_code.value %}Suggested from your last order — edit it if yours differs.
+          {% else %}Paste the number from your own system.{% endif %}
+          It goes on the waybill and your invoices.
+        </div>
+      </div>
+    </div>
 
     <!-- Customer Section -->
     <div class="pwa-form-section">
@@ -58,7 +80,12 @@
             class="pwa-form-group__input pwa-form-group__input--phone" placeholder="XXXXXXXX" maxlength="8">
         </div>
       </div>
-      <input type="hidden" name="customer_whatsapp" id="mobile_customer_whatsapp" value="">
+      <div class="pwa-form-group" id="fg_customer_whatsapp">
+        <label class="pwa-form-group__label" for="mobile_customer_whatsapp"><i class="fa-brands fa-whatsapp text-success me-1"></i>WhatsApp</label>
+        <input type="text" name="customer_whatsapp" id="mobile_customer_whatsapp"
+          class="pwa-form-group__input" placeholder="974XXXXXXXX" inputmode="tel">
+        <div class="pwa-form-group__hint">Auto-filled from the phone number — edit if it differs.</div>
+      </div>
     </div>
 
     <!-- Delivery Section -->
@@ -88,17 +115,17 @@
         <label class="pwa-form-group__label"><i class="fa-brands fa-whatsapp text-success me-1"></i>Paste WhatsApp Location</label>
         <div id="mobileLocDrop" class="pwa-loc-paste"
              ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
-             ondrop="locDropHandle(event, {latId:'mobile_latitude', lngId:'mobile_longitude', mapId:'mobileMapLink', resultId:'mobileLocResult', inputId:'mobileLocPaste'})">
+             ondrop="locDropHandle(event, {latId:'mobile_latitude', lngId:'mobile_longitude', mapId:'mobileMapLink', accuracyId:'mobile_coords_accuracy', resultId:'mobileLocResult', inputId:'mobileLocPaste'})">
           <i class="fa-solid fa-location-dot pwa-loc-paste__icon"></i>
           <input type="text" id="mobileLocPaste" class="pwa-form-group__input pwa-loc-paste__input" inputmode="url"
                  placeholder="Paste WhatsApp / Google Maps link"
-                 oninput="whatsappLocationFill(this.value, {latId:'mobile_latitude', lngId:'mobile_longitude', mapId:'mobileMapLink', resultId:'mobileLocResult'})">
+                 oninput="whatsappLocationFill(this.value, {latId:'mobile_latitude', lngId:'mobile_longitude', mapId:'mobileMapLink', accuracyId:'mobile_coords_accuracy', resultId:'mobileLocResult'})">
         </div>
         <div id="mobileLocResult" class="mt-1"></div>
       </div>
       <div class="pwa-form-group mb-2">
         <button type="button" class="btn btn-sm btn-outline-warning w-100" id="mobileQnasBtn"
-                onclick="qnasValidateAndFill({zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', zoneNameId:'mobile_zone_name_display', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink'})">
+                onclick="qnasValidateAndFill({zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', zoneNameId:'mobile_zone_name_display', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink', accuracyId:'mobile_coords_accuracy'})">
           <i class="fa-solid fa-satellite-dish me-1"></i>Validate Address
         </button>
         <div id="mobileQnasResult" class="mt-1"></div>
@@ -109,7 +136,7 @@
           <input type="text" name="customer_address" id="mobile_customer_address"
             class="pwa-form-group__input flex-grow-1" placeholder="Full address or area name">
           <button type="button" class="btn btn-sm btn-outline-info" id="mobileAiParseBtn" style="height: 38px; white-space: nowrap;"
-                  onclick="aiParseAddress('mobile_customer_address', 'mobile_dl_zone', 'mobile_dl_street', 'mobile_dl_building', 'mobileAiParseBtn', 'mobileAiParseResult', {qnasOpts: {zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', zoneNameId:'mobile_zone_name_display', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink'}})">
+                  onclick="aiParseAddress('mobile_customer_address', 'mobile_dl_zone', 'mobile_dl_street', 'mobile_dl_building', 'mobileAiParseBtn', 'mobileAiParseResult', {qnasOpts: {zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', zoneNameId:'mobile_zone_name_display', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink', accuracyId:'mobile_coords_accuracy'}})">
             <i class="fa-solid fa-wand-magic-sparkles"></i>
           </button>
         </div>
@@ -118,11 +145,11 @@
       <div class="pwa-form-row-3">
         <div class="pwa-form-group">
           <label class="pwa-form-group__label">Lat</label>
-          <input type="text" id="mobile_latitude" class="pwa-form-group__input" placeholder="--" readonly>
+          <input type="text" name="latitude" id="mobile_latitude" class="pwa-form-group__input" placeholder="--" readonly>
         </div>
         <div class="pwa-form-group">
           <label class="pwa-form-group__label">Lng</label>
-          <input type="text" id="mobile_longitude" class="pwa-form-group__input" placeholder="--" readonly>
+          <input type="text" name="longitude" id="mobile_longitude" class="pwa-form-group__input" placeholder="--" readonly>
         </div>
         <div class="pwa-form-group">
           <label class="pwa-form-group__label">Zone Name</label>
@@ -140,6 +167,14 @@
     <div class="pwa-form-section">
       <div class="pwa-form-section__header">
         <i class="fas fa-money-bill-wave"></i> Payment
+      </div>
+      <div class="pwa-form-group" id="fg_cod_status">
+        <label class="pwa-form-group__label" for="mobile_cod_status">COD Status</label>
+        <select name="cod_status_by_client" id="mobile_cod_status" class="pwa-form-group__input">
+          {% for value, label in form.fields.cod_status_by_client.widget.choices %}
+          <option value="{{ value }}"{% if value == 'online_paid' %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div class="pwa-form-group" id="fg_cod_amount">
         <label class="pwa-form-group__label">COD Amount (QAR)</label>
@@ -1494,9 +1529,9 @@
     const extractStatus = document.getElementById('ai_extract_status');
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    // Auto-generate client order code
-    const ts = Math.floor(Date.now() / 1000);
-    document.getElementById('mobile_client_order_code').value = 'ORD-' + ts;
+    // Order number: the field is the seller's to fill (pre-filled with the
+    // view's suggestion). Only generate one if it is still empty at submit.
+    const orderCodeInput = document.getElementById('mobile_client_order_code');
 
     // Source text: copy paste textarea into hidden field before submit
     const mobileForm = document.getElementById('orders_add_form_mobile');
@@ -1505,20 +1540,28 @@
         const pasteText = document.getElementById('ai_extract_textarea')?.value?.trim() || '';
         const srcField = document.getElementById('mobile_order_source_text');
         if (srcField && pasteText) srcField.value = pasteText;
+        if (orderCodeInput && !orderCodeInput.value.trim()) {
+          orderCodeInput.value = 'ORD-' + Math.floor(Date.now() / 1000);
+        }
       });
     }
 
     // Phone → WhatsApp auto-copy
     const phoneInput = document.getElementById('mobile_customer_phone');
     const waInput = document.getElementById('mobile_customer_whatsapp');
+    let waTouched = false;
+    waInput.addEventListener('input', function() { waTouched = true; });
     phoneInput.addEventListener('input', function() {
-      waInput.value = '974' + this.value;
+      if (!waTouched) waInput.value = '974' + this.value;
     });
 
     // COD amount → auto-set cod_status ("Online Paid" until an amount is typed)
     const codAmountInput = document.getElementById('mobile_cod_amount');
     const codStatusInput = document.getElementById('mobile_cod_status');
+    let codStatusTouched = false;
+    codStatusInput.addEventListener('change', function() { codStatusTouched = true; });
     codAmountInput.addEventListener('input', function() {
+      if (codStatusTouched) return;
       const val = parseFloat(this.value) || 0;
       codStatusInput.value = val > 0 ? 'unpaid' : 'online_paid';
     });

@@ -10,6 +10,7 @@
     background: var(--brand-grey-50, #f8f9fa);
     min-height: 100vh;
     /* Salary blue, named once and reused by the tile, the tag and the cards. */
+    --fde-verified: var(--brand-success, #16a34a);
     --fde-salary: var(--brand-info, #2563eb);
     --fde-salary-ink: var(--brand-info-dark, #1e40af);
     --fde-salary-wash: var(--brand-info-bg, #eff6ff);
@@ -88,6 +89,10 @@
 /* The one tile carrying money wears the brand mark; the salary tile carries the
    blue it is teaching. Everything else stays grey. */
 .fde__stat--money { border-left-color: var(--brand-primary, #f7c000); }
+/* Verified money is agreed but not released — green because it is settled work,
+   not because it is payable yet. It sits beside the money tile and deliberately
+   does not wear the brand mark: only one tile on this page is money owed. */
+.fde__stat--verified { border-left-color: var(--fde-verified); }
 .fde__stat--salary { border-left-color: var(--fde-salary); }
 
 .fde__stat-top {
@@ -110,6 +115,7 @@
 }
 
 .fde__stat--money .fde__stat-icon { color: var(--brand-primary-text, #8f6b00); }
+.fde__stat--verified .fde__stat-icon { color: var(--fde-verified); }
 .fde__stat--salary .fde__stat-icon { color: var(--fde-salary); }
 
 .fde__stat-value {
@@ -313,6 +319,10 @@ input.fde__filter-input:focus {
 }
 
 .fde__detail-value--salary { color: var(--fde-salary-ink); }
+
+/* Verified but unpublished: a real figure, so it is not muted, but it is not the
+   payout figure either, so it does not take the --highlight weight. */
+.fde__detail-value--verified { color: var(--fde-verified); }
 
 /* A salary of 0/mo pays nothing for the deliveries it absorbs — argued with,
    not read past. */

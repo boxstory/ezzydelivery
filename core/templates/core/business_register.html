@@ -282,15 +282,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const phoneAlertBox   = document.getElementById('core_business_phone_alert_container');
     const waAlertBox      = document.getElementById('core_business_whatsapp_alert_container');
 
-    let waManuallyEdited = false;
+    // A number already saved by the user is theirs to keep — never auto-overwrite it.
+    let waManuallyEdited = !!(waInput && waInput.value.replace(/\D/g, ''));
 
-    // Parse existing phone value into CC + local on page load
+    // Same dial-code list as core/profile_add.html
+    const COUNTRY_CODES = ['974','971','966','965','973','968','962','961','977','880','91','92','63','94','20','44','1'];
+
+    // Parse existing phone value into CC + local on page load. Longest code first so
+    // 974/971 win over 97/9. An unknown code stays whole in the local box with the CC
+    // cleared, so recombining gives back exactly what was stored.
     const storedPhone = phoneHidden.value.replace(/\D/g, '');
-    if (storedPhone.startsWith('974') && storedPhone.length > 3) {
-        phoneCcEl.value    = '974';
-        phoneLocalEl.value = storedPhone.slice(3);
-    } else if (storedPhone) {
-        phoneLocalEl.value = storedPhone;
+    if (storedPhone) {
+        const match = [...COUNTRY_CODES]
+            .sort((a, b) => b.length - a.length)
+            .find(code => storedPhone.startsWith(code) && storedPhone.length > code.length);
+        phoneCcEl.value    = match || '';
+        phoneLocalEl.value = match ? storedPhone.slice(match.length) : storedPhone;
     }
 
     function getCombinedPhone() {

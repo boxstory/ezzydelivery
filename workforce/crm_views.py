@@ -3,9 +3,12 @@
 # Notes: Business logic lives in crm/services.py; JSON endpoints mirror the pricing_inquiry_update_status fetch-POST pattern.
 
 import logging
+import os
 import re
+import threading
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib import messages
@@ -13,22 +16,31 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db import models
-from django.db.models import Count, Max, Q
-from django.db.models.functions import TruncMonth
+from django.db.models import (Case, Count, F, IntegerField, Max, OuterRef, Q,
+                              Subquery, Value, When)
+from django.db.models.functions import Coalesce, Lower, NullIf, TruncMonth
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
 from core.decorators import staff_required
 from crm import services as crm_services
+from crm import wa_inbox
 from crm import contact_tags as crm_contact_tags
 from crm.contact_tags import CONTACT_TAGS, strip_tags
 from crm import stage_rules as crm_stage_rules
 from crm.models import STAGE_CACHE_KEY, InboxDismissal, Lead, LeadActivity, LeadStage
 from core.validators import safe_int
+from workforce.sorting import apply_sort
 
 logger = logging.getLogger(__name__)
+
+# Anything outside this set is collapsed to a dash in a ZIP member name, so a
+# driver called with a slash or a right-to-left mark in their name cannot shape
+# the path the archive unpacks to.
+_ZIP_UNSAFE = re.compile(r'[^A-Za-z0-9._-]+')
 
 # Board columns are LeadStage rows managed by staff at /workforce/crm/stages/ —
 # label, order, colour, terminal-ness, how long a closed card lingers, and (on the
@@ -57,8 +69,39 @@ def _parse_followup_date(raw):
     return parsed, ''
 
 
-def _filtered_leads(request):
-    """Shared filter logic for board + list."""
+def _search_terms(search):
+    """The search box split on commas, blanks dropped. A box with no comma is a
+    single term, which is exactly today's behaviour."""
+    return [term.strip() for term in (search or '').split(',') if term.strip()]
+
+
+def _search_term_q(term):
+    """One search term as a lookup across the fields the box covers.
+
+    A term that is mostly digits is treated as a phone number and matched on its
+    last 8 (the Qatar local part), so '+974 3312 3456', '97433123456' and
+    '33123456' all find the same card whichever form the row was stored in.
+    """
+    digits = crm_services.normalize_phone(term)
+    if len(digits) >= 7 and re.sub(r'[\s()+.\-]', '', term).isdigit():
+        return Q(phone__endswith=digits[-8:]) | Q(wa_chat_override__endswith=digits[-8:])
+    return (
+        Q(company_name__icontains=term) |
+        Q(contact_name__icontains=term) |
+        Q(phone__icontains=term) |
+        Q(product_category__icontains=term)
+    )
+
+
+def _filtered_leads(request, multi_facets=False):
+    """Shared filter logic for board + list.
+
+    `multi_facets` switches the source and assignee facets from one value to a
+    list: the picker on those bars is a checkbox multi-select, so ?source=a&
+    source=b has to read as "either", not as the last value alone. The two
+    returned facet values become lists in that mode — the templates that opt in
+    compare with `in` instead of `==`. Every other caller keeps the single-value
+    behaviour, and a lone ?source=x works identically either way."""
     # Absorbed duplicates never appear on their own — they render inside their parent.
     leads = (Lead.objects.select_related('assigned_to', 'converted_business')
              .filter(merged_into__isnull=True)
@@ -66,20 +109,48 @@ def _filtered_leads(request):
 
     search = request.GET.get('search', '').strip()
     if search:
-        leads = leads.filter(
-            Q(company_name__icontains=search) |
-            Q(contact_name__icontains=search) |
-            Q(phone__icontains=search) |
-            Q(product_category__icontains=search)
-        )
+        # Commas make the box a list, not one string: paste a column of numbers
+        # from a sheet and get exactly those cards back. Each term is matched on
+        # its own and the results are OR'd, so one unknown number in the paste
+        # never empties the page.
+        matches = Q()
+        for term in _search_terms(search):
+            matches |= _search_term_q(term)
+        leads = leads.filter(matches)
 
-    source_filter = request.GET.get('source', '').strip()
-    if source_filter:
-        leads = leads.filter(source=source_filter)
+    if multi_facets:
+        source_filter = [v.strip() for v in request.GET.getlist('source') if v.strip()]
+        if source_filter:
+            leads = leads.filter(source__in=source_filter)
+    else:
+        source_filter = request.GET.get('source', '').strip()
+        if source_filter:
+            leads = leads.filter(source=source_filter)
 
     category_filter = request.GET.get('category', '').strip()
     if category_filter in {c for c, _ in Lead.CATEGORY_CHOICES}:
         leads = leads.filter(category=category_filter)
+
+    if multi_facets:
+        assigned_filter = [v.strip() for v in request.GET.getlist('assigned') if v.strip()]
+        # OR'd, not chained: two filters AND'd together would ask for a lead that
+        # is both mine and unassigned, which is nothing.
+        picks = Q()
+        matched = False
+        for value in assigned_filter:
+            if value == 'me':
+                picks |= Q(assigned_to=request.user)
+            elif value == 'none':
+                picks |= Q(assigned_to__isnull=True)
+            else:
+                try:
+                    picks |= Q(assigned_to_id=int(value))
+                except ValueError:
+                    continue
+            matched = True
+        if matched:
+            leads = leads.filter(picks)
+        return leads, search, source_filter, assigned_filter, category_filter
 
     assigned_filter = request.GET.get('assigned', '').strip()
     if assigned_filter == 'me':
@@ -117,7 +188,10 @@ def _annotate_wa_chats(leads):
             variants |= crm_services._phone_variants(phone)
         if override:
             variants.add(override)
-            variants |= crm_services._phone_variants(override)
+            # Only expand it as a phone when it is one: a lid's last 8 digits
+            # make a plausible 974 number that belongs to somebody else.
+            if not crm_services.is_lid_value(override):
+                variants |= crm_services._phone_variants(override)
             # A manual override is an operator asserting "this identifier is
             # this lead" — honour it on any session.
             ident_map.setdefault(f'{override}@lid', []).append(lead)
@@ -157,6 +231,42 @@ def _annotate_wa_chats(leads):
         logger.exception('crm: WA chat annotation failed')
 
 
+def _annotate_driver_vehicles(leads):
+    """Bulk-set lead.vehicle_type / lead.vehicle_label for driver leads.
+
+    Why: the card's driver chip used a fixed motorcycle icon for everyone, so a
+    desk scanning the recruitment pipeline could not tell a car applicant from a
+    bike one. One query for the whole page; leads with no application bound yet
+    keep the generic chip.
+    """
+    from fleet.models import VEHICLE_CHOICES, DriverVehicle
+
+    labels = dict(VEHICLE_CHOICES)
+    # The chip is a nowrap band on a narrow kanban card, so the two long names
+    # get a short form rather than stretching the card.
+    labels.update({'pickup3ton': 'Pickup 3T', 'pickup_big': 'Pickup Big'})
+    driver_ids = {
+        lead.driver_id for lead in leads
+        if lead.category == Lead.CATEGORY_DRIVER and lead.driver_id
+    }
+    by_driver = {}
+    if driver_ids:
+        # Newest row wins: a driver who re-registered on a different vehicle is
+        # shown as what they drive now, not what they first applied with.
+        rows = (DriverVehicle.objects
+                .filter(driver_id__in=driver_ids)
+                .exclude(vehicle_type='')
+                .exclude(vehicle_type='none')
+                .order_by('driver_id', '-created_at')
+                .values_list('driver_id', 'vehicle_type'))
+        for driver_id, vehicle_type in rows:
+            by_driver.setdefault(driver_id, vehicle_type)
+
+    for lead in leads:
+        vehicle_type = by_driver.get(getattr(lead, 'driver_id', None), '')
+        lead.vehicle_type = vehicle_type
+        lead.vehicle_label = labels.get(vehicle_type, '')
+
 def _render_leads_board(request, board_category, template):
     """Shared kanban builder behind the two board pages. The business sales pipeline
     and the driver recruitment pipeline are separate pages with their own URL, their
@@ -186,6 +296,7 @@ def _render_leads_board(request, board_category, template):
         keep |= Q(stage=key, closed_at__gte=now - timedelta(days=days))
     leads = list(leads.filter(keep).order_by('-created_at'))
     _annotate_wa_chats(leads)
+    _annotate_driver_vehicles(leads)
 
     by_stage = {s.key: [] for s in stage_rows}
     for lead in leads:
@@ -340,7 +451,34 @@ def _render_leads_list(request, list_category):
             next_followup_at__lt=timezone.localdate()
         ).exclude(stage__in=crm_services.closed_stage_keys())
 
-    leads = leads.order_by('-created_at')
+    # Stage columns are this board's own, and they are needed twice: to rank a
+    # stage sort in board order and to fill the stage filter below.
+    stage_rows = crm_services.board_stages(list_category)
+
+    # Column sorting. The whitelist is this page's contract with the URL — a
+    # ?sort= naming anything else quietly falls back to newest-first.
+    lead_name = Lower(Coalesce(
+        NullIf('company_name', Value('')),
+        NullIf('contact_name', Value('')),
+        NullIf('phone', Value('')),
+    ))
+    leads, sort = apply_sort(leads, request.GET.get('sort'), {
+        'id': (F('pk'),),
+        'lead': (lead_name,),
+        'phone': (NullIf('phone', Value('')),),
+        'category': (Lower(NullIf('product_category', Value(''))),),
+        'source': ('source',),
+        # Board order, not the alphabet: "New before Won" is the only reading of
+        # a pipeline column that means anything to the desk.
+        'stage': (Case(
+            *[When(stage=row.key, then=Value(index)) for index, row in enumerate(stage_rows)],
+            default=Value(len(stage_rows)), output_field=IntegerField(),
+        ),),
+        'assignee': (Lower(Coalesce(
+            NullIf('assigned_to__first_name', Value('')), 'assigned_to__username')),),
+        'followup': ('next_followup_at',),
+        'created': ('created_at',),
+    }, default='-created')
 
     # Metrics scoped to the active category tab (All / Business / Drivers). The closed
     # keys are scoped to the same board: a terminal column that exists on only one
@@ -358,13 +496,19 @@ def _render_leads_list(request, list_category):
     ).count()
 
     # Stage filter options are this page's own board columns.
-    stage_choices = [(s.key, s.label) for s in crm_services.board_stages(list_category)]
+    stage_choices = [(row.key, row.label) for row in stage_rows]
     stage_choices = stage_choices or Lead.STAGE_CHOICES
 
     page_obj = paginate_queryset(request, leads, items_per_page=50)
+    # Materialised so the per-lead vehicle set below survives into the template —
+    # a sliced queryset would hand the loop fresh, un-annotated instances.
+    page_obj.object_list = list(page_obj.object_list)
+    _annotate_driver_vehicles(page_obj.object_list)
 
     from urllib.parse import urlencode
-    filter_params = urlencode({k: v for k, v in {
+    # Two strings, deliberately: pagination has to carry the sort with it, while a
+    # header cell writes its own sort and must not inherit the old one.
+    sort_params = urlencode({k: v for k, v in {
         'search': search,
         'stage': stage_filter,
         'source': source_filter,
@@ -372,15 +516,41 @@ def _render_leads_list(request, list_category):
         'overdue': overdue_filter,
         'category': category_filter,
     }.items() if v})
+    filter_params = urlencode({k: v for k, v in {
+        'search': search,
+        'stage': stage_filter,
+        'source': source_filter,
+        'assigned': assigned_filter,
+        'overdue': overdue_filter,
+        'category': category_filter,
+        'sort': sort.value,
+    }.items() if v})
 
     is_driver_list = list_category == Lead.CATEGORY_DRIVER
+    # The shared column picker + row-tick contract (workforce/js/export-columns.js):
+    # each page names its own registry, its own endpoint and its own remembered
+    # column selection, so the two pipelines never overwrite each other's.
+    from core.departments import can_access
+    from workforce.views import export_columns_context
+
     context = {
         'page_title': 'Driver Leads' if is_driver_list else 'Business Leads',
+        # Documents carry QID and licence scans, so the button only appears for the
+        # desk that owns them — marketing works the same table without it.
+        'can_download_documents': (
+            is_driver_list and can_access(request.user, 'crm_driver_leads_documents')),
+        # What the Documents dialog offers to pick from.
+        'document_type_choices': _fleet_document_choices(),
+        'document_driver_cap': MAX_DOCUMENT_DRIVERS,
         'list_category': list_category,
         'is_driver_list': is_driver_list,
         'page_obj': page_obj,
         'per_page': request.GET.get('per_page', '50'),
         'filter_params': filter_params,
+        'sort': sort,
+        'sort_params': sort_params,
+        'sort_url': reverse('workforce:crm_driver_leads_list' if is_driver_list
+                            else 'workforce:crm_leads_list'),
         'search': search,
         'source_filter': source_filter,
         'assigned_filter': assigned_filter,
@@ -397,6 +567,13 @@ def _render_leads_list(request, list_category):
         'won_count': won_count,
         'today': timezone.localdate(),
     }
+    context.update(export_columns_context(
+        CRM_DRIVER_LEAD_EXPORT_COLUMNS if is_driver_list else CRM_BUSINESS_LEAD_EXPORT_COLUMNS,
+        url_name=('workforce:crm_driver_leads_export_csv' if is_driver_list
+                  else 'workforce:crm_leads_export_csv'),
+        storage_key=('wf_crm_driver_lead_cols' if is_driver_list
+                     else 'wf_crm_lead_cols'),
+    ))
     return render(request, 'workforce/crm/leads_list.html', context)
 
 
@@ -449,6 +626,423 @@ def _split_name(name):
         return parts[0], ''
     return parts[0], ' '.join(parts[1:])
 
+
+# ── Ticked-row downloads ─────────────────────────────────────────────────────
+# Both downloads read the same selection the shared export-columns.js writes:
+# ?ids=3,9,14 from the row checkboxes, and no ids at all meaning "everything the
+# current filter matches". They are plain links, never htmx, so the file lands as
+# a file instead of being swapped into the page.
+
+# A driver's documents are photographs of a QID and a licence, ~1 MB each, so a
+# whole-page download runs to hundreds of megabytes. The cap is what one desk can
+# reasonably be handed in a single file; past it the operator narrows the ticks.
+MAX_DOCUMENT_DRIVERS = 25
+
+
+def _fleet_document_choices():
+    from fleet.models import DriverDocument
+    return DriverDocument.document_choices
+
+
+# Offered in the Documents dialog, straight off the model so a new kind never has
+# to be added in two places.
+DOCUMENT_TYPES = [key for key, _label in _fleet_document_choices()]
+
+
+def _lead_driver(lead):
+    """The application behind a driver lead, or None.
+
+    The FK is authoritative (crm.services._driver_for_lead) — a card not yet
+    bound to an applicant exports blank driver columns rather than guessing from
+    the phone number.
+    """
+    return lead.driver if lead.driver_id else None
+
+
+def _driver_attr(getter):
+    """Wrap a Driver getter so an unbound lead exports '' instead of raising."""
+    def read(lead):
+        driver = _lead_driver(lead)
+        return getter(driver) if driver else ''
+    return read
+
+
+def _primary_vehicle(driver):
+    return next(iter(driver.driver_vehicle.all()), None)
+
+
+def _driver_documents_held(driver):
+    """The document types actually uploaded — the placeholder image every row
+    ships with is not a document (fleet.models.has_real_file)."""
+    return ', '.join(sorted({
+        doc.document_type for doc in driver.driver_document.all()
+        if doc.has_real_file and doc.document_type
+    }))
+
+
+def _lead_assignee(lead):
+    if not lead.assigned_to:
+        return ''
+    return lead.assigned_to.get_full_name() or lead.assigned_to.username
+
+
+# (key, label, getter) in the order the modal offers them and the file writes them.
+CRM_LEAD_BASE_COLUMNS = [
+    ('lead_id',    'Lead #',     lambda l: l.pk),
+    ('company',    'Company',    lambda l: l.company_name or ''),
+    ('contact',    'Contact',    lambda l: strip_tags(l.contact_name) or ''),
+    ('phone',      'Phone',      lambda l: l.phone or ''),
+    ('stage',      'Stage',      lambda l: l.stage_label),
+    ('source',     'Source',     lambda l: l.get_source_display()),
+    ('assignee',   'Assignee',   _lead_assignee),
+    ('followup',   'Follow-up',  lambda l: l.next_followup_at.strftime('%Y-%m-%d') if l.next_followup_at else ''),
+    ('created',    'Created',    lambda l: timezone.localtime(l.created_at).strftime('%Y-%m-%d')),
+    ('notes',      'Notes',      lambda l: l.notes or ''),
+]
+
+CRM_BUSINESS_LEAD_EXPORT_COLUMNS = CRM_LEAD_BASE_COLUMNS + [
+    ('category',   'Category',   lambda l: l.product_category or ''),
+    ('converted',  'Converted to', lambda l: l.converted_business.business_name if l.converted_business else ''),
+]
+
+# The recruitment desk works from the card AND the application behind it, so the
+# driver columns ride along with the lead ones in one file.
+CRM_DRIVER_LEAD_EXPORT_COLUMNS = CRM_LEAD_BASE_COLUMNS + [
+    ('driver_code',  'Driver code',   _driver_attr(lambda d: d.driver_code or d.pk)),
+    ('whatsapp',     'WhatsApp',      _driver_attr(lambda d: d.driver_whatsapp or '')),
+    ('vehicle',      'Vehicle',       _driver_attr(
+        lambda d: (_primary_vehicle(d).get_vehicle_type_display()
+                   if _primary_vehicle(d) and _primary_vehicle(d).vehicle_type != 'none' else ''))),
+    ('plate',        'Plate',         _driver_attr(
+        lambda d: (_primary_vehicle(d).vehicle_no or '') if _primary_vehicle(d) else '')),
+    ('application',  'Application',   _driver_attr(
+        lambda d: d.profile.get_verification_status_display() if d.profile else '')),
+    ('driver_status', 'Driver status', _driver_attr(lambda d: d.get_driver_status_display())),
+    ('job_type',     'Job type',      _driver_attr(
+        lambda d: d.get_job_type_display() if d.job_type else '')),
+    ('zones',        'Zones',         _driver_attr(
+        lambda d: ', '.join(zg.name for zg in d.preferred_zone_groups.all()))),
+    ('nationality',  'Nationality',   _driver_attr(
+        lambda d: (d.profile.nationlity or '') if d.profile else '')),
+    ('area',         'Area',          _driver_attr(
+        lambda d: (d.profile.zone_name or '') if d.profile else '')),
+    ('licence',      'Licence no',    _driver_attr(lambda d: d.driver_license_number or '')),
+    ('documents',    'Documents held', _driver_attr(_driver_documents_held)),
+]
+
+
+def _export_leads_queryset(request, list_category):
+    """The rows behind a download: the page's own filters re-applied.
+
+    ?ids= is left to csv_columns_response, which narrows to the ticked rows —
+    but only ever within this queryset, so a hand-written id can never reach
+    across the category boundary into the other pipeline.
+    """
+    leads, *_ = _filtered_leads(request)
+    leads = leads.filter(category=list_category)
+
+    stage_filter = request.GET.get('stage', '').strip()
+    if stage_filter:
+        leads = leads.filter(stage=stage_filter)
+    if request.GET.get('overdue', '').strip() == '1':
+        leads = leads.filter(
+            next_followup_at__lt=timezone.localdate()
+        ).exclude(stage__in=crm_services.closed_stage_keys())
+
+    return (leads
+            .select_related('assigned_to', 'converted_business',
+                            'driver', 'driver__user', 'driver__profile')
+            .prefetch_related('driver__driver_document', 'driver__driver_vehicle',
+                              'driver__preferred_zone_groups')
+            .order_by('-created_at'))
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_leads_export_csv(request):
+    """Business leads table as a spreadsheet — ticked rows, else the whole filter."""
+    from workforce.views import csv_columns_response
+
+    return csv_columns_response(
+        request, _export_leads_queryset(request, Lead.CATEGORY_BUSINESS),
+        CRM_BUSINESS_LEAD_EXPORT_COLUMNS, 'ezzy_business_leads')
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_driver_leads_export_csv(request):
+    """Driver leads table as a spreadsheet, application columns included."""
+    from workforce.views import csv_columns_response
+
+    return csv_columns_response(
+        request, _export_leads_queryset(request, Lead.CATEGORY_DRIVER),
+        CRM_DRIVER_LEAD_EXPORT_COLUMNS, 'ezzy_driver_leads')
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_driver_leads_documents(request):
+    """The ticked applicants' uploaded documents, as chosen in the Documents dialog.
+
+    ?types= picks the document kinds (blank = all of them) and ?format= picks the
+    shape: `pdf` gives one captioned PDF per applicant, `images` the photographs
+    themselves in a folder per applicant. Built on a temp file rather than in
+    memory — a selection is hundreds of megabytes of photographs — and stored,
+    not deflated, because JPEGs do not compress. Capped at MAX_DOCUMENT_DRIVERS:
+    a whole-page download is not a file anyone can send on.
+    """
+    import tempfile
+    import zipfile
+
+    from core.exports import set_export_filename
+    from django.http import FileResponse, HttpResponse
+
+    # Back to the table the operator came from, filters intact — but without what
+    # belongs to the download, which would otherwise sit in the address bar.
+    params = request.GET.copy()
+    for key in ('ids', 'types', 'format'):
+        params.pop(key, None)
+    query = params.urlencode()
+    back_url = reverse('workforce:crm_driver_leads_list') + (f'?{query}' if query else '')
+
+    ids = [value for value in (request.GET.get('ids', '') or '').split(',')
+           if value.strip().isdigit()]
+    if not ids:
+        messages.warning(request, 'Tick the applicants whose documents you want, '
+                                  'then press Documents again.')
+        return redirect(back_url)
+
+    wanted = {value for value in request.GET.getlist('types') if value in DOCUMENT_TYPES}
+    as_pdf = request.GET.get('format') == 'pdf'
+
+    leads = _export_leads_queryset(request, Lead.CATEGORY_DRIVER).filter(pk__in=ids)
+    drivers = list({lead.driver_id: lead.driver
+                    for lead in leads if lead.driver_id}.values())
+
+    if not drivers:
+        messages.warning(request, 'None of those leads has a driver application yet, '
+                                  'so there are no documents to download.')
+        return redirect(back_url)
+    if len(drivers) > MAX_DOCUMENT_DRIVERS:
+        messages.warning(
+            request,
+            f'{len(drivers)} applicants ticked — documents come {MAX_DOCUMENT_DRIVERS} '
+            'at a time. Tick fewer rows, or narrow the filter first.')
+        return redirect(back_url)
+
+    index = [['Driver code', 'Name', 'Phone', 'Document', 'Number',
+              'Issued from', 'Expiry', 'File in this download']]
+    archive = tempfile.NamedTemporaryFile(suffix='.zip')
+    written = 0
+    single_pdf = None
+    with zipfile.ZipFile(archive, 'w', zipfile.ZIP_STORED) as bundle:
+        for driver in drivers:
+            scans = _selected_scans(driver, wanted)
+            if not scans:
+                continue
+            folder = _driver_folder_name(driver)
+
+            # An already-PDF upload cannot be drawn onto a page (no PDF library
+            # here), so it rides along as itself rather than going missing.
+            images = [scan for scan in scans if _is_image(scan[2])]
+            originals = scans if not as_pdf else [s for s in scans if not _is_image(s[2])]
+
+            if as_pdf and images:
+                blob = _driver_documents_pdf(driver, images)
+                if blob:
+                    member = f'{folder}.pdf'
+                    bundle.writestr(member, blob)
+                    single_pdf = blob if len(drivers) == 1 else None
+                    written += 1
+                    for doc, side, _field in images:
+                        index.append(_index_row(driver, doc, side, member))
+
+            for doc, side, field in originals:
+                member = (f'{folder} - {_scan_label(doc, side)}{_extension(field)}'
+                          if as_pdf else
+                          f'{folder}/{_scan_label(doc, side)}{_extension(field)}')
+                try:
+                    with field.open('rb') as handle:
+                        bundle.writestr(member, handle.read())
+                except (OSError, ValueError):
+                    # A row pointing at a file that is no longer on disk must not
+                    # cost the operator everyone else's documents.
+                    logger.warning('crm: document file %s missing for driver %s',
+                                   field.name, driver.pk)
+                    continue
+                written += 1
+                index.append(_index_row(driver, doc, side, member))
+
+        # Numbers and expiry dates live in the table, not on the photographs, so
+        # the archive carries its own index rather than arriving as loose files.
+        if written:
+            bundle.writestr('index.csv', _index_csv(index))
+
+    if not written:
+        archive.close()
+        messages.warning(
+            request,
+            'Nothing to download — those applicants have not uploaded '
+            + ('any documents yet.' if not wanted else 'the document types you picked.'))
+        return redirect(back_url)
+
+    # One applicant asked for as one PDF is a PDF, not a one-item archive.
+    if single_pdf is not None and written == 1:
+        archive.close()
+        response = HttpResponse(single_pdf, content_type='application/pdf')
+        return set_export_filename(response, 'ezzy_driver_documents',
+                                   code=drivers[0], ext='pdf')
+
+    archive.seek(0)
+    response = FileResponse(archive, content_type='application/zip')
+    set_export_filename(
+        response, 'ezzy_driver_documents',
+        code=drivers[0] if len(drivers) == 1 else None, ext='zip')
+    return response
+
+
+def _selected_scans(driver, wanted):
+    """[(doc, side, file field)] for one applicant, narrowed to the chosen types.
+
+    `wanted` empty means every type. The placeholder image every DriverDocument
+    row ships with is not a document, so only real uploads come back
+    (fleet.models.has_real_file); a back side is only ever a real file.
+    """
+    scans = []
+    for doc in driver.driver_document.all():
+        if wanted and doc.document_type not in wanted:
+            continue
+        if doc.has_real_file:
+            scans.append((doc, 'front', doc.document_file))
+        back = doc.document_file_back
+        if back and back.name:
+            scans.append((doc, 'back', back))
+    return scans
+
+
+def _driver_folder_name(driver):
+    """`CODE-Name` — what one applicant's files are filed under in the archive."""
+    name = (driver.user.get_full_name() if driver.user else '') or ''
+    return '-'.join(part for part in (
+        _ZIP_UNSAFE.sub('-', str(driver.driver_code or driver.pk)).strip('-'),
+        _ZIP_UNSAFE.sub('-', name).strip('-'),
+    ) if part) or str(driver.pk)
+
+
+def _scan_label(doc, side):
+    label = _ZIP_UNSAFE.sub('-', doc.document_type or 'Document').strip('-')
+    return f'{label}_back' if side == 'back' else label
+
+
+def _extension(field):
+    return os.path.splitext(field.name)[1].lower() or '.jpg'
+
+
+def _is_image(field):
+    """True when the upload can be drawn onto a PDF page. The field is an
+    ImageField, but 16 rows predate that and hold a PDF."""
+    return _extension(field) in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic'}
+
+
+def _index_row(driver, doc, side, member):
+    return [
+        driver.driver_code or driver.pk,
+        (driver.user.get_full_name() if driver.user else '') or '',
+        driver.driver_phone or '',
+        (doc.document_type or 'Document') + (' (back)' if side == 'back' else ''),
+        doc.document_no or '',
+        doc.document_issued_from or '',
+        doc.document_expiry_date.strftime('%Y-%m-%d') if doc.document_expiry_date else '',
+        member,
+    ]
+
+
+def _driver_documents_pdf(driver, scans):
+    """One applicant's scans as a single A4 PDF, a captioned page each.
+
+    The captions are the point: once the photographs leave the table they carry
+    no name, no document number and no expiry date, and a pack of anonymous
+    phone snaps is not something a desk can file.
+    """
+    import io
+
+    from PIL import Image, ImageOps
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
+    name = (driver.user.get_full_name() if driver.user else '') or ''
+    heading = ' · '.join(part for part in (
+        str(driver.driver_code or driver.pk), name, driver.driver_phone or '') if part)
+
+    buffer = io.BytesIO()
+    page = canvas.Canvas(buffer, pagesize=A4)
+    page.setTitle(f'EZZY driver documents — {heading}')
+    width, height = A4
+    margin = 15 * mm
+    pages = 0
+
+    for doc, side, field in scans:
+        try:
+            with field.open('rb') as handle:
+                image = Image.open(handle)
+                # Phone cameras record orientation in EXIF rather than in the
+                # pixels; without this half the licences arrive on their side.
+                image = ImageOps.exif_transpose(image)
+                image = image.convert('RGB')
+                image.load()
+        except Exception:
+            logger.warning('crm: could not render %s for driver %s',
+                           field.name, driver.pk)
+            continue
+
+        # Re-encode as JPEG at print resolution and hand reportlab the encoded
+        # bytes, not the pixels: given a raw image it stores every one of them
+        # losslessly, which turned a 3 MB pack of photos into a 23 MB PDF.
+        # A4 at 200 dpi is past what any of these scans actually resolve.
+        image.thumbnail((1654, 2339), Image.LANCZOS)
+        encoded = io.BytesIO()
+        image.save(encoded, format='JPEG', quality=85, optimize=True)
+        encoded.seek(0)
+
+        page.setFont('Helvetica-Bold', 11)
+        page.drawString(margin, height - margin, heading)
+        page.setFont('Helvetica', 9.5)
+        caption = (doc.document_type or 'Document') + (' — back' if side == 'back' else '')
+        detail = ' · '.join(part for part in (
+            doc.document_no or '',
+            f'issued {doc.document_issued_from}' if doc.document_issued_from else '',
+            f'expires {doc.document_expiry_date:%d %b %Y}' if doc.document_expiry_date else '',
+        ) if part)
+        page.drawString(margin, height - margin - 13, caption + (f'   ({detail})' if detail else ''))
+
+        top = height - margin - 26
+        page.drawImage(ImageReader(encoded), margin, margin,
+                       width=width - 2 * margin, height=top - margin,
+                       preserveAspectRatio=True, anchor='c', mask='auto')
+        page.showPage()
+        pages += 1
+
+    if not pages:
+        return None
+    page.save()
+    return buffer.getvalue()
+
+
+def _index_csv(rows):
+    """The archive's own index as CSV text, formula-guarded like every export."""
+    import csv
+    import io
+
+    from core.exports import safe_csv_writer
+
+    buffer = io.StringIO()
+    writer = safe_csv_writer(buffer, quoting=csv.QUOTE_MINIMAL)
+    for row in rows:
+        writer.writerow(row)
+    # Excel reads UTF-8 only with the BOM, and these rows carry Arabic names.
+    return '﻿' + buffer.getvalue()
 
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -571,7 +1165,11 @@ def _lead_wa_identifiers(lead):
         # A manual override is an operator asserting the mapping — trust it on
         # any session rather than guessing which one they meant.
         idents.add(f'{override}@lid')
-        idents |= crm_services._phone_variants(override)
+        # …but only read it as a phone when it is one. A lid expanded through
+        # the phone variants invents '974' + its last 8 digits, which is a
+        # perfectly plausible Qatar number belonging to a stranger.
+        if not crm_services.is_lid_value(override):
+            idents |= crm_services._phone_variants(override)
     if not idents:
         return set(), set()
     try:
@@ -1146,6 +1744,179 @@ def crm_lead_detail(request, lead_id):
     return render(request, 'workforce/crm/lead_detail.html', context)
 
 
+def _wa_chat_id(ident):
+    """A stored identifier ('97455…', '1234567890@lid') as a WAHA chatId."""
+    ident = (ident or '').strip()
+    if not ident:
+        return ''
+    if '@' in ident:
+        return ident
+    if crm_services.is_lid_value(ident):
+        return f'{ident}@lid'
+    return f'{ident}@c.us'
+
+
+def _lead_wa_chat_targets(lead, session=''):
+    """[(session, chatId)] — the WAHA chats holding this lead's thread.
+
+    Read off the lead's newest stored messages, because those rows already name
+    the identifier WhatsApp actually routes on (a phone JID on one number, a
+    per-device @lid on the other) rather than a guess built from the phone.
+    Falls back to the phone when nothing is stored yet — a lead the webhook
+    never delivered is exactly what the Refresh button is for.
+    """
+    from whatsapp import sessions as wa_sessions
+
+    idents, lid_pairs = _lead_wa_identifiers(lead)
+    lid_values = {lid for _sess, lid in lid_pairs}
+    targets, seen = [], set()
+
+    wa_q = _lead_wa_q(lead, session)
+    if wa_q is not None:
+        try:
+            from whatsapp.models import WhatsAppMessage
+            rows = list(
+                WhatsAppMessage.objects.filter(wa_q)
+                .order_by('-received_at')
+                .values_list('session', 'from_number', 'to_number')[:100]
+            )
+        except Exception:
+            logger.exception('crm: chat target lookup failed for lead %s', lead.pk)
+            rows = []
+        for sess, from_number, to_number in rows:
+            for cand in (from_number, to_number):
+                # Whichever side of the row is the LEAD — our own number is never
+                # in the identifier set, so this picks the counterpart.
+                if not cand or (cand not in idents and cand not in lid_values):
+                    continue
+                key = (sess, _wa_chat_id(cand))
+                if key[1] and key not in seen:
+                    seen.add(key)
+                    targets.append(key)
+
+    if not targets:
+        fallback_session = session or wa_sessions.default_session()
+        override = crm_services.normalize_phone(
+            getattr(lead, 'wa_chat_override', '') or '')
+        phone = crm_services.normalize_phone(lead.phone or '')
+        if override and crm_services.is_lid_value(override):
+            # A lid addresses a chat only on the session whose device issued it;
+            # the same string elsewhere is a different person. So it is a target
+            # only where this lead's lid is known, and the plain phone carries
+            # the fallback on every other number.
+            base = override if (fallback_session, override) in lid_pairs else phone
+        else:
+            base = override or phone
+        if base and crm_services.is_lid_value(base):
+            targets.append((fallback_session, _wa_chat_id(base)))
+        elif base:
+            # WhatsApp routes on the full international number.
+            variants = crm_services._phone_variants(base)
+            full = next((v for v in sorted(variants) if v.startswith('974')), base)
+            targets.append((fallback_session, _wa_chat_id(full)))
+    return targets
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_lead_chat_refresh(request, lead_id):
+    """POST: pull this lead's chat straight from WAHA, then hand back the
+    re-rendered message bubbles.
+
+    The conversation panel is fed by the webhook, so a message that arrived
+    while the bridge was down never appears no matter how often staff reload.
+    This does what the inbox Resync does, scoped to one lead's chat(s) so it
+    stays inside a request: fetch → upsert → re-render.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    lead = get_object_or_404(Lead, pk=lead_id)
+
+    # Same gate as the panel itself — a platform account's thread carries auth
+    # messages and must not be pulled into view here.
+    if crm_services.wa_read_blocked(_lead_wa_identifiers(lead)):
+        return JsonResponse({'success': False, 'error': 'This chat is not readable here'}, status=403)
+
+    # Resolve the same way the page does, but never persist: refreshing a panel
+    # is not the staff member choosing a number.
+    requested = request.POST.get('session') or request.GET.get('session') or ''
+    wa_session, _options, _changed, _explicit = _lead_wa_session_choice(lead, requested)
+
+    pulled = 0
+    pull_error = ''
+    fetched_any = False
+    if getattr(settings, 'WAHA_API_KEY', ''):
+        import time as _time
+        from whatsapp.management.commands.backfill_waha import upsert_message, waha_get
+
+        started = _time.monotonic()
+        budget_s = 20  # nginx cuts the response off at 60s — stay well inside it
+        for sess, chat_id in _lead_wa_chat_targets(lead, wa_session)[:3]:
+            if _time.monotonic() - started > budget_s:
+                break
+            try:
+                body = waha_get(
+                    f'/api/{sess}/chats/{quote(chat_id, safe="")}/messages',
+                    params={'limit': 50, 'downloadMedia': 'true'},
+                    timeout=12,
+                )
+            except Exception as exc:
+                logger.warning('crm: chat refresh failed for lead %s (%s/%s): %s',
+                               lead.pk, sess, chat_id, exc)
+                # A bridge that is down and a chat WAHA will not open are
+                # different problems: the first is ours to fix, the second means
+                # we asked this number for a thread it does not have. Saying
+                # "bridge did not answer" for both sends staff chasing an
+                # outage that is not happening.
+                status = getattr(getattr(exc, 'response', None), 'status_code', None)
+                pull_error = (
+                    f'no WhatsApp thread for this lead on {sess}'
+                    if status else 'WhatsApp bridge did not answer'
+                )
+                continue
+            fetched_any = True
+            if isinstance(body, dict) and isinstance(body.get('messages'), list):
+                msgs = body['messages']
+            elif isinstance(body, list):
+                msgs = body
+            else:
+                msgs = []
+            for m in msgs:
+                if not isinstance(m, dict) or not m.get('id'):
+                    continue
+                try:
+                    _obj, created = upsert_message(m, sess, chat_id)
+                except Exception:
+                    logger.exception('crm: chat refresh upsert failed for lead %s', lead.pk)
+                    continue
+                if created:
+                    pulled += 1
+    else:
+        pull_error = 'WhatsApp bridge is not configured'
+
+    # One target failing while another answered is not worth an error banner —
+    # the panel below already has the messages.
+    if fetched_any:
+        pull_error = ''
+
+    # Media bodies are downloaded by the per-minute archive_wa_media cron, so a
+    # brand-new photo can land here as a link before its local copy exists.
+    wa_messages, _wa_media = _lead_wa_conversation(lead, wa_session)
+    html = render_to_string(
+        'workforce/crm/parts/_lead_chat_messages.html',
+        {'wa_messages': wa_messages, 'lead': lead},
+        request=request,
+    )
+    return JsonResponse({
+        'success': True,
+        'html': html,
+        'count': len(wa_messages),
+        'new': pulled,
+        'error': pull_error,
+    })
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def crm_lead_ai_summary(request, lead_id):
@@ -1701,6 +2472,91 @@ def crm_lead_unpin_stage(request, lead_id):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+def crm_lead_move_board(request, lead_id):
+    """POST category=business|driver: re-file a card on the other pipeline.
+
+    The two boards share no stage keys, so the category can never move on its own —
+    a business lead flipped to `driver` keeps a business stage and lands in the grey
+    Unsorted lane. Re-homing the stage to the target board's entry column is part of
+    the same write.
+
+    Deliberately NOT routed through crm_services.set_lead_stage: that fires the
+    marketing auto-flows, and filing a card on the right board is housekeeping the
+    lead must not hear about. No driver write-back happens either — both entry
+    columns carry a blank `write_back`.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    lead = get_object_or_404(Lead, pk=lead_id)
+
+    target = (request.POST.get('category') or '').strip()
+    if target not in {c for c, _ in Lead.CATEGORY_CHOICES}:
+        return JsonResponse({'success': False, 'error': 'Pick a board to move to.'}, status=400)
+    if target == lead.category:
+        return JsonResponse({'success': False, 'error': 'This card is already on that board.'},
+                            status=400)
+
+    # A converted client is not a driver applicant, and a merged card is not on a
+    # board at all — both would make the move meaningless rather than wrong.
+    if lead.converted_business_id:
+        return JsonResponse({
+            'success': False,
+            'error': (f'This lead is already linked to Business #{lead.converted_business_id}, '
+                      'so it belongs on the Business board. Unlink it first.'),
+        }, status=400)
+    if lead.merged_into_id:
+        return JsonResponse({
+            'success': False,
+            'error': (f'This card is merged into #{lead.merged_into_id} and does not appear on a '
+                      'board on its own. Un-merge it first, or move the card it sits inside.'),
+        }, status=400)
+
+    old_label = dict(Lead.CATEGORY_CHOICES).get(lead.category, lead.category)
+    new_label = dict(Lead.CATEGORY_CHOICES)[target]
+    old_stage_label = lead.stage_label
+
+    lead.category = target
+    lead.stage = crm_services.initial_stage_key(target)
+    lead.stage_changed_at = timezone.now()
+    lead.closed_at = None          # both boards' entry columns are open stages
+    # Pinning only ever protects a driver card from its own auto-filing. A card that
+    # has just arrived must follow the application status it now tracks.
+    lead.stage_pinned = False
+    lead.stage_pinned_at = None
+    if target == Lead.CATEGORY_BUSINESS:
+        # `driver` is the binding a driver card is *about*; on the business board it
+        # would be a dangling claim on a real applicant.
+        lead.driver = None
+    # Full save, not update_fields: Lead.save() re-tags contact_name ZyBuz ⇄ ZyDrv so
+    # the synced phone address book keeps matching the board.
+    lead.save()
+
+    # Absorbed cards render inside this one, so they follow it across rather than
+    # keeping the old board's tag and a stage label from a pipeline they left.
+    for child in lead.merged_children.all():
+        child.category = target
+        child.stage = lead.stage
+        child.save()
+
+    LeadActivity.objects.create(
+        lead=lead,
+        activity_type=LeadActivity.TYPE_STAGE_CHANGE,
+        body=(f'Moved from the {old_label} board to the {new_label} board — '
+              f'{old_stage_label} → {lead.stage_label}'),
+        created_by=request.user,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'category': lead.category,
+        'stage': lead.stage,
+        'stage_display': lead.stage_label,
+        'redirect': reverse('workforce:crm_lead_detail', args=[lead.pk]),
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 def crm_lead_update(request, lead_id):
     """AJAX: update assignee, follow-up date, notes, and contact fields."""
     if request.method != 'POST':
@@ -1775,6 +2631,15 @@ def crm_lead_update(request, lead_id):
         'assigned_to': (lead.assigned_to.get_full_name() or lead.assigned_to.username)
                        if lead.assigned_to else '',
         'next_followup_at': lead.next_followup_at.isoformat() if lead.next_followup_at else '',
+        # Echoed back so the contact card can repaint from what was stored rather
+        # than from what was typed — the phone is normalised on the way in, so the
+        # two differ whenever staff paste a +974 / spaced number.
+        'contact': {
+            'company_name': lead.company_name or '',
+            'contact_name': lead.contact_name or '',
+            'phone': lead.phone or '',
+            'product_category': lead.product_category or '',
+        },
     })
 
 
@@ -1858,7 +2723,13 @@ def crm_lead_link_business(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def crm_whatsapp_inbox(request):
-    """Inbound WAHA senders not yet known: promote to lead or dismiss."""
+    """Inbound WAHA senders not yet known: send them a form link, or dismiss.
+
+    A conversation is deliberately NOT a lead here. The primary action sends the
+    driver join form or the pricing enquiry link, and the CRM card is created by
+    the submission itself — so a board column means "this person applied", not
+    "this person said hello".
+    """
     from workforce.views import paginate_queryset
     from whatsapp import sessions as wa_sessions
 
@@ -1883,175 +2754,10 @@ def crm_whatsapp_inbox(request):
     except Exception:
         logger.exception('crm: WAHA session status fetch failed')
 
-    rows = []
     search = request.GET.get('search', '').strip()
-
-    try:
-        from whatsapp.models import WhatsAppMessage
-        # 'system' rows are encryption notices and the like — a sender with no
-        # message. Counting them here put ~74 people in the triage queue who
-        # had never written to us.
-        inbound = WhatsAppMessage.objects.filter(direction='inbound').exclude(message_type='system')
-        if session_filter:
-            inbound = inbound.filter(session=session_filter)
-        grouped = (
-            inbound
-            .exclude(from_number='')
-            # Groups and status broadcasts are not promotable senders
-            .exclude(from_number__contains='-')
-            .exclude(from_number__contains='@g.us')
-            .exclude(from_number__istartswith='status')
-            # Grouped per session, not per bare identifier: an @lid sender only
-            # identifies someone relative to the number that received it, so the
-            # same lid on our other number is a different person.
-            .values('session', 'from_number')
-            .annotate(last_at=Max('received_at'), msg_count=Count('id'))
-            .order_by('-last_at')
-        )
-        if search:
-            # Senders are stored under the id WhatsApp delivered them as, which
-            # for almost every modern sender is an @lid — never the number the
-            # row displays. Matching the raw id alone meant searching the very
-            # number on screen returned "no unknown senders", so the term is
-            # resolved through the contact directory (and names) first.
-            from whatsapp.models import WhatsAppContact
-            search_digits = ''.join(ch for ch in search if ch.isdigit())
-            contact_q = Q(saved_name__icontains=search) | Q(push_name__icontains=search)
-            if search_digits:
-                contact_q |= Q(phone__icontains=search_digits) | Q(lid__icontains=search_digits)
-            search_digit_ids = set()
-            for c in WhatsAppContact.objects.filter(contact_q).only('phone', 'lid'):
-                search_digit_ids.update(d for d in (c.phone, c.lid) if d)
-            # The directory only covers senders the contact cron has seen. Rows
-            # resolved live off WAHA's lids API would still be unfindable, so
-            # search the same (cached) map the row rendering uses.
-            if search_digits:
-                try:
-                    from whatsapp.wa_chats_view import _lid_map, _waha_base
-                    api_key = getattr(settings, 'WAHA_API_KEY', '') or ''
-                    scope = [session_filter] if session_filter else [
-                        s['name'] for s in wa_session_list
-                    ]
-                    for sess in scope:
-                        for lid, phone in _lid_map(_waha_base(), sess, api_key).items():
-                            if search_digits in phone:
-                                search_digit_ids.update({lid, phone})
-                except Exception:
-                    logger.exception('crm: inbox search lid lookup failed')
-            # Both id shapes: the webhook strips the @suffix, the backfill keeps it.
-            search_ids = set()
-            for d in search_digit_ids:
-                search_ids.update({d, f'{d}@lid', f'{d}@c.us'})
-            match = Q(from_number__icontains=search)
-            if search_ids:
-                match |= Q(from_number__in=search_ids)
-            grouped = grouped.filter(match)
-        grouped = [
-            r for r in grouped
-            # Newer-style group ids: 120363-prefixed and far longer than any phone
-            if not (r['from_number'].split('@', 1)[0].startswith('120363')
-                    and len(r['from_number'].split('@', 1)[0]) > 15)
-        ]
-
-        # Resolve EVERY sender id against the synced contact directory by its
-        # digits part — @lid JIDs, bare lid digits (webhook variants store
-        # them without the suffix), @c.us JIDs, and bare phones all match, so
-        # saved chats/contacts supply the real number + name.
-        lid_pn = {}          # (session, lid digits) -> real phone
-        contact_names = {}
-        sender_digits = {r['from_number'].split('@', 1)[0] for r in grouped}
-        try:
-            from whatsapp.models import WhatsAppContact
-            directory = WhatsAppContact.objects.filter(
-                Q(lid__in=sender_digits) | Q(phone__in=sender_digits)
-            )
-            for c in directory:
-                if c.lid:
-                    lid_pn[(c.session, c.lid)] = c.phone
-                if c.display_name:
-                    contact_names[c.phone] = c.display_name
-        except Exception:
-            logger.exception('crm: contact directory lookup failed')
-        # Digits that still look like lids (too long for a phone, no mapping
-        # yet) — fall back to WAHA's lids API, once per session on screen.
-        missing_by_session = {}
-        for r in grouped:
-            d = r['from_number'].split('@', 1)[0]
-            if (r['session'], d) not in lid_pn and d.isdigit() and len(d) > 13:
-                missing_by_session.setdefault(r['session'], set()).add(d)
-        if missing_by_session:
-            try:
-                from whatsapp.wa_chats_view import _lid_map, _waha_base
-                api_key = getattr(settings, 'WAHA_API_KEY', '') or ''
-                for sess, lids in missing_by_session.items():
-                    waha_map = _lid_map(_waha_base(), sess, api_key)
-                    for lid in lids:
-                        if lid in waha_map:
-                            lid_pn[(sess, lid)] = waha_map[lid]
-            except Exception:
-                logger.exception('crm: lid map fetch failed')
-
-        business_numbers = set(
-            WhatsAppMessage.objects
-            .filter(direction='inbound', business__isnull=False)
-            .values_list('from_number', flat=True).distinct()
-        )
-        # Expand each dismissal to all digit variants (with/without 974) so a
-        # sender can't resurface under a different identifier form. Raw values
-        # kept too for legacy rows and lid-only dismissals.
-        dismissed_numbers = set()
-        for dismissed in InboxDismissal.objects.values_list('phone', flat=True):
-            dismissed_numbers.add(dismissed)
-            normalized_dismissed = crm_services.normalize_phone(dismissed)
-            if normalized_dismissed:
-                dismissed_numbers.update(crm_services._phone_variants(normalized_dismissed))
-
-        from core.models import Profile
-        profile_numbers = set()
-        for phone, whatsapp in Profile.objects.exclude(
-            phone='', whatsapp=''
-        ).values_list('phone', 'whatsapp'):
-            for value in (phone, whatsapp):
-                normalized = crm_services.normalize_phone(value)
-                if normalized:
-                    profile_numbers.add(normalized)
-
-        # Keyed by every digit variant (with/without 974) so a lead saved as
-        # '55512345' still matches an inbox sender '97455512345' and vice versa.
-        open_leads = {}
-        for phone, pk in (
-            Lead.objects.filter(merged_into__isnull=True)
-            .exclude(stage__in=crm_services.closed_stage_keys())
-            .exclude(phone='').order_by('created_at').values_list('phone', 'pk')
-        ):
-            normalized_lead = crm_services.normalize_phone(phone)
-            if not normalized_lead:
-                continue
-            for variant in crm_services._phone_variants(normalized_lead):
-                open_leads[variant] = pk
-
-        for row in grouped:
-            number = row['from_number']
-            digits = number.split('@', 1)[0]
-            real = lid_pn.get((row['session'], digits))
-            if real == digits:
-                real = None  # sender already displays as its own phone
-            if real:
-                row['real_number'] = real
-            check = real or number
-            row['contact_name'] = contact_names.get(real or digits, '')
-            candidates = {number, check}
-            normalized = crm_services.normalize_phone(check)
-            if normalized:
-                candidates.update(crm_services._phone_variants(normalized))
-            if candidates & (business_numbers | dismissed_numbers):
-                continue
-            if normalized in profile_numbers:
-                continue
-            row['existing_lead_id'] = open_leads.get(normalized)
-            rows.append(row)
-    except Exception:
-        logger.exception('crm: WA inbox query failed')
+    rows = wa_inbox.collect_senders(
+        session_filter=session_filter, search=search, wa_session_list=wa_session_list,
+    )
 
     page_obj = paginate_queryset(request, rows, items_per_page=25)
 
@@ -2116,6 +2822,86 @@ def crm_wa_promote(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+def crm_wa_send_link(request):
+    """AJAX: WhatsApp the driver join form or the pricing enquiry link to an inbound sender.
+
+    The intended answer to an unknown sender, in place of filing them as a lead:
+    a conversation is not an application. Sending the link creates nothing — the
+    CRM card appears only when they actually submit the form, so the boards hold
+    real applicants and real enquiries rather than everyone who ever said hello.
+
+    Replies on the SAME number the sender wrote to. Routing by message section
+    would answer a fleet-number enquiry from the marketing number, which reads to
+    the recipient as a different company.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    from core import message_templates as msg_templates
+    from crm import wa_triage
+    from whatsapp import sessions as wa_sessions
+    from whatsapp.waha_views import send_waha_text
+
+    kind = 'driver' if request.POST.get('kind') == 'driver' else 'business'
+    template_key = (
+        msg_templates.CRM_WA_DRIVER_LINK if kind == 'driver'
+        else msg_templates.CRM_WA_PRICING_LINK
+    )
+
+    # promotable_phone is the house rule for "digits we can actually ring back".
+    # A sender still known only by an @lid normalizes to something that is not a
+    # phone number at all, and sending there would invent a stranger's number.
+    phone = wa_triage.promotable_phone(request.POST.get('phone', '').strip())
+    if not phone:
+        return JsonResponse({
+            'success': False,
+            'error': 'No callable number behind this sender — open the chat in WhatsApp '
+                     'and send the link by hand.',
+        }, status=400)
+
+    body = msg_templates.render_template(
+        template_key, contact_name=_wa_link_greeting_name(phone),
+    )
+    if body is None:
+        label = msg_templates.get_template(template_key)['label']
+        return JsonResponse({
+            'success': False,
+            'error': f'"{label}" is switched off on the Messages page — turn it back '
+                     f'on to send it.',
+        }, status=400)
+
+    session = wa_sessions.normalize(request.POST.get('session', ''))
+    ok, info = send_waha_text(phone, body, session=session)
+    if not ok:
+        return JsonResponse({
+            'success': False,
+            'error': info.get('error') or 'WhatsApp send failed',
+        }, status=502)
+
+    return JsonResponse({
+        'success': True,
+        'kind': kind,
+        'sent_from': wa_sessions.sender_number(session),
+    })
+
+
+def _wa_link_greeting_name(phone):
+    """First name to greet an inbox sender by, or '' to greet them plainly.
+
+    A WhatsApp push name is whatever the sender typed into their own phone, so it
+    is often a shop name, an emoji or a full sentence. Anything that does not read
+    as a name is dropped rather than pasted into the greeting.
+    """
+    contact = crm_services._wa_contact_for_phone(phone)
+    name = ((contact.display_name if contact else '') or '').strip()
+    if not name or len(name) > 40:
+        return ''
+    first = name.split()[0]
+    return first if first.replace('-', '').replace("'", '').isalpha() else ''
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 def crm_wa_dismiss(request):
     """AJAX: mark an inbound WhatsApp number as not-a-lead (hidden from inbox)."""
     if request.method != 'POST':
@@ -2130,6 +2916,55 @@ def crm_wa_dismiss(request):
         phone=normalized[:50], defaults={'dismissed_by': request.user},
     )
     return JsonResponse({'success': True})
+
+
+# The contact-directory refresh is far too slow to run inside a request: WAHA
+# takes ~80s just to serialise the main number's ~22k-row directory, and nginx
+# cuts the response off at 60s. The browser then receives an HTML 504 page and
+# the Resync button dies on `r.json()` with "Unexpected token '<'". So it runs
+# in a daemon thread and the JSON answer goes back immediately; the daily
+# sync_wa_contacts cron remains the freshness backstop.
+#
+# The lock is per gunicorn worker (3 of them), so at worst three sweeps overlap
+# — they are idempotent upserts, and it beats stacking one per click.
+_CONTACT_SYNC_LOCK = threading.Lock()
+
+
+def _contact_sync_worker(session_names):
+    from django.db import connections
+    try:
+        from whatsapp.contacts import sync_contacts
+        for session in session_names:
+            try:
+                res = sync_contacts(session=session)
+                logger.info(
+                    'crm resync: contacts %s -> %s new, %s updated',
+                    session, res['created'], res['updated'],
+                )
+            except Exception:
+                logger.exception('crm resync: contact sync failed for %s', session)
+    finally:
+        # A thread gets its own DB connection; leaving it open leaks a backend.
+        connections.close_all()
+        _CONTACT_SYNC_LOCK.release()
+
+
+def _spawn_contact_sync(session_names):
+    """Kick off the directory refresh off-request. Returns a status string."""
+    if not _CONTACT_SYNC_LOCK.acquire(blocking=False):
+        return 'already running'
+    try:
+        threading.Thread(
+            target=_contact_sync_worker,
+            args=(list(session_names),),
+            name='crm-wa-contact-sync',
+            daemon=True,
+        ).start()
+    except Exception:
+        _CONTACT_SYNC_LOCK.release()
+        logger.exception('crm resync: could not start contact sync thread')
+        return 'failed to start'
+    return 'running in background'
 
 
 @login_required(login_url='/accounts/login/')
@@ -2158,7 +2993,7 @@ def crm_wa_resync(request):
         session_names = [s['name'] for s in wa_sessions.list_sessions()]
 
     started = _time.monotonic()
-    budget_s = 20  # stay well inside gunicorn's 30s window
+    budget_s = 20  # nginx cuts the response off at 60s — stay well inside it
 
     scanned = 0
     inserted = 0
@@ -2209,24 +3044,10 @@ def crm_wa_resync(request):
             status=502,
         )
 
-    # Refresh the contact directory too, but only with time left in the
-    # budget — no Celery worker runs in this deployment, so it's inline here
-    # (steady-state ~5s) with a daily cron as the freshness backstop.
-    contacts_sync = 'skipped'
-    if not partial and _time.monotonic() - started < budget_s:
-        created_n = updated_n = 0
-        try:
-            from whatsapp.contacts import sync_contacts
-            for session in session_names:
-                if _time.monotonic() - started >= budget_s:
-                    break
-                cres = sync_contacts(session=session)
-                created_n += cres['created']
-                updated_n += cres['updated']
-            contacts_sync = f"{created_n} new, {updated_n} updated"
-        except Exception:
-            logger.exception('crm resync: contact sync failed')
-            contacts_sync = 'failed'
+    # Refresh the contact directory too, but never inside this request — see
+    # _spawn_contact_sync for why. Messages (what the operator clicked for) are
+    # already saved above; names catch up a minute later.
+    contacts_sync = _spawn_contact_sync(session_names)
 
     return JsonResponse({
         'success': True,
@@ -2490,6 +3311,8 @@ def _lead_map_point(lead, stage_labels, stage_outcomes):
         'code': driver.driver_code or '',
         'stage': lead.stage,
         'stage_label': stage_labels.get(lead.stage, lead.stage),
+        # Set in bulk by _annotate_driver_vehicles — one query for the whole map.
+        'vehicle': getattr(lead, 'vehicle_label', '') or '',
         # Colour axis: still live, hired, or gone. The stage itself is in the popup.
         'outcome': stage_outcomes.get(lead.stage, ''),
         'account': driver.get_driver_status_display(),
@@ -2509,7 +3332,12 @@ def crm_driver_map(request):
     Built from the whole filtered set rather than a page of it, so the map answers
     "where are my applicants" instead of "where is page 1".
     """
-    leads, search, source_filter, assigned_filter, _category = _filtered_leads(request)
+    from fleet.models import DRIVER_STATUS_CHOICES, VEHICLE_CHOICES, DriverVehicle
+
+    # Every facet on this bar is a checkbox multi-select, so each one reads its
+    # values with getlist — including the two the shared helper owns.
+    leads, search, source_filter, assigned_filter, _category = _filtered_leads(
+        request, multi_facets=True)
     leads = leads.filter(category=Lead.CATEGORY_DRIVER)
 
     stages = list(crm_services.board_stages(Lead.CATEGORY_DRIVER))
@@ -2519,17 +3347,50 @@ def crm_driver_map(request):
     # Applied whenever one is given, not only when it matches a configured column:
     # validating against the board made an unrecognised stage fall through and show
     # every lead, which reads as "the filter did nothing".
-    stage_filter = (request.GET.get('stage') or '').strip()
-    if stage_filter:
-        leads = leads.filter(stage=stage_filter)
+    # getlist, not get: the picker is a multi-select, so "Uploads Done + Applied"
+    # is one map rather than two trips. A single ?stage=x still works unchanged.
+    stage_filters = [v.strip() for v in request.GET.getlist('stage') if v.strip()]
+    if stage_filters:
+        leads = leads.filter(stage__in=stage_filters)
+
+    # Vehicle and account status: the two things a recruiter narrows by before
+    # asking "where are they". Vehicle resolves to the SAME row the pin popup and
+    # the board chip show — newest registration wins — so filtering by Bike can
+    # never leave a pin labelled Car on the map.
+    vehicle_filter = [v.strip() for v in request.GET.getlist('vehicle') if v.strip()]
+    account_filter = [v.strip() for v in request.GET.getlist('account') if v.strip()]
+
+    if vehicle_filter:
+        newest_vehicle = (DriverVehicle.objects
+                          .filter(driver_id=OuterRef('driver_id'))
+                          .exclude(vehicle_type='')
+                          .exclude(vehicle_type='none')
+                          .order_by('-created_at')
+                          .values('vehicle_type')[:1])
+        leads = leads.annotate(current_vehicle=Subquery(newest_vehicle))
+        # "No vehicle on file" is a pick like any other, so Bike + none is one
+        # OR'd question rather than two impossible AND'd ones.
+        picked = [v for v in vehicle_filter if v != 'none']
+        vehicle_q = Q(current_vehicle__in=picked) if picked else Q()
+        if 'none' in vehicle_filter:
+            vehicle_q |= Q(current_vehicle__isnull=True)
+        leads = leads.filter(vehicle_q)
+
+    if account_filter:
+        leads = leads.filter(driver__driver_status__in=account_filter)
 
     # Only leads bound to a driver can carry a registration capture at all.
     leads = (leads.select_related('driver', 'driver__profile', 'driver__profile__user')
              .order_by('-created_at'))
 
     total = leads.count()
+    plotted = list(leads[:DRIVER_MAP_PIN_LIMIT])
+    # Same source as the board chip and the list column, so a pin, a card and a row
+    # never disagree about what someone drives.
+    _annotate_driver_vehicles(plotted)
+
     points, no_driver, no_location = [], 0, 0
-    for lead in leads[:DRIVER_MAP_PIN_LIMIT]:
+    for lead in plotted:
         if not lead.driver_id:
             no_driver += 1
             continue
@@ -2551,7 +3412,11 @@ def crm_driver_map(request):
         'truncated': total > DRIVER_MAP_PIN_LIMIT,
         'pin_limit': DRIVER_MAP_PIN_LIMIT,
         'stages': stages,
-        'stage_filter': stage_filter,
+        'stage_filters': stage_filters,
+        'vehicle_filter': vehicle_filter,
+        'account_filter': account_filter,
+        'vehicle_choices': [(k, v) for k, v in VEHICLE_CHOICES if k != 'none'],
+        'account_choices': DRIVER_STATUS_CHOICES,
         'search': search,
         'source_filter': source_filter,
         'assigned_filter': assigned_filter,

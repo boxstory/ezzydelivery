@@ -26,6 +26,7 @@ Notes: Flat, one level deep. The two links that span the whole money model
 {% url 'workforce:client_charge_verification' as u_client_charge_verification %}
 {% url 'workforce:client_charges_collect' as u_client_charges_collect %}
 {% url 'workforce:client_charge_invoices' as u_client_charge_invoices %}
+{% url 'workforce:wf_p2p_rate_card' as u_wf_p2p_rate_card %}
 
 {# --- Shared: both sides of the money model --- #}
 {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_overview" url=u_workforce_finance_dashboard icon="fa-solid fa-chart-pie" label="Finance Overview" active_names="workforce_finance_dashboard" %}
@@ -56,7 +57,7 @@ Notes: Flat, one level deep. The two links that span the whole money model
 {% endwith %}
 
 {# --- Seller leg --- #}
-{% with active="seller_transactions,client_ledger,cod_business_settlement_report,cod_business_payout_invoice,cod_business_payout_history,client_charge_verification,client_charges_collect,client_charge_invoices,client_charge_invoice_detail" %}
+{% with active="seller_transactions,client_ledger,cod_business_settlement_report,cod_business_payout_invoice,cod_business_payout_history,client_charge_verification,client_charges_collect,client_charge_invoices,client_charge_invoice_detail,wf_p2p_rate_card" %}
 <li id="workforce_sidebar_menu_finance_seller" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_finance_seller" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-finance-seller" data-title="Seller">
     <i class="fa-solid fa-store me-2"></i>
@@ -72,6 +73,7 @@ Notes: Flat, one level deep. The two links that span the whole money model
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_client_charges" url=u_client_charge_verification icon="fa-solid fa-file-invoice" label="Client Charges" active_names="client_charge_verification" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_charges_collect" url=u_client_charges_collect icon="fa-solid fa-hand-holding-dollar" label="Charges to Collect" active_names="client_charges_collect" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_finance_charge_invoices" url=u_client_charge_invoices icon="fa-solid fa-file-invoice-dollar" label="Charge Invoices" active_names="client_charge_invoices,client_charge_invoice_detail" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_p2p_rate_card" url=u_wf_p2p_rate_card icon="fa-solid fa-tags" label="P2P Rate Card" active_names="wf_p2p_rate_card" %}
     </ul>
   </div>
 </li>

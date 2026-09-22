@@ -174,6 +174,9 @@ def annotate_route_distance(orders):
 ZONE_AREA_CACHE_KEY = 'delivery_zone_area_map_v1'
 ZONE_AREA_CACHE_TTL = 3600
 
+ZONE_NAME_CACHE_KEY = 'delivery_zone_name_map_v1'
+ZONE_NAME_CACHE_TTL = 3600
+
 SOURCE_AREA_PIN = 'pin'
 SOURCE_AREA_ONLY = 'only_area'
 SOURCE_AREA_SAME_AS_ZONE = 'same_as_zone'
@@ -212,6 +215,34 @@ def zone_area_map():
 
     cache.set(ZONE_AREA_CACHE_KEY, areas, ZONE_AREA_CACHE_TTL)
     return areas
+
+
+def zone_name_map():
+    """``{zone_number: zone_name}`` for every active zone.
+
+    The zone's own name, which is not the same question as
+    :func:`zone_area_map`: that one names the neighbourhood *within* a zone and
+    deliberately returns nothing when the neighbourhood merely repeats the zone.
+    This map is the fallback for exactly those rows — a screen that prints a bare
+    zone number has told the reader nothing, and 577 of 1,831 orders resolve to
+    ``same_as_zone`` and so carry no area name of their own.
+
+    96 rows, changed only when staff edit a zone, so it is cached the same hour
+    as its two siblings above.
+    """
+    cached = cache.get(ZONE_NAME_CACHE_KEY)
+    if cached is not None:
+        return cached
+
+    from delivery.models import ZoneName
+
+    names = {
+        number: (name or '').strip()
+        for number, name in ZoneName.objects.filter(is_active=True).values_list(
+            'zone_number', 'zone_name')
+    }
+    cache.set(ZONE_NAME_CACHE_KEY, names, ZONE_NAME_CACHE_TTL)
+    return names
 
 
 def resolve_delivery_area(order, area_map=None):

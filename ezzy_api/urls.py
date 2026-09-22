@@ -47,6 +47,8 @@ urlpatterns = [
     path('driver/app-config/', ezzy_api_views.driver_app_config, name='driver_app_config'),
     path('driver/location/', ezzy_api_views.driver_update_location, name='driver_update_location'),
     path('driver/nav-handoff/', ezzy_api_views.driver_nav_handoff, name='driver_nav_handoff'),
+    path('driver/push/subscribe/', ezzy_api_views.driver_push_subscribe, name='driver_push_subscribe'),
+    path('driver/push/unsubscribe/', ezzy_api_views.driver_push_unsubscribe, name='driver_push_unsubscribe'),
     path('driver/<int:driver_id>/location/', ezzy_api_views.driver_latest_location, name='driver_latest_location'),
     path('driver/statistics/', ezzy_api_views.driver_statistics, name='driver_statistics'),
 

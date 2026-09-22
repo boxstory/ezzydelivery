@@ -1,0 +1,726 @@
+/* Purpose: User profile record — navy identity band, completion rail and two-column detail register. */
+/* Used by: core/profile.html, core/parts/dashboard_sidebar_profile.html (and the 5 join_* pages that include it) */
+/* Notes: Ezzy yellow is spent exactly twice — the record code on navy and the single Edit action.
+   Meter width comes from --cprf-p modifier classes because inline styles are banned house-wide. */
+
+.cprf {
+  --cprf-ink: var(--brand-grey-800);
+  --cprf-ink-mid: var(--brand-grey-600);
+  --cprf-ink-soft: var(--brand-grey-500);
+  --cprf-ink-faint: var(--brand-grey-450);
+  --cprf-rule: var(--brand-grey-200);
+  --cprf-rule-firm: var(--brand-grey-300);
+  --cprf-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--brand-font-primary);
+  color: var(--cprf-ink);
+}
+
+/* ==========================================================================
+   1. Identity band
+   ========================================================================== */
+
+.cprf__band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.125rem;
+  padding: 1.125rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--brand-radius-sm);
+  background: var(--brand-gradient-navy);
+  color: var(--brand-white);
+}
+
+.cprf__band-id {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  min-width: 0;
+}
+
+.cprf__band-bank {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Avatar is a real <button> for the owner so the upload is keyboard reachable;
+   a plain <span> for staff viewing someone else, who cannot edit that photo. */
+.cprf__avatar {
+  position: relative;
+  flex: none;
+  display: block;
+  width: 5.25rem;
+  height: 5.25rem;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+button.cprf__avatar {
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+button.cprf__avatar:hover,
+button.cprf__avatar:focus-visible {
+  border-color: var(--brand-primary);
+}
+
+.cprf__avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.cprf__avatar-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  font-size: 1.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.cprf__avatar-cam {
+  position: absolute;
+  right: -0.125rem;
+  bottom: -0.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 2px solid var(--brand-navy);
+  border-radius: 50%;
+  background: var(--brand-white);
+  color: var(--brand-navy);
+  font-size: 0.7rem;
+}
+
+.cprf__ident {
+  min-width: 0;
+}
+
+.cprf__name {
+  margin: 0 0 0.25rem;
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--brand-white);
+  overflow-wrap: anywhere;
+}
+
+.cprf__record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* The one identity mark on the page — yellow is legible on navy at 9.86:1. */
+.cprf__code {
+  font-family: var(--cprf-mono);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-primary);
+}
+
+.cprf__sep {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.cprf__standing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.625rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--brand-white);
+}
+
+.cprf__standing::before {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.cprf__standing--verified {
+  color: var(--brand-success-bright);
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.cprf__standing--wait {
+  color: var(--brand-warning-alt);
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.cprf__standing--stop {
+  background: var(--brand-danger-dark);
+  border-color: var(--brand-danger-dark);
+  color: var(--brand-white);
+}
+
+/* ==========================================================================
+   2. Panels
+   ========================================================================== */
+
+.cprf__panel {
+  border: 1px solid var(--cprf-rule);
+  border-radius: var(--brand-radius-sm);
+  background: var(--brand-white);
+}
+
+.cprf__panel + .cprf__panel {
+  margin-top: 0.75rem;
+}
+
+.cprf__panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1.125rem;
+  border-bottom: 1px solid var(--cprf-rule);
+}
+
+.cprf__panel-title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cprf-ink-soft);
+}
+
+.cprf__panel-body {
+  padding: 0.75rem 1.125rem 1.125rem;
+}
+
+.cprf__panel-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.75rem 1.125rem;
+  border-top: 1px solid var(--cprf-rule);
+}
+
+@media (min-width: 992px) {
+  .cprf__rail {
+    position: sticky;
+    top: 1.5rem;
+  }
+}
+
+/* ==========================================================================
+   3. Completion meter
+   ========================================================================== */
+
+.cprf__meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.375rem;
+}
+
+.cprf__meter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cprf-ink-mid);
+}
+
+.cprf__meter-pct {
+  font-family: var(--cprf-mono);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-navy);
+}
+
+.cprf__meter {
+  height: 0.375rem;
+  border-radius: 999px;
+  background: var(--brand-grey-200);
+  overflow: hidden;
+}
+
+.cprf__meter-fill {
+  width: var(--cprf-p, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand-navy);
+}
+
+/* The page's single unprompted motion: the one number that asks for action. */
+@media (prefers-reduced-motion: no-preference) {
+  .cprf__meter-fill {
+    animation: cprf-fill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes cprf-fill {
+  from { width: 0; }
+  to { width: var(--cprf-p, 0%); }
+}
+
+.cprf__meter-fill--0 { --cprf-p: 0%; }
+.cprf__meter-fill--10 { --cprf-p: 10%; }
+.cprf__meter-fill--20 { --cprf-p: 20%; }
+.cprf__meter-fill--30 { --cprf-p: 30%; }
+.cprf__meter-fill--40 { --cprf-p: 40%; }
+.cprf__meter-fill--50 { --cprf-p: 50%; }
+.cprf__meter-fill--60 { --cprf-p: 60%; }
+.cprf__meter-fill--70 { --cprf-p: 70%; }
+.cprf__meter-fill--80 { --cprf-p: 80%; }
+.cprf__meter-fill--90 { --cprf-p: 90%; }
+.cprf__meter-fill--100 { --cprf-p: 100%; background: var(--brand-success-light); }
+
+.cprf__meter-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--cprf-ink-soft);
+}
+
+/* ==========================================================================
+   4. Status checks — swatch + text, not loud pills
+   ========================================================================== */
+
+.cprf__checks {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cprf__check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5625rem 0;
+  border-top: 1px solid var(--cprf-rule);
+}
+
+.cprf__check-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--cprf-ink);
+}
+
+.cprf__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cprf__state::before {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.cprf__state--done { color: var(--brand-success); }
+.cprf__state--wait { color: var(--brand-warning-text); }
+.cprf__state--idle { color: var(--cprf-ink-soft); }
+
+/* ==========================================================================
+   5. Role chips
+   ========================================================================== */
+
+.cprf__roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.cprf__role {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.625rem;
+  border: 1px solid var(--brand-grey-300);
+  border-radius: 999px;
+  background: var(--brand-grey-50);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-navy);
+}
+
+.cprf__role i {
+  font-size: 0.72rem;
+  color: var(--cprf-ink-soft);
+}
+
+.cprf__role-note {
+  font-weight: 400;
+  color: var(--cprf-ink-soft);
+}
+
+.cprf__role--alert {
+  border-color: var(--brand-danger);
+  background: var(--brand-danger-bg);
+  color: var(--brand-danger-dark);
+}
+
+.cprf__role--alert i {
+  color: var(--brand-danger);
+}
+
+/* ==========================================================================
+   6. Buttons
+   ========================================================================== */
+
+.cprf__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid transparent;
+  border-radius: var(--brand-radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    color 0.2s ease, transform 0.2s ease;
+}
+
+.cprf__btn:hover,
+.cprf__btn:focus {
+  text-decoration: none;
+}
+
+.cprf__btn--accent {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: var(--brand-navy);
+}
+
+.cprf__btn--accent:hover {
+  background: var(--brand-primary-dark);
+  color: var(--brand-navy);
+  transform: translateY(-1px);
+  box-shadow: var(--brand-shadow-sm);
+}
+
+.cprf__btn--solid {
+  background: var(--brand-navy);
+  border-color: var(--brand-navy);
+  color: var(--brand-white);
+}
+
+.cprf__btn--solid:hover {
+  background: var(--brand-navy-light);
+  color: var(--brand-white);
+  transform: translateY(-1px);
+  box-shadow: var(--brand-shadow-sm);
+}
+
+.cprf__btn--quiet {
+  background: var(--brand-grey-100);
+  border-color: var(--brand-grey-400);
+  color: var(--brand-grey-800);
+}
+
+.cprf__btn--quiet:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+  color: var(--brand-grey-800);
+}
+
+.cprf__btn--block {
+  width: 100%;
+}
+
+.cprf__btn-stack {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* ==========================================================================
+   7. Notices
+   ========================================================================== */
+
+.cprf__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1.125rem;
+  margin-bottom: 1.125rem;
+  border: 1px solid var(--cprf-rule);
+  border-left: 3px solid var(--brand-grey-400);
+  border-radius: var(--brand-radius-sm);
+  background: var(--brand-grey-50);
+}
+
+.cprf__notice--wait { border-left-color: var(--brand-warning-alt); }
+.cprf__notice--wait .cprf__notice-icon { color: var(--brand-warning); }
+
+.cprf__notice--act { border-left-color: var(--brand-navy); }
+.cprf__notice--act .cprf__notice-icon { color: var(--brand-navy); }
+
+.cprf__notice-icon {
+  flex: none;
+  margin-top: 0.125rem;
+  font-size: 0.95rem;
+  color: var(--cprf-ink-soft);
+}
+
+.cprf__notice-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.cprf__notice-title {
+  margin: 0 0 0.125rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--cprf-ink);
+}
+
+.cprf__notice-text {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--cprf-ink-mid);
+}
+
+.cprf__notice-action {
+  flex: none;
+  align-self: center;
+}
+
+/* ==========================================================================
+   8. Detail register
+   ========================================================================== */
+
+.cprf__set + .cprf__set {
+  margin-top: 1.125rem;
+}
+
+/* Navy so the section titles outrank the grey panel title above them. */
+.cprf__set-title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-navy);
+}
+
+.cprf__fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin: 0;
+}
+
+@media (min-width: 768px) {
+  .cprf__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1.5rem;
+  }
+}
+
+.cprf__field {
+  min-width: 0;
+  padding: 0.5625rem 0;
+  border-top: 1px solid var(--cprf-rule);
+}
+
+.cprf__field--wide {
+  grid-column: 1 / -1;
+}
+
+.cprf__field-label {
+  margin: 0 0 0.125rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cprf-ink-soft);
+}
+
+.cprf__field-value {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--cprf-ink);
+  overflow-wrap: anywhere;
+}
+
+.cprf__field-value--empty {
+  font-weight: 400;
+  color: var(--cprf-ink-faint);
+}
+
+/* ==========================================================================
+   9. Team business block
+   ========================================================================== */
+
+.cprf__org {
+  padding: 0.75rem;
+  border: 1px solid var(--cprf-rule);
+  border-radius: var(--brand-radius-sm);
+  background: var(--brand-grey-50);
+}
+
+.cprf__org-name {
+  margin: 0 0 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.cprf__org-list {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+  color: var(--cprf-ink-mid);
+}
+
+.cprf__org-list i {
+  width: 1rem;
+  color: var(--cprf-ink-faint);
+}
+
+/* ==========================================================================
+   10. Focus
+   ========================================================================== */
+
+.cprf a:focus-visible,
+.cprf button:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.cprf__band a:focus-visible,
+.cprf__band button:focus-visible {
+  outline-color: var(--brand-white);
+}
+
+/* ==========================================================================
+   11. Small screens
+   ========================================================================== */
+
+@media (max-width: 575.98px) {
+  .cprf__band {
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+
+  .cprf__band-id {
+    gap: 0.75rem;
+  }
+
+  .cprf__avatar {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .cprf__avatar-cam {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.6rem;
+  }
+
+  .cprf__name {
+    font-size: 1.125rem;
+  }
+
+  .cprf__band-bank {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .cprf__panel-head,
+  .cprf__panel-body,
+  .cprf__panel-foot {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .cprf__notice {
+    flex-wrap: wrap;
+    padding: 0.75rem;
+  }
+
+  .cprf__notice-action {
+    width: 100%;
+  }
+
+  .cprf__notice-action .cprf__btn {
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
+   12. Rail-mounted identity header (join_* pages, which render no wide band)
+   ========================================================================== */
+
+.cprf__band--rail {
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+
+.cprf__band--rail .cprf__band-id {
+  gap: 0.75rem;
+}
+
+.cprf__band--rail .cprf__ident {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.cprf__avatar--sm {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.cprf__name--sm {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.cprf__band--rail .cprf__record {
+  font-size: 0.72rem;
+}
+
+.cprf__band--rail .cprf__code {
+  font-size: 0.75rem;
+}

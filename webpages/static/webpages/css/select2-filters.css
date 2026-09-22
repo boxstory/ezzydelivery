@@ -43,6 +43,159 @@
     box-shadow: 0 0 0 2px rgba(247, 192, 0, 0.15);
 }
 
+/* ── Multi-select (driver picker, client picker) ──────────────
+   Select2 renders each pick as a tag, so the control grows with the selection.
+   Pinned to the same 34px box as the single pickers beside it and scrolled
+   internally, or one busy filter pushes the whole bar out of line.
+   The tighter .pg-filter__row metrics in workforce.css override these. */
+.select2-container.ez-filter-select .select2-selection--multiple {
+    min-height: 34px;
+    max-height: 34px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 0 0.3rem;
+    border: 1px solid var(--brand-grey-300, #d5dbe3);
+    border-radius: 0.4rem;
+    background-color: var(--brand-white, #fff);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: nowrap;
+}
+/* ── Summary instead of tags ──────────────────────────────────
+   A checklist on a console filter row has one track to say what it holds, and
+   three tags in it collapse to "Ap…" "Up…" "Un…". A select that names itself
+   with data-facet-label gets a summary written onto the control by the
+   initialiser — the pick's own label when there is one, "3 stages" when there
+   are more. No attribute (nothing picked, or no JS) and the tags render as
+   before, so the control degrades to what it always was. */
+.select2-container.ez-filter-select .select2-selection--multiple[data-facet-summary]::before {
+    content: attr(data-facet-summary);
+    order: -1;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding-left: 0.15rem;
+    font-weight: 600;
+    color: var(--brand-navy, #001f3f);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.select2-container.ez-filter-select .select2-selection--multiple[data-facet-summary] .select2-selection__choice {
+    display: none;
+}
+
+.select2-container.ez-filter-select.select2-container--focus .select2-selection--multiple,
+.select2-container.ez-filter-select.select2-container--open .select2-selection--multiple {
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 2px rgba(247, 192, 0, 0.15);
+}
+/* Select2 leaves the rendered list at overflow:visible, so tags spill straight
+   out past the border of the control. */
+.select2-container.ez-filter-select .select2-selection--multiple .select2-selection__rendered {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: nowrap;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    min-width: 0;
+}
+/* A picked driver is a tag. Select2 absolutely positions the remove button and
+   reserves no room for it, so the × sits on top of the first characters unless
+   the padding is put back by hand. A long name truncates rather than pushing
+   the row around. */
+.select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice {
+    position: relative;
+    margin: 0;
+    padding: 0 0.35rem 0 1.1rem;
+    max-width: 9rem;
+    font-size: 0.72rem;
+    line-height: 1.4rem;
+    background: var(--brand-grey-100, #f1f3f6);
+    border: 1px solid var(--brand-grey-300, #d5dbe3);
+    border-radius: 0.25rem;
+    color: var(--brand-navy, #001f3f);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 1 auto;
+}
+.select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice__remove {
+    position: absolute;
+    left: 0.2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 0.85rem;
+    line-height: 1;
+    color: var(--brand-grey-500, #6c757d);
+    /* Select2 4.1 renders this as a <button>, and mobile-app.css puts a 44px
+       touch floor on every button under 768px. Absolutely positioned, that 44px
+       square sat straight over the first characters of the name, so a picked
+       driver read as a × with letters behind it. Pinned to its own width; the
+       tag is 44px tall on a phone, so the target stays big enough to hit. */
+    min-width: 0;
+    min-height: 0;
+    width: 1.15rem;
+    height: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice__remove:hover {
+    color: var(--brand-danger, #dc3545);
+    background: none;
+}
+/* Select2 4.1 builds the inline search as an auto-sizing <textarea> that
+   computes ~88px tall. Inside a 34px control that pushes the placeholder below
+   the visible strip, so the picker renders as a blank box with no hint of what
+   it is. Pinned to one line. */
+.select2-container.ez-filter-select .select2-search--inline {
+    display: flex;
+    align-items: center;
+    flex: 1 1 4rem;
+    min-width: 2rem;
+}
+.select2-container.ez-filter-select .select2-search--inline .select2-search__field {
+    margin: 0;
+    padding: 0;
+    height: 1.9rem !important;
+    min-height: 0;
+    line-height: 1.9rem;
+    font-size: 0.78rem;
+    resize: none;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.select2-container.ez-filter-select .select2-search--inline .select2-search__field::placeholder {
+    color: var(--brand-grey-500, #6c757d);
+}
+/* The caret would otherwise blink in a field that still reads "All Drivers",
+   which no other picker on the bar does. It comes back the moment anything is
+   typed, so typing never feels dead. */
+.select2-container.ez-filter-select .select2-search__field:placeholder-shown {
+    caret-color: transparent;
+}
+/* Without an arrow the multi picker reads as a text box rather than something
+   you open — every single-value picker beside it carries one. */
+.select2-container.ez-filter-select .select2-selection--multiple::after {
+    content: "";
+    flex: 0 0 auto;
+    width: 0;
+    height: 0;
+    margin-left: auto;
+    margin-right: 0.2rem;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--brand-grey-500, #6c757d);
+}
+
 /* ── Dropdown ─────────────────────────────────────────────────
    `ez-filter-select__menu` is applied to Select2's dropdown *container*
    (`inst.$dropdown` is the container span, not the `.select2-dropdown` panel
@@ -106,6 +259,86 @@
 .ez-filter-select__menu .select2-results__option[aria-selected="true"] {
     background-color: var(--brand-grey-100, #f5f6f8);
     color: var(--brand-navy, #001f3f);
+}
+
+/* ── Checklist dropdowns (multi-selects) ──────────────────────
+   A multi-select filter is a checklist, and it has to look like one: without a
+   box beside each row, ticking one option and getting the list back with a grey
+   band on it reads as "the page ignored me". The modifier is set by the
+   initialiser, never by a stylesheet — the dropdown is parented to <body>, and a
+   single select marks its current value `aria-selected="true"` exactly the same
+   way, so matching on the attribute alone would draw ticked boxes next to values
+   that cannot be unticked. */
+/* The list is as wide as the control it hangs off, and a console facet track is
+   ~8rem — every second label wrapped onto two lines. A checklist is read down
+   its left edge, so it gets room to keep one option on one line. */
+.ez-filter-select__menu--multi .select2-dropdown {
+    min-width: 13rem;
+}
+
+.ez-filter-select__menu--multi .select2-results__option {
+    position: relative;
+    padding-left: 1.85rem;
+}
+
+.ez-filter-select__menu--multi .select2-results__option::before {
+    content: '';
+    position: absolute;
+    left: 0.6rem;
+    top: 50%;
+    width: 0.85rem;
+    height: 0.85rem;
+    margin-top: -0.425rem;
+    border: 1px solid var(--brand-grey-400, #97a3b4);
+    border-radius: 3px;
+    background-color: var(--brand-white, #fff);
+    box-sizing: border-box;
+}
+
+/* Ticked: the box fills and grows a checkmark drawn from two borders — a glyph
+   would inherit the row's font and drift between browsers. */
+.ez-filter-select__menu--multi .select2-results__option--selected::before,
+.ez-filter-select__menu--multi .select2-results__option[aria-selected="true"]::before {
+    background-color: var(--brand-navy, #001f3f);
+    border-color: var(--brand-navy, #001f3f);
+}
+
+.ez-filter-select__menu--multi .select2-results__option--selected::after,
+.ez-filter-select__menu--multi .select2-results__option[aria-selected="true"]::after {
+    content: '';
+    position: absolute;
+    left: 0.89rem;
+    top: 50%;
+    width: 0.25rem;
+    height: 0.45rem;
+    margin-top: -0.28rem;
+    border: solid var(--brand-white, #fff);
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+}
+
+/* The highlighted row is navy, so a navy box on it disappears — the tick flips
+   to the yellow that the rest of the console uses for "this one". */
+.ez-filter-select__menu--multi .select2-results__option--highlighted::before {
+    border-color: var(--brand-white, #fff);
+}
+
+.ez-filter-select__menu--multi .select2-results__option--highlighted.select2-results__option--selected::before,
+.ez-filter-select__menu--multi .select2-results__option--highlighted[aria-selected="true"]::before {
+    background-color: var(--brand-yellow, #f7c000);
+    border-color: var(--brand-yellow, #f7c000);
+}
+
+.ez-filter-select__menu--multi .select2-results__option--highlighted.select2-results__option--selected::after,
+.ez-filter-select__menu--multi .select2-results__option--highlighted[aria-selected="true"]::after {
+    border-color: var(--brand-navy, #001f3f);
+}
+
+/* A ticked row keeps the plain background: the box already says it is on, and
+   the grey band on top of it made the list look like it had lost its place. */
+.ez-filter-select__menu--multi .select2-results__option--selected,
+.ez-filter-select__menu--multi .select2-results__option[aria-selected="true"] {
+    background-color: transparent;
 }
 
 /* ── Inside a Bootstrap modal ─────────────────────────────────

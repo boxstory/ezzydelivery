@@ -1,6 +1,7 @@
 {% extends "wf_dashboard_base.html" %}
 {% load business_dropdown %}
 {% load static custom_filters %}
+{% load workforce_tags %}
 {% comment %}
 Purpose: Staff queue of WhatsApp address-verification jobs (auto-import + delivery-recovery)
 Used by: workforce.views.temp_verify_queue at /workforce/orders/temp/verify-queue/
@@ -264,7 +265,8 @@ Notes: Row actions POST to temp_verify_queue_action; the WAHA banner toggle is a
                                 {% if j.status == 'queued' or j.status == 'failed' %}
                                     <button type="button" class="vfq__action vfq__action--send"
                                             onclick="jobAction({{ j.id }}, 'send_now', this)"
-                                            title="Send WhatsApp now" aria-label="Send WhatsApp now">
+                                            title="Send WhatsApp now — message {% msgid_text 'order_verify_manual' %}"
+                                            aria-label="Send WhatsApp now">
                                         <i class="fa-solid fa-paper-plane"></i>
                                     </button>
                                     <button type="button" class="vfq__action vfq__action--cancel"

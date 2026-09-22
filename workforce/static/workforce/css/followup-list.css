@@ -178,6 +178,61 @@
   border-bottom-color: rgba(255, 255, 255, 0.7);
 }
 
+/* Multi-select driver picker on the same navy surface. The shared metrics in
+   select2-filters.css are sized for a 34px white filter bar; the hero runs a
+   1.75rem dark control, so the box, the tags and the inline search are all
+   re-stated here. A little wider than the single picker — it has tags to hold. */
+.wfl__hero__aside > .pg-filter__select-driver + .select2-container.ez-filter-select,
+.wfl__hero__aside > .wfl__hero__select--multi + .select2-container.ez-filter-select {
+  flex: 0 1 13rem;
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--multiple {
+  min-height: 1.75rem;
+  max-height: 1.75rem;
+  padding: 0 0.3rem;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+}
+.wfl__hero__aside .select2-container.ez-filter-select:hover .select2-selection--multiple {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+.wfl__hero__aside .select2-container--open .select2-selection--multiple,
+.wfl__hero__aside .select2-container--focus .select2-selection--multiple {
+  border-color: var(--brand-primary, #f7c000);
+  background-color: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+}
+/* Tags read as light chips on the navy, not as the grey they are on a white bar. */
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice {
+  max-width: 7rem;
+  font-size: 0.66rem;
+  line-height: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice__remove {
+  color: rgba(255, 255, 255, 0.7);
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice__remove:hover {
+  color: var(--brand-primary, #f7c000);
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-search--inline .select2-search__field {
+  height: 1.5rem !important;
+  line-height: 1.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-search--inline .select2-search__field::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+.wfl__hero__aside .select2-container.ez-filter-select .select2-selection--multiple::after {
+  border-top-color: rgba(255, 255, 255, 0.7);
+}
+
 /* ── Filter chips — restrained ink/navy, replaces the white-on-yellow candy pill ── */
 .wfl .followup-filter-pill {
   border: 1px solid var(--brand-grey-300, #dcdcdc);
@@ -296,4 +351,14 @@
   .wfl__tier__num { font-size: 1.15rem; }
   .wfl .wfl__hero__select { flex: 1 1 auto; max-width: none; }
   .wfl__hero__aside > .select2-container.ez-filter-select { flex: 1 1 auto; }
+  /* Touch floor — a 28px tag box is not a tappable target on a phone. */
+  .wfl__hero__aside .select2-container.ez-filter-select .select2-selection--multiple {
+    min-height: 2.75rem;
+    max-height: 2.75rem;
+  }
+  .wfl__hero__aside .select2-container.ez-filter-select .select2-search--inline .select2-search__field {
+    height: 2.5rem !important;
+    line-height: 2.5rem;
+    font-size: 16px;
+  }
 }

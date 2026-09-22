@@ -1,0 +1,323 @@
+/* Purpose: Legal pages (privacy, terms) — filed-document design: navy record band, sticky clause index, hanging clause numbers
+   Used by: webpages/templates/webpages/privacy.html (block prefix wplg__)
+   Notes: yellow accent budget = masthead rule + active rail marker only; mono carries clause numbers, record strip and contact values */
+
+/* ---------- Masthead: compact navy cover band ---------- */
+.wplg__masthead {
+    background: var(--brand-gradient-navy);
+    color: var(--brand-white);
+    padding: 2.25rem 0 0;
+    border-bottom: 3px solid var(--brand-primary);
+}
+.wplg__title {
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: clamp(1.9rem, 4vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    color: var(--brand-white);
+}
+.wplg__lede {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.72);
+    max-width: 34rem;
+}
+
+/* Record strip: the document's own metadata, set as data not decoration */
+.wplg__record {
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+.wplg__record-cell {
+    padding: 0.625rem 2.25rem 0.75rem 0;
+}
+.wplg__record-k {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+}
+.wplg__record-v {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.92);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Page body ---------- */
+.wplg__page {
+    padding: 2.5rem 0 3.5rem;
+}
+.wplg__doc {
+    max-width: 41rem;
+}
+/* Index + document read as one block: cap both containers so the masthead
+   title stays on the same left axis as the index. */
+.wplg__masthead > .container,
+.wplg__page > .container {
+    max-width: 68rem;
+}
+
+/* ---------- Clause index ---------- */
+.wplg__rail-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--brand-grey-500);
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--brand-navy);
+}
+.wplg__rail-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.wplg__rail-link {
+    display: flex;
+    gap: 0.625rem;
+    align-items: baseline;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--brand-grey-600);
+    text-decoration: none;
+    padding: 0.375rem 0 0.375rem 0.625rem;
+    border-left: 2px solid transparent;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+.wplg__rail-link:hover,
+.wplg__rail-link:focus-visible {
+    color: var(--brand-navy);
+}
+.wplg__rail-link--active {
+    color: var(--brand-navy);
+    font-weight: 600;
+    border-left-color: var(--brand-primary);
+}
+.wplg__rail-n {
+    flex: 0 0 0.9rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    color: var(--brand-grey-400);
+    font-variant-numeric: tabular-nums;
+}
+.wplg__rail-link--active .wplg__rail-n {
+    color: var(--brand-primary-text);
+}
+
+/* Mobile index: same content, boxed above the document */
+.wplg__rail--inline {
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-sm);
+    padding: 0.75rem 0.875rem 0.5rem;
+}
+
+/* ---------- Clauses ---------- */
+.wplg__clause {
+    padding-top: 1.75rem;
+    margin-top: 1.75rem;
+    border-top: 1px solid var(--brand-grey-200);
+    scroll-margin-top: 1.5rem;
+}
+.wplg__clause--first {
+    padding-top: 0;
+    margin-top: 0;
+    border-top: 0;
+}
+.wplg__clause-head {
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+}
+.wplg__clause-n {
+    flex: 0 0 1.75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--brand-grey-400);
+    font-variant-numeric: tabular-nums;
+}
+.wplg__clause-title {
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--brand-navy);
+    margin: 0;
+}
+.wplg__clause-body p {
+    font-size: 1rem;
+    line-height: 1.75;
+    color: var(--brand-grey-700);
+}
+.wplg__clause-body p:last-child {
+    margin-bottom: 0;
+}
+.wplg__clause-body a {
+    color: var(--brand-navy);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+.wplg__clause-body a:hover {
+    color: var(--brand-navy-light);
+}
+
+/* ---------- Third-party services: hairline ledger ---------- */
+/* Page background is grey-100, so inset surfaces are white, not tinted */
+.wplg__srv-caption {
+    font-size: 0.875rem;
+    color: var(--brand-grey-600);
+}
+.wplg__srv {
+    background: var(--brand-white);
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-sm);
+    overflow: hidden;
+}
+/* Beats .wplg__clause-body a (0,2,0), which would otherwise underline both cells */
+.wplg__clause-body .wplg__srv-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.25rem 1rem;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid var(--brand-grey-200);
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+.wplg__srv-row:last-child {
+    border-bottom: 0;
+}
+.wplg__srv-row:hover,
+.wplg__srv-row:focus-visible {
+    background: var(--brand-grey-50);
+}
+.wplg__srv-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+}
+.wplg__srv-host {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+    color: var(--brand-grey-500);
+}
+.wplg__srv-row:hover .wplg__srv-host {
+    color: var(--brand-navy);
+}
+
+/* ---------- Contact plate ---------- */
+.wplg__contact {
+    background: var(--brand-white);
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-md);
+    padding: 1.125rem;
+}
+.wplg__contact-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.125rem 0.75rem;
+    padding: 0.375rem 0;
+}
+.wplg__contact-k {
+    flex: 0 0 5.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--brand-grey-500);
+    line-height: 1.6;
+}
+.wplg__contact-v {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.875rem;
+    color: var(--brand-navy);
+}
+a.wplg__contact-v {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+/* ---------- Accessibility & motion ---------- */
+.wplg__rail-link:focus-visible,
+.wplg__srv-row:focus-visible,
+.wplg__clause-body a:focus-visible,
+a.wplg__contact-v:focus-visible {
+    outline: 2px solid var(--brand-navy);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wplg__rail-link,
+    .wplg__srv-row {
+        transition: none;
+    }
+}
+
+/* ---------- Desktop: sticky index beside the document ---------- */
+@media (min-width: 992px) {
+    .wplg__rail--sticky {
+        position: sticky;
+        top: 1.5rem;
+    }
+    .wplg__clause-body {
+        padding-left: 2.5rem;
+    }
+}
+
+/* ---------- Small screens ---------- */
+@media (max-width: 575.98px) {
+    .wplg__masthead {
+        padding-top: 1.75rem;
+    }
+    .wplg__record-cell {
+        padding-right: 1.5rem;
+    }
+    .wplg__clause-head {
+        gap: 0.5rem;
+    }
+    .wplg__clause-n {
+        flex-basis: 1.4rem;
+    }
+    .wplg__clause-body p {
+        font-size: 0.9375rem;
+    }
+}
+
+/* ---------- Print: legal pages get saved and filed ---------- */
+@media print {
+    .wplg__rail,
+    .wplg__rail--inline {
+        display: none !important;
+    }
+    .wplg__masthead {
+        background: none !important;
+        color: #000 !important;
+        border-bottom: 2px solid #000;
+        padding-top: 0;
+    }
+    .wplg__title,
+    .wplg__lede,
+    .wplg__record-k,
+    .wplg__record-v {
+        color: #000 !important;
+    }
+    .wplg__record {
+        border-top-color: #000;
+    }
+    .wplg__doc {
+        max-width: none;
+    }
+    .wplg__clause {
+        break-inside: avoid;
+    }
+    .wplg__clause-body {
+        padding-left: 0;
+    }
+}

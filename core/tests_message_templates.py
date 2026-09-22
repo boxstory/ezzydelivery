@@ -19,8 +19,8 @@ from core import whatsapp_utils
 from core.message_templates import (
     CRM_LEAD_MANUAL, KIND_COMPOSER, MANUAL_COMPOSERS, ORDER_VERIFY_MANUAL,
     P2P_BOOKING_CONFIRM, PRICING_INQUIRY_THANKS, QUOTE_AGREED_ALERT,
-    TEMPLATE_DEFAULTS, TRIGGER_TEMPLATES, get_body, get_template,
-    render_template, validate_body,
+    TEMPLATE_DEFAULTS, TRIGGER_TEMPLATES, get_body, get_template, id_index,
+    msg_id, render_template, validate_body,
 )
 
 User = get_user_model()
@@ -95,11 +95,22 @@ class TemplateResolutionTests(TestCase):
         """This text is what customers have been receiving — a reword here is a
         product decision, not a refactor side effect."""
         body = get_body(ORDER_VERIFY_MANUAL, customer_name='Sara',
-                        order_number='EZ-1', items_line='', verify_url='https://x/')
+                        order_number='EZ-1', items_line='', total_line='',
+                        verify_url='https://x/')
         self.assertEqual(
             body,
             'Hi Sara, this is regarding your order EZ-1. Please confirm your '
             'delivery details and availability.\n\n📌 Verify your location: https://x/')
+
+    def test_order_verify_default_quotes_one_total_at_the_door(self):
+        """COD + delivery as a single figure — the same number the waybill
+        prints as "Collect", so the message and the label never disagree."""
+        body = get_body(ORDER_VERIFY_MANUAL, customer_name='Sara',
+                        order_number='EZ-1', items_line='',
+                        total_line='💵 To pay on delivery: QAR 275.00 '
+                                   '(order 250.00 + delivery 25.00)\n',
+                        verify_url='https://x/')
+        self.assertIn('QAR 275.00 (order 250.00 + delivery 25.00)\n📌', body)
 
 
 class RegistryCoverageTests(TestCase):
@@ -136,6 +147,25 @@ class RegistryCoverageTests(TestCase):
         for key in TEMPLATE_DEFAULTS:
             with self.subTest(key=key):
                 self.assertEqual(validate_body(key, TEMPLATE_DEFAULTS[key]['body']), '')
+
+    def test_every_message_carries_a_unique_id(self):
+        """The ID is printed on the buttons that send the body, so a missing or
+        duplicated one points staff at the wrong message."""
+        ids = [tpl.get('msg_id', '') for tpl in TEMPLATE_DEFAULTS.values()]
+        self.assertNotIn('', ids, 'a registered message has no msg_id')
+        self.assertEqual(len(set(ids)), len(ids), 'two messages share an msg_id')
+        for ident in ids:
+            with self.subTest(msg_id=ident):
+                self.assertRegex(ident, r'^M\d{2}$')
+
+    def test_msg_id_survives_the_resolver_and_the_reverse_lookup(self):
+        for key, tpl in TEMPLATE_DEFAULTS.items():
+            with self.subTest(key=key):
+                self.assertEqual(get_template(key)['msg_id'], tpl['msg_id'])
+                self.assertEqual(msg_id(key), tpl['msg_id'])
+        self.assertEqual(id_index()[TEMPLATE_DEFAULTS[ORDER_VERIFY_MANUAL]['msg_id']],
+                         ORDER_VERIFY_MANUAL)
+        self.assertEqual(msg_id('not_a_real_key'), '')
 
 
 class RequiredPlaceholderTests(TestCase):

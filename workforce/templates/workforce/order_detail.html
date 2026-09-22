@@ -1,6 +1,7 @@
 {% extends "workforce/wf_base_dashboard.html" %}
 {% load static %}
 {% load custom_filters %}
+{% load workforce_tags %}
 {% comment %}
 Purpose: Full staff view of one order — customer, address + verification, package, money, task, timeline
 Used by: workforce_views.order_detail at /workforce/orders/<id>/ (panel variant uses order_detail_panel.html)
@@ -290,11 +291,11 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                                 <span class="wod__field-value d-flex align-items-center gap-2">
                                     {% if order.customer_whatsapp %}
                                     <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="text-decoration-none text-success">
-                                        <i class="fa-brands fa-whatsapp me-1"></i>{{ order.customer_whatsapp }}
+                                        <i class="fa-brands fa-whatsapp me-1"></i>{{ order.customer_whatsapp }}{% msgid_own %}
                                     </a>
                                     <button type="button"
                                             class="odp__btn-wa-send"
-                                            title="Send WhatsApp via Evolution API"
+                                            title="Send WhatsApp via Evolution API — message {% msgid_text 'order_verify_manual' %}"
                                             onclick="EzzyOrderDetail.openWhatsAppModal()">
                                         <i class="fa-solid fa-paper-plane"></i>
                                     </button>
@@ -473,7 +474,7 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                                     {% if address_verify_job.status == 'failed' or address_verify_job.status == 'queued' %}
                                         <button type="button" class="wod__wa-verify-btn wod__wa-verify-btn--primary"
                                                 onclick="waVerifyAction({{ address_verify_job.id }}, 'send_now', this)">
-                                            <i class="fa-solid fa-paper-plane"></i> Send now
+                                            <i class="fa-solid fa-paper-plane"></i> Send now{% msgid 'order_verify_manual' %}
                                         </button>
                                     {% endif %}
                                     {% if address_verify_job.status == 'sent' %}
@@ -661,15 +662,17 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                         <span class="badge bg-warning text-dark">Partial Delivery</span>
                         {% elif delivery_task.dl_task_status == 'failed' %}
                         <span class="badge bg-danger">Failed</span>
+                        {% elif delivery_task.dl_task_status == 'returned_to_shipper' %}
+                        <span class="badge bg-warning text-dark">Returned to Shipper</span>
                         {% else %}
                         <span class="badge bg-info">{{ delivery_task.get_dl_task_status_display }}</span>
                         {% endif %}
                     </p>
-                    {% if delivery_task.dl_task_status == 'partial_delivery' %}
+                    {% if delivery_task.dl_task_status == 'partial_delivery' or delivery_task.dl_task_status == 'returned_to_shipper' %}
                     {% with return_req=order.return_requests.first %}
                     {% if return_req %}
                     <div class="alert alert-warning p-2 mb-2" style="font-size:0.85rem;">
-                        <strong><i class="fa-solid fa-box-open me-1"></i>Partial Return</strong>
+                        <strong><i class="fa-solid fa-box-open me-1"></i>{% if delivery_task.dl_task_status == 'returned_to_shipper' %}Returned to Shipper{% else %}Partial Return{% endif %}</strong>
                         {% if delivery_task.cod_collected_amount %}
                         — COD collected: <strong>{{ delivery_task.cod_collected_amount }} QR</strong>
                         (original: {{ order.cod_amount }} QR)

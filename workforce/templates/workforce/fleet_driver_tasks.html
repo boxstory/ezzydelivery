@@ -11,7 +11,7 @@ Notes: Docket stats and chart are computed on the whole filtered set; only the t
 {% block title %}Driver Tasks — Fleet A/Cs{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/fleet_driver_tasks.css' %}?v=20260728g">
+<link rel="stylesheet" href="{% static 'workforce/css/fleet_driver_tasks.css' %}?v=20260921c">
 {% endblock extra_css %}
 
 {% block content %}
@@ -49,15 +49,26 @@ Notes: Docket stats and chart are computed on the whole filtered set; only the t
 
   <!-- ── ROSTER ───────────────────────────────────────────── -->
   <div class="fdt__roster">
-    <span class="fdt__roster-label">Roster</span>
     <div class="fdt__roster-scroll">
       {% for d in drivers %}
       <a href="?driver_id={{ d.driver_id }}"
+         title="{{ d.driver_name }}{% if d.driver_code %} · {{ d.driver_code }}{% endif %} · ID {{ d.driver_id }}"
          class="fdt__roster-tab {% if selected_driver and selected_driver.driver_id == d.driver_id %}fdt__roster-tab--active{% endif %}">
         {% if d.driver_availability == 'available' %}<span class="fdt__dot fdt__dot--green"></span>
         {% elif d.driver_availability == 'on_delivery' %}<span class="fdt__dot fdt__dot--amber"></span>
         {% else %}<span class="fdt__dot fdt__dot--grey"></span>{% endif %}
-        {{ d }}
+        {% with pic=d.profile.profile_picture.all.0 %}
+        {% if pic and pic.profile_picture %}
+        <img class="fdt__roster-avatar" src="{{ pic.profile_picture.url }}"
+             alt="" width="24" height="24" loading="lazy">
+        {% else %}
+        <span class="fdt__roster-avatar fdt__roster-avatar--fb">{{ d.driver_name|first|upper }}</span>
+        {% endif %}
+        {% endwith %}
+        <span class="fdt__roster-meta">
+          <span class="fdt__roster-name">{{ d.driver_name }}</span>
+          <span class="fdt__roster-sub">{% if d.driver_code %}{{ d.driver_code }} · {% endif %}#{{ d.driver_id }}</span>
+        </span>
       </a>
       {% empty %}
       <span class="fdt__roster-empty">No approved drivers yet.</span>

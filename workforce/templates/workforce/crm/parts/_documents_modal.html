@@ -1,0 +1,63 @@
+{% comment %}
+Purpose: "Download documents" chooser for the driver leads table — which document kinds, and in what shape.
+Used by: workforce/crm/leads_list.html (driver pipeline only); submitted by export-columns.js via [data-selection-link].
+Notes: Mirrors _export_columns_modal.html so the two downloads on this row feel like one pair. The Download
+       button carries data-selection-options, which makes the helper append every ticked control in here
+       (types + format) to the ids and the page's current filters.
+{% endcomment %}
+<div class="modal fade" id="crmDocsModal" tabindex="-1" aria-labelledby="crmDocsModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content wfx">
+      <div class="modal-header">
+        <h5 class="modal-title" id="crmDocsModalTitle">
+          <i class="fa-solid fa-file-zipper me-2"></i>Download documents
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        {# Says whose documents are coming — filled by export-columns.js #}
+        <p class="wfx__scope small mb-2" data-selection-scope></p>
+
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="text-muted small">Include these documents.</span>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-light" data-docs-all>Select all</button>
+            <button type="button" class="btn btn-sm btn-light" data-docs-none>Clear</button>
+          </div>
+        </div>
+        <div class="wfx__cols">
+          {% for key, label in document_type_choices %}
+          <label class="wfx__col">
+            <input type="checkbox" class="form-check-input" name="types" value="{{ key }}" checked>
+            <span>{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+
+        <div class="text-muted small mt-3 mb-2">And in this shape.</div>
+        <div class="wfx__cols crmdoc__shapes">
+          <label class="wfx__col">
+            <input type="radio" class="form-check-input" name="format" value="pdf" checked>
+            <span>One PDF per applicant <span class="text-muted">— every scan on its own captioned page</span></span>
+          </label>
+          <label class="wfx__col">
+            <input type="radio" class="form-check-input" name="format" value="images">
+            <span>Separate images <span class="text-muted">— a folder of photos per applicant</span></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <span class="me-auto small text-muted">
+          Up to {{ document_driver_cap }} applicants at a time.
+        </span>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <a class="btn btn-success btn-sm" href="{% url 'workforce:crm_driver_leads_documents' %}"
+           data-selection-link data-selection-options="#crmDocsModal" data-bs-dismiss="modal">
+          <i class="fa-solid fa-download me-1"></i>Download
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

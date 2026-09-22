@@ -77,9 +77,10 @@
 
 /* ── Roster rail ─────────────────────────────────────────── */
 .fdt__roster {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  /* Roster grid geometry: 8 equal tabs per row, two rows visible, rest scrolls */
+  --fdt-roster-cols: 8;
+  --fdt-roster-row: 40px;
+  --fdt-roster-gap: 0.4rem;
   background: var(--fdt-sheet);
   border: 1px solid var(--fdt-hairline);
   border-top: none;
@@ -87,27 +88,25 @@
   padding: 0.55rem 1rem;
   margin-bottom: 1rem;
 }
-.fdt__roster-label {
-  font-size: 0.6rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--fdt-muted);
-  flex-shrink: 0;
-}
 .fdt__roster-scroll {
-  display: flex;
-  gap: 0.4rem;
-  overflow-x: auto;
+  display: grid;
+  grid-template-columns: repeat(var(--fdt-roster-cols), minmax(0, 1fr));
+  grid-auto-rows: var(--fdt-roster-row);
+  gap: var(--fdt-roster-gap);
+  /* Two rows stay open; a third row and beyond scroll inside the strip */
+  max-height: calc(var(--fdt-roster-row) * 2 + var(--fdt-roster-gap) + 4px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   padding: 2px;
 }
 .fdt__roster-tab {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
+  min-width: 0;
   white-space: nowrap;
-  padding: 0.32rem 0.7rem;
+  padding: 0.3rem 0.45rem 0.3rem 0.4rem;
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--fdt-ink);
@@ -124,6 +123,65 @@
   border-color: var(--fdt-navy);
   color: #fff;
 }
+
+/* Roster tab identity: avatar + name over code/id */
+.fdt__roster-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  background: #eef1f5;
+  border: 1px solid var(--fdt-hairline);
+}
+.fdt__roster-avatar--fb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--fdt-muted);
+  text-transform: uppercase;
+}
+.fdt__roster-tab--active .fdt__roster-avatar {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+.fdt__roster-tab--active .fdt__roster-avatar--fb {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.fdt__roster-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+  text-align: left;
+}
+/* Tabs are equal width, so a long name clips to an ellipsis (full text in the title) */
+.fdt__roster-name,
+.fdt__roster-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fdt__roster-name {
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.fdt__roster-sub {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fdt-muted);
+}
+.fdt__roster-tab--active .fdt__roster-sub { color: rgba(255, 255, 255, 0.72); }
+
+/* Fewer columns as the shell narrows — tabs keep their equal width */
+@media (max-width: 1400px) { .fdt__roster { --fdt-roster-cols: 6; } }
+@media (max-width: 1100px) { .fdt__roster { --fdt-roster-cols: 4; } }
+@media (max-width: 768px)  { .fdt__roster { --fdt-roster-cols: 3; } }
+@media (max-width: 575px)  { .fdt__roster { --fdt-roster-cols: 2; } }
 .fdt__roster-empty { font-size: 0.75rem; color: var(--fdt-muted); }
 
 /* Availability dots (roster + docket) */

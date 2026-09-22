@@ -4,6 +4,7 @@
 {#        and drops every staff control. The payment desk below the sheet is screen-only and never prints. #}
 {% extends seller_view|yesno:"business_dashboard_base.html,wf_dashboard_base.html" %}
 {% load static humanize %}
+{% load workforce_tags %}
 
 {% block title %}Invoice {{ invoice.invoice_code }}{% endblock %}
 
@@ -32,7 +33,7 @@
       <button type="button" class="bpi__ghost" id="workforce_charge_invoice_btn_columns"
               data-bs-toggle="modal" data-bs-target="#cccColumnsModal">Columns</button>
       {% if not invoice.is_void %}
-      <button type="button" class="bpi__ghost" id="workforce_charge_invoice_btn_whatsapp">Send on WhatsApp</button>
+      <button type="button" class="bpi__ghost" id="workforce_charge_invoice_btn_whatsapp">Send on WhatsApp{% msgid 'client_invoice_manual' %}</button>
       {% if invoice.amount_due > 0 %}
       <button type="button" class="bpi__ghost ccc__btn-pay" data-bs-toggle="modal" data-bs-target="#cccPayModal">Record payment</button>
       {% endif %}

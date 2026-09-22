@@ -1,225 +1,160 @@
 {% extends "base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
-{% load show_results %}
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'core/css/core_dashboard.css' %}?v=20260218a" rel="stylesheet" type="text/css" />
-<link href="{% static 'core/css/profile-mobile.css' %}?v=20260214b" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/profile-record.css' %}?v=20260914a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<section id="core_profile_section_main">
+{% comment %}Profile carries no name helper, so the two parts are joined once here
+and reused by the band heading and the Full name field.{% endcomment %}
+{% with first=profile.first_name|default:"" last=profile.last_name|default:"" %}
+{% with full_name=first|add:" "|add:last %}
+<section class="cprf" id="core_profile_section_record">
     <div class="container-xl px-3 py-3">
         {% include "core/parts/filepath.html" %}
 
-        <div class="row g-4">
-            <!-- Profile Sidebar - Sticky on Large Screens -->
-            <div class="col-12 col-lg-4 col-xl-3">
-                <div class="position-lg-sticky" style="top: 2rem;">
-                    {% include "core/parts/dashboard_sidebar_profile.html" %}
+        <!-- Identity band -->
+        <header class="cprf__band" id="core_profile_band_identity">
+            <div class="cprf__band-id">
+                {% if is_own_profile %}
+                <button type="button" class="cprf__avatar" data-bs-toggle="modal" data-bs-target="#updatePhotoModal"
+                        id="core_profile_btn_photo" aria-label="Change your profile photo">
+                    {% if profile_picture and profile_picture.profile_picture %}
+                    <img src="{{ profile_picture.profile_picture.url }}" alt="" class="cprf__avatar-img" width="84" height="84">
+                    {% else %}
+                    <span class="cprf__avatar-blank"><i class="fa-solid fa-user"></i></span>
+                    {% endif %}
+                    <span class="cprf__avatar-cam" aria-hidden="true"><i class="fa-solid fa-camera"></i></span>
+                </button>
+                {% else %}
+                <span class="cprf__avatar">
+                    {% if profile_picture and profile_picture.profile_picture %}
+                    <img src="{{ profile_picture.profile_picture.url }}" alt="" class="cprf__avatar-img" width="84" height="84">
+                    {% else %}
+                    <span class="cprf__avatar-blank"><i class="fa-solid fa-user"></i></span>
+                    {% endif %}
+                </span>
+                {% endif %}
+
+                <div class="cprf__ident">
+                    <h1 class="cprf__name">{{ full_name.strip|default:"Unnamed profile" }}</h1>
+                    <p class="cprf__record">
+                        {% if profile.user_number %}
+                        <span class="cprf__code">{{ profile.user_number }}</span>
+                        <span class="cprf__sep" aria-hidden="true">·</span>
+                        {% endif %}
+                        <span>{{ profile.zone_name|default:"Zone not set" }}, {{ profile.nationlity|default:"Qatar" }}</span>
+                    </p>
                 </div>
             </div>
 
-            <!-- Profile Content - Main Information -->
+            <div class="cprf__band-bank">
+                {% if profile.verification_status == 'verified' %}
+                <span class="cprf__standing cprf__standing--verified">Verified</span>
+                {% elif profile.verification_status == 'pending' or profile.verification_status == 'under_review' %}
+                <span class="cprf__standing cprf__standing--wait">Under review</span>
+                {% elif profile.verification_status == 'rejected' %}
+                <span class="cprf__standing cprf__standing--stop">Rejected</span>
+                {% else %}
+                <span class="cprf__standing">Not verified</span>
+                {% endif %}
+
+                <a href="{% url 'core:profile_complete_update' %}" class="cprf__btn cprf__btn--accent" id="core_profile_btn_edit_band">
+                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                    <span>Edit profile</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="row g-3">
+            <!-- Standing rail -->
+            <div class="col-12 col-lg-4 col-xl-3">
+                <div class="cprf__rail">
+                    {% include "core/parts/dashboard_sidebar_profile.html" with hide_identity=True %}
+                </div>
+            </div>
+
+            <!-- Detail register -->
             <div class="col-12 col-lg-8 col-xl-9">
-                <div class="card mb-4" id="core_profile_card_info">
-                    <div class="card-header">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-                            <div>
-                                <h4 class="mb-1 fw-bold">Profile Information</h4>
-                                <p class="text-muted mb-0 small">Manage your personal details and preferences</p>
-                            </div>
-                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                {% if not profile.is_business and not profile.is_driver and profile.verification_status == 'incomplete' %}
-                                <a href="{% url 'core:profile_complete_update' %}#core_profile_complete_section_role" class="btn btn-success fw-bold d-inline-flex align-items-center gap-2 px-4">
-                                    <i class="fas fa-arrow-right"></i>
-                                    <span>Choose Role</span>
-                                </a>
-                                {% endif %}
-                                <a href="{% url 'core:profile_complete_update' %}" class="btn btn-warning fw-bold d-inline-flex align-items-center gap-2 px-4">
-                                    <i class="fas fa-edit"></i>
-                                    <span>Edit Profile</span>
-                                </a>
-                            </div>
-                        </div>
+                <div class="cprf__panel" id="core_profile_panel_details">
+                    <div class="cprf__panel-head">
+                        <h2 class="cprf__panel-title">{% if is_own_profile %}Your details{% else %}Account details{% endif %}</h2>
                     </div>
 
-                    <div class="card-body px-4 py-4">
-                        {% if profile.verification_status == 'pending' or profile.verification_status == 'under_review' %}
-                        <div class="alert alert-warning d-flex align-items-start gap-3 mb-4">
-                            <i class="fa-solid fa-clock fs-5 mt-1"></i>
-                            <div>
-                                <strong class="d-block">Application Pending</strong>
-                                <span class="small">Your driver verification is under review. We'll notify you once it's approved!</span>
+                    <div class="cprf__panel-body">
+                        {% if not profile.is_business and not profile.is_driver and profile.verification_status == 'incomplete' %}
+                        <div class="cprf__notice cprf__notice--act">
+                            <i class="fa-solid fa-user-tag cprf__notice-icon" aria-hidden="true"></i>
+                            <div class="cprf__notice-body">
+                                <p class="cprf__notice-title">Pick how you'll use EzzyDelivery</p>
+                                <p class="cprf__notice-text">Choose whether you're sending parcels as a business or driving for us. Your dashboard is set up from this.</p>
+                            </div>
+                            <div class="cprf__notice-action">
+                                <a href="{% url 'core:profile_complete_update' %}#core_profile_complete_section_role" class="cprf__btn cprf__btn--solid" id="core_profile_btn_choose_role">
+                                    Choose role
+                                </a>
                             </div>
                         </div>
                         {% endif %}
 
-                        <!-- Personal Information Section -->
-                        <div class="mb-4">
-                            <h6 class="text-uppercase text-muted fw-bold small mb-3">
-                                <i class="fas fa-user-circle me-2"></i>Personal Information
-                            </h6>
-
-                            <!-- Name -->
-                            <div class="row align-items-center py-3 px-2">
-                                <div class="col-12 col-sm-4 col-lg-3">
-                                    <p class="mb-2 mb-sm-0 fw-semibold">Full Name</p>
-                                </div>
-                                <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0">
-                                        {{ profile.first_name|default:"—" }} {{ profile.last_name|default:"" }}
-                                    </p>
-                                </div>
-                            </div>
-                            <hr class="my-2 opacity-50" />
-
-                            <!-- Email -->
-                            <div class="row align-items-center py-3 px-2">
-                                <div class="col-12 col-sm-4 col-lg-3">
-                                    <p class="mb-2 mb-sm-0 fw-semibold">Email Address</p>
-                                </div>
-                                <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0 d-flex align-items-center gap-2">
-                                        <i class="fas fa-envelope text-secondary"></i>
-                                        <span>{{ profile.email|default:"—" }}</span>
-                                    </p>
-                                </div>
-                            </div>
-                            <hr class="my-2 opacity-50" />
-
-                            <!-- Nationality -->
-                            <div class="row align-items-center py-3 px-2">
-                                <div class="col-12 col-sm-4 col-lg-3">
-                                    <p class="mb-2 mb-sm-0 fw-semibold">Nationality</p>
-                                </div>
-                                <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0 d-flex align-items-center gap-2">
-                                        <i class="fas fa-flag text-secondary"></i>
-                                        <span>{{ profile.nationlity|default:"—" }}</span>
-                                    </p>
-                                </div>
-                            </div>
-                            <hr class="my-2 opacity-50" />
-
-                            <!-- Birthday -->
-                            <div class="row align-items-center py-3 px-2">
-                                <div class="col-12 col-sm-4 col-lg-3">
-                                    <p class="mb-2 mb-sm-0 fw-semibold">Date of Birth</p>
-                                </div>
-                                <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0 d-flex align-items-center gap-2">
-                                        <i class="fas fa-birthday-cake text-secondary"></i>
-                                        <span>{{ profile.date_of_birth|default:"—" }}</span>
-                                    </p>
-                                </div>
+                        {% if profile.verification_status == 'pending' or profile.verification_status == 'under_review' %}
+                        <div class="cprf__notice cprf__notice--wait">
+                            <i class="fa-solid fa-clock cprf__notice-icon" aria-hidden="true"></i>
+                            <div class="cprf__notice-body">
+                                <p class="cprf__notice-title">Application under review</p>
+                                <p class="cprf__notice-text">Our team is checking your details. We'll message you on WhatsApp as soon as it's approved.</p>
                             </div>
                         </div>
+                        {% endif %}
 
-                        <!-- Contact Information Section -->
-                        <div class="mb-4">
-                            <h6 class="text-uppercase text-muted fw-bold small mb-3 mt-4">
-                                <i class="fas fa-phone me-2"></i>Contact Information
-                            </h6>
+                        <section class="cprf__set">
+                            <h3 class="cprf__set-title">Personal</h3>
+                            <dl class="cprf__fields">
+                                {% include "core/parts/profile_field.html" with label="Full name" value=full_name.strip %}
+                                {% include "core/parts/profile_field.html" with label="Nationality" value=profile.nationlity %}
+                                {% include "core/parts/profile_field.html" with label="Email address" value=profile.email %}
+                                {% include "core/parts/profile_field.html" with label="Date of birth" value=profile.date_of_birth %}
+                            </dl>
+                        </section>
 
-                            <!-- Mobile -->
-                            <div class="row align-items-center py-3 px-2">
-                                <div class="col-12 col-sm-4 col-lg-3">
-                                    <p class="mb-2 mb-sm-0 fw-semibold">Mobile Number</p>
-                                </div>
-                                <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0 d-flex align-items-center gap-2">
-                                        <i class="fas fa-mobile-alt text-secondary"></i>
-                                        <span>{{ profile.phone|default:"—" }}</span>
-                                    </p>
-                                </div>
-                            </div>
-                            <hr class="my-2 opacity-50" />
+                        <section class="cprf__set">
+                            <h3 class="cprf__set-title">Contact</h3>
+                            <dl class="cprf__fields">
+                                {% include "core/parts/profile_field.html" with label="Mobile number" value=profile.phone %}
+                                {% include "core/parts/profile_field.html" with label="WhatsApp" value=profile.whatsapp %}
+                                {% include "core/parts/profile_field.html" with label="Instagram" value=profile.instagram %}
+                            </dl>
+                        </section>
 
-                            <!-- WhatsApp -->
-                            <div class="row align-items-center py-3 px-2">
-                                <div class="col-12 col-sm-4 col-lg-3">
-                                    <p class="mb-2 mb-sm-0 fw-semibold">WhatsApp</p>
-                                </div>
-                                <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0">
-                                        {{ profile.whatsapp|default:"—" }}
-                                    </p>
-                                </div>
-                            </div>
-                            <hr class="my-2 opacity-50" />
-
-                            <!-- Instagram -->
-                            <div class="row align-items-center py-3 px-2">
-                                <div class="col-12 col-sm-4 col-lg-3">
-                                    <p class="mb-2 mb-sm-0 fw-semibold">Instagram</p>
-                                </div>
-                                <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0">
-                                        {{ profile.instagram|default:"—" }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Location Information Section -->
-                        <div class="mb-2">
-                            <h6 class="text-uppercase text-muted fw-bold small mb-3 mt-4">
-                                <i class="fas fa-map-marker-alt me-2"></i>Location Information
-                            </h6>
-
-                            <!-- Zone -->
-                            <div class="row align-items-center py-3 px-2">
-                                <div class="col-12 col-sm-4 col-lg-3">
-                                    <p class="mb-2 mb-sm-0 fw-semibold">Zone</p>
-                                </div>
-                                <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0 d-flex align-items-center gap-2">
-                                        <i class="fas fa-map-pin text-secondary"></i>
-                                        <span>{{ profile.zone_name|default:"—" }}</span>
-                                    </p>
-                                </div>
-                            </div>
-                            <hr class="my-2 opacity-50" />
-
-                            <!-- Address -->
-                            <div class="row align-items-start py-3 px-2">
-                                <div class="col-12 col-sm-4 col-lg-3">
-                                    <p class="mb-2 mb-sm-0 fw-semibold">Address</p>
-                                </div>
-                                <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0">
-                                        {{ profile.address|default:"—" }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                        <section class="cprf__set">
+                            <h3 class="cprf__set-title">Location</h3>
+                            <dl class="cprf__fields">
+                                {% include "core/parts/profile_field.html" with label="Zone" value=profile.zone_name %}
+                                {% include "core/parts/profile_field.html" with label="Address" value=profile.address %}
+                            </dl>
+                        </section>
                     </div>
 
-                    <!-- Card Footer with Action Button -->
-                    <div class="card-footer bg-transparent border-0 px-4 pb-4 pt-2">
-                        <div class="d-grid d-sm-block text-sm-end">
-                            <a href="{% url 'core:profile_complete_update' %}" class="btn btn-warning fw-bold text-uppercase d-inline-flex align-items-center justify-content-center gap-2 px-5 py-3">
-                                <i class="fas fa-edit"></i>
-                                <span>Edit Profile</span>
-                            </a>
-                        </div>
+                    <div class="cprf__panel-foot">
+                        <a href="{% url 'core:profile_complete_update' %}" class="cprf__btn cprf__btn--quiet" id="core_profile_btn_edit_foot">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                            <span>Edit profile</span>
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Photo Update Modal (outside sticky container to avoid z-index issues) -->
+    {% if is_own_profile %}
+    <!-- Photo modal sits outside the sticky rail so it is not clipped -->
     <div class="modal fade" id="updatePhotoModal" tabindex="-1" aria-labelledby="updatePhotoModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="updatePhotoModalLabel">
-                        <i class="fas fa-camera me-2"></i>Update Profile Picture
-                    </h5>
+                    <h5 class="modal-title" id="updatePhotoModalLabel">Change profile photo</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -228,5 +163,8 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </section>
+{% endwith %}
+{% endwith %}
 {% endblock content %}

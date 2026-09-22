@@ -1,0 +1,369 @@
+/* Purpose: Returns custody console (/workforce/returns/) — the liability ledger for parcels coming back
+   Used by: workforce/templates/workforce/returns_custody_list.html
+   Notes: Only what Bootstrap, .wfstat and the shared wfhero/wfcard shell do not already cover. The
+          page's one yellow is the bulk Receive action — the row buttons that used to render yellow
+          text on white (1.68:1) are navy and grey here. Age is the only other colour spend, and it
+          is a fact rather than decoration: open rows age live and carry a tick in the ledger margin,
+          closed rows report turnaround in grey and are never banded. */
+
+/* ==========================================================================
+   1. LOCAL TOKENS
+   ========================================================================== */
+.rtn {
+    --crm-ctl-h: 2.25rem;
+    --rtn-ink: var(--brand-grey-800, #1f1f1f);
+    --rtn-ink-2: var(--brand-grey-500, #6c757d);
+    --rtn-ink-3: var(--brand-grey-450, #9ca3af);
+    --rtn-line: var(--brand-grey-200, #f0f0f0);
+    --rtn-line-2: var(--brand-grey-400, #b0b0b0);
+    --rtn-navy: var(--brand-navy, #001f3f);
+    --rtn-wash: var(--brand-grey-50, #f8f9fa);
+}
+
+/* ==========================================================================
+   2. HEADLINE FIGURES — .wfstat cards doing the filtering the hero ghost
+      links used to do, so the number and the way in are one target.
+      Only the two modifiers the shared component lacks live here.
+   ========================================================================== */
+
+/* Nothing is overdue and nothing is stuck: the quiet case still needs a value,
+   and a dash in grey says "measured, none" where an empty card says nothing. */
+.rtn__stat-none .wfstat__value,
+.wfstat__card.rtn__stat-none .wfstat__value { color: var(--rtn-ink-3); }
+
+/* The oldest parcel still in somebody's hands has crossed the late line. This is
+   the only place on the page danger colour is allowed to sit at rest. */
+.wfstat__card.rtn__stat--late { border-left-color: var(--brand-danger, #dc2626); }
+.wfstat__card.rtn__stat--late .wfstat__value { color: var(--brand-danger-dark, #991b1b); }
+
+/* ==========================================================================
+   3. THE LEDGER
+   ========================================================================== */
+.rtn__toolbar { display: flex; align-items: center; gap: 0.5rem; }
+.rtn__count {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--rtn-ink-2);
+    text-transform: none;
+}
+
+.rtn__table { margin-bottom: 0; }
+/* !important is not decoration here: brandkit-overrides.css ships
+   `.table thead th { background-color: grey-200 !important; color: grey-700 !important }`
+   globally, so a plain declaration loses however specific it is. Same
+   restore-per-page pattern as the other navy ledgers in this dashboard.
+   The child combinators beat Bootstrap's `.table > :not(caption) > * > *`,
+   which otherwise wins on padding and repaints every cell background. */
+.rtn__table > thead > tr > th {
+    background: var(--rtn-navy) !important;
+    color: #fff !important;
+    padding: 0.5rem 0.625rem;
+    border: 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+/* Names both halves of the custody cell, so neither the holder nor the
+   destination reads as a column that went missing. */
+.rtn__th-arrow { color: rgba(255, 255, 255, 0.45); margin: 0 0.2rem; font-weight: 400; }
+.rtn__th-check { width: 2.5rem; }
+.rtn__table > thead > tr > th.rtn__th-age { text-align: right; }
+/* Shrink-to-content, so the two row actions never wrap onto separate lines. */
+.rtn__table > thead > tr > th.rtn__th-actions { width: 1%; white-space: nowrap; }
+
+/* orders.css ships `tbody, tbody td, tbody th { font-size: .75rem !important }`
+   site-wide, which drags every staff table body under the 0.8rem legible floor.
+   Countered here rather than there: that global is load-bearing for other pages. */
+.rtn__table > tbody > tr > td {
+    padding: 0.5rem 0.625rem;
+    border-bottom: 1px solid var(--rtn-line);
+    font-size: 0.8rem !important;
+    color: var(--rtn-ink);
+    vertical-align: middle;
+}
+.rtn__table > tbody > tr:last-child > td { border-bottom: 0; }
+/* Bootstrap paints --bs-table-accent-bg onto the cell, so the row wash has to be
+   set there rather than on the <tr> it logically belongs to. */
+.rtn__table > tbody > tr:hover > td { background-color: var(--rtn-wash); }
+/* A row whose parcel came home is settled work sitting among live liabilities. */
+.rtn__table > tbody > tr.rtn__row--closed > td { color: var(--rtn-ink-2); }
+
+/* --- Parcel cell: one identifier, then its paperwork, each named ----------- */
+.rtn__code {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--rtn-navy);
+    text-decoration: none;
+}
+.rtn__code:hover { color: var(--rtn-navy); text-decoration: underline; }
+.rtn__refs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.625rem;
+    margin-top: 0.1rem;
+}
+/* Three near-identical codes stacked unlabelled is how this cell read before —
+   the word in front is what tells staff which one they are looking at. */
+.rtn__ref { font-size: 0.68rem; color: var(--rtn-ink-2); white-space: nowrap; }
+.rtn__ref-key { font-weight: 600; }
+.rtn__ref-val { color: var(--rtn-ink-2); }
+
+.rtn__client { font-size: 0.8rem; }
+.rtn__table > tbody > tr > td.rtn__td-client { min-width: 8.5rem; }
+.rtn__client--none { color: var(--rtn-ink-3); }
+
+/* --- Custody chain: who is holding it, and where it is headed ------------- */
+.rtn__table > tbody > tr > td.rtn__td-chain { min-width: 15rem; }
+.rtn__chain {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.45rem;
+}
+.rtn__hand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+}
+.rtn__hand > i { font-size: 0.66rem; color: var(--rtn-ink-3); flex-shrink: 0; }
+.rtn__hand-name { font-size: 0.78rem; }
+.rtn__hand-code { font-size: 0.7rem; color: var(--rtn-ink-2); }
+/* The destination is the answer the desk is looking for, so it carries the ink. */
+.rtn__hand--to .rtn__hand-name { font-weight: 600; color: var(--rtn-navy); }
+.rtn__hand--none { color: var(--rtn-ink-3); }
+.rtn__hand--none > i { color: var(--rtn-ink-3); }
+/* A handover, not button chrome: the glyph is the only place an arrow appears. */
+.rtn__chain-arrow { font-size: 0.6rem; color: var(--rtn-ink-3); }
+
+.rtn__flags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.375rem;
+    margin-top: 0.3rem;
+}
+.rtn__flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+/* Nowhere resolved to go — the row that actually blocks a driver. */
+.rtn__flag--triage {
+    background: var(--brand-warning-bg, #fef3c7);
+    color: #92400e;
+}
+/* Staff changed the snapshot by hand; quiet, it is a note not a problem. */
+.rtn__flag--override {
+    background: var(--rtn-line);
+    color: var(--brand-grey-600, #555);
+}
+/* This row is the run back OUT of a hub, not the leg that brought the parcel in.
+   The two sit together in the list and are otherwise identical. */
+.rtn__flag--leg {
+    background: var(--brand-info-bg, #eff6ff);
+    color: var(--brand-info-dark, #1e40af);
+}
+.rtn__why {
+    margin-top: 0.2rem;
+    font-size: 0.7rem;
+    color: var(--rtn-ink-2);
+}
+
+/* --- Age: the ruler ------------------------------------------------------- */
+/* Right-aligned tabular figures so the column scans as one measure, and a tick
+   in the margin on the rows that have run long. */
+.rtn__td-age { text-align: right; white-space: nowrap; }
+/* Bootstrap sets `box-shadow: inset 0 0 0 9999px …` on every table cell, so the
+   margin tick has to out-specify it or it never paints. */
+.rtn__table > tbody > tr > td.rtn__td-age--warn {
+    box-shadow: inset 2px 0 0 var(--brand-warning, #d97706);
+}
+.rtn__table > tbody > tr > td.rtn__td-age--late {
+    box-shadow: inset 2px 0 0 var(--brand-danger, #dc2626);
+}
+.rtn__age {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+.rtn__age--fresh { color: var(--rtn-ink-2); }
+.rtn__age--warn { color: #92400e; }
+.rtn__age--late { color: var(--brand-danger-dark, #991b1b); }
+/* Turnaround on a finished job. A settled row is not late, whatever it took. */
+.rtn__age--closed { font-size: 0.78rem; font-weight: 600; color: var(--rtn-ink-3); }
+.rtn__age-note {
+    display: block;
+    font-size: 0.66rem;
+    font-weight: 400;
+    color: var(--rtn-ink-3);
+    line-height: 1.3;
+}
+
+/* --- Status: swatch and word, not a filled pill --------------------------- */
+/* "At hub — awaiting run to client" is the longest state there is. Held on one
+   line it claimed a quarter of the table and squeezed the custody chain onto two,
+   so the label wraps and the dot stays put beside its first line. */
+.rtn__state {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.375rem;
+    max-width: 11rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+.rtn__state::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: currentColor;
+    transform: translateY(-1px);
+}
+.rtn__state--with_driver { color: #92400e; }
+.rtn__state--in_manifest { color: #075985; }
+.rtn__state--at_hub { color: #3730a3; }
+.rtn__state--received { color: var(--brand-success, #15803d); }
+.rtn__state--disputed { color: var(--brand-danger-dark, #991b1b); }
+.rtn__state--not_in_custody,
+.rtn__state--lost,
+.rtn__state--voided { color: var(--rtn-ink-2); }
+
+/* ==========================================================================
+   4. ACTIONS — every one of them a real surface. A bare BEM button class
+      inherits the link colour and renders as unreadable yellow on white.
+   ========================================================================== */
+.rtn__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 0.3rem;
+}
+.rtn__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    min-height: 2.1rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.rtn__btn i { font-size: 0.75rem; }
+.rtn__btn--primary {
+    background: var(--rtn-navy);
+    border: 1px solid var(--rtn-navy);
+    color: #fff;
+}
+.rtn__btn--primary:hover:not(:disabled) {
+    background: var(--brand-navy-light, #003366);
+    border-color: var(--brand-navy-light, #003366);
+    color: #fff;
+}
+.rtn__btn--quiet {
+    background: var(--brand-grey-100, #f0f0f0);
+    border: 1px solid var(--rtn-line-2);
+    color: var(--rtn-ink);
+}
+.rtn__btn--quiet:hover:not(:disabled) {
+    background: var(--brand-secondary, #fff7d6);
+    border-color: var(--brand-primary, #f7c000);
+    color: var(--rtn-ink);
+}
+/* THE yellow. One per view — the bulk sign-in, which is the job this page exists
+   to do. Disabled it drops the fill entirely: a bright button that does nothing
+   when clicked is worse than a grey one that explains itself. */
+.rtn__btn--go {
+    background: var(--brand-primary, #f7c000);
+    border: 1px solid var(--brand-primary, #f7c000);
+    color: #1a1200;
+}
+.rtn__btn--go:hover:not(:disabled) {
+    background: var(--brand-primary-dark, #f4c20d);
+    border-color: var(--brand-primary-dark, #f4c20d);
+    color: #1a1200;
+}
+.rtn__btn--go:disabled {
+    background: var(--brand-grey-100, #f0f0f0);
+    border-color: var(--brand-grey-300, #dcdcdc);
+    color: var(--rtn-ink-3);
+    cursor: not-allowed;
+}
+.rtn__btn:disabled { opacity: 1; }
+
+/* An in-cell control, sized to the same floor as the row actions — on a 25-row
+   ledger an underlined word is a hard target to see and to hit. */
+.rtn__btn--edit {
+    font-size: 0.75rem;
+    min-height: 1.85rem;
+    padding: 0.2rem 0.5rem;
+}
+.rtn__closed { font-size: 0.72rem; color: var(--rtn-ink-3); white-space: nowrap; }
+
+/* In the filter bar the button is one instrument with the selects beside it, so
+   it takes the toolbar's height rather than its own floor. */
+.crm__facets .rtn__btn { height: var(--crm-ctl-h); }
+
+.rtn__btn:focus-visible,
+.rtn__code:focus-visible {
+    outline: 2px solid var(--rtn-navy);
+    outline-offset: 2px;
+}
+
+/* ==========================================================================
+   5. NOTES AND EMPTY STATES
+   ========================================================================== */
+/* .rtn__windownote lives in workforce.css — the Return Requests page next door
+   uses it as well and does not load this stylesheet. */
+
+/* The default view can be empty while parcels sit on a shelf two filters away —
+   the tallies say so and the table used to dead-end anyway. Route to the work. */
+.rtn__empty-links {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.75rem;
+}
+
+/* ==========================================================================
+   6. NARROW SCREENS
+   ========================================================================== */
+@media (max-width: 991.98px) {
+    /* crm.css lays the shared filter bar out as fixed 8.25rem tracks in a single
+       row, which runs off the side once the staff sidebar has taken its 210px.
+       Scoped to .rtn so the other consoles on that bar are untouched. */
+    .rtn .crm__facets {
+        grid-auto-flow: row;
+        grid-template-columns: repeat(auto-fit, minmax(8.25rem, 1fr));
+    }
+    .rtn__table > thead > tr > th,
+    .rtn__table > tbody > tr > td { padding: 0.45rem 0.45rem; }
+    /* The handover stacks rather than squeezing the two names to nothing. */
+    .rtn__chain { flex-direction: column; align-items: flex-start; gap: 0.15rem; }
+    .rtn__chain-arrow { transform: rotate(90deg); margin-left: 0.2rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rtn__btn { transition: none; }
+}

@@ -84,6 +84,10 @@ Notes: One template, several routes — the queryset differs per view but the co
                            aria-label="Search by customer name or mobile"
                            value="{{ filters.search }}"
                            autocomplete="off">
+                    {% comment %} Driver sits with Client, not with the statuses: it is a "who" filter,
+                    and row 2 is already seven controls wide — the tag box had no room to show a name there. {% endcomment %}
+                    <span class="pg-filter__label">Driver</span>
+                    {% include "workforce/parts/components/_driver_filter.html" %}
                     <div class="pg-filter__actions">
                         <button type="submit" class="pg-filter__btn pg-filter__btn--go" title="Apply filters" aria-label="Apply filters">
                             <i class="fa fa-search"></i>
@@ -159,43 +163,56 @@ Notes: One template, several routes — the queryset differs per view but the co
             </form>
 
             {% comment %} Applied filters live inside the same card, so the bar reads as one object. {% endcomment %}
-            {% if filters.dlCode or filters.search or filters.cStatus or filters.dlTaskStatus or filters.datePreset or filters.business %}
+            {% if filters.dlCode or filters.search or filters.cStatus or filters.orderType or filters.dlTaskStatus or filters.datePreset or filters.business or filters.driver %}
             <div class="pg-filter__applied">
                 <span class="pg-filter__applied-label">Applied</span>
                 {% if filters.business %}
                 <span class="pg-filter__tag">
                     <strong>Biz:</strong> {% for biz in all_businesses %}{% if biz.business_id|stringformat:"s" == filters.business %}{{ biz.business_name }}{% endif %}{% endfor %}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'business' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'business' and key != 'driver' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for d in filters.driver %}driver={{ d }}&{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.dlCode %}
                 <span class="pg-filter__tag">
                     <strong>DL:</strong> {{ filters.dlCode }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dlCode' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dlCode' and key != 'driver' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for d in filters.driver %}driver={{ d }}&{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.search %}
                 <span class="pg-filter__tag">
                     <strong>Search:</strong> {{ filters.search }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'search' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'search' and key != 'driver' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for d in filters.driver %}driver={{ d }}&{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.cStatus %}
                 <span class="pg-filter__tag">
                     <strong>Order:</strong> {{ filters.cStatusLabel|default:filters.cStatus }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cStatus' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cStatus' and key != 'driver' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for d in filters.driver %}driver={{ d }}&{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+                {% if filters.orderType %}
+                <span class="pg-filter__tag">
+                    <strong>Type:</strong> {% if filters.orderType == 'pick_and_drop' %}Pick and Drop (P2P){% else %}Normal Delivery{% endif %}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'orderType' and key != 'driver' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for d in filters.driver %}driver={{ d }}&{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.dlTaskStatus %}
                 <span class="pg-filter__tag">
                     <strong>DL Status:</strong> {{ filters.dlTaskStatusLabel|default:filters.dlTaskStatus }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dlTaskStatus' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dlTaskStatus' and key != 'driver' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for d in filters.driver %}driver={{ d }}&{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+                {% if filters.driver %}
+                {% comment %} One chip for the whole pick — a chip per driver would run the strip off the card. {% endcomment %}
+                <span class="pg-filter__tag">
+                    <strong>Driver:</strong> {{ filters.driverLabels|join:", " }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'driver' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.datePreset %}
                 <span class="pg-filter__tag">
                     <strong>Date:</strong> {% if filters.datePreset == 'custom' %}{{ filters.dateFrom }} → {{ filters.dateTo }}{% else %}{{ filters.datePresetLabel|default:filters.datePreset }}{% endif %}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'datePreset' and key != 'dateFrom' and key != 'dateTo' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'datePreset' and key != 'dateFrom' and key != 'dateTo' and key != 'driver' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% for d in filters.driver %}driver={{ d }}&{% endfor %}" class="pg-filter__tag-close"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% comment %} Clears back to this same list — it used to jump to All Orders. {% endcomment %}
@@ -993,5 +1010,5 @@ Notes: One template, several routes — the queryset differs per view but the co
     })();
 
     </script>
-<script src="{% static 'workforce/js/export-columns.js' %}?v=20260807b"></script>
+<script src="{% static 'workforce/js/export-columns.js' %}?v=20260921e"></script>
 {% endblock content %}

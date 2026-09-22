@@ -211,6 +211,14 @@ Each task should have select_related: order, driver, business, pickup_location, 
                     <td class="dl-table__td-cod">
                         <div class="dl-table__cod-stack">
                                 <span class="dl-table__cod-amount">{{ dl.order.cod_amount|default:0 }} QR</span>
+                            {# Second line: what we bill the CLIENT for the delivery — never #}
+                            {# folded into the COD figure above. An em dash means the charge #}
+                            {# has not been verified yet, which is not the same as free. #}
+                            {% if dl.known_charge is not None %}
+                            <span class="dl-table__dl-charge" title="Delivery charge billed to the client">DL {{ dl.known_charge|floatformat:2 }} QR</span>
+                            {% else %}
+                            <span class="dl-table__dl-charge dl-table__dl-charge--unset" title="Delivery charge not verified yet">DL —</span>
+                            {% endif %}
                             {% if dl.order.cod_amount and dl.order.cod_amount > 0 and dl.order.cod_status_by_staff %}
                             <span class="dl-table__verify-status dl-table__verify-status--{{ dl.order.cod_status_by_staff }}">
                                 {% if dl.order.cod_status_by_staff == 'cod_with_driver' %}

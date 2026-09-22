@@ -1,0 +1,34 @@
+{% comment %}
+Purpose: The searchable multi-select driver picker shared by every staff task and order list filter bar.
+Used by: dl_list_all / dl_list_followup / dl_list_upcoming, orders_list_view, orders_p2p_list_view.
+Notes: A plain <select multiple> — the Select2 enhancer in includes/main_dashboard_scripts.html turns
+       any select inside a GET filter bar into a searchable tag box, so no per-page JS is needed.
+       130+ approved drivers means the search field always shows (it appears from 8 options up).
+
+PARAMS
+    driver_choices   REQUIRED. Approved drivers, from views.driver_filter_choices().
+    driver_selected  REQUIRED. List of picked values as strings, from views.driver_filter_values().
+    driver_class     Extra classes for the control (the host bar's own sizing hook).
+    driver_id        Element id. Defaults to pgf_driver; give it a page-local one where
+                     two bars could otherwise collide.
+    driver_all_text  Placeholder shown when nothing is picked. Default "All Drivers".
+    driver_submit_on_close
+                     True on a bar with no Apply button: submits the form once the
+                     dropdown closes, instead of reloading after the first pick.
+    driver_form      Id of the owning <form> when the picker is rendered outside it
+                     (the follow-up/upcoming heroes park it beside the page title).
+{% endcomment %}
+<select name="driver" id="{{ driver_id|default:'pgf_driver' }}" multiple
+        class="{{ driver_class|default:'form-select form-select-sm pg-filter__select-driver' }}"
+        data-placeholder="{{ driver_all_text|default:'All Drivers' }}"
+        {% if driver_form %}form="{{ driver_form }}"{% endif %}
+        {% if driver_submit_on_close %}data-submit-on-close{% endif %}
+        aria-label="Filter by driver (choose one or more)">
+    {% comment %} Tasks with nobody on them are what ops chases first, so the pool is part of the same picker. {% endcomment %}
+    <option value="none" {% if 'none' in driver_selected %}selected{% endif %}>Unassigned</option>
+    {% for d in driver_choices %}
+    <option value="{{ d.driver_id }}" {% if d.driver_id|stringformat:"s" in driver_selected %}selected{% endif %}>
+        {{ d.user.first_name }} {{ d.user.last_name }}{% if d.driver_code %} ({{ d.driver_code }}){% endif %}
+    </option>
+    {% endfor %}
+</select>

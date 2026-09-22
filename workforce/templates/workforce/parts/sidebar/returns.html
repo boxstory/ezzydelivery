@@ -1,0 +1,29 @@
+{% load workforce_tags %}
+{% comment %}
+Purpose: Workforce sidebar — Returns section (parcel custody: open pool, triage queue, hub shelf)
+Used by: dashboard_sidebar_workforce.html / dashboard_sidebar_workforce_mob.html
+Notes: The badge counts OPEN custody rows — parcels somebody is still liable for. Both sidebar
+       templates must carry this section; the mobile one drifts silently otherwise.
+{% endcomment %}
+{% url 'workforce:returns_custody_list' as u_returns %}
+{% url 'workforce:returns_requests_list' as u_return_reqs %}
+{% with active="returns_custody_list,returns_requests_list" %}
+<li id="workforce_sidebar_menu_returns" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+  <div id="workforce_sidebar_link_returns" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-returns" data-title="Returns">
+    <i class="fa-solid fa-rotate-left me-2"></i>
+    <span>Returns</span>
+    <span class="badge wf-sidebar__badge ms-auto me-2" data-badge="returns_open">{{ returns_open_count|default:"0" }}</span>
+    <i class="fa-solid fa-chevron-down"></i>
+  </div>
+  <div id="submenu-returns" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+    <ul class="nav flex-column">
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_returns_open" url=u_returns icon="fa-solid fa-box-open" label="Coming Back" active_names="returns_custody_list" badge_var=returns_open_count badge_key="returns_open" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_returns_triage" url=u_returns|add:"?status=triage" icon="fa-solid fa-triangle-exclamation" label="Needs Triage" %}
+      {% comment %}Parcels signed in at a hub with no run back out raised. Badged with
+      default_zero because a shelf that has emptied is worth seeing as 0, not as a gap.{% endcomment %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_returns_shelf" url=u_returns|add:"?status=to_forward" icon="fa-solid fa-boxes-stacked" label="On the Shelf" badge_var=returns_shelf_count badge_default_zero=1 badge_key="returns_shelf" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_return_requests" url=u_return_reqs icon="fa-solid fa-file-invoice" label="Return Requests" active_names="returns_requests_list" %}
+    </ul>
+  </div>
+</li>
+{% endwith %}

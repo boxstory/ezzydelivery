@@ -6,14 +6,16 @@ from .models import BlogCategory, BlogPost
 class BlogCategoryAdmin(admin.ModelAdmin):
     list_display = ['name', 'slug']
     prepopulated_fields = {'slug': ('name',)}
-    search_fields = ['name', 'description']
+    search_fields = ('name', 'seo_title', 'description', 'slug', 'icon', 'seo_description')
 
 
 @admin.register(BlogPost)
 class BlogPostAdmin(admin.ModelAdmin):
     list_display = ['title', 'category', 'status', 'author', 'published_at', 'views']
     list_filter = ['status', 'category', 'created_at', 'published_at']
-    search_fields = ['title', 'content', 'seo_keywords']
+    search_fields = ('title', 'seo_title', 'status', 'content', 'seo_keywords', 'slug', 'intro',
+                     'featured_image_alt', 'tags', 'seo_description', 'canonical_url',
+                     'author__username', 'category__slug')
     prepopulated_fields = {'slug': ('title',)}
     readonly_fields = ['views', 'created_at', 'updated_at']
 

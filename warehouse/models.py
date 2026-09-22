@@ -1507,7 +1507,8 @@ class ProductRequestItem(models.Model):
 
     def __str__(self):
         request = self.inbound_request or self.outbound_request
-        return f"{self.product.product_title} x{self.quantity_requested} ({request.request_number})"
+        ref = request.request_number if request else 'unlinked'
+        return f"{self.product.item_name} x{self.quantity_requested} ({ref})"
 
     @property
     def is_fully_fulfilled(self):

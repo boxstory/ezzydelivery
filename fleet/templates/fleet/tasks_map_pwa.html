@@ -18,7 +18,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260912a">
+<link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260921r">
 {% endblock %}
 
 {% block content %}
@@ -36,6 +36,21 @@
     <button type="button" class="map-recenter" onclick="recenterMap()" title="Fit all pins">
         <i class="fa-solid fa-crosshairs"></i>
     </button>
+</div>
+
+{% comment %}
+The task detail sheet (pwa_base.html) reads a .task-card element, not an API.
+One hidden card per pin gives the map the exact same sheet the Tasks list opens,
+with no second data path to keep in step.
+{% endcomment %}
+<div class="map-task-cards" hidden>
+    {% for card in tasks %}
+    {% with addr=card.dl_to_address %}<div class="task-card" id="mapTaskCard{{ card.id }}"
+    {% include "fleet/parts/_task_data_attrs.html" %}
+    >
+    {% include "fleet/parts/_task_data_json.html" %}
+    </div>{% endwith %}
+    {% endfor %}
 </div>
 {% else %}
 <div class="map-empty">
@@ -118,8 +133,14 @@
         html += '<span class="task-popup__badge task-popup__badge--' + p.status + '">' + escHtml(p.status_display) + '</span>';
         html += '</div>';
 
+        if (p.business) {
+            html += '<div class="task-popup__row"><i class="fa-solid fa-store"></i>' + escHtml(p.business) + '</div>';
+        }
         if (p.customer_name) {
             html += '<div class="task-popup__row"><i class="fa-solid fa-user"></i>' + escHtml(p.customer_name) + '</div>';
+        }
+        if (p.cod) {
+            html += '<div class="task-popup__row"><i class="fa-solid fa-money-bill-wave"></i>COD ' + escHtml(p.cod) + ' QR</div>';
         }
         if (p.customer_phone) {
             html += '<div class="task-popup__row"><i class="fa-solid fa-phone"></i>';
@@ -137,8 +158,19 @@
             html += '<span class="task-card__acc-badge task-card__acc-badge--' + p.coords_accuracy + '">' + accText + '</span></div>';
         }
 
-        html += '<a href="/fleet/tasks/' + p.id + '/navigate/" class="task-popup__nav-btn">';
-        html += '<i class="fa-solid fa-route me-1"></i>Navigate</a>';
+        html += '<div class="task-popup__actions">';
+        html += '<button type="button" class="task-popup__btn task-popup__btn--detail" ' +
+                'onclick="openMapTaskDetail(' + p.id + ')">' +
+                '<i class="fa-solid fa-circle-info"></i>Details</button>';
+        if (p.is_new) {
+            html += '<button type="button" class="task-popup__btn task-popup__btn--take" ' +
+                    'onclick="takeMapTask(' + p.id + ', this)">' +
+                    '<i class="fa-solid fa-hand"></i>Take</button>';
+        } else {
+            html += '<a href="/fleet/tasks/' + p.id + '/navigate/" class="task-popup__btn task-popup__btn--nav">' +
+                    '<i class="fa-solid fa-route"></i>Navigate</a>';
+        }
+        html += '</div>';
         html += '</div>';
         return html;
     }
@@ -175,6 +207,27 @@
         markers.push(marker);
         bounds.extend([p.lat, p.lng]);
     });
+
+    // The active/new count chip floats above the popup pane, so it lands on top
+    // of an open popup. Step it aside while one is open.
+    map.on('popupopen', function() { document.body.classList.add('map-popup-open'); });
+    map.on('popupclose', function() { document.body.classList.remove('map-popup-open'); });
+
+    // Popup → the shared task detail sheet, driven by this pin's hidden card.
+    window.openMapTaskDetail = function(taskId) {
+        var card = document.getElementById('mapTaskCard' + taskId);
+        if (!card) { showToast('Task details not available', 'danger'); return; }
+        if (typeof openTaskDetail !== 'function') return;
+        map.closePopup();
+        openTaskDetail(null, card);
+    };
+
+    // Claim a pool task without leaving the map. Same request the sheet sends.
+    window.takeMapTask = function(taskId, btn) {
+        var card = document.getElementById('mapTaskCard' + taskId);
+        var taskNum = card ? (card.dataset.tasknum || '') : '';
+        window.tdTakeTaskById(taskId, taskNum, btn);
+    };
 
     // Fit bounds with padding
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });

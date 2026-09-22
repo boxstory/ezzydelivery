@@ -696,6 +696,22 @@ def _driver_match_keys(*phones):
     return keys
 
 
+def is_lid_value(value):
+    """True when a stored identifier is a WhatsApp LID rather than a phone number.
+
+    LIDs are 14-15 digit privacy identifiers that share fields like
+    ``wa_chat_override`` with real numbers. Running ``_phone_variants`` over one
+    invents a '974' + last-8 number that can belong to a stranger — it then
+    matches the wrong chat, or asks WAHA for a thread that does not exist. Every
+    caller that wants to read one of those fields as a phone asks this first.
+
+    Same boundary as :func:`_driver_match_keys`: 8 = local Qatar, 9-13 = with a
+    country code, longer is a LID.
+    """
+    n = normalize_phone(value)
+    return n.isdigit() and len(n) > 13
+
+
 def driver_lead_target_stage(driver, stages=None):
     """Stage key a driver-category lead should sit in for this driver's status.
 

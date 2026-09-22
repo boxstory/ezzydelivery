@@ -21,7 +21,8 @@ ZERO = Decimal('0.00')
 # (see orders/migrations/0001_initial.py); legacy rows still carry it and other
 # call sites still filter on it, so it has to stay eligible here too.
 ELIGIBLE_ORDER_STATUSES = ('delivered', 'fulfilled')
-ELIGIBLE_TASK_STATUSES = ('failed', 'partial_delivery', 'non_reachable')
+ELIGIBLE_TASK_STATUSES = ('failed', 'partial_delivery', 'non_reachable',
+                          'returned_to_shipper')
 
 
 def can_replace(order):
@@ -227,3 +228,80 @@ def create_replacement_order(source, *, reason, items=None, collect_back=False,
                                      charge_verification_status='verified')
 
     return new
+
+
+# ---------------------------------------------------------------------------
+# Return requests (RMA paperwork)
+# ---------------------------------------------------------------------------
+
+def next_return_number(business):
+    """A return number the seller can recognise: their code, then 8 hex.
+
+    One generator, because the two older call sites invented two different
+    formats (business/views.py used the business code, fleet/views.py used a
+    'PDR-' prefix) and nothing reconciles them. New paths use this; the old two
+    keep their formats until someone decides to change what sellers already see.
+    """
+    code = (getattr(business, 'business_code', '') or 'RET')[:12].upper()
+    return f"{code}-{uuid.uuid4().hex[:8].upper()}"
+
+
+@transaction.atomic
+def create_return_request(order, *, reason, reason_notes='', items=None,
+                          cod_reversal_amount=None, status='pending', user=None):
+    """Open the RMA paperwork for `order`. Returns the ReturnRequest.
+
+    `items` is an optional [(OrderItem, qty)] subset; None means every line at its
+    remaining quantity (quantity - quantity_returned), which is what a whole parcel
+    coming back means. Lines with nothing left to return are skipped.
+
+    `cod_reversal_amount` is the refund OWED TO THE CUSTOMER and defaults to
+    orders.money.collected_for(order) — what was actually taken, net of refunds
+    already made. It is never the order's face value: an order the driver never
+    collected on has nothing to hand back, however large its cod_amount is.
+    """
+    from orders.models import ReturnItem, ReturnRequest
+
+    if items is None:
+        items = [
+            (item, item.quantity - (item.quantity_returned or 0))
+            for item in order.order_items.all()
+        ]
+    items = [(item, int(qty)) for item, qty in items if int(qty) > 0]
+
+    if cod_reversal_amount is None:
+        cod_reversal_amount = money.collected_for(order)
+
+    # uuid4 collisions are vanishingly rare, but return_number is unique and a
+    # clash would surface as a 500 on a driver's phone. Retry instead.
+    for attempt in range(5):
+        try:
+            with transaction.atomic():
+                ret = ReturnRequest.objects.create(
+                    return_number=next_return_number(order.business),
+                    order=order,
+                    business=order.business,
+                    reason=reason,
+                    reason_notes=reason_notes or '',
+                    status=status,
+                    cod_reversal_amount=cod_reversal_amount,
+                )
+            break
+        except IntegrityError:
+            if attempt == 4:
+                raise
+    else:  # pragma: no cover - the loop always breaks or raises
+        raise IntegrityError('could not allocate a return number')
+
+    if status != 'pending' and user is not None and getattr(user, 'is_authenticated', False):
+        from django.utils import timezone
+        ret.reviewed_by = user
+        ret.reviewed_at = timezone.now()
+        ret.save(update_fields=['reviewed_by', 'reviewed_at', 'updated_at'])
+
+    for item, qty in items:
+        ReturnItem.objects.create(
+            return_request=ret, order_item=item, quantity_returned=qty,
+        )
+
+    return ret

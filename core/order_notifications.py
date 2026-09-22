@@ -97,6 +97,7 @@ def notify_order_event(event, task=None, order=None):
             'delivery_failed': 'failed',
         }
         trigger_status = event_to_trigger.get(event)
+        trigger = None
         if trigger_status and _order.business_id:
             trigger = WhatsAppNotificationTrigger.objects.filter(
                 business_id=_order.business_id,
@@ -112,30 +113,13 @@ def notify_order_event(event, task=None, order=None):
             logger.debug(f"notify_order_event({event}): order {_order.order_number} has no customer_phone, skipping")
             return
 
-        # Use custom message from trigger if set
+        # Use the business's own wording when it set one. Placeholders are
+        # resolved in core/trigger_tokens.py — the same list the settings page
+        # advertises — so a token can never be offered but not filled.
         custom_msg = None
-        if trigger_status and _order.business_id:
-            trigger_obj = WhatsAppNotificationTrigger.objects.filter(
-                business_id=_order.business_id,
-                trigger_status=trigger_status,
-                is_active=True
-            ).first()
-            if trigger_obj and trigger_obj.custom_message:
-                try:
-                    driver_name = ''
-                    driver_phone_str = ''
-                    if task and task.driver:
-                        driver_name = str(task.driver)
-                        driver_phone_str = task.driver.driver_phone or ''
-                    custom_msg = trigger_obj.custom_message.format(
-                        customer_name=_order.customer_name or '',
-                        order_number=_order.order_number or '',
-                        driver_name=driver_name,
-                        driver_phone=driver_phone_str,
-                    )
-                except (KeyError, IndexError):
-                    logger.warning(f"Custom message template error for business {_order.business_id}, event {event}")
-                    custom_msg = None
+        if trigger and trigger.custom_message:
+            from core.trigger_tokens import render as render_trigger_message
+            custom_msg = render_trigger_message(trigger.custom_message, _order, task=task) or None
 
         message = custom_msg or _build_message(event, _order, task)
         if not message:
