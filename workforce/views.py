@@ -9321,6 +9321,15 @@ _DL_TERMINAL_BAD = {
     'rejected': 'Rejected by driver',
     'cancelled': 'Delivery cancelled',
     'dropsownlost': 'Dropped / lost',
+    'returned_to_shipper': 'Returned to shipper',
+}
+# Statuses that end the leg badly but only AFTER a real attempt. They replace the
+# last rail step rather than flattening the rail: the drive out happened, it just
+# did not end in a delivery. Every other bad ending (rejected, cancelled, dropped)
+# stays in _DL_TERMINAL_BAD and renders flat, because nothing was ever attempted.
+_DL_OUTCOME_STEPS = {
+    'returned_to_shipper': 'Returned',
+    'failed': 'Failed',
 }
 _DL_STEPS = [
     ('pending', 'Pending', ('pending', 'for_review')),
@@ -9342,26 +9351,61 @@ def _delivery_leg(task, status_history, proof_count):
     jump straight from accepted to delivered, stages reached but never recorded
     are counted so the rail does not imply they happened.
     """
-    ts_by_status = {}
+    ts_by_status, last_ts_by_status = {}, {}
     for entry in status_history:
         if entry.field_name == 'dl_task_status':
             ts_by_status.setdefault(entry.new_value, entry.created_at)
+            # A retried task passes through 'failed' more than once; the outcome
+            # step wants the attempt that actually closed the leg, not the first.
+            last_ts_by_status[entry.new_value] = entry.created_at
 
     current = task.dl_task_status
+
+    # A returned or failed leg is not a leg that never happened: the driver went
+    # out, tried, and it ended badly. Those keep the rail every other leg gets,
+    # with the last step renamed to how it really ended — unlike a cancelled or
+    # rejected leg, which is flattened because nothing was ever attempted.
+    outcome_label = _DL_OUTCOME_STEPS.get(current)
+    returned = current == 'returned_to_shipper'
+
     rank = _DL_STAGE_RANK.get(current, -1)
+    on_rail = rank >= 0
+    if outcome_label:
+        # These statuses sit off the rail, so how far the attempt got has to come
+        # from the history. Capped at Out for delivery: whatever the history says,
+        # a parcel that failed or came back was never delivered.
+        rank = min(max([_DL_STAGE_RANK.get(s, -1) for s in ts_by_status] + [-1]), 4)
 
     steps, unrecorded = [], 0
     for key, label, sources in _DL_STEPS:
         step_rank = _DL_STAGE_RANK[key]
         stamp = next((ts_by_status[s] for s in sources if s in ts_by_status), None)
-        approx = False
-        if stamp is None and key == 'delivered' and rank >= 5 and task.completed_at:
-            stamp, approx = task.completed_at, True
-        done = rank >= step_rank
-        if done and stamp is None and step_rank > 0:
-            unrecorded += 1
+        approx, bad = False, False
+
+        if key == 'delivered' and outcome_label:
+            # The last step is the outcome, not the hope: "Returned" or "Failed"
+            # stands where "Delivered" would, filled red and stamped with when
+            # the leg actually closed.
+            label, done, bad = outcome_label, True, True
+            stamp = last_ts_by_status.get(current)
+            if stamp is None and task.completed_at:
+                stamp, approx = task.completed_at, True
+        else:
+            if stamp is None and key == 'delivered' and rank >= 5 and task.completed_at:
+                stamp, approx = task.completed_at, True
+            done = rank >= step_rank
+            if outcome_label and not done:
+                # A returned parcel is routinely marked delivered first and
+                # reversed after, which leaves a stamp on a step the job never
+                # actually held. Showing it under a hollow dot reads as progress;
+                # the Status Timeline below is where the reversal belongs.
+                stamp = None
+            if done and stamp is None and step_rank > 0:
+                unrecorded += 1
+
         steps.append({
-            'label': label, 'done': done, 'now': rank == step_rank,
+            'label': label, 'done': done, 'bad': bad,
+            'now': bad or (on_rail and rank == step_rank),
             'time': stamp, 'approx': approx,
         })
 
@@ -9378,7 +9422,11 @@ def _delivery_leg(task, status_history, proof_count):
 
     return {
         'steps': steps,
-        'terminal': _DL_TERMINAL_BAD.get(current),
+        # None once the rail carries the outcome itself — the flat row would
+        # replace a rail that is still true.
+        'terminal': None if outcome_label else _DL_TERMINAL_BAD.get(current),
+        'outcome': outcome_label,
+        'returned': returned,
         'status': current,
         'status_label': task.get_dl_task_status_display(),
         'published': task.dl_task_publish,
@@ -9393,6 +9441,98 @@ def _delivery_leg(task, status_history, proof_count):
         'failure_reason': task.get_failure_reason_display() if task.failure_reason else None,
         'failure_notes': task.failure_notes,
         'attempts': task.failed_attempt_count,
+    }
+
+
+# Return leg: the custody rail a parcel runs AFTER a delivery closes as returned.
+# The positions are owned by ParcelCustody.stage_index — this only holds the words,
+# so the two cannot disagree about which step a status sits on.
+_RETURN_STEPS = [
+    ('with_driver', 'With driver'),
+    ('in_manifest', 'In manifest'),
+    ('received', 'Received'),
+]
+# Custody states that are off the rail: the row is closed, but the parcel did not
+# come home. Rendered flat, the way a cancelled leg is.
+_RETURN_EXCEPTIONS = {
+    'disputed': 'Disputed — who is holding this is not agreed',
+    'not_in_custody': 'Driver says they are not holding it',
+    'lost': 'Lost — never came back',
+    'voided': 'Voided by staff',
+}
+
+
+def _return_leg(task, status_history):
+    """
+    Build the return-leg strip: who holds the parcel, where it is headed, and
+    whether anyone has actually signed for it.
+
+    Returns None for any task that did not close as returned_to_shipper — every
+    other status has no parcel coming back. A returned task with NO ParcelCustody
+    row still returns a dict (custody None), because that is the case most worth
+    showing: the delivery says the box came back and nothing is tracking it.
+
+    Step times come from the 'parcel_custody' history entries rather than the row,
+    which only keeps the latest state; opened_at and received_at fill the two ends.
+    """
+    from delivery.services.returns import CUSTODY_HISTORY_FIELD, RETURNED_TO_SHIPPER
+
+    if task.dl_task_status != RETURNED_TO_SHIPPER:
+        return None
+
+    returned_at, custody_times = None, {}
+    for entry in status_history:
+        if entry.field_name == 'dl_task_status' and entry.new_value == RETURNED_TO_SHIPPER:
+            # Last one wins: a retried task can be returned more than once, and the
+            # parcel in hand now is the one from the most recent return.
+            returned_at = entry.created_at
+        elif entry.field_name == CUSTODY_HISTORY_FIELD:
+            custody_times.setdefault(entry.new_value, entry.created_at)
+
+    custody = (
+        task.parcel_custodies
+        .select_related('driver__user', 'warehouse_location', 'pickup_location',
+                        'return_request', 'received_by')
+        .order_by('-opened_at')
+        .first()
+    )
+
+    steps = []
+    if custody is not None:
+        reached = custody.stage_index
+        for index, (key, label) in enumerate(_RETURN_STEPS):
+            stamp = custody_times.get(key)
+            if stamp is None and key == 'with_driver':
+                stamp = custody.opened_at
+            elif stamp is None and key == 'received':
+                stamp = custody.received_at
+            steps.append({
+                'label': label, 'done': reached >= index, 'now': reached == index,
+                'time': stamp, 'approx': False,
+            })
+
+    return {
+        'custody': custody,
+        'steps': steps,
+        'returned_at': returned_at or task.completed_at,
+        'status': getattr(custody, 'status', ''),
+        'status_label': custody.get_status_display() if custody else 'Not tracked',
+        'exception': _RETURN_EXCEPTIONS.get(custody.status) if custody else None,
+        'received': custody is not None and custody.status == 'received',
+        'is_open': custody.is_open if custody else False,
+        'received_at': custody.received_at if custody else None,
+        'received_by': custody.received_by if custody else None,
+        'destination_label': custody.destination_label if custody else '',
+        'destination_kind': custody.destination_kind if custody else '',
+        'needs_triage': custody.needs_triage if custody else False,
+        'destination_overridden': custody.destination_overridden if custody else False,
+        'fallback_reason': custody.destination_fallback_reason if custody else '',
+        # Whoever is answerable for the box. Falls back to the task's driver only
+        # when there is no custody row at all — with a row, a blank driver is the
+        # fact ("nobody is on the hook"), not a gap to paper over.
+        'driver': custody.driver if custody else task.driver,
+        'return_request': custody.return_request if custody else None,
+        'manifest_reference': custody.manifest_reference if custody else '',
     }
 
 
@@ -9544,6 +9684,10 @@ def delivery_task_detail(request, task_id):
     # Delivery-leg stage rail for the Driver App Updates card
     delivery_leg = _delivery_leg(task, status_history, timeline_evidence['proof_count'])
 
+    # Return leg — None unless this task closed as returned_to_shipper, in which
+    # case it renders under the delivery rail as the last leg of the job.
+    return_leg = _return_leg(task, status_history)
+
     # First-mile pickup leg context
     pickup_task = getattr(task.order, 'pickup_task', None) if task.order else None
     pickup_gps = _pickup_gps_coverage(pickup_task)
@@ -9613,6 +9757,7 @@ def delivery_task_detail(request, task_id):
         'cod_returned_amount': cod_returned_amount,
         'cod_refundable': cod_refundable,
         'delivery_leg': delivery_leg,
+        'return_leg': return_leg,
         'timeline_events': timeline_events,
         'timeline_evidence': timeline_evidence,
         'timeline_now_at': timeline_now_at,

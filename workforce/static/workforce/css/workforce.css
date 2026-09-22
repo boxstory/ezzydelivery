@@ -22315,6 +22315,20 @@ body .select2-container--default.ppl__pick-menu .select2-results__option[aria-se
 .pkl__state--dl-failed::before, .pkl__state--dl-rejected::before,
 .pkl__state--dl-dropsownlost::before { background: #ef4444; }
 .pkl__state--dl-cancelled { color: #9ca3af; }
+/* Return-leg custody states carry a --rt- prefix for the same reason the delivery
+   ones carry --dl-: three legs, and more than one of them owns a "received". */
+.pkl__state--rt-with_driver::before { background: #3b82f6; }
+.pkl__state--rt-in_manifest::before { background: #f7c000; }
+.pkl__state--rt-received { color: #166534; }
+.pkl__state--rt-received::before { background: #22c55e; }
+.pkl__state--rt-disputed, .pkl__state--rt-not_in_custody,
+.pkl__state--rt-lost { color: #b91c1c; }
+.pkl__state--rt-disputed::before, .pkl__state--rt-not_in_custody::before,
+.pkl__state--rt-lost::before { background: #ef4444; }
+.pkl__state--rt-voided { color: #9ca3af; }
+/* No custody row at all — the parcel is off the books, not merely unfinished */
+.pkl__state--rt-untracked { color: #b91c1c; }
+.pkl__state--rt-untracked::before { background: #ef4444; }
 .pkl__meta { font-size: 0.7rem; color: #6b7280; }
 .pkl__driver {
     font-size: 0.68rem;
@@ -22370,6 +22384,16 @@ body .select2-container--default.ppl__pick-menu .select2-results__option[aria-se
     border-color: #f7c000;
     box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.35);
 }
+/* The leg ended badly where a delivery should have been — Returned or Failed
+   standing in the Delivered slot. Filled, because it really is the last thing
+   that happened, but red so a scan down the rail never reads it as a success. */
+.lgr__step--bad .lgr__dot {
+    background: #dc2626;
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+}
+/* The run-in to a bad ending, so the turn is visible before the last dot */
+.lgr__step--bad::before { background: #dc2626; }
 .lgr__step-label {
     font-size: 0.62rem;
     font-weight: 600;
@@ -22377,6 +22401,7 @@ body .select2-container--default.ppl__pick-menu .select2-results__option[aria-se
     line-height: 1.15;
 }
 .lgr__step--done .lgr__step-label { color: #001f3f; }
+.lgr__step--bad .lgr__step-label { color: #b91c1c; font-weight: 700; }
 .lgr__step-time {
     font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
     font-size: 0.58rem;
@@ -22418,6 +22443,9 @@ body .select2-container--default.ppl__pick-menu .select2-results__option[aria-se
 }
 .pkl__hub i { color: #6b7280; margin-right: 0.2rem; }
 .pkl__note--warn { color: #92400e; font-weight: 600; }
+/* The one line that closes a leg cleanly — a parcel signed back in */
+.pkl__note--ok { color: #166534; font-weight: 600; }
+.pkl__note--ok i { color: #22c55e; }
 .pkl__evidence {
     display: flex;
     flex-wrap: wrap;

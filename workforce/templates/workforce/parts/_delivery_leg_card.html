@@ -1,8 +1,10 @@
 {% comment %}
 Purpose: Delivery-leg strip — stage rail, driver and evidence for the DeliveryTask itself.
 Used by: workforce/parts/delivery_task_detail.html (Driver App Updates card); pass leg=<dict from _delivery_leg>.
-Notes: Mirrors _pickup_leg_card.html so both legs of the job read the same way. A failed or
-       cancelled task shows a flat row instead of the rail.
+Notes: Mirrors _pickup_leg_card.html so both legs of the job read the same way. A cancelled,
+       rejected or dropped task shows a flat row instead of the rail, because nothing was ever
+       attempted. A returned or failed one keeps the rail with its last step renamed to the
+       outcome (_DL_OUTCOME_STEPS); on a return, _return_leg_card.html carries the way back.
 {% endcomment %}
 {% if leg %}
 <div class="pkl">
@@ -29,6 +31,15 @@ Notes: Mirrors _pickup_leg_card.html so both legs of the job read the same way. 
     {% endif %}
     {% else %}
     {% include "workforce/parts/_leg_rail.html" with rail_steps=leg.steps %}
+
+    {% comment %}Why it ended badly. The rail's last step names the outcome but not the
+    reason, so on a returned or failed leg this is the only place the reason appears.{% endcomment %}
+    {% if leg.outcome and leg.failure_reason %}
+    <div class="pkl__note pkl__note--warn">
+        <i class="fa-solid fa-triangle-exclamation"></i> {{ leg.failure_reason }}{% if leg.failure_notes %} — {{ leg.failure_notes }}{% endif %}
+        {% if leg.attempts %} · attempt {{ leg.attempts }}{% endif %}
+    </div>
+    {% endif %}
 
     {% comment %}Drivers commonly jump straight from accepted to delivered, so a filled
     rail can imply stages that were never actually recorded.{% endcomment %}

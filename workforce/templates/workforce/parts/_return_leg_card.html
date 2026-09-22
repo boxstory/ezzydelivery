@@ -1,0 +1,84 @@
+{% comment %}
+Purpose: Return-leg strip — custody rail, destination and sign-in state for a parcel coming back.
+Used by: workforce/parts/delivery_task_detail.html (Driver App Updates card); pass leg=<dict from _return_leg>.
+Notes: Renders nothing unless the task closed as returned_to_shipper. A returned task with NO
+       ParcelCustody row still renders — that is the case worth showing, because the delivery says
+       the box came back and nothing is tracking it. The destination is the SNAPSHOT taken when the
+       parcel left; it is never re-resolved here. Custody states off the 3-step rail (disputed,
+       lost, voided, not held) render flat, the way a cancelled leg does.
+{% endcomment %}
+{% if leg %}
+<div class="pkl">
+    <div class="pkl__head">
+        <span class="pkl__title">
+            <i class="fa-solid fa-rotate-left"></i> Return Leg
+            {# The rail shades the steps; this says whether anyone has signed for it yet. #}
+            <span class="pkl__state pkl__state--rt-{{ leg.status|default:'untracked' }}">{{ leg.status_label }}</span>
+        </span>
+        <span class="pkl__meta">
+            {% if leg.returned_at %}Returned {{ leg.returned_at|date:"d M, H:i" }}{% else %}Return time not recorded{% endif %}
+            {% if leg.custody %}
+            · {% if leg.destination_kind == 'hub' %}<span class="pkl__hub"><i class="fa-solid fa-warehouse"></i> {{ leg.destination_label }}</span>{% else %}<span class="pkl__hub"><i class="fa-solid fa-store"></i> {{ leg.destination_label }}</span>{% endif %}
+            {% endif %}
+            {% if leg.driver %}· {% include "workforce/parts/_driver_chip.html" with driver=leg.driver %}{% endif %}
+        </span>
+    </div>
+
+    {% if not leg.custody %}
+    {% comment %}No custody row at all: the delivery closed as returned but nobody opened the
+    paperwork, so the parcel is off the books. The returns desk can open it by hand.{% endcomment %}
+    <div class="pkl__cancelled"><i class="fa-solid fa-circle-question"></i> Not tracked — no custody record was opened for this parcel</div>
+    <div class="pkl__note pkl__note--warn">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        Nobody is on the hook for this box. Open it from the
+        <a href="{% url 'workforce:returns_custody_list' %}?status=all&amp;days=all&amp;search={{ task.order.order_number|urlencode }}">returns desk</a>.
+    </div>
+
+    {% elif leg.exception %}
+    <div class="pkl__cancelled"><i class="fa-solid fa-circle-xmark"></i> {{ leg.exception }}</div>
+    {% if leg.custody.notes %}
+    <div class="pkl__note"><i class="fa-regular fa-message"></i> {{ leg.custody.notes }}</div>
+    {% endif %}
+
+    {% else %}
+    {% include "workforce/parts/_leg_rail.html" with rail_steps=leg.steps %}
+
+    {% comment %}The rail alone never says the word: a parcel sitting at "With driver" for a
+    week looks identical to one collected an hour ago.{% endcomment %}
+    {% if leg.received %}
+    <div class="pkl__note pkl__note--ok">
+        <i class="fa-solid fa-circle-check"></i>
+        Returned and signed for{% if leg.received_at %} on {{ leg.received_at|date:"d M Y, H:i" }}{% endif %}{% if leg.received_by %} by {{ leg.received_by.get_full_name|default:leg.received_by.username }}{% endif %}.
+    </div>
+    {% else %}
+    <div class="pkl__note pkl__note--warn">
+        <i class="fa-solid fa-hourglass-half"></i>
+        Not returned yet — still {{ leg.status_label|lower }}{% if leg.returned_at %}, {{ leg.returned_at|timesince }} since the delivery failed{% endif %}.
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if leg.custody %}
+    <div class="pkl__evidence">
+        {% if leg.needs_triage %}
+        <span class="pkl__ev pkl__ev--none">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            Needs triage — no destination resolved{% if leg.fallback_reason %}: {{ leg.fallback_reason }}{% endif %}
+        </span>
+        {% elif leg.destination_overridden %}
+        <span class="pkl__ev"><i class="fa-solid fa-pen"></i> Destination set by staff</span>
+        {% endif %}
+        {% if leg.manifest_reference %}
+        <span class="pkl__ev"><i class="fa-solid fa-bag-shopping"></i> Manifest {{ leg.manifest_reference }}</span>
+        {% endif %}
+        {% if leg.return_request %}
+        <span class="pkl__ev"><i class="fa-solid fa-file-lines"></i> {{ leg.return_request.return_number }}</span>
+        {% endif %}
+        <span class="pkl__ev">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            <a href="{% url 'workforce:returns_custody_list' %}?status=all&amp;days=all&amp;search={{ task.order.order_number|urlencode }}">Returns desk</a>
+        </span>
+    </div>
+    {% endif %}
+</div>
+{% endif %}

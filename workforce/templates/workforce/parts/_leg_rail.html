@@ -1,12 +1,13 @@
 {% comment %}
 Purpose: Shared 6-step progress rail used by both job legs (first-mile pickup and delivery).
 Used by: workforce/parts/_pickup_leg_card.html, workforce/parts/_delivery_leg_card.html.
-Notes: Pass rail_steps = list of {label, done, now, time, approx}; approx prefixes the time with
-       "≈" for stages the system infers rather than stamps.
+Notes: Pass rail_steps = list of {label, done, now, time, approx, bad}; approx prefixes the time
+       with "≈" for stages the system infers rather than stamps, and bad marks a step that is
+       done but ended badly (Returned / Failed standing where Delivered would).
 {% endcomment %}
 <div class="lgr__rail">
     {% for step in rail_steps %}
-    <div class="lgr__step{% if step.done %} lgr__step--done{% endif %}{% if step.now %} lgr__step--now{% endif %}">
+    <div class="lgr__step{% if step.done %} lgr__step--done{% endif %}{% if step.now %} lgr__step--now{% endif %}{% if step.bad %} lgr__step--bad{% endif %}">
         <span class="lgr__dot"></span>
         <span class="lgr__step-label">{{ step.label }}</span>
         {% if step.time %}
