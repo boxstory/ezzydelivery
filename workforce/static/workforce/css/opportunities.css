@@ -1,0 +1,176 @@
+/* Purpose: Staff driver-opportunities console — postings list, posting form, and the interest review page.
+   Used by: workforce/templates/workforce/fleet/opportunities_list.html, opportunity_form.html, opportunity_detail.html
+   Notes: The navy hero band and the white card headers come from staff-hero.css by class suffix (*__hero,
+          *__card-header) and it loads last — never re-declare them here. Only page-specific rules belong in this file. */
+
+/* ---------------------------------------------------------------------------
+   Slot card — the shift heading carries its own fill count on the right.
+   --------------------------------------------------------------------------- */
+.wfopp__slot-meta {
+  float: right;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.wfopp__sub {
+  font-size: 0.72rem;
+  color: var(--brand-grey-500);
+  margin-top: 0.125rem;
+}
+
+.wfopp__none {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--brand-grey-500);
+}
+
+/* ---------------------------------------------------------------------------
+   Table. orders.css pins every staff tbody td to 12px site-wide with !important,
+   so the body size is restated here at the console floor rather than inherited.
+   --------------------------------------------------------------------------- */
+.wfopp__table thead th {
+  background: var(--brand-navy);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 0;
+  white-space: nowrap;
+}
+
+.wfopp__table tbody td {
+  font-size: 0.8rem !important;
+  color: var(--brand-grey-800);
+  border-bottom: 1px solid var(--brand-grey-200);
+  vertical-align: middle;
+}
+
+.wfopp__table tbody tr:hover {
+  background: var(--brand-grey-50);
+}
+
+/* ---------------------------------------------------------------------------
+   Status — swatch + text, not a loud pill.
+   --------------------------------------------------------------------------- */
+.wfopp__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wfopp__state::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+/* Posting states */
+.wfopp__state--draft { color: var(--brand-grey-500); }
+.wfopp__state--draft::before { background: var(--brand-grey-400); }
+
+.wfopp__state--open { color: var(--brand-success); }
+.wfopp__state--open::before { background: var(--brand-success); }
+
+.wfopp__state--closed { color: var(--brand-grey-500); }
+.wfopp__state--closed::before { background: var(--brand-grey-300); }
+
+/* Interest states */
+.wfopp__state--interested { color: var(--brand-grey-600); }
+.wfopp__state--interested::before { background: var(--brand-grey-400); }
+
+.wfopp__state--shortlisted { color: var(--brand-info); }
+.wfopp__state--shortlisted::before { background: var(--brand-info); }
+
+.wfopp__state--confirmed { color: var(--brand-success); }
+.wfopp__state--confirmed::before { background: var(--brand-success); }
+
+.wfopp__state--declined { color: var(--brand-danger); }
+.wfopp__state--declined::before { background: var(--brand-danger); }
+
+.wfopp__state--withdrawn { color: var(--brand-grey-500); }
+.wfopp__state--withdrawn::before { background: var(--brand-grey-300); }
+
+/* ---------------------------------------------------------------------------
+   Buttons. Row actions are bordered controls, never underlined words — on a long
+   review table an underlined word is a hard target to see and to hit.
+   --------------------------------------------------------------------------- */
+.wfopp__rowbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.1rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-400);
+  border-radius: var(--brand-radius-sm);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wfopp__rowbtn:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+  color: var(--brand-grey-800);
+}
+
+.wfopp__rowbtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.wfopp__rowbtn--danger {
+  color: var(--brand-danger);
+  border-color: var(--brand-grey-300);
+}
+
+.wfopp__rowbtn--danger:hover {
+  background: var(--brand-danger-bg);
+  border-color: var(--brand-danger);
+  color: var(--brand-danger);
+}
+
+/* The page's single navy primary; the yellow accent stays on the hero kicker. */
+.wfopp__btn-primary {
+  min-height: 2.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-navy);
+  border: 1px solid var(--brand-navy);
+}
+
+.wfopp__btn-primary:hover {
+  background: var(--brand-navy-light);
+  border-color: var(--brand-navy-light);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: var(--brand-shadow-sm);
+}
+
+.wfopp__btn-secondary {
+  min-height: 2.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-400);
+}
+
+.wfopp__btn-secondary:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+  color: var(--brand-grey-800);
+}

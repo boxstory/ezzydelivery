@@ -1,0 +1,129 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Create or edit a driver opportunity posting (the role; its dated shifts are added on the detail page).
+Used by: workforce.views.wf_opportunity_edit at /workforce/fleet/opportunities/new/ and .../<id>/edit/
+Notes: .wfcard--form caps the form at 60rem — a full-width input row is unreadable on a 1900px monitor.
+{% endcomment %}
+{% block title %}{% if posting %}Edit{% else %}New{% endif %} Opportunity - Ezzy Delivery{% endblock title %}
+{% block content %}
+<div class="wfpage">
+
+    <div class="wfopp__hero">
+        <div class="wfhero__content">
+            <nav aria-label="breadcrumb">
+                <ol class="wfhero__crumbs">
+                    <li class="wfhero__crumb"><a class="wfhero__crumb-link" href="{% url 'workforce:wf_opportunities' %}">Opportunities</a></li>
+                    <li class="wfhero__crumb wfhero__crumb--active">{% if posting %}Edit{% else %}New{% endif %}</li>
+                </ol>
+            </nav>
+            <h1 class="wfhero__heading">{% if posting %}{{ posting.title }}{% else %}New posting{% endif %}</h1>
+        </div>
+    </div>
+
+    <div class="wfpage__body">
+        <div class="wfcard wfcard--form">
+            <div class="wfcard__header"><i class="fa-solid fa-briefcase"></i> Posting details</div>
+            <div class="wfcard__body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="opp_title">Title</label>
+                            <input type="text" class="form-control" id="opp_title" name="title" maxlength="150"
+                                   value="{{ posting.title|default:'' }}" required
+                                   placeholder="e.g. Evening bike riders — Lusail">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="opp_description">Description</label>
+                            <textarea class="form-control" id="opp_description" name="description" rows="3"
+                                      placeholder="What the work involves, who it suits">{{ posting.description|default:'' }}</textarea>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="opp_job_type">Job type</label>
+                            <select class="form-select" id="opp_job_type" name="job_type">
+                                <option value="">Any</option>
+                                {% for key, label in job_type_choices %}
+                                <option value="{{ key }}" {% if posting.job_type == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="opp_vehicle">Vehicle</label>
+                            <select class="form-select" id="opp_vehicle" name="vehicle_type">
+                                <option value="">Any</option>
+                                {% for key, label in vehicle_choices %}
+                                <option value="{{ key }}" {% if posting.vehicle_type == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="opp_location">Based at</label>
+                            <select class="form-select" id="opp_location" name="pickup_location">
+                                <option value="">Not tied to a store</option>
+                                {% for location in pickup_locations %}
+                                <option value="{{ location.pk }}" {% if posting.pickup_location_id == location.pk %}selected{% endif %}>
+                                    {{ location }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">
+                                Needed before a confirmed driver can be turned into a dispatch shift.
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="opp_pay">Pay note</label>
+                            <input type="text" class="form-control" id="opp_pay" name="pay_note" maxlength="200"
+                                   value="{{ posting.pay_note|default:'' }}"
+                                   placeholder="e.g. QAR 25/hour + fuel">
+                            <div class="form-text">
+                                Free text for the advert. Actual pay always resolves through the rate cards.
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="opp_zones">Zone groups</label>
+                            <select class="form-select" id="opp_zones" name="zone_groups" multiple size="5">
+                                {% for zone in zone_groups %}
+                                <option value="{{ zone.pk }}" {% if zone.pk in selected_zones %}selected{% endif %}>{{ zone }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="opp_status">Status</label>
+                            <select class="form-select" id="opp_status" name="status">
+                                {% for key, label in status_choices %}
+                                <option value="{{ key }}" {% if posting.status == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Drivers see a posting only while it is Open.</div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="opp_closes">Closes at</label>
+                            <input type="datetime-local" class="form-control" id="opp_closes" name="closes_at"
+                                   value="{{ posting.closes_at|date:'Y-m-d\TH:i' }}">
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn wfopp__btn-primary">Save posting</button>
+                        <a class="btn wfopp__btn-secondary" href="{% url 'workforce:wf_opportunities' %}">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/opportunities.css' %}?v=20260922a">
+{% endblock %}

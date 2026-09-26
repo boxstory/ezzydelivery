@@ -195,6 +195,39 @@
   border-color: var(--crm-accent);
   box-shadow: var(--crm-focus);
 }
+/* The two boxes a custom date range needs. Not a Select2 control — a native date
+   input — so it states the row's height itself instead of inheriting it, and it
+   keeps its own picker chevron rather than the chevron tile the selects carry. */
+.crm__facet-date {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 8.5rem;
+  height: var(--crm-ctl-h);
+  padding: 0 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--crm-ink-2);
+  background-color: var(--brand-white);
+  border: 1px solid var(--crm-line-2);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+.crm__facet-date:hover { border-color: var(--crm-ink-2); color: var(--crm-ink); }
+.crm__facet-date:focus-visible {
+  outline: none;
+  border-color: var(--crm-accent);
+  box-shadow: var(--crm-focus);
+}
+/* An empty date box is a filter that is not doing anything yet — only a filled
+   one earns the engaged edge, exactly as a picked facet does. */
+.crm__facet-date--on {
+  color: var(--crm-ink);
+  font-weight: 600;
+  border-color: var(--crm-ink);
+  box-shadow: inset 0 0 0 1px var(--crm-ink);
+}
+
 /* Engaged facet — ink edge and weight, no colour spend. */
 .crm__facet-select--on {
   color: var(--crm-ink);
@@ -303,12 +336,150 @@
     grid-auto-flow: row;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .crm__facet-select { width: 100%; min-width: 0; height: 2.5rem; }
+  /* 2.75rem, and on the token rather than only on the select: mobile-app.css
+     puts a 44px touch floor on the button Select2 renders for a single picker,
+     so anything shorter leaves the checklists (which size off --crm-ctl-h, their
+     control being a sibling of the hidden <select>) standing 4px short beside
+     them. One height for every facet, and it clears the touch floor. */
+  .crm__facets { --crm-ctl-h: 2.75rem; }
+  .crm__facet-select,
+  .crm__facet-date { width: 100%; min-width: 0; height: 2.75rem; }
   .crm__filters > .crm__btn,
   .crm__clear-all { flex: 1 1 8rem; margin-left: 0; height: 2.5rem; justify-content: center; }
 }
 @media (max-width: 479.98px) {
   .crm__facets { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* ── MULTI-SELECT FACETS ────────────────────────────────────────── */
+/* Shared by every CRM toolbar whose facets are checklists — the two leads tables
+   and the driver map — which is why these live here rather than beside one page's
+   rules: written for the map alone first, they had to be lifted the moment a
+   second bar wanted them. Sizes come off --crm-ctl-h, so a denser toolbar (the
+   map sets 2rem) fits itself without restating any of this.
+
+   They follow the worked pattern from the .pg-filter__row bar in workforce.css
+   and cover the no-summary state — nothing picked, or the initialiser did not
+   run. Three traps, all load-bearing: the control is capped to the bar's height
+   and scrolls inside, so stacking six stages cannot push the row out of line;
+   the tags are absolutely-positioned-× chips, which Select2 reserves no room
+   for; and Select2 4.1 builds the inline search as an auto-sizing <textarea>
+   that computes ~88px tall — left alone it renders the picker as a tall blank
+   box with the placeholder pushed out of sight. */
+.crm .select2-container.ez-filter-select .select2-selection--multiple[data-facet-summary]::before {
+  font-size: 0.82rem;
+}
+.crm .select2-container.ez-filter-select .select2-selection--multiple {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.2rem;
+  min-height: var(--crm-ctl-h);
+  max-height: var(--crm-ctl-h);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 0.25rem;
+  border: 1px solid var(--crm-line-2);
+  border-radius: 6px;
+}
+.crm .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__rendered {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-wrap: nowrap;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.crm .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice {
+  position: relative;
+  /* min-width keeps a tag legible instead of letting it collapse to "Ap…" when a
+     second one is picked; the pair shrink together rather than the first losing. */
+  flex: 0 1 auto;
+  min-width: 4.25rem;
+  max-width: 6.5rem;
+  margin: 0;
+  padding: 0 0.3rem 0 1rem;
+  font-size: 0.72rem;
+  line-height: 1.15rem;
+  color: var(--crm-ink);
+  background: var(--crm-canvas);
+  border: 1px solid var(--crm-line-2);
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crm .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice__remove {
+  position: absolute;
+  left: 0.15rem;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--crm-muted);
+}
+.crm .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice__remove:hover {
+  color: var(--brand-danger);
+  background: none;
+}
+/* The inline search is a caret parking spot here, not a field anyone types a
+   paragraph into — it yields its width to the summary instead of competing. */
+.crm .select2-container.ez-filter-select .select2-search--inline {
+  display: flex;
+  align-items: center;
+  flex: 0 1 1.5rem;
+  min-width: 0.9rem;
+}
+/* Until something is picked that field IS the control's label: Select2 hangs the
+   placeholder off it, so a 1.5rem basis printed "All s" and left four facets
+   looking like they had lost their names. It only steps aside once there is a
+   summary to step aside for. */
+.crm .select2-container.ez-filter-select .select2-selection--multiple:not([data-facet-summary]) .select2-search--inline {
+  flex: 1 1 auto;
+}
+.crm .select2-container.ez-filter-select .select2-search--inline .select2-search__field {
+  height: 1.4rem !important;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  font-size: 0.82rem;
+  line-height: 1.4rem;
+  resize: none;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.crm .select2-container.ez-filter-select .select2-search--inline .select2-search__field::placeholder {
+  color: var(--crm-muted);
+}
+/* The caret would otherwise blink inside a box still reading "All stages",
+   while every single-value picker beside it keeps its search in the dropdown. */
+.crm .select2-container.ez-filter-select .select2-search__field:placeholder-shown {
+  caret-color: transparent;
+}
+/* Without an arrow the tag box reads as a text field, not something you open. */
+.crm .select2-container.ez-filter-select .select2-selection--multiple::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  margin-left: auto;
+  margin-right: 0.15rem;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--crm-muted);
+}
+/* Engaged state for the multi picker — the single-select rule next door only
+   matches .select2-selection--single. */
+.crm .crm__facet-select--on + .select2-container.ez-filter-select .select2-selection--multiple {
+  border-color: var(--crm-ink);
+  box-shadow: inset 0 0 0 1px var(--crm-ink);
 }
 
 /* ── RESULT BAR / TABLE ───────────────────────────────────────────────────── */
@@ -467,6 +638,9 @@
 }
 .crm__panel-hd {
   display: flex;
+  /* A header carrying a title, a count and two buttons runs past a phone's width,
+     and .crm__panel clips rather than scrolls — the last button was unreachable. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem;
   padding: 0.8rem 1.1rem;
@@ -858,25 +1032,88 @@
 
 /* Everything below the hero — one padded section */
 .crmd__body { padding: 0.325rem; }
+
+/* ── DETAIL HERO — written for the navy band, not for a white card ─────────── */
+/* staff-hero.css paints EVERY class ending in __hero navy and loads after this
+   file, so this hero's surface was never white: the old rules here kept sending
+   console ink (#47566d, #16233a) onto #001f3f, which is how the sub-line, the
+   source chip and the Driver chip all ended up unreadable. Nothing below sets a
+   surface — the band is the shell's job — only the contents of it.
+   Two lines: line one is who this is, line two is the state they are in. */
 .crmd__hero {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.75rem 1.125rem;
   align-items: center;
-  padding: 1.2rem 1.4rem;
-  background: var(--brand-white);
-  border: 1px solid var(--crm-line-2);
-  border-radius: 10px;
-  margin-bottom: 1rem;
+  justify-content: space-between;
 }
-.crmd__hero-info { flex: 1 1 300px; }
-.crmd__hero-name { font-size: 1.25rem; font-weight: 700; margin: 0 0 0.25rem; color: var(--crm-ink); }
-.crmd__hero-sub { font-size: 0.78rem; color: var(--crm-ink-2); display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
-.crmd__hero-badges { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.55rem; }
-.crmd__hero-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.crmd__hero-info { flex: 1 1 320px; min-width: 0; }
+.crmd__hero-id { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.crmd__hero-name { margin: 0; color: var(--brand-white); overflow-wrap: anywhere; }
+/* When the lead has no company and no contact its name IS a phone number, so it
+   is set as one: tabular figures, tracked out, readable back over a call. A
+   company name keeps the page's sans — this variant is applied per record. */
+.crmd__hero-name--num {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+.crmd__hero-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+  margin-top: 0.5rem;
+}
+/* One plate for every fact on the band — 8% white fill, hairline at 22%. Quiet
+   enough that six of them never compete with the name, solid enough to read at
+   0.74rem. Scoped to the hero: these same chips sit on white rows on the list
+   and board pages, where the console ink is correct. */
+.crmd__hero .crm__source,
+.crmd__hero .crm__cat--driver,
+.crmd__hero-plate,
+.crmd__hero-fact {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+  color: var(--brand-white);
+}
+.crmd__hero .crm__source { font-size: 0.72rem; padding: 0.14rem 0.45rem; }
+.crmd__hero .crm__cat--driver { font-size: 0.72rem; padding: 0.14rem 0.45rem; }
+.crmd__hero-plate,
+.crmd__hero-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.74rem;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.crmd__hero-plate { font-weight: 600; }
+/* Facts are context, the stage is the headline — so the facts sit a shade back. */
+.crmd__hero-fact { font-weight: 500; color: rgba(255, 255, 255, 0.88); }
+.crmd__hero-fact i { font-size: 0.72rem; color: rgba(255, 255, 255, 0.5); }
+/* Stage swatches were chosen against white rows; on the band they need lifting
+   or a slate/blue dot disappears into the navy. */
+.crmd__hero-plate:not(.crmd__hero-plate--alert) i { filter: brightness(1.5); }
+.crmd__hero-plate--alert {
+  background: rgba(179, 70, 47, 0.3);
+  border-color: rgba(255, 150, 120, 0.5);
+  color: #ffd9cf;
+}
+.crmd__hero-plate--alert i { color: #ff9c7d; }
+.crmd__hero-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+
 .crmd__grid { display: grid; grid-template-columns: 1fr 380px; gap: 1rem; align-items: start; }
 @media (max-width: 991px) { .crmd__grid { grid-template-columns: 1fr; } }
-.crmd__left, .crmd__right { display: flex; flex-direction: column; gap: 1rem; }
+/* Grid and flex children default to min-width:auto, so one unbreakable string in
+   the chat used to widen the whole left column past the viewport — and because an
+   ancestor clips rather than scrolls, the far edge of every panel was unreachable
+   on a phone. Both columns are allowed to shrink instead. */
+.crmd__grid > *,
+.crmd__split > * { min-width: 0; }
+.crmd__left, .crmd__right { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
 /* Source + Contact share one row inside the left column — same top edge, half each */
 .crmd__split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
 @media (max-width: 1199px) { .crmd__split { grid-template-columns: 1fr; } }
@@ -945,7 +1182,8 @@
 .crmd__stage-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; }
 .crmd__stage-opt {
   padding: 0.45rem 0.5rem;
-  font-size: 0.74rem;
+  /* Console floor: these twelve are the most-clicked controls on the page. */
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--crm-ink-2);
   background: var(--brand-white);

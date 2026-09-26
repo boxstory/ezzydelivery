@@ -10,6 +10,8 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
        'refunded' is staff-only (business/views.py STAFF_ONLY_RETURN_STATUSES) because it asserts
        EzzyDelivery paid money back out; before this page existed nobody could set it at all.
        The default filter hides closed/refunded/rejected — the page is a work queue, not an archive.
+       A claim with no order is a standalone one, raised here by staff for goods a client's own
+       courier delivered: it carries its own collection address and is collected the same way.
        "COD owed" is the money view: a refund promised to a customer that nobody has paid yet.
 {% endcomment %}
 
@@ -17,7 +19,7 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
 
 {% block extra_css %}
 {% comment %}crm.css carries the shared staff filter bar (crm__facets / crm__facet-select).{% endcomment %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260922a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260923c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -47,6 +49,11 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
           </div>
         </div>
         <nav class="wfhero__actions">
+          {% comment %}Goods we never carried have no order to raise a claim from,
+          so this is the only way one gets opened.{% endcomment %}
+          <a href="{% url 'workforce:returns_request_create' %}" class="wfhero__ghost">
+            <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>New return &mdash; not delivered by us
+          </a>
           <a href="?status=cod_owed" class="wfhero__ghost{% if cod_owed_count %} wfhero__ghost--alert{% endif %}">
             QAR {{ cod_owed_total }} unrefunded &#9656;
           </a>
@@ -116,6 +123,7 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
               <th scope="col">Refund owed</th>
               <th scope="col">Parcel</th>
               <th scope="col">Raised</th>
+              <th scope="col">Collection</th>
               <th scope="col">Status</th>
             </tr>
           </thead>
@@ -127,7 +135,15 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
                 {% if r.order %}
                 <a href="{% url 'workforce:order_detail' r.order.id %}">{{ r.order.order_number }}</a>
                 <div class="text-muted small">{{ r.order.customer_name }}</div>
-                {% else %}—{% endif %}
+                {% else %}
+                {% comment %}A standalone claim — we never carried these goods, so
+                the client's own reference is all there is to name them by.{% endcomment %}
+                <span class="badge bg-secondary">Not delivered by us</span>
+                {% if r.external_reference %}
+                <div class="text-muted small">ref {{ r.external_reference }}</div>
+                {% endif %}
+                <div class="text-muted small">{{ r.customer_name }}</div>
+                {% endif %}
               </td>
               <td>{{ r.business.business_name|default:"—" }}</td>
               <td>
@@ -140,7 +156,11 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
                 {% for ri in r.return_items.all %}
                 <span class="badge bg-secondary">{{ ri.order_item.display_name|truncatechars:22 }} &times;{{ ri.quantity_returned }}</span>
                 {% empty %}
+                {% if r.order %}
                 <span class="text-muted">whole order</span>
+                {% else %}
+                <span class="text-muted">{{ r.package_description|default:"unspecified goods" }}{% if r.package_qty %} &times;{{ r.package_qty }}{% endif %}</span>
+                {% endif %}
                 {% endfor %}
               </td>
               <td>
@@ -169,6 +189,23 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
                 <div class="text-muted small">by {{ r.reviewed_by.get_full_name|default:r.reviewed_by.username }}</div>
                 {% endif %}
               </td>
+              <td class="rtn__collect" data-return-id="{{ r.id }}">
+                {% if r.pickup_order %}
+                <a href="{% url 'workforce:order_detail' r.pickup_order.id %}">{{ r.pickup_order.order_number }}</a>
+                <div class="text-muted small">{{ r.pickup_order.get_order_status_display }}</div>
+                {% elif r.can_schedule_pickup %}
+                <button type="button" class="btn btn-sm btn-outline-primary rtn__schedule-btn"
+                        data-id="{{ r.id }}" data-return="{{ r.return_number }}"
+                        data-customer="{{ r.claim_customer_name|default:'' }}"
+                        data-charge="{{ r.default_pickup_charge }}"
+                        data-dropoff="{{ r.claim_pickup_location.pickup_location_title|default:'' }}"
+                        data-overlap="{{ r.collect_overlap }}">
+                  <i class="fa-solid fa-truck-arrow-right me-1" aria-hidden="true"></i>Schedule pickup
+                </button>
+                {% else %}
+                <span class="text-muted small" title="{{ r.schedule_pickup_reason }}">—</span>
+                {% endif %}
+              </td>
               <td>
                 <select class="form-select form-select-sm rtn__status-select" data-no-select2
                         data-id="{{ r.id }}" aria-label="Status for {{ r.return_number }}">
@@ -180,11 +217,11 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
             </tr>
             {% empty %}
             <tr>
-              <td colspan="9">
+              <td colspan="10">
                 <div class="empty-state">
                   <i class="fa-solid fa-file-circle-check empty-state__icon" aria-hidden="true"></i>
                   <p class="empty-state__title">No return requests here</p>
-                  <p class="empty-state__text">Returns are raised by a seller, by a driver marking a partial delivery, or when a task closes as Returned to Shipper.</p>
+                  <p class="empty-state__text">Returns are raised by a seller, by a driver marking a partial delivery, or when a task closes as Returned to Shipper. For goods we never delivered, <a href="{% url 'workforce:returns_request_create' %}">raise one here</a>.</p>
                 </div>
               </td>
             </tr>
@@ -195,6 +232,39 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
     </div>
 
     {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params="status="|add:status_filter|add:"&business="|add:business_filter|add:"&days="|add:days_filter|add:"&search="|add:search pagination_id="return_requests" %}
+  </div>
+</div>
+<div class="modal fade" id="workforce_returns_modal_schedule" tabindex="-1" aria-hidden="true"
+     aria-labelledby="workforce_returns_modal_schedule_title">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="workforce_returns_modal_schedule_title">Schedule a collection</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3" id="workforce_returns_txt_schedule_summary"></p>
+        {% comment %}A collect-back replacement takes the same parcel. Warned, not
+        blocked — ops decides which trip keeps it.{% endcomment %}
+        <div class="alert alert-warning py-2" id="workforce_returns_txt_schedule_overlap" hidden></div>
+        <div class="mb-3">
+          <label class="form-label" for="workforce_returns_input_charge">Charge the seller (QAR)</label>
+          <input type="number" step="0.01" min="0" class="form-control" id="workforce_returns_input_charge">
+          <div class="form-text">Defaults to what they paid for the outbound trip. The driver is paid a normal delivery fee either way.</div>
+        </div>
+        <div class="mb-1">
+          <label class="form-label" for="workforce_returns_input_notes">Note (optional)</label>
+          <textarea class="form-control" rows="2" id="workforce_returns_input_notes"
+                    placeholder="Anything the driver or the next desk should know"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="workforce_returns_btn_schedule_confirm">
+          Raise collection order
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock content %}
@@ -243,6 +313,67 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
 
     // Remember the starting value so a refused change can be put back.
     table.querySelectorAll('.rtn__status-select').forEach(s => { s.dataset.previous = s.value; });
+
+    // --- Schedule a collection -------------------------------------------
+    // The seller raised the claim; this is where staff decide a driver goes out.
+    // The order it raises runs backwards — collect at the customer, drop at the
+    // seller — and lands in the driver pool immediately.
+    const modalEl = document.getElementById('workforce_returns_modal_schedule');
+    const summary = document.getElementById('workforce_returns_txt_schedule_summary');
+    const chargeInput = document.getElementById('workforce_returns_input_charge');
+    const notesInput = document.getElementById('workforce_returns_input_notes');
+    const confirmBtn = document.getElementById('workforce_returns_btn_schedule_confirm');
+    const overlapBox = document.getElementById('workforce_returns_txt_schedule_overlap');
+    if (!modalEl || !confirmBtn) return;
+    const modal = new bootstrap.Modal(modalEl);
+    let pending = null;
+
+    table.addEventListener('click', function (e) {
+        const btn = e.target.closest('.rtn__schedule-btn');
+        if (!btn) return;
+        pending = btn;
+        summary.textContent = 'Collect ' + btn.dataset.return + ' from ' +
+            (btn.dataset.customer || 'the customer') + ' and deliver it to ' +
+            (btn.dataset.dropoff || 'the seller') + '.';
+        chargeInput.value = btn.dataset.charge || '0';
+        notesInput.value = '';
+        const overlap = btn.dataset.overlap || '';
+        overlapBox.textContent = overlap
+            ? 'Already collecting these goods: ' + overlap +
+              '. Scheduling this sends a second driver.'
+            : '';
+        overlapBox.hidden = !overlap;
+        modal.show();
+    });
+
+    confirmBtn.addEventListener('click', function () {
+        if (!pending) return;
+        const id = pending.dataset.id;
+        confirmBtn.disabled = true;
+        fetch('/workforce/returns/requests/' + id + '/schedule-pickup/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify({ charge: chargeInput.value, notes: notesInput.value })
+        })
+        .then(r => r.json())
+        .then(data => {
+            confirmBtn.disabled = false;
+            if (!data.success) { alert(data.error || 'Could not raise the collection'); return; }
+            modal.hide();
+            const cell = table.querySelector('.rtn__collect[data-return-id="' + id + '"]');
+            if (cell) {
+                cell.innerHTML = '';
+                const link = document.createElement('a');
+                link.href = data.order_url;
+                link.textContent = data.order_number;
+                cell.appendChild(link);
+            }
+            const sel = table.querySelector('.rtn__status-select[data-id="' + id + '"]');
+            if (sel) { sel.value = data.status; sel.dataset.previous = data.status; }
+            pending = null;
+        })
+        .catch(() => { confirmBtn.disabled = false; alert('Network error'); });
+    });
 })();
 </script>
 {% endblock extra_js %}

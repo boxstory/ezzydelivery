@@ -266,18 +266,34 @@
           $el.on('change', syncSummary);
         }
 
-        // A multi-select on a bar with no Apply button cannot submit per pick:
-        // the page would reload after the first driver and throw the rest of
-        // the selection away. `data-submit-on-close` waits for the dropdown to
-        // be dismissed and submits once, and only if the pick actually moved.
-        if (el.multiple && $el.is('[data-submit-on-close]')) {
+        // A multi-select on a bar with no Apply button cannot fire per pick: the
+        // page would reload after the first driver and throw the rest of the
+        // selection away. Both opt-ins below wait for the dropdown to be
+        // dismissed and act once, and only if the pick actually moved.
+        var onPickSettled = function (run) {
           var openedWith = null;
           var picked = function () { return ($el.val() || []).join(','); };
           $el.on('select2:open', function () { openedWith = picked(); });
           $el.on('select2:close', function () {
             var before = openedWith;
             openedWith = null;
-            if (before !== null && picked() !== before && el.form) el.form.submit();
+            if (before !== null && picked() !== before) run();
+          });
+        };
+
+        // A plain GET form bar: submit the form.
+        if (el.multiple && $el.is('[data-submit-on-close]')) {
+          onPickSettled(function () { if (el.form) el.form.submit(); });
+          return;
+        }
+
+        // An htmx bar (hx-trigger="change" on the select) has the same problem
+        // with a sharper edge: a request per tick swaps the whole bar away
+        // mid-pick, taking the open dropdown with it. One native change once
+        // the list is dismissed is what that trigger is waiting for.
+        if (el.multiple && $el.is('[data-change-on-close]')) {
+          onPickSettled(function () {
+            el.dispatchEvent(new Event('change', { bubbles: true }));
           });
           return;
         }
@@ -301,8 +317,21 @@
       enhanceFilterSelects(document);
     });
     // HTMX swaps replace whole filter bars, which drops the Select2 instance.
-    document.body.addEventListener('htmx:afterSwap', function (evt) {
-      enhanceFilterSelects(evt.detail.target);
+    // Two details here, both learned the hard way on the CRM leads bar:
+    //
+    // afterSettle, not afterSwap. htmx settles `class` and `style` on swapped-in
+    // elements that carry an id — it holds the old values through the swap and
+    // writes the server's back a tick later. Enhancing at afterSwap therefore
+    // worked and was then undone: Select2's own `select2-hidden-accessible` was
+    // wiped off the <select> by the settle, leaving the raw control visible NEXT
+    // TO its Select2 box — every facet drawn twice.
+    //
+    // document, not evt.detail.target. These bars swap with hx-swap="outerHTML"
+    // on #main-content, so the target is the element that was REPLACED — detached,
+    // with the new filter bar nowhere inside it. Re-scanning the page is cheap:
+    // already-enhanced selects hit the guard above.
+    document.body.addEventListener('htmx:afterSettle', function () {
+      enhanceFilterSelects(document);
     });
     // Several driver pickers are built after page load — a modal injected via
     // innerHTML, or a list fetched over AJAX once the dialog opens. Enhancing

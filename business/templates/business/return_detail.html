@@ -7,7 +7,7 @@
 <div class="flex-fill biz-dash__page" id="business_return_detail_container">
 
   <!-- Page Header -->
-  {% with ret_title="RET-"|add:ret.return_number ret_sub="Order #"|add:ret.order.order_number %}
+  {% with ret_title="RET-"|add:ret.return_number ret_sub=ret.reference_label %}
   {% bconheader eyebrow="Returns" live=ret.get_status_display icon="fa-solid fa-rotate-left" title=ret_title subtitle=ret_sub %}
     <span class="badge brt__badge--{{ ret.status }} fs-6">{{ ret.get_status_display }}</span>
     <a href="{% url 'business:returns_list' %}" class="bcon__btn bcon__btn--ghost">
@@ -25,11 +25,28 @@
       <div class="bcon__panel mb-3">
         <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-box"></i> Order Information</h5></div>
         <div class="bcon__panel-body">
+          {% comment %}claim_* reads the order where there is one and the claim's own
+          snapshot where there is not — a return raised for goods our drivers never
+          carried keeps its collection address on itself.{% endcomment %}
           <div class="row g-3">
-            <div class="col-6"><p class="bcon__plate-label mb-1">Order Number</p><a href="{% url 'orders:order_details' ret.order_id %}" class="bcon__num text-decoration-none">#{{ ret.order.order_number }}</a></div>
-            <div class="col-6"><p class="bcon__plate-label mb-1">Customer</p><div class="fw-semibold">{{ ret.order.customer_name|default:"-" }}</div></div>
-            <div class="col-6"><p class="bcon__plate-label mb-1">Phone</p><div class="bcon__num">{{ ret.order.customer_phone|default:"-" }}</div></div>
-            <div class="col-6"><p class="bcon__plate-label mb-1">COD Amount</p><div class="bcon__amount">{% if ret.order.cod_amount %}{{ ret.order.cod_amount }} <small>QAR</small>{% else %}-{% endif %}</div></div>
+            <div class="col-6">
+              <p class="bcon__plate-label mb-1">{% if ret.order_id %}Order Number{% else %}Your Reference{% endif %}</p>
+              {% if ret.order_id %}
+              <a href="{% url 'orders:order_details' ret.order_id %}" class="bcon__num text-decoration-none">#{{ ret.order.order_number }}</a>
+              {% else %}
+              <div class="bcon__num">{{ ret.external_reference|default:"-" }}</div>
+              {% endif %}
+            </div>
+            <div class="col-6"><p class="bcon__plate-label mb-1">Customer</p><div class="fw-semibold">{{ ret.claim_customer_name|default:"-" }}</div></div>
+            <div class="col-6"><p class="bcon__plate-label mb-1">Phone</p><div class="bcon__num">{{ ret.claim_customer_phone|default:"-" }}</div></div>
+            <div class="col-6">
+              <p class="bcon__plate-label mb-1">{% if ret.order_id %}COD Amount{% else %}Collecting{% endif %}</p>
+              {% if ret.order_id %}
+              <div class="bcon__amount">{% if ret.order.cod_amount %}{{ ret.order.cod_amount }} <small>QAR</small>{% else %}-{% endif %}</div>
+              {% else %}
+              <div class="fw-semibold">{{ ret.package_description|default:"-" }}{% if ret.package_qty %} &times;{{ ret.package_qty }}{% endif %}</div>
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>
@@ -73,6 +90,31 @@
           <div class="col-6 text-end">
             {% if ret.cod_reversal_processed %}<span class="bcon__badge bcon__badge--success"><i class="fas fa-check"></i> Processed</span>
             {% else %}<span class="bcon__badge bcon__badge--warning"><i class="fas fa-clock"></i> Pending</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Collection -->
+      {% comment %}The collection is a real order of its own, raised by EzzyDelivery
+      staff. The seller sees it and can follow it, but does not raise it.{% endcomment %}
+      {% if ret.pickup_order %}
+      <div class="bcon__panel mb-3">
+        <div class="bcon__panel-head"><h5 class="bcon__panel-title"><i class="fa-solid fa-truck-arrow-right"></i> Collection</h5></div>
+        <div class="bcon__panel-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <p class="bcon__plate-label mb-1">Pickup Order</p>
+              <a href="{% url 'orders:order_details' ret.pickup_order_id %}" class="bcon__num text-decoration-none">#{{ ret.pickup_order.order_number }}</a>
+            </div>
+            <div class="col-6">
+              <p class="bcon__plate-label mb-1">Status</p>
+              <div class="fw-semibold">{{ ret.pickup_order.get_order_status_display }}</div>
+            </div>
+            <div class="col-12">
+              <p class="bcon__plate-label mb-1">Route</p>
+              <div>{{ ret.claim_customer_name|default:"The customer" }} &rarr; {{ ret.pickup_order.pickup_location.pickup_location_title|default:"your address" }}</div>
+            </div>
           </div>
         </div>
       </div>

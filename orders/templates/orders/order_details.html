@@ -385,9 +385,15 @@
         </a>
         {% endif %}
         {% if order.order_status == 'delivered' or order.order_status == 'fulfilled' %}
+        {% if open_return %}
+        <a class="bcon__btn bcon__btn--secondary" href="{% url 'business:return_detail' open_return.id %}" id="order_details_btn_return">
+          <i class="fa-solid fa-rotate-left"></i> View Return RET-{{ open_return.return_number }}
+        </a>
+        {% else %}
         <a class="bcon__btn bcon__btn--secondary" href="{% url 'business:return_create' order.id %}" id="order_details_btn_return">
           <i class="fa-solid fa-rotate-left"></i> Request Return
         </a>
+        {% endif %}
         {% endif %}
         {% if can_request_replacement %}
         <button type="button" class="bcon__btn bcon__btn--secondary"
@@ -402,8 +408,22 @@
       {% endbconheader %}
       {% endwith %}
 
-      {% if order.replaces or order.replacements.exists %}
+      {% if order.replaces or order.replacements.exists or order_returns %}
       <div class="odt__replnote" role="note">
+        {% for ret in order_returns %}
+        <div class="odt__replnote-line">
+          <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+          <span>Return
+            <a href="{% url 'business:return_detail' ret.id %}">RET-{{ ret.return_number }}</a>
+            — {{ ret.get_status_display }}
+            {% if ret.pickup_order %}
+            · collection
+            <a href="{% url 'orders:order_details' ret.pickup_order_id %}">{{ ret.pickup_order.order_number }}</a>
+            ({{ ret.pickup_order.get_order_status_display }})
+            {% endif %}
+          </span>
+        </div>
+        {% endfor %}
         {% if order.replaces %}
         <div class="odt__replnote-line">
           <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
@@ -910,7 +930,23 @@
           <label class="form-check-label" for="order_details_input_replacement_collect_back">
             The driver should bring the original items back
           </label>
+          <div class="form-text">
+            A separate collection is raised once the replacement is delivered, so the
+            original items are picked up on their own trip.
+          </div>
         </div>
+
+        {% comment %}A return collection and a collect-back replacement are the same
+        physical job. Neither is wrong, but running both sends two drivers for one
+        parcel — so say so and let the seller decide.{% endcomment %}
+        {% if collection_jobs %}
+        <div class="alert alert-warning py-2 mb-3" role="alert">
+          <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>
+          A driver is already coming for these goods —
+          {% for job in collection_jobs %}{{ job.label }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+          Ticking the box above sends a second one.
+        </div>
+        {% endif %}
 
         <div class="mb-1">
           <label class="form-label odt__repl-label" for="order_details_input_replacement_notes">

@@ -114,6 +114,7 @@
                 </div>
             </li>
 
+            {% if driver_dashboard_access %}
             <li class="fleet-list-item" onclick="window.location.href='{% url 'fleet:driver_performance' %}'">
                 <div class="fleet-list-item__icon fleet-stat__icon--success">
                     <i class="fa-solid fa-chart-line"></i>
@@ -126,11 +127,40 @@
                     <i class="fa-solid fa-chevron-right fleet-list-item__chevron"></i>
                 </div>
             </li>
+            {% endif %}
 
         </ul>
     </div>
 </div>
 
+{% comment %}
+Every destination in this card sits behind driver_dashboard_required, so a driver
+ops have not cleared to work would only tap into a refusal. Shown as a whole or
+not at all — see fleet/access.py.
+{% endcomment %}
+{% if not driver_dashboard_access %}
+<!-- Opportunities — the one work surface open before ops grant access -->
+<div class="fleet-card fleet-slide-up" style="animation-delay: 0.3s;">
+    <div class="fleet-card__body fleet-card__body--flush">
+        <ul class="fleet-list fleet-list--menu">
+            <li class="fleet-list-item" onclick="window.location.href='{% url 'fleet:opportunities' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--warning">
+                    <i class="fa-solid fa-calendar-day"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Opportunities</div>
+                    <div class="fleet-list-item__subtitle">Shifts you can put your hand up for</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right fleet-list-item__chevron"></i>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% if driver_dashboard_access %}
 <!-- Earnings & Finance -->
 <div class="fleet-card fleet-slide-up" style="animation-delay: 0.3s;">
     <div class="fleet-card__header">
@@ -210,6 +240,7 @@
         </ul>
     </div>
 </div>
+{% endif %}
 
 <!-- Account Information -->
 <div class="fleet-card fleet-slide-up" style="animation-delay: 0.5s;">

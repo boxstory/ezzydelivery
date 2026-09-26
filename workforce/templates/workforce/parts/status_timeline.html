@@ -9,6 +9,8 @@ Required context variables (passed directly, NOT via timeline_items):
   - delivery_task: DeliveryTask or None
   - timeline_count: int (event count)
   - status_point_map: dict mapping "old__new" to TaskStatusPoint (optional)
+    Each point may carry .trail — the driver's position before / at / after
+    that change, which the map draws instead of the driver-vs-drop pair.
 
 Optional merged-stream mode (delivery_task_detail only):
   - timeline_events: pre-merged chronological event dicts from _build_task_timeline
@@ -81,7 +83,7 @@ Usage:
                         <div class="odp__tl-gps">
                             <span class="odp__tl-gps__pin" title="{{ ev.map.label }}">
                                 <i class="fa-solid fa-location-dot"></i> {{ ev.map.label }}
-                                {% include "includes/components/_map_point.html" with uid=ev.ts|date:"U"|add:"-org" lat=ev.map.lat lon=ev.map.lng lat2=ev.map.ref_lat lon2=ev.map.ref_lng label=ev.map.label label2=ev.map.ref_label colour=ev.map.colour|default:"#8a6d00" colour2="#b4532a" size="sm" %}
+                                {% include "includes/components/_map_point.html" with uid=ev.ts|date:"U"|add:"-org" lat=ev.map.lat lon=ev.map.lng lat2=ev.map.ref_lat lon2=ev.map.ref_lng label=ev.map.label label2=ev.map.ref_label time=ev.map.time time2=ev.map.ref_time colour=ev.map.colour|default:"#8a6d00" colour2="#b4532a" size="sm" %}
                             </span>
                         </div>
                         {% endif %}
@@ -96,7 +98,11 @@ Usage:
                                 {% comment %} Driver's stamped position against the customer pin — the pair
                                    is the evidence, so both go on one map. {% endcomment %}
                                 Driver here
+                                {% if ev.gps.trail %}
+                                {% include "includes/components/_map_point.html" with uid=ev.gps.lat|stringformat:"s"|add:"-tl" lat=ev.gps.lat lon=ev.gps.lng points=ev.gps.trail label="Driver movement around this change" colour="#2f6f4f" size="sm" %}
+                                {% else %}
                                 {% include "includes/components/_map_point.html" with uid=ev.gps.lat|stringformat:"s"|add:"-tl" lat=ev.gps.lat lon=ev.gps.lng lat2=ev.gps.ref_lat|default:order.latitude lon2=ev.gps.ref_lng|default:order.longitude label="Driver at this status change" label2=ev.gps.ref_label|default:"Customer's saved location" colour="#2f6f4f" colour2="#b4532a" size="sm" %}
+                                {% endif %}
                             </span>
                             {% if ev.gps.accuracy %}
                             <span class="odp__tl-gps__acc" title="GPS accuracy"><i class="fa-solid fa-crosshairs"></i> &plusmn;{{ ev.gps.accuracy|floatformat:0 }}m</span>
@@ -228,12 +234,16 @@ Usage:
                         </div>
                         {% with newpin=entry.new_display|coords_of oldpin=entry.old_display|coords_of %}
                         {% if newpin %}
+                        {% comment %} Both pins are dated off the one moment the move happened:
+                           the old one held until then, the new one from then on. {% endcomment %}
+                        {% with moved_at=entry.created_at|date:"d M Y, H:i" %}
                         <div class="odp__tl-gps">
                             <span class="odp__tl-gps__pin" title="Pin after this change">
                                 <i class="fa-solid fa-location-dot"></i> Pin after this change
-                                {% include "includes/components/_map_point.html" with uid=entry.id|stringformat:"s"|add:"-pin" lat=newpin.lat lon=newpin.lng lat2=oldpin.lat lon2=oldpin.lng label="Pin after this change" label2="Pin before this change" colour="#2f6f4f" colour2="#b4532a" size="sm" %}
+                                {% include "includes/components/_map_point.html" with uid=entry.id|stringformat:"s"|add:"-pin" lat=newpin.lat lon=newpin.lng lat2=oldpin.lat lon2=oldpin.lng label="Pin after this change" label2="Pin before this change" time="from "|add:moved_at time2="until "|add:moved_at colour="#2f6f4f" colour2="#b4532a" size="sm" %}
                             </span>
                         </div>
+                        {% endwith %}
                         {% endif %}
                         {% endwith %}
                         {% if entry.notes %}
@@ -249,7 +259,11 @@ Usage:
                             {% if sp.latitude and sp.longitude %}
                             <span class="odp__tl-gps__pin" title="Driver GPS at status change">
                                 <i class="fa-solid fa-location-dot"></i> Driver here
+                                {% if sp.trail %}
+                                {% include "includes/components/_map_point.html" with uid=sp.id|stringformat:"s"|add:"-sp" lat=sp.latitude lon=sp.longitude points=sp.trail label="Driver movement around this change" colour="#2f6f4f" size="sm" %}
+                                {% else %}
                                 {% include "includes/components/_map_point.html" with uid=sp.id|stringformat:"s"|add:"-sp" lat=sp.latitude lon=sp.longitude lat2=sp.delivery_latitude lon2=sp.delivery_longitude label="Driver at this status change" label2="Delivery location" colour="#2f6f4f" colour2="#b4532a" size="sm" %}
+                                {% endif %}
                             </span>
                             {% if sp.accuracy %}
                             <span class="odp__tl-gps__acc" title="GPS accuracy">

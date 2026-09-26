@@ -76,6 +76,8 @@ Notes: Per-row save (a bulk submit would clear every unticked box on the page). 
               <th class="text-center">Proof on failed</th>
               <th>Counts as proof</th>
               <th class="text-center">Live tracking</th>
+              <th class="text-center">Customer pays delivery</th>
+              <th>Collected goods go to</th>
               <th>Driver sees</th>
             </tr>
           </thead>
@@ -109,6 +111,25 @@ Notes: Per-row save (a bulk submit would clear every unticked box on the page). 
                 <input type="checkbox" role="switch" class="dac__switch dac-tracking"
                        aria-label="Show this client the Live Tracking map"
                        {% if biz.live_tracking_enabled %}checked{% endif %}>
+              </td>
+              <td class="text-center">
+                {% comment %}ON = the driver asks the customer for the delivery charge on top
+                of the COD, as one figure, and this client is NOT invoiced for it. OFF (the
+                default) = we bill the client and the driver collects COD only.{% endcomment %}
+                <input type="checkbox" role="switch" class="dac__switch dac-pays-delivery"
+                       aria-label="Customer pays the delivery charge at the door"
+                       {% if biz.customer_pays_delivery %}checked{% endif %}>
+              </td>
+              <td>
+                {% comment %}Where goods COLLECTED BACK from a customer are taken. Not the
+                same question as where an undelivered parcel goes — that one is
+                return_destination and defaults to the hub.{% endcomment %}
+                <select class="form-select form-select-sm dac__select dac-collect-dest"
+                        aria-label="Where goods collected back from a customer are taken">
+                  {% for value, label in collect_dest_choices %}
+                    <option value="{{ value }}" {% if biz.return_collection_destination == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
               </td>
               <td class="dac__meta dac-summary"></td>
             </tr>
@@ -152,6 +173,8 @@ Notes: Per-row save (a bulk submit would clear every unticked box on the page). 
         failed: row.querySelector('.dac-failed').checked,
         tracking: row.querySelector('.dac-tracking').checked,
         kind: row.querySelector('.dac-kind').value,
+        collect_dest: row.querySelector('.dac-collect-dest').value,
+        pays_delivery: row.querySelector('.dac-pays-delivery').checked,
     });
 
     // What the server currently holds for each row. Everything else is compared
@@ -161,7 +184,8 @@ Notes: Per-row save (a bulk submit would clear every unticked box on the page). 
     const isDirty = row => {
         const was = saved.get(row), now = state(row);
         return was.delivered !== now.delivered || was.failed !== now.failed
-            || was.tracking !== now.tracking || was.kind !== now.kind;
+            || was.tracking !== now.tracking || was.kind !== now.kind
+            || was.collect_dest !== now.collect_dest;
     };
 
     // Spell out what the rule actually does to the driver's screen, so nobody has to
@@ -173,7 +197,13 @@ Notes: Per-row save (a bulk submit would clear every unticked box on the page). 
         if (now.delivered) parts.push('Delivered: ' + words[now.kind]);
         if (now.failed) parts.push('Failed: photo');
         if (now.tracking) parts.push('Client can watch the driver');
-        return parts.length ? parts.join(' \u00b7 ') : 'Nothing required \u2014 proof stays optional';
+        // Worth spelling out: this is the one rule here that moves money.
+        parts.push(now.pays_delivery
+            ? 'Customer pays delivery at the door (client not invoiced)'
+            : 'Delivery charge billed to the client');
+        parts.push('Collected goods: ' +
+            (now.collect_dest === 'hub' ? 'to an Ezzy hub' : 'straight to the client'));
+        return parts.join(' \u00b7 ');
     }
 
     function refreshRow(row) {
@@ -196,7 +226,7 @@ Notes: Per-row save (a bulk submit would clear every unticked box on the page). 
 
     rows.forEach(row => {
         refreshRow(row);
-        row.querySelectorAll('.dac-delivered, .dac-failed, .dac-kind, .dac-tracking').forEach(el =>
+        row.querySelectorAll('.dac-delivered, .dac-failed, .dac-kind, .dac-tracking, .dac-collect-dest, .dac-pays-delivery').forEach(el =>
             el.addEventListener('change', () => { refreshRow(row); refreshBar(); }));
     });
     refreshBar();
@@ -214,6 +244,8 @@ Notes: Per-row save (a bulk submit would clear every unticked box on the page). 
             row.querySelector('.dac-failed').checked = was.failed;
             row.querySelector('.dac-tracking').checked = was.tracking;
             row.querySelector('.dac-kind').value = was.kind;
+            row.querySelector('.dac-collect-dest').value = was.collect_dest;
+            row.querySelector('.dac-pays-delivery').checked = was.pays_delivery;
             refreshRow(row);
         });
         refreshBar();

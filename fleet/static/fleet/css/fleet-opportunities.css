@@ -1,0 +1,348 @@
+/* Purpose: Driver opportunities board — the shift cards a verified driver browses before ops clear them to work.
+   Used by: fleet/templates/fleet/opportunities_pwa.html
+   Notes: The PWA shell loads no Bootstrap, so layout is declared here. Builds on .fleet-card / .fleet-btn /
+          .fleet-badge from fleet-pwa-modern.css — fopp__ only adds what those do not already provide. */
+
+/* ---------------------------------------------------------------------------
+   Pending-access notice. Warning tint, not danger: nothing is wrong with this
+   driver's account, they are simply waiting on ops.
+   --------------------------------------------------------------------------- */
+.fopp__notice {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  background: var(--fleet-warning-light);
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-md);
+}
+
+.fopp__notice-icon {
+  flex: 0 0 auto;
+  font-size: 1.125rem;
+  color: #b45309;
+  line-height: 1.4;
+}
+
+.fopp__notice-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--fleet-grey-800);
+  margin-bottom: 0.125rem;
+}
+
+.fopp__notice-text {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--fleet-grey-700);
+}
+
+/* ---------------------------------------------------------------------------
+   Section headings
+   --------------------------------------------------------------------------- */
+.fopp__section-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fleet-grey-500);
+  margin: var(--spacing-lg) 0 var(--spacing-sm);
+}
+
+.fopp__section-title:first-child {
+  margin-top: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Slot card
+   --------------------------------------------------------------------------- */
+.fopp__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fopp__card {
+  background: var(--fleet-white);
+  border: 1px solid var(--fleet-grey-200);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+}
+
+/* The one accent on this page: a slot that matches the hours the driver already
+   told us they work. Everything else stays monochrome so this reads at a glance. */
+.fopp__card--match {
+  border-left: 3px solid #f7c000;
+}
+
+.fopp__card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.fopp__title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--fleet-grey-900);
+  line-height: 1.3;
+}
+
+.fopp__match-flag {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8f6b00;
+  white-space: nowrap;
+}
+
+.fopp__when {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fleet-grey-800);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--spacing-xs);
+}
+
+.fopp__desc {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--fleet-grey-600);
+  margin-bottom: var(--spacing-sm);
+}
+
+/* Meta chips: vehicle, zone, pay, places left */
+.fopp__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.fopp__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--fleet-grey-600);
+}
+
+.fopp__meta-item i {
+  font-size: 0.72rem;
+  color: var(--fleet-grey-400);
+}
+
+.fopp__places {
+  font-weight: 600;
+  color: var(--fleet-grey-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.fopp__places--last {
+  color: #b45309;
+}
+
+/* ---------------------------------------------------------------------------
+   Actions. Touch targets stay at the 44px PWA floor.
+   --------------------------------------------------------------------------- */
+.fopp__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.fopp__btn {
+  min-height: 44px;
+  flex: 1 1 auto;
+}
+
+.fopp__btn--withdraw {
+  flex: 0 0 auto;
+  min-width: 44px;
+}
+
+/* ---------------------------------------------------------------------------
+   Standing-interest state. Swatch + text, not a loud pill.
+   --------------------------------------------------------------------------- */
+.fopp__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.fopp__state::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.fopp__state--interested { color: var(--fleet-grey-600); }
+.fopp__state--interested::before { background: var(--fleet-grey-400); }
+
+.fopp__state--shortlisted { color: #1e40af; }
+.fopp__state--shortlisted::before { background: var(--fleet-info); }
+
+.fopp__state--confirmed { color: #065f46; }
+.fopp__state--confirmed::before { background: var(--fleet-success); }
+
+.fopp__state--declined { color: var(--fleet-grey-500); }
+.fopp__state--declined::before { background: var(--fleet-grey-300); }
+
+/* ---------------------------------------------------------------------------
+   "Your shifts" rows — a compact ledger of what the driver already asked for.
+   --------------------------------------------------------------------------- */
+.fopp__mine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--fleet-grey-100);
+}
+
+.fopp__mine:last-child {
+  border-bottom: none;
+}
+
+.fopp__mine-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fleet-grey-800);
+}
+
+.fopp__mine-when {
+  font-size: 0.75rem;
+  color: var(--fleet-grey-500);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Empty state
+   --------------------------------------------------------------------------- */
+.fopp__empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--fleet-grey-500);
+}
+
+.fopp__empty i {
+  font-size: 2rem;
+  color: var(--fleet-grey-300);
+  margin-bottom: var(--spacing-md);
+  display: block;
+}
+
+.fopp__empty-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--fleet-grey-700);
+  margin-bottom: var(--spacing-xs);
+}
+
+.fopp__empty-text {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------------
+   Driver proposals — the standing offers marketing publishes (fleet.DriverProposal).
+   Read-only cards: no action row, so they must not imitate the shift cards below
+   or a driver will look for an "I'm interested" button that is not there. The
+   left navy rule is what separates an advert from a bookable shift.
+   --------------------------------------------------------------------------- */
+.fopp__proplist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fopp__prop {
+  background: var(--fleet-white);
+  border: 1px solid var(--fleet-grey-200);
+  border-left: 3px solid #001f3f;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+}
+
+.fopp__prop-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin-bottom: 0.25rem;
+}
+
+/* The pay line is the reason a driver reads the card at all, so it is the one
+   figure allowed to sit apart from the body text. */
+.fopp__prop-pay {
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--fleet-grey-800);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.fopp__prop-headline {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fleet-grey-700);
+  line-height: 1.4;
+  margin-bottom: var(--spacing-sm);
+}
+
+.fopp__prop-block {
+  margin-bottom: var(--spacing-sm);
+}
+
+.fopp__prop-block-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fleet-grey-500);
+  margin-bottom: 0.25rem;
+}
+
+.fopp__prop-points {
+  margin: 0;
+  padding-left: 1.125rem;
+}
+
+.fopp__prop-points li {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--fleet-grey-700);
+}
+
+.fopp__prop-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--fleet-grey-200);
+  font-size: 0.75rem;
+  color: var(--fleet-grey-500);
+}
+
+.fopp__prop-closes {
+  font-weight: 600;
+  color: var(--fleet-grey-600);
+  font-variant-numeric: tabular-nums;
+}

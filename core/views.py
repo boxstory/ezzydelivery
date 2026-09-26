@@ -614,6 +614,7 @@ def join_driver(request):
                     or vehicle_selected
                     or bool(typed_doc_nos)
                     or bool((request.POST.get('driver_license_number') or '').strip())
+                    or bool((request.POST.get('driver_sponsor') or '').strip())
                     or request.POST.get('has_driver_license') == 'on'
                     or bool(job_type_val)
                     or bool(request.POST.getlist('work_time_slabs'))
@@ -644,6 +645,11 @@ def join_driver(request):
                     license_no = (request.POST.get('driver_license_number') or '').strip()
                     if license_no:
                         driver.driver_license_number = license_no
+                    # Sponsor is optional, and a partial save must not wipe an
+                    # answer the applicant gave on an earlier pass — so it is only
+                    # written when the field is actually posted.
+                    if 'driver_sponsor' in request.POST:
+                        driver.driver_sponsor = (request.POST.get('driver_sponsor') or '').strip()[:150]
 
                     # Work availability preference (Section 3)
                     if job_type_val in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES):

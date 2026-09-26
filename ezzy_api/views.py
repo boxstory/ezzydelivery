@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 
 from orders import models as orders_models
 from fleet import models as fleet_models
+from fleet.access import api_driver_dashboard_required, has_dashboard_access
 from delivery import models as delivery_models
 from delivery.ordering import TASK_SEQ_DESC, annotate_task_sequence
 from delivery.state_machine import can_transition as task_can_transition
@@ -221,6 +222,7 @@ def driver_profile(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_tasks(request):
     """Get all tasks assigned to the driver"""
     try:
@@ -273,6 +275,7 @@ def driver_tasks(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_task_detail(request, task_id):
     """Get detailed information about a specific task"""
     try:
@@ -306,6 +309,7 @@ def driver_task_detail(request, task_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_accept_task(request, task_id):
     """Driver accepts a task"""
     try:
@@ -380,6 +384,7 @@ def driver_accept_task(request, task_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_reject_task(request, task_id):
     """Driver rejects a task"""
     try:
@@ -449,6 +454,7 @@ def driver_reject_task(request, task_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_update_task_status(request, task_id):
     """Driver updates task status"""
     VALID_DRIVER_STATUSES = [
@@ -661,6 +667,7 @@ def _parse_fix_time(value):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_update_location(request):
     """
     Save GPS ping(s) from the driver PWA.
@@ -761,6 +768,7 @@ def driver_update_location(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_nav_handoff(request):
     """Record a driver leaving for, or returning from, an external nav app.
 
@@ -975,6 +983,7 @@ def driver_latest_location(request, driver_id):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_statistics(request):
     """Get driver statistics (completed tasks, earnings, ratings, etc.)"""
     try:
@@ -1031,6 +1040,7 @@ def driver_statistics(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_hub_batches(request):
     """List active hub pickup batches assigned to the requesting driver."""
     try:
@@ -1072,6 +1082,7 @@ def driver_hub_batches(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_hub_batch_detail(request, batch_id):
     """Get detail for a single hub pickup batch."""
     try:
@@ -1116,6 +1127,7 @@ def driver_hub_batch_detail(request, batch_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_hub_batch_accept(request, batch_id):
     """Driver accepts a hub pickup batch."""
     try:
@@ -1139,6 +1151,7 @@ def driver_hub_batch_accept(request, batch_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_hub_batch_status(request, batch_id):
     """Driver updates hub pickup batch status."""
     DRIVER_ALLOWED_TRANSITIONS = {
@@ -1177,8 +1190,59 @@ def driver_hub_batch_status(request, batch_id):
 
 # ==================== ENHANCED DRIVER APP TASK APIs ====================
 
+def _record_door_fee(task, request, source=''):
+    """Book a delivery fee the driver took in cash at the door, once.
+
+    Idempotent on the task's own field: a retried submit must not book the money
+    twice. Never raises — a bookkeeping failure must not undo the driver's status
+    change, which is the same rule the custody sync follows.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    # DRF hands us .data; a plain Django request only has .POST. Resolved with
+    # getattr so this helper works from either, and from a test request.
+    payload = getattr(request, 'data', None)
+    if payload is None or not hasattr(payload, 'get'):
+        payload = request.POST
+    raw = payload.get('fee_collected')
+    if not raw:
+        return None
+    try:
+        amount = Decimal(str(raw)).quantize(Decimal('0.01'))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    if amount <= 0 or (task.fee_collected_amount or 0) > 0:
+        return None
+
+    try:
+        from fleet.wallet_service import WalletService
+        txn = WalletService.record_transaction(
+            driver=task.driver,
+            transaction_type='fee_collection',
+            amount=amount,
+            description=(
+                f"Delivery fee collected in cash for "
+                f"{task.order.order_number if task.order else task.dl_task_number}"
+                + (f" ({source})" if source else "")),
+            delivery_task=task,
+            created_by=request.user,
+            payment_method='cash',
+            business=task.order.business if task.order else None,
+        )
+        task.fee_collected_amount = amount
+        task.fee_collected_at = timezone.now()
+        task.save(update_fields=['fee_collected_amount', 'fee_collected_at'])
+        if task.driver:
+            WalletService.sync_cod_in_hand(task.driver)
+        return txn
+    except Exception as e:
+        logger.exception("Door fee booking failed for task %s: %s", task.pk, e)
+        return None
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_complete_task(request, task_id):
     """Driver completes a task with delivery proof, signature, and photos"""
     try:
@@ -1225,12 +1289,39 @@ def driver_complete_task(request, task_id):
         cod_collected = serializer.validated_data.get('cod_collected', False)
         cod_amount_collected = serializer.validated_data.get('cod_amount_collected')
 
+        # The driver app asks for ONE figure and never makes the driver work out
+        # which part is the customer's money and which is our delivery fee. Split
+        # it here, before anything downstream reads it, so every COD branch below
+        # (including the 110%-of-expected inflation cap) still sees only the COD
+        # half — a fee folded into that figure would trip the cap and be clamped
+        # away. Deliberately NOT done on the client webhook further down: an
+        # external DMS reports COD, and nothing else. See delivery/collect.py.
+        from delivery import collect as delivery_collect
+        fee_amount_collected = None
+        if cod_amount_collected:
+            _cod_part, _fee_part = delivery_collect.split_collected(
+                task, cod_amount_collected)
+            if _fee_part > 0:
+                cod_amount_collected = _cod_part
+                fee_amount_collected = _fee_part
+
         # Block delivery without COD confirmation when order has COD
         if status_value == 'delivered' and task.order and task.order.cod_amount and task.order.cod_amount > 0:
             if not cod_collected and not task.cod_collected:
                 return Response({
                     'error': f'This order has COD of {task.order.cod_amount} QAR. '
                              f'Please confirm COD collection before marking as delivered.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Same gate for a delivery fee the customer pays at the door. A fee-only job
+        # (COD 0) slipped past the check above, so a close-out that never asked for
+        # the money went through and the fee was silently lost to the invoice.
+        if status_value == 'delivered' and task.order and not cod_collected and not task.cod_collected:
+            door_due = delivery_collect.amount_to_collect(task)
+            if door_due.fee_due > 0:
+                return Response({
+                    'error': f'Collect {door_due.total} QAR from the customer '
+                             f'(includes {door_due.fee_due} QAR delivery fee) before marking as delivered.'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         # Block a close-out that the client contracted proof for. The driver app
@@ -1289,6 +1380,9 @@ def driver_complete_task(request, task_id):
                 task.cod_collected_at = timezone.now()
             if cod_amount_collected:
                 task.cod_collected_amount = cod_amount_collected
+            if fee_amount_collected:
+                task.fee_collected_amount = fee_amount_collected
+                task.fee_collected_at = timezone.now()
 
             # Save payment method and split payment from driver
             payment_method = request.data.get('payment_method', '') if hasattr(request.data, 'get') else request.POST.get('payment_method', '')
@@ -1460,6 +1554,42 @@ def driver_complete_task(request, task_id):
                 from fleet.wallet_service import WalletService
                 WalletService.sync_cod_in_hand(task.driver)
 
+            # The fee half of the same handful of cash. Booked as its own
+            # transaction type so the settlement desk can tell Ezzy's revenue from
+            # the client's money, and the booking is closed out so the door prompt
+            # never asks for it twice. Idempotent on the booking's own fee_status,
+            # and — for a 'customer pays delivery' client, which has no booking —
+            # on an existing fee row for the task. That second case used to book
+            # nothing, so the fee cash never reached the ledger (Alan the label).
+            if fee_amount_collected and status_value == 'delivered':
+                from fleet.wallet_service import WalletService
+                booking = getattr(task.order, 'p2p_booking', None)
+                if booking is not None:
+                    book_fee = booking.fee_status == 'pending'
+                else:
+                    book_fee = not fleet_models.DriverTransaction.objects.filter(
+                        delivery_task=task, transaction_type='fee_collection',
+                    ).exists()
+                if book_fee:
+                    fee_txn = WalletService.record_transaction(
+                        driver=task.driver,
+                        transaction_type='fee_collection',
+                        amount=fee_amount_collected,
+                        description=(
+                            f"Delivery fee collected at the door for "
+                            f"{task.order.order_number}"),
+                        delivery_task=task,
+                        created_by=request.user,
+                        payment_method='cash',
+                        business=task.order.business,
+                    )
+                    if booking is not None:
+                        booking.fee_status = 'collected_cash'
+                        booking.fee_txn = fee_txn
+                        booking.save(update_fields=['fee_status', 'fee_txn', 'updated_at'])
+                if task.driver:
+                    WalletService.sync_cod_in_hand(task.driver)
+
             # Log COD amount mismatch warning
             if task.order and cod_amount_collected and task.order.cod_amount:
                 from decimal import Decimal
@@ -1543,6 +1673,12 @@ def driver_complete_task(request, task_id):
         # that is still out for delivery would be far worse than doing nothing.
         task.refresh_from_db(fields=['dl_task_status'])
         if task.dl_task_status == 'returned_to_shipper':
+            # The customer pays for the trip that was made even though they kept
+            # nothing, and the driver takes that cash at the door. Booked BEFORE
+            # the return paperwork so a failure in the RMA cannot lose money the
+            # driver is already holding. Never invoiced to the client as well —
+            # billing_service.billable_tasks() drops a task once this is set.
+            _record_door_fee(task, request, source='returned at the door')
             try:
                 from delivery.services.returns import open_return_for_task
                 open_return_for_task(
@@ -1602,6 +1738,7 @@ def driver_complete_task(request, task_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_upload_task_document(request, task_id):
     """Driver uploads a document for a task"""
     try:
@@ -1674,6 +1811,7 @@ def driver_upload_task_document(request, task_id):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_task_documents(request, task_id):
     """Get all documents for a task"""
     try:
@@ -3447,6 +3585,13 @@ def business_orders_api(request):
                         {'error': 'Pickup location not found'},
                         status=status.HTTP_404_NOT_FOUND
                     )
+            else:
+                # No id sent: use the client's default pickup, as every other create
+                # path does — without one the order has no start point, so no
+                # distance and no rate-card fee.
+                pickup_location = business_models.PickupLocation.objects.filter(
+                    business=business, is_default=True, pickup_status='active'
+                ).first()
 
             def _safe_int(val):
                 try:
@@ -4665,6 +4810,7 @@ def webhook_inbound_order(request, webhook_key):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_cod_submit(request):
     """Driver submits collected COD cash to admin for a specific task."""
     try:
@@ -4738,6 +4884,7 @@ def driver_cod_submit(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_cod_pending(request):
     """List tasks where COD was collected but not yet submitted to admin."""
     try:
@@ -4774,6 +4921,7 @@ def driver_cod_pending(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_transactions(request):
     """List all financial transactions for the authenticated driver."""
     try:
@@ -4826,6 +4974,7 @@ def driver_transactions(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_transaction_detail(request, code):
     """Get details of a single transaction by its code."""
     try:
@@ -4863,6 +5012,7 @@ def driver_transaction_detail(request, code):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_settlements(request):
     """List all earnings settlements for the authenticated driver."""
     try:
@@ -4903,6 +5053,7 @@ def driver_settlements(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_settlement_detail(request, code):
     """Get full details of a single settlement including its transactions."""
     try:
@@ -5163,6 +5314,7 @@ def driver_set_work_preference(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_dashboard(request):
     """Aggregated dashboard data for the driver app home screen.
 
@@ -5267,6 +5419,7 @@ def driver_dashboard(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_cod_submit_bulk(request):
     """Bulk COD submission — submit multiple tasks at once.
 
@@ -5341,6 +5494,7 @@ def driver_cod_submit_bulk(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_order_lookup(request):
     """Look up an order by order_number or client_order_code (barcode scan at pickup).
 
@@ -5385,6 +5539,7 @@ def driver_order_lookup(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_report_task_issue(request, task_id):
     """Driver reports a problem with a delivery task.
 
@@ -5450,6 +5605,7 @@ def driver_report_task_issue(request, task_id):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_pickup_locations(request):
     """List active pickup locations for tasks currently assigned to this driver."""
     try:
@@ -5488,6 +5644,7 @@ def driver_pickup_locations(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_task_items(request, task_id):
     """Get package contents (order items) for a delivery task."""
     try:
@@ -5601,6 +5758,7 @@ def driver_document_upload(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, ApiKeyScopePermission])
+@api_driver_dashboard_required
 def driver_performance_metrics(request):
     """Driver performance metrics — success rate, earnings, rating.
 

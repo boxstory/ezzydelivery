@@ -3,126 +3,156 @@
 {% comment %}
 Purpose: Live operations map — delivery task pins and driver GPS positions across Qatar.
 Used by: workforce_views.tasks_live_map at /workforce/tasks/live-map/
-Notes: Full-bleed Leaflet map; every control is an absolutely positioned overlay, so the page-notes card
-       (wfnote__, shared) sits above the map in normal flow and its help button rides in the filter toolbar.
+Notes: Two-column shell (.lmap) — Leaflet canvas on the left, a fixed-width control panel on the right.
+       Every filter, counter, legend and the page-notes card (wfnote__, shared) live in that panel, not over
+       the map; only the recenter button and the toast stay as canvas overlays.
 {% endcomment %}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/live-map.css' %}?v=20260921a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/live-map.css' %}?v=20260923b" rel="stylesheet" type="text/css" />
 {% endblock %}
 
 {% block content %}
 
-{% comment %} Notes card sits above the map in normal flow — every map control is an absolute overlay,
-   so putting it inside the map wrapper would be covered by the toolbars. {% endcomment %}
-<div class="wfnote" id="workforce_tasks_live_map_card_notes"
-         data-wfnote-src="{% url 'workforce:page_notes' 'workforce_tasks_live_map_card_notes' %}" hidden></div>
+<div class="lmap">
 
-<div style="position: relative;">
-    <!-- Date range filter -->
-    <div class="map-daterange">
-        <i class="fa-solid fa-calendar-days" style="color:#9ca3af;font-size:11px;"></i>
-        <input type="date" id="wf-date-from" class="map-daterange__input" value="{{ date_from }}">
-        <span class="map-daterange__sep">—</span>
-        <input type="date" id="wf-date-to" class="map-daterange__input" value="{{ date_to }}">
-        <button class="map-daterange__btn" onclick="applyDateFilter()">Apply</button>
+    <!-- Map canvas -->
+    <div class="lmap__canvas">
+        {% comment %}
+        Result of a "Ask for location" press. A popup closes the moment the map
+        refreshes underneath it, so the outcome is reported outside the popup or it
+        is not reported at all.
+        {% endcomment %}
+        <div class="wf-map-toast" id="wf-map-toast" role="status" aria-live="polite"></div>
+
+        <div id="wf-live-map"></div>
+
+        <!-- Recenter -->
+        <button type="button" class="map-recenter" onclick="recenterMap()" title="Fit all">
+            <i class="fa-solid fa-crosshairs"></i>
+        </button>
     </div>
 
-    <!-- Summary chips -->
-    <div class="map-bar">
-        <div class="map-bar__chip map-bar__chip--deliveries" id="wf-delivery-chip" onclick="togglePickupFilter(event)" title="Filter by pickup location">
-            <span class="map-bar__num">{{ pin_count }}</span>
-            deliveries <i class="fa-solid fa-chevron-down ms-1" style="font-size:9px;"></i>
+    <!-- Control panel — every filter, counter and legend lives here, off the map -->
+    <aside class="lmap__panel" id="workforce_live_map_panel_controls">
+        <div class="lmap__panel-head">
+            <span class="lmap__panel-title">Map Controls</span>
+            <button type="button" class="wfnote__btn" data-wfnote-toggle
+                    aria-expanded="false" aria-controls="workforce_tasks_live_map_card_notes"
+                    title="About this page">
+                <i class="fa-solid fa-question" aria-hidden="true"></i>
+                <span class="visually-hidden">Show notes</span>
+            </button>
         </div>
-        <div class="map-bar__chip map-bar__chip--drivers" id="wf-driver-chip" onclick="toggleDriverFilter(event)" title="Filter by driver">
-            <span class="map-bar__num" id="wf-driver-count">{{ driver_count }}</span>
-            drivers <i class="fa-solid fa-chevron-down ms-1" style="font-size:9px;"></i>
+
+        <div class="lmap__panel-body">
+
+            <div class="wfnote" id="workforce_tasks_live_map_card_notes"
+                 data-wfnote-src="{% url 'workforce:page_notes' 'workforce_tasks_live_map_card_notes' %}" hidden></div>
+
+            <!-- Date range filter -->
+            <section class="lmap__group">
+                <div class="lmap__group-title">Date Range</div>
+                <div class="map-daterange">
+                    <i class="fa-solid fa-calendar-days map-daterange__icon" aria-hidden="true"></i>
+                    <input type="date" id="wf-date-from" class="map-daterange__input" value="{{ date_from }}" aria-label="From date">
+                    <span class="map-daterange__sep">—</span>
+                    <input type="date" id="wf-date-to" class="map-daterange__input" value="{{ date_to }}" aria-label="To date">
+                    <button class="map-daterange__btn" onclick="applyDateFilter()">Apply</button>
+                </div>
+            </section>
+
+            <!-- Summary chips + their dropdowns -->
+            <section class="lmap__group">
+                <div class="lmap__group-title">Counts</div>
+                <div class="map-bar">
+                    <div class="map-bar__chip map-bar__chip--deliveries" id="wf-delivery-chip" onclick="togglePickupFilter(event)" title="Filter by pickup location">
+                        <span class="map-bar__num">{{ pin_count }}</span>
+                        <span class="map-bar__label">deliveries</span>
+                        <i class="fa-solid fa-chevron-down map-bar__caret"></i>
+                    </div>
+
+                    <!-- Pickup location filter dropdown -->
+                    <div class="map-pickup-filter" id="wf-pickup-filter">
+                        <div class="map-pickup-filter__header">
+                            <span>Filter by Pickup</span>
+                            <span class="map-pickup-filter__clear" id="wf-pickup-filter-clear" onclick="clearPickupFilter(event)">Show All</span>
+                        </div>
+                        <!-- Items injected by JS -->
+                    </div>
+
+                    <div class="map-bar__chip map-bar__chip--drivers" id="wf-driver-chip" onclick="toggleDriverFilter(event)" title="Filter by driver">
+                        <span class="map-bar__num" id="wf-driver-count">{{ driver_count }}</span>
+                        <span class="map-bar__label">drivers</span>
+                        <i class="fa-solid fa-chevron-down map-bar__caret"></i>
+                    </div>
+
+                    <!-- Driver filter dropdown -->
+                    <div class="map-driver-filter" id="wf-driver-filter">
+                        <div class="map-driver-filter__header">
+                            <span>Filter Drivers</span>
+                            <span class="map-driver-filter__clear" id="wf-driver-filter-clear" onclick="clearDriverFilter(event)">Show All</span>
+                        </div>
+                        <!-- Items injected by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Toggle filters -->
+            <section class="lmap__group">
+                <div class="lmap__group-title">Status</div>
+                <div class="map-filters">
+                    <button class="map-filters__btn" data-filter="all" onclick="filterTasks('all', this)">All</button>
+                    <button class="map-filters__btn active" data-filter="new" onclick="filterTasks('new', this)">
+                        <span class="map-filters__dot map-filters__dot--new"></span>New
+                    </button>
+                    <button class="map-filters__btn active" data-filter="active" onclick="filterTasks('active', this)">
+                        <span class="map-filters__dot map-filters__dot--active"></span>Active
+                    </button>
+                    <button class="map-filters__btn active" data-filter="transit" onclick="filterTasks('transit', this)">
+                        <span class="map-filters__dot map-filters__dot--transit"></span>In Transit
+                    </button>
+                    <button class="map-filters__btn" data-filter="delivered" onclick="filterTasks('delivered', this)">
+                        <span class="map-filters__dot map-filters__dot--delivered"></span>Delivered
+                    </button>
+                    <button class="map-filters__btn" data-filter="issue" onclick="filterTasks('issue', this)">
+                        <span class="map-filters__dot map-filters__dot--issue"></span>Issue
+                    </button>
+                    <button class="map-filters__btn active map-filters__btn--wide" data-filter="drivers" onclick="toggleLayer('drivers', this)">
+                        <i class="fa-solid fa-car me-1"></i>Show Drivers
+                    </button>
+                </div>
+            </section>
+
+            <!-- Live tracking toggle -->
+            <section class="lmap__group">
+                <div class="map-live-toggle" id="wf-live-toggle">
+                    <span class="map-live-toggle__dot on" id="wf-live-dot"></span>
+                    <span id="wf-live-label">Live</span>
+                    <div class="map-live-toggle__switch on" id="wf-live-switch" onclick="toggleLiveTracking()"></div>
+                </div>
+            </section>
+
+            <!-- Legend -->
+            <section class="lmap__group">
+                <div class="lmap__group-title">Legend</div>
+                <div class="map-legend">
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--new"></span> New</div>
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--assigned"></span> Assigned</div>
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--accepted"></span> Accepted</div>
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--picked"></span> Picked Up</div>
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--transit"></span> In Transit</div>
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--issue"></span> Issue</div>
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--delivered"></span> Delivered</div>
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--cancelled"></span> Cancelled</div>
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--driver"></span> Driver (live)</div>
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--driver-stale"></span> Driver (stale)</div>
+                    <div class="map-legend__item"><span class="map-legend__dot map-legend__dot--driver-nogps"></span> Driver (no GPS)</div>
+                </div>
+            </section>
+
         </div>
-    </div>
-
-    {% comment %}
-    Result of a "Ask for location" press. A popup closes the moment the map
-    refreshes underneath it, so the outcome is reported outside the popup or it
-    is not reported at all.
-    {% endcomment %}
-    <div class="wf-map-toast" id="wf-map-toast" role="status" aria-live="polite"></div>
-
-    <!-- Pickup location filter dropdown -->
-    <div class="map-pickup-filter" id="wf-pickup-filter">
-        <div class="map-pickup-filter__header">
-            <span>Filter by Pickup</span>
-            <span class="map-pickup-filter__clear" id="wf-pickup-filter-clear" onclick="clearPickupFilter(event)">Show All</span>
-        </div>
-        <!-- Items injected by JS -->
-    </div>
-
-    <!-- Driver filter dropdown -->
-    <div class="map-driver-filter" id="wf-driver-filter">
-        <div class="map-driver-filter__header">
-            <span>Filter Drivers</span>
-            <span class="map-driver-filter__clear" id="wf-driver-filter-clear" onclick="clearDriverFilter(event)">Show All</span>
-        </div>
-        <!-- Items injected by JS -->
-    </div>
-
-    <!-- Toggle filters -->
-    <div class="map-filters">
-        <button class="map-filters__btn" data-filter="all" onclick="filterTasks('all', this)">All</button>
-        <button class="map-filters__btn active" data-filter="new" onclick="filterTasks('new', this)">
-            <span class="map-filters__dot" style="background:#8b5cf6;"></span>New
-        </button>
-        <button class="map-filters__btn active" data-filter="active" onclick="filterTasks('active', this)">
-            <span class="map-filters__dot" style="background:#3b82f6;"></span>Active
-        </button>
-        <button class="map-filters__btn active" data-filter="transit" onclick="filterTasks('transit', this)">
-            <span class="map-filters__dot" style="background:#f59e0b;"></span>In Transit
-        </button>
-        <button class="map-filters__btn" data-filter="delivered" onclick="filterTasks('delivered', this)">
-            <span class="map-filters__dot" style="background:#22c55e;"></span>Delivered
-        </button>
-        <button class="map-filters__btn" data-filter="issue" onclick="filterTasks('issue', this)">
-            <span class="map-filters__dot" style="background:#ef4444;"></span>Issue
-        </button>
-        <button class="map-filters__btn active" data-filter="drivers" onclick="toggleLayer('drivers', this)">
-            <i class="fa-solid fa-car me-1"></i>Drivers
-        </button>
-        <button type="button" class="wfnote__btn wfnote__btn--ink" data-wfnote-toggle
-                aria-expanded="false" aria-controls="workforce_tasks_live_map_card_notes"
-                title="About this page">
-            <i class="fa-solid fa-question" aria-hidden="true"></i>
-            <span class="visually-hidden">Show notes</span>
-        </button>
-    </div>
-
-    <!-- Live tracking toggle -->
-    <div class="map-live-toggle" id="wf-live-toggle">
-        <span class="map-live-toggle__dot on" id="wf-live-dot"></span>
-        <span id="wf-live-label">Live</span>
-        <div class="map-live-toggle__switch on" id="wf-live-switch" onclick="toggleLiveTracking()"></div>
-    </div>
-
-    <!-- Map container -->
-    <div id="wf-live-map"></div>
-
-    <!-- Legend -->
-    <div class="map-legend">
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#8b5cf6;"></span> New</div>
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#6366f1;"></span> Assigned</div>
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#3b82f6;"></span> Accepted</div>
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#fb923c;"></span> Picked Up</div>
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#f59e0b;"></span> In Transit</div>
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#ef4444;"></span> Issue</div>
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#22c55e;"></span> Delivered</div>
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#6b7280;"></span> Cancelled</div>
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#800020; box-shadow: 0 0 6px rgba(128,0,32,0.6);"></span> Driver (live)</div>
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#9ca3af;"></span> Driver (stale)</div>
-        <div class="map-legend__item"><span class="map-legend__dot" style="background:#f59e0b;"></span> Driver (no GPS)</div>
-    </div>
-
-    <!-- Recenter -->
-    <button type="button" class="map-recenter" onclick="recenterMap()" title="Fit all">
-        <i class="fa-solid fa-crosshairs"></i>
-    </button>
+    </aside>
 </div>
 
 <!-- Map initialization script — Leaflet is preloaded in wf_dashboard_base.html -->

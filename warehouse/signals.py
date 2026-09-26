@@ -10,6 +10,7 @@ logger = logging.getLogger('warehouse')
 # It moves stock OFF our shelf without ever being a fulfilment — see the
 # 'delivered' branch of delivery_task_post_save_handler.
 from delivery.services.returns import RETURN_LEG  # noqa: E402
+from delivery.selectors import COLLECT_LEG  # noqa: E402
 
 # Store old status values for change detection
 _old_order_status = {}
@@ -1298,6 +1299,14 @@ def delivery_task_post_save_handler(sender, instance, created, *args, **kwargs):
 
     old_status = _old_delivery_status.pop(instance.pk, None)
     status = instance.dl_task_status
+
+    # A return pickup moves goods the other way: the driver collects them from the
+    # customer and carries them to the seller. Nothing leaves our shelf on this leg
+    # — the stock was deducted when the original order shipped — so shipping it
+    # again here would take the same units off twice, and marking items delivered
+    # would record a delivery of goods that are coming back.
+    if instance.task_leg == COLLECT_LEG:
+        return
 
     # The driver has the goods — take them off the shelf now, not at delivery.
     if status == 'picked_up' and old_status != 'picked_up':

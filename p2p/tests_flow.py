@@ -391,7 +391,8 @@ class DriverFeeCollectionTests(TestCase):
             driver_code='DRVP2P', driver_phone='55599999',
             driver_whatsapp='55599999', driver_languages='english',
             driver_license_number='LICP2P', driver_status='approved',
-            credit_limit=Decimal('5000'))
+            # A cleared driver: the fee endpoints sit behind driver_dashboard_required.
+            dashboard_access_enabled=True, credit_limit=Decimal('5000'))
 
     def _confirmed_booking(self, **overrides):
         self.client.force_login(self.user)

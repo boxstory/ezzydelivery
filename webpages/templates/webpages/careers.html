@@ -6,7 +6,7 @@ Careers
 {% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'webpages/css/careers.css' %}?v=20260722b" rel="stylesheet" type="text/css" />
+<link href="{% static 'webpages/css/careers.css' %}?v=20260924a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -102,6 +102,86 @@ Careers
           </div>
         </article>
       </div>
+
+      {% if driver_proposals %}
+      {% comment %}
+      Driver offers — the same fleet.DriverProposal rows the driver app shows.
+      Written by marketing at /workforce/marketing/driver-proposals/; this page
+      never filters them itself (fleet/proposals.py decides the audience).
+      {% endcomment %}
+      <h2 class="wpk__section-head mt-5 mb-0">
+        DRIVER OFFERS &mdash; <span class="wpk__section-head-count">{{ driver_proposals|length|stringformat:"02d" }}</span>
+      </h2>
+
+      <div id="webpages_careers_list_offers">
+        {% for proposal in driver_proposals %}
+        <article class="wpk__role wpk__offer">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+              {% if proposal.ref_code %}
+              <div class="wpk__role-ref mb-1">{{ proposal.ref_code }}</div>
+              {% endif %}
+              <h3 class="wpk__role-title mb-1">{{ proposal.title }}</h3>
+              <div class="wpk__role-meta mb-2">
+                {% if proposal.job_type %}{{ proposal.get_job_type_display|upper }}{% else %}ANY SCHEDULE{% endif %}
+                &middot;
+                {% if proposal.vehicle_type %}{{ proposal.get_vehicle_type_display|upper }}{% else %}ANY VEHICLE{% endif %}
+                &middot;
+                {% for zone in proposal.zone_groups.all %}{{ zone|upper }}{% if not forloop.last %} / {% endif %}{% empty %}ALL ZONES{% endfor %}
+              </div>
+              {% if proposal.headline %}
+              <p class="wpk__offer-headline mb-2">{{ proposal.headline }}</p>
+              {% endif %}
+              {% if proposal.description %}
+              <p class="wpk__role-desc mb-0">{{ proposal.description|linebreaksbr }}</p>
+              {% endif %}
+            </div>
+            <a class="wpk__role-apply mt-4" href="{% url 'core:join_driver_start' %}">Apply &rarr;</a>
+          </div>
+
+          {% if proposal.pay_package %}
+          <div class="wpk__offer-pay mt-3">
+            <span class="wpk__offer-pay-label">Pay</span>
+            <span class="wpk__offer-pay-value">{{ proposal.pay_package }}</span>
+          </div>
+          {% endif %}
+
+          {% if proposal.perk_list or proposal.requirement_list %}
+          <div class="row g-3 mt-2">
+            {% if proposal.perk_list %}
+            <div class="col-12 col-md-6">
+              <div class="wpk__offer-block">
+                <div class="wpk__offer-block-label mb-1">What you get</div>
+                <ul class="wpk__offer-points mb-0">
+                  {% for perk in proposal.perk_list %}
+                  <li>{{ perk }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+            {% endif %}
+            {% if proposal.requirement_list %}
+            <div class="col-12 col-md-6">
+              <div class="wpk__offer-block">
+                <div class="wpk__offer-block-label mb-1">What we need</div>
+                <ul class="wpk__offer-points mb-0">
+                  {% for requirement in proposal.requirement_list %}
+                  <li>{{ requirement }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          {% if proposal.closes_at %}
+          <div class="wpk__offer-closes mt-3">Offer open until {{ proposal.closes_at|date:"d M Y" }}</div>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+      {% endif %}
 
       <!-- Terms: what we offer, plainly -->
       <h2 class="wpk__section-head mt-5 mb-4">WHAT YOU GET</h2>

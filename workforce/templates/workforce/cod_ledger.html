@@ -1,17 +1,17 @@
 {% extends "wf_dashboard_base.html" %}
-{% load static %}
+{% load static humanize %}
 {% comment %}
 Purpose: COD bookkeeping ledger — every COD transaction with date/type/driver/business/method/status filters
-Used by: workforce_views.cod_ledger at /workforce/cod-ledger/
-Notes: Read-only and append-only; the summary tiles reflect the active filter, not the whole table.
+Used by: workforce_views.cod_ledger at /workforce/fleet/cash-ledger/
+Notes: Read-only and append-only; the balance tiles are live positions, not filtered sums.
        The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
        help button toggles it via the delegated handler in workforce.js.
 {% endcomment %}
 
-{% block title %}COD Ledger{% endblock %}
+{% block title %}Cash Ledger{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260816a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/cod_ledger.css' %}?v=20260926q" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -20,7 +20,7 @@ Notes: Read-only and append-only; the summary tiles reflect the active filter, n
   <!-- Hero Header -->
   <div class="wfd__hero">
     <div class="wfd__hero-content">
-      <h1 class="wfd__hero-title"><i class="fa-solid fa-book"></i>COD Ledger</h1>
+      <h1 class="wfd__hero-title"><i class="fa-solid fa-book"></i>Cash Ledger</h1>
       <p class="wfd__hero-subtitle">Append-only log of every COD cash movement — customer → driver → Ezzy → business</p>
     </div>
     <div class="wfd__hero-actions">
@@ -48,27 +48,32 @@ Notes: Read-only and append-only; the summary tiles reflect the active filter, n
   <div class="wfnote" id="workforce_cod_ledger_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_cod_ledger_card_notes' %}" hidden></div>
 
-  <!-- Summary tiles (reflect the current filter) -->
+  <!-- Balance tiles: where the COD sits right now (not filtered) -->
   <div class="codl__summary">
     <div class="codl__tile">
-      <span class="codl__tile-label">Collected</span>
-      <span class="codl__tile-value">{{ totals.collected|floatformat:2 }} <small>QR</small></span>
+      <span class="codl__tile-label">COD in Hand · Drivers</span>
+      <span class="codl__tile-value">{{ balances.in_hand|floatformat:2|intcomma }} <small>QR</small></span>
+      <span class="codl__tile-note">{{ balances.drivers_holding }} driver{{ balances.drivers_holding|pluralize }} holding cash</span>
     </div>
     <div class="codl__tile">
-      <span class="codl__tile-label">Handed to Ezzy</span>
-      <span class="codl__tile-value">{{ totals.to_ezzy|floatformat:2 }} <small>QR</small></span>
+      <span class="codl__tile-label">Hand-ins Not Verified</span>
+      <span class="codl__tile-value">{{ balances.unverified|floatformat:2|intcomma }} <small>QR</small></span>
+      <span class="codl__tile-note">Submitted, awaiting confirmation</span>
     </div>
     <div class="codl__tile">
-      <span class="codl__tile-label">Paid to Business</span>
-      <span class="codl__tile-value">{{ totals.to_business|floatformat:2 }} <small>QR</small></span>
+      <span class="codl__tile-label">Held by Ezzy · Owed to Clients</span>
+      <span class="codl__tile-value">{{ balances.owed_to_clients|floatformat:2|intcomma }} <small>QR</small></span>
+      <span class="codl__tile-note">{{ balances.owed_tasks }} deliveries awaiting payout</span>
     </div>
     <div class="codl__tile">
-      <span class="codl__tile-label">Returned</span>
-      <span class="codl__tile-value">{{ totals.returned|floatformat:2 }} <small>QR</small></span>
+      <span class="codl__tile-label">Electronic Not Bank-Matched</span>
+      <span class="codl__tile-value">{{ balances.unmatched|floatformat:2|intcomma }} <small>QR</small></span>
+      <span class="codl__tile-note">Fawran / POS pending reconciliation</span>
     </div>
     <div class="codl__tile codl__tile--accent">
       <span class="codl__tile-label">Rows</span>
-      <span class="codl__tile-value">{{ totals.count }}</span>
+      <span class="codl__tile-value">{{ totals.count|intcomma }}</span>
+      <span class="codl__tile-note">Matching the filter below</span>
     </div>
   </div>
 
@@ -140,6 +145,10 @@ Notes: Read-only and append-only; the summary tiles reflect the active filter, n
           <input type="text" name="q" class="form-control codl__filter-input flex-grow-1"
                  placeholder="Transaction code, order #, customer, driver, business, reference, notes…"
                  value="{{ f_q }}">
+          <div class="form-check flex-shrink-0 mb-0" title="Hide the 0.00 COD rows booked for prepaid deliveries (no cash at the door). They still count for billing.">
+            <input class="form-check-input" type="checkbox" name="hide_zero" value="1" id="workforce_codl_chk_hide_zero" onchange="this.form.submit()" {% if f_hide_zero %}checked{% endif %}>
+            <label class="form-check-label text-nowrap" for="workforce_codl_chk_hide_zero">Hide no-cash rows</label>
+          </div>
           <button type="submit" class="codl__filter-btn flex-shrink-0"><i class="fa-solid fa-filter me-1"></i> Filter</button>
           <a href="{% url 'workforce:cod_ledger' %}" class="codl__filter-btn codl__filter-btn--ghost flex-shrink-0">Reset</a>
         </div>
@@ -153,17 +162,15 @@ Notes: Read-only and append-only; the summary tiles reflect the active filter, n
       <thead>
         <tr>
           <th class="codl__num">#</th>
-          <th>Date / Time</th>
-          <th>Code / Type</th>
-          <th>Business</th>
-          <th>Driver</th>
-          <th class="codl__num codl__amt">Amount<br>Method</th>
-          <th class="codl__num codl__shrink">COD in hand<br>after</th>
-          <th class="codl__num">Wallet after</th>
-          <th>Order #</th>
-          <th>Customer / Mobile</th>
+          <th>Date<br>Time</th>
+          <th>Code<br>Type</th>
+          <th>Business / Order<br>Task / Customer</th>
+          <th class="codl__num codl__amt" title="Line 1: COD money this row moves (hand-ins and payouts land here too). Line 2: delivery fee taken in cash at the door — Ezzy's money, not the client's.">COD<br>DL fee</th>
+          <th class="codl__num" title="Everything the driver took from the customer for this delivery. COD and the delivery fee are booked as two rows; the bold line is the part this row books.">Taken<br>at door</th>
+          <th class="codl__num codl__shrink" title="What the driver holds after this row, replayed from the ledger: cash in hand, and Fawran collected but not yet closed by a hand-in. Last line: driver code - name.">Driver cash<br>after</th>
+          <th class="codl__num codl__shrink" title="The client's position after this row. COD: collected from their customers, not yet paid out to them. DL owed: delivery charges they owe Ezzy, not yet recovered. Total: COD minus DL owed. DL coll.: delivery fees drivers collected at their doors, running total (not in the Total).">Client<br>after</th>
           <th>COD Status<br>Submission</th>
-          <th>Recorded by</th>
+          <th>Recorded<br>by</th>
           <th>Notes</th>
         </tr>
       </thead>
@@ -175,39 +182,117 @@ Notes: Read-only and append-only; the summary tiles reflect the active filter, n
             <div>{{ t.created_at|date:"Y-m-d" }}</div>
             <span class="codl__submeta">{{ t.created_at|date:"H:i" }}</span>
           </td>
+          {% comment %}
+            A prepaid door visit books a 0.00 COD row next to the fee the driver took.
+            Only the fee changed hands, so the fee is the row's type; the zero COD
+            row stays as a muted code for traceability.
+          {% endcomment %}
           <td class="codl__nowrap">
+            {% if t.merged_fee and t.transaction_type == 'cod_collection' and not t.amount %}
+              <div class="codl__code">{{ t.merged_fee.transaction_code|default:t.merged_fee.pk }}</div>
+              <span class="codl__badge codl__badge--fee_collection">{{ t.merged_fee.get_transaction_type_display }}</span>
+              <span class="codl__submeta" title="Zero COD row booked with this prepaid delivery">{{ t.transaction_code|default:t.pk }} · no COD</span>
+            {% else %}
             <div class="codl__code">{{ t.transaction_code|default:t.pk }}</div>
             <span class="codl__badge codl__badge--{{ t.transaction_type }}">{{ t.get_transaction_type_display }}</span>
+            {% if t.merged_fee %}
+              <div class="codl__code">{{ t.merged_fee.transaction_code|default:t.merged_fee.pk }}</div>
+              <span class="codl__badge codl__badge--fee_collection">{{ t.merged_fee.get_transaction_type_display }}</span>
+              {% if t.merged_fee.created_at|date:"Y-m-d" != t.created_at|date:"Y-m-d" %}<span class="codl__submeta">{{ t.merged_fee.created_at|date:"Y-m-d H:i" }}</span>{% endif %}
+            {% endif %}
+            {% endif %}
           </td>
           <td>
             {% if t.business %}
-              <div>{{ t.business.business_name }}</div>
-              <span class="codl__submeta">{{ t.business.business_code }}</span>
+              <div>{{ t.business.business_name }} <span class="codl__bizcode">{{ t.business.business_code }}</span></div>
             {% elif t.delivery_task.order.business %}
-              <div>{{ t.delivery_task.order.business.business_name }}</div>
-              <span class="codl__submeta">{{ t.delivery_task.order.business.business_code }}</span>
-            {% else %}<span class="codl__muted">—</span>{% endif %}
+              <div>{{ t.delivery_task.order.business.business_name }} <span class="codl__bizcode">{{ t.delivery_task.order.business.business_code }}</span></div>
+            {% else %}<div class="codl__muted">—</div>{% endif %}
+            {% if t.delivery_task.order %}
+              <a href="{% url 'workforce:order_detail' t.delivery_task.order.id %}" class="codl__code codl__link">{{ t.delivery_task.order.order_number }}</a>
+            {% endif %}
+            {% if t.delivery_task %}
+              <a href="{% url 'workforce:delivery_task_detail' t.delivery_task.id %}" class="codl__submeta codl__link">Task {{ t.delivery_task.dl_task_number }}</a>
+            {% endif %}
+            {% with o=t.delivery_task.order %}{% if o.customer_name or o.customer_phone %}
+              <div class="codl__submeta codl__truncate codl__cust" title="{{ o.customer_name|default:'' }} {{ o.customer_phone|default:'' }}">{{ o.customer_name|default:"—" }}{% if o.customer_phone %} · {{ o.customer_phone }}{% endif %}</div>
+            {% endif %}{% endwith %}
           </td>
-          <td>
-            {% if t.driver %}
-              {% with dn=t.driver.user.get_full_name|default:t.driver.driver_code %}
-              <div class="codl__truncate" title="{{ dn }}">{{ dn }}</div>
-              {% endwith %}
-              <span class="codl__submeta">{{ t.driver.driver_code }}</span>
-            {% else %}<span class="codl__muted">—</span>{% endif %}
-          </td>
+          {% comment %}
+            One cell, two lines split by whose money it is: a fee_collection row books the
+            delivery fee (Ezzy's), every other row books COD / cash movements.
+            A COD row carries its folded fee row as t.merged_fee (see cod_ledger).
+          {% endcomment %}
           <td class="codl__num codl__amt">
-            <div class="{% if t.amount < 0 %}codl__debit{% else %}codl__credit{% endif %}">{{ t.amount|floatformat:2 }}</div>
-            {% if t.payment_method %}
-              <span class="codl__pay codl__pay--{{ t.payment_method }}">{% if t.payment_method == 'pos' %}POS{% elif t.payment_method == 'bank' %}Bank{% elif t.payment_method == 'atm' %}ATM{% elif t.payment_method == 'fawran' %}Fawran{% else %}Cash{% endif %}</span>
-            {% else %}<span class="codl__submeta">—</span>{% endif %}
+            <div class="codl__amts">
+              {% if t.transaction_type == 'fee_collection' %}
+                {% include "workforce/parts/_codl_amount.html" with a=None label="COD" %}
+                {% include "workforce/parts/_codl_amount.html" with a=t label="DL fee" %}
+              {% else %}
+                {% include "workforce/parts/_codl_amount.html" with a=t label="COD" %}
+                {% include "workforce/parts/_codl_amount.html" with a=t.merged_fee label="DL fee" %}
+              {% endif %}
+            </div>
           </td>
-          <td class="codl__num codl__shrink">{{ t.cod_in_hand_after|floatformat:2 }}</td>
-          <td class="codl__num">{{ t.wallet_balance_after|floatformat:2 }}</td>
-          <td class="codl__code">{{ t.delivery_task.order.order_number|default:"—" }}</td>
-          <td>
-            <div>{{ t.delivery_task.order.customer_name|default:"—"|truncatechars:22 }}</div>
-            {% if t.delivery_task.order.customer_phone %}<span class="codl__submeta">{{ t.delivery_task.order.customer_phone }}</span>{% endif %}
+          {% comment %}
+            Taken at door: a door collection is booked as two rows (COD + fee).
+            Both rows show the same receipt; the line this row books is bold and
+            the other half is muted, so a pair reads as one collection. A COD-only
+            door (no fee taken) still shows its receipt, with the fee line dashed.
+            A zero COD half (returned / prepaid) shows a dash, not "0.00 Cash".
+          {% endcomment %}
+          <td class="codl__door">
+            {% if t.transaction_type == 'cod_collection' or t.transaction_type == 'fee_collection' %}{% if t.delivery_task.fee_collected_amount or t.transaction_type == 'cod_collection' and t.delivery_task %}
+              {% with cod=t.delivery_task.cod_collected_amount|default:0 fee=t.delivery_task.fee_collected_amount|default:0 pm=t.delivery_task.payment_method %}
+              <div class="codl__receipt">
+                <span class="codl__receipt-line{% if t.transaction_type == 'cod_collection' %} codl__receipt-line--self{% endif %}">
+                  <span>COD</span>
+                  {% if cod %}<span class="codl__receipt-amt">{{ cod|floatformat:2|intcomma }}</span>
+                  <span class="codl__receipt-method">{% if t.delivery_task.payment_split and t.delivery_task.payment_split|length > 1 %}<span class="codl__pay codl__pay--mixed">Mixed</span>{% elif pm == 'pos' %}<span class="codl__pay codl__pay--pos">POS</span>{% elif pm == 'bank' %}<span class="codl__pay codl__pay--bank">Bank</span>{% elif pm == 'atm' %}<span class="codl__pay codl__pay--atm">ATM</span>{% elif pm == 'fawran' %}<span class="codl__pay codl__pay--fawran">Fawran</span>{% else %}<span class="codl__pay codl__pay--cash">Cash</span>{% endif %}</span>
+                  {% else %}<span class="codl__receipt-amt codl__muted">—</span><span class="codl__receipt-method"></span>{% endif %}
+                </span>
+                <span class="codl__receipt-line{% if t.transaction_type == 'fee_collection' or t.merged_fee %} codl__receipt-line--self{% endif %}">
+                  <span>DL fee</span>
+                  {% if fee %}<span class="codl__receipt-amt">{{ fee|floatformat:2|intcomma }}</span>
+                  <span class="codl__receipt-method"><span class="codl__pay codl__pay--cash">Cash</span></span>
+                  {% else %}<span class="codl__receipt-amt codl__muted">—</span><span class="codl__receipt-method"></span>{% endif %}
+                </span>
+                <span class="codl__receipt-line codl__receipt-line--total">
+                  <span>Total</span>
+                  <span class="codl__receipt-amt">{{ cod|add:fee|floatformat:2|intcomma }}</span>
+                  <span class="codl__receipt-method">QR</span>
+                </span>
+              </div>
+              {% endwith %}
+            {% else %}<span class="codl__muted">—</span>{% endif %}{% else %}<span class="codl__muted">—</span>{% endif %}
+          </td>
+          {% comment %}
+            Running cash and Fawran with the driver, replayed from the ledger by
+            recalculate_cod_balances() on every COD write — unlike cod_in_hand_after,
+            a one-off snapshot that goes stale when a row is backfilled. Only the
+            collection/fee/hand-in rows carry it; other rows fall back to the snapshot.
+          {% endcomment %}
+          <td class="codl__num codl__shrink">{% if not t.driver %}<span class="codl__muted">—</span>{% else %}
+            {% if t.transaction_type in running_cash_types %}
+            <div class="codl__amts">
+              <span class="codl__amts-line"><span class="codl__amts-label">Cash</span><span>{{ t.cod_cash_after|floatformat:2|intcomma }}</span></span>
+              <span class="codl__amts-line"><span class="codl__amts-label">Fawran</span><span>{{ t.cod_fawran_after|floatformat:2|intcomma }}</span></span>
+              <span class="codl__amts-line codl__amts-line--total"><span class="codl__amts-label">Total</span><span>{{ t.cod_after_total|floatformat:2|intcomma }}</span></span>
+            </div>
+            {% else %}<div>{{ t.cod_in_hand_after|floatformat:2|intcomma }}</div>{% endif %}
+            {% with dn=t.driver.user.get_full_name %}
+            <span class="codl__submeta codl__truncate codl__drvname" title="{{ t.driver.driver_code }}{% if dn %} - {{ dn }}{% endif %}">{{ t.driver.driver_code }}{% if dn %} - {{ dn }}{% endif %}</span>
+            {% endwith %}
+          {% endif %}</td>
+          <td class="codl__num codl__shrink">
+            {% if t.client_cod_after is None %}<span class="codl__muted">—</span>{% else %}
+            <div class="codl__amts">
+              <span class="codl__amts-line"><span class="codl__amts-label">COD</span><span>{{ t.client_cod_after|floatformat:2|intcomma }}</span></span>
+              <span class="codl__amts-line"><span class="codl__amts-label">DL owed</span><span>{{ t.client_dl_after|floatformat:2|intcomma }}</span></span>
+              <span class="codl__amts-line codl__amts-line--total"><span class="codl__amts-label">Total</span><span>{{ t.client_net_after|floatformat:2|intcomma }}</span></span>
+              <span class="codl__amts-line codl__amts-line--aside" title="Delivery fees drivers collected in cash at this client's doors, running total. Ezzy's money, so it is not in the Total."><span class="codl__amts-label">DL coll.</span><span>{{ t.client_dl_collected_after|floatformat:2|intcomma }}</span></span>
+            </div>
+            {% endif %}
           </td>
           <td>
             {% if t.delivery_task.order.cod_status_by_staff %}
@@ -235,7 +320,7 @@ Notes: Read-only and append-only; the summary tiles reflect the active filter, n
         </tr>
         {% empty %}
         <tr>
-          <td colspan="13" class="codl__empty">
+          <td colspan="11" class="codl__empty">
             <i class="fa-solid fa-inbox"></i>
             <span>No COD transactions match these filters.</span>
           </td>

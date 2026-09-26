@@ -8,7 +8,7 @@
 {#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260922a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260923c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -86,9 +86,17 @@
 
     <!-- TOOLBAR -->
     <div class="crm__toolbar">
+      {# The FORM carries the request for the whole facet row, not each select. A #}
+      {# select that fires its own hx-get is included twice — once as the element #}
+      {# that triggered it, once by hx-include pulling the form it sits in — and a #}
+      {# multi-select made that visible, writing ?vehicle=car&vehicle=bike&vehicle=car #}
+      {# into the pushed URL. Triggering from the form serialises it exactly once. #}
+      {# The search box keeps its own request: it is outside .crm__facets and runs #}
+      {# on a keyup delay rather than on change. #}
       <form method="get"
             hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
             hx-swap="outerHTML" hx-push-url="true"
+            hx-trigger="submit, change from:.crm__facets"
             id="workforce_crm_leads_form_filter" class="crm__filters">
 
         <div class="crm__search {% if search %}is-filled{% endif %}">
@@ -104,23 +112,28 @@
         </div>
 
         <div class="crm__facets">
-          <select name="stage" class="crm__facet-select {% if stage_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by stage"
-                  hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
-                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
-                  hx-include="#workforce_crm_leads_form_filter">
-            <option value="">All stages</option>
+          {% comment %}Every facet is a checkbox multi-select. A desk reads "Applied +
+          Uploads Done" or "Bike + Car" as one pool, so each picker OR's its ticks
+          instead of forcing a second trip through the bar. data-change-on-close
+          holds the htmx request until the dropdown is dismissed — one request per
+          tick would swap the table out from under the open list and throw the rest
+          of the selection away. With nothing ticked the placeholder reads All …, so
+          the bar still says what it holds without JS.{% endcomment %}
+          <select name="stage" multiple data-placeholder="All stages"
+                  data-facet-label="stage" data-facet-plural="stages" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if stage_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_leads_select_stage" aria-label="Filter by stage">
             {% for value, label in stage_choices %}
-            <option value="{{ value }}" {% if stage_filter == value %}selected{% endif %}>{{ label }}</option>
+            <option value="{{ value }}" {% if value in stage_filter %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
 
-          <select name="source" class="crm__facet-select {% if source_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by source"
-                  hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
-                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
-                  hx-include="#workforce_crm_leads_form_filter">
-            <option value="">All sources</option>
+          <select name="source" multiple data-placeholder="All sources"
+                  data-facet-label="source" data-facet-plural="sources" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if source_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_leads_select_source" aria-label="Filter by source">
             {% for value, label in source_choices %}
-            <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ label }}</option>
+            <option value="{{ value }}" {% if value in source_filter %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
 
@@ -129,24 +142,37 @@
           {# Same reason for the column sort: changing a filter must not throw the sort away #}
           <input type="hidden" name="sort" value="{{ sort.value }}">
 
-          <select name="assigned" class="crm__facet-select {% if assigned_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by assignee"
-                  hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
-                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
-                  hx-include="#workforce_crm_leads_form_filter">
-            <option value="">All assignees</option>
-            <option value="me" {% if assigned_filter == 'me' %}selected{% endif %}>Assigned to me</option>
-            <option value="none" {% if assigned_filter == 'none' %}selected{% endif %}>Unassigned</option>
+          <select name="assigned" multiple data-placeholder="All assignees"
+                  data-facet-label="assignee" data-facet-plural="assignees" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if assigned_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_leads_select_assigned" aria-label="Filter by assignee">
+            <option value="me" {% if 'me' in assigned_filter %}selected{% endif %}>Assigned to me</option>
+            <option value="none" {% if 'none' in assigned_filter %}selected{% endif %}>Unassigned</option>
             {% for user in staff_users %}
-            <option value="{{ user.pk }}" {% if assigned_filter == user.pk|stringformat:"s" %}selected{% endif %}>
+            <option value="{{ user.pk }}" {% if user.pk|stringformat:"s" in assigned_filter %}selected{% endif %}>
               {{ user.get_full_name|default:user.username }}
             </option>
             {% endfor %}
           </select>
 
-          <select name="overdue" class="crm__facet-select {% if overdue_filter %}crm__facet-select--on{% endif %}" aria-label="Filter overdue"
-                  hx-get="{{ sort_url }}" hx-target="#main-content" hx-select="#main-content"
-                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
-                  hx-include="#workforce_crm_leads_form_filter">
+          {# Vehicle is a recruitment question — the business table has no application #}
+          {# behind a lead, so the facet only exists on the driver page. #}
+          {% if is_driver_list %}
+          <select name="vehicle" multiple data-placeholder="All vehicles"
+                  data-facet-label="vehicle" data-facet-plural="vehicles" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if vehicle_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_leads_select_vehicle" aria-label="Filter by vehicle type"
+                  title="The vehicle the applicant registered — 'No vehicle' is an applicant with none on file yet">
+            {% for value, label in vehicle_choices %}
+            <option value="{{ value }}" {% if value in vehicle_filter %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            <option value="none" {% if 'none' in vehicle_filter %}selected{% endif %}>No vehicle</option>
+          </select>
+          {% endif %}
+
+          {% include "workforce/crm/parts/_date_facet.html" %}
+
+          <select name="overdue" class="crm__facet-select {% if overdue_filter %}crm__facet-select--on{% endif %}" aria-label="Filter overdue">
             <option value="">Any follow-up</option>
             <option value="1" {% if overdue_filter == '1' %}selected{% endif %}>Overdue only</option>
           </select>
@@ -176,7 +202,7 @@
         {# The category is fixed by the URL now, so it is not one of the filters a #}
         {# Reset can clear — Reset returns to this same page, unfiltered. #}
         {% if is_driver_list %}{% url 'workforce:crm_driver_leads_list' as list_reset_url %}{% else %}{% url 'workforce:crm_leads_list' as list_reset_url %}{% endif %}
-        {% if search or stage_filter or source_filter or assigned_filter or overdue_filter %}
+        {% if search or stage_filter or source_filter or assigned_filter or overdue_filter or vehicle_filter or date_preset %}
         <a href="{{ list_reset_url }}" class="crm__clear-all"
            hx-get="{{ list_reset_url }}"
            hx-target="#main-content" hx-select="#main-content"

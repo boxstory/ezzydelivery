@@ -324,6 +324,56 @@ Notes: Status changes are superadmin-gated in Settings; the state-strip dropdown
                 </div>
             </div>
 
+            {% comment %}
+            Dashboard access — the permission that clears an approved driver to
+            actually work. Approval means the documents check out; this means ops
+            put them on the road. Only meaningful once approved, so the card only
+            appears then, the same rule the availability toggle uses above.
+            {% endcomment %}
+            {% if driver.driver_status == 'approved' %}
+            <div class="wdd__card" id="wdd_access_card">
+                <div class="wdd__card__header">
+                    <span><i class="fa-solid fa-id-badge"></i> Dashboard Access</span>
+                </div>
+                <div class="wdd__card__body">
+                    <div class="wdd__pref__row">
+                        <span class="wdd__pref__label">Cleared to work</span>
+                        <span class="wdd__pref__value" id="wdd_access_state">
+                            {% if driver.dashboard_access_enabled %}
+                                Yes
+                            {% else %}
+                                <span class="wdd__pref__value--muted">No — profile &amp; opportunities only</span>
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    {% if driver.dashboard_access_enabled and driver.dashboard_access_granted_at %}
+                    <div class="wdd__pref__row">
+                        <span class="wdd__pref__label">Granted</span>
+                        <span class="wdd__pref__value">
+                            {{ driver.dashboard_access_granted_at|date:"d M Y, H:i" }}
+                            {% if driver.dashboard_access_granted_by %}
+                                by {{ driver.dashboard_access_granted_by.username }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+
+                    <div class="wdd__pref__row wdd__pref__row--stack">
+                        <button type="button" class="wdd__btn" id="wdd_access_btn"
+                                data-enabled="{{ driver.dashboard_access_enabled|yesno:'1,0' }}"
+                                data-url="{% url 'workforce:driver_set_dashboard_access' driver.driver_id %}">
+                            {% if driver.dashboard_access_enabled %}
+                                <i class="fa-solid fa-lock"></i> Withdraw access
+                            {% else %}
+                                <i class="fa-solid fa-unlock"></i> Grant access
+                            {% endif %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Work Preference -->
             <div class="wdd__card" id="wdd_workpref_card">
                 <div class="wdd__card__header">
@@ -699,6 +749,10 @@ Notes: Status changes are superadmin-gated in Settings; the state-strip dropdown
                             <span class="wdd__info-row__value">{{ driver.driver_license_number|default:"N/A" }}</span>
                         </div>
                         <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Sponsor / Company</span>
+                            <span class="wdd__info-row__value">{{ driver.driver_sponsor|default:"N/A" }}</span>
+                        </div>
+                        <div class="wdd__info-row">
                             <span class="wdd__info-row__label">Languages</span>
                             <span class="wdd__info-row__value">{{ driver.driver_languages|title|default:"N/A" }}</span>
                         </div>
@@ -734,6 +788,12 @@ Notes: Status changes are superadmin-gated in Settings; the state-strip dropdown
                                     <label class="wdd__form-label" for="wdd_identity_license">License No</label>
                                     <input type="text" class="wdd__form-input" name="driver_license_number"
                                            id="wdd_identity_license" value="{{ driver.driver_license_number|default:'' }}" maxlength="100">
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <label class="wdd__form-label" for="wdd_identity_sponsor">Sponsor / Company</label>
+                                    <input type="text" class="wdd__form-input" name="driver_sponsor"
+                                           id="wdd_identity_sponsor" value="{{ driver.driver_sponsor|default:'' }}"
+                                           maxlength="150" placeholder="Company on the QID">
                                 </div>
                                 <div class="col-12 col-sm-6">
                                     <label class="wdd__form-label" for="wdd_identity_lang">Languages</label>
@@ -1507,6 +1567,34 @@ Notes: Status changes are superadmin-gated in Settings; the state-strip dropdown
                 text.textContent = newLabel;
             });
         });
+    });
+})();
+
+// Dashboard access — grant or withdraw clearance to work.
+// Reloads on success: the granted-by/at lines and the button label all change
+// together, and re-deriving them in JS would be three places to keep in step.
+(function() {
+    var btn = document.getElementById('wdd_access_btn');
+    if (!btn) return;
+    var csrf = '{{ csrf_token }}';
+    btn.addEventListener('click', function() {
+        var enabling = btn.dataset.enabled !== '1';
+        if (!enabling && !confirm('Withdraw this driver\'s access? They will keep their profile and the opportunities board, but cannot take tasks, pickups or COD.')) {
+            return;
+        }
+        btn.disabled = true;
+        fetch(btn.dataset.url, {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+            body: JSON.stringify({enabled: enabling}),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) { window.location.reload(); return; }
+            btn.disabled = false;
+            alert(data.error || 'Could not change access.');
+        })
+        .catch(function() { btn.disabled = false; });
     });
 })();
 

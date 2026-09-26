@@ -6,6 +6,7 @@ that extend the fleet dashboard base.
 """
 
 from fleet import models as fleet_models
+from fleet.access import has_dashboard_access
 from fleet.wallet_service import WalletService
 
 
@@ -20,6 +21,10 @@ def driver_wallet_status(request):
         'driver_wallet_blocked': False,
         'unread_notifications': 0,
         'pickup_badge_count': 0,
+        # Cleared to work. The PWA shell is shared by every fleet page, so the nav
+        # needs this flag site-wide — a per-view context variable (like driver_active)
+        # cannot reach pwa_base.html. Defaults False: no driver, no access.
+        'driver_dashboard_access': False,
     }
 
     if not request.user.is_authenticated:
@@ -35,6 +40,7 @@ def driver_wallet_status(request):
 
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        context['driver_dashboard_access'] = has_dashboard_access(driver)
         wallet_status = WalletService.get_wallet_status(driver)
 
         context['driver_wallet_status'] = wallet_status

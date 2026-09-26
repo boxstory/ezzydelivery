@@ -94,6 +94,9 @@
             <th class="wh__th">Date</th>
             <th class="wh__th">Transaction #</th>
             <th class="wh__th">Type</th>
+            <th class="wh__th">Order</th>
+            <th class="wh__th">Delivery Date</th>
+            <th class="wh__th">Driver</th>
             <th class="wh__th">Warehouse</th>
             <th class="wh__th wh__th--end">Qty</th>
             <th class="wh__th wh__th--end">Before</th>
@@ -115,6 +118,32 @@
                 {{ txn.get_transaction_type_display }}
               </span>
             </td>
+            <td class="wh__td">
+              {% if txn.ref_order %}
+                {% if is_staff %}
+                <a class="wh__link" href="{% url 'workforce:order_detail' txn.ref_order.pk %}"
+                   hx-get="{% url 'workforce:order_detail' txn.ref_order.pk %}" hx-target="#main-content"
+                   hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">{{ txn.ref_order.order_number }}</a>
+                {% else %}
+                <a class="wh__link" href="{% url 'orders:order_details' txn.ref_order.pk %}">{{ txn.ref_order.order_number }}</a>
+                {% endif %}
+                {% if txn.ref_order.client_order_code %}<span class="wh__meta d-block">{{ txn.ref_order.client_order_code }}</span>{% endif %}
+              {% elif txn.ref_order_label %}
+                <span class="wh__meta">{{ txn.ref_order_label }}</span>
+              {% else %}
+                <span class="wh__muted">-</span>
+              {% endif %}
+            </td>
+            <td class="wh__td">
+              {% if txn.ref_delivered_at %}
+                <span class="wh__meta">{{ txn.ref_delivered_at|date:"d M Y H:i" }}</span>
+              {% elif txn.ref_task_date %}
+                <span class="wh__muted" title="Task date - this delivery is not completed yet">{{ txn.ref_task_date|date:"d M Y" }} (planned)</span>
+              {% else %}
+                <span class="wh__muted">-</span>
+              {% endif %}
+            </td>
+            <td class="wh__td">{{ txn.ref_driver_name|default:"-" }}</td>
             <td class="wh__td">{{ txn.warehouse.name }}</td>
             <td class="wh__td wh__td--end">
               {% if txn.quantity > 0 %}<span class="wh__amount--positive">+{{ txn.quantity }}</span>{% else %}<span class="wh__amount--negative">{{ txn.quantity }}</span>{% endif %}
@@ -125,7 +154,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="8" class="wh__empty">
+            <td colspan="11" class="wh__empty">
               <i class="fas fa-arrow-right-arrow-left"></i>
               <p><strong>No transactions yet</strong></p>
               <p>Stock movements for this product will appear here.</p>

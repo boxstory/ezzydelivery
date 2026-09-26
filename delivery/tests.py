@@ -115,7 +115,7 @@ class DeliveryTaskModelTestCase(TestCase):
             driver_whatsapp='22222222',
             driver_languages='english',
             driver_license_number='LIC12345',
-            driver_status='approved'
+            driver_status='approved', dashboard_access_enabled=True
         )
 
     def test_delivery_task_creation(self):
@@ -453,7 +453,7 @@ class DriverAssignmentTestCase(TestCase):
             driver_whatsapp='22222222',
             driver_languages='english',
             driver_license_number='LIC54321',
-            driver_status='approved'
+            driver_status='approved', dashboard_access_enabled=True
         )
 
     def test_assign_driver_to_task(self):
@@ -508,7 +508,7 @@ class DriverAssignmentTestCase(TestCase):
             driver_whatsapp='33333333',
             driver_languages='english',
             driver_license_number='LIC98765',
-            driver_status='approved'
+            driver_status='approved', dashboard_access_enabled=True
         )
 
         task = DeliveryTask.objects.create(

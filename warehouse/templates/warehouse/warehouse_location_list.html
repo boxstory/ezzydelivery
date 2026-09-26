@@ -71,8 +71,10 @@
                         <th class="wh__th">Code</th>
                         <th class="wh__th">Zone</th>
                         <th class="wh__th">Address</th>
+                        <th class="wh__th">Pin</th>
                         <th class="wh__th">Status</th>
                         <th class="wh__th">Default</th>
+                        <th class="wh__th">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -99,6 +101,16 @@
                             {% endif %}
                         </td>
                         <td class="wh__td">
+                            {% comment %}This pin is what the driver PWA navigates to on a hub leg,
+                            so a blank one is worth seeing from the list.{% endcomment %}
+                            {% if loc.latitude and loc.longitude %}
+                            <a class="wh__code" target="_blank" rel="noopener"
+                               href="https://www.google.com/maps?q={{ loc.latitude }},{{ loc.longitude }}">{{ loc.latitude|floatformat:5 }}, {{ loc.longitude|floatformat:5 }}</a>
+                            {% else %}
+                            <span class="wh__badge wh__badge--muted">Not set</span>
+                            {% endif %}
+                        </td>
+                        <td class="wh__td">
                             {% if loc.is_active %}
                             <span class="wh__badge wh__badge--success">Active</span>
                             {% else %}
@@ -112,10 +124,22 @@
                             <span class="wh__muted">-</span>
                             {% endif %}
                         </td>
+                        <td class="wh__td">
+                            <div class="d-flex flex-row flex-nowrap gap-2">
+                                <a href="{% url 'warehouse:warehouse_location_edit' loc.pk %}" class="wh__btn wh__btn--secondary"
+                                   hx-get="{% url 'warehouse:warehouse_location_edit' loc.pk %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                                    <i class="fas fa-pen"></i> Edit
+                                </a>
+                                <a href="{% url 'warehouse:warehouse_location_delete' loc.pk %}" class="wh__btn wh__btn--secondary"
+                                   hx-get="{% url 'warehouse:warehouse_location_delete' loc.pk %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="wh__empty">
+                        <td colspan="9" class="wh__empty">
                             <i class="fas fa-map-marker-alt"></i>
                             <p>No warehouse locations found</p>
                         </td>

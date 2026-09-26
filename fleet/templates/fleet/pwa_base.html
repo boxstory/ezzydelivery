@@ -54,10 +54,13 @@
                 <h1 class="fleet-pwa__title">{% block page_title %}Dashboard{% endblock %}</h1>
                 <div class="fleet-pwa__header-actions">
                     {% block header_actions %}
+                    {# The map is a work surface, so it follows the same gate as the tasks tab. #}
+                    {% if driver_dashboard_access %}
                     <a href="{% url 'fleet:fleet_tasks_map' %}" class="fleet-btn-icon fleet-pwa__header-link" title="Tasks Map">
                         <i class="fa-solid fa-map-location-dot"></i>
                         <span id="fleet_gps_status_dot" class="fleet-gps-dot fleet-gps-dot--grey" title="GPS: checking…"></span>
                     </a>
+                    {% endif %}
                     <button type="button" class="fleet-btn-icon" id="fleet_pwa_install_btn" style="display:none;" title="Install App">
                         <i class="fa-solid fa-download"></i>
                     </button>
@@ -101,6 +104,28 @@
         <!-- Bottom Navigation -->
         {% block bottom_nav %}
         <nav class="fleet-bottom-nav">
+            {% comment %}
+            A driver ops have not cleared to work gets a two-item bar. Every other
+            destination here is behind driver_dashboard_required, so showing the full
+            five would be five taps into a refusal. See fleet/access.py.
+            {% endcomment %}
+            {% if not driver_dashboard_access %}
+            <div class="fleet-bottom-nav__items">
+                <a href="{% url 'fleet:opportunities' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'opportunities' %}active{% endif %}">
+                    <span class="fleet-bottom-nav__icon">
+                        <i class="fa-solid fa-calendar-day"></i>
+                    </span>
+                    <span class="fleet-bottom-nav__label">Shifts</span>
+                </a>
+
+                <a href="{% url 'fleet:driver_profile_mobile' %}" class="fleet-bottom-nav__item fleet-bottom-nav__item--profile {% if request.resolver_match.url_name in 'driver_profile_mobile,driver_documents,vehicle_own,driver_settings,driver_help' %}active{% endif %}">
+                    <span class="fleet-bottom-nav__icon">
+                        <i class="fa-solid fa-user-circle"></i>
+                    </span>
+                    <span class="fleet-bottom-nav__label">Profile</span>
+                </a>
+            </div>
+            {% else %}
             <div class="fleet-bottom-nav__items">
                 <a href="{% url 'fleet:fleet_dashboard' %}" class="fleet-bottom-nav__item fleet-bottom-nav__item--home {% if request.resolver_match.url_name == 'fleet_dashboard' %}active{% endif %}">
                     <span class="fleet-bottom-nav__icon">
@@ -143,12 +168,20 @@
                     <span class="fleet-bottom-nav__label">Profile</span>
                 </a>
             </div>
+            {% endif %}
         </nav>
         {% endblock %}
     </div>
 
     <!-- Task Detail Bottom Sheet (shared across all PWA pages) -->
+    {% comment %}
+    The task sheet is ~1800 lines of task JS. A driver ops have not cleared to work
+    has no tasks to open it on, and every endpoint it calls would refuse them, so
+    it is dead weight on their phone.
+    {% endcomment %}
+    {% if driver_dashboard_access %}
     {% include "fleet/parts/task_detail_sheet.html" %}
+    {% endif %}
 
     <!-- Toast Notifications Container -->
     <div id="toastContainer" class="fleet-toast-container"></div>

@@ -1,0 +1,141 @@
+{% extends 'wh_dashboard_base.html' %}
+{% load static %}
+{% comment %}
+Purpose: Confirm deletion of a warehouse pickup/dispatch location (the dock a hub leg collects from).
+Used by: warehouse.views.warehouse_location_delete at /warehouse/warehouse-locations/<pk>/delete/
+Notes: Every FK to this row is SET_NULL, so a referenced dock is deactivated, never deleted.
+{% endcomment %}
+
+{% block title %}Delete Pickup/Dispatch Location{% endblock %}
+
+
+{% block content %}
+<div class="wh">
+    <div>
+        <a href="{% url 'warehouse:warehouse_location_list' %}" class="wh__btn wh__btn--secondary"
+           hx-get="{% url 'warehouse:warehouse_location_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+            <i class="fa-solid fa-arrow-left"></i> Back to Pickup/Dispatch Locations
+        </a>
+    </div>
+
+    <div class="wld__hero">
+        <div class="wld__hero-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div>
+            <h1 class="wld__hero-title">Confirm Delete Pickup/Dispatch Location</h1>
+            <p class="wld__hero-subtitle">This action cannot be undone</p>
+        </div>
+    </div>
+
+    {% if in_use %}
+    <div class="wld__alert wld__alert--danger">
+        <i class="fa-solid fa-exclamation-triangle"></i>
+        <div>
+            <strong>This location is still in use</strong> and cannot be deleted — every record pointing at it would
+            silently lose its collection point. Untick <strong>Active</strong> on the edit page instead.
+            <ul class="wld__impact-list">
+                {% for reference in in_use %}
+                <li>{{ reference }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% else %}
+    <div class="wld__alert wld__alert--warning">
+        <i class="fa-solid fa-info-circle"></i>
+        <div>
+            <strong>Warning:</strong> Nothing currently references this location, so it can be removed permanently.
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left">
+                <i class="fa-solid fa-map-marker-alt"></i>
+                <span>LOCATION TO DELETE</span>
+            </div>
+        </div>
+        <div class="wh__card-body">
+            <div class="wld__detail-grid">
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Warehouse</span>
+                    <span class="whdt__field-value">{{ location.warehouse.name }}</span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Name</span>
+                    <span class="whdt__field-value">{{ location.name }}</span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Code</span>
+                    <span class="whdt__field-value"><span class="wh__code">{{ location.code }}</span></span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Address</span>
+                    <span class="whdt__field-value">{{ location.address|default:'—' }}</span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Pin</span>
+                    <span class="whdt__field-value">
+                        {% if location.latitude and location.longitude %}
+                        {{ location.latitude|floatformat:6 }}, {{ location.longitude|floatformat:6 }}
+                        {% else %}
+                        <span class="wh__badge wh__badge--muted">Not set</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Status</span>
+                    <span class="whdt__field-value">
+                        {% if location.is_active %}
+                        <span class="wh__badge wh__badge--success">Active</span>
+                        {% else %}
+                        <span class="wh__badge wh__badge--muted">Inactive</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="wh__card">
+        <div class="wh__card-body">
+            <form method="post" action="" novalidate>
+                {% csrf_token %}
+                {% if not in_use %}
+                <div class="wha__check-card">
+                    <input type="checkbox" class="wha__check-input" id="confirm-delete" required>
+                    <label class="wha__check-label" for="confirm-delete">
+                        <strong>I understand that this action is permanent and cannot be reversed</strong>
+                    </label>
+                </div>
+                {% endif %}
+                <div class="wld__confirm-actions">
+                    {% if not in_use %}
+                    <button type="submit" class="wh__btn wld__btn--danger" id="delete-button" disabled>
+                        <i class="fa-solid fa-trash"></i> Yes, Delete Location
+                    </button>
+                    {% endif %}
+                    <a href="{% url 'warehouse:warehouse_location_edit' location.pk %}" class="wh__btn wh__btn--secondary"
+                       hx-get="{% url 'warehouse:warehouse_location_edit' location.pk %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                        <i class="fa-solid fa-pen"></i> Edit Instead
+                    </a>
+                    <a href="{% url 'warehouse:warehouse_location_list' %}" class="wh__btn wh__btn--secondary"
+                       hx-get="{% url 'warehouse:warehouse_location_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                        <i class="fa-solid fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var box = document.getElementById('confirm-delete');
+    var btn = document.getElementById('delete-button');
+    if (box && btn) {
+        box.addEventListener('change', function () { btn.disabled = !this.checked; });
+    }
+})();
+</script>
+{% endblock %}

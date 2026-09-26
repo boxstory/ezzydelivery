@@ -149,10 +149,15 @@ class ReturnRequestAdmin(admin.ModelAdmin):
     list_display = ('return_number', 'order', 'business', 'reason', 'status', 'cod_reversal_amount', 'created_at')
     search_fields = ('return_number', 'status', 'reason', 'reason_notes', 'cod_reversal_amount',
                      'review_notes', 'order__order_number', 'replacement_order__order_number',
-                     'business__business_name', 'reviewed_by__username')
+                     'business__business_name', 'reviewed_by__username',
+                     'external_reference', 'customer_name', 'customer_phone')
     list_filter = ('reason', 'status', 'cod_reversal_processed')
     list_select_related = ('order', 'business')
-    raw_id_fields = ('order', 'business', 'replacement_order', 'reviewed_by')
+    # pickup_location is raw_id like the rest: a plain select renders every
+    # address in the database on a claim that uses one only when it is a
+    # standalone claim for goods we never delivered.
+    raw_id_fields = ('order', 'business', 'replacement_order', 'reviewed_by',
+                     'pickup_location')
 
 @admin.register(orders_models.TempOrder)
 class TempOrderAdmin(admin.ModelAdmin):

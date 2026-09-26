@@ -231,6 +231,66 @@ def _annotate_wa_chats(leads):
         logger.exception('crm: WA chat annotation failed')
 
 
+# ── Vehicle facet (driver list) ─────────────────────────────────────────
+# 'none' is the model's own "not stated" placeholder and never reads as a vehicle,
+# so it is dropped from the options and its value reused for the question a
+# recruiter actually asks: which applicants have no vehicle on file at all.
+def _vehicle_labels():
+    """Display names shared by the row's vehicle chip and the facet that filters on
+    it. The two long names get a short form: the chip is a nowrap band on a narrow
+    kanban card and the facet sits in a fixed-width track, so neither reads in full
+    at the model's own wording."""
+    from fleet.models import VEHICLE_CHOICES
+
+    labels = dict(VEHICLE_CHOICES)
+    labels.update({'pickup3ton': 'Pickup 3T', 'pickup_big': 'Pickup Big'})
+    return labels
+
+
+def _vehicle_filter_choices():
+    from fleet.models import VEHICLE_CHOICES
+
+    labels = _vehicle_labels()
+    return [(key, labels[key]) for key, _label in VEHICLE_CHOICES if key != 'none']
+
+
+def _apply_vehicle_filter(leads, vehicle_filter):
+    """Narrow driver leads to the vehicle their application registered.
+
+    `vehicle_filter` is a list of ticks — the facet is a checkbox multi-select on
+    every page that offers it, and a recruiter reads "Bike + Car" as one pool, so
+    the ticks are OR'd rather than forcing a second trip through the bar.
+
+    Resolves to the SAME row the vehicle chip and the map pin show — newest
+    registration wins — so filtering by Bike can never leave a lead labelled Car
+    on the page. Values that are not vehicles are dropped: one typo in a
+    hand-edited URL narrows nothing rather than emptying the page.
+    """
+    from fleet.models import DriverVehicle
+
+    real_types = [key for key, _label in _vehicle_filter_choices()]
+    # 'none' is not a vehicle, it is the absence of one, so it rides separately.
+    picked = [v for v in vehicle_filter if v in real_types]
+    want_none = 'none' in vehicle_filter
+    if not picked and not want_none:
+        return leads
+
+    newest_vehicle = (DriverVehicle.objects
+                      .filter(driver_id=OuterRef('driver_id'))
+                      .exclude(vehicle_type='')
+                      .exclude(vehicle_type='none')
+                      .order_by('-created_at')
+                      .values('vehicle_type')[:1])
+    leads = leads.annotate(current_vehicle=Subquery(newest_vehicle))
+
+    vehicle_q = Q(current_vehicle__in=picked) if picked else Q()
+    if want_none:
+        # No application bound to the card yet, or one carrying no usable vehicle
+        # row — both read as "vehicle unknown" wherever the lead is drawn.
+        vehicle_q |= Q(current_vehicle__isnull=True)
+    return leads.filter(vehicle_q)
+
+
 def _annotate_driver_vehicles(leads):
     """Bulk-set lead.vehicle_type / lead.vehicle_label for driver leads.
 
@@ -239,12 +299,9 @@ def _annotate_driver_vehicles(leads):
     bike one. One query for the whole page; leads with no application bound yet
     keep the generic chip.
     """
-    from fleet.models import VEHICLE_CHOICES, DriverVehicle
+    from fleet.models import DriverVehicle
 
-    labels = dict(VEHICLE_CHOICES)
-    # The chip is a nowrap band on a narrow kanban card, so the two long names
-    # get a short form rather than stretching the card.
-    labels.update({'pickup3ton': 'Pickup 3T', 'pickup_big': 'Pickup Big'})
+    labels = _vehicle_labels()
     driver_ids = {
         lead.driver_id for lead in leads
         if lead.category == Lead.CATEGORY_DRIVER and lead.driver_id
@@ -271,10 +328,25 @@ def _render_leads_board(request, board_category, template):
     """Shared kanban builder behind the two board pages. The business sales pipeline
     and the driver recruitment pipeline are separate pages with their own URL, their
     own columns and their own help notes — this only assembles what they share."""
-    leads, search, source_filter, assigned_filter, category_filter = _filtered_leads(request)
+    # Every facet on this bar is a checkbox multi-select, the same as the tables:
+    # "Manual + WhatsApp Inbound" is one pool, not two trips through the bar.
+    leads, search, source_filter, assigned_filter, category_filter = _filtered_leads(
+        request, multi_facets=True)
     leads = leads.filter(category=board_category)
 
     is_driver_board = board_category == Lead.CATEGORY_DRIVER
+
+    # Vehicle is a recruitment question, so the facet exists only on the driver
+    # board — a business lead has no application behind it to carry one.
+    vehicle_filter = []
+    if is_driver_board:
+        vehicle_filter = [v.strip() for v in request.GET.getlist('vehicle') if v.strip()]
+        leads = _apply_vehicle_filter(leads, vehicle_filter)
+
+    # When the card was raised — a preset is one pick, so this facet is a single
+    # select rather than a checklist.
+    date_preset, date_from, date_to = _date_filter(request)
+    leads = _apply_date_filter(leads, date_from, date_to)
 
     # Driver board mirrors the real applicant pool: ensure a card exists for every
     # driver application and each card's stage matches the driver's form status.
@@ -350,38 +422,61 @@ def _render_leads_board(request, board_category, template):
     # screen, and each engaged filter gets a chip that carries its own removal URL.
     staff_users = _staff_users()
     board_total = sum(c['count'] for c in columns)
-    filters_on = bool(search or source_filter or assigned_filter)
+    filters_on = bool(search or source_filter or assigned_filter or vehicle_filter
+                      or date_from or date_to)
     board_grand_total = board_total
     if filters_on:
         board_grand_total = (Lead.objects
                              .filter(merged_into__isnull=True, category=board_category)
                              .filter(keep).count())
 
-    def _chip(param, label, value):
+    def _chip(param, label, display, tick=None):
+        """One removable chip. `tick` drops just that value and leaves the facet's
+        other ticks alone — with multi-selects a chip that cleared the whole param
+        would throw away picks the staffer never pointed at. `param` may be several
+        names, for a facet that spans more than one (the date range is a preset
+        plus its two ends)."""
         params = request.GET.copy()
-        params.pop(param, None)
+        names = [param] if isinstance(param, str) else list(param)
+        if tick is None:
+            for name in names:
+                params.pop(name, None)
+        else:
+            params.setlist(names[0], [v for v in params.getlist(names[0]) if v != tick])
         query = params.urlencode()
         return {
             'label': label,
-            'value': value,
+            'value': display,
             'remove_url': f'{request.path}?{query}' if query else request.path,
         }
 
     active_filters = []
     if search:
         active_filters.append(_chip('search', 'Search', search))
-    if source_filter:
-        active_filters.append(_chip(
-            'source', 'Source', dict(Lead.SOURCE_CHOICES).get(source_filter, source_filter)))
-    if assigned_filter:
-        if assigned_filter == 'me':
+
+    source_labels = dict(Lead.SOURCE_CHOICES)
+    for value in source_filter:
+        active_filters.append(_chip('source', 'Source', source_labels.get(value, value), value))
+
+    for value in assigned_filter:
+        if value == 'me':
             assigned_label = 'Assigned to me'
-        elif assigned_filter == 'none':
+        elif value == 'none':
             assigned_label = 'Unassigned'
         else:
-            match = next((u for u in staff_users if str(u.pk) == assigned_filter), None)
+            match = next((u for u in staff_users if str(u.pk) == value), None)
             assigned_label = (match.get_full_name() or match.username) if match else 'Assignee'
-        active_filters.append(_chip('assigned', 'Assignee', assigned_label))
+        active_filters.append(_chip('assigned', 'Assignee', assigned_label, value))
+
+    vehicle_labels = dict(_vehicle_filter_choices())
+    for value in vehicle_filter:
+        active_filters.append(_chip(
+            'vehicle', 'Vehicle', vehicle_labels.get(value, 'No vehicle'), value))
+
+    if date_from or date_to:
+        active_filters.append(_chip(
+            ('datePreset', 'dateFrom', 'dateTo'), 'Created',
+            _date_filter_label(date_preset, date_from, date_to)))
 
     # Headline outcome metric = the column this board calls a win (Won / Approved),
     # falling back to its leftmost terminal column if none declares an outcome.
@@ -401,6 +496,12 @@ def _render_leads_board(request, board_category, template):
         'search': search,
         'source_filter': source_filter,
         'assigned_filter': assigned_filter,
+        'vehicle_filter': vehicle_filter,
+        'vehicle_choices': _vehicle_filter_choices(),
+        'date_preset': date_preset,
+        'date_from': date_from.isoformat() if date_from else '',
+        'date_to': date_to.isoformat() if date_to else '',
+        'date_preset_choices': DATE_PRESET_CHOICES,
         'category_filter': category_filter,
         'staff_users': staff_users,
         'source_choices': Lead.SOURCE_CHOICES,
@@ -432,24 +533,141 @@ def crm_driver_leads_board(request):
         request, Lead.CATEGORY_DRIVER, 'workforce/crm/driver_leads_board.html')
 
 
+# ── Created-date facet ──────────────────────────────────────────────
+# Keys, labels and arithmetic are the shared staff-list ones (workforce.views.
+# _resolve_print_label_dates and pgApplyPreset in workforce.js), so "Last 7 days"
+# spans the same week here as on every other bar in the dashboard. Param names
+# match them too: a URL copied between bars keeps meaning what it said.
+DATE_PRESET_CHOICES = [
+    ('today', 'Today'),
+    ('yesterday', 'Yesterday'),
+    ('3days', 'Last 3 days'),
+    ('week', 'Last 7 days'),
+    ('month', 'Last 30 days'),
+    ('custom', 'Custom'),
+]
+
+# Days back from today, inclusive of today.
+DATE_PRESET_SPANS = {'today': 0, '3days': 2, 'week': 6, 'month': 29}
+
+
+def _parse_crm_date(raw):
+    from datetime import date as _date
+
+    raw = (raw or '').strip()
+    if not raw:
+        return None
+    try:
+        return _date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def _date_filter(request):
+    """(preset, date_from, date_to) for the Created facet.
+
+    A preset always resolves to the range it names: the dates on the URL are read
+    only for 'custom', so a stale or hand-edited ?dateFrom= can never disagree
+    with the option the bar is showing as selected. An unknown preset, or a custom
+    range with neither end filled in, narrows nothing.
+
+    Dates are Qatar dates — settings.TIME_ZONE is Asia/Qatar, so localdate() and
+    the __date lookup below both read in the timezone the desk works in, not UTC.
+    """
+    preset = request.GET.get('datePreset', '').strip()
+
+    if preset == 'custom':
+        return (preset,
+                _parse_crm_date(request.GET.get('dateFrom')),
+                _parse_crm_date(request.GET.get('dateTo')))
+
+    today = timezone.localdate()
+    if preset == 'yesterday':
+        day = today - timedelta(days=1)
+        return preset, day, day
+    if preset in DATE_PRESET_SPANS:
+        return preset, today - timedelta(days=DATE_PRESET_SPANS[preset]), today
+    return '', None, None
+
+
+def _apply_date_filter(leads, date_from, date_to):
+    """Narrow to cards raised inside the range, either end on its own being valid."""
+    if date_from:
+        leads = leads.filter(created_at__date__gte=date_from)
+    if date_to:
+        leads = leads.filter(created_at__date__lte=date_to)
+    return leads
+
+
+def _date_filter_label(preset, date_from, date_to):
+    """What the applied-filter chip says. A custom range prints its own dates so
+    the chip is readable without opening the picker."""
+    if preset != 'custom':
+        return dict(DATE_PRESET_CHOICES).get(preset, '')
+    if date_from and date_to:
+        return f'{date_from:%d %b} – {date_to:%d %b %Y}'
+    if date_from:
+        return f'From {date_from:%d %b %Y}'
+    if date_to:
+        return f'Until {date_to:%d %b %Y}'
+    return 'Custom range'
+
+
+def _facet_params(pairs):
+    """Query string for a bar whose facets are multi-selects.
+
+    urlencode on a dict would write ?stage=%5B%27new%27%5D for a list; every tick
+    needs its own ?stage= so the link a sort header or a page button writes reads
+    back as the same filter. Empty values and empty lists write nothing.
+    """
+    from urllib.parse import urlencode
+
+    out = []
+    for key, value in pairs:
+        if isinstance(value, (list, tuple)):
+            out.extend((key, item) for item in value if item)
+        elif value:
+            out.append((key, value))
+    return urlencode(out)
+
+
 def _render_leads_list(request, list_category):
     """Shared table builder behind the two list pages. The category is fixed by the
     URL, not by a tab — a business page never shows driver applicants and vice versa."""
     from workforce.views import paginate_queryset
 
-    leads, search, source_filter, assigned_filter, _category_filter = _filtered_leads(request)
+    # Every facet on this bar is a checkbox multi-select, so each one reads its
+    # ticks with getlist — including the two the shared helper owns. A URL
+    # carrying a single ?source=x still reads identically.
+    leads, search, source_filter, assigned_filter, _category_filter = _filtered_leads(
+        request, multi_facets=True)
     category_filter = list_category
     leads = leads.filter(category=list_category)
 
-    stage_filter = request.GET.get('stage', '').strip()
+    # Applied whenever one is given, not only when it matches a configured column:
+    # an unrecognised stage falling through would show every lead, which reads as
+    # "the filter did nothing".
+    stage_filter = [v.strip() for v in request.GET.getlist('stage') if v.strip()]
     if stage_filter:
-        leads = leads.filter(stage=stage_filter)
+        leads = leads.filter(stage__in=stage_filter)
 
     overdue_filter = request.GET.get('overdue', '').strip()
     if overdue_filter == '1':
         leads = leads.filter(
             next_followup_at__lt=timezone.localdate()
         ).exclude(stage__in=crm_services.closed_stage_keys())
+
+    # Vehicle is a recruitment question, so the facet only exists on the driver
+    # page — a business lead has no application to carry one.
+    vehicle_filter = []
+    if list_category == Lead.CATEGORY_DRIVER:
+        vehicle_filter = [v.strip() for v in request.GET.getlist('vehicle') if v.strip()]
+        leads = _apply_vehicle_filter(leads, vehicle_filter)
+
+    # When the card was raised. A preset is one pick, never several — "Today and
+    # Last 30 days" is just Last 30 days — so this facet stays a single select.
+    date_preset, date_from, date_to = _date_filter(request)
+    leads = _apply_date_filter(leads, date_from, date_to)
 
     # Stage columns are this board's own, and they are needed twice: to rank a
     # stage sort in board order and to fill the stage filter below.
@@ -505,26 +723,23 @@ def _render_leads_list(request, list_category):
     page_obj.object_list = list(page_obj.object_list)
     _annotate_driver_vehicles(page_obj.object_list)
 
-    from urllib.parse import urlencode
     # Two strings, deliberately: pagination has to carry the sort with it, while a
     # header cell writes its own sort and must not inherit the old one.
-    sort_params = urlencode({k: v for k, v in {
-        'search': search,
-        'stage': stage_filter,
-        'source': source_filter,
-        'assigned': assigned_filter,
-        'overdue': overdue_filter,
-        'category': category_filter,
-    }.items() if v})
-    filter_params = urlencode({k: v for k, v in {
-        'search': search,
-        'stage': stage_filter,
-        'source': source_filter,
-        'assigned': assigned_filter,
-        'overdue': overdue_filter,
-        'category': category_filter,
-        'sort': sort.value,
-    }.items() if v})
+    facets = [
+        ('search', search),
+        ('stage', stage_filter),
+        ('source', source_filter),
+        ('assigned', assigned_filter),
+        ('overdue', overdue_filter),
+        ('vehicle', vehicle_filter),
+        ('datePreset', date_preset),
+        # Only a custom range carries its dates; a preset re-resolves server-side.
+        ('dateFrom', date_from.isoformat() if date_preset == 'custom' and date_from else ''),
+        ('dateTo', date_to.isoformat() if date_preset == 'custom' and date_to else ''),
+        ('category', category_filter),
+    ]
+    sort_params = _facet_params(facets)
+    filter_params = _facet_params(facets + [('sort', sort.value)])
 
     is_driver_list = list_category == Lead.CATEGORY_DRIVER
     # The shared column picker + row-tick contract (workforce/js/export-columns.js):
@@ -556,6 +771,12 @@ def _render_leads_list(request, list_category):
         'assigned_filter': assigned_filter,
         'stage_filter': stage_filter,
         'overdue_filter': overdue_filter,
+        'vehicle_filter': vehicle_filter,
+        'vehicle_choices': _vehicle_filter_choices(),
+        'date_preset': date_preset,
+        'date_from': date_from.isoformat() if date_from else '',
+        'date_to': date_to.isoformat() if date_to else '',
+        'date_preset_choices': DATE_PRESET_CHOICES,
         'category_filter': category_filter,
         'staff_users': _staff_users(),
         'stage_choices': stage_choices,
@@ -727,6 +948,7 @@ CRM_DRIVER_LEAD_EXPORT_COLUMNS = CRM_LEAD_BASE_COLUMNS + [
     ('area',         'Area',          _driver_attr(
         lambda d: (d.profile.zone_name or '') if d.profile else '')),
     ('licence',      'Licence no',    _driver_attr(lambda d: d.driver_license_number or '')),
+    ('sponsor',      'Sponsor',       _driver_attr(lambda d: d.driver_sponsor or '')),
     ('documents',    'Documents held', _driver_attr(_driver_documents_held)),
 ]
 
@@ -738,16 +960,23 @@ def _export_leads_queryset(request, list_category):
     but only ever within this queryset, so a hand-written id can never reach
     across the category boundary into the other pipeline.
     """
-    leads, *_ = _filtered_leads(request)
+    leads, *_ = _filtered_leads(request, multi_facets=True)
     leads = leads.filter(category=list_category)
 
-    stage_filter = request.GET.get('stage', '').strip()
+    stage_filter = [v.strip() for v in request.GET.getlist('stage') if v.strip()]
     if stage_filter:
-        leads = leads.filter(stage=stage_filter)
+        leads = leads.filter(stage__in=stage_filter)
     if request.GET.get('overdue', '').strip() == '1':
         leads = leads.filter(
             next_followup_at__lt=timezone.localdate()
         ).exclude(stage__in=crm_services.closed_stage_keys())
+
+    if list_category == Lead.CATEGORY_DRIVER:
+        leads = _apply_vehicle_filter(
+            leads, [v.strip() for v in request.GET.getlist('vehicle') if v.strip()])
+
+    _preset, date_from, date_to = _date_filter(request)
+    leads = _apply_date_filter(leads, date_from, date_to)
 
     return (leads
             .select_related('assigned_to', 'converted_business',
@@ -1057,7 +1286,11 @@ def crm_leads_export_google(request):
     from core.exports import safe_csv_writer, set_export_filename
     from django.http import HttpResponse
 
-    leads, _search, _source, _assigned, _category = _filtered_leads(request)
+    # multi_facets: this link carries the list page's own query string, whose
+    # facets each write one param per tick — read singly, ?source=a&source=b
+    # would silently export only the last of the two.
+    leads, _search, _source, _assigned, _category = _filtered_leads(
+        request, multi_facets=True)
     # _filtered_leads prefetches for the table view; none of it is needed here.
     leads = (leads.exclude(phone='')
              .prefetch_related(None)
@@ -1144,8 +1377,13 @@ def _media_kind(mime, message_type):
     return ''
 
 
-def _lead_wa_identifiers(lead):
-    """WhatsAppMessage from/to identifiers that can mean this lead's phone.
+def wa_identifiers_for(raw_phone, raw_override=''):
+    """WhatsAppMessage from/to identifiers that can mean one phone number.
+
+    Split out of _lead_wa_identifiers so surfaces that have a bare number rather
+    than a Lead — the driver verification queue — can read the same thread
+    without re-deriving the LID rules, which is exactly where a duplicate would
+    go wrong (see the 974-invention trap below).
 
     Returns (idents, lid_pairs):
       idents    — phone-shaped identifiers (bare digits with/without the 974
@@ -1154,8 +1392,8 @@ def _lead_wa_identifiers(lead):
                   device, so the same lid string on our other number belongs to
                   a different person and must only match within its session.
     """
-    phone = crm_services.normalize_phone(lead.phone)
-    override = crm_services.normalize_phone(getattr(lead, 'wa_chat_override', '') or '')
+    phone = crm_services.normalize_phone(raw_phone)
+    override = crm_services.normalize_phone(raw_override or '')
     idents = set()
     lid_pairs = set()
     if phone:
@@ -1184,11 +1422,16 @@ def _lead_wa_identifiers(lead):
             lid_pairs.add((sess, lid))
             lid_pairs.add((sess, f'{lid}@lid'))
     except Exception:
-        logger.exception('crm: lid lookup failed for lead %s', lead.pk)
+        logger.exception('crm: lid lookup failed for phone %s', phone or override)
     for p in list(idents):
         if '@' not in p:
             idents.add(f'{p}@c.us')
     return idents, lid_pairs
+
+
+def _lead_wa_identifiers(lead):
+    """Identifiers for a Lead — the phone plus any manual chat override."""
+    return wa_identifiers_for(lead.phone, getattr(lead, 'wa_chat_override', '') or '')
 
 
 def _lead_wa_q(lead, session=''):
@@ -3332,7 +3575,7 @@ def crm_driver_map(request):
     Built from the whole filtered set rather than a page of it, so the map answers
     "where are my applicants" instead of "where is page 1".
     """
-    from fleet.models import DRIVER_STATUS_CHOICES, VEHICLE_CHOICES, DriverVehicle
+    from fleet.models import DRIVER_STATUS_CHOICES
 
     # Every facet on this bar is a checkbox multi-select, so each one reads its
     # values with getlist — including the two the shared helper owns.
@@ -3360,21 +3603,10 @@ def crm_driver_map(request):
     vehicle_filter = [v.strip() for v in request.GET.getlist('vehicle') if v.strip()]
     account_filter = [v.strip() for v in request.GET.getlist('account') if v.strip()]
 
-    if vehicle_filter:
-        newest_vehicle = (DriverVehicle.objects
-                          .filter(driver_id=OuterRef('driver_id'))
-                          .exclude(vehicle_type='')
-                          .exclude(vehicle_type='none')
-                          .order_by('-created_at')
-                          .values('vehicle_type')[:1])
-        leads = leads.annotate(current_vehicle=Subquery(newest_vehicle))
-        # "No vehicle on file" is a pick like any other, so Bike + none is one
-        # OR'd question rather than two impossible AND'd ones.
-        picked = [v for v in vehicle_filter if v != 'none']
-        vehicle_q = Q(current_vehicle__in=picked) if picked else Q()
-        if 'none' in vehicle_filter:
-            vehicle_q |= Q(current_vehicle__isnull=True)
-        leads = leads.filter(vehicle_q)
+    # Shared with the driver leads table (_apply_vehicle_filter): "No vehicle on
+    # file" is a pick like any other, so Bike + none is one OR'd question rather
+    # than two impossible AND'd ones.
+    leads = _apply_vehicle_filter(leads, vehicle_filter)
 
     if account_filter:
         leads = leads.filter(driver__driver_status__in=account_filter)
@@ -3415,7 +3647,7 @@ def crm_driver_map(request):
         'stage_filters': stage_filters,
         'vehicle_filter': vehicle_filter,
         'account_filter': account_filter,
-        'vehicle_choices': [(k, v) for k, v in VEHICLE_CHOICES if k != 'none'],
+        'vehicle_choices': _vehicle_filter_choices(),
         'account_choices': DRIVER_STATUS_CHOICES,
         'search': search,
         'source_filter': source_filter,

@@ -25,7 +25,7 @@ logger = logging.getLogger('orders')
 
 # Orders that have finished one way or the other. A pickup location attached to
 # one of these is a bookkeeping edit, never a reason to open a first-mile leg.
-TERMINAL_ORDER_STATUSES = ('delivered', 'cancelled')
+TERMINAL_ORDER_STATUSES = ('delivered', 'cancelled', 'returned')
 
 
 def generate_sequence_code(number):
@@ -124,6 +124,16 @@ def order_pre_save_receiver(sender, instance, *args, **kwargs):
             instance.client_order_code or 'ORD'
         )
 
+    # A new order that arrives without a pickup (API, imports, integrations) takes
+    # the client's default one — without it there is no start point, so no
+    # distance and no rate-card fee. P2P orders carry their own pickup address.
+    if (not instance.pk and not instance.pickup_location_id and instance.business_id
+            and instance.order_type != 'pick_and_drop'):
+        from business.models import PickupLocation
+        instance.pickup_location = PickupLocation.objects.filter(
+            business_id=instance.business_id, is_default=True, pickup_status='active'
+        ).first()
+
     # Store old status values for change detection
     if instance.pk:
         try:
@@ -192,11 +202,29 @@ def _refresh_delivery_area(instance):
                        exc_info=True)
 
 
+def _apply_distance_rate(instance):
+    """Price the order from its client's distance rate card, once the distance is known.
+
+    Runs after _refresh_route_distance so a moved pin re-prices in the same save.
+    A staff-typed fee is left alone — see delivery.client_rates.
+    """
+    if instance.route_distance_km is None or not instance.business_id:
+        return
+    try:
+        from delivery.client_rates import apply_rate_card
+        apply_rate_card(instance)
+    except Exception:
+        # A fee is never worth failing an order save over; staff can still type one.
+        logger.warning('Could not apply distance rate for order %s', instance.pk,
+                       exc_info=True)
+
+
 @receiver(post_save, sender=Order, dispatch_uid='orders.order_post_save')
 def order_post_save_receiver(sender, instance, created, *args, **kwargs):
     logger.debug('order_post_save_receiver')
     _refresh_route_distance(instance)
     _refresh_delivery_area(instance)
+    _apply_distance_rate(instance)
     if created:
         logger.debug(f'New order created: {instance}')
         if not instance.order_number or instance.order_number == "":
@@ -828,12 +856,20 @@ def _create_delivery_task_from_order(order):
             else:
                 preferred_time = '6pm-10pm'
 
-        # An exchange goes both ways: the driver hands over the replacement and
-        # brings the original back. The leg is what prices the round trip and what
-        # raises the 'collect the old item' banner in his app, so it has to be set
-        # wherever the task is born — a replacement raised by the seller is a draft
-        # with no task yet, and only gets one here when staff publish it.
-        task_leg = 'exchange' if order.collect_back else 'single'
+        # A return pickup runs the other way entirely — the driver collects at the
+        # customer's door and drops at the seller's or a hub.
+        #
+        # `collect_back` deliberately does NOT make an 'exchange' leg any more. That
+        # leg carried goods away from a customer and modelled nothing about where
+        # they went: no destination, no custody, no record that a driver was holding
+        # a seller's stock. The original is now collected by its own task, raised
+        # when this delivery completes (orders.services.raise_collect_back_collection),
+        # so every movement has two real ends. Tasks already on the road keep their
+        # 'exchange' leg and everything that reads it.
+        if order.order_type == 'return_pickup':
+            task_leg = 'collect_from_customer'
+        else:
+            task_leg = 'single'
 
         # Create delivery task with all mapped fields
         delivery_task = DeliveryTask.objects.create(
@@ -853,6 +889,27 @@ def _create_delivery_task_from_order(order):
             preferred_time=preferred_time,
             address_accuracy=address_accuracy,
         )
+
+        # A collection may be routed to a hub rather than the client's counter.
+        # Resolved HERE, once, and snapshotted onto the task — and resolved BEFORE
+        # the stamp, never after: resolve_hub_for_task reads task.hub_warehouse as
+        # its first precedence step, so resolving a stamped task just echoes back
+        # what we wrote.
+        if delivery_task.task_leg == 'collect_from_customer':
+            try:
+                from delivery.services.returns import (
+                    DEST_HUB, resolve_collection_destination,
+                )
+                destination = resolve_collection_destination(delivery_task)
+                if (destination.kind == DEST_HUB
+                        and destination.warehouse_location is not None):
+                    delivery_task.hub_warehouse = destination.warehouse_location
+                    delivery_task.save(update_fields=['hub_warehouse'])
+            except Exception as e:
+                # A routing failure must not stop the collection existing; it just
+                # ends at the client's counter, which is the safe default.
+                logger.warning(
+                    f"Collection destination unresolved for task {delivery_task.pk}: {e}")
 
         # Update order
         order.task_created = True

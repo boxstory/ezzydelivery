@@ -299,6 +299,9 @@ Notes: One template, several routes — the queryset differs per view but the co
                         {% if order.is_transferred %}<span class="badge bg-success ms-1" style="font-size:0.6rem;vertical-align:middle;">Transferred</span>{% endif %}
                         {% if order.order_type == 'pick_and_drop' %}<span class="badge bg-info ms-1" style="font-size:0.6rem;vertical-align:middle;">P2P</span>{% endif %}
                         {% if order.order_type == 'pick_and_drop' and not order.dl_amount %}<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;vertical-align:middle;">Price pending</span>{% endif %}
+                        {% comment %}The customer pays this client's delivery fee at the door, but no fee is set
+                        yet (usually no pin, so no distance to price it from) — the driver would ask for COD only.{% endcomment %}
+                        {% if order.order_type == 'normal_delivery' and order.business.customer_pays_delivery and not order.dl_amount and order.cod_status_by_client != 'online_paid' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}<span class="badge bg-warning text-dark ms-1" title="Customer pays delivery, but no fee is set — pin the address or type a fee before publishing">Fee pending</span>{% endif %}
                         <span class="orc__seller">{{ order.business.business_name }}</span>
                     </div>
                     <div class="orc__cell orc__cell--cust">
@@ -316,15 +319,16 @@ Notes: One template, several routes — the queryset differs per view but the co
                             {% if order.dl_zone or order.dl_street or order.dl_building %}
                             <span class="orc__zone">Z{{ order.dl_zone|default:"-" }} / S{{ order.dl_street|default:"-" }} / B{{ order.dl_building|default:"-" }}</span>
                             {% endif %}
-                            {% include "includes/components/_route_distance.html" with order=order %}
+                            {% comment %} With a pin, the distance sits in the coords line below (map → km → accuracy). {% endcomment %}
+                            {% if not order.latitude or not order.longitude %}{% include "includes/components/_route_distance.html" with order=order %}{% endif %}
                         </span>
                         <span class="orc__addr">{{ order.customer_address }}</span>
                         {% if order.latitude and order.longitude %}
                         <span class="orc__coords">
-                            {% comment %} The pin in the zone line above opens the map for this row; these
-                               are the same coordinates, so they read as text, not a second link. {% endcomment %}
-                            <span class="orc__coords-link"><i class="fa-solid fa-map-pin"></i>
-                            {{ order.latitude|floatformat:4 }}, {{ order.longitude|floatformat:4 }}</span>
+                            {% comment %} Map icon instead of raw lat/long: opens the pin in Google Maps
+                               in a new tab; the coordinates stay available on hover. {% endcomment %}
+                            <a class="orc__coords-link" href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" rel="noopener" title="Open in Google Maps ({{ order.latitude|floatformat:5 }}, {{ order.longitude|floatformat:5 }})" aria-label="Open location in Google Maps"><i class="fa-solid fa-map-location-dot"></i></a>
+                            {% include "includes/components/_route_distance.html" with order=order %}
                             {% if order.coords_accuracy %}
                             <span class="orc__loc-acc orc__loc-acc--{{ order.coords_accuracy }}">{% if order.coords_accuracy == 'by_customer' %}By Client{% elif order.coords_accuracy == 'by_staff' %}By Staff{% elif order.coords_accuracy == 'by_driver' %}By Driver{% elif order.coords_accuracy == 'exact' %}Exact{% elif order.coords_accuracy == 'street' %}Street{% elif order.coords_accuracy == 'landmark' %}Landmark{% elif order.coords_accuracy == 'zone_center' %}Zone{% elif order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
                             {% endif %}
@@ -363,6 +367,7 @@ Notes: One template, several routes — the queryset differs per view but the co
                     </div>
                     <div class="orc__cell orc__cell--cod">
                         <span class="orc__cod-val">{{ order.cod_amount|default:0 }}</span><span class="orc__cod-cur">QR</span>
+                        <span class="orc__dl-charge" title="Delivery charge">DL {{ order.dl_amount|default:0 }}</span>
                     </div>
                     <div class="orc__cell orc__cell--date"><span class="orc__date">{{ order.order_date|date:"d M" }}</span><span class="orc__time text-muted" style="font-size:0.75rem;display:block;">{{ order.created_at|time:"H:i" }}</span></div>
                     <div class="orc__cell orc__cell--status">

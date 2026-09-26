@@ -47,6 +47,10 @@ urlpatterns = [
     path('driver/start/',
          RedirectView.as_view(pattern_name='core:join_driver_start', permanent=True),
          name='join_driver_start_short'),
+    # Short URL: /driver/join/ -> /join_us/driver/ (application form)
+    path('driver/join/',
+         RedirectView.as_view(pattern_name='core:join_driver', permanent=True),
+         name='join_driver_short'),
     path('join_us/business/update/',
          core_views.business_profile_update, name='business_profile_update'),
     path('join_us/driver/update/',

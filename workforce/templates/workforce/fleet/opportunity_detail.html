@@ -1,0 +1,203 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: One opportunity posting — its dated shifts and every driver who raised a hand, with the ops decision.
+Used by: workforce.views.wf_opportunity_detail at /workforce/fleet/opportunities/<id>/
+Notes: Decisions POST to wf_opportunity_interest_decide, which routes through fleet/opportunities.py —
+       capacity is enforced under a row lock there, so this page never counts seats itself.
+{% endcomment %}
+{% block title %}{{ posting.title }} - Ezzy Delivery{% endblock title %}
+{% block content %}
+<div class="wfpage">
+
+    <div class="wfopp__hero">
+        <div class="wfhero__content">
+            <nav aria-label="breadcrumb">
+                <ol class="wfhero__crumbs">
+                    <li class="wfhero__crumb"><a class="wfhero__crumb-link" href="{% url 'workforce:wf_opportunities' %}">Opportunities</a></li>
+                    <li class="wfhero__crumb wfhero__crumb--active">{{ posting.title }}</li>
+                </ol>
+            </nav>
+            <h1 class="wfhero__heading">{{ posting.title }}</h1>
+            <p class="wfhero__record">
+                <span class="wfhero__tag">{{ posting.get_status_display|upper }}</span>
+                {% if posting.pickup_location %}
+                <span class="wfhero__dot">·</span> {{ posting.pickup_location }}
+                {% endif %}
+                {% if posting.pay_note %}
+                <span class="wfhero__dot">·</span> {{ posting.pay_note }}
+                {% endif %}
+            </p>
+        </div>
+        <div class="wfhero__bank">
+            <div class="d-flex flex-wrap justify-content-end gap-2">
+                <a class="wfhero__btn" href="{% url 'workforce:wf_opportunity_edit' posting.pk %}">
+                    <i class="fa-solid fa-pen"></i> Edit posting
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="wfpage__body">
+
+        <div class="wfcard">
+            <div class="wfcard__header"><i class="fa-solid fa-plus"></i> Add a shift</div>
+            <div class="wfcard__body">
+                <form method="post" action="{% url 'workforce:wf_opportunity_slot_save' posting.pk %}"
+                      class="row g-2 align-items-end">
+                    {% csrf_token %}
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="slot_start">Starts</label>
+                        <input type="datetime-local" class="form-control" id="slot_start" name="starts_at" required>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="slot_end">Ends</label>
+                        <input type="datetime-local" class="form-control" id="slot_end" name="ends_at" required>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="slot_slab">Time band</label>
+                        <select class="form-select" id="slot_slab" name="time_slab">
+                            <option value="">None</option>
+                            {% for key, label in slab_choices %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Matches the hours drivers picked at signup.</div>
+                    </div>
+                    <div class="col-3 col-md-2">
+                        <label class="form-label" for="slot_capacity">Riders</label>
+                        <input type="number" class="form-control" id="slot_capacity" name="capacity"
+                               min="1" value="1">
+                    </div>
+                    <div class="col-3 col-md-1">
+                        <button type="submit" class="btn wfopp__btn-primary w-100">Add</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% for slot in slots %}
+        <div class="wfcard wfopp__slot">
+            <div class="wfcard__header">
+                <i class="fa-solid fa-clock"></i>
+                {{ slot.starts_at|date:"D d M Y, H:i" }} – {{ slot.ends_at|date:"H:i" }}
+                <span class="wfopp__slot-meta wfmono">
+                    {{ slot.confirmed_count }}/{{ slot.capacity }} confirmed ·
+                    {{ slot.get_status_display }}
+                </span>
+            </div>
+            <div class="wfcard__body">
+
+                {% if slot.interests.all %}
+                <div class="table-responsive">
+                    <table class="wfopp__table table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Driver</th>
+                                <th>Raised</th>
+                                <th>Note</th>
+                                <th>State</th>
+                                <th>Decision</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for interest in slot.interests.all %}
+                            <tr data-interest="{{ interest.pk }}">
+                                <td>
+                                    <a href="{% url 'workforce:driver_detail' interest.driver.driver_id %}">
+                                        {{ interest.driver.driver_name }}
+                                    </a>
+                                    <div class="wfopp__sub wfmono">{{ interest.driver.driver_code|default:"—" }}</div>
+                                </td>
+                                <td class="wfmono">{{ interest.created_at|date:"d M, H:i" }}</td>
+                                <td>{{ interest.note|default:"—" }}</td>
+                                <td>
+                                    <span class="wfopp__state wfopp__state--{{ interest.status }}">
+                                        {{ interest.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for key, label in interest_statuses %}
+                                        {% if key != 'withdrawn' and key != interest.status %}
+                                        <button type="button" class="wfopp__rowbtn"
+                                                data-decide="{% url 'workforce:wf_opportunity_interest_decide' interest.pk %}"
+                                                data-status="{{ key }}">{{ label }}</button>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="wfopp__none">No interest yet.</p>
+                {% endif %}
+
+                {% if not slot.confirmed_count %}
+                <form method="post" action="{% url 'workforce:wf_opportunity_slot_delete' slot.pk %}" class="mt-3">
+                    {% csrf_token %}
+                    <button type="submit" class="wfopp__rowbtn wfopp__rowbtn--danger"
+                            onclick="return confirm('Remove this shift?');">
+                        <i class="fa-solid fa-trash"></i> Remove shift
+                    </button>
+                </form>
+                {% endif %}
+
+            </div>
+        </div>
+        {% empty %}
+        <div class="wfcard">
+            <div class="wfcard__body">
+                <div class="empty-state">
+                    <i class="fa-solid fa-clock"></i>
+                    <p>No shifts on this posting yet. Add one above — drivers only see shifts, not the posting alone.</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/opportunities.css' %}?v=20260922a">
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Ops decision on one raised hand. Reloads on success because a confirmation can
+// also flip the slot to full and change every other row's available actions.
+(function () {
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    document.addEventListener('click', function (event) {
+        const btn = event.target.closest('[data-decide]');
+        if (!btn) return;
+
+        btn.disabled = true;
+        const body = new FormData();
+        body.append('status', btn.dataset.status);
+
+        fetch(btn.dataset.decide, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+            body: body,
+        })
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+            if (data.success) { window.location.reload(); return; }
+            btn.disabled = false;
+            alert(data.error || 'Could not save that decision.');
+        })
+        .catch(function () {
+            btn.disabled = false;
+            alert('Network problem. Please try again.');
+        });
+    });
+})();
+</script>
+{% endblock %}

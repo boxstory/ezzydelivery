@@ -45,7 +45,7 @@ class PodBaseTestCase(TestCase):
             driver_id=9100, user=self.driver_user, profile=driver_profile,
             driver_code='PODD1', driver_phone='30000001', driver_whatsapp='30000001',
             driver_languages='english', driver_license_number='PODLIC1',
-            driver_status='approved',
+            driver_status='approved', dashboard_access_enabled=True,
         )
 
         self.order = orders_models.Order.objects.create(

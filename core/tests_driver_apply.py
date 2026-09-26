@@ -233,3 +233,48 @@ class DriverDocumentPlaceholderTest(TestCase):
         self.assertFalse(docs_section['done'])
         self.assertIn('Selfie missing', docs_section['detail'])
         self.assertIn('0/2 IDs', docs_section['detail'])
+
+@override_settings(MEDIA_ROOT='/tmp/ezzy-test-media')
+class DriverApplySponsorTest(TestCase):
+    """The Sponsor / Company field on the public application: renders, and persists."""
+
+    @classmethod
+    def setUpTestData(cls):
+        app = SocialApp.objects.create(
+            provider='google', name='Google', client_id='x', secret='y')
+        app.sites.add(Site.objects.get_current())
+        cls.zone = ZoneGroup.objects.create(name='Central Doha', is_active=True)
+
+    def setUp(self):
+        self.client = Client(HTTP_USER_AGENT=BROWSER_UA)
+        self.user = User.objects.create_user(
+            username='sponsor-applicant', email='sa@example.com', password='pw12345!')
+        self.client.force_login(self.user)
+        self.url = reverse('core:join_driver')
+
+    def test_the_form_renders_the_sponsor_input(self):
+        html = self.client.get(self.url).content.decode()
+
+        self.assertIn('name="driver_sponsor"', html)
+        self.assertIn('Sponsor / Company', html)
+
+    def test_a_draft_save_keeps_the_sponsor(self):
+        self.client.post(self.url, {
+            'action': 'save', 'first_name': 'Ashiraf', 'last_name': 'Waluboga',
+            'phone': '31029502', 'whatsapp': '97431029502',
+            'veh-vehicle_type': 'car',
+            'driver_sponsor': '  Qatar Star Trading WLL  ',
+        })
+
+        driver = fleet_models.Driver.objects.get(user=self.user)
+        self.assertEqual(driver.driver_sponsor, 'Qatar Star Trading WLL')
+
+    def test_the_saved_sponsor_comes_back_on_the_form(self):
+        self.client.post(self.url, {
+            'action': 'save', 'first_name': 'Ashiraf', 'last_name': 'Waluboga',
+            'phone': '31029502', 'whatsapp': '97431029502',
+            'veh-vehicle_type': 'car', 'driver_sponsor': 'Doha Logistics Co',
+        })
+
+        html = self.client.get(self.url).content.decode()
+        self.assertIn('Doha Logistics Co', html)

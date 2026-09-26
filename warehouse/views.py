@@ -7,6 +7,7 @@ from django.db.models import Sum, F, Q, Count
 from django.http import JsonResponse
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_http_methods
 
 from warehouse import models as warehouse_models
@@ -37,6 +38,14 @@ Business = business_models.Business
 Product = product_models.Product
 
 logger = logging.getLogger('warehouse')
+
+# Sign of the movement, offered as a filter on the transactions ledger.
+# Not a model field — it reads InventoryTransaction.quantity, which is
+# positive for stock in and negative for stock out.
+TXN_DIRECTION_CHOICES = [
+    ('in', 'Stock In (+)'),
+    ('out', 'Stock Out (−)'),
+]
 
 
 def get_user_business(request):
@@ -485,6 +494,82 @@ def inventory_list(request):
     return render(request, 'warehouse/inventory_list.html', context)
 
 
+def _task_rank(task):
+    """Pick order for the several delivery tasks an order can carry.
+
+    A completed leg wins over an open one, and the newest row wins between two
+    of the same kind, so a return leg created later does not hide the drop that
+    actually moved the stock off the shelf.
+    """
+    return (1 if task.completed_at else 0, task.pk)
+
+
+def _attach_movement_references(transactions):
+    """Resolve the order, delivery date and driver behind each stock movement.
+
+    An InventoryTransaction only carries a loose (reference_type, reference_id)
+    pair: 'order' rows hold an Order.order_number and 'delivery_task' rows hold
+    a DeliveryTask.dl_task_number. The stock card has to look both up itself,
+    which is done in two queries for the whole page rather than one per row.
+    """
+    from orders.models import Order
+
+    transactions = list(transactions)
+
+    order_numbers = {
+        txn.reference_id for txn in transactions
+        if txn.reference_type == 'order' and txn.reference_id
+    }
+    task_numbers = {
+        txn.reference_id for txn in transactions
+        if txn.reference_type == 'delivery_task' and txn.reference_id
+    }
+
+    orders_by_number = {}
+    if order_numbers:
+        orders_by_number = {
+            order.order_number: order
+            for order in Order.objects.filter(order_number__in=order_numbers)
+        }
+
+    task_by_number = {}
+    task_by_order_number = {}
+    if order_numbers or task_numbers:
+        tasks = delivery_models.DeliveryTask.objects.filter(
+            Q(order__order_number__in=order_numbers) | Q(dl_task_number__in=task_numbers)
+        ).select_related('order', 'driver', 'driver__profile', 'driver__user')
+        for task in tasks:
+            task_by_number[task.dl_task_number] = task
+            key = task.order.order_number
+            best = task_by_order_number.get(key)
+            if best is None or _task_rank(task) >= _task_rank(best):
+                task_by_order_number[key] = task
+
+    for txn in transactions:
+        order = None
+        task = None
+        if txn.reference_type == 'order':
+            order = orders_by_number.get(txn.reference_id)
+            task = task_by_order_number.get(txn.reference_id)
+        elif txn.reference_type == 'delivery_task':
+            task = task_by_number.get(txn.reference_id)
+            order = task.order if task else None
+
+        txn.ref_order = order
+        # A reference that resolves to nothing (a deleted order, a put-away, an
+        # adjustment) still shows whatever string was recorded, so the audit
+        # trail is never silently blanked.
+        txn.ref_order_label = order.order_number if order else (txn.reference_id or '')
+        txn.ref_task = task
+        txn.ref_driver_name = task.driver.driver_name if task and task.driver else ''
+        txn.ref_delivered_at = task.completed_at if task else None
+        # Not delivered yet: the task's own date is a plan, not a delivery, and
+        # the template marks it as such.
+        txn.ref_task_date = task.dl_task_date if task and not task.completed_at else None
+
+    return transactions
+
+
 @login_required(login_url='account_login')
 @user_passes_test(has_warehouse_access, login_url='account_login')
 def stock_card(request, product_id):
@@ -513,6 +598,7 @@ def stock_card(request, product_id):
 
     stock_levels = stock_levels.select_related('warehouse', 'location')
     transactions = transactions.select_related('warehouse', 'location', 'created_by').order_by('-created_at')[:50]
+    transactions = _attach_movement_references(transactions)
 
     context = {
         'product': product,
@@ -709,7 +795,7 @@ def stock_level_detail_modal(request, stock_id):
 @login_required(login_url='account_login')
 @user_passes_test(has_warehouse_access, login_url='account_login')
 def transaction_list(request):
-    """List all inventory transactions"""
+    """List inventory transactions with multi-select filters, search and a date range."""
     business, is_staff = get_business_filter(request)
 
     if not is_staff and not business:
@@ -727,29 +813,152 @@ def transaction_list(request):
         transactions = warehouse_models.InventoryTransaction.objects.filter(warehouse_id__in=linked_warehouse_ids)
         warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
 
-    transactions = transactions.select_related('product', 'warehouse', 'location').order_by('-created_at')
+    transactions = transactions.select_related(
+        'product', 'product__business', 'warehouse', 'location'
+    ).order_by('-created_at')
 
-    # Filters
-    transaction_type = request.GET.get('type')
-    warehouse_id = request.GET.get('warehouse')
+    # The un-narrowed pool, kept so the dropdowns keep offering every option the
+    # user is allowed to see instead of only what survives the current filter.
+    scoped = transactions
 
-    if transaction_type:
-        transactions = transactions.filter(transaction_type=transaction_type)
-    if warehouse_id:
-        transactions = transactions.filter(warehouse_id=warehouse_id)
+    # ── Filters ────────────────────────────────────────────────────────────
+    # Everything except search and the dates is a repeated param
+    # (?type=receive&type=ship) driven by the shared .msf checkbox dropdown —
+    # request.GET.get() would silently read only the last one.
+    selected_types = request.GET.getlist('type')
+    selected_warehouses = request.GET.getlist('warehouse')
+    selected_refs = request.GET.getlist('ref')
+    selected_directions = request.GET.getlist('direction')
+    selected_businesses = request.GET.getlist('business')
+    search = (request.GET.get('search') or '').strip()
+    date_from = (request.GET.get('date_from') or '').strip()
+    date_to = (request.GET.get('date_to') or '').strip()
+
+    valid_types = {val for val, _ in warehouse_models.TRANSACTION_TYPE_CHOICES}
+    selected_types = [t for t in selected_types if t in valid_types]
+    if selected_types:
+        transactions = transactions.filter(transaction_type__in=selected_types)
+
+    warehouse_ids = [wid for wid in (safe_int(w, default=0) for w in selected_warehouses) if wid]
+    if warehouse_ids:
+        transactions = transactions.filter(warehouse_id__in=warehouse_ids)
+    selected_warehouses = [str(wid) for wid in warehouse_ids]
+
+    # reference_type is free text on the model, so the options come from the data.
+    # 'none' is the sentinel for rows with no source (manual adjustments etc).
+    ref_values = sorted(
+        {r for r in scoped.values_list('reference_type', flat=True).distinct() if r}
+    )
+    ref_choices = [(r, r.replace('_', ' ').title()) for r in ref_values]
+    if scoped.filter(reference_type='').exists():
+        ref_choices.append(('none', 'No Source'))
+    valid_refs = {val for val, _ in ref_choices}
+    selected_refs = [r for r in selected_refs if r in valid_refs]
+    if selected_refs:
+        ref_q = Q()
+        if 'none' in selected_refs:
+            ref_q |= Q(reference_type='')
+        named = [r for r in selected_refs if r != 'none']
+        if named:
+            ref_q |= Q(reference_type__in=named)
+        transactions = transactions.filter(ref_q)
+
+    selected_directions = [d for d in selected_directions if d in {'in', 'out'}]
+    if selected_directions:
+        dir_q = Q()
+        if 'in' in selected_directions:
+            dir_q |= Q(quantity__gt=0)
+        if 'out' in selected_directions:
+            dir_q |= Q(quantity__lt=0)
+        transactions = transactions.filter(dir_q)
+
+    # Business is a staff-only lens — a seller already only sees their own rows.
+    business_choices = []
+    if is_staff:
+        biz_ids = [b for b in scoped.values_list('product__business_id', flat=True).distinct() if b]
+        business_choices = [
+            (str(b.business_id),
+             f"{b.business_code or '*' + str(b.business_id)} - {b.business_name}")
+            for b in business_models.Business.objects.filter(
+                business_id__in=biz_ids
+            ).order_by('business_name')
+        ]
+        valid_biz = {val for val, _ in business_choices}
+        selected_businesses = [b for b in selected_businesses if b in valid_biz]
+        if selected_businesses:
+            transactions = transactions.filter(product__business_id__in=selected_businesses)
+    else:
+        selected_businesses = []
+
+    if search:
+        transactions = transactions.filter(
+            Q(transaction_number__icontains=search) |
+            Q(reference_id__icontains=search) |
+            Q(product__item_name__icontains=search) |
+            Q(product__item_sku__icontains=search) |
+            Q(product__product_id__icontains=search) |
+            Q(location__code__icontains=search) |
+            Q(notes__icontains=search)
+        )
+
+    # __date compares in TIME_ZONE (Asia/Qatar), so the range means local days.
+    parsed_from = parse_date(date_from) if date_from else None
+    parsed_to = parse_date(date_to) if date_to else None
+    if parsed_from:
+        transactions = transactions.filter(created_at__date__gte=parsed_from)
+    else:
+        date_from = ''
+    if parsed_to:
+        transactions = transactions.filter(created_at__date__lte=parsed_to)
+    else:
+        date_to = ''
+
+    # ── Totals for the filtered set ────────────────────────────────────────
+    totals = transactions.aggregate(
+        qty_in=Sum('quantity', filter=Q(quantity__gt=0)),
+        qty_out=Sum('quantity', filter=Q(quantity__lt=0)),
+    )
+    total_in = totals['qty_in'] or 0
+    total_out = abs(totals['qty_out'] or 0)
 
     # Pagination
     paginator = Paginator(transactions, wh_per_page(request, 50))
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
 
+    # Everything except `page` and `per_page`, so paging keeps the filters. The
+    # pager writes both of those itself — leaving them here would emit the old
+    # per_page *after* the new one and the per-page selector would do nothing.
+    filter_qs = request.GET.copy()
+    filter_qs.pop('page', None)
+    filter_qs.pop('per_page', None)
+
+    active_filters = (
+        len(selected_types) + len(selected_warehouses) + len(selected_refs) +
+        len(selected_directions) + len(selected_businesses) +
+        (1 if search else 0) + (1 if date_from else 0) + (1 if date_to else 0)
+    )
+
     context = {
         'transactions': items,
         'per_page': str(wh_per_page(request, 50)),
-        'warehouses': warehouses,
+        'warehouse_choices': [(str(wh.id), wh.name) for wh in warehouses],
         'transaction_types': warehouse_models.TRANSACTION_TYPE_CHOICES,
-        'selected_type': transaction_type,
-        'selected_warehouse': warehouse_id,
+        'ref_choices': ref_choices,
+        'direction_choices': TXN_DIRECTION_CHOICES,
+        'business_choices': business_choices,
+        'selected_types': selected_types,
+        'selected_warehouses': selected_warehouses,
+        'selected_refs': selected_refs,
+        'selected_directions': selected_directions,
+        'selected_businesses': selected_businesses,
+        'search': search,
+        'date_from': date_from,
+        'date_to': date_to,
+        'active_filters': active_filters,
+        'total_in': total_in,
+        'total_out': total_out,
+        'filter_params': filter_qs.urlencode(),
         'is_staff': is_staff,
     }
     return render(request, 'warehouse/transaction_list.html', context)
@@ -3755,6 +3964,124 @@ def warehouse_location_add(request):
         'is_staff': is_staff,
     }
     return render(request, 'warehouse/warehouse_location_add.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
+def warehouse_location_edit(request, pk):
+    """Edit a warehouse pickup/dispatch location - Superuser only.
+
+    The pin on this row is what the driver PWA navigates to on a hub leg
+    (delivery/selectors.py task_origin), so a stale one sends the parcel to the
+    wrong street. It has to be correctable without a shell.
+    """
+    business, is_staff = get_business_filter(request)
+    location = get_object_or_404(
+        warehouse_models.WarehouseLocation.objects.select_related('warehouse'), pk=pk)
+
+    if request.method == 'POST':
+        try:
+            warehouse_id = request.POST.get('warehouse')
+            name = request.POST.get('name')
+            code = request.POST.get('code')
+            zone_number = request.POST.get('zone_number', '')
+            latitude = request.POST.get('latitude', '')
+            longitude = request.POST.get('longitude', '')
+
+            if not warehouse_id:
+                messages.error(request, "Please select a warehouse")
+                raise ValueError("Warehouse is required")
+
+            if not name:
+                messages.error(request, "Please enter a location name")
+                raise ValueError("Location name is required")
+
+            if not code:
+                messages.error(request, "Please enter a location code")
+                raise ValueError("Location code is required")
+
+            location.warehouse = get_object_or_404(
+                warehouse_models.Warehouse, pk=warehouse_id)
+            location.name = name
+            location.code = code
+            location.address = request.POST.get('address', '')
+            location.zone_number = int(zone_number) if zone_number else None
+            location.latitude = float(latitude) if latitude else None
+            location.longitude = float(longitude) if longitude else None
+            location.operating_hours = request.POST.get('operating_hours', '')
+            location.notes = request.POST.get('notes', '')
+            location.is_active = request.POST.get('is_active') == 'on'
+            location.is_default = request.POST.get('is_default') == 'on'
+            location.save()
+
+            messages.success(
+                request,
+                f"Updated pickup location: {location.warehouse.code}/{location.name}"
+            )
+            logger.info(f"Warehouse location updated: {location} by {request.user.username}")
+
+            return redirect('warehouse:warehouse_location_list')
+
+        except Exception as e:
+            logger.error(f"Error updating warehouse location {pk}: {e}")
+            if "is required" not in str(e):
+                messages.error(request, f"Error updating location: {str(e)}")
+
+    warehouses = warehouse_models.Warehouse.objects.filter(is_active=True).order_by('name')
+
+    context = {
+        'warehouses': warehouses,
+        'location': location,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/warehouse_location_add.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
+def warehouse_location_delete(request, pk):
+    """Delete a warehouse pickup/dispatch location - Superuser only.
+
+    Every FK pointing here is SET_NULL, so deleting a dock that is still on a
+    task would quietly leave that leg with nowhere to collect from. A referenced
+    location is deactivated instead, which keeps the history readable.
+    """
+    business, is_staff = get_business_filter(request)
+    location = get_object_or_404(
+        warehouse_models.WarehouseLocation.objects.select_related('warehouse'), pk=pk)
+
+    references = [
+        ('delivery task', 'delivery tasks', location.hub_delivery_tasks.count()),
+        ('pickup task', 'pickup tasks', location.pickup_drop_tasks.count()),
+        ('hub batch', 'hub batches', location.pickup_batches.count()),
+        ('return custody', 'return custodies', location.return_custodies.count()),
+        ('order', 'orders', location.hub_orders.count()),
+        ('seller link', 'seller links', location.default_for_sellers.count()),
+    ]
+    in_use = [f"{count} {one if count == 1 else many}"
+              for one, many, count in references if count]
+
+    if request.method == 'POST':
+        if in_use:
+            messages.error(
+                request,
+                "Cannot delete %s/%s — still referenced by %s. Untick Active instead." % (
+                    location.warehouse.code, location.name, ', '.join(in_use))
+            )
+            return redirect('warehouse:warehouse_location_list')
+
+        label = f"{location.warehouse.code}/{location.name}"
+        location.delete()
+        messages.success(request, f"Deleted pickup location: {label}")
+        logger.info(f"Warehouse location deleted: {label} by {request.user.username}")
+        return redirect('warehouse:warehouse_location_list')
+
+    context = {
+        'location': location,
+        'in_use': in_use,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/warehouse_location_delete.html', context)
 
 
 # =============================================================================

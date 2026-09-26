@@ -62,7 +62,14 @@
           });
           var badge = document.getElementById('workforce_crm_detail_span_stage');
           if (badge) {
-            badge.className = 'crm__stage crm__stage--sw-' + (data.stage_swatch || 'grey');
+            // Swap only the swatch modifier. Rewriting className wholesale used to
+            // drop crmd__hero-plate, which is what makes the badge legible on the
+            // navy band — the stage went dark-on-dark until the next page load.
+            badge.className = badge.className
+              .split(/\s+/)
+              .filter(function (c) { return c && c.indexOf('crm__stage--sw-') !== 0; })
+              .join(' ');
+            badge.classList.add('crm__stage', 'crm__stage--sw-' + (data.stage_swatch || 'grey'));
             // textContent, not innerHTML: stage_display is a staff-editable column label.
             badge.textContent = '';
             var icon = document.createElement('i');

@@ -160,11 +160,11 @@ def driver_fee(task, card=None):
     if task.task_leg == 'exchange':
         return card.exchange_fee.quantize(CENTS, rounding=ROUND_HALF_UP)
 
-    # A return run is a full trip out to the client, so it pays a normal drop.
-    # It has to sit ABOVE the pick & drop branch: a P&D order's return leg carries
-    # dl_price 0 (nothing is owed on the way back), so the percentage rule would
-    # price the driver's trip at nothing.
-    if task.task_leg == 'return_to_client':
+    # A return run is a full trip out to the client, and a return pickup is a full
+    # trip out to the customer and back — both pay a normal drop. They have to sit
+    # ABOVE the pick & drop branch: these legs can carry dl_price 0, so the
+    # percentage rule would price the driver's trip at nothing.
+    if task.task_leg in ('return_to_client', 'collect_from_customer'):
         return card.normal_fee.quantize(CENTS, rounding=ROUND_HALF_UP)
 
     order = getattr(task, 'order', None)
@@ -198,7 +198,8 @@ def _card_branches(row, extra=None):
     return [
         When(scope & Q(task_leg='hub_delivery'), then=Value(row.hub_fee)),
         When(scope & Q(task_leg='exchange'), then=Value(row.exchange_fee)),
-        When(scope & Q(task_leg='return_to_client'), then=Value(row.normal_fee)),
+        When(scope & Q(task_leg__in=('return_to_client', 'collect_from_customer')),
+             then=Value(row.normal_fee)),
         When(scope & Q(order__order_type='pick_and_drop'),
              then=Coalesce(F('dl_price'), Value(Decimal('0.00'))) * Value(percent)),
         When(scope, then=Value(row.normal_fee)),

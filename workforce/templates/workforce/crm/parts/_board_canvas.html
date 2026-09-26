@@ -7,9 +7,16 @@
     {# row count, so a filter's only visible effect is cards quietly disappearing; the #}
     {# scope line states how much of the board is on screen and what is narrowing it. #}
     <div class="crm__toolbar crmb__filterbar {% if filters_on %}crmb__filterbar--on{% endif %}">
+      {# The FORM carries the request for the facet row, not each select: a select #}
+      {# firing its own hx-get is serialised twice — once as the element that #}
+      {# triggered it, once by hx-include pulling in the form it sits in — which a #}
+      {# multi-select makes visible as ?source=manual&source=manual in the URL. #}
+      {# hx-get names the board rather than being left empty, so the request never #}
+      {# inherits the query string already on the page. #}
       <form method="get"
-            hx-get="" hx-target="#main-content" hx-select="#main-content"
+            hx-get="{{ board_url }}" hx-target="#main-content" hx-select="#main-content"
             hx-swap="outerHTML" hx-push-url="true"
+            hx-trigger="submit, change from:.crm__facets"
             id="workforce_crm_board_form_filter" class="crm__filters crmb__filters">
 
         <div class="crm__search {% if search %}is-filled{% endif %}">
@@ -17,36 +24,56 @@
           <input type="text" name="search" value="{{ search }}" id="workforce_crm_board_input_search"
                  class="crm__search-input" autocomplete="off"
                  placeholder="Search company, contact, phone…"
-                 hx-get="" hx-target="#main-content" hx-select="#main-content"
+                 hx-get="{{ board_url }}" hx-target="#main-content" hx-select="#main-content"
                  hx-swap="outerHTML" hx-push-url="true"
                  hx-trigger="keyup changed delay:350ms, search" data-search-min="3"
                  hx-include="#workforce_crm_board_form_filter">
         </div>
 
         <div class="crm__facets">
-          <select name="source" class="crm__facet-select {% if source_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by source"
-                  hx-get="" hx-target="#main-content" hx-select="#main-content"
-                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
-                  hx-include="#workforce_crm_board_form_filter">
-            <option value="">All sources</option>
+          {% comment %}Every facet is a checkbox multi-select, matching the leads
+          tables. data-change-on-close holds the request until the dropdown is
+          dismissed — one request per tick would swap the board out from under the
+          open list and throw the rest of the selection away. Whatever is ticked is
+          named in a chip on the right of the bar, each chip dropping only its own
+          tick.{% endcomment %}
+          <select name="source" multiple data-placeholder="All sources"
+                  data-facet-label="source" data-facet-plural="sources" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if source_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_board_select_source" aria-label="Filter by source">
             {% for value, label in source_choices %}
-            <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ label }}</option>
+            <option value="{{ value }}" {% if value in source_filter %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
 
-          <select name="assigned" class="crm__facet-select {% if assigned_filter %}crm__facet-select--on{% endif %}" aria-label="Filter by assignee"
-                  hx-get="" hx-target="#main-content" hx-select="#main-content"
-                  hx-swap="outerHTML" hx-push-url="true" hx-trigger="change"
-                  hx-include="#workforce_crm_board_form_filter">
-            <option value="">All assignees</option>
-            <option value="me" {% if assigned_filter == 'me' %}selected{% endif %}>Assigned to me</option>
-            <option value="none" {% if assigned_filter == 'none' %}selected{% endif %}>Unassigned</option>
+          <select name="assigned" multiple data-placeholder="All assignees"
+                  data-facet-label="assignee" data-facet-plural="assignees" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if assigned_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_board_select_assigned" aria-label="Filter by assignee">
+            <option value="me" {% if 'me' in assigned_filter %}selected{% endif %}>Assigned to me</option>
+            <option value="none" {% if 'none' in assigned_filter %}selected{% endif %}>Unassigned</option>
             {% for user in staff_users %}
-            <option value="{{ user.pk }}" {% if assigned_filter == user.pk|stringformat:"s" %}selected{% endif %}>
+            <option value="{{ user.pk }}" {% if user.pk|stringformat:"s" in assigned_filter %}selected{% endif %}>
               {{ user.get_full_name|default:user.username }}
             </option>
             {% endfor %}
           </select>
+
+          {# Driver board only — a business lead has no application to carry a vehicle. #}
+          {% if is_driver_board %}
+          <select name="vehicle" multiple data-placeholder="All vehicles"
+                  data-facet-label="vehicle" data-facet-plural="vehicles" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if vehicle_filter %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_board_select_vehicle" aria-label="Filter by vehicle type"
+                  title="The vehicle the applicant registered — 'No vehicle' is an applicant with none on file yet">
+            {% for value, label in vehicle_choices %}
+            <option value="{{ value }}" {% if value in vehicle_filter %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            <option value="none" {% if 'none' in vehicle_filter %}selected{% endif %}>No vehicle</option>
+          </select>
+          {% endif %}
+
+          {% include "workforce/crm/parts/_date_facet.html" %}
         </div>
       </form>
 

@@ -206,6 +206,33 @@
     </div>
     {% endif %}
 
+    {% if card.task_leg == 'collect_from_customer' %}
+    {% comment %}The reverse trip. Without this the card reads like a delivery and the
+    driver turns up empty-handed expecting to hand something over, when the whole job
+    is to take goods away and carry them somewhere else.{% endcomment %}
+    <div class="task-card__exchange">
+        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+        <div class="task-card__exchange-text">
+            <strong>Collection — pick the goods up</strong>
+            <span>Collect from {{ card.route_origin.label|default:"the customer" }} and take them to
+                {{ card.route_destination.address_text|default:"the client" }}. Nothing to hand over, nothing to collect in cash.</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if card.task_leg == 'return_to_client' %}
+    {% comment %}Without this the card reads like any other delivery: the "customer"
+    is the client's own shop and there is nothing to collect. A driver who treats it
+    as a normal drop asks the wrong person for money.{% endcomment %}
+    <div class="task-card__exchange">
+        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+        <div class="task-card__exchange-text">
+            <strong>Return — take it back to the client</strong>
+            <span>Collect from the hub and hand it to the shop. Nothing to collect on this trip.</span>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Business + Customer Row -->
     <div class="task-card__body">
         <!-- Customer Info -->
@@ -225,7 +252,7 @@
                 <a href="tel:{{ addr.mobile_no }}" class="task-card__icon-btn task-card__icon-btn--call" title="{{ addr.mobile_no }}">
                     <i class="fa-solid fa-phone"></i>
                 </a>
-                <a href="#" onclick="waMessage(this, '{{ addr.mobile_no }}', '{{ card.order.order_number|default:card.id }}', '{{ card.order.dl_zone|default:'' }}', '{{ card.order.dl_street|default:'' }}', '{{ card.order.dl_building|default:'' }}', '{{ card.order.cod_amount|default:'' }}'); return false;" class="task-card__icon-btn task-card__icon-btn--wa">
+                <a href="#" onclick="waMessage(this, '{{ addr.mobile_no }}', '{{ card.order.order_number|default:card.id }}', '{{ card.route_destination.zone|default_if_none:'' }}', '{{ card.route_destination.street|default_if_none:'' }}', '{{ card.route_destination.building|default_if_none:'' }}', '{{ card.order.cod_amount|default:'' }}'); return false;" class="task-card__icon-btn task-card__icon-btn--wa">
                     <i class="fa-brands fa-whatsapp"></i>
                 </a>
             </div>
@@ -234,7 +261,7 @@
                 <a href="tel:{{ card.order.customer_phone }}" class="task-card__icon-btn task-card__icon-btn--call" title="{{ card.order.customer_phone }}">
                     <i class="fa-solid fa-phone"></i>
                 </a>
-                <a href="#" onclick="waMessage(this, '{{ card.order.customer_phone }}', '{{ card.order.order_number|default:card.id }}', '{{ card.order.dl_zone|default:'' }}', '{{ card.order.dl_street|default:'' }}', '{{ card.order.dl_building|default:'' }}', '{{ card.order.cod_amount|default:'' }}'); return false;" class="task-card__icon-btn task-card__icon-btn--wa">
+                <a href="#" onclick="waMessage(this, '{{ card.order.customer_phone }}', '{{ card.order.order_number|default:card.id }}', '{{ card.route_destination.zone|default_if_none:'' }}', '{{ card.route_destination.street|default_if_none:'' }}', '{{ card.route_destination.building|default_if_none:'' }}', '{{ card.order.cod_amount|default:'' }}'); return false;" class="task-card__icon-btn task-card__icon-btn--wa">
                     <i class="fa-brands fa-whatsapp"></i>
                 </a>
             </div>
@@ -247,7 +274,7 @@
             <div class="task-card__route-point task-card__route-point--pickup">
                 <i class="fa-solid fa-circle-dot task-card__route-pin task-card__route-pin--green"></i>
                 <div class="task-card__route-info">
-                    <span class="task-card__route-value">{{ card.order.pickup_location.pickup_location_title|default:"—" }}</span>
+                    <span class="task-card__route-value">{{ card.route_origin.label|default:"—" }}</span>
                 </div>
             </div>
             <div class="task-card__route-line"></div>
@@ -255,28 +282,30 @@
             <div class="task-card__route-point task-card__route-point--dropoff">
                 <i class="fa-solid fa-location-dot task-card__route-pin task-card__route-pin--red"></i>
                 <div class="task-card__route-info">
-                    {% with azone=addr.dl_zone azstreet=addr.dl_street azbldg=addr.dl_building %}
-                    {% with pzone=card.order.dl_zone|default:azone pst=card.order.dl_street|default:azstreet pbldg=card.order.dl_building|default:azbldg %}
+                    {% with dest=card.route_destination %}
+                    {% with pzone=dest.zone pst=dest.street pbldg=dest.building %}
                     <div class="task-card__route-line1">
                         <span class="ftk__plate">
                             <span class="ftk__plate-cell"><span class="ftk__plate-tag">Zone</span><span class="ftk__plate-num{% if not pzone %} ftk__plate-num--empty{% endif %}">{{ pzone|default:"—" }}</span></span>
                             <span class="ftk__plate-cell"><span class="ftk__plate-tag">St</span><span class="ftk__plate-num{% if not pst %} ftk__plate-num--empty{% endif %}">{{ pst|default:"—" }}</span></span>
                             <span class="ftk__plate-cell"><span class="ftk__plate-tag">Bldg</span><span class="ftk__plate-num{% if not pbldg %} ftk__plate-num--empty{% endif %}">{{ pbldg|default:"—" }}</span></span>
-                            {% if addr and addr.dl_unit %}<span class="ftk__plate-cell"><span class="ftk__plate-tag">Unit</span><span class="ftk__plate-num">{{ addr.dl_unit }}</span></span>{% endif %}
+                            {% if dest.unit %}<span class="ftk__plate-cell"><span class="ftk__plate-tag">Unit</span><span class="ftk__plate-num">{{ dest.unit }}</span></span>{% endif %}
                         </span>
                         {% if pzone and zone_name_map and pzone in zone_name_map %}
                         <span class="ftk__plate-zonewrap">
                             <span class="ftk__plate-zonename">{{ zone_name_map|get_item:pzone }}</span>
-                            {% if card.order.delivery_area_name %}
+                            {% comment %}delivery_area_name is the BUYER's neighbourhood. On a leg
+                            going back to the client it belongs to the other end of the trip.{% endcomment %}
+                            {% if dest.is_customer and card.order.delivery_area_name %}
                             <span class="ftk__plate-zonearea">{{ card.order.delivery_area_name }}</span>
                             {% endif %}
                         </span>
                         {% endif %}
-                        {% if card.order.coords_accuracy %}
+                        {% if dest.is_customer and card.order.coords_accuracy %}
                         <span class="task-card__acc-badge task-card__acc-badge--{{ card.order.coords_accuracy }}">{% if card.order.coords_accuracy == 'by_customer' %}By Client{% elif card.order.coords_accuracy == 'by_staff' %}By Staff{% elif card.order.coords_accuracy == 'by_driver' %}By Driver{% elif card.order.coords_accuracy == 'exact' %}Exact{% elif card.order.coords_accuracy == 'street' %}Street{% elif card.order.coords_accuracy == 'landmark' %}Landmark{% elif card.order.coords_accuracy == 'zone_center' %}Zone Ctr{% elif card.order.coords_accuracy == 'ai_estimate' %}AI Est.{% else %}{{ card.order.get_coords_accuracy_display }}{% endif %}</span>
                         {% endif %}
                     </div>
-                    <span class="task-card__route-sub">{% if card.order.customer_address %}<span class="task-card__route-addr">{{ card.order.customer_address }}</span>{% elif addr and addr.area_name %}<span class="task-card__route-addr">{{ addr.area_name }}</span>{% endif %}</span>
+                    <span class="task-card__route-sub">{% if dest.address_text %}<span class="task-card__route-addr">{{ dest.address_text }}</span>{% elif dest.area %}<span class="task-card__route-addr">{{ dest.area }}</span>{% endif %}</span>
                     {% endwith %}{% endwith %}
                 </div>
             </div>
@@ -298,21 +327,10 @@
         </div>
         {% endif %}
 
-        {# P2P receiver-pays fee. The person who ordered the delivery is the one #}
-        {# waiting for it, so the cash only exists at this end of the job. #}
+        {# The fee due at the door is folded into the one Collect figure in the strip #}
+        {# below — the driver is never asked to tell our fee from the customer's money. #}
         {% with p2pb=card.order.p2p_booking %}
-        {% if p2pb.fee_due_at_delivery %}
-        <div class="task-card__fee" id="fleet_task_fee_{{ card.id }}">
-            <span class="task-card__fee-label">Collect delivery fee at the door</span>
-            <span class="task-card__fee-amount">QAR {{ p2pb.fee_amount|floatformat:2 }}</span>
-            {% if current_tab != 'all' %}
-            <button type="button" class="task-card__fee-btn" data-p2p-task-fee="{{ card.id }}"
-                    onclick="event.stopPropagation()" id="fleet_task_btn_fee_{{ card.id }}">
-                Mark collected
-            </button>
-            {% endif %}
-        </div>
-        {% elif p2pb.fee_payer == 'receiver' and p2pb.fee_status == 'collected_cash' %}
+        {% if p2pb.fee_payer == 'receiver' and p2pb.fee_status == 'collected_cash' %}
         <div class="task-card__fee task-card__fee--done" id="fleet_task_fee_{{ card.id }}">
             <span class="task-card__fee-label">Delivery fee collected</span>
             <span class="task-card__fee-amount">QAR {{ p2pb.fee_amount|floatformat:2 }}</span>
@@ -322,22 +340,22 @@
 
         <!-- Bottom info strip: COD + Items + Earnings + inline action -->
         <div class="task-card__strip">
-            {% if card.order.cod_amount %}
-                {% if card.order.cod_status_by_client == 'online_paid' %}
+            {% with due=card.collect_amount %}
+            {% if card.order.cod_status_by_client == 'online_paid' and not due.fee_due %}
                 <div class="task-card__strip-item task-card__strip-item--cod-paid">
                     <i class="fa-solid fa-circle-check"></i>
                     <span>Online Paid</span>
                 </div>
-                {% else %}
+            {% elif due.total %}
                 <div class="task-card__strip-item task-card__strip-item--cod">
-                    <span>COD {{ card.order.cod_amount }} QR</span>
+                    <span>Collect {{ due.total|floatformat:2 }} QR</span>
                 </div>
-                {% endif %}
             {% else %}
             <div class="task-card__strip-item task-card__strip-item--cod task-card__strip-item--cod-zero">
-                <span>COD 0 QR</span>
+                <span>Collect 0 QR</span>
             </div>
             {% endif %}
+            {% endwith %}
 
             {% with item_count=card.order.order_items.count %}
             {% if item_count %}

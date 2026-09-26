@@ -34,7 +34,7 @@ class TasksMapPinCardTests(TestCase):
         self.driver = fleet_models.Driver.objects.create(
             driver_id=7701, user=self.user, profile=self.profile,
             driver_code='DRVMAP', driver_phone='55512399', driver_whatsapp='55512399',
-            driver_status='approved')
+            driver_status='approved', dashboard_access_enabled=True)
 
         biz_user = User.objects.create_user(
             username='mapbiz', email='mapbiz@test.com', password='TestDriver@123')

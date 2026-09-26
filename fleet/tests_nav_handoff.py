@@ -32,6 +32,7 @@ class NavHandoffTests(TestCase):
             driver_id=9501, user=self.user, profile=profile, driver_code='NAV1',
             driver_phone='97412345678', driver_whatsapp='97412345678',
             driver_languages='english', driver_status='approved',
+            dashboard_access_enabled=True,
         )
         self.client = Client()
         self.client.force_login(self.user)
@@ -298,6 +299,7 @@ class NavHandoffOnTheLiveMapTests(WorkforceTestMixin, TestCase):
             driver_id=9502, user=driver_user, profile=driver_profile, driver_code='NAV2',
             driver_phone='97412345679', driver_whatsapp='97412345679',
             driver_languages='english', driver_status='approved',
+            dashboard_access_enabled=True,
         )
         DriverLocation.objects.create(
             driver=self.driver, latitude=DOHA[0], longitude=DOHA[1], accuracy=12,
@@ -355,6 +357,7 @@ class TrackingModuleLoadingTests(TestCase):
             driver_id=9503, user=self.user, profile=profile, driver_code='NAV3',
             driver_phone='97412345670', driver_whatsapp='97412345670',
             driver_languages='english', driver_status='approved',
+            dashboard_access_enabled=True,
         )
         self.client = Client()
 
@@ -403,6 +406,7 @@ class DriverTimelineTests(WorkforceTestMixin, TestCase):
             driver_id=9504, user=driver_user, profile=driver_profile, driver_code='NAV4',
             driver_phone='97412345671', driver_whatsapp='97412345671',
             driver_languages='english', driver_status='approved',
+            dashboard_access_enabled=True,
         )
         self.today = timezone.localdate()
 

@@ -35,6 +35,10 @@ def make_driver(idx, status='approved'):
         driver_code=f'PKD{idx}', driver_phone=str(30000000 + idx),
         driver_whatsapp=str(30000000 + idx), driver_languages='english',
         driver_license_number=f'LIC{idx}', driver_status=status,
+        # Approved in a fixture means a driver who works — the same thing the
+        # production backfill said of everyone approved before dashboard access
+        # became a separate permission.
+        dashboard_access_enabled=status == 'approved',
     )
 
 

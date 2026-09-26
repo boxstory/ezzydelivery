@@ -1,0 +1,24 @@
+{# Purpose: CRM bar "Created" facet — the period preset picker plus the two boxes a custom range needs. #}
+{# Used by: workforce/crm/leads_list.html and workforce/crm/parts/_board_canvas.html #}
+{# Notes: Single select, not a checklist — "Today and Last 30 days" is just Last 30 days. The custom #}
+{#        boxes are rendered by the server rather than toggled in JS: picking Custom range fires the #}
+{#        bar's own htmx request, which comes back with the boxes in place. Preset keys are the shared #}
+{#        staff-list ones (crm_views.DATE_PRESET_CHOICES). Needs date_preset / date_from / date_to. #}
+<select name="datePreset" class="crm__facet-select {% if date_preset %}crm__facet-select--on{% endif %}"
+        aria-label="Filter by date created" title="When the lead was raised">
+  <option value="">Any date</option>
+  {% for value, label in date_preset_choices %}
+  <option value="{{ value }}" {% if date_preset == value %}selected{% endif %}>{{ label }}</option>
+  {% endfor %}
+</select>
+
+{% if date_preset == 'custom' %}
+{# Either end on its own is a valid range, so neither box is required; each one #}
+{# bounds the other so a backwards range cannot be picked in the first place. #}
+<input type="date" name="dateFrom" value="{{ date_from }}"
+       class="crm__facet-date {% if date_from %}crm__facet-date--on{% endif %}"
+       aria-label="Created from" title="Created from"{% if date_to %} max="{{ date_to }}"{% endif %}>
+<input type="date" name="dateTo" value="{{ date_to }}"
+       class="crm__facet-date {% if date_to %}crm__facet-date--on{% endif %}"
+       aria-label="Created to" title="Created to"{% if date_from %} min="{{ date_from }}"{% endif %}>
+{% endif %}

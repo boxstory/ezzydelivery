@@ -967,6 +967,8 @@ def contactus(request):
 
 @ratelimit(key='ip', rate=PUBLIC_FORM_RATE, method='POST', block=False)
 def careers(request):
+    from fleet.proposals import careers_proposals
+
     meta = SEOMetadata.get_careers_meta()
     f = CareersForm(request.POST or None)
     if request.method == 'POST':
@@ -978,7 +980,14 @@ def careers(request):
             messages.success(request, "Successful Submission")
             return redirect('/')
 
-    return render(request, 'webpages/careers.html', {'seo': meta, 'form': f})
+    # Driver offers marketing publishes (fleet.DriverProposal). The same rows are
+    # shown inside the driver app; which surface gets which offer is decided by
+    # fleet/proposals.py, never by a filter written here.
+    return render(request, 'webpages/careers.html', {
+        'seo': meta,
+        'form': f,
+        'driver_proposals': list(careers_proposals()),
+    })
 
 
 def privacy(request):

@@ -233,6 +233,33 @@ class Business(EmailNormalizedModel, models.Model):
                   "location is inactive or is itself a fulfilment centre."
     )
 
+    # Where goods COLLECTED BACK from a customer go — a return the customer asked
+    # for, or the original item on a collect-back replacement. Deliberately its own
+    # field and not return_destination above: that one answers a different question
+    # (a parcel we failed to deliver, which defaults to our own hub), and every
+    # client sits on its default. Reusing it would have re-routed every failed
+    # delivery the day collections started honouring it.
+    return_collection_destination = models.CharField(
+        max_length=20, choices=RETURN_DESTINATION_CHOICES, default='business',
+        help_text="Where goods collected back from a customer are taken. Defaults "
+                  "to the client's own counter; 'Ezzy hub' routes them to a hub "
+                  "first, which then needs a run out to the client."
+    )
+
+    # Who pays the delivery charge on this client's orders. OFF (the default, and
+    # how every account behaved before this existed) means we bill the client on
+    # their charge invoice and the driver collects COD only. ON means the customer
+    # pays it at the door: the charge is added to the ONE figure the driver is
+    # shown, and delivery/collect.py splits it back out on the way in — so the
+    # client is never invoiced for a fee their customer already paid. The two can
+    # never both happen: billing_service.billable_tasks() drops a task the moment
+    # fee_collected_amount is set.
+    customer_pays_delivery = models.BooleanField(
+        default=False,
+        help_text="The customer pays the delivery charge in cash at the door, on top of "
+                  "any COD. This client is then NOT invoiced for it."
+    )
+
     # Live tracking — lets this client follow their driver's GPS position on a map
     # once a ride is under way. Staff switch it on alongside the proof rules.
     live_tracking_enabled = models.BooleanField(
@@ -1016,3 +1043,34 @@ class WhatsAppNotificationTrigger(models.Model):
 
     def __str__(self):
         return f"{self.business} - {self.trigger_status} ({'active' if self.is_active else 'inactive'})"
+
+
+class BusinessDistanceRate(models.Model):
+    """One band of a client's delivery charge, priced by pickup→drop distance.
+
+    The bands are data, edited by staff on the seller's Delivery Pricing tab: a
+    row covers every distance up to its ceiling that no lower row covers, and a
+    blank ceiling catches everything beyond the last one. delivery/client_rates.py
+    is the only reader — it turns an order's route_distance_km into its fee.
+    """
+
+    business = models.ForeignKey(
+        Business, on_delete=models.CASCADE, related_name='distance_rates')
+    up_to_km = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True,
+        help_text="Distance ceiling for this band, inclusive. Blank = no upper limit.")
+    price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        help_text="QAR charged for a delivery that falls in this band.")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Distance rate"
+        verbose_name_plural = "Distance rates"
+        ordering = ['business', models.F('up_to_km').asc(nulls_last=True), 'id']
+
+    def __str__(self):
+        ceiling = f"up to {self.up_to_km} km" if self.up_to_km is not None else "beyond"
+        return f"{self.business} - {ceiling}: {self.price} QAR"

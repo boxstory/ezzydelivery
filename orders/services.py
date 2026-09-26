@@ -4,6 +4,7 @@
 #        never written as a negative cod_amount — nothing downstream handles that; it is routed
 #        through orders.money.refund_route instead.
 
+import logging
 import uuid
 from decimal import Decimal
 
@@ -14,6 +15,8 @@ from orders import money
 from orders.models import (
     MAX_REPLACEMENT_DEPTH, Order, OrderComments, OrderItem,
 )
+
+logger = logging.getLogger(__name__)
 
 ZERO = Decimal('0.00')
 
@@ -246,6 +249,26 @@ def next_return_number(business):
     return f"{code}-{uuid.uuid4().hex[:8].upper()}"
 
 
+def _create_claim(business, **fields):
+    """Create a ReturnRequest under a fresh return number.
+
+    uuid4 collisions are vanishingly rare, but return_number is unique and a
+    clash would surface as a 500 on a driver's phone. Retry instead.
+    """
+    from orders.models import ReturnRequest
+
+    for attempt in range(5):
+        try:
+            with transaction.atomic():
+                return ReturnRequest.objects.create(
+                    return_number=next_return_number(business),
+                    business=business, **fields)
+        except IntegrityError:
+            if attempt == 4:
+                raise
+    raise IntegrityError('could not allocate a return number')  # pragma: no cover
+
+
 @transaction.atomic
 def create_return_request(order, *, reason, reason_notes='', items=None,
                           cod_reversal_amount=None, status='pending', user=None):
@@ -260,7 +283,7 @@ def create_return_request(order, *, reason, reason_notes='', items=None,
     already made. It is never the order's face value: an order the driver never
     collected on has nothing to hand back, however large its cod_amount is.
     """
-    from orders.models import ReturnItem, ReturnRequest
+    from orders.models import ReturnItem
 
     if items is None:
         items = [
@@ -272,26 +295,14 @@ def create_return_request(order, *, reason, reason_notes='', items=None,
     if cod_reversal_amount is None:
         cod_reversal_amount = money.collected_for(order)
 
-    # uuid4 collisions are vanishingly rare, but return_number is unique and a
-    # clash would surface as a 500 on a driver's phone. Retry instead.
-    for attempt in range(5):
-        try:
-            with transaction.atomic():
-                ret = ReturnRequest.objects.create(
-                    return_number=next_return_number(order.business),
-                    order=order,
-                    business=order.business,
-                    reason=reason,
-                    reason_notes=reason_notes or '',
-                    status=status,
-                    cod_reversal_amount=cod_reversal_amount,
-                )
-            break
-        except IntegrityError:
-            if attempt == 4:
-                raise
-    else:  # pragma: no cover - the loop always breaks or raises
-        raise IntegrityError('could not allocate a return number')
+    ret = _create_claim(
+        order.business,
+        order=order,
+        reason=reason,
+        reason_notes=reason_notes or '',
+        status=status,
+        cod_reversal_amount=cod_reversal_amount,
+    )
 
     if status != 'pending' and user is not None and getattr(user, 'is_authenticated', False):
         from django.utils import timezone
@@ -305,3 +316,496 @@ def create_return_request(order, *, reason, reason_notes='', items=None,
         )
 
     return ret
+
+
+@transaction.atomic
+def create_standalone_return_request(
+        business, *, reason, pickup_location, customer_name='', customer_phone='',
+        customer_whatsapp='', customer_address='', zone=None, street=None,
+        building=None, latitude=None, longitude=None, external_reference='',
+        package_description='', package_qty=0, collection_charge=None,
+        reason_notes='', status='approved', user=None):
+    """Open a claim for goods EzzyDelivery never delivered. Staff only.
+
+    The client's own courier — or their shop counter — put the parcel with the
+    customer, and now they want us to bring it back. There is no outbound order
+    to copy an address, a charge or a line list off, so all three are typed here
+    and stored on the claim itself (see ReturnRequest's standalone block).
+
+    Opens at 'approved' rather than 'pending': a staff member raising this by
+    hand IS the decision, and a claim sitting at 'pending' would be waiting for
+    the seller to approve paperwork they never filed.
+
+    `cod_reversal_amount` stays 0 and is not an argument. We never collected on
+    these goods, so there is no money of ours to hand back; a refund between the
+    client and their customer is not ours to record.
+
+    Returns the ReturnRequest. Raises ValidationError on anything that would
+    leave a claim nobody can collect.
+    """
+    from orders.models import ReturnRequest
+
+    if business is None:
+        raise ValidationError("A return needs a client.")
+
+    if reason not in {k for k, _ in ReturnRequest.RETURN_REASON_CHOICES}:
+        raise ValidationError("Pick a reason for the return.")
+
+    if pickup_location is None:
+        raise ValidationError(
+            "Choose where the driver drops the goods — the client's address.")
+    if pickup_location.business_id != business.pk:
+        raise ValidationError(
+            "That drop-off address belongs to a different client.")
+
+    # The same floor can_schedule_return_pickup enforces, applied at the door so
+    # a claim is never created that the console would then refuse to collect.
+    if not (customer_phone or customer_address or zone):
+        raise ValidationError(
+            "Give a phone, an address or a zone — the driver has to find the "
+            "customer.")
+
+    charge = None if collection_charge is None else money._money(collection_charge)
+    if charge is not None and charge < ZERO:
+        raise ValidationError("A collection charge cannot be negative.")
+
+    ret = _create_claim(
+        business,
+        order=None,
+        reason=reason,
+        reason_notes=reason_notes or '',
+        status=status,
+        cod_reversal_amount=ZERO,
+        external_reference=(external_reference or '')[:64],
+        customer_name=(customer_name or '')[:100],
+        customer_phone=(customer_phone or '')[:100],
+        customer_whatsapp=(customer_whatsapp or '')[:100],
+        customer_address=(customer_address or '')[:255],
+        dl_zone=zone,
+        dl_street=street,
+        dl_building=building,
+        latitude=latitude,
+        longitude=longitude,
+        pickup_location=pickup_location,
+        package_description=(package_description or '')[:255],
+        package_qty=package_qty or 0,
+        collection_charge=charge,
+    )
+
+    if user is not None and getattr(user, 'is_authenticated', False):
+        from django.utils import timezone
+        ret.reviewed_by = user
+        ret.reviewed_at = timezone.now()
+        ret.save(update_fields=['reviewed_by', 'reviewed_at', 'updated_at'])
+
+    return ret
+
+
+# ---------------------------------------------------------------------------
+# Return pickup — the collection trip a return request asks for
+# ---------------------------------------------------------------------------
+
+# A claim in one of these is finished: nothing left to collect, and nothing
+# stopping the seller opening a fresh claim on the same order.
+CLOSED_RETURN_STATUSES = ('rejected', 'closed', 'refunded')
+
+# Kept under its old name for the call sites that read as "cannot be collected".
+RETURN_PICKUP_BLOCKED_STATUSES = CLOSED_RETURN_STATUSES
+
+# A task in one of these is over; it is not going to collect anything more.
+_FINISHED_TASK_STATUSES = ('delivered', 'partial_delivery', 'cancelled', 'failed',
+                           'returned_to_shipper')
+
+
+def open_return_for_order(order):
+    """The claim still being worked on for `order`, or None.
+
+    A seller with a return in flight should be adding to it, not opening a second
+    one — three clicks used to mean three claims and three collections, with
+    nothing anywhere pointing that out.
+    """
+    if order is None:
+        return None
+    return (order.return_requests
+            .exclude(status__in=CLOSED_RETURN_STATUSES)
+            .order_by('-created_at')
+            .first())
+
+
+def jobs_collecting_from(order):
+    """Every job currently set to take `order`'s goods back off the customer.
+
+    There are two, they were built years apart, and neither knows about the
+    other: a replacement ticked 'collect the old item back' rides an `exchange`
+    leg, and a return claim rides a `return_pickup` order. Both are legitimate;
+    running both means two drivers turning up for one parcel. Whatever raises one
+    shows the other rather than deciding for ops.
+
+    Returns [{'kind', 'order', 'label'}], newest first.
+    """
+    if order is None:
+        return []
+
+    jobs = []
+
+    def _live(candidate):
+        # A draft counts: it has no task yet but it is going to get one.
+        tasks = candidate.delivery_task.all()
+        return (not tasks
+                or any(t.dl_task_status not in _FINISHED_TASK_STATUSES for t in tasks))
+
+    for repl in (order.replacements.filter(collect_back=True)
+                 .exclude(order_status='cancelled')
+                 .prefetch_related('delivery_task')):
+        if _live(repl):
+            jobs.append({
+                'kind': 'exchange', 'order': repl,
+                'label': (f"replacement {repl.order_number} is set to collect the "
+                          f"old item at the door"),
+            })
+
+    for ret in (order.return_requests.filter(pickup_order__isnull=False)
+                .select_related('pickup_order')
+                .prefetch_related('pickup_order__delivery_task')):
+        collection = ret.pickup_order
+        if collection.order_status != 'cancelled' and _live(collection):
+            jobs.append({
+                'kind': 'collection', 'order': collection,
+                'label': (f"collection {collection.order_number} is already raised "
+                          f"for return {ret.return_number}"),
+            })
+
+    return jobs
+
+
+def can_schedule_return_pickup(ret):
+    """Whether a collection may be raised for `ret`. Returns (bool, reason).
+
+    One gate for the console button, the template and the service itself, so a
+    button that is shown always corresponds to a call that will succeed — the
+    same contract can_replace() has.
+    """
+    if ret.pickup_order_id:
+        # A cancelled collection is a trip that never happened — the goods are
+        # still with the customer and the claim is still open, so staff must be
+        # able to send another driver. Anything else leaves the claim stuck
+        # forever on a trip nobody is making.
+        if ret.pickup_order.order_status != 'cancelled':
+            return False, (
+                f"Collection {ret.pickup_order.order_number} is already raised for "
+                f"this return.")
+
+    if ret.status in RETURN_PICKUP_BLOCKED_STATUSES:
+        return False, (
+            f"This return is {ret.get_status_display().lower()} — there is "
+            f"nothing left to collect.")
+
+    # A sibling claim on the same order may already have a driver going. Two
+    # collections for one parcel is the thing worth refusing outright; the
+    # exchange-leg overlap is only warned about, because that one is a judgement
+    # call ops sometimes need to make. A standalone claim has no order and so no
+    # siblings — jobs_collecting_from(None) is empty and says so.
+    for job in jobs_collecting_from(ret.order):
+        if job['kind'] == 'collection':
+            return False, f"A {job['label']}."
+
+    # Both ends of the trip, read through the claim rather than off the order:
+    # a standalone claim carries its own, and the message has to name the right
+    # form for staff to know what to fix.
+    where = 'This return' if ret.is_standalone else 'The original order'
+    if ret.claim_pickup_location is None:
+        return False, (
+            f"{where} has no seller address, so there is nowhere to "
+            f"take the goods back to.")
+
+    if not (ret.claim_customer_phone or ret.claim_customer_address
+            or ret.claim_zone):
+        return False, f"{where} has no customer address to collect from."
+
+    return True, ''
+
+
+def _return_pickup_code(business, base):
+    """`base` suffixed -RP1, -RP2, ... — same reasoning as _replacement_code: an
+    opaque uuid tells a client nothing about which of their orders a collection
+    belongs to.
+
+    `base` is the outbound order's own code where there is one, and the return
+    number where there is not (a standalone claim for goods we never delivered —
+    that number is the only reference the client and we share).
+
+    Counted off the codes themselves rather than off `pickup_order`, because
+    re-scheduling a cancelled collection moves that one-to-one to the new order
+    and the abandoned trip would stop being counted — handing the replacement the
+    same -RP1 the cancelled one already has."""
+    prefix = f"{base[:55]}-RP"
+    n = Order.objects.filter(
+        business=business, client_order_code__startswith=prefix).count() + 1
+    return f"{prefix}{n}"
+
+
+# Where the claim stands once the trip has started. Ordered, and only ever
+# applied forwards: a driver re-opening a task must not drag the claim back to
+# 'picked_up' after the seller has already signed for the goods.
+RETURN_PICKUP_CLAIM_FLOW = ['pickup_scheduled', 'picked_up', 'received']
+
+TASK_STATUS_TO_CLAIM = {
+    'picked_up': 'picked_up',
+    # The collection's 'delivered' means it reached the SELLER — which from the
+    # claim's point of view is the goods being received back.
+    'delivered': 'received',
+}
+
+
+def sync_return_pickup_claim(task):
+    """Move the return request as its collection task moves.
+
+    The driver's pickup and drop-off ARE the claim's progress — staff must not
+    have to repeat them on the returns console. Same principle as
+    delivery.signals.sync_return_leg_custody, and like it, never raises: a
+    bookkeeping failure must not roll back the driver's status change.
+
+    Returns the new claim status, or None when nothing moved.
+    """
+    from orders.models import ReturnRequest
+
+    target = TASK_STATUS_TO_CLAIM.get(task.dl_task_status)
+    if target is None or not task.order_id:
+        return None
+
+    ret = ReturnRequest.objects.filter(pickup_order_id=task.order_id).first()
+    if ret is None:
+        return None
+
+    try:
+        here = RETURN_PICKUP_CLAIM_FLOW.index(ret.status)
+    except ValueError:
+        # Somebody has moved the claim off this track by hand — rejected,
+        # refunded, closed. That decision outranks the van.
+        return None
+
+    if RETURN_PICKUP_CLAIM_FLOW.index(target) <= here:
+        return None
+
+    ret.status = target
+    ret.save(update_fields=['status', 'updated_at'])
+    return target
+
+
+@transaction.atomic
+def create_return_pickup_order(ret, *, items=None, charge=None, user=None,
+                               notes='', publish=True):
+    """Raise the order that collects `ret`'s goods from the customer.
+
+    This is the reverse of every other order in the system: the customer fields
+    are where the driver COLLECTS and `pickup_location` is where he DROPS OFF.
+    Nothing here says so twice — `order_type='return_pickup'` is the single
+    signal, and delivery/selectors.py resolves both ends of the leg from it.
+
+    Staff-gated on purpose: the seller raises the claim, someone here decides a
+    driver is worth sending. `publish=True` puts the task straight in the pool,
+    because a staff member pressing the button IS the approval — unlike a
+    replacement, which waits at 'to_review' while somebody finds the goods.
+
+    `items` is an optional [(OrderItem, qty)] subset; the return's own lines by
+    default. `charge` is what the seller pays for the trip, defaulting to what
+    they paid for the outbound one — or, on a standalone claim for goods we
+    never delivered, to the figure staff named when they raised it.
+
+    Returns the new Order. Raises ValidationError when the return cannot be
+    collected.
+    """
+    from orders.models import ReturnRequest
+
+    # of=('self',) locks the claim row only. Both `order` and `pickup_location`
+    # are nullable, so select_related emits LEFT OUTER JOINs and PostgreSQL
+    # refuses a bare FOR UPDATE across them ("cannot be applied to the nullable
+    # side of an outer join"). The claim is the row two staff can race on.
+    ret = ReturnRequest.objects.select_for_update(of=('self',)).select_related(
+        'order', 'business', 'pickup_location').get(pk=ret.pk)
+
+    ok, why = can_schedule_return_pickup(ret)
+    if not ok:
+        raise ValidationError(why)
+
+    # None on a standalone claim, and every read below goes through the claim's
+    # own resolvers rather than this — `src` is only for the things that exist
+    # solely on an outbound order: its number, its comment thread, its lines.
+    src = ret.order
+    charge = money._money(ret.claim_charge if charge is None else charge)
+    if charge < ZERO:
+        raise ValidationError("A collection charge cannot be negative.")
+
+    if items is None:
+        items = [(ri.order_item, ri.quantity_returned)
+                 for ri in ret.return_items.select_related('order_item')]
+    items = [(item, int(qty)) for item, qty in items if int(qty) > 0]
+
+    customer_name = ret.claim_customer_name or 'Customer'
+    fields = dict(
+        business=ret.business,
+        # --- where the driver goes: the customer who is sending goods back ---
+        customer_name=ret.claim_customer_name,
+        customer_phone=ret.claim_customer_phone,
+        customer_whatsapp=ret.claim_customer_whatsapp,
+        customer_address=ret.claim_customer_address,
+        dl_zone=ret.claim_zone,
+        dl_street=ret.claim_street,
+        dl_building=ret.claim_building,
+        latitude=ret.claim_latitude,
+        longitude=ret.claim_longitude,
+        coords_accuracy=src.coords_accuracy if src is not None else None,
+        # --- where he drops off: the seller's own counter ---
+        # Must be set on the FIRST save, like a replacement's. The first-mile
+        # hook reads it too, and bails on 'return_pickup' precisely because this
+        # address is the destination here, not the origin.
+        pickup_location=ret.claim_pickup_location,
+        order_type='return_pickup',
+        delivery_speed=src.delivery_speed if src is not None else 'standard',
+        package_description=(ret.claim_package_description
+                             or f"Return from {customer_name}")[:100],
+        package_qty=sum(qty for _, qty in items) or ret.claim_package_qty,
+        package_weight_kg=src.package_weight_kg if src is not None else None,
+        order_notes=(f"Return pickup for {src.order_number}" if src is not None
+                     else f"Return pickup for {ret.return_number}")[:100],
+        # --- money ---
+        # No cash changes hands at the door. The refund this claim owes the
+        # customer is cod_reversal_amount and it settles through
+        # orders.money.refund_route — never as a COD, let alone a negative one.
+        cod_amount=ZERO,
+        cod_status_by_client='online_paid',
+        cod_status_by_staff=None,
+        dl_included=True,
+        dl_amount=charge,
+        order_status='to_review',
+        task_status='new_order',
+        verification_status='pending',
+        platform='manual',
+    )
+
+    code_base = src.client_order_code if src is not None else ret.return_number
+    try:
+        with transaction.atomic():
+            new = Order.objects.create(
+                client_order_code=_return_pickup_code(ret.business, code_base),
+                **fields)
+    except IntegrityError:
+        # Same collision case as a replacement's: a hand-edited code, or a
+        # deleted collection, can make the -RP<n> suffix repeat.
+        new = Order.objects.create(
+            client_order_code=f"RP-{uuid.uuid4().hex[:8].upper()}", **fields)
+
+    for item, qty in items:
+        OrderItem.objects.create(
+            order=new, product=item.product, quantity=qty,
+            unit_price=item.unit_price, notes=item.notes)
+
+    # Both threads carry the link, so either order tells the story on its own.
+    # A standalone claim has only one thread — there is no outbound order to
+    # write the other half onto, and the claim itself names what came back.
+    if src is not None:
+        raised_for = f"{src.order_number} ({ret.return_number})"
+    else:
+        ref = f" / ref {ret.external_reference}" if ret.external_reference else ''
+        raised_for = f"{ret.return_number}{ref} — not delivered by EzzyDelivery"
+    OrderComments.objects.create(
+        order=new, name=getattr(user, 'username', 'system'), author=user,
+        author_role='system', is_internal=True,
+        body=(f"Return pickup for {raised_for} — "
+              f"collect from {customer_name} and deliver to "
+              f"{ret.claim_pickup_location.pickup_location_title}. "
+              f"{notes}").strip()[:1000])
+    if src is not None:
+        OrderComments.objects.create(
+            order=src, name=getattr(user, 'username', 'system'), author=user,
+            author_role='system', is_internal=True,
+            body=(f"Return pickup {new.order_number} raised for "
+                  f"{ret.return_number}.").strip()[:1000])
+
+    ret.pickup_order = new
+    ret.status = 'pickup_scheduled'
+    if user is not None and getattr(user, 'is_authenticated', False):
+        from django.utils import timezone
+        ret.reviewed_by = user
+        ret.reviewed_at = timezone.now()
+        ret.save(update_fields=['pickup_order', 'status', 'reviewed_by',
+                                'reviewed_at', 'updated_at'])
+    else:
+        ret.save(update_fields=['pickup_order', 'status', 'updated_at'])
+
+    if publish:
+        # NOT apply_ready_and_publish: 'ready_to_pickup' reserves warehouse stock
+        # and opens a first-mile leg at the seller, and neither applies to goods
+        # that are still in the customer's hands. Going straight to 'publish'
+        # creates the delivery task and nothing else.
+        new.order_status = 'publish'
+        new._status_changed_by = user
+        new.save()
+        # Published on creation for the same reason forward_to_client does it:
+        # any driver can take it. Staff can still unpublish from the task page.
+        new.delivery_task.update(dl_task_publish=True, dl_task_status='pending')
+
+    return new
+
+
+# A replacement says why fresh goods went out; a claim says why goods are coming
+# back. The two vocabularies were deliberately kept apart (see
+# REPLACEMENT_REASON_CHOICES), so translate rather than pass the string through.
+_REPLACEMENT_TO_RETURN_REASON = {
+    'wrong_item': 'wrong_item',
+    'damaged': 'damaged',
+    'missing_items': 'not_as_described',
+    'failed_delivery': 'undelivered',
+}
+
+
+def raise_collect_back_collection(replacement, *, user=None):
+    """Raise the collection for a delivered collect-back replacement.
+
+    The seller ticked "bring the original back" and the replacement has now
+    reached the customer, so the original items need their own trip: collect at
+    the customer's door, drop at whichever end their client's preference says.
+
+    Deliberately a SECOND task rather than a flag on the outbound one. An
+    exchange leg told the driver to carry goods away and then modelled nothing —
+    no destination, no custody, no record that he was holding a seller's stock.
+
+    The claim is raised against the ORIGINAL order, not the replacement: those
+    are the goods coming back, and that is the order a seller looks at.
+
+    Returns the collection Order, or None when there is nothing to raise.
+    Never raises — a bookkeeping failure must not roll back a delivery.
+    """
+    source = replacement.replaces if replacement.replaces_id else None
+    if source is None:
+        return None
+
+    try:
+        with transaction.atomic():
+            # Anything already coming for these goods wins; two drivers for one
+            # parcel is exactly what this feature exists to prevent.
+            if any(job['kind'] == 'collection' for job in jobs_collecting_from(source)):
+                return None
+
+            ret = open_return_for_order(source)
+            if ret is None:
+                ret = create_return_request(
+                    source,
+                    reason=_REPLACEMENT_TO_RETURN_REASON.get(
+                        replacement.replacement_reason, 'other'),
+                    reason_notes=(
+                        f"Original items collected back on replacement "
+                        f"{replacement.order_number}."),
+                    status='approved', user=user)
+
+            ok, _ = can_schedule_return_pickup(ret)
+            if not ok:
+                return None
+
+            return create_return_pickup_order(
+                ret, user=user, publish=True,
+                notes=f"Raised automatically for replacement {replacement.order_number}.")
+    except Exception:
+        logger.exception(
+            "Collect-back collection failed for replacement %s", replacement.pk)
+        return None

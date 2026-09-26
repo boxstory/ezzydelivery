@@ -119,7 +119,7 @@ These cannot be locked to one department: they are the landing page or AJAX help
 ### 2.5 Drivers
 | URL name | Path |
 |---|---|
-| `drivers_list` / `drivers_pending` / `drivers_active` / `drivers_inactive` | `drivers/...` |
+| `drivers_list` / `drivers_active` / `drivers_inactive` | `drivers/...` |
 | `driver_detail` | `drivers/<id>/` |
 | `driver_toggle_status` / `driver_set_status` / `driver_set_work_pref` | `drivers/<id>/...` |
 | `driver_vehicle_add` / `driver_vehicle_edit` / `driver_vehicle_delete` | `drivers/<id>/vehicle/...` |
@@ -131,13 +131,16 @@ These cannot be locked to one department: they are the landing page or AJAX help
 ### 2.6 Sellers (account operations)
 | URL name | Path |
 |---|---|
-| `sellers_list` / `sellers_pending` / `sellers_active` / `sellers_inactive` | `sellers/...` |
+| `sellers_list` / `sellers_active` / `sellers_inactive` | `sellers/...` |
 | `seller_detail` | `sellers/<id>/` |
 | `seller_doc_field_update` | `sellers/<id>/doc-field/` |
 | `seller_api_products` / `seller_api_products_import` / `seller_api_orders` | `sellers/<id>/api-.../` |
 | `wf_pickup_location_add` / `wf_pickup_location_update` / `wf_pickup_location_delete` | `sellers/<id>/pickup-location/...` |
 
-> `sellers_pending` is also a **Marketing** funnel view — grant read to `mkt` if the acquisition team works the pending queue.
+> The `sellers_pending` / `drivers_pending` queues were retired (2026-09-24). Both
+> standings are now reached through the roster filters — `sellers/?verification=pending`
+> and `drivers/?status=pending&status=processing` — so there is no longer a
+> Marketing-shared route in this section.
 
 ### 2.7 Verification & Documents
 | URL name | Path |
@@ -197,7 +200,7 @@ These cannot be locked to one department: they are the landing page or AJAX help
 |---|---|---|
 | `workforce_finance_dashboard` | `finance/` | Overview |
 | `fleet_cod_in_hand` | `fleet/cod-in-hand/` | COD position |
-| `cod_ledger` | `fleet/cod-ledger/` | Ledger |
+| `cod_ledger` | `fleet/cash-ledger/` | Cash Ledger |
 | `cod_legacy_reconciliation` | `fleet/cod-legacy-reconciliation/` | Ledger |
 | `process_cod_return` | `delivery-task/<id>/cod-return/` | COD movement |
 | `fleet_task_cod_correct` | `fleet/tasks/<id>/cod-correct/` | COD movement |
@@ -357,9 +360,8 @@ shared.
 
 ## Judgement calls worth confirming
 
-1. **`sellers_pending`** — listed under Operations, but it is the acquisition funnel. Likely needs `ops + mkt`.
-2. **`process_cod_return`** — sits on the delivery-task detail page (an Operations screen) but moves money. Classified Finance; if ops staff must click it, grant `fin` read on that one endpoint.
-3. **`send_order_whatsapp` / `order_whatsapp_defaults`** — customer delivery comms, so Operations, not Marketing. The Marketing WhatsApp routes are the CRM inbox and the generic sender.
-4. **`pickup_automation_*`** — configuration screens, but ops staff run them daily. Kept in Operations.
-5. **`staff_reports` / `wf_export_*`** — a single reports page spanning all departments. Either keep it `shared` or filter the report list by department inside the view.
-6. **AJAX helpers in §1** must stay `shared` or department gating will break pages in other departments (driver pickers, zone lookup, warehouse pickers).
+1. **`process_cod_return`** — sits on the delivery-task detail page (an Operations screen) but moves money. Classified Finance; if ops staff must click it, grant `fin` read on that one endpoint.
+2. **`send_order_whatsapp` / `order_whatsapp_defaults`** — customer delivery comms, so Operations, not Marketing. The Marketing WhatsApp routes are the CRM inbox and the generic sender.
+3. **`pickup_automation_*`** — configuration screens, but ops staff run them daily. Kept in Operations.
+4. **`staff_reports` / `wf_export_*`** — a single reports page spanning all departments. Either keep it `shared` or filter the report list by department inside the view.
+5. **AJAX helpers in §1** must stay `shared` or department gating will break pages in other departments (driver pickers, zone lookup, warehouse pickers).

@@ -359,6 +359,66 @@ input.wh__filter-input:focus {
     gap: 0.5rem;
     padding-bottom: 0.25rem;
 }
+
+/* Clear-everything link beside the Filter button; only rendered when something
+   is actually applied. */
+.wh__filter-reset {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    height: 34px;
+    padding: 0 0.7rem;
+    border: 1px solid var(--wh-border);
+    border-radius: 0.4rem;
+    background: var(--wh-surface);
+    color: var(--wh-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color var(--wh-transition), border-color var(--wh-transition);
+}
+.wh__filter-reset:hover {
+    color: var(--wh-navy);
+    border-color: var(--wh-navy);
+    text-decoration: none;
+}
+
+/* Count of applied filters, sitting inside the Filter button */
+.wh__count-badge--inline {
+    padding: 0.05rem 0.4rem;
+    margin-left: 0.2rem;
+    background: var(--wh-accent);
+    color: var(--wh-navy);
+    font-size: 0.62rem;
+}
+
+/* Running +/- totals for the filtered ledger, shown in a card header */
+.wh__tally {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--wh-muted);
+}
+.wh__tally strong { font-size: 0.75rem; }
+
+/* The .msf checkbox dropdown sits in the filter bar next to native controls. */
+.wh__filter-group .msf { min-width: 0; }
+/* whSlideIn runs with fill-mode:both, so the bar keeps transform:translateY(0)
+   for good — that makes it a stacking context and the menu's own z-index can
+   never escape it, leaving the table card below painted over the open dropdown.
+   Lift the whole bar instead, and only while a menu is actually open. */
+.wh__filter-bar:has(.msf__menu.show) {
+    position: relative;
+    z-index: 30;
+    overflow: visible;
+}
 .wh__filter-check input[type="checkbox"] {
     width: 15px;
     height: 15px;
@@ -452,6 +512,11 @@ input.wh__filter-input:focus {
 .wh__th--end { text-align: right; }
 /* Column width hints — auto table-layout honours these when content allows */
 .wh__th--w15 { width: 15%; }
+/* Row actions pack two pills to a line. Without a hint the auto layout starves
+   this column, the pills stack three-deep and every row grows by ~36px. */
+.wh__th--actions { width: 195px; }
+/* Wide enough for a SKU plus the label-print icons beside it on one line. */
+.wh__th--codes { width: 168px; }
 .wh__td {
     padding: 0.5rem 0.75rem;
     vertical-align: middle;
@@ -505,6 +570,24 @@ input.wh__filter-input:focus {
 /* Keep a full 16-char TXN- reference on a single line */
 .wh__code--nowrap {
     white-space: nowrap;
+}
+
+/* Reference link inside a table cell (an order number that opens its order).
+   Mono because it is a code, and the rule only appears on hover so a whole
+   column of them does not read as a wall of underlines. */
+.wh__link {
+    font-family: var(--wh-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--wh-navy);
+    text-decoration: none;
+    white-space: nowrap;
+    border-bottom: 1px solid transparent;
+}
+.wh__link:hover,
+.wh__link:focus-visible {
+    color: var(--wh-navy);
+    border-bottom-color: var(--wh-accent);
 }
 /* Wrap free text over three lines, then ellipsis */
 .wh__clamp3 {
@@ -678,6 +761,17 @@ input.wh__filter-input:focus {
     padding: 0.3rem 0.75rem;
     border-radius: 999px;
     font-size: 0.725rem;
+    font-weight: 600;
+}
+/* Icon-sized action that sits inline with the value it acts on (the label
+   printers beside the SKU). Width grows for the "all N variants" count. */
+.wh__action-btn--xs {
+    width: auto;
+    min-width: 28px;
+    height: 28px;
+    gap: 0.2rem;
+    padding: 0 0.3rem;
+    font-size: 0.7rem;
     font-weight: 600;
 }
 
@@ -2972,6 +3066,51 @@ input.wsa__input {
 .wh__th--sortable:hover { background: rgba(0,0,0,.04); }
 .wh__sort-icon { margin-left: 4px; opacity: .35; font-size: .7rem; }
 .wh__th--sorted .wh__sort-icon { opacity: 1; color: var(--brand-primary, #0d6efd); }
+
+/* A merged column head carries one sort button per field it absorbed, so no
+   sort was lost when the fifteen columns became eight. Bare control on the
+   navy band: the label IS the button, it only lifts to white on hover. */
+.wh__sort {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.72);
+    white-space: nowrap;
+    cursor: pointer;
+    line-height: 1.5;
+}
+.wh__sort:hover,
+.wh__sort:focus-visible {
+    color: #fff;
+}
+.wh__sort--on {
+    color: #fff;
+}
+.wh__sort--on .wh__sort-icon {
+    opacity: 1;
+    color: var(--brand-primary, #f7c000);
+}
+
+/* Lets a long product name wrap inside a flex cell instead of forcing the
+   column wider — a flex item's min-width defaults to its content, and these
+   names are one unbreakable token (01_CX-948-BK_Watch-RoundDail_Black__), so
+   without `anywhere` a 1366px laptop pays for the longest name on the page. */
+.wh__cell-body {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+/* Brand mark beside its name — smaller than the product thumbnail so the
+   product stays the thing the eye lands on. */
+.wh__product-img--xs {
+    width: 26px;
+    height: 26px;
+}
 
 /* ═══════════════════════════════════════════════════════════
    CYCLE COUNT DETAIL — Progress bars, stats, count inputs

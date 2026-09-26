@@ -8,7 +8,7 @@
 {% block title %}Location Review{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/delivery_location_reviews.css' %}?v=20260909e" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/delivery_location_reviews.css' %}?v=20260923f" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -251,7 +251,13 @@
                map tabs make it harder, not easier. It sits with the second point because
                that is what it compares against. Uses the shared component so this page
                and every other coordinate on the site behave the same. {% endcomment %}
-            {% include "includes/components/_map_point.html" with uid=r.id|stringformat:"s"|add:"-rev" lat=r.driver_latitude lon=r.driver_longitude lat2=r.customer_latitude lon2=r.customer_longitude label="Driver delivered here" label2="Customer's saved location" colour="#2f6f4f" colour2="#b4532a" btn_label="Compare" %}
+            {% comment %} actions_id hands the row's verdict buttons to the map modal — the
+               decision is made looking at the two points, so it should not need the map
+               closed first. A reviewed row has no block under that id, and the component
+               simply shows no footer. {% endcomment %}
+            {% with rid=r.id|stringformat:"s" %}
+            {% include "includes/components/_map_point.html" with uid=rid|add:"-rev" lat=r.driver_latitude lon=r.driver_longitude lat2=r.customer_latitude lon2=r.customer_longitude label="Driver delivered here" label2="Customer's saved location" colour="#2f6f4f" colour2="#b4532a" btn_label="Compare" actions_id="dgr_mapact_"|add:rid %}
+            {% endwith %}
           </td>
           <td>
             {% if r.is_open %}
@@ -268,6 +274,45 @@
         {% endfor %}
       </tbody>
     </table>
+  </div>
+
+  {% comment %}
+  The per-row verdict blocks the map modal borrows. They live outside the table on
+  purpose: inside a row their button text would join that row's search haystack,
+  and "driver correct" would then match every row on the page.
+  {% endcomment %}
+  <div class="dgr__mapacts" hidden>
+    {% for r in reviews %}{% if r.is_open %}
+    <div class="dgr__mapact" id="dgr_mapact_{{ r.id }}" data-review-id="{{ r.id }}" hidden>
+      <div class="dgr__mapact-ask">
+        <p class="dgr__mapact-q">Which point is right?</p>
+        <p class="dgr__mapact-rec">
+          <span class="dgr__mapact-ref">{{ r.order.order_number|default:"This delivery" }}</span>
+          <span class="dgr__mapact-gap">{{ r.gap_km|floatformat:1 }} km apart</span>
+        </p>
+      </div>
+      {% comment %} The two real answers carry the map's own marker colours and the row's own
+         icons, so the eye goes marker → button with nothing to decode. Equal weight on
+         purpose: the driver verdict rewrites the customer's address, and a console that
+         dresses it as the primary action is nudging the verdict. {% endcomment %}
+      <div class="dgr__mapact-pick">
+        <button type="button" class="btn dgr__pick dgr__pick--driver" data-decision="driver_correct">
+          <i class="fa-solid fa-motorcycle" aria-hidden="true"></i>
+          <span class="dgr__pick-lbl">Driver GPS</span>
+          <span class="dgr__pick-sub">moves the order pin here</span>
+        </button>
+        <button type="button" class="btn dgr__pick dgr__pick--customer" data-decision="customer_correct">
+          <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+          <span class="dgr__pick-lbl">Customer pin</span>
+          <span class="dgr__pick-sub">pin stays as saved</span>
+        </button>
+      </div>
+      <div class="dgr__mapact-else">
+        <button type="button" class="btn dgr__btn-neutral" data-decision="both_wrong">Both wrong</button>
+        <button type="button" class="btn dgr__btn-neutral" data-decision="dismissed">Dismiss</button>
+      </div>
+    </div>
+    {% endif %}{% endfor %}
   </div>
 
   {% include "includes/components/_pagination.html" with page_obj=reviews filter_params=filter_params %}
@@ -370,44 +415,61 @@
     searchInput.addEventListener('search', filterLoaded);
   }
 
-  bar?.querySelectorAll('[data-decision]').forEach(btn => {
-    btn.addEventListener('click', async function () {
-      const ids = selected();
-      if (!ids.length) return;
-      const decision = this.dataset.decision;
-      // Moving the pin rewrites the order's coordinates, so it is confirmed.
-      if (decision === 'driver_correct' &&
-          !confirm('Accept the driver GPS as correct for ' + ids.length +
-                   ' delivery(ies)? This overwrites the customer location on those orders.')) return;
+  // One verdict path for both places it can be given: the bulk bar over the
+  // checked rows, and the map modal over the single row whose map is open.
+  async function decide(btn, ids) {
+    if (!ids.length) return;
+    const decision = btn.dataset.decision;
+    const one = ids.length === 1;
+    // Moving the pin rewrites the order's coordinates, so it is confirmed.
+    if (decision === 'driver_correct' &&
+        !confirm(one
+          ? 'Accept the driver GPS as correct for this delivery? This overwrites the customer location on the order.'
+          : 'Accept the driver GPS as correct for ' + ids.length +
+            ' deliveries? This overwrites the customer location on those orders.')) return;
 
-      this.disabled = true;
-      const body = new URLSearchParams();
-      ids.forEach(id => body.append('review_ids[]', id));
-      body.append('decision', decision);
-      body.append('notes', document.getElementById('dgr_notes').value || '');
-      try {
-        const resp = await fetch('{% url "workforce:delivery_location_review_action" %}', {
-          method: 'POST',
-          headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body.toString(),
-        });
-        // A rejected POST comes back as an HTML error page, so parsing it as JSON
-        // throws and the real cause (403, 500, a login redirect) gets lost. Read
-        // the status first and say what actually happened.
-        if (!resp.ok) {
-          alert(resp.status === 403
-            ? 'Rejected: your session expired or the security token is stale. Reload the page and try again.'
-            : 'The server refused this (HTTP ' + resp.status + '). Nothing was changed.');
-          this.disabled = false;
-          return;
-        }
-        const data = await resp.json();
-        if (data.success) { window.location.reload(); }
-        else { alert(data.error || (data.errors || []).join('\n') || 'Nothing was updated'); this.disabled = false; }
-      } catch (e) {
-        alert('Could not reach the server — nothing was changed. ' + e);
-        this.disabled = false;
+    btn.disabled = true;
+    const body = new URLSearchParams();
+    ids.forEach(id => body.append('review_ids[]', id));
+    body.append('decision', decision);
+    body.append('notes', document.getElementById('dgr_notes')?.value || '');
+    try {
+      const resp = await fetch('{% url "workforce:delivery_location_review_action" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      // A rejected POST comes back as an HTML error page, so parsing it as JSON
+      // throws and the real cause (403, 500, a login redirect) gets lost. Read
+      // the status first and say what actually happened.
+      if (!resp.ok) {
+        alert(resp.status === 403
+          ? 'Rejected: your session expired or the security token is stale. Reload the page and try again.'
+          : 'The server refused this (HTTP ' + resp.status + '). Nothing was changed.');
+        btn.disabled = false;
+        return;
       }
+      const data = await resp.json();
+      if (data.success) { window.location.reload(); }
+      else { alert(data.error || (data.errors || []).join('\n') || 'Nothing was updated'); btn.disabled = false; }
+    } catch (e) {
+      alert('Could not reach the server — nothing was changed. ' + e);
+      btn.disabled = false;
+    }
+  }
+
+  bar?.querySelectorAll('[data-decision]').forEach(btn => {
+    btn.addEventListener('click', () => decide(btn, selected()));
+  });
+
+  // The same four verdicts inside the map modal, acting on that one delivery —
+  // the comparison is on screen there, which is when staff actually know the
+  // answer. The block is moved into the modal by map-point.js, so the listener
+  // is bound here once and travels with it.
+  document.querySelectorAll('.dgr__mapact [data-decision]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.closest('.dgr__mapact')?.dataset.reviewId;
+      if (id) decide(btn, [id]);
     });
   });
 })();

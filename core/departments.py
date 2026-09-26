@@ -96,6 +96,9 @@ _OPS = [
     'returns_custody_set_destination', 'returns_custody_bulk_receive',
     'returns_custody_open', 'returns_custody_forward',
     'returns_requests_list', 'returns_request_set_status',
+    'returns_request_create',
+    # Sending a driver to collect goods back is a dispatch decision, same desk.
+    'returns_request_schedule_pickup',
 
     # Dispatch & batching (config lives under ADMIN)
     'dispatch_dashboard', 'dispatch_batch_list', 'dispatch_batch_detail',
@@ -105,17 +108,22 @@ _OPS = [
     'dispatch_batch_monitor_partial', 'dispatch_shift_status_partial',
 
     # Drivers
-    'drivers_list', 'drivers_pending', 'drivers_active', 'drivers_inactive', 'driver_detail',
+    'drivers_list', 'drivers_active', 'drivers_inactive', 'driver_detail',
     'driver_timeline',
     'driver_request_location',
     'driver_toggle_status', 'driver_set_status', 'driver_set_work_pref',
+    'driver_set_dashboard_access', 'driver_wa_thread',
+    # Driver opportunities board (postings, slots, interest decisions)
+    'wf_opportunities', 'wf_opportunity_new', 'wf_opportunity_detail',
+    'wf_opportunity_edit', 'wf_opportunity_slot_save', 'wf_opportunity_slot_delete',
+    'wf_opportunity_interest_decide',
     'driver_vehicle_add', 'driver_vehicle_edit', 'driver_vehicle_delete',
     'driver_document_add', 'driver_document_edit', 'driver_document_delete',
     'driver_remind_completion', 'export_drivers_csv', 'wf_driver_tasks',
     # One-device-per-driver console
     'driver_devices', 'driver_device_release', 'driver_device_revoke',
 
-    # Sellers (account operations; sellers_pending is shared with MKT below)
+    # Sellers (account operations)
     'sellers_list', 'sellers_active', 'sellers_inactive', 'seller_detail',
     'seller_doc_field_update', 'seller_api_products', 'seller_api_products_import',
     'seller_api_orders', 'seller_team_member_detail', 'seller_team_member_update',
@@ -231,6 +239,7 @@ _MKT = [
     'crm_leads_board', 'crm_driver_leads_board', 'crm_leads_list',
     'crm_driver_leads_list', 'crm_lead_create',
     'crm_lead_detail', 'crm_lead_update', 'crm_lead_update_stage', 'crm_lead_unpin_stage',
+    'crm_lead_move_board',
     'crm_lead_add_activity', 'crm_lead_delete_activity', 'crm_lead_link_business',
     'crm_lead_ai_summary',
     # CRM WhatsApp
@@ -248,6 +257,11 @@ _MKT = [
     'pricing_inquiries_list', 'pricing_inquiry_detail', 'pricing_inquiry_update_status',
     'pricing_inquiry_edit', 'pricing_inquiry_add_activity', 'pricing_inquiry_delete_activity',
     'pricing_inquiry_quote_price',
+    # Driver proposals — the recruitment offer shown in the driver app and on
+    # /careers/. Marketing writes the advert; the pay it quotes is free text and
+    # never feeds the payout code, so ops/finance have nothing to approve here.
+    'wf_driver_proposals', 'wf_driver_proposal_new', 'wf_driver_proposal_edit',
+    'wf_driver_proposal_status', 'wf_driver_proposal_delete',
     # Outbound comms
     'whatsapp_send_message', 'whatsapp_last_message',
 ]
@@ -291,10 +305,6 @@ _ADMIN = [
 
 # Routes belonging to more than one desk.
 _MULTI = {
-    # The pending-sellers queue is both an ops verification queue and the
-    # acquisition team's funnel.
-    'sellers_pending': [OPS, MKT],
-
     # Auto Triggers is a shared catalogue: every desk owns some of the rows
     # (AutoTriggerConfig.department / WhatsAppSenderRoute.SECTION_DEPARTMENTS).
     # The page and its write endpoints filter per-desk themselves, so opening
@@ -334,6 +344,8 @@ _MULTI = {
     'crm_lead_update': [OPS, MKT, ADMIN],
     'crm_lead_update_stage': [OPS, MKT, ADMIN],
     'crm_lead_unpin_stage': [OPS, MKT, ADMIN],
+    # Re-files a card on the other board; same desks as a stage change.
+    'crm_lead_move_board': [OPS, MKT, ADMIN],
     'crm_lead_merge': [OPS, MKT, ADMIN],
     'crm_lead_unmerge': [OPS, MKT, ADMIN],
     'crm_lead_add_activity': [OPS, MKT, ADMIN],

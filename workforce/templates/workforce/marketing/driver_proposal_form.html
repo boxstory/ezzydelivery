@@ -1,0 +1,193 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Create or edit a driver proposal — the offer text, the audience switches and the publish state.
+Used by: workforce.marketing_views.wf_driver_proposal_edit at /workforce/marketing/driver-proposals/new/ and .../<id>/edit/
+Notes: .wfcard--form caps the form at 60rem. The two audience checkboxes are the only way a proposal reaches a
+       surface — a published proposal with both off shows nowhere, which the list spells out.
+{% endcomment %}
+{% block title %}{% if proposal %}Edit{% else %}New{% endif %} Driver Proposal - Ezzy Delivery{% endblock title %}
+{% block content %}
+<div class="wfpage">
+
+    <div class="wfprop__hero">
+        <div class="wfhero__content">
+            <nav aria-label="breadcrumb">
+                <ol class="wfhero__crumbs">
+                    <li class="wfhero__crumb"><a class="wfhero__crumb-link" href="{% url 'workforce:wf_driver_proposals' %}">Driver Proposals</a></li>
+                    <li class="wfhero__crumb wfhero__crumb--active">{% if proposal %}Edit{% else %}New{% endif %}</li>
+                </ol>
+            </nav>
+            <h1 class="wfhero__heading">{% if proposal %}{{ proposal.title }}{% else %}New proposal{% endif %}</h1>
+            {% if proposal %}
+            <p class="wfhero__record">
+                {% if proposal.ref_code %}<span class="wfhero__tag">{{ proposal.ref_code }}</span>
+                <span class="wfhero__dot">·</span>{% endif %}
+                {% if proposal.published_at %}Published {{ proposal.published_at|date:"d M Y, H:i" }}{% else %}Never published{% endif %}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="wfpage__body">
+        <div class="wfcard wfcard--form">
+            <div class="wfcard__header"><i class="fa-solid fa-file-signature"></i> The offer</div>
+            <div class="wfcard__body">
+                <form method="post" id="workforce_proposal_form_edit">
+                    {% csrf_token %}
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-8">
+                            <label class="form-label" for="prop_title">Title</label>
+                            <input type="text" class="form-control" id="prop_title" name="title" maxlength="150"
+                                   value="{{ proposal.title|default:'' }}" required
+                                   placeholder="e.g. Full-time bike rider — Doha">
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="prop_ref">Reference</label>
+                            <input type="text" class="form-control" id="prop_ref" name="ref_code" maxlength="20"
+                                   value="{{ proposal.ref_code|default:'' }}" placeholder="EZY-DRV-01">
+                            <div class="form-text">Optional. Shown on the careers page next to the title.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="prop_headline">Headline</label>
+                            <input type="text" class="form-control" id="prop_headline" name="headline" maxlength="200"
+                                   value="{{ proposal.headline|default:'' }}"
+                                   placeholder="The offer in one sentence">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="prop_description">Description</label>
+                            <textarea class="form-control" id="prop_description" name="description" rows="4"
+                                      placeholder="What the work involves and who it suits">{{ proposal.description|default:'' }}</textarea>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="prop_pay">Pay package</label>
+                            <input type="text" class="form-control" id="prop_pay" name="pay_package" maxlength="200"
+                                   value="{{ proposal.pay_package|default:'' }}"
+                                   placeholder="e.g. QAR 3,500/month + fuel">
+                            <div class="form-text">
+                                Free text for the advert. Real driver pay always resolves through the rate cards.
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-3">
+                            <label class="form-label" for="prop_job_type">Job type</label>
+                            <select class="form-select" id="prop_job_type" name="job_type">
+                                <option value="">Any</option>
+                                {% for key, label in job_type_choices %}
+                                <option value="{{ key }}" {% if proposal.job_type == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-3">
+                            <label class="form-label" for="prop_vehicle">Vehicle</label>
+                            <select class="form-select" id="prop_vehicle" name="vehicle_type">
+                                <option value="">Any</option>
+                                {% for key, label in vehicle_choices %}
+                                <option value="{{ key }}" {% if proposal.vehicle_type == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="prop_perks">What the driver gets</label>
+                            <textarea class="form-control" id="prop_perks" name="perks" rows="5"
+                                      placeholder="One per line&#10;Weekly payouts&#10;Fuel allowance">{{ proposal.perks|default:'' }}</textarea>
+                            <div class="form-text">One per line. Rendered as a list on both surfaces.</div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="prop_requirements">What we need from them</label>
+                            <textarea class="form-control" id="prop_requirements" name="requirements" rows="5"
+                                      placeholder="One per line&#10;Valid QID&#10;Own bike">{{ proposal.requirements|default:'' }}</textarea>
+                            <div class="form-text">One per line.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="prop_zones">Zone groups</label>
+                            <select class="form-select" id="prop_zones" name="zone_groups" multiple size="5">
+                                {% for zone in zone_groups %}
+                                <option value="{{ zone.pk }}" {% if zone.pk in selected_zones %}selected{% endif %}>{{ zone }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Leave nothing selected for "anywhere in Qatar".</div>
+                        </div>
+                    </div>
+
+                    <div class="wfprop__divider"></div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="wfprop__section-label">Where it shows</div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="1"
+                                       id="prop_show_app" name="show_in_driver_app"
+                                       {% if not proposal or proposal.show_in_driver_app %}checked{% endif %}>
+                                <label class="form-check-label" for="prop_show_app">
+                                    Driver app — opportunities screen
+                                </label>
+                            </div>
+                            <div class="form-text">Seen by drivers who already have an account.</div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="1"
+                                       id="prop_show_careers" name="show_on_careers"
+                                       {% if not proposal or proposal.show_on_careers %}checked{% endif %}>
+                                <label class="form-check-label" for="prop_show_careers">
+                                    Public careers page
+                                </label>
+                            </div>
+                            <div class="form-text">Seen by anyone on /careers/, logged in or not.</div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="prop_status">Status</label>
+                            <select class="form-select" id="prop_status" name="status">
+                                {% for key, label in status_choices %}
+                                <option value="{{ key }}" {% if proposal.status == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Only a Published proposal is ever shown.</div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="prop_closes">Closes at</label>
+                            <input type="datetime-local" class="form-control" id="prop_closes" name="closes_at"
+                                   value="{{ proposal.closes_at|date:'Y-m-d\TH:i' }}">
+                            <div class="form-text">Leave empty to keep it up until you close it.</div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="prop_order">Display order</label>
+                            <input type="number" class="form-control" id="prop_order" name="display_order"
+                                   min="0" step="1" value="{{ proposal.display_order|default:0 }}">
+                            <div class="form-text">Lower numbers come first.</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn wfprop__btn-primary" id="workforce_proposal_btn_save">
+                            Save proposal
+                        </button>
+                        <a class="btn wfprop__btn-secondary" href="{% url 'workforce:wf_driver_proposals' %}">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/driver-proposals.css' %}?v=20260924a">
+{% endblock %}

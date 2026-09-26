@@ -7,7 +7,9 @@ Notes: The badge counts OPEN custody rows — parcels somebody is still liable f
 {% endcomment %}
 {% url 'workforce:returns_custody_list' as u_returns %}
 {% url 'workforce:returns_requests_list' as u_return_reqs %}
-{% with active="returns_custody_list,returns_requests_list" %}
+{% comment %}returns_request_create is a child of Return Requests, not a menu entry of its
+own — it is listed here so the section stays open and lit while the form is on screen.{% endcomment %}
+{% with active="returns_custody_list,returns_requests_list,returns_request_create" %}
 <li id="workforce_sidebar_menu_returns" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_returns" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-returns" data-title="Returns">
     <i class="fa-solid fa-rotate-left me-2"></i>
@@ -22,7 +24,7 @@ Notes: The badge counts OPEN custody rows — parcels somebody is still liable f
       {% comment %}Parcels signed in at a hub with no run back out raised. Badged with
       default_zero because a shelf that has emptied is worth seeing as 0, not as a gap.{% endcomment %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_returns_shelf" url=u_returns|add:"?status=to_forward" icon="fa-solid fa-boxes-stacked" label="On the Shelf" badge_var=returns_shelf_count badge_default_zero=1 badge_key="returns_shelf" %}
-      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_return_requests" url=u_return_reqs icon="fa-solid fa-file-invoice" label="Return Requests" active_names="returns_requests_list" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_return_requests" url=u_return_reqs icon="fa-solid fa-file-invoice" label="Return Requests" active_names="returns_requests_list,returns_request_create" %}
     </ul>
   </div>
 </li>

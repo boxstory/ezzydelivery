@@ -1,7 +1,7 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 {% comment %}
-Purpose: Full staff record for one client business — dossier header plus eight tabbed panels
+Purpose: Full staff record for one client business — dossier header plus nine tabbed panels
 Used by: workforce.views.seller_detail at /workforce/sellers/<business_id>/
 Notes: Most panel actions save over AJAX without reloading. Carries the shared wfnote__ page-notes
        card under the dossier, hidden on load; the help button in the dossier toggles it.
@@ -167,6 +167,7 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
         <button class="sld__tab" data-tab="team">Team <span class="sld__tab-count">{{ team_members.count|default:0 }}</span></button>
         <button class="sld__tab" data-tab="products">Products <span class="sld__tab-count">{{ products_list.count|default:0 }}</span></button>
         <button class="sld__tab" data-tab="integrations">Integrations <span class="sld__tab-count">{{ api_settings.count|default:0 }}</span></button>
+        <button class="sld__tab" data-tab="finance">Finance</button>
         <button class="sld__tab" data-tab="edit">Edit</button>
     </div>
 
@@ -1940,6 +1941,100 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
         {% endif %}
     </div>
 
+    <!-- Tab: Finance — who pays delivery, and the distance rate card that prices it.
+         Saves on its own (section=finance), outside #updateForm. -->
+    <div id="panel-finance" class="sld__panel">
+        <div class="sld__section">
+            <h3 class="sld__section-title">
+                <i class="fa-solid fa-chart-bar sld__section-icon"></i> Delivery Charges
+            </h3>
+            <div class="sld__order-grid">
+                <div class="sld__order-cell">
+                    <div class="sld__order-num sld__order-num--info">{{ finance_stats.open_total|default:0 }}</div>
+                    <div class="sld__order-text">Open orders</div>
+                </div>
+                <div class="sld__order-cell">
+                    <div class="sld__order-num sld__order-num--warning">{{ finance_stats.no_distance|default:0 }}</div>
+                    <div class="sld__order-text">No distance (unpinned)</div>
+                </div>
+                <div class="sld__order-cell">
+                    <div class="sld__order-num sld__order-num--danger">{{ finance_stats.no_fee|default:0 }}</div>
+                    <div class="sld__order-text">Open with fee 0</div>
+                </div>
+                <div class="sld__order-cell">
+                    <div class="sld__order-num sld__order-num--success">{{ finance_stats.door_fees|floatformat:2 }}</div>
+                    <div class="sld__order-text">Fees collected at door (QAR)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sld__section">
+            <h3 class="sld__section-title mb-2">
+                <i class="fa-solid fa-money-bill-wave sld__section-icon"></i> Who Pays Delivery
+            </h3>
+            <label class="sld__switch" for="sld_fin_pays">
+                <input type="checkbox" id="sld_fin_pays" class="sld__switch-input" {% if business.customer_pays_delivery %}checked{% endif %}>
+                <span class="sld__switch-track" aria-hidden="true"><span class="sld__switch-knob"></span></span>
+                <span class="sld__switch-text">
+                    <span class="sld__switch-title">Customer pays delivery at the door</span>
+                    <span class="sld__switch-sub">On: the driver collects COD + delivery fee as one amount and this client is not invoiced for it. On online-paid orders the driver still collects the delivery fee. Same switch as Delivery App Control.</span>
+                </span>
+            </label>
+        </div>
+
+        <div class="sld__section">
+            <div class="sld__panel-head">
+                <div class="sld__panel-head-main">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-route sld__section-icon"></i> Distance Rate Card
+                    </h3>
+                    <p class="sld__panel-note">Delivery fee by pickup&rarr;drop road distance. Each band covers distances up to its limit (inclusive) not covered by a smaller band; leave the limit blank on the last band for everything beyond. Open orders are re-priced on save. A fee staff typed on an order is never overwritten &mdash; clear it to 0 to hand the order back to this card.</p>
+                </div>
+                <div class="sld__act-group">
+                    <button type="button" class="sld__act" id="workforce_seller_finance_btn_add_band">
+                        <i class="fa-solid fa-plus"></i> Add band
+                    </button>
+                </div>
+            </div>
+            <div class="sld__table-wrap">
+                <table class="sld__table" id="workforce_seller_finance_table_rates">
+                    <thead>
+                        <tr>
+                            <th>Up to km</th>
+                            <th>Price (QAR)</th>
+                            <th class="text-end">Remove</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sld-fin-rows">
+                        {% for rate in distance_rates %}
+                        <tr class="sld-fin-row">
+                            <td><input type="number" class="sld__form-input sld-fin-km" min="0" step="0.1" value="{{ rate.up_to_km|default_if_none:'' }}" placeholder="No limit" aria-label="Up to km"></td>
+                            <td><input type="number" class="sld__form-input sld-fin-price" min="0" step="0.01" value="{{ rate.price }}" aria-label="Price in QAR"></td>
+                            <td class="text-end"><button type="button" class="sld__action-btn sld-fin-del" aria-label="Remove band"><i class="fa-solid fa-trash"></i></button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if not distance_rates %}
+            <p class="sld__panel-note mt-2" id="sld-fin-empty">No bands yet &mdash; fees for this client are typed by hand.</p>
+            {% endif %}
+            <template id="sld-fin-row-tpl">
+                <tr class="sld-fin-row">
+                    <td><input type="number" class="sld__form-input sld-fin-km" min="0" step="0.1" placeholder="No limit" aria-label="Up to km"></td>
+                    <td><input type="number" class="sld__form-input sld-fin-price" min="0" step="0.01" aria-label="Price in QAR"></td>
+                    <td class="text-end"><button type="button" class="sld__action-btn sld-fin-del" aria-label="Remove band"><i class="fa-solid fa-trash"></i></button></td>
+                </tr>
+            </template>
+            <div class="d-flex align-items-center justify-content-end flex-wrap gap-2 mt-3">
+                <span class="sld__location-addr" id="sld-fin-msg" hidden></span>
+                <button type="button" class="sld__act sld__act--primary" id="workforce_seller_finance_btn_save">
+                    <i class="fa-solid fa-floppy-disk"></i> Save finance
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Tab: Edit -->
     <div id="panel-edit" class="sld__panel">
         <div class="sld__panel-head">
@@ -2488,6 +2583,58 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
         .catch(function() {
             sw.checked = !on;
             sw.disabled = false;
+            say('Network error');
+        });
+    });
+})();
+
+// Finance tab — customer-pays switch + distance rate card, saved together as
+// section=finance. The server validates the bands and re-prices open orders.
+(function() {
+    var rowsEl = document.getElementById('sld-fin-rows');
+    if (!rowsEl) return;
+    var tpl = document.getElementById('sld-fin-row-tpl');
+    var note = document.getElementById('sld-fin-msg');
+    var saveBtn = document.getElementById('workforce_seller_finance_btn_save');
+    function say(text) { note.hidden = !text; note.textContent = text || ''; }
+
+    document.getElementById('workforce_seller_finance_btn_add_band').addEventListener('click', function() {
+        rowsEl.appendChild(tpl.content.cloneNode(true));
+        var empty = document.getElementById('sld-fin-empty');
+        if (empty) empty.hidden = true;
+    });
+    rowsEl.addEventListener('click', function(e) {
+        var del = e.target.closest('.sld-fin-del');
+        if (del) del.closest('tr').remove();
+    });
+
+    saveBtn.addEventListener('click', function() {
+        var rates = Array.prototype.map.call(rowsEl.querySelectorAll('.sld-fin-row'), function(tr) {
+            return { up_to_km: tr.querySelector('.sld-fin-km').value, price: tr.querySelector('.sld-fin-price').value };
+        });
+        var fd = new FormData();
+        fd.append('section', 'finance');
+        fd.append('rates', JSON.stringify(rates));
+        if (document.getElementById('sld_fin_pays').checked) fd.append('customer_pays_delivery', 'on');
+        saveBtn.disabled = true;
+        say('Saving…');
+        fetch('{% url "workforce:seller_detail" business.business_id %}', {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                say('Saved. ' + data.repriced + ' open order(s) re-priced.');
+                setTimeout(function() { location.reload(); }, 900);
+                return;
+            }
+            saveBtn.disabled = false;
+            say(data.error || 'Failed to save');
+        })
+        .catch(function() {
+            saveBtn.disabled = false;
             say('Network error');
         });
     });

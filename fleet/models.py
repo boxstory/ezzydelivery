@@ -43,6 +43,7 @@ Related:
 """
 
 import json
+import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from django.db import models
@@ -182,6 +183,15 @@ class Driver(models.Model):
         max_length=100, choices=driver_languages_choices)
     driver_license_number = models.CharField(max_length=100, blank=True, null=True)
     has_driver_license = models.BooleanField(default=False)
+
+    # The company that holds this driver's residence permit — the name on the QID,
+    # which is often not the company they deliver for. Ops need it to know who to
+    # contact about a driver's papers, so it is free text rather than a Business FK:
+    # most sponsors are outside firms that have no record on this platform.
+    driver_sponsor = models.CharField(
+        max_length=150, blank=True, default='',
+        help_text="Sponsor / company on the driver's QID (free text — usually an outside firm)"
+    )
     driver_rating = models.IntegerField(default=0)
     driver_rating_count = models.IntegerField(default=0)
     driver_reviews = models.TextField(default="")
@@ -192,6 +202,29 @@ class Driver(models.Model):
         max_length=20, choices=DRIVER_AVAILABILITY_CHOICES, default='offline', db_index=True,
         help_text="Real-time availability status of the driver"
     )
+
+    # Cleared to work — a second permission that sits ON TOP of driver_status.
+    # Approving an application means the identity and documents check out; it does
+    # not by itself put a driver on the road. Ops grant this separately at
+    # /workforce/drivers/<id>/. Until they do, an approved driver sees only their
+    # own profile and the opportunities board. Enforced through fleet/access.py,
+    # server-side on every claim and COD endpoint — never only hidden in the UI.
+    dashboard_access_enabled = models.BooleanField(
+        default=False, db_index=True,
+        help_text="Cleared to work: tasks, pickups, COD and earnings. Separate from "
+                  "driver_status — an approved driver without this sees only their "
+                  "profile and the opportunities board."
+    )
+    dashboard_access_granted_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When dashboard access was last granted"
+    )
+    dashboard_access_granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='granted_driver_dashboard_access',
+        help_text="Staff user who last granted dashboard access"
+    )
+
     job_type = models.CharField(
         max_length=20, choices=DRIVER_JOB_TYPE_CHOICES, blank=True, default='',
         help_text="Employment preference declared by the driver (full time / part time / flexible)"
@@ -510,6 +543,11 @@ class DriverTransaction(models.Model):
         ('cod_client_settle', 'COD Client Settlement'),
         ('cod_client_settle_reversal', 'COD Client Settlement Reversal'),
         ('cod_return', 'COD Return'),
+        # Our delivery fee taken in cash at the door, on a job that is not billed
+        # to a client invoice. Rides back on the same hand-in as the COD — the
+        # driver was given one figure — but it is Ezzy's revenue, so it must never
+        # be settled onward to the business the way a COD collection is.
+        ('fee_collection', 'Delivery Fee Collected in Cash'),
         # Delivery / Service Charges
         ('delivery_charge', 'Delivery Charge'),
         ('fulfillment_charge', 'Fulfillment Charge'),
@@ -2195,3 +2233,353 @@ class BusinessLedgerEntry(models.Model):
     def signed_amount(self):
         """Effect on the balance: positive raises what we owe the client."""
         return (self.credit or Decimal('0')) - (self.debit or Decimal('0'))
+
+
+# =============================================================================
+# DRIVER OPPORTUNITIES
+#
+# The front half of a machine that already half-existed. dispatch.RiderShift
+# models a shift ops assign to a named rider; nothing let a driver see the work
+# going and put their hand up for it. These three models are that missing half:
+# a posting, the dated slots inside it, and a driver's expression of interest.
+#
+# This is the one surface a verified driver can use before ops clear them to
+# work, so it must never depend on Driver.dashboard_access_enabled.
+# =============================================================================
+
+OPPORTUNITY_STATUS_CHOICES = [
+    ('draft', 'Draft'),
+    ('open', 'Open'),
+    ('closed', 'Closed'),
+]
+
+OPPORTUNITY_SLOT_STATUS_CHOICES = [
+    ('open', 'Open'),
+    ('full', 'Full'),
+    ('closed', 'Closed'),
+    ('cancelled', 'Cancelled'),
+]
+
+OPPORTUNITY_INTEREST_STATUS_CHOICES = [
+    ('interested', 'Interested'),
+    ('shortlisted', 'Shortlisted'),
+    ('confirmed', 'Confirmed'),
+    ('declined', 'Declined'),
+    ('withdrawn', 'Withdrawn'),
+]
+
+#: Interest states that consume a place on the slot. Shortlisting is a maybe and
+#: deliberately does not hold a seat — only a confirmation does.
+OPPORTUNITY_SEAT_TAKING_STATUSES = ['confirmed']
+
+
+class DriverOpportunity(models.Model):
+    """A posting: work ops are recruiting for, holding one or more dated slots.
+
+    Money is a free-text note on purpose. Driver pay is resolved by
+    delivery/earnings.py against DeliveryPayRate cards; putting a rate on a
+    recruitment advert would create a second, unauthoritative source for it.
+    """
+
+    title = models.CharField(max_length=150)
+    description = models.TextField(blank=True, default='')
+
+    vehicle_type = models.CharField(
+        max_length=100, choices=VEHICLE_CHOICES, blank=True, default='',
+        help_text="Vehicle this work needs; blank means any"
+    )
+    job_type = models.CharField(
+        max_length=20, choices=DRIVER_JOB_TYPE_CHOICES, blank=True, default='',
+        help_text="Full time / part time / flexible"
+    )
+    zone_groups = models.ManyToManyField(
+        'delivery.ZoneGroup', blank=True, related_name='opportunities',
+        help_text="Zone groups this work covers; blank means anywhere"
+    )
+    pickup_location = models.ForeignKey(
+        'business.PickupLocation', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='opportunities',
+        help_text="Store this work is based at. Required before a confirmed interest "
+                  "can be turned into a dispatch RiderShift."
+    )
+    pay_note = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text="Free text, e.g. 'QAR 25/hour + fuel'. Not a rate card — actual pay "
+                  "always resolves through delivery/earnings.py."
+    )
+
+    status = models.CharField(
+        max_length=20, choices=OPPORTUNITY_STATUS_CHOICES, default='draft', db_index=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    closes_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Stop showing this posting after this time"
+    )
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_opportunities')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Driver Opportunity'
+        verbose_name_plural = 'Driver Opportunities'
+        ordering = ['-published_at', '-created_at']
+        indexes = [
+            models.Index(fields=['status', 'published_at'], name='opp_status_published_idx'),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def is_live(self):
+        """Open, published, and not past its closing time."""
+        if self.status != 'open':
+            return False
+        if self.closes_at and self.closes_at <= dj_timezone.now():
+            return False
+        return True
+
+
+class DriverOpportunitySlot(models.Model):
+    """One dated shift inside a posting, with a headcount.
+
+    starts_at/ends_at are the truth; time_slab is only a label, drawn from the
+    same WORK_TIME_SLAB_CHOICES the driver already picked during onboarding so a
+    slot can be matched against their stated hours. Deliberately NOT
+    dispatch.RiderShift.SHIFT_TYPE — that vocabulary uses different boundaries,
+    and a third set of bands is the last thing this codebase needs.
+    """
+
+    opportunity = models.ForeignKey(
+        DriverOpportunity, on_delete=models.CASCADE, related_name='slots')
+    slot_code = models.CharField(max_length=32, unique=True, db_index=True, editable=False)
+
+    starts_at = models.DateTimeField(db_index=True)
+    ends_at = models.DateTimeField()
+    time_slab = models.CharField(
+        max_length=20, choices=WORK_TIME_SLAB_CHOICES, blank=True, default='',
+        help_text="Label only, for matching against Driver.work_time_slabs"
+    )
+
+    capacity = models.PositiveIntegerField(
+        default=1, help_text="How many drivers can be confirmed onto this slot")
+    status = models.CharField(
+        max_length=20, choices=OPPORTUNITY_SLOT_STATUS_CHOICES, default='open', db_index=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Opportunity Slot'
+        verbose_name_plural = 'Opportunity Slots'
+        ordering = ['starts_at']
+        indexes = [
+            models.Index(fields=['status', 'starts_at'], name='oppslot_status_start_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(ends_at__gt=models.F('starts_at')),
+                name='opportunity_slot_end_after_start'
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.opportunity.title} — {self.starts_at:%d %b %H:%M}"
+
+    def save(self, *args, **kwargs):
+        if not self.slot_code:
+            self.slot_code = f"OPP-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
+
+    @property
+    def confirmed_count(self):
+        return self.interests.filter(
+            status__in=OPPORTUNITY_SEAT_TAKING_STATUSES).count()
+
+    @property
+    def places_left(self):
+        return max(self.capacity - self.confirmed_count, 0)
+
+    @property
+    def is_past(self):
+        return self.starts_at <= dj_timezone.now()
+
+    @property
+    def is_open_for_interest(self):
+        """A driver may raise a hand only while the slot is live and still has room."""
+        return (
+            self.status == 'open'
+            and not self.is_past
+            and self.places_left > 0
+            and self.opportunity.is_live
+        )
+
+
+class DriverOpportunityInterest(models.Model):
+    """A driver putting their hand up for one slot.
+
+    unique_together keeps this idempotent: tapping Interested twice is the same
+    row, and a withdrawn interest is revived rather than duplicated.
+    """
+
+    slot = models.ForeignKey(
+        DriverOpportunitySlot, on_delete=models.CASCADE, related_name='interests')
+    driver = models.ForeignKey(
+        Driver, on_delete=models.CASCADE, related_name='opportunity_interests')
+
+    status = models.CharField(
+        max_length=20, choices=OPPORTUNITY_INTEREST_STATUS_CHOICES,
+        default='interested', db_index=True)
+    note = models.CharField(
+        max_length=300, blank=True, default='',
+        help_text="Anything the driver wanted to add")
+
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='decided_opportunity_interests')
+
+    # Set only when a confirmation was turned into a real dispatch shift, which
+    # needs the posting to carry a pickup_location. Nullable because plenty of
+    # postings will not have one.
+    rider_shift = models.OneToOneField(
+        'dispatch.RiderShift', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='opportunity_interest')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Opportunity Interest'
+        verbose_name_plural = 'Opportunity Interests'
+        ordering = ['-created_at']
+        unique_together = [('slot', 'driver')]
+        indexes = [
+            models.Index(fields=['driver', 'status'], name='oppint_driver_status_idx'),
+            models.Index(fields=['slot', 'status'], name='oppint_slot_status_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.driver} → {self.slot} ({self.status})"
+
+
+# =============================================================================
+# DRIVER PROPOSALS
+#
+# The recruitment *offer* marketing publishes, as opposed to the dated shifts in
+# DriverOpportunity above. A proposal is a standing package — "Full time bike
+# rider, QAR X a month, these zones, these perks" — written once and shown in
+# two places: the driver app (existing drivers, referrals, drivers looking to
+# switch job type) and the public careers page.
+#
+# It carries no slots, no capacity and no interest rows on purpose: it is an
+# advert, not a booking. A driver who wants the work applies through the normal
+# funnel (/join_us/driver/start/) or tells operations.
+# =============================================================================
+
+PROPOSAL_STATUS_CHOICES = [
+    ('draft', 'Draft'),
+    ('published', 'Published'),
+    ('closed', 'Closed'),
+]
+
+
+class DriverProposal(models.Model):
+    """A published driver offer package, shown in the driver app and on careers.
+
+    ``pay_package`` is free text for the same reason DriverOpportunity.pay_note
+    is: real driver pay resolves through delivery/earnings.py against
+    DeliveryPayRate cards, and an advert must never become a second source for
+    it. Nothing in this model is read by the payout code.
+    """
+
+    title = models.CharField(max_length=150)
+    ref_code = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text="Optional public reference shown on the careers page, e.g. EZY-DRV-01"
+    )
+    headline = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text="One line under the title — the offer in a sentence"
+    )
+    description = models.TextField(
+        blank=True, default='', help_text="What the work involves and who it suits")
+
+    pay_package = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text="Free text for the advert, e.g. 'QAR 3,500/month + fuel'. Not a "
+                  "rate card — actual pay always resolves through delivery/earnings.py."
+    )
+    job_type = models.CharField(
+        max_length=20, choices=DRIVER_JOB_TYPE_CHOICES, blank=True, default='',
+        help_text="Full time / part time / flexible; blank means any"
+    )
+    vehicle_type = models.CharField(
+        max_length=100, choices=VEHICLE_CHOICES, blank=True, default='',
+        help_text="Vehicle this offer needs; blank means any"
+    )
+    zone_groups = models.ManyToManyField(
+        'delivery.ZoneGroup', blank=True, related_name='driver_proposals',
+        help_text="Zone groups this offer covers; blank means anywhere"
+    )
+
+    perks = models.TextField(
+        blank=True, default='', help_text="One perk per line")
+    requirements = models.TextField(
+        blank=True, default='', help_text="One requirement per line")
+
+    # Audience. One proposal is often right for only one of the two surfaces —
+    # an offer aimed at drivers already on the fleet has no business on a public
+    # careers page, and a cold-recruitment advert adds nothing inside the app.
+    show_in_driver_app = models.BooleanField(
+        default=True, help_text="Show on the driver app opportunities screen")
+    show_on_careers = models.BooleanField(
+        default=True, help_text="Show in the driver offers section of /careers/")
+
+    status = models.CharField(
+        max_length=20, choices=PROPOSAL_STATUS_CHOICES, default='draft', db_index=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    closes_at = models.DateTimeField(
+        null=True, blank=True, help_text="Stop showing this offer after this time")
+
+    display_order = models.PositiveIntegerField(
+        default=0, help_text="Lower numbers come first on both surfaces")
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_driver_proposals')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Driver Proposal'
+        verbose_name_plural = 'Driver Proposals'
+        ordering = ['display_order', '-published_at', '-created_at']
+        indexes = [
+            models.Index(fields=['status', 'display_order'],
+                         name='drvprop_status_order_idx'),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def is_live(self):
+        """Published and not past its closing time."""
+        if self.status != 'published':
+            return False
+        if self.closes_at and self.closes_at <= dj_timezone.now():
+            return False
+        return True
+
+    @property
+    def perk_list(self):
+        """Perks as a list, blank lines dropped — the textarea is one per line."""
+        return [line.strip() for line in (self.perks or '').splitlines() if line.strip()]
+
+    @property
+    def requirement_list(self):
+        return [line.strip() for line in (self.requirements or '').splitlines() if line.strip()]

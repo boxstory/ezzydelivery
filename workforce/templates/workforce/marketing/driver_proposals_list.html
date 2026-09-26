@@ -1,0 +1,160 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff list of driver proposals — the recruitment offers marketing publishes to the driver app and the public careers page.
+Used by: workforce.marketing_views.wf_driver_proposals at /workforce/marketing/driver-proposals/
+Notes: Uses the shared staff shell (.wfpage / *__hero / .wfcard) — the navy band and card headers come from
+       staff-hero.css by class suffix, so this page declares no band colours. The "Showing on" column is the
+       whole point of the table: a proposal can be live and still be invisible on one of the two surfaces.
+{% endcomment %}
+{% block title %}Driver Proposals - Ezzy Delivery{% endblock title %}
+{% block content %}
+<div class="wfpage">
+
+    <div class="wfprop__hero">
+        <div class="wfhero__content">
+            <nav aria-label="breadcrumb">
+                <ol class="wfhero__crumbs">
+                    <li class="wfhero__crumb"><a class="wfhero__crumb-link" href="{% url 'workforce:crm_driver_leads_board' %}">Marketing</a></li>
+                    <li class="wfhero__crumb wfhero__crumb--active">Driver Proposals</li>
+                </ol>
+            </nav>
+            <h1 class="wfhero__heading">Driver Proposals</h1>
+            <p class="wfhero__record">
+                <span class="wfhero__tag">LIVE {{ live_count }}</span>
+                <span class="wfhero__dot">·</span> shown in the driver app and on /careers/
+            </p>
+        </div>
+        <div class="wfhero__bank">
+            <div class="d-flex flex-wrap justify-content-end gap-2">
+                <a class="wfhero__btn" href="{% url 'webpages:careers' %}#webpages_careers_list_offers" target="_blank" rel="noopener">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> View careers page
+                </a>
+                <a class="wfhero__btn" href="{% url 'workforce:wf_driver_proposal_new' %}">
+                    <i class="fa-solid fa-plus"></i> New proposal
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="wfpage__body">
+        <div class="wfcard">
+            <div class="wfcard__header"><i class="fa-solid fa-file-signature"></i> Proposals</div>
+            <div class="wfcard__body">
+
+                <form method="get" class="wfprop__facets mb-3">
+                    <label class="wfprop__facet-label" for="workforce_proposals_filter_select_status">Status</label>
+                    <select id="workforce_proposals_filter_select_status" name="status"
+                            class="wfprop__facet-select" onchange="this.form.submit()">
+                        <option value="">All statuses</option>
+                        {% for key, label in status_choices %}
+                        <option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+
+                {% if rows %}
+                <div class="table-responsive">
+                    <table id="workforce_proposals_list_table_view" class="wfprop__table table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Proposal</th>
+                                <th>Status</th>
+                                <th>Showing on</th>
+                                <th>Pay package</th>
+                                <th>Zones</th>
+                                <th>Order</th>
+                                <th>Closes</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in rows %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'workforce:wf_driver_proposal_edit' row.proposal.pk %}">{{ row.proposal.title }}</a>
+                                    {% if row.proposal.ref_code %}
+                                    <span class="wfmono wfprop__ref">{{ row.proposal.ref_code }}</span>
+                                    {% endif %}
+                                    <div class="wfprop__sub">
+                                        {% if row.proposal.job_type %}{{ row.proposal.get_job_type_display }}{% else %}Any job type{% endif %}
+                                        ·
+                                        {% if row.proposal.vehicle_type %}{{ row.proposal.get_vehicle_type_display }}{% else %}Any vehicle{% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="wfprop__state wfprop__state--{{ row.proposal.status }}">
+                                        {{ row.proposal.get_status_display }}
+                                    </span>
+                                    {% if row.proposal.status == 'published' and not row.is_live %}
+                                    <div class="wfprop__sub">Expired — past its closing time</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if row.is_live %}
+                                        {% if row.proposal.show_in_driver_app %}
+                                        <span class="wfprop__surface"><i class="fa-solid fa-mobile-screen"></i> Driver app</span>
+                                        {% endif %}
+                                        {% if row.proposal.show_on_careers %}
+                                        <span class="wfprop__surface"><i class="fa-solid fa-globe"></i> Careers</span>
+                                        {% endif %}
+                                        {% if not row.proposal.show_in_driver_app and not row.proposal.show_on_careers %}
+                                        <span class="wfprop__surface wfprop__surface--off">Nowhere</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="wfprop__surface wfprop__surface--off">Nowhere</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.proposal.pay_package|default:"—" }}</td>
+                                <td>
+                                    {% for zone in row.proposal.zone_groups.all %}{{ zone }}{% if not forloop.last %}, {% endif %}{% empty %}Anywhere{% endfor %}
+                                </td>
+                                <td class="wfmono">{{ row.proposal.display_order }}</td>
+                                <td class="wfmono">
+                                    {% if row.proposal.closes_at %}{{ row.proposal.closes_at|date:"d M Y, H:i" }}{% else %}—{% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1 justify-content-end">
+                                        <a class="wfprop__rowbtn" href="{% url 'workforce:wf_driver_proposal_edit' row.proposal.pk %}">Edit</a>
+                                        {% if row.proposal.status == 'published' %}
+                                        <form method="post" action="{% url 'workforce:wf_driver_proposal_status' row.proposal.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="status" value="closed">
+                                            <button type="submit" class="wfprop__rowbtn">Close</button>
+                                        </form>
+                                        {% else %}
+                                        <form method="post" action="{% url 'workforce:wf_driver_proposal_status' row.proposal.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="status" value="published">
+                                            <button type="submit" class="wfprop__rowbtn">Publish</button>
+                                        </form>
+                                        {% endif %}
+                                        <form method="post" action="{% url 'workforce:wf_driver_proposal_delete' row.proposal.pk %}"
+                                              onsubmit="return confirm('Delete this proposal? This cannot be undone.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="wfprop__rowbtn wfprop__rowbtn--danger">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-file-signature"></i>
+                    <p>No proposals yet. Write one to put an offer in front of drivers and job seekers.</p>
+                    <a class="wfprop__rowbtn" href="{% url 'workforce:wf_driver_proposal_new' %}">New proposal</a>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/driver-proposals.css' %}?v=20260924a">
+{% endblock %}

@@ -8447,6 +8447,9 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 .orc__coords-link { color: inherit; text-decoration: none; transition: color 0.2s ease; }
 .orc__coords-link:hover { color: var(--brand-info-dark); text-decoration: underline; }
 .orc__coords-link:hover i { color: var(--brand-info-dark); }
+.orc__coords .orc__coords-link i { font-size: 0.75rem; color: var(--brand-info-dark); }
+.orc__coords .rdist { font-family: inherit; font-size: 0.625rem; }
+.orc__coords .rdist i { font-size: 0.5625rem; color: var(--brand-grey-500, #777); }
 .orc__coords .orc__loc-acc,
 .dl-table__coords .orc__loc-acc { font-family: inherit; font-size: 0.5rem; padding: 0 4px; }
 .orc__addr {
@@ -8546,6 +8549,12 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-left: 2px;
+}
+.orc__dl-charge {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--brand-grey-500, #6c757d);
 }
 .orc__cod-nil {
     color: var(--brand-grey-300, #dcdcdc);
@@ -10333,10 +10342,10 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
    SHARED: Hero Header (navy gradient)
    Used by drl, dra, dri, drp, sll, sla, sli, slp, sld
    ------------------------------------------------------------------ */
-.drl__hero, .dra__hero, .dri__hero, .drp__hero,
-.sll__hero, .sla__hero, .sli__hero, .slp__hero,
-.drl__hero-inner, .dra__hero-inner, .dri__hero-inner, .drp__hero-inner,
-.sll__hero-inner, .sla__hero-inner, .sli__hero-inner, .slp__hero-inner,
+.drl__hero, .dra__hero, .dri__hero,
+.sll__hero, .sla__hero, .sli__hero,
+.drl__hero-inner, .dra__hero-inner, .dri__hero-inner,
+.sll__hero-inner, .sla__hero-inner, .sli__hero-inner,
 .sld__hero-inner {
     display: flex;
     align-items: center;
@@ -10344,14 +10353,14 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     flex-wrap: wrap;
     gap: 1rem;
 }
-.drl__hero-left, .dra__hero-left, .dri__hero-left, .drp__hero-left,
-.sll__hero-left, .sla__hero-left, .sli__hero-left, .slp__hero-left,
+.drl__hero-left, .dra__hero-left, .dri__hero-left,
+.sll__hero-left, .sla__hero-left, .sli__hero-left,
 .sld__hero-left {
     flex: 1;
     min-width: 240px;
 }
-.drl__hero-title, .dra__hero-title, .dri__hero-title, .drp__hero-title,
-.sll__hero-title, .sla__hero-title, .sli__hero-title, .slp__hero-title,
+.drl__hero-title, .dra__hero-title, .dri__hero-title,
+.sll__hero-title, .sla__hero-title, .sli__hero-title,
 .sld__hero-title {
     font-size: 1.25rem;
     font-weight: 700;
@@ -10361,13 +10370,13 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     align-items: center;
     gap: 0.5rem;
 }
-.drl__hero-title i, .dra__hero-title i, .dri__hero-title i, .drp__hero-title i,
-.sll__hero-title i, .sla__hero-title i, .sli__hero-title i, .slp__hero-title i,
+.drl__hero-title i, .dra__hero-title i, .dri__hero-title i,
+.sll__hero-title i, .sla__hero-title i, .sli__hero-title i,
 .sld__hero-title i {
     color: #f7c000;
 }
-.drl__hero-sub, .dra__hero-sub, .dri__hero-sub, .drp__hero-sub,
-.sll__hero-sub, .sla__hero-sub, .sli__hero-sub, .slp__hero-sub {
+.drl__hero-sub, .dra__hero-sub, .dri__hero-sub,
+.sll__hero-sub, .sla__hero-sub, .sli__hero-sub {
     font-size: 0.8125rem;
     color: rgba(255,255,255,0.7);
     margin: 0;
@@ -10488,16 +10497,16 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
    SHARED: Filter Section
    Used by drl, dra, dri, drp, sll, sla, sli, slp
    ------------------------------------------------------------------ */
-.drl__filter, .dra__filter, .dri__filter, .drp__filter,
-.sll__filter, .sla__filter, .sli__filter, .slp__filter {
+.drl__filter, .dra__filter, .dri__filter,
+.sll__filter, .sla__filter, .sli__filter {
     background: #fff;
     border: 1px solid #dee2e6;
     border-radius: 0.5rem;
     padding: 0.8rem 1rem;
     margin-bottom: 0.9rem;
 }
-.drl__filter-header, .dra__filter-header, .dri__filter-header, .drp__filter-header,
-.sll__filter-header, .sla__filter-header, .sli__filter-header, .slp__filter-header {
+.drl__filter-header, .dra__filter-header, .dri__filter-header,
+.sll__filter-header, .sla__filter-header, .sli__filter-header {
     font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -10508,28 +10517,28 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     align-items: center;
     gap: 0.4rem;
 }
-.drl__filter-header-icon, .dra__filter-header-icon, .dri__filter-header-icon, .drp__filter-header-icon,
-.sll__filter-header-icon, .sla__filter-header-icon, .sli__filter-header-icon, .slp__filter-header-icon {
+.drl__filter-header-icon, .dra__filter-header-icon, .dri__filter-header-icon,
+.sll__filter-header-icon, .sla__filter-header-icon, .sli__filter-header-icon {
     color: #f7c000;
 }
-.drl__filter-form, .dra__filter-form, .dri__filter-form, .drp__filter-form,
-.sll__filter-form, .sla__filter-form, .sli__filter-form, .slp__filter-form {
+.drl__filter-form, .dra__filter-form, .dri__filter-form,
+.sll__filter-form, .sla__filter-form, .sli__filter-form {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
     align-items: flex-end;
 }
-.drl__filter-group, .dra__filter-group, .dri__filter-group, .drp__filter-group,
-.sll__filter-group, .sla__filter-group, .sli__filter-group, .slp__filter-group {
+.drl__filter-group, .dra__filter-group, .dri__filter-group,
+.sll__filter-group, .sla__filter-group, .sli__filter-group {
     flex: 1 1 180px;
     min-width: 0;
 }
-.drl__filter-group--lg, .dra__filter-group--lg, .dri__filter-group--lg, .drp__filter-group--lg,
-.sll__filter-group--lg, .sla__filter-group--lg, .sli__filter-group--lg, .slp__filter-group--lg {
+.drl__filter-group--lg, .dra__filter-group--lg, .dri__filter-group--lg,
+.sll__filter-group--lg, .sla__filter-group--lg, .sli__filter-group--lg {
     flex: 2 1 280px;
 }
-.drl__filter-label, .dra__filter-label, .dri__filter-label, .drp__filter-label,
-.sll__filter-label, .sla__filter-label, .sli__filter-label, .slp__filter-label {
+.drl__filter-label, .dra__filter-label, .dri__filter-label,
+.sll__filter-label, .sla__filter-label, .sli__filter-label {
     display: block;
     font-size: 0.7rem;
     font-weight: 600;
@@ -10538,13 +10547,13 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     color: #6c757d;
     margin-bottom: 0.375rem;
 }
-.drl__filter-label i, .dra__filter-label i, .dri__filter-label i, .drp__filter-label i,
-.sll__filter-label i, .sla__filter-label i, .sli__filter-label i, .slp__filter-label i {
+.drl__filter-label i, .dra__filter-label i, .dri__filter-label i,
+.sll__filter-label i, .sla__filter-label i, .sli__filter-label i {
     color: #f7c000;
     margin-right: 0.25rem;
 }
-input.drl__filter-input, input.dra__filter-input, input.dri__filter-input, input.drp__filter-input,
-input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input.slp__filter-input {
+input.drl__filter-input, input.dra__filter-input, input.dri__filter-input,
+input.sll__filter-input, input.sla__filter-input, input.sli__filter-input {
     width: 100%;
     min-height: 0;
     height: 34px;
@@ -10556,14 +10565,14 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     background: #fff;
     transition: border-color 0.2s;
 }
-.drl__filter-input:focus, .dra__filter-input:focus, .dri__filter-input:focus, .drp__filter-input:focus,
-.sll__filter-input:focus, .sla__filter-input:focus, .sli__filter-input:focus, .slp__filter-input:focus {
+.drl__filter-input:focus, .dra__filter-input:focus, .dri__filter-input:focus,
+.sll__filter-input:focus, .sla__filter-input:focus, .sli__filter-input:focus {
     outline: none;
     border-color: #f7c000;
     box-shadow: 0 0 0 2px rgba(247, 192, 0, 0.15);
 }
-.drl__filter-actions, .dra__filter-actions, .dri__filter-actions, .drp__filter-actions,
-.sll__filter-actions, .sla__filter-actions, .sli__filter-actions, .slp__filter-actions {
+.drl__filter-actions, .dra__filter-actions, .dri__filter-actions,
+.sll__filter-actions, .sla__filter-actions, .sli__filter-actions {
     display: flex;
     gap: 0.5rem;
     flex-shrink: 0;
@@ -10578,34 +10587,34 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
        children to the RIGHT and shrink-wraps them. `flex: 1 1 100%` then sized
        their height, not their width, so every field floated right at its
        content width with the left half of the card empty. */
-    .drl__filter-form, .dra__filter-form, .dri__filter-form, .drp__filter-form,
-    .sll__filter-form, .sla__filter-form, .sli__filter-form, .slp__filter-form {
+    .drl__filter-form, .dra__filter-form, .dri__filter-form,
+    .sll__filter-form, .sla__filter-form, .sli__filter-form {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         align-items: end;
         gap: 0.5rem;
     }
-    .drl__filter-group, .dra__filter-group, .dri__filter-group, .drp__filter-group,
-    .sll__filter-group, .sla__filter-group, .sli__filter-group, .slp__filter-group {
+    .drl__filter-group, .dra__filter-group, .dri__filter-group,
+    .sll__filter-group, .sla__filter-group, .sli__filter-group {
         min-width: 0;
     }
     /* --lg is the free-text search: long placeholders, so it keeps a full row */
-    .drl__filter-group--lg, .dra__filter-group--lg, .dri__filter-group--lg, .drp__filter-group--lg,
-    .sll__filter-group--lg, .sla__filter-group--lg, .sli__filter-group--lg, .slp__filter-group--lg,
-    .drl__filter-actions, .dra__filter-actions, .dri__filter-actions, .drp__filter-actions,
-    .sll__filter-actions, .sla__filter-actions, .sli__filter-actions, .slp__filter-actions {
+    .drl__filter-group--lg, .dra__filter-group--lg, .dri__filter-group--lg,
+    .sll__filter-group--lg, .sla__filter-group--lg, .sli__filter-group--lg,
+    .drl__filter-actions, .dra__filter-actions, .dri__filter-actions,
+    .sll__filter-actions, .sla__filter-actions, .sli__filter-actions {
         grid-column: 1 / -1;
     }
     .drl__filter-actions .drl__btn, .dra__filter-actions .dra__btn,
-    .dri__filter-actions .dri__btn, .drp__filter-actions .drp__btn,
+    .dri__filter-actions .dri__btn,
     .sll__filter-actions .sll__btn, .sla__filter-actions .sla__btn,
-    .sli__filter-actions .sli__btn, .slp__filter-actions .slp__btn {
+    .sli__filter-actions .sli__btn {
         flex: 1 1 0;
         justify-content: center;
     }
     /* 16px stops iOS zooming the viewport when the search field takes focus */
-    input.drl__filter-input, input.dra__filter-input, input.dri__filter-input, input.drp__filter-input,
-    input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input.slp__filter-input {
+    input.drl__filter-input, input.dra__filter-input, input.dri__filter-input,
+    input.sll__filter-input, input.sla__filter-input, input.sli__filter-input {
         height: 2.75rem;
         font-size: 16px;
     }
@@ -10614,8 +10623,8 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 /* ------------------------------------------------------------------
    SHARED: Buttons
    ------------------------------------------------------------------ */
-.drl__btn, .dra__btn, .dri__btn, .drp__btn,
-.sll__btn, .sla__btn, .sli__btn, .slp__btn {
+.drl__btn, .dra__btn, .dri__btn,
+.sll__btn, .sla__btn, .sli__btn {
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
@@ -10629,13 +10638,13 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     transition: transform 0.15s, box-shadow 0.15s;
     white-space: nowrap;
 }
-.drl__btn:hover, .dra__btn:hover, .dri__btn:hover, .drp__btn:hover,
-.sll__btn:hover, .sla__btn:hover, .sli__btn:hover, .slp__btn:hover {
+.drl__btn:hover, .dra__btn:hover, .dri__btn:hover,
+.sll__btn:hover, .sla__btn:hover, .sli__btn:hover {
     transform: none;
     box-shadow: none;
 }
-.drl__btn--primary, .dra__btn--primary, .dri__btn--primary, .drp__btn--primary,
-.sll__btn--primary, .sla__btn--primary, .sli__btn--primary, .slp__btn--primary {
+.drl__btn--primary, .dra__btn--primary, .dri__btn--primary,
+.sll__btn--primary, .sla__btn--primary, .sli__btn--primary {
     background: #001f3f;
     color: #fff;
     height: 34px;
@@ -10646,32 +10655,22 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     letter-spacing: 0.03em;
     border-bottom: 2px solid #f7c000;
 }
-.drl__btn--primary:hover, .dra__btn--primary:hover, .dri__btn--primary:hover, .drp__btn--primary:hover,
-.sll__btn--primary:hover, .sla__btn--primary:hover, .sli__btn--primary:hover, .slp__btn--primary:hover {
+.drl__btn--primary:hover, .dra__btn--primary:hover, .dri__btn--primary:hover,
+.sll__btn--primary:hover, .sla__btn--primary:hover, .sli__btn--primary:hover {
     background: #002a54;
     color: #fff;
 }
 .drl__btn--view, .dra__btn--view, .dri__btn--view,
-.sll__btn--view, .sla__btn--view, .sli__btn--view, .slp__btn--view {
+.sll__btn--view, .sla__btn--view, .sli__btn--view {
     background: #eff6ff;
     color: #2563eb;
     border: 1px solid #dbeafe;
 }
 .drl__btn--view:hover, .dra__btn--view:hover, .dri__btn--view:hover,
-.sll__btn--view:hover, .sla__btn--view:hover, .sli__btn--view:hover, .slp__btn--view:hover {
+.sll__btn--view:hover, .sla__btn--view:hover, .sli__btn--view:hover {
     background: #dbeafe;
     color: #1d4ed8;
-}
-.drp__btn--review, .slp__btn--review {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
-}
-.drp__btn--review:hover, .slp__btn--review:hover {
-    background: #fde68a;
-    color: #78350f;
-}
-.drl__btn--export {
+}.drl__btn--export {
     background: #f0fdf4;
     color: #15803d;
     border: 1px solid #bbf7d0;
@@ -10688,8 +10687,8 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
    is 364px on a phone, so `overflow: hidden` left the right-hand columns
    (business status, actions) unreachable — the table could not be swiped. y
    stays hidden so the rounded corners still clip. */
-.drl__table-wrap, .dra__table-wrap, .dri__table-wrap, .drp__table-wrap,
-.sll__table-wrap, .sla__table-wrap, .sli__table-wrap, .slp__table-wrap,
+.drl__table-wrap, .dra__table-wrap, .dri__table-wrap,
+.sll__table-wrap, .sla__table-wrap, .sli__table-wrap,
 .sld__table-wrap {
     position: relative;
     background: #fff;
@@ -10700,14 +10699,14 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
 }
-.drl__table, .dra__table, .dri__table, .drp__table,
-.sll__table, .sla__table, .sli__table, .slp__table,
+.drl__table, .dra__table, .dri__table,
+.sll__table, .sla__table, .sli__table,
 .sld__table {
     width: 100%;
     border-collapse: collapse;
 }
-.drl__table th, .dra__table th, .dri__table th, .drp__table th,
-.sll__table th, .sla__table th, .sli__table th, .slp__table th,
+.drl__table th, .dra__table th, .dri__table th,
+.sll__table th, .sla__table th, .sli__table th,
 .sld__table th {
     text-align: left;
     padding: 0.75rem 1rem;
@@ -10719,8 +10718,8 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     background: #fafafa;
     border-bottom: 1px solid #f0f0f0;
 }
-.drl__table td, .dra__table td, .dri__table td, .drp__table td,
-.sll__table td, .sla__table td, .sli__table td, .slp__table td,
+.drl__table td, .dra__table td, .dri__table td,
+.sll__table td, .sla__table td, .sli__table td,
 .sld__table td {
     padding: 0.75rem 1rem;
     font-size: 0.8125rem;
@@ -10728,15 +10727,15 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     border-bottom: 1px solid #f5f5f5;
     vertical-align: middle;
 }
-.drl__table tbody tr:hover, .dra__table tbody tr:hover, .dri__table tbody tr:hover, .drp__table tbody tr:hover,
-.sll__table tbody tr:hover, .sla__table tbody tr:hover, .sli__table tbody tr:hover, .slp__table tbody tr:hover,
+.drl__table tbody tr:hover, .dra__table tbody tr:hover, .dri__table tbody tr:hover,
+.sll__table tbody tr:hover, .sla__table tbody tr:hover, .sli__table tbody tr:hover,
 .sld__table tbody tr:hover {
     background: #fafbfc;
 }
 .drl__table tbody tr:last-child td, .dra__table tbody tr:last-child td,
-.dri__table tbody tr:last-child td, .drp__table tbody tr:last-child td,
+.dri__table tbody tr:last-child td,
 .sll__table tbody tr:last-child td, .sla__table tbody tr:last-child td,
-.sli__table tbody tr:last-child td, .slp__table tbody tr:last-child td,
+.sli__table tbody tr:last-child td,
 .sld__table tbody tr:last-child td {
     border-bottom: none;
 }
@@ -10744,12 +10743,12 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 /* ------------------------------------------------------------------
    SHARED: Driver / Seller Cell (avatar + name)
    ------------------------------------------------------------------ */
-.drl__driver-cell, .dra__driver-cell, .dri__driver-cell, .drp__driver-cell {
+.drl__driver-cell, .dra__driver-cell, .dri__driver-cell {
     display: flex;
     align-items: center;
     gap: 0.75rem;
 }
-.drl__driver-avatar, .dra__driver-avatar, .dri__driver-avatar, .drp__driver-avatar {
+.drl__driver-avatar, .dra__driver-avatar, .dri__driver-avatar {
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -10763,23 +10762,23 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 }
 .dra__driver-avatar--active { background: #dcfce7; color: #15803d; }
 .dri__driver-avatar--inactive { background: #fef2f2; color: #dc2626; }
-.drl__driver-name, .dra__driver-name, .dri__driver-name, .drp__driver-name {
+.drl__driver-name, .dra__driver-name, .dri__driver-name {
     font-weight: 600;
     color: #1a1a2e;
     font-size: 0.8125rem;
 }
-.drl__driver-code, .dra__driver-code, .dri__driver-code, .drp__driver-code {
+.drl__driver-code, .dra__driver-code, .dri__driver-code {
     font-size: 0.7rem;
     color: #9ca3af;
     font-family: monospace;
 }
 
-.sll__seller-cell, .sla__seller-cell, .sli__seller-cell, .slp__seller-cell {
+.sll__seller-cell, .sla__seller-cell, .sli__seller-cell {
     display: flex;
     align-items: center;
     gap: 0.75rem;
 }
-.sll__seller-avatar, .sla__seller-avatar, .sli__seller-avatar, .slp__seller-avatar {
+.sll__seller-avatar, .sla__seller-avatar, .sli__seller-avatar {
     width: 36px;
     height: 36px;
     border-radius: 0.5rem;
@@ -10792,14 +10791,12 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     flex-shrink: 0;
 }
 .sla__seller-avatar--active { background: #dcfce7; color: #15803d; }
-.sli__seller-avatar--inactive { background: #fef2f2; color: #dc2626; }
-.slp__seller-avatar--pending { background: #fef3c7; color: #92400e; }
-.sll__seller-name, .sla__seller-name, .sli__seller-name, .slp__seller-name {
+.sli__seller-avatar--inactive { background: #fef2f2; color: #dc2626; }.sll__seller-name, .sla__seller-name, .sli__seller-name {
     font-weight: 600;
     color: #1a1a2e;
     font-size: 0.8125rem;
 }
-.sll__seller-code, .sla__seller-code, .sli__seller-code, .slp__seller-code {
+.sll__seller-code, .sla__seller-code, .sli__seller-code {
     font-size: 0.7rem;
     color: #9ca3af;
     font-family: monospace;
@@ -10808,14 +10805,14 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 /* ------------------------------------------------------------------
    SHARED: Contact Lines
    ------------------------------------------------------------------ */
-.drl__contact-line, .dra__contact-line, .dri__contact-line, .drp__contact-line,
-.sll__contact-line, .sla__contact-line, .sli__contact-line, .slp__contact-line {
+.drl__contact-line, .dra__contact-line, .dri__contact-line,
+.sll__contact-line, .sla__contact-line, .sli__contact-line {
     font-size: 0.8125rem;
     color: #4b5563;
     margin-bottom: 0.125rem;
 }
-.drl__contact-line i, .dra__contact-line i, .dri__contact-line i, .drp__contact-line i,
-.sll__contact-line i, .sla__contact-line i, .sli__contact-line i, .slp__contact-line i {
+.drl__contact-line i, .dra__contact-line i, .dri__contact-line i,
+.sll__contact-line i, .sla__contact-line i, .sli__contact-line i {
     color: #9ca3af;
     width: 14px;
     text-align: center;
@@ -10826,8 +10823,8 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 /* ------------------------------------------------------------------
    SHARED: Badges (status)
    ------------------------------------------------------------------ */
-.drl__badge, .dra__badge, .dri__badge, .drp__badge,
-.sll__badge, .sla__badge, .sli__badge, .slp__badge,
+.drl__badge, .dra__badge, .dri__badge,
+.sll__badge, .sla__badge, .sli__badge,
 .sld__badge {
     display: inline-flex;
     align-items: center;
@@ -10839,14 +10836,14 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
     text-transform: capitalize;
     white-space: nowrap;
 }
-.drl__badge--success, .dra__badge--success, .dri__badge--success, .drp__badge--success,
-.sll__badge--success, .sla__badge--success, .sli__badge--success, .slp__badge--success,
+.drl__badge--success, .dra__badge--success, .dri__badge--success,
+.sll__badge--success, .sla__badge--success, .sli__badge--success,
 .sld__badge--success { background: #dcfce7; color: #15803d; }
-.drl__badge--warning, .dra__badge--warning, .dri__badge--warning, .drp__badge--warning,
-.sll__badge--warning, .sla__badge--warning, .sli__badge--warning, .slp__badge--warning,
+.drl__badge--warning, .dra__badge--warning, .dri__badge--warning,
+.sll__badge--warning, .sla__badge--warning, .sli__badge--warning,
 .sld__badge--warning { background: #fef3c7; color: #92400e; }
-.drl__badge--danger, .dra__badge--danger, .dri__badge--danger, .drp__badge--danger,
-.sll__badge--danger, .sla__badge--danger, .sli__badge--danger, .slp__badge--danger,
+.drl__badge--danger, .dra__badge--danger, .dri__badge--danger,
+.sll__badge--danger, .sla__badge--danger, .sli__badge--danger,
 .sld__badge--danger { background: #fef2f2; color: #dc2626; }
 .drl__badge--muted, .sll__badge--muted, .sld__badge--muted { background: #f3f4f6; color: #6b7280; }
 .sll__badge--info, .sld__badge--info { background: #eff6ff; color: #2563eb; }
@@ -10880,16 +10877,16 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 /* ------------------------------------------------------------------
    SHARED: Vehicle, Wallet, Docs, Date, Muted text
    ------------------------------------------------------------------ */
-.drl__vehicle-type, .dra__vehicle-type, .dri__vehicle-type, .drp__vehicle-type {
+.drl__vehicle-type, .dra__vehicle-type, .dri__vehicle-type {
     font-size: 0.8125rem;
     color: #374151;
 }
-.drl__vehicle-no, .dra__vehicle-no, .dri__vehicle-no, .drp__vehicle-no {
+.drl__vehicle-no, .dra__vehicle-no, .dri__vehicle-no {
     font-size: 0.7rem;
     color: #9ca3af;
 }
-.drl__text-muted, .dra__text-muted, .dri__text-muted, .drp__text-muted,
-.sll__text-muted, .sla__text-muted, .sli__text-muted, .slp__text-muted,
+.drl__text-muted, .dra__text-muted, .dri__text-muted,
+.sll__text-muted, .sla__text-muted, .sli__text-muted,
 .sld__text-muted {
     color: #9ca3af;
     font-size: 0.8125rem;
@@ -10905,16 +10902,7 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 .dra__avail-badge--on_delivery { background: #dbeafe; color: #1d4ed8; }
 .dra__avail-badge--on_break    { background: #fef9c3; color: #92400e; }
 .dra__avail-badge--returning   { background: #e0f2fe; color: #0369a1; }
-.dra__avail-badge--offline     { background: #f3f4f6; color: #6b7280; }
-.drp__doc-count {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    font-size: 0.8125rem;
-}
-.drp__doc-count--has { color: #15803d; }
-.drp__doc-count--none { color: #dc2626; }
-.sll__date, .sla__date, .sli__date, .slp__date {
+.dra__avail-badge--offline     { background: #f3f4f6; color: #6b7280; }.sll__date, .sla__date, .sli__date {
     font-size: 0.8125rem;
     color: #6b7280;
 }
@@ -10923,28 +10911,28 @@ input.sll__filter-input, input.sla__filter-input, input.sli__filter-input, input
 /* ------------------------------------------------------------------
    SHARED: Empty State
    ------------------------------------------------------------------ */
-.drl__empty, .dra__empty, .dri__empty, .drp__empty,
-.sll__empty, .sla__empty, .sli__empty, .slp__empty {
+.drl__empty, .dra__empty, .dri__empty,
+.sll__empty, .sla__empty, .sli__empty {
     text-align: center;
     padding: 3rem 1.5rem;
     color: #9ca3af;
 }
-.drl__empty i, .dra__empty i, .dri__empty i, .drp__empty i,
-.sll__empty i, .sla__empty i, .sli__empty i, .slp__empty i {
+.drl__empty i, .dra__empty i, .dri__empty i,
+.sll__empty i, .sla__empty i, .sli__empty i {
     font-size: 2.5rem;
     color: #d1d5db;
     margin-bottom: 0.75rem;
     display: block;
 }
-.drl__empty h3, .dra__empty h3, .dri__empty h3, .drp__empty h3,
-.sll__empty h3, .sla__empty h3, .sli__empty h3, .slp__empty h3 {
+.drl__empty h3, .dra__empty h3, .dri__empty h3,
+.sll__empty h3, .sla__empty h3, .sli__empty h3 {
     font-size: 1rem;
     font-weight: 600;
     color: #4b5563;
     margin: 0 0 0.375rem;
 }
-.drl__empty p, .dra__empty p, .dri__empty p, .drp__empty p,
-.sll__empty p, .sla__empty p, .sli__empty p, .slp__empty p {
+.drl__empty p, .dra__empty p, .dri__empty p,
+.sll__empty p, .sla__empty p, .sli__empty p {
     font-size: 0.8125rem;
     margin: 0;
 }
@@ -21083,6 +21071,22 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 }
 .uvl__btn--wa:disabled { opacity: 0.55; cursor: not-allowed; }
 
+/* Direct WhatsApp chat link (verification manifest).
+   Deliberately quieter than .uvl__btn--wa next to it: the filled green button
+   SENDS the templated completion reminder, this one only opens a conversation.
+   Two identical green buttons in one row would read as the same action twice. */
+.uvl__btn--wa-chat {
+    background: #fff;
+    border: 1px solid #86efac;
+    color: var(--brand-success);
+    text-decoration: none;
+}
+.uvl__btn--wa-chat:hover {
+    background: var(--brand-success-bg);
+    border-color: var(--brand-success);
+    color: var(--brand-success);
+}
+
 /* WhatsApp reminder modal — green header + message preview */
 .uvl__modal__header--wa {
     background: var(--brand-success-bg);
@@ -25293,3 +25297,73 @@ thead:hover .wfsort__icon--idle,
 .rtn__status-select { min-width: 10.5rem; }
 
 #workforce_returns_table_requests td:last-child { white-space: nowrap; }
+
+/* ---------------------------------------------------------------------------
+   Drivers roster — "no app access" flag.
+   Marks a driver who is verified but whom ops have not cleared to work. Quiet
+   on purpose: this is a normal waiting state, not a fault, so it reads as a
+   muted note under the account-status badge rather than a second alarm.
+   --------------------------------------------------------------------------- */
+.drl__no-access {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+  white-space: nowrap;
+}
+
+.drl__no-access i {
+  font-size: 0.68rem;
+  color: var(--brand-grey-400);
+}
+
+
+/* ---------------------------------------------------------------------------
+   WhatsApp compose popup (driver verification queue).
+   Chips stay neutral grey: the only green in this modal belongs to the one
+   button that actually opens WhatsApp.
+   --------------------------------------------------------------------------- */
+.dvm__wa-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
+}
+.dvm__wa-preset {
+    min-height: 2.1rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+    background: var(--brand-grey-100);
+    border: 1px solid var(--brand-grey-400);
+    border-radius: var(--brand-radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.dvm__wa-preset:hover {
+    background: var(--brand-secondary);
+    border-color: var(--brand-primary);
+}
+.dvm__wa-text {
+    width: 100%;
+    min-height: 7rem;
+    margin-top: 0.375rem;
+    padding: 0.75rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--brand-grey-800);
+    background: #fff;
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    resize: vertical;
+}
+.dvm__wa-text:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: none;
+}

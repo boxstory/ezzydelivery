@@ -1,0 +1,102 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff list of driver opportunity postings — the recruitment board ops publish to the driver PWA.
+Used by: workforce.views.wf_opportunities at /workforce/fleet/opportunities/
+Notes: Uses the shared staff shell (.wfpage / *__hero / .wfcard) — the navy band and card headers
+       are applied by staff-hero.css from the class suffix, so this page declares no band colours.
+{% endcomment %}
+{% block title %}Driver Opportunities - Ezzy Delivery{% endblock title %}
+{% block content %}
+<div class="wfpage">
+
+    <div class="wfopp__hero">
+        <div class="wfhero__content">
+            <nav aria-label="breadcrumb">
+                <ol class="wfhero__crumbs">
+                    <li class="wfhero__crumb"><a class="wfhero__crumb-link" href="{% url 'workforce:drivers_list' %}">Drivers</a></li>
+                    <li class="wfhero__crumb wfhero__crumb--active">Opportunities</li>
+                </ol>
+            </nav>
+            <h1 class="wfhero__heading">Driver Opportunities</h1>
+            <p class="wfhero__record">Shifts published to the driver app</p>
+        </div>
+        <div class="wfhero__bank">
+            <div class="d-flex flex-wrap justify-content-end gap-2">
+                <a class="wfhero__btn" href="{% url 'workforce:wf_opportunity_new' %}">
+                    <i class="fa-solid fa-plus"></i> New posting
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="wfpage__body">
+        <div class="wfcard">
+            <div class="wfcard__header"><i class="fa-solid fa-filter"></i> Postings</div>
+            <div class="wfcard__body">
+
+                <form method="get" class="crm__facets mb-3">
+                    <select name="status" class="crm__facet-select" onchange="this.form.submit()">
+                        <option value="">All statuses</option>
+                        {% for key, label in status_choices %}
+                        <option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+
+                {% if rows %}
+                <div class="table-responsive">
+                    <table class="wfopp__table table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Posting</th>
+                                <th>Status</th>
+                                <th>Shifts</th>
+                                <th>Based at</th>
+                                <th>Closes</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in rows %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'workforce:wf_opportunity_detail' row.posting.pk %}">{{ row.posting.title }}</a>
+                                    {% if row.posting.job_type %}
+                                    <div class="wfopp__sub">{{ row.posting.get_job_type_display }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="wfopp__state wfopp__state--{{ row.posting.status }}">
+                                        {{ row.posting.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="wfmono">{{ row.open_slots }} open / {{ row.slot_count }}</td>
+                                <td>{{ row.posting.pickup_location|default:"—" }}</td>
+                                <td class="wfmono">
+                                    {% if row.posting.closes_at %}{{ row.posting.closes_at|date:"d M Y, H:i" }}{% else %}—{% endif %}
+                                </td>
+                                <td>
+                                    <a class="wfopp__rowbtn" href="{% url 'workforce:wf_opportunity_detail' row.posting.pk %}">Open</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-calendar-day"></i>
+                    <p>No postings yet. Create one to start collecting driver interest.</p>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/opportunities.css' %}?v=20260922a">
+{% endblock %}

@@ -39,6 +39,7 @@
   font-variant-numeric: tabular-nums;
 }
 .codl__tile-value small { font-size: 0.7rem; font-weight: 600; color: var(--brand-grey-500); }
+.codl__tile-note { font-size: 0.72rem; color: var(--brand-grey-500); }
 
 /* ── Filter card ───────────────────────────────────────────────── */
 .codl__filter-card {
@@ -160,12 +161,43 @@ select.codl__filter-input:focus {
 
 /* Two-line stacked cells (Code/Type, Amount/Method, Customer/Mobile) */
 .codl__table td .codl__code { display: block; margin-bottom: 0.2rem; }
+.codl__link { color: var(--brand-navy); text-decoration: none; }
+.codl__bizcode { font-size: 0.72rem; color: var(--brand-grey-500); margin-left: 0.25rem; }
+.codl__link:hover { text-decoration: underline; }
 .codl__submeta {
   display: block;
   font-size: 0.72rem;
   color: var(--brand-grey-500);
   margin-top: 0.15rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* "Taken at door" receipt — COD + fee as one aligned sum. The line this row
+   books is inked; the other half is muted, so a COD row and its fee row read
+   as two halves of one collection. */
+/* Every receipt spans the full cell, label left / amount / fixed method track,
+   so the rows line up down the column instead of each hugging its own width. */
+.codl__door { vertical-align: middle; width: 1%; min-width: 10rem; }
+.codl__receipt {
+  display: grid;
+  grid-template-columns: 1fr auto 3.25rem;
+  column-gap: 0;
+  row-gap: 0.1rem;
+  width: 100%;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+.codl__receipt-line { display: contents; color: var(--brand-grey-500); }
+.codl__receipt-amt, .codl__receipt-method { padding-left: 0.5rem; }
+.codl__receipt-line > span:first-child { text-align: left; }
+.codl__receipt-amt { text-align: right; }
+.codl__receipt-method { text-align: left; }
+.codl__receipt-line--self { color: var(--brand-grey-800); font-weight: 600; }
+.codl__receipt-line--total { color: var(--brand-grey-800); font-weight: 700; }
+.codl__receipt-line--total > span {
+  border-top: 1px solid var(--brand-grey-300);
+  padding-top: 0.2rem;
+  margin-top: 0.15rem;
 }
 .codl__notes { white-space: normal; min-width: 140px; max-width: 200px; color: var(--brand-grey-500); }
 /* Shrink a numeric column to its content/header width */
@@ -179,6 +211,10 @@ select.codl__filter-input:focus {
   white-space: nowrap;
   cursor: default;
 }
+/* Customer · mobile, the 4th line of the Business / Order / Task cell */
+.codl__cust { display: block; max-width: 190px; }
+/* Driver "code - name" under the right-aligned Driver cash after figures */
+.codl__drvname { display: block; max-width: 150px; margin-left: auto; }
 
 /* Payment-method bubble */
 .codl__pay {
@@ -197,6 +233,9 @@ select.codl__filter-input:focus {
 .codl__pay--pos    { background: #efe7fb; color: #5a3aa8; }  /* purple */
 .codl__pay--bank   { background: #eef1f6; color: #3a4a6b; }  /* slate */
 .codl__pay--atm    { background: #fff4e0; color: #8a5a00; }  /* amber */
+.codl__pay--mixed  { background: var(--brand-grey-200); color: var(--brand-grey-700); }
+/* Pills inside the "Taken at door" receipt sit on the text line */
+.codl__receipt .codl__pay { margin-top: 0; padding: 0 0.4rem; font-size: 0.58rem; vertical-align: middle; }
 
 /* Credit / debit ink (restrained, not candy) */
 .codl__credit { color: #1a7f4b; font-weight: 600; }
@@ -214,7 +253,8 @@ select.codl__filter-input:focus {
   color: var(--brand-grey-800);
   border-left: 3px solid var(--brand-grey-400, #adadad);
 }
-.codl__badge--cod_collection { border-left-color: #1a7f4b; }
+.codl__badge--cod_collection,
+.codl__badge--fee_collection { border-left-color: #1a7f4b; }
 .codl__badge--cod_deposit,
 .codl__badge--cod_driver_settle { border-left-color: var(--brand-navy); }
 .codl__badge--cod_client_settle { border-left-color: var(--brand-primary); }
@@ -275,3 +315,24 @@ select.codl__filter-input:focus {
 /* Hero sits flush; .codl__body below it carries the page padding. */
 .codl.container-fluid { padding-left: 0; padding-right: 0; }
 .codl__body { padding: 0.325rem; }
+/* The other half of a pair stays muted, pill included */
+.codl__receipt-line:not(.codl__receipt-line--self):not(.codl__receipt-line--total) .codl__pay { opacity: 0.55; }
+
+/* COD / DL fee cell — two aligned lines: label · amount · method pill */
+/* Same fixed tracks on every row (label / amount) so the column lines up. */
+.codl__amts {
+  display: grid;
+  grid-template-columns: 3.5rem 4.5rem;
+  row-gap: 0.25rem;
+  align-items: center;
+}
+.codl__amts-line { display: contents; }
+.codl__amts-line > span + span { padding-left: 0.5rem; text-align: right; }
+.codl__amts-label { font-size: 0.68rem; color: var(--brand-grey-500); text-align: left; }
+.codl__amts-line--total > span {
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  border-top: 1px solid var(--brand-grey-300);
+  padding-top: 0.15rem;
+}
+.codl__amts-line--aside > span { padding-top: 0.25rem; color: var(--brand-grey-500); font-size: 0.68rem; }

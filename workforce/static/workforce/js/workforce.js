@@ -2,6 +2,37 @@
    WORKFORCE APP - MERGED JAVASCRIPT
    ============================================ */
 
+/* ---------- DOOR COLLECTION CONFIRM ---------- */
+/**
+ * Marking a task Delivered books the cash taken at the door (COD + a
+ * customer-pays delivery fee). The server answers 409 needs_confirmation with
+ * the figures; this asks staff to confirm them. Returns true to resend with
+ * confirm_collection. Used by the task detail modal, list modal and bulk update.
+ */
+window.wfConfirmDoorCollection = function(data) {
+    var c = data.collect || {};
+    var tasks = data.tasks || [];
+    var lines = ['Confirm the cash collected at the door:', ''];
+    if (tasks.length === 1) {
+        if (tasks[0].driver) lines.push('Driver: ' + tasks[0].driver);
+    } else {
+        lines.push(tasks.length + ' task(s) with money due:');
+        tasks.slice(0, 8).forEach(function(t) {
+            lines.push('  ' + t.task + (t.driver ? ' (' + t.driver + ')' : '') + ' — QAR ' + t.total);
+        });
+        if (tasks.length > 8) lines.push('  … and ' + (tasks.length - 8) + ' more');
+        lines.push('');
+    }
+    lines.push('COD:            QAR ' + c.cod);
+    lines.push('Delivery fee:   QAR ' + c.fee);
+    lines.push('TOTAL:          QAR ' + c.total);
+    lines.push('');
+    lines.push('⚠️ This is booked as cash the driver holds and must hand in.' +
+               (parseFloat(c.fee) > 0 ? ' The fee comes off the client\'s invoice.' : ''));
+    lines.push('If the driver did not collect this, cancel and correct the amounts first.');
+    return confirm(lines.join('\n'));
+};
+
 /* ---------- WF LISTS ---------- */
 /**
  * Workforce Lists JavaScript
@@ -317,7 +348,7 @@
             if (time) payload.time = time;
             if (notes) payload.notes = notes;
 
-            fetch('/workforce/delivery-task/' + taskId + '/update-status/', {
+            var send = function() { return fetch('/workforce/delivery-task/' + taskId + '/update-status/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -327,6 +358,15 @@
             })
             .then(function(response) { return response.json(); })
             .then(function(data) {
+                // Delivered with money due: confirm COD + fee, then resend.
+                if (data.needs_confirmation) {
+                    if (window.wfConfirmDoorCollection(data)) {
+                        payload.confirm_collection = true;
+                        payload.collected_total = data.collect.total;
+                        return send();
+                    }
+                    data = { success: false, error: 'Cancelled — nothing was changed' };
+                }
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Update Status';
@@ -355,7 +395,8 @@
                 }
                 console.error('Error:', error);
                 showToast('Error: ' + (error.message || 'An error occurred while updating status'), 'danger');
-            });
+            }); };
+            send();
         }
     };
 

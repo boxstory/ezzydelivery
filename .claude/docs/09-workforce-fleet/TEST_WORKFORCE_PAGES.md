@@ -43,10 +43,6 @@
   - Expected: Active driver cards with green status
   - CSS: `drivers_list.css`
 
-- [ ] http://127.0.0.1:8004/workforce/drivers/pending/
-  - Expected: Pending driver cards with yellow status
-  - CSS: `drivers_list.css`
-
 - [ ] http://127.0.0.1:8004/workforce/drivers/{id}/
   - Expected: Driver detail with breadcrumbs, stats
   - CSS: `workforce-pages.css`
@@ -54,10 +50,6 @@
 #### Sellers/Business
 - [ ] http://127.0.0.1:8004/workforce/sellers/
   - Expected: Seller cards with logos, statistics
-  - CSS: `sellers_list.css`
-
-- [ ] http://127.0.0.1:8004/workforce/sellers/pending/
-  - Expected: Pending sellers with approval panels
   - CSS: `sellers_list.css`
 
 - [ ] http://127.0.0.1:8004/workforce/business/licenses/

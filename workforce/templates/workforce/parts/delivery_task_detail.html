@@ -12,7 +12,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
 
 {% block extra_css %}
 {# Leaflet CSS preloaded in wf_dashboard_base.html for HTMX compatibility #}
-<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=20260908e">
+<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=20260926a">
 {% endblock extra_css %}
 
 {% block content %}
@@ -964,8 +964,21 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                         shown as a real amount instead of being dropped as falsy.{% endcomment %}
                         <div class="dtd__field">
                             <span class="dtd__field__label"><i class="fa-solid fa-money-bill-wave"></i> Amount Collected</span>
-                            <span class="dtd__field__value fw-semibold">{{ cod_state.collected_amount }} QAR</span>
+                            <span class="dtd__field__value fw-semibold">{{ cod_state.collected_amount }} QAR {% include 'workforce/parts/_collected_methods.html' with rows=collected_by_method.cod %}</span>
                         </div>
+                        {% comment %}The driver takes COD and a customer-paid delivery fee as one
+                        figure; the server splits them (delivery/collect.py). Shown apart here
+                        because the fee is Ezzy's and never settles onward to the client.{% endcomment %}
+                        {% if task.fee_collected_amount %}
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-truck"></i> Delivery Fee Collected</span>
+                            <span class="dtd__field__value fw-semibold">{{ task.fee_collected_amount }} QAR {% include 'workforce/parts/_collected_methods.html' with rows=collected_by_method.fee %}</span>
+                        </div>
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-sack-dollar"></i> Total Collected by Driver</span>
+                            <span class="dtd__field__value fw-semibold">{{ task.collected_total }} QAR</span>
+                        </div>
+                        {% endif %}
                         {% if cod_returned_amount %}
                         <div class="dtd__field">
                             <span class="dtd__field__label"><i class="fa-solid fa-rotate-left"></i> Handed Back to Customer</span>
@@ -1654,18 +1667,19 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
         const btn = document.querySelector('#updateStatusModal .dtd__btn--primary');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
-        fetch(`/workforce/delivery-task/${taskId}/update-status/`, {
+        const payload = {
+            status: status,
+            delivered_date: document.getElementById('statusDeliveredDate').value,
+            cod_amount: document.getElementById('statusCodAmount').value,
+            failure_reason: reasonKey,
+            failure_notes: reasonNotes,
+            // Timeline label, same shape the driver app posts
+            notes: reasonKey ? (reasonNotes ? (reasonLabel + ' — ' + reasonNotes) : reasonLabel) : ''
+        };
+        const send = () => fetch(`/workforce/delivery-task/${taskId}/update-status/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-            body: JSON.stringify({
-                status: status,
-                delivered_date: document.getElementById('statusDeliveredDate').value,
-                cod_amount: document.getElementById('statusCodAmount').value,
-                failure_reason: reasonKey,
-                failure_notes: reasonNotes,
-                // Timeline label, same shape the driver app posts
-                notes: reasonKey ? (reasonNotes ? (reasonLabel + ' — ' + reasonNotes) : reasonLabel) : ''
-            })
+            body: JSON.stringify(payload)
         })
         .then(response => {
             if (!response.ok) {
@@ -1674,6 +1688,15 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
             return response.json();
         })
         .then(data => {
+            // Delivered with money due: confirm COD + delivery fee, then resend.
+            if (data.needs_confirmation) {
+                if (window.wfConfirmDoorCollection(data)) {
+                    payload.confirm_collection = true;
+                    payload.collected_total = data.collect.total;
+                    return send();
+                }
+                data = { success: false, error: 'Cancelled — nothing was changed.' };
+            }
             if (data.success) {
                 showStatusSuccess('Status updated successfully!');
                 setTimeout(() => {
@@ -1692,6 +1715,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
             btn.innerHTML = '<i class="fa-solid fa-check"></i> Update';
             showStatusError('Network error. Please try again.');
         });
+        send();
     }
 
     function markCommentsAsRead(taskId) {

@@ -1599,6 +1599,7 @@ DRIVER_EXPORT_COLUMNS = [
     ('phone',          'Phone',          lambda d: d.driver_phone),
     ('whatsapp',       'WhatsApp',       lambda d: d.driver_whatsapp),
     ('email',          'Email',          lambda d: d.user.email),
+    ('sponsor',        'Sponsor',        lambda d: getattr(d, 'driver_sponsor', '') or ''),
     ('status',         'Status',         lambda d: d.driver_status),
     ('availability',   'Availability',   lambda d: getattr(d, 'driver_availability', '')),
     ('rating',         'Rating',         lambda d: d.driver_rating),
@@ -7529,6 +7530,48 @@ def workflow_guide(request):
     return render(request, 'workforce/workflow_guide.html', context)
 
 
+def _collection_methods(task):
+    """What the driver took at this door, by payment method — overall and per leg.
+
+    Returns (payment_split_calc, collected_by_method): {method: amount} summed
+    across COD + fee, and {'cod': [(method, amount)], 'fee': [...]} so each
+    collected figure can say how it came in ("0 QAR · Fawran", "35 QAR · Cash").
+    Read from DriverTransaction rows, not the task's stored split.
+    """
+    from django.db.models import Sum, DecimalField
+    payment_split_calc = {}
+    collected_by_method = {'cod': [], 'fee': []}
+    if task is None:
+        return payment_split_calc, collected_by_method
+    if task.cod_collected or task.fee_collected_amount:
+        try:
+            from fleet.models import DriverTransaction
+            # The door delivery fee is its own transaction (always cash), taken with
+            # the COD as one figure — leaving it out showed Fawran 1350 for a
+            # 1375 collection. Display only; the wallet already counts the fee.
+            txns = DriverTransaction.objects.filter(
+                delivery_task=task,
+                transaction_type__in=['cod_collection', 'fee_collection'],
+            ).values('transaction_type', 'payment_method').annotate(
+                total=Sum('amount', output_field=DecimalField(max_digits=10, decimal_places=2))
+            )
+            for txn in txns:
+                method = txn['payment_method'] or 'cash'
+                amount = txn['total'] or 0
+                payment_split_calc[method] = payment_split_calc.get(method, 0) + float(amount)
+                leg = 'fee' if txn['transaction_type'] == 'fee_collection' else 'cod'
+                collected_by_method[leg].append((method, float(amount)))
+        except Exception:
+            pass
+    # A collection recorded before transactions carried a method: fall back to the task.
+    if task.cod_collected and not collected_by_method['cod']:
+        split = task.payment_split if isinstance(task.payment_split, dict) else {}
+        collected_by_method['cod'] = [
+            (m, float(a)) for m, a in split.items() if a
+        ] or [(task.payment_method or 'cash', float(task.cod_collected_amount or 0))]
+    return payment_split_calc, collected_by_method
+
+
 # Order Detail View ------------------------------------------------------------------------------------------------------
 
 @login_required(login_url='/accounts/login/')
@@ -7586,6 +7629,21 @@ def order_detail(request, order_id):
         except Exception:
             dl_zone_name = None
 
+    # GPS stamped on each task status change, keyed "old__new" so the timeline
+    # can hang a map on the matching dl_task_status row — the same lookup the
+    # task detail page builds. Without it the template's map branch never fires
+    # and a delivered row shows no pin at all.
+    status_point_map = {}
+    if delivery_task:
+        status_points = list(delivery_models.TaskStatusPoint.objects.filter(
+            task=delivery_task
+        ).order_by('created_at'))
+        for sp in status_points:
+            # The map on each row shows the driver's movement around the change,
+            # so each point carries its neighbours with it.
+            sp.trail = _status_point_trail(sp, status_points)
+            status_point_map[f"{sp.old_status}__{sp.new_status}"] = sp
+
     context = {
         'order': order,
         'order_items': order_items,
@@ -7593,7 +7651,9 @@ def order_detail(request, order_id):
         'order_comments': order_comments,
         'verification_logs': verification_logs,
         'delivery_task': delivery_task,
+        'collected_by_method': _collection_methods(delivery_task)[1],
         'status_history': status_history,
+        'status_point_map': status_point_map,
         'timeline_count': status_history.count(),
         'wa_instances': wa_data['instances'],
         'wa_default_instance': wa_data['default'],
@@ -7955,6 +8015,14 @@ def cancel_order(request, order_id):
             return JsonResponse({
                 'success': False,
                 'error': 'Cannot cancel a delivered order'
+            }, status=400)
+
+        # The parcel already went out and came back, and both legs have been
+        # billed and paid. Cancelling now would contradict money already booked.
+        if order.order_status == 'returned':
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot cancel a returned order'
             }, status=400)
 
         if order.order_status == 'cancelled':
@@ -9009,7 +9077,45 @@ _GPS_PROXIMITY_STATUSES = {
 }
 
 
-def _gps_evidence(status_point):
+def _status_point_trail(status_point, ordered_points):
+    """Where the driver stood at the status change before this one, at this one,
+    and at the one after it.
+
+    One stamped fix held against the customer pin only answers "was he there?".
+    The three read together answer where he came from and where he went next,
+    which is what staff are actually after when a delivery is queried. Points
+    with no fix recorded are skipped — a missing reading is not a position.
+
+    ``ordered_points`` must be this task's TaskStatusPoint rows oldest first.
+    Returns a list of {lat, lon, label, time, colour} dicts for _map_point.html;
+    label and time stay separate so the legend can stack them on two lines.
+    """
+    fixed = [p for p in ordered_points if p.latitude and p.longitude]
+    here = next((n for n, p in enumerate(fixed) if p.pk == status_point.pk), None)
+    if here is None:
+        return []
+
+    labels = dict(delivery_models.DeliveryTask.DL_TASK_STATUS_CHOICES)
+    trail = []
+    for pos, colour, lead in ((here - 1, '#8a6d00', 'Before'),
+                              (here, '#2f6f4f', 'This change'),
+                              (here + 1, '#1F2A44', 'After')):
+        if pos < 0 or pos >= len(fixed):
+            continue
+        point = fixed[pos]
+        status = labels.get(point.new_status,
+                            point.new_status.replace('_', ' ').title())
+        trail.append({
+            'lat': str(point.latitude),
+            'lon': str(point.longitude),
+            'label': '%s \u2014 %s' % (lead, status),
+            'time': timezone.localtime(point.created_at).strftime('%d %b %Y, %H:%M'),
+            'colour': colour,
+        })
+    return trail
+
+
+def _gps_evidence(status_point, ordered_points=()):
     """
     Turn a TaskStatusPoint into a verdict staff can act on.
 
@@ -9035,6 +9141,9 @@ def _gps_evidence(status_point):
         'verdict': 'ok',
         'stale_seconds': None,
         'fresh': None,
+        # The neighbouring stamped positions, so the map shows the movement
+        # around this change rather than a lone pin beside the drop.
+        'trail': _status_point_trail(status_point, ordered_points),
     }
 
     # How long had this exact coordinate been repeating before it was stamped?
@@ -9213,18 +9322,23 @@ def _split_coords(display):
     return label, (match.group(1), match.group(2))
 
 
-def _map_pin(lat, lng, label, ref=None, ref_label=None, colour=None):
+def _map_pin(lat, lng, label, ref=None, ref_label=None, colour=None,
+             time=None, ref_time=None):
     """One timeline map pin, optionally paired with a second point to compare.
 
     Returns None when there is no coordinate, so callers can pass a possibly
-    empty pair straight through. ``ref`` is a (lat, lng) pair.
+    empty pair straight through. ``ref`` is a (lat, lng) pair. ``time`` and
+    ``ref_time`` are display strings for when each point applied — a fixed
+    place like a hub has none, a pin that moved has one on each side.
     """
     if lat is None or lng is None or lat == '' or lng == '':
         return None
-    pin = {'lat': lat, 'lng': lng, 'label': label, 'colour': colour}
+    pin = {'lat': lat, 'lng': lng, 'label': label, 'colour': colour,
+           'time': time}
     if ref and ref[0] is not None and ref[1] is not None:
         pin['ref_lat'], pin['ref_lng'] = ref[0], ref[1]
         pin['ref_label'] = ref_label
+        pin['ref_time'] = ref_time
     return pin
 
 
@@ -9276,7 +9390,7 @@ def _build_task_timeline(task, status_history, verification_logs, status_points,
     # GPS verdict per driver status change ----------------------------------
     gps_by_key = {}
     for sp in status_points:
-        gps_by_key[f"{sp.old_status}__{sp.new_status}"] = _gps_evidence(sp)
+        gps_by_key[f"{sp.old_status}__{sp.new_status}"] = _gps_evidence(sp, status_points)
 
     # Status history ---------------------------------------------------------
     # field_name -> (icon, icon variant matching the odp__tl-icon--* CSS)
@@ -9324,11 +9438,16 @@ def _build_task_timeline(task, status_history, verification_logs, status_points,
         if is_location:
             from_label, old_xy = _split_coords(from_label)
             to_label, new_xy = _split_coords(to_label)
+            # One moment dates both pins: the old one held until it, the new
+            # one applies from it.
+            moved_at = timezone.localtime(entry.created_at).strftime('%d %b %Y, %H:%M')
             pin = _map_pin(*(new_xy or (None, None)), 'Pin after this change',
                            ref=old_xy, ref_label='Pin before this change',
-                           colour='#2f6f4f')
+                           colour='#2f6f4f',
+                           time=f'from {moved_at}', ref_time=f'until {moved_at}')
             if not pin and old_xy:
-                pin = _map_pin(*old_xy, 'Pin before this change', colour='#b4532a')
+                pin = _map_pin(*old_xy, 'Pin before this change', colour='#b4532a',
+                               time=f'until {moved_at}')
 
         # The place a fixed leg happened: the client's collection point, or the
         # hub that took custody. The driver's own fix is separate evidence and
@@ -9904,24 +10023,7 @@ def delivery_task_detail(request, task_id):
                 'product', 'location', 'order_item'
             ).order_by('location__code')
 
-    # Calculate actual payment split from DriverTransaction records (not static stored values)
-    from django.db.models import Sum, DecimalField, Case, When, Value
-    payment_split_calc = {}
-    if task.cod_collected:
-        try:
-            from fleet.models import DriverTransaction
-            txns = DriverTransaction.objects.filter(
-                delivery_task=task,
-                transaction_type='cod_collection'
-            ).values('payment_method').annotate(
-                total=Sum('amount', output_field=DecimalField(max_digits=10, decimal_places=2))
-            )
-            for txn in txns:
-                method = txn['payment_method'] or 'cash'
-                amount = txn['total'] or 0
-                payment_split_calc[method] = float(amount)
-        except Exception:
-            pass
+    payment_split_calc, collected_by_method = _collection_methods(task)
 
     # WhatsApp send modal (Evolution API) — same context as order_detail
     from core.templatetags.custom_filters import whatsapp_number
@@ -9967,6 +10069,7 @@ def delivery_task_detail(request, task_id):
         'pick_list': pick_list,
         'pick_list_items': pick_list_items,
         'payment_split_calc': payment_split_calc,  # Calculated from actual transactions
+        'collected_by_method': collected_by_method,
         # Same reason list the driver app shows on its Failed sheet, so a staff
         # status change is recorded against the same keys as a driver one.
         'failure_reason_choices': delivery_models.DeliveryTask.FAILURE_REASON_CHOICES,
@@ -10237,6 +10340,98 @@ def pass_note_to_driver(request, task_id):
     })
 
 
+def _staff_door_due(task):
+    """What the customer still owes at the door when staff close a task as delivered.
+
+    The same one figure the driver app asks for (COD + a customer-pays delivery
+    fee, see delivery/collect.py). None when nothing is due, or the driver app or
+    an earlier edit already booked it.
+    """
+    if not task.order or task.cod_collected or (task.fee_collected_amount or 0) > 0:
+        return None
+    from delivery.collect import amount_to_collect
+    due = amount_to_collect(task)
+    return due if due.total > 0 else None
+
+
+def _staff_door_confirmation(tasks_due):
+    """The 409 body that makes staff confirm the door money before it is booked."""
+    from decimal import Decimal
+    cod = sum((d.cod_due for _, d in tasks_due), Decimal('0.00'))
+    fee = sum((d.fee_due for _, d in tasks_due), Decimal('0.00'))
+    return JsonResponse({
+        'success': False,
+        'needs_confirmation': True,
+        'error': 'Confirm the cash collected at the door.',
+        'collect': {'cod': str(cod), 'fee': str(fee), 'total': str(cod + fee)},
+        'tasks': [{
+            'task': t.dl_task_number,
+            'driver': (t.driver.driver_name if t.driver else ''),
+            'cod': str(d.cod_due), 'fee': str(d.fee_due), 'total': str(d.total),
+        } for t, d in tasks_due],
+    }, status=409)
+
+
+def _apply_staff_door_split(task, collected):
+    """Split what the driver took into COD and fee onto the task, before its save.
+
+    Set pre-save on purpose: the delivered signal reads cod_collected to fire the
+    'COD collected' auto-flows. Returns (cod_part, fee_part, changed_fields).
+    """
+    from delivery.collect import split_collected
+    cod_part, fee_part = split_collected(task, collected)
+    now = timezone.now()
+    fields = []
+    if cod_part > 0:
+        task.cod_collected = True
+        task.cod_collected_at = now
+        task.cod_collected_amount = cod_part
+        fields += ['cod_collected', 'cod_collected_at', 'cod_collected_amount']
+    if fee_part > 0:
+        task.fee_collected_amount = fee_part
+        task.fee_collected_at = now
+        fields += ['fee_collected_amount', 'fee_collected_at']
+    return cod_part, fee_part, fields
+
+
+def _book_staff_door_split(task, user, cod_part, fee_part):
+    """Write the ledger rows for a staff close-out, as the driver app would:
+    COD and the delivery fee each on their own row, once per task."""
+    from decimal import Decimal
+    from fleet.wallet_service import WalletService
+    order = task.order
+    rows = fleet_models.DriverTransaction.objects.filter(delivery_task=task)
+    if cod_part > 0:
+        expected = Decimal(str(order.cod_amount or 0))
+        if order.cod_status_by_staff not in ('cod_with_ezzy', 'cod_settled_with_business'):
+            order.cod_status_by_staff = (
+                'partially_collected' if expected > 0 and cod_part < expected else 'cod_with_driver')
+            order.save(update_fields=['cod_status_by_staff'])
+        if not rows.filter(transaction_type='cod_collection').exists():
+            WalletService.record_transaction(
+                driver=task.driver,
+                transaction_type='cod_collection',
+                amount=cod_part,
+                description=f"COD collected for order {order.order_number}"
+                            f"{' (partial: ' + str(cod_part) + ' of ' + str(expected) + ')' if cod_part < expected else ''}"
+                            f" (staff update)",
+                delivery_task=task,
+                created_by=user,
+            )
+    if fee_part > 0 and not rows.filter(transaction_type='fee_collection').exists():
+        WalletService.record_transaction(
+            driver=task.driver,
+            transaction_type='fee_collection',
+            amount=fee_part,
+            description=f"Delivery fee collected in cash for {order.order_number} (staff update)",
+            delivery_task=task,
+            created_by=user,
+            payment_method='cash',
+            business=order.business,
+        )
+    WalletService.sync_cod_in_hand(task.driver)
+
+
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -10334,6 +10529,8 @@ def update_task_status(request, task_id):
         time_str = data.get('time', '')
         delivered_date_str = data.get('delivered_date', '')
         cod_amount_str = data.get('cod_amount', '')
+        collected_total_str = str(data.get('collected_total') or '').strip()
+        confirm_collection = bool(data.get('confirm_collection'))
 
         # Validate transition — admin/superuser can go backward, staff forward only
         from delivery.state_machine import can_transition, get_allowed_transitions
@@ -10416,6 +10613,7 @@ def update_task_status(request, task_id):
 
         # Update COD amount on order if provided
         # Fix 12: Skip if COD is locked after collection (superadmin can override)
+        cod_edited = False
         if cod_amount_str and task.order:
             _is_sa = getattr(_profile, 'is_superadmin', False) if _profile else request.user.is_superuser
             if getattr(task.order, 'cod_amount_locked', False) and not _is_sa:
@@ -10423,9 +10621,26 @@ def update_task_status(request, task_id):
             else:
                 try:
                     task.order.cod_amount = int(float(cod_amount_str))
-                    task.order.save(update_fields=['cod_amount'])
+                    cod_edited = True
                 except (ValueError, TypeError):
                     pass
+
+        # Closing as delivered books the door money the same way the driver app
+        # does: COD + a customer-pays delivery fee as one figure, split into two
+        # ledger rows. Staff confirm the figure first — nothing is written until
+        # they do (the COD edit above is still in memory only).
+        door_due = _staff_door_due(task) if status == 'delivered' else None
+        if door_due is not None:
+            if not task.driver:
+                return JsonResponse({
+                    'success': False,
+                    'error': (f'QAR {door_due.total} is due at the door on this task — '
+                              'assign the driver who collected it before marking it delivered.'),
+                }, status=400)
+            if not confirm_collection:
+                return _staff_door_confirmation([(task, door_due)])
+        if cod_edited:
+            task.order.save(update_fields=['cod_amount'])
 
         # Persist the reason on the same fields the driver app writes, so the
         # task detail, the CSV exports and the WhatsApp recovery flow all read
@@ -10455,53 +10670,25 @@ def update_task_status(request, task_id):
             update_fields.append('dl_task_description')
             task._status_notes = notes
 
-        # COD handling on delivered — sync with driver API flow
-        # Staff can pass cod_amount in the request to indicate partial collection
-        if status == 'delivered' and task.order and task.order.cod_amount and task.order.cod_amount > 0:
-            if not task.cod_collected:
-                from decimal import Decimal
-                expected = Decimal(str(task.order.cod_amount))
-                # Use staff-provided cod_amount if present, otherwise assume full collection
-                staff_cod = Decimal(str(cod_amount_str)) if cod_amount_str else expected
-                task.cod_collected = True
-                task.cod_collected_at = timezone.now()
-                task.cod_collected_amount = staff_cod
-                update_fields.extend(['cod_collected', 'cod_collected_at', 'cod_collected_amount'])
+        # Split what the driver took into COD and fee (full amount unless staff
+        # typed a different total; a lower COD Amount above is a partial delivery).
+        door_split = None
+        if door_due is not None:
+            from decimal import Decimal, InvalidOperation
+            try:
+                collected = Decimal(collected_total_str) if collected_total_str else door_due.total
+            except InvalidOperation:
+                collected = door_due.total
+            cod_part, fee_part, split_fields = _apply_staff_door_split(task, collected)
+            update_fields.extend(split_fields)
+            door_split = (cod_part, fee_part)
 
         task.save(update_fields=update_fields)
 
-        # Post-save: update order COD status + driver wallet (same as driver API)
-        if status == 'delivered' and task.order and task.cod_collected and task.cod_collected_amount and task.driver:
+        # Post-save: the ledger rows + order COD status (same as driver API)
+        if door_split is not None:
             try:
-                from decimal import Decimal
-                expected = Decimal(str(task.order.cod_amount)) if task.order.cod_amount else Decimal('0')
-                collected = Decimal(str(task.cod_collected_amount))
-
-                # Set correct COD status: partial or full
-                if task.order.cod_status_by_staff not in ('cod_with_ezzy', 'cod_settled_with_business'):
-                    if expected > 0 and collected < expected:
-                        task.order.cod_status_by_staff = 'partially_collected'
-                    else:
-                        task.order.cod_status_by_staff = 'cod_with_driver'
-                    task.order.save(update_fields=['cod_status_by_staff'])
-
-                # Record COD in driver wallet (actual collected amount)
-                from fleet.wallet_service import WalletService
-                existing = fleet_models.DriverTransaction.objects.filter(
-                    delivery_task=task,
-                    transaction_type='cod_collection',
-                ).exists()
-                if not existing:
-                    WalletService.record_transaction(
-                        driver=task.driver,
-                        transaction_type='cod_collection',
-                        amount=collected,
-                        description=f"COD collected for order {task.order.order_number}"
-                                 f"{' (partial: ' + str(collected) + ' of ' + str(expected) + ')' if collected < expected else ''}"
-                                 f" (staff update)",
-                        delivery_task=task,
-                        created_by=request.user,
-                    )
+                _book_staff_door_split(task, request.user, *door_split)
             except Exception as e:
                 logger.warning(f"COD wallet update failed for task {task.id}: {e}")
 
@@ -13287,8 +13474,12 @@ def _earnings_verification_queue(driver, from_date=None, to_date=None, only=''):
     """
     from delivery import models as delivery_models
 
+    # A trip that ended 'returned_to_shipper' is paid like a drop: the driver
+    # drove the whole way and carried the parcel back. Same list the client
+    # charge leg bills from, so a job is never paid without being billed.
+    from fleet.billing_service import BILLABLE_STATUSES
     queue = delivery_models.DeliveryTask.objects.filter(
-        dl_task_status__in=['delivered', 'partial_delivery'],
+        dl_task_status__in=BILLABLE_STATUSES,
     ).exclude(
         earnings_verification_status='published',
     )
@@ -14415,9 +14606,12 @@ def client_charge_verification(request):
         window &= Q(dl_task_date__lte=window_end)
 
     # Every completed job is billable, COD or prepaid — same rule as the driver
-    # leg, so the two consoles never disagree about which rows exist.
+    # leg, so the two consoles never disagree about which rows exist. Read from
+    # billing_service so this page and the invoice that actually bills can never
+    # list different rows.
+    from fleet.billing_service import BILLABLE_STATUSES
     tasks = delivery_models.DeliveryTask.objects.filter(
-        dl_task_status__in=['delivered', 'partial_delivery'],
+        dl_task_status__in=BILLABLE_STATUSES,
     ).filter(window).select_related(
         'order', 'order__business', 'pickup_location', 'dl_to_address',
         'charge_verified_by', 'driver', 'driver__user',
@@ -14956,6 +15150,10 @@ def cod_settlement_report(request):
 # COD transaction types, in lifecycle order, used by the COD ledger.
 COD_LEDGER_TYPES = [
     'cod_collection',
+    # A customer-paid delivery fee is cash the driver took at the same door and
+    # hands in on the same deposit — without it a 1020 hand-in books against a
+    # 1000 collection and the ledger never balances. It is Ezzy's, not the client's.
+    'fee_collection',
     'cod_deposit',
     'cod_driver_settle',
     'cod_return',
@@ -15266,6 +15464,179 @@ def cod_legacy_reconciliation(request):
     return render(request, 'workforce/cod_legacy_reconciliation.html', context)
 
 
+def _cod_ledger_balances():
+    """Where the COD money sits right now, from the same task truth the
+    Collect COD and Business COD Payout pages read.
+
+    Deliberately unfiltered: a balance is a position, not a sum of the rows
+    the filter happens to show.
+    """
+    from decimal import Decimal
+    from django.db.models import Sum
+    from delivery import models as delivery_models
+    from fleet.wallet_service import WalletService
+
+    # With drivers — cash collected and not yet handed in (live_cod_in_hand,
+    # never the cached Driver.cod_in_hand column).
+    in_hand, drivers_holding = Decimal('0.00'), 0
+    for driver in fleet_models.Driver.objects.filter(
+        driver_id__in=delivery_models.DeliveryTask.objects.filter(
+            cod_collected=True, cod_settled=False,
+        ).values('driver_id')
+    ):
+        amount = WalletService.live_cod_in_hand(driver)
+        if amount > 0:
+            in_hand += amount
+            drivers_holding += 1
+
+    # Handed in (task already cod_settled) but the deposit not yet verified —
+    # part of the Ezzy figure below, shown so unconfirmed cash is visible.
+    unverified = fleet_models.DriverTransaction.objects.filter(
+        transaction_type__in=fleet_models.DriverTransaction.COD_SUBMISSION_TYPES,
+        is_verified=False,
+    ).aggregate(t=Sum('amount'))['t'] or Decimal('0.00')
+
+    # Held by Ezzy, still owed to clients — the Business COD Payout candidates.
+    owed = delivery_models.DeliveryTask.objects.filter(
+        cod_collected=True,
+        cod_settled=True,
+        cod_client_settled=False,
+        dl_task_status__in=['delivered', 'partial_delivery'],
+    ).aggregate(t=Sum('cod_collected_amount'), n=Count('id'))
+
+    # Electronic legs (Fawran/POS/bank/ATM) not yet matched to a statement.
+    unmatched = Decimal('0.00')
+    for task in delivery_models.DeliveryTask.objects.filter(
+        electronic_leg_q(prefix=''), cod_reconciled=False,
+    ).only('cod_collected', 'payment_method', 'payment_split', 'cod_collected_amount'):
+        unmatched += sum(task.electronic_cod_legs.values(), Decimal('0.00'))
+
+    return {
+        'in_hand': in_hand,
+        'drivers_holding': drivers_holding,
+        'unverified': unverified,
+        'owed_to_clients': owed['t'] or Decimal('0.00'),
+        'owed_tasks': owed['n'],
+        'unmatched': unmatched,
+    }
+
+
+def _attach_client_cod_after(rows):
+    """Set the client's position at the moment of each ledger row:
+
+    - t.client_cod_after: COD Ezzy owes the client (collected from their
+      customers, not yet paid out to them).
+    - t.client_dl_after: delivery charges the client owes Ezzy (completed,
+      not yet recovered by a payout deduction or an invoice payment).
+    - t.client_net_after: COD minus DL, what the client would receive on balance.
+    - t.client_dl_collected_after: running total of delivery fees drivers took
+      in cash at this client's doors. Ezzy's money, so it is not in the Total.
+
+    Replayed from task truth, the same source as the "owed to clients" tile.
+    The ledger rows alone do not net: a payout books the net cash (deductions
+    sit on separate rows) and early collections predate the ledger.
+    """
+    from bisect import bisect_right
+    from decimal import Decimal
+    from django.db.models import Exists, OuterRef
+    from django.db.models.functions import Coalesce
+    from delivery.charges import BILLABLE_CHARGE
+    from fleet.billing_service import BILLABLE_STATUSES
+
+    zero = Decimal('0')
+    by_biz = {}
+    for t in rows:
+        t.client_cod_after = t.client_dl_after = t.client_net_after = None
+        t.client_dl_collected_after = None
+        biz_id = t.business_id
+        if not biz_id and t.delivery_task_id and t.delivery_task.order_id:
+            biz_id = t.delivery_task.order.business_id
+        if biz_id:
+            by_biz.setdefault(biz_id, []).append(t)
+    if not by_biz:
+        return
+
+    # Each balance is a list of dated +/- events per client; a row reads the
+    # running total up to its own time. An undated event counts from the start.
+    floor = timezone.make_aware(datetime(2000, 1, 1))
+    cod_events = {b: [] for b in by_biz}
+    dl_events = {b: [] for b in by_biz}
+    door_fee_events = {b: [] for b in by_biz}
+
+    for biz_id, amount, collected_at, settled_at in delivery_models.DeliveryTask.objects.filter(
+        order__business_id__in=by_biz,
+        cod_collected=True,
+        dl_task_status__in=['delivered', 'partial_delivery'],
+    ).values_list('order__business_id', 'cod_collected_amount', 'cod_collected_at', 'cod_client_settled_at'):
+        amount = amount or zero
+        cod_events[biz_id].append((collected_at or floor, amount))
+        if settled_at:
+            cod_events[biz_id].append((settled_at, -amount))
+
+    # Same "still to recover" rule as fleet.billing_service.billable_tasks():
+    # a fee the driver took in cash at the door was never owed by the client.
+    for biz_id, fee, completed_at, settled_at, frozen, deducted in delivery_models.DeliveryTask.objects.filter(
+        order__business_id__in=by_biz,
+        dl_task_status__in=BILLABLE_STATUSES,
+        fee_collected_amount=0,
+    ).annotate(fee=BILLABLE_CHARGE).filter(fee__gt=0).annotate(
+        deducted=Exists(fleet_models.BusinessPayoutDeduction.objects.filter(
+            settle_txn_id=OuterRef('cod_client_settle_txn_id'), kind='delivery_charge',
+        )),
+    ).values_list(
+        'order__business_id', 'fee', 'completed_at', 'cod_client_settled_at',
+        'settled_delivery_charge', 'deducted',
+    ):
+        dl_events[biz_id].append((completed_at or floor, fee))
+        # Withheld at a COD payout: recovered when that payout was made.
+        if settled_at and (frozen is not None or deducted):
+            dl_events[biz_id].append((settled_at, -(frozen if frozen is not None else fee)))
+
+    # Invoiced charges are paid against the invoice, not per delivery.
+    for biz_id, amount, paid_at in fleet_models.BusinessInvoicePayment.objects.filter(
+        invoice__business_id__in=by_biz,
+    ).exclude(invoice__status=fleet_models.BusinessChargeInvoice.STATUS_VOID).values_list(
+        'invoice__business_id', 'amount', 'created_at',
+    ):
+        dl_events[biz_id].append((paid_at, -(amount or zero)))
+
+    # Door fees, straight from the ledger's fee_collection rows (booked without
+    # a business, so the client comes from the order).
+    for biz_id, amount, booked_at in fleet_models.DriverTransaction.objects.filter(
+        transaction_type='fee_collection',
+    ).annotate(
+        biz=Coalesce('business_id', 'delivery_task__order__business_id'),
+    ).filter(biz__in=by_biz).values_list('biz', 'amount', 'created_at'):
+        door_fee_events[biz_id].append((booked_at, amount or zero))
+
+    def running(events):
+        events.sort(key=lambda e: e[0])
+        times, totals, total = [], [], zero
+        for at, delta in events:
+            total += delta
+            times.append(at)
+            totals.append(total)
+        return times, totals
+
+    def at(series, cutoff):
+        times, totals = series
+        i = bisect_right(times, cutoff)
+        return totals[i - 1] if i else zero
+
+    # Task stamps land a few ms after their ledger row, so a row sees
+    # everything up to one second past it (its own collection or payout included).
+    grace = timedelta(seconds=1)
+    for biz_id, group in by_biz.items():
+        cod_series, dl_series = running(cod_events[biz_id]), running(dl_events[biz_id])
+        door_series = running(door_fee_events[biz_id])
+        for t in group:
+            cutoff = t.created_at + grace
+            t.client_cod_after = at(cod_series, cutoff)
+            t.client_dl_after = at(dl_series, cutoff)
+            t.client_net_after = t.client_cod_after - t.client_dl_after
+            t.client_dl_collected_after = at(door_series, cutoff)
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def cod_ledger(request):
@@ -15275,7 +15646,7 @@ def cod_ledger(request):
     Ezzy -> business, plus returns/reversals) with rich columns and filtering by
     date, type, driver, business, payment method, and free-text search.
     """
-    from django.db.models import Sum, Q
+    from django.db.models import Exists, OuterRef, Sum, Q
     from django.core.paginator import Paginator
     from urllib.parse import urlencode
 
@@ -15295,6 +15666,7 @@ def cod_ledger(request):
     payment_method = request.GET.get('payment_method', '').strip()
     cod_status = request.GET.get('cod_status', '').strip()
     search = request.GET.get('q', '').strip()
+    hide_zero = request.GET.get('hide_zero') == '1'
 
     cod_status_valid = {c[0] for c in orders_models.COD_STATUS_BY_STAFF}
 
@@ -15304,10 +15676,29 @@ def cod_ledger(request):
         txns = txns.filter(created_at__date__lte=date_to)
     if txn_type and txn_type in COD_LEDGER_TYPES:
         txns = txns.filter(transaction_type=txn_type)
+        if txn_type == 'cod_collection':
+            # A prepaid door visit books a 0.00 COD row beside the fee the driver
+            # took. Only the fee changed hands, and the list shows that visit as a
+            # fee collection, so it belongs under that filter, not this one.
+            txns = txns.exclude(
+                Exists(fleet_models.DriverTransaction.objects.filter(
+                    transaction_type='fee_collection',
+                    delivery_task_id=OuterRef('delivery_task_id'),
+                    driver_id=OuterRef('driver_id'),
+                )),
+                amount=0,
+            )
     if driver_id.isdigit():
         txns = txns.filter(driver_id=driver_id)
     if business_id.isdigit():
-        txns = txns.filter(business__business_id=business_id)
+        # COD collections are booked without a business (1,327 rows as of
+        # 2026-09-26), so matching on the transaction alone hid every collection
+        # from a client filter. Fall back to the order's client, as the Client
+        # column already does.
+        txns = txns.filter(
+            Q(business__business_id=business_id)
+            | Q(business__isnull=True, delivery_task__order__business__business_id=business_id)
+        )
     if payment_method:
         txns = txns.filter(payment_method=payment_method)
     if cod_status and cod_status in cod_status_valid:
@@ -15320,22 +15711,42 @@ def cod_ledger(request):
             Q(delivery_task__order__customer_name__icontains=search) |
             Q(driver__user__first_name__icontains=search) |
             Q(business__business_name__icontains=search) |
+            Q(delivery_task__order__business__business_name__icontains=search) |
             Q(notes__icontains=search)
+        )
+
+    # One door visit books two rows (COD + delivery fee). Show them as one:
+    # a fee row whose COD partner (same task, same driver) survives the same
+    # filters is dropped here and folded back onto that partner below.
+    filtered = txns
+    txns = txns.exclude(
+        Exists(filtered.filter(
+            transaction_type='cod_collection',
+            delivery_task_id=OuterRef('delivery_task_id'),
+            driver_id=OuterRef('driver_id'),
+        )),
+        transaction_type='fee_collection',
+    )
+    if hide_zero:
+        # The 0.00 COD row every prepaid delivery books so its fee can be billed
+        # to the client. Hidden from the list only — a zero COD row that took a
+        # fee at the door (a folded fee partner) still took cash and stays.
+        txns = txns.exclude(
+            ~Exists(filtered.filter(
+                transaction_type='fee_collection',
+                delivery_task_id=OuterRef('delivery_task_id'),
+                driver_id=OuterRef('driver_id'),
+            )),
+            transaction_type='cod_collection',
+            amount=0,
         )
 
     txns = txns.order_by('-created_at')
 
-    # --- Totals for the filtered set (before pagination) ---
-    totals = {
-        'count': txns.count(),
-        'net': txns.aggregate(t=Sum('amount'))['t'] or 0,
-        'collected': txns.filter(transaction_type='cod_collection').aggregate(t=Sum('amount'))['t'] or 0,
-        'to_ezzy': txns.filter(
-            transaction_type__in=['cod_deposit', 'cod_driver_settle']
-        ).aggregate(t=Sum('amount'))['t'] or 0,
-        'to_business': txns.filter(transaction_type='cod_client_settle').aggregate(t=Sum('amount'))['t'] or 0,
-        'returned': txns.filter(transaction_type='cod_return').aggregate(t=Sum('amount'))['t'] or 0,
-    }
+    # Row count for the filtered set. The tiles above the filter are live
+    # balances, not sums of these rows — lifetime totals of collected/handed-in
+    # never net to anything (pre-ledger hand-ins exceed booked collections).
+    totals = {'count': txns.count()}
 
     # --- Pagination ---
     try:
@@ -15346,16 +15757,42 @@ def cod_ledger(request):
     paginator = Paginator(txns, per_page)
     page_obj = paginator.get_page(request.GET.get('page'))
 
+    # Attach each folded fee row to the newest COD row of its task on this page.
+    cod_rows = {}
+    for t in page_obj.object_list:
+        t.merged_fee = None
+        if t.transaction_type == 'cod_collection' and t.delivery_task_id:
+            cod_rows.setdefault((t.delivery_task_id, t.driver_id), t)
+    if cod_rows:
+        fees = filtered.filter(
+            transaction_type='fee_collection',
+            delivery_task_id__in={k[0] for k in cod_rows},
+        ).order_by('created_at')
+        for fee in fees:
+            row = cod_rows.get((fee.delivery_task_id, fee.driver_id))
+            if row is not None:
+                row.merged_fee = fee
+                # Cash in hand after both halves are booked.
+                if fee.created_at > row.created_at:
+                    row.cod_cash_after = fee.cod_cash_after
+                    row.cod_fawran_after = fee.cod_fawran_after
+
+    _attach_client_cod_after(page_obj.object_list)
+
     # Preserve active filters across pagination links.
     filter_dict = {k: v for k, v in {
         'date_from': date_from, 'date_to': date_to, 'txn_type': txn_type,
         'driver_id': driver_id, 'business_id': business_id,
         'payment_method': payment_method, 'cod_status': cod_status, 'q': search,
+        'hide_zero': '1' if hide_zero else '',
     }.items() if v}
     filter_params = urlencode(filter_dict)
 
     context = {
-        'page_title': 'COD Ledger',
+        'page_title': 'Cash Ledger',
+        'balances': _cod_ledger_balances(),
+        # Rows whose cod_cash_after is kept by recalculate_cod_balances().
+        'running_cash_types': ('cod_collection', 'fee_collection', 'cod_deposit', 'cod_driver_settle'),
         'page_obj': page_obj,
         'transactions': page_obj.object_list,
         'totals': totals,
@@ -15374,6 +15811,7 @@ def cod_ledger(request):
         'f_date_from': date_from, 'f_date_to': date_to, 'f_txn_type': txn_type,
         'f_driver_id': driver_id, 'f_business_id': business_id,
         'f_payment_method': payment_method, 'f_cod_status': cod_status, 'f_q': search,
+        'f_hide_zero': hide_zero,
     }
     return render(request, 'workforce/cod_ledger.html', context)
 
@@ -17075,7 +17513,7 @@ def fleet_transactions(request):
             selected_driver = fleet_models.Driver.objects.select_related('user').get(driver_id=driver_id)
             transactions = fleet_models.DriverTransaction.objects.filter(
                 driver=selected_driver
-            ).select_related('delivery_task', 'delivery_task__cod_submission_txn', 'settlement')
+            ).select_related('delivery_task', 'delivery_task__order', 'delivery_task__cod_submission_txn', 'settlement')
         except fleet_models.Driver.DoesNotExist:
             selected_driver = None
 
@@ -17290,7 +17728,11 @@ def fleet_transactions(request):
             transactions = all_txns.filter(
                 transaction_type__in=fleet_models.DriverTransaction.COD_SUBMISSION_TYPES)
         else:
-            transactions = all_txns.filter(transaction_type__in=['cod_collection', 'cod_driver_settle', 'cod_deposit'])
+            # 'fee_collection' belongs on this tab: it is cash in the driver's
+            # pocket that settles on the same hand-in as the COD. Leaving it out
+            # meant money the driver was carrying appeared on no COD screen at all.
+            transactions = all_txns.filter(transaction_type__in=[
+                'cod_collection', 'fee_collection', 'cod_driver_settle', 'cod_deposit'])
             view_type = 'cod'
 
         # Re-apply ALL user filters after the view_type reassignment (previously only
@@ -21121,41 +21563,6 @@ def sellers_list(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
-def sellers_pending(request):
-    """
-    View to display sellers pending approval
-    """
-    # Get businesses with pending verification
-    businesses = business_models.Business.objects.select_related(
-        'profile', 'business_profile'
-    ).filter(
-        profile__verification_status='pending'
-    ).order_by('-business_since', '-business_id')
-
-    # Apply search filter
-    search = request.GET.get('search', '').strip()
-    if search:
-        from django.db.models import Q
-        businesses = businesses.filter(
-            Q(business_name__icontains=search) |
-            Q(business_email__icontains=search) |
-            Q(business_phone__icontains=search)
-        )
-
-    # Paginate
-    page_obj = paginate_queryset(request, businesses, items_per_page=50)
-
-    context = {
-        'page_title': 'Pending Sellers',
-        'page_obj': page_obj,
-        'search': search,
-    }
-
-    return render(request, 'workforce/sellers_pending.html', context)
-
-
-@login_required(login_url='/accounts/login/')
-@staff_required
 def sellers_active(request):
     """
     View to display active verified sellers
@@ -21355,6 +21762,71 @@ def _provision_fulfilment_pickup_location(business, user=None):
     return loc, None
 
 
+def _seller_finance_save(request, business):
+    """Save the seller Finance tab: who pays delivery, and the distance rate card.
+
+    The bands replace the client's rows wholesale, then every open order is
+    re-priced so the next driver out asks for the new figure. Answers JSON.
+    """
+    import json
+    from decimal import Decimal, InvalidOperation
+    from django.db import transaction as db_transaction
+    from delivery.client_rates import reprice_open_orders
+
+    try:
+        raw_rows = json.loads(request.POST.get('rates') or '[]')
+        if not isinstance(raw_rows, list):
+            raise ValueError
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Rate card could not be read.'}, status=400)
+
+    rows, seen, open_ended = [], set(), 0
+    for row in raw_rows:
+        if not isinstance(row, dict):
+            continue
+        km_raw = str(row.get('up_to_km') or '').strip()
+        price_raw = str(row.get('price') or '').strip()
+        if not km_raw and not price_raw:
+            continue  # an empty line left in the editor
+        try:
+            km = Decimal(km_raw) if km_raw else None
+            price = Decimal(price_raw)
+        except InvalidOperation:
+            return JsonResponse({'success': False, 'error': 'Distances and prices must be numbers.'}, status=400)
+        if km is not None and (km <= 0 or km > Decimal('10000')):
+            return JsonResponse({'success': False, 'error': 'A distance must be above 0 km.'}, status=400)
+        if price < 0 or price > Decimal('10000'):
+            return JsonResponse({'success': False, 'error': 'A price must be between 0 and 10000 QAR.'}, status=400)
+        if km is None:
+            open_ended += 1
+        elif km in seen:
+            return JsonResponse({'success': False, 'error': f'Two bands end at {km} km.'}, status=400)
+        else:
+            seen.add(km)
+        rows.append((km, price))
+    if open_ended > 1:
+        return JsonResponse({'success': False, 'error': 'Only one band can have no upper limit.'}, status=400)
+
+    pays_delivery = request.POST.get('customer_pays_delivery') == 'on'
+    with db_transaction.atomic():
+        _apply_dac_rules(
+            business, business.pod_required_delivered, business.pod_required_failed,
+            business.pod_kind, business.live_tracking_enabled,
+            business.return_collection_destination, request.user.username,
+            pays_delivery=pays_delivery)
+        business.distance_rates.all().delete()
+        business_models.BusinessDistanceRate.objects.bulk_create([
+            business_models.BusinessDistanceRate(business=business, up_to_km=km, price=price)
+            for km, price in rows
+        ])
+    repriced = reprice_open_orders(business)
+    logger.info("[seller-finance] %s saved %d distance bands for %s (%s), "
+                "customer_pays_delivery=%s, repriced %d open orders",
+                request.user.username, len(rows), business.business_name,
+                business.business_id, pays_delivery, repriced)
+    return JsonResponse({'success': True, 'repriced': repriced})
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def seller_detail(request, business_id):
@@ -21487,6 +21959,9 @@ def seller_detail(request, business_id):
         avg_orders_per_month = round((order_stats.get('total_orders') or 0) / months_active, 1)
 
     # Handle POST for status update
+    if request.method == 'POST' and request.POST.get('section') == 'finance':
+        return _seller_finance_save(request, business)
+
     if request.method == 'POST':
         # The fulfilment switch now lives on the Store Locations tab and saves on
         # its own, so it posts `section=fulfilment` and nothing else. It has to be
@@ -21685,7 +22160,25 @@ def seller_detail(request, business_id):
     # no lead is attached, so a converted client costs nothing extra.
     crm_linked_leads, crm_lead_suggestions = _seller_crm_leads(business)
 
+    # Finance tab: the distance bands, and how the open orders stand against them.
+    # An open order with no distance cannot be priced — staff need to pin it.
+    from delivery.client_rates import CLOSED_ORDER_STATUSES
+    distance_rates = list(business.distance_rates.all())
+    open_orders = orders_models.Order.objects.filter(
+        business=business, order_type='normal_delivery',
+    ).exclude(order_status__in=CLOSED_ORDER_STATUSES)
+    finance_stats = open_orders.aggregate(
+        open_total=Count('id'),
+        no_distance=Count('id', filter=Q(route_distance_km__isnull=True)),
+        no_fee=Count('id', filter=Q(dl_amount=0)),
+    )
+    finance_stats['door_fees'] = delivery_models.DeliveryTask.objects.filter(
+        order__business=business, fee_collected_amount__gt=0,
+    ).aggregate(total=Sum('fee_collected_amount'))['total'] or 0
+
     context = {
+        'distance_rates': distance_rates,
+        'finance_stats': finance_stats,
         'page_title': f'Seller: {business.business_name}',
         'business': business,
         'business_profile': business_profile,
@@ -22935,6 +23428,7 @@ def _apply_driver_filters(request, drivers, params=None, default_approved=True):
         'slab': 'slab', 'vehicle': 'vehicle', 'zone': 'zone',
         'availability': 'availability', 'language': 'language',
         'verification': 'verification', 'crm_stage': 'crm_stage',
+        'access': 'access',
     }
     if params:
         keys.update(params)
@@ -22956,7 +23450,8 @@ def _apply_driver_filters(request, drivers, params=None, default_approved=True):
             Q(driver_code__icontains=search) |
             Q(driver_phone__icontains=search) |
             Q(driver_whatsapp__icontains=search) |
-            Q(driver_license_number__icontains=search)
+            Q(driver_license_number__icontains=search) |
+            Q(driver_sponsor__icontains=search)
         )
 
     status_filters = choose('driver_status', dict(fleet_models.DRIVER_STATUS_CHOICES))
@@ -23004,6 +23499,13 @@ def _apply_driver_filters(request, drivers, params=None, default_approved=True):
     if verification_filters:
         drivers = drivers.filter(profile__verification_status__in=verification_filters)
 
+    # Cleared to work. Separate from account standing on purpose: "approved but not
+    # yet on the road" is exactly the cohort ops need to find, and no status value
+    # expresses it.
+    access_filters = choose('access', {'yes', 'no'})
+    if access_filters and len(access_filters) == 1:
+        drivers = drivers.filter(dashboard_access_enabled=(access_filters[0] == 'yes'))
+
     # CRM pipeline column. Valid keys are the live driver-board columns, so a column
     # staff added at /workforce/crm/stages/ is filterable without a code change.
     # `none` is offered too — an applicant the board has not filed yet.
@@ -23037,6 +23539,7 @@ def _apply_driver_filters(request, drivers, params=None, default_approved=True):
         'vehicle': vehicle_filters, 'zone': zone_ids,
         'availability': availability_filters, 'language': language_filters,
         'verification': verification_filters, 'crm_stage': crm_stage_filters,
+        'access': access_filters,
     }
     return drivers.distinct(), picked
 
@@ -23118,6 +23621,7 @@ def drivers_list(request):
     language_filters = picked['language']
     verification_filters = picked['verification']
     crm_stage_filters = picked['crm_stage']
+    access_filters = picked['access']
 
     # Sorting
     from django.db.models import F
@@ -23166,6 +23670,8 @@ def drivers_list(request):
         'verification_choices': core_models.Profile.VERIFICATION_STATUS_CHOICES,
         'crm_stage_choices': _crm_driver_stage_choices(),
         'selected_crm_stages': crm_stage_filters,
+        'access_choices': [('yes', 'Cleared to work'), ('no', 'No app access')],
+        'selected_access': access_filters,
         'zone_group_choices': list(
             ZoneGroup.objects.filter(is_active=True)
             .order_by('display_order', 'name')
@@ -23183,45 +23689,6 @@ def drivers_list(request):
     }
 
     return render(request, 'workforce/drivers_list.html', context)
-
-
-@login_required(login_url='/accounts/login/')
-@staff_required
-def drivers_pending(request):
-    """
-    View to display drivers pending approval
-    """
-    drivers = fleet_models.Driver.objects.select_related(
-        'user', 'profile'
-    ).prefetch_related(
-        'driver_vehicle', 'driver_document'
-    ).filter(
-        driver_status__in=['pending', 'processing']
-    ).order_by('-driver_id')
-
-    # Apply search filter
-    search = request.GET.get('search', '').strip()
-    if search:
-        from django.db.models import Q
-        drivers = drivers.filter(
-            Q(user__first_name__icontains=search) |
-            Q(user__last_name__icontains=search) |
-            Q(driver_code__icontains=search) |
-            Q(driver_phone__icontains=search)
-        )
-
-    # Pagination
-    page_obj = paginate_queryset(request, drivers, items_per_page=50)
-    _attach_crm_leads(page_obj)
-
-    context = {
-        'page_title': 'Pending Drivers',
-        'page_obj': page_obj,
-        'search': search,
-        'status_type': 'pending',
-    }
-
-    return render(request, 'workforce/drivers_pending.html', context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -23495,6 +23962,8 @@ def driver_detail(request, driver_id):
             # fields never blanks the ones it doesn't carry.
             if 'driver_license_number' in request.POST:
                 driver.driver_license_number = request.POST.get('driver_license_number', '').strip()
+            if 'driver_sponsor' in request.POST:
+                driver.driver_sponsor = request.POST.get('driver_sponsor', '').strip()[:150]
             if 'driver_languages' in request.POST:
                 lang = request.POST.get('driver_languages', '').strip()
                 valid_langs = dict(fleet_models.Driver.driver_languages_choices)
@@ -23505,14 +23974,21 @@ def driver_detail(request, driver_id):
                     }, status=400)
                 driver.driver_languages = lang
 
-            # Name and email live on the User row, not the Driver row.
+            # Name and email live on the User row, not the Driver row. The name
+            # also lives on the Profile, which is the copy that wins everywhere
+            # (Driver.driver_name, WhatsApp sends, exports), so write that one and
+            # let Profile.save() mirror it onto the User — see core/name_sync.py.
+            # Writing only the User is what let the two names drift apart.
             user_fields = []
+            profile_name_fields = []
             if 'first_name' in request.POST:
                 driver.user.first_name = request.POST.get('first_name', '').strip()
                 user_fields.append('first_name')
+                profile_name_fields.append('first_name')
             if 'last_name' in request.POST:
                 driver.user.last_name = request.POST.get('last_name', '').strip()
                 user_fields.append('last_name')
+                profile_name_fields.append('last_name')
             if 'email' in request.POST:
                 email = request.POST.get('email', '').strip()
                 if email:
@@ -23529,6 +24005,10 @@ def driver_detail(request, driver_id):
                 user_fields.append('email')
             if user_fields:
                 driver.user.save(update_fields=user_fields)
+            if profile_name_fields and driver.profile_id:
+                for field in profile_name_fields:
+                    setattr(driver.profile, field, getattr(driver.user, field))
+                driver.profile.save(update_fields=profile_name_fields + ['updated_at'])
             # Notify opt-in + preferred zones live on the "Zones & Notify" tab.
             # Only update when that form's marker is posted, otherwise the
             # Settings-tab save would clear them on every submit.
@@ -23646,6 +24126,73 @@ def driver_set_status(request, driver_id):
     driver.driver_status = new_status
     driver.save(update_fields=['driver_status'])
     return JsonResponse({'success': True, 'status': new_status})
+
+
+def _apply_dashboard_access(driver, enabled, actor):
+    """Grant or withdraw a driver's clearance to work, and leave a trail.
+
+    Shared by the JSON endpoint and the driver-detail form so the two cannot
+    drift, in the mould of _apply_dac_rules for the client delivery-app switches.
+    Early-returns when nothing changed, so a double-tap does not rewrite the
+    granted-by audit fields.
+    """
+    if bool(driver.dashboard_access_enabled) == bool(enabled):
+        return False
+
+    was = driver.dashboard_access_enabled
+    driver.dashboard_access_enabled = bool(enabled)
+    driver.dashboard_access_granted_at = timezone.now() if enabled else None
+    driver.dashboard_access_granted_by = actor if enabled else None
+    driver.save(update_fields=[
+        'dashboard_access_enabled',
+        'dashboard_access_granted_at',
+        'dashboard_access_granted_by',
+    ])
+    logger.info(
+        "Driver %s dashboard access %s -> %s by %s",
+        driver.driver_id, was, driver.dashboard_access_enabled,
+        getattr(actor, 'username', 'system'),
+    )
+    return True
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_set_dashboard_access(request, driver_id):
+    """Grant or withdraw a driver's clearance to work (POST, JSON).
+
+    Approving an application says the documents check out; this says the driver
+    goes on the road. Only an approved driver can be cleared — granting access to
+    a pending or blocked account would be a contradiction the gate then refuses
+    anyway, so refuse it here where staff can see why.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import json as _json
+    try:
+        body = _json.loads(request.body)
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    if 'enabled' not in body:
+        return JsonResponse({'success': False, 'error': 'enabled required'}, status=400)
+    enabled = bool(body.get('enabled'))
+
+    driver = get_object_or_404(fleet_models.Driver, driver_id=driver_id)
+    if enabled and driver.driver_status != 'approved':
+        return JsonResponse({
+            'success': False,
+            'error': f'Only approved drivers can be cleared to work '
+                     f'(this one is {driver.get_driver_status_display()}).',
+        }, status=400)
+
+    changed = _apply_dashboard_access(driver, enabled, request.user)
+    return JsonResponse({
+        'success': True,
+        'enabled': driver.dashboard_access_enabled,
+        'changed': changed,
+    })
 
 
 @login_required(login_url='/accounts/login/')
@@ -24034,8 +24581,7 @@ def delivery_task_edit(request, task_id):
                         except (InvalidOperation, ValueError):
                             pass
 
-                dl_amount = request.POST.get('dl_amount', '0')
-                order.dl_amount = int(dl_amount) if dl_amount and dl_amount.isdigit() else 0
+                _set_order_fee_from_post(order, request.POST.get('dl_amount'))
 
                 # Coordinates & accuracy
                 lat_raw = request.POST.get('latitude', '').strip()
@@ -24053,6 +24599,17 @@ def delivery_task_edit(request, task_id):
                     order.coords_accuracy = coords_accuracy
 
                 order.save()
+
+                # The fee typed here is the order's, but the invoice bills the task's
+                # dl_price — without this the edit only ever reached the order and the
+                # client was billed 0. Skipped for the return leg (priced on its own) and
+                # once the charge is on an invoice or payout.
+                if (Decimal(str(old_vals['dl_amount'])) != Decimal(str(order.dl_amount or 0))
+                        and task.task_leg in ('single', 'hub_delivery')
+                        and task.charge_invoice_id is None
+                        and task.settled_delivery_charge is None):
+                    delivery_models.DeliveryTask.objects.filter(pk=task.pk).update(
+                        dl_price=order.dl_amount or 0)
 
                 # Update order item quantities
                 from orders.models import OrderItem
@@ -24364,21 +24921,58 @@ def bulk_update_status(request):
         # DMS status mapping for sync
 
         # Update all selected tasks (excluding locked tasks)
-        tasks = delivery_models.DeliveryTask.objects.select_related('order').filter(
+        tasks = list(delivery_models.DeliveryTask.objects.select_related(
+            'order', 'order__business', 'driver',
+        ).filter(
             id__in=task_ids
         ).exclude(
             order__cod_status_by_staff='cod_settled_with_business'
-        )
+        ))
+
+        # Delivered with money due at the door books it like the single-task
+        # update: full COD + customer-pays fee, confirmed by staff first. A task
+        # with money due but no driver is skipped — nobody to hold the cash.
+        due_by_task = {}
+        if status == 'delivered':
+            due_by_task = {t.pk: d for t in tasks for d in [_staff_door_due(t)] if d is not None}
+        no_driver = [t for t in tasks if t.pk in due_by_task and not t.driver]
+        if no_driver:
+            skip = {t.pk for t in no_driver}
+            tasks = [t for t in tasks if t.pk not in skip]
+        if due_by_task and not data.get('confirm_collection'):
+            payable = [(t, due_by_task[t.pk]) for t in tasks if t.pk in due_by_task]
+            if payable:
+                return _staff_door_confirmation(payable)
+
         updated = 0
         for task in tasks:
             task.dl_task_status = status
-            task.save(update_fields=['dl_task_status'])
+            fields = ['dl_task_status']
+            due = due_by_task.get(task.pk)
+            split = None
+            if due is not None:
+                cod_part, fee_part, split_fields = _apply_staff_door_split(task, due.total)
+                fields += split_fields
+                split = (cod_part, fee_part)
+            task.save(update_fields=fields)
+            if split is not None:
+                task.refresh_from_db(fields=['dl_task_status'])
+                if task.dl_task_status == status:
+                    try:
+                        _book_staff_door_split(task, request.user, *split)
+                    except Exception as e:
+                        logger.warning(f"COD wallet update failed for task {task.id}: {e}")
             updated += 1
 
+        message = f'{updated} task(s) updated to {status}'
+        if no_driver:
+            message += (f'; {len(no_driver)} skipped — money due but no driver assigned: '
+                        + ', '.join(t.dl_task_number for t in no_driver[:10]))
         return JsonResponse({
             'success': True,
-            'message': f'{updated} task(s) updated to {status}',
-            'updated_count': updated
+            'message': message,
+            'updated_count': updated,
+            'skipped': [t.dl_task_number for t in no_driver],
         })
     except Exception as e:
         logger.exception("Error bulk updating task status: %s", str(e))
@@ -24680,8 +25274,7 @@ def order_edit(request, order_id):
                 order.cod_status_by_client = 'unpaid'
 
             # Delivery amount
-            dl_amount = request.POST.get('dl_amount', '0')
-            order.dl_amount = int(dl_amount) if dl_amount and dl_amount.isdigit() else 0
+            _set_order_fee_from_post(order, request.POST.get('dl_amount'))
 
             # Pickup location — validate it belongs to the order's business
             pickup_id = request.POST.get('pickup_location')
@@ -24880,6 +25473,29 @@ def order_edit(request, order_id):
 # Task statuses where the driver has finished — don't rewrite their snapshot.
 _TASK_TERMINAL_STATUSES = ['delivered', 'partial_delivery', 'cancelled', 'rejected', 'dropsownlost',
                            'returned_to_shipper']
+
+
+def _set_order_fee_from_post(order, raw):
+    """Apply the fee typed on a staff edit form to ``order`` in memory.
+
+    The forms prefill the stored Decimal ("20.00"), which an isdigit() check read
+    as garbage and zeroed on every save. An unreadable value now keeps the fee.
+    A changed non-zero fee is pinned as 'manual' so the distance rate card never
+    overwrites it; clearing it to 0 hands the order back to the rate card.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    raw = (raw or '').strip()
+    try:
+        new_fee = Decimal(raw) if raw else Decimal('0')
+    except (InvalidOperation, ValueError):
+        return
+    if new_fee < 0:
+        return
+    if new_fee == (order.dl_amount or 0):
+        return
+    order.dl_amount = new_fee
+    order.dl_amount_source = 'manual' if new_fee > 0 else ''
 
 
 def _push_order_package_to_tasks(order):
@@ -35138,9 +35754,12 @@ def delivery_app_control(request):
         'search': search,
         'only': only,
         'pod_kind_choices': business_models.Business.POD_KIND_CHOICES,
+        'collect_dest_choices': business_models.RETURN_DESTINATION_CHOICES,
         'delivered_count': active_qs.filter(pod_required_delivered=True).count(),
         'failed_count': active_qs.filter(pod_required_failed=True).count(),
         'tracking_count': active_qs.filter(live_tracking_enabled=True).count(),
+        'hub_collect_count': active_qs.filter(
+            return_collection_destination='hub').count(),
     }
     return render(request, 'workforce/delivery_app_control.html', context)
 
@@ -35164,21 +35783,41 @@ def delivery_app_control_save(request):
     kind = request.POST.get('kind')
     if kind not in dict(business_models.Business.POD_KIND_CHOICES):
         return JsonResponse({'success': False, 'error': 'Invalid proof type'})
+    from business.models import RETURN_DESTINATION_CHOICES
+
+    # Absent means "leave it alone": this endpoint predates the field and is not
+    # called by the page, so a caller that never learned about it must not be
+    # able to silently rewrite where a client's collected goods go.
+    collect_dest = (request.POST.get('collect_dest')
+                    or business.return_collection_destination)
+    if collect_dest not in dict(RETURN_DESTINATION_CHOICES):
+        return JsonResponse({'success': False, 'error': 'Invalid collection destination'})
+
+    raw_pays = request.POST.get('pays_delivery')
+    pays_delivery = None if raw_pays is None else (raw_pays == '1')
 
     _apply_dac_rules(business, on_delivered, on_failed, kind, on_tracking,
-                     request.user.username)
+                     collect_dest, request.user.username,
+                     pays_delivery=pays_delivery)
     return JsonResponse({'success': True})
 
 
-def _apply_dac_rules(business, on_delivered, on_failed, kind, on_tracking, username):
+def _apply_dac_rules(business, on_delivered, on_failed, kind, on_tracking,
+                     collect_dest, username, pays_delivery=None):
     """Write one client's driver-app rules. Returns True if anything actually changed.
 
     Shared by the single-row save and Save All so the two cannot drift on what a rule
     means, what gets logged, or which cache is dropped.
     """
+    # None means "leave it alone", same convention as collect_dest: a caller that
+    # predates this field must not be able to silently move who pays for delivery.
+    if pays_delivery is None:
+        pays_delivery = business.customer_pays_delivery
+
     old = (business.pod_required_delivered, business.pod_required_failed,
-           business.pod_kind, business.live_tracking_enabled)
-    new = (on_delivered, on_failed, kind, on_tracking)
+           business.pod_kind, business.live_tracking_enabled,
+           business.return_collection_destination, business.customer_pays_delivery)
+    new = (on_delivered, on_failed, kind, on_tracking, collect_dest, pays_delivery)
     if old == new:
         return False
 
@@ -35186,14 +35825,19 @@ def _apply_dac_rules(business, on_delivered, on_failed, kind, on_tracking, usern
     business.pod_required_failed = on_failed
     business.pod_kind = kind
     business.live_tracking_enabled = on_tracking
+    business.return_collection_destination = collect_dest
+    business.customer_pays_delivery = pays_delivery
     business.save(update_fields=[
         'pod_required_delivered', 'pod_required_failed', 'pod_kind',
-        'live_tracking_enabled'])
+        'live_tracking_enabled', 'return_collection_destination',
+        'customer_pays_delivery'])
 
     logger.info(
         f"[delivery-app-control] {username} set driver-app rules for "
         f"{business.business_name} ({business.business_id}): delivered={on_delivered}, "
-        f"failed={on_failed}, kind={kind}, live_tracking={on_tracking} (was {old})"
+        f"failed={on_failed}, kind={kind}, live_tracking={on_tracking}, "
+        f"collect_dest={collect_dest}, customer_pays_delivery={pays_delivery} "
+        f"(was {old})"
     )
     # The client sidebar badge count is cached per business; a rule change should show
     # up on their next page load, not up to 20s later.
@@ -35228,7 +35872,10 @@ def delivery_app_control_save_all(request):
     if len(rows) > 100:
         return JsonResponse({'success': False, 'error': 'Too many rows in one save'})
 
+    from business.models import RETURN_DESTINATION_CHOICES
+
     valid_kinds = dict(business_models.Business.POD_KIND_CHOICES)
+    valid_dests = dict(RETURN_DESTINATION_CHOICES)
     wanted = {}
     for row in rows:
         if not isinstance(row, dict):
@@ -35236,9 +35883,18 @@ def delivery_app_control_save_all(request):
         kind = row.get('kind')
         if kind not in valid_kinds:
             return JsonResponse({'success': False, 'error': 'Invalid proof type'})
+        # Absent means "leave it alone", same as the single-row endpoint: a payload
+        # written before this field existed must not be able to rewrite where a
+        # client's collected goods go. Resolved per row once the rows are fetched.
+        collect_dest = row.get('collect_dest')
+        if collect_dest is not None and collect_dest not in valid_dests:
+            return JsonResponse(
+                {'success': False, 'error': 'Invalid collection destination'})
+        raw_pays = row.get('pays_delivery')
         wanted[str(row.get('business_id'))] = (
             bool(row.get('delivered')), bool(row.get('failed')),
-            kind, bool(row.get('tracking')))
+            kind, bool(row.get('tracking')), collect_dest,
+            None if raw_pays is None else bool(raw_pays))
 
     businesses = business_models.Business.objects.filter(business_id__in=wanted.keys())
     found = {str(b.business_id): b for b in businesses}
@@ -35251,7 +35907,13 @@ def delivery_app_control_save_all(request):
     saved = []
     with transaction.atomic():
         for bid, values in wanted.items():
-            if _apply_dac_rules(found[bid], *values, username=request.user.username):
+            business = found[bid]
+            *rules, collect_dest, pays_delivery = values
+            if collect_dest is None:
+                collect_dest = business.return_collection_destination
+            if _apply_dac_rules(business, *rules, collect_dest,
+                                username=request.user.username,
+                                pays_delivery=pays_delivery):
                 saved.append(bid)
 
     return JsonResponse({'success': True, 'saved': len(saved), 'ids': saved,
@@ -37698,7 +38360,8 @@ def returns_requests_list(request):
         since = timezone.now() - timedelta(days=int(days_filter))
 
     qs = ReturnRequest.objects.select_related(
-        'order', 'business', 'reviewed_by',
+        'order', 'business', 'reviewed_by', 'pickup_order',
+        'order__pickup_location', 'pickup_location',
     ).prefetch_related('return_items__order_item').order_by('-created_at')
 
     status_counts = dict(
@@ -37726,6 +38389,11 @@ def returns_requests_list(request):
             | Q(order__client_order_code__icontains=search)
             | Q(order__customer_name__icontains=search)
             | Q(business__business_name__icontains=search)
+            # A standalone claim keeps its own customer and the client's own
+            # reference; without these it is unsearchable by anything but its
+            # return number.
+            | Q(customer_name__icontains=search)
+            | Q(external_reference__icontains=search)
         )
 
     page_obj = paginate_queryset(request, qs, 25)
@@ -37742,6 +38410,20 @@ def returns_requests_list(request):
     }
     for ret in rows:
         ret.custody = custody_by_return.get(ret.id)
+
+    # One gate for the button and the endpoint behind it, so a button that is
+    # shown always corresponds to a call that will succeed.
+    from orders.services import can_schedule_return_pickup, jobs_collecting_from
+    for ret in rows:
+        ret.can_schedule_pickup, ret.schedule_pickup_reason = (
+            can_schedule_return_pickup(ret))
+        ret.default_pickup_charge = ret.claim_charge or 0
+        # A replacement ticked 'collect the old item back' is the same physical
+        # job as this collection. Not refused — ops sometimes has a reason — but
+        # never silent, or two drivers turn up for one parcel.
+        ret.collect_overlap = '; '.join(
+            job['label'] for job in jobs_collecting_from(ret.order)
+            if job['kind'] == 'exchange')
 
     owed = ReturnRequest.objects.filter(
         cod_reversal_processed=False, cod_reversal_amount__gt=0,
@@ -37776,6 +38458,188 @@ def returns_requests_list(request):
     return render(request, 'workforce/returns_requests_list.html', context)
 
 
+@login_required(login_url='/accounts/login/')
+@staff_required
+@ensure_csrf_cookie
+def returns_request_create(request):
+    """Raise a claim for goods EzzyDelivery never delivered — staff only.
+
+    Every other claim on this desk starts from an order we carried: the seller
+    presses "Request Return" on it, or a driver fails a delivery and one opens
+    itself. A client whose own courier (or shop counter) put the parcel with the
+    customer has no such order, so there is nothing anywhere to press — and the
+    collection they want is a perfectly ordinary trip for us to make.
+
+    The address typed here IS the claim; the claim stores it rather than reading
+    an order (orders.services.create_standalone_return_request). After that it
+    behaves like any other: the same Schedule pickup button raises the same
+    backwards-running collection order.
+
+    Not offered to sellers on purpose. A wrong address here sends a driver to a
+    door with nothing behind it, and nothing upstream has checked it.
+    """
+    from core.validators import sanitize_text
+    from orders.models import ReturnRequest
+    from orders.services import create_standalone_return_request
+
+    businesses = business_models.Business.objects.filter(
+        business_status='active').order_by('business_name')
+
+    # Every drop-off a client could name, in one query — the form filters them
+    # by client in the browser rather than reloading the page per choice. P2P
+    # one-offs are excluded by .selectable(); a non-active address cannot
+    # receive goods back (delivery.services.returns._UNUSABLE_PICKUP_STATUSES).
+    locations = (business_models.PickupLocation.objects.selectable()
+                 .filter(business__business_status='active',
+                         pickup_status='active')
+                 .select_related('business')
+                 .order_by('business__business_name', '-is_default',
+                           'pickup_location_title'))
+
+    form = {}
+    if request.method == 'POST':
+        form = request.POST
+
+        business = business_models.Business.objects.filter(
+            business_id=safe_int(form.get('business'), default=0)).first()
+        location = business_models.PickupLocation.objects.filter(
+            id=safe_int(form.get('pickup_location'), default=0)).first()
+
+        # Same normalisation the staff order form applies, so a collection card
+        # reads like every other card in the driver's app.
+        customer_name = sanitize_text(form.get('customer_name', ''), True)
+        customer_address = sanitize_text(form.get('customer_address', ''), True)
+        if contains_arabic(customer_name):
+            customer_name = translate_to_english(customer_name)
+        if contains_arabic(customer_address):
+            customer_address = translate_to_english(customer_address)
+        customer_phone = convert_arabic_numerals(
+            sanitize_text(form.get('customer_phone', ''), True))
+        raw_whatsapp = sanitize_text(form.get('customer_whatsapp', ''), True)
+        customer_whatsapp = format_whatsapp_number(raw_whatsapp or customer_phone)
+
+        try:
+            if business is None:
+                raise ValidationError("Pick the client this return belongs to.")
+            ret = create_standalone_return_request(
+                business,
+                reason=form.get('reason', ''),
+                reason_notes=sanitize_text(form.get('reason_notes', '')),
+                pickup_location=location,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                customer_whatsapp=customer_whatsapp,
+                customer_address=customer_address,
+                zone=safe_int(form.get('dl_zone'), default=None),
+                street=safe_int(form.get('dl_street'), default=None),
+                building=safe_int(form.get('dl_building'), default=None),
+                latitude=safe_decimal(form.get('latitude')),
+                longitude=safe_decimal(form.get('longitude')),
+                external_reference=sanitize_text(
+                    form.get('external_reference', ''), True),
+                package_description=sanitize_text(
+                    form.get('package_description', ''), True),
+                package_qty=safe_int(form.get('package_qty'), default=0,
+                                     minimum=0, maximum=10000),
+                collection_charge=safe_decimal(form.get('collection_charge')),
+                user=request.user,
+            )
+        except ValidationError as exc:
+            messages.error(request, '; '.join(exc.messages))
+        except Exception:
+            logger.exception("Standalone return creation failed")
+            messages.error(request, "Could not raise this return. Try again.")
+        else:
+            messages.success(
+                request,
+                f"Return {ret.return_number} raised for "
+                f"{ret.business.business_name}. Schedule the pickup to send a "
+                f"driver.")
+            return redirect(
+                f"{reverse('workforce:returns_requests_list')}"
+                f"?status=all&search={ret.return_number}")
+
+    context = {
+        'page_title': 'New return — not delivered by us',
+        'businesses': businesses,
+        'locations': locations,
+        'reason_choices': ReturnRequest.RETURN_REASON_CHOICES,
+        'form': form,
+    }
+    return render(request, 'workforce/returns_request_create.html', context)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def returns_request_schedule_pickup(request, return_id):
+    """Raise the collection order for one return request — staff only.
+
+    The seller opens the claim; this is the moment somebody here decides a driver
+    is worth sending. The order it creates runs backwards (collect at the
+    customer, drop at the seller) and goes straight into the driver pool, so no
+    second approval step stands between this click and a driver seeing it.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    from django.core.exceptions import ValidationError
+
+    from orders.models import ReturnRequest
+    from orders.services import create_return_pickup_order
+
+    ret = get_object_or_404(
+        ReturnRequest.objects.select_related(
+            'order', 'business', 'pickup_location'), id=return_id)
+    data = _custody_body(request)
+
+    charge = data.get('charge')
+    if charge in ('', None):
+        charge = None
+    else:
+        try:
+            charge = Decimal(str(charge))
+        except (InvalidOperation, TypeError, ValueError):
+            return JsonResponse(
+                {'success': False, 'error': 'That collection charge is not a number.'},
+                status=400)
+
+    try:
+        order = create_return_pickup_order(
+            ret, charge=charge, user=request.user,
+            notes=(data.get('notes') or '').strip())
+    except ValidationError as exc:
+        return JsonResponse({'success': False, 'error': '; '.join(exc.messages)},
+                            status=400)
+    except Exception:
+        logger.exception("Return pickup failed for return request %s", return_id)
+        return JsonResponse(
+            {'success': False, 'error': 'Could not raise the collection.'}, status=500)
+
+    # Same timeline the seller and the custody desk write to, so one order tells
+    # the whole story rather than three systems each keeping half of it. A
+    # standalone claim has no outbound order to write onto, so the collection
+    # itself carries the entry — the only order that trip ever had.
+    try:
+        orders_models.OrderStatusHistory.objects.create(
+            order=ret.order or order,
+            field_name='return_status',
+            old_value='', new_value='pickup_scheduled',
+            old_display='', new_display='Pickup Scheduled',
+            changed_by=request.user,
+            notes=f'{ret.return_number}: collection {order.order_number}'[:255],
+        )
+    except Exception as e:
+        logger.warning("Return pickup history failed for %s: %s", ret.pk, e)
+
+    return JsonResponse({
+        'success': True,
+        'status': 'pickup_scheduled',
+        'status_display': 'Pickup Scheduled',
+        'order_number': order.order_number,
+        'order_url': reverse('workforce:order_detail', args=[order.id]),
+    })
+
+
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -37785,7 +38649,8 @@ def returns_request_set_status(request, return_id):
     from orders.models import ReturnRequest
 
     ret = get_object_or_404(
-        ReturnRequest.objects.select_related('order', 'business'), id=return_id)
+        ReturnRequest.objects.select_related(
+            'order', 'business', 'pickup_order'), id=return_id)
     data = _custody_body(request)
     new_status = (data.get('status') or '').strip()
     valid = {k for k, _ in ReturnRequest.RETURN_STATUS_CHOICES}
@@ -37807,20 +38672,26 @@ def returns_request_set_status(request, return_id):
         'status', 'reviewed_by', 'reviewed_at', 'review_notes', 'updated_at'])
 
     # Same timeline the seller and the custody desk write to, so one order tells
-    # the whole story rather than three systems each keeping half of it.
+    # the whole story rather than three systems each keeping half of it. A
+    # standalone claim has no outbound order; its collection carries the entry
+    # once there is one, and before that the claim's own review notes are the
+    # record. Never a silent IntegrityError on a null order.
     labels = dict(ReturnRequest.RETURN_STATUS_CHOICES)
-    try:
-        orders_models.OrderStatusHistory.objects.create(
-            order=ret.order,
-            field_name='return_status',
-            old_value=old_status, new_value=new_status,
-            old_display=labels.get(old_status, old_status),
-            new_display=labels.get(new_status, new_status),
-            changed_by=request.user,
-            notes=(f'{ret.return_number}: {notes}'[:255] if notes else ret.return_number),
-        )
-    except Exception as e:
-        logger.warning("Return status history failed for %s: %s", ret.pk, e)
+    timeline_order = ret.order or ret.pickup_order
+    if timeline_order is not None:
+        try:
+            orders_models.OrderStatusHistory.objects.create(
+                order=timeline_order,
+                field_name='return_status',
+                old_value=old_status, new_value=new_status,
+                old_display=labels.get(old_status, old_status),
+                new_display=labels.get(new_status, new_status),
+                changed_by=request.user,
+                notes=(f'{ret.return_number}: {notes}'[:255] if notes
+                       else ret.return_number),
+            )
+        except Exception as e:
+            logger.warning("Return status history failed for %s: %s", ret.pk, e)
 
     return JsonResponse({
         'success': True, 'status': ret.status,
@@ -38067,4 +38938,353 @@ def returns_custody_open(request, task_id):
         'custody_id': outcome.custody.id,
         'created': outcome.created,
         'warnings': outcome.warnings,
+    })
+
+
+# =============================================================================
+# DRIVER OPPORTUNITIES — staff console
+#
+# The ops half of the driver opportunities board. Postings and their dated slots
+# are created here; the driver side (fleet/views.py) only reads them and records
+# interest. Every transition goes through fleet/opportunities.py so the rules —
+# capacity, seat counting, RiderShift materialisation — live in one place.
+# =============================================================================
+
+def _opportunity_dt(raw):
+    """Parse a datetime-local field into an aware datetime, or None.
+
+    The browser sends no offset, so the value arrives naive. Reading it in the
+    active zone (Asia/Qatar) is the only interpretation that matches what the
+    staff member typed — storing it as UTC would move every shift three hours.
+    """
+    from django.utils.dateparse import parse_datetime
+
+    if not raw:
+        return None
+    parsed = parse_datetime(raw)
+    if parsed is None:
+        return None
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_opportunities(request):
+    """Postings list, newest first."""
+    from fleet.models import DriverOpportunity
+
+    status = (request.GET.get('status') or '').strip()
+    postings = (
+        DriverOpportunity.objects
+        .select_related('pickup_location')
+        .prefetch_related('zone_groups', 'slots')
+        .order_by('-created_at')
+    )
+    if status in dict(fleet_models.OPPORTUNITY_STATUS_CHOICES):
+        postings = postings.filter(status=status)
+
+    rows = []
+    for posting in postings:
+        slots = list(posting.slots.all())
+        rows.append({
+            'posting': posting,
+            'slot_count': len(slots),
+            'open_slots': sum(1 for s in slots if s.status == 'open'),
+        })
+
+    return render(request, 'workforce/fleet/opportunities_list.html', {
+        'rows': rows,
+        'status': status,
+        'status_choices': fleet_models.OPPORTUNITY_STATUS_CHOICES,
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_opportunity_edit(request, opportunity_id=None):
+    """Create or edit a posting. Slots are managed on the detail page."""
+    from fleet.models import DriverOpportunity
+    from delivery.models import ZoneGroup
+    from business.models import PickupLocation
+
+    posting = None
+    if opportunity_id:
+        posting = get_object_or_404(DriverOpportunity, pk=opportunity_id)
+
+    if request.method == 'POST':
+        title = (request.POST.get('title') or '').strip()
+        if not title:
+            messages.error(request, 'A title is required.')
+            return redirect(request.path)
+
+        if posting is None:
+            posting = DriverOpportunity(created_by=request.user)
+
+        posting.title = title[:150]
+        posting.description = (request.POST.get('description') or '').strip()
+
+        vehicle = (request.POST.get('vehicle_type') or '').strip()
+        posting.vehicle_type = vehicle if vehicle in dict(fleet_models.VEHICLE_CHOICES) else ''
+
+        job_type = (request.POST.get('job_type') or '').strip()
+        posting.job_type = job_type if job_type in dict(fleet_models.DRIVER_JOB_TYPE_CHOICES) else ''
+
+        posting.pay_note = (request.POST.get('pay_note') or '').strip()[:200]
+
+        location_id = (request.POST.get('pickup_location') or '').strip()
+        posting.pickup_location = (
+            PickupLocation.objects.filter(pk=location_id).first() if location_id.isdigit() else None
+        )
+
+        new_status = (request.POST.get('status') or 'draft').strip()
+        if new_status not in dict(fleet_models.OPPORTUNITY_STATUS_CHOICES):
+            new_status = 'draft'
+        # Publishing is the moment the board starts showing it, so stamp it once
+        # and never re-stamp — a later edit is not a republication.
+        if new_status == 'open' and not posting.published_at:
+            posting.published_at = timezone.now()
+        posting.status = new_status
+
+        posting.closes_at = _opportunity_dt((request.POST.get('closes_at') or '').strip())
+
+        posting.save()
+
+        zone_ids = [z for z in request.POST.getlist('zone_groups') if z.isdigit()]
+        posting.zone_groups.set(ZoneGroup.objects.filter(id__in=zone_ids))
+
+        messages.success(request, 'Opportunity saved.')
+        return redirect('workforce:wf_opportunity_detail', opportunity_id=posting.pk)
+
+    return render(request, 'workforce/fleet/opportunity_form.html', {
+        'posting': posting,
+        'status_choices': fleet_models.OPPORTUNITY_STATUS_CHOICES,
+        'vehicle_choices': [c for c in fleet_models.VEHICLE_CHOICES if c[0] != 'none'],
+        'job_type_choices': fleet_models.DRIVER_JOB_TYPE_CHOICES,
+        'zone_groups': ZoneGroup.objects.filter(is_active=True).order_by('display_order', 'name'),
+        'selected_zones': [z.pk for z in posting.zone_groups.all()] if posting else [],
+        'pickup_locations': PickupLocation.objects.select_related('business').order_by('pickup_location_title'),
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_opportunity_detail(request, opportunity_id):
+    """A posting with its slots and everyone who raised a hand."""
+    from fleet.models import DriverOpportunity
+
+    posting = get_object_or_404(
+        DriverOpportunity.objects.prefetch_related('zone_groups'), pk=opportunity_id)
+
+    slots = (
+        posting.slots
+        .prefetch_related('interests__driver__user', 'interests__driver__profile')
+        .order_by('starts_at')
+    )
+
+    return render(request, 'workforce/fleet/opportunity_detail.html', {
+        'posting': posting,
+        'slots': slots,
+        'slab_choices': fleet_models.WORK_TIME_SLAB_CHOICES,
+        'interest_statuses': fleet_models.OPPORTUNITY_INTEREST_STATUS_CHOICES,
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_opportunity_slot_save(request, opportunity_id):
+    """Add a dated slot to a posting."""
+    from fleet.models import DriverOpportunity, DriverOpportunitySlot
+
+    posting = get_object_or_404(DriverOpportunity, pk=opportunity_id)
+    if request.method != 'POST':
+        return redirect('workforce:wf_opportunity_detail', opportunity_id=posting.pk)
+
+    starts_at = _opportunity_dt((request.POST.get('starts_at') or '').strip())
+    ends_at = _opportunity_dt((request.POST.get('ends_at') or '').strip())
+    if not starts_at or not ends_at:
+        messages.error(request, 'Both a start and an end time are required.')
+        return redirect('workforce:wf_opportunity_detail', opportunity_id=posting.pk)
+    if ends_at <= starts_at:
+        # The model carries a CheckConstraint for this; catching it here turns a
+        # database error into a sentence staff can act on.
+        messages.error(request, 'The shift must end after it starts.')
+        return redirect('workforce:wf_opportunity_detail', opportunity_id=posting.pk)
+
+    try:
+        capacity = max(int(request.POST.get('capacity') or 1), 1)
+    except ValueError:
+        capacity = 1
+
+    slab = (request.POST.get('time_slab') or '').strip()
+    if slab not in dict(fleet_models.WORK_TIME_SLAB_CHOICES):
+        slab = ''
+
+    DriverOpportunitySlot.objects.create(
+        opportunity=posting,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        time_slab=slab,
+        capacity=capacity,
+    )
+    messages.success(request, 'Shift added.')
+    return redirect('workforce:wf_opportunity_detail', opportunity_id=posting.pk)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_opportunity_slot_delete(request, slot_id):
+    """Remove a slot. Refuses once anyone is confirmed on it."""
+    from fleet.models import DriverOpportunitySlot
+
+    slot = get_object_or_404(DriverOpportunitySlot, pk=slot_id)
+    opportunity_id = slot.opportunity_id
+    if request.method == 'POST':
+        if slot.confirmed_count:
+            messages.error(
+                request,
+                'Drivers are already confirmed on this shift. Cancel it instead of deleting it.')
+        else:
+            slot.delete()
+            messages.success(request, 'Shift removed.')
+    return redirect('workforce:wf_opportunity_detail', opportunity_id=opportunity_id)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_opportunity_interest_decide(request, interest_id):
+    """Shortlist, confirm, decline — the ops decision on one raised hand."""
+    from fleet.models import DriverOpportunityInterest
+    from fleet.opportunities import set_interest_status, REFUSAL_MESSAGES as SLOT_MESSAGES
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    interest = get_object_or_404(
+        DriverOpportunityInterest.objects.select_related('slot', 'slot__opportunity', 'driver'),
+        pk=interest_id)
+
+    status = (request.POST.get('status') or '').strip()
+    valid = dict(fleet_models.OPPORTUNITY_INTEREST_STATUS_CHOICES)
+    if status not in valid:
+        return JsonResponse({'success': False, 'error': 'Invalid status'}, status=400)
+
+    interest, reason = set_interest_status(interest, status, by_user=request.user)
+    if reason:
+        return JsonResponse(
+            {'success': False, 'error': SLOT_MESSAGES[reason], 'code': reason}, status=400)
+
+    return JsonResponse({
+        'success': True,
+        'status': interest.status,
+        'places_left': interest.slot.places_left,
+    })
+
+
+# =============================================================================
+# DRIVER WHATSAPP THREAD
+# =============================================================================
+
+#: How far back the verification-queue popup reads. The backfill keeps ~120 days,
+#: but a reviewer is deciding on a live application — two months of context is
+#: the conversation, and anything older is history they can open the CRM card for.
+DRIVER_WA_THREAD_DAYS = 60
+
+#: Ceiling on rows returned, newest-last. A chatty applicant should not ship a
+#: 2,000-message payload into a modal that shows the last screenful.
+DRIVER_WA_THREAD_LIMIT = 200
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_wa_thread(request, driver_id):
+    """The last 60 days of WhatsApp with this driver, for the verification popup.
+
+    Reads the stored WhatsAppMessage table (filled by the WAHA webhook and by
+    our own routed sends), never WAHA's HTTP API — the popup must open instantly
+    and must not fail when the container is mid-restart.
+
+    Identifier matching goes through workforce.crm_views.wa_identifiers_for so
+    the LID rules stay in one place: a lid expanded as a phone invents a real
+    stranger's Qatar number.
+    """
+    from datetime import timedelta
+    from django.db.models import Q
+    from django.utils import timezone
+    from workforce.crm_views import wa_identifiers_for
+    from crm import services as crm_services
+
+    driver = get_object_or_404(
+        fleet_models.Driver.objects.select_related('user', 'profile'),
+        driver_id=driver_id,
+    )
+    phone = (driver.driver_whatsapp or driver.profile.whatsapp
+             or driver.driver_phone or '').strip() if driver.profile else (
+             driver.driver_whatsapp or driver.driver_phone or '').strip()
+
+    if not phone:
+        return JsonResponse({'success': True, 'messages': [], 'phone': '',
+                             'note': 'No WhatsApp number on this application.'})
+
+    idents, lid_pairs = wa_identifiers_for(phone)
+    if not idents and not lid_pairs:
+        return JsonResponse({'success': True, 'messages': [], 'phone': phone})
+
+    # A number belonging to one of our own platform accounts must not have its
+    # thread exposed here: it carries OTPs. Same gate as the CRM inbox.
+    try:
+        if crm_services.wa_read_blocked((idents, lid_pairs)):
+            return JsonResponse({'success': True, 'messages': [], 'phone': phone,
+                                 'note': 'This number belongs to a platform account.'})
+    except Exception:
+        logger.exception('driver wa thread: read gate failed for driver %s', driver_id)
+        return JsonResponse({'success': False, 'error': 'Could not check this number.'},
+                            status=500)
+
+    ident_list = list(idents)
+    wa_q = Q(from_number__in=ident_list) | Q(to_number__in=ident_list) if ident_list else None
+    for sess, lid in lid_pairs:
+        clause = Q(session=sess) & (Q(from_number=lid) | Q(to_number=lid))
+        wa_q = clause if wa_q is None else (wa_q | clause)
+    if wa_q is None:
+        return JsonResponse({'success': True, 'messages': [], 'phone': phone})
+
+    since = timezone.now() - timedelta(days=DRIVER_WA_THREAD_DAYS)
+    try:
+        from whatsapp.models import WhatsAppMessage
+        rows = list(
+            WhatsAppMessage.objects
+            .filter(wa_q)
+            .filter(received_at__gte=since)
+            .order_by('-received_at', '-created_at')[:DRIVER_WA_THREAD_LIMIT]
+        )[::-1]
+    except Exception:
+        logger.exception('driver wa thread: query failed for driver %s', driver_id)
+        return JsonResponse({'success': False, 'error': 'Could not load the conversation.'},
+                            status=500)
+
+    out = []
+    for r in rows:
+        body = (r.body or '').strip()
+        # Media is flagged, not rendered: the media proxy is lead-scoped, and a
+        # reviewer only needs to know a photo exists before opening WhatsApp.
+        has_media = bool(r.media_file) or bool(r.media_url)
+        if not body and not has_media:
+            continue          # reactions / protocol rows are noise in a review
+        out.append({
+            'direction': r.direction,
+            'body': body,
+            'media': has_media,
+            'type': r.message_type or 'text',
+            'at': timezone.localtime(r.received_at).strftime('%d %b, %H:%M')
+                  if r.received_at else '',
+        })
+
+    return JsonResponse({
+        'success': True,
+        'phone': phone,
+        'days': DRIVER_WA_THREAD_DAYS,
+        'messages': out,
+        'truncated': len(rows) >= DRIVER_WA_THREAD_LIMIT,
     })

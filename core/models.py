@@ -17,6 +17,7 @@ Dependencies:
 from django.conf import settings
 from django.db import models
 
+from core import name_sync
 from core import signup_origin
 from core.email_normalize import EmailNormalizedModel
 from core.validators import image_validators
@@ -177,7 +178,18 @@ class Profile(EmailNormalizedModel, models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        """Override save to auto-generate user_number on creation"""
+        """Auto-generate user_number on creation, and keep one name per person.
+
+        The name lives in two places — here and on the auth User row — and nothing
+        used to hold them together, so a Google display name and the name typed on
+        the application drifted apart (see core/name_sync.py). A new Profile borrows
+        the auth user's name when it has none of its own, and every save that writes
+        a name mirrors it back onto the User.
+        """
+        creating = self._state.adding
+        if creating and self.user_id:
+            name_sync.seed_profile_name_from_user(self)
+
         if not self.user_number:
             # Generate user number: EZZY + Year + 6-digit number
             from django.utils import timezone as dj_timezone
@@ -192,6 +204,9 @@ class Profile(EmailNormalizedModel, models.Model):
                 self.user_number = f"EZZY{year}{random_num}"
 
         super().save(*args, **kwargs)
+
+        if self.user_id and (creating or name_sync.touches_name(kwargs.get('update_fields'))):
+            name_sync.push_profile_name_to_user(self)
 
     def __str__(self):
         return f"{self.username or self.user_number}"

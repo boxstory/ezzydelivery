@@ -4312,6 +4312,8 @@ def returns_list(request):
     returns_qs = ReturnRequest.objects.filter(
         business=business
     ).select_related('order', 'reviewed_by').order_by('-created_at')
+    # A staff-raised claim for goods we never delivered has no order; it is the
+    # client's return all the same, so it lists here beside the rest.
 
     if status_filter:
         returns_qs = returns_qs.filter(status=status_filter)
@@ -4334,11 +4336,14 @@ def returns_list(request):
 # claim about our cash, not the seller's, so they may not make it — there is no
 # refund path anywhere that a seller can trigger.
 #
+# 'pickup_scheduled' asserts a driver is coming. Since the collection is a real
+# order raised by staff (orders.services.create_return_pickup_order), a seller
+# setting it by hand would promise a trip nobody is making.
+#
 # Deliberately NOT 'approved'/'rejected': those decide whether the seller takes
 # their own goods back and write to their own OrderItem counts, which is theirs
-# to call. There is also no staff-side return console, so restricting them would
-# mean no one could approve a return at all.
-STAFF_ONLY_RETURN_STATUSES = ('refunded',)
+# to call.
+STAFF_ONLY_RETURN_STATUSES = ('refunded', 'pickup_scheduled')
 
 
 def _collected_cod_for(order):
@@ -4365,7 +4370,10 @@ def return_detail(request, return_id):
 
     from orders.models import ReturnRequest
     ret = get_object_or_404(
-        ReturnRequest.objects.select_related('order', 'business', 'reviewed_by').prefetch_related('return_items__order_item__product'),
+        ReturnRequest.objects.select_related(
+            'order', 'business', 'reviewed_by', 'pickup_location',
+            'pickup_order', 'pickup_order__pickup_location',
+        ).prefetch_related('return_items__order_item__product'),
         id=return_id, business=business
     )
 
@@ -4450,6 +4458,22 @@ def return_create(request, order_id):
     if order.order_status not in ('delivered', 'fulfilled'):
         messages.warning(request, "Returns can only be requested for delivered orders.")
         return redirect('orders:order_details', order.id)
+
+    # One open claim per order. Three clicks here used to mean three claims and
+    # three collections, with nothing anywhere saying so. More items coming back
+    # go on the claim that is already open; a new one waits until it is closed.
+    # Deliberately in the view and not in create_return_request(): a failed
+    # delivery raises its own claim automatically and must never be blocked.
+    from orders.services import open_return_for_order
+
+    existing = open_return_for_order(order)
+    if existing is not None:
+        messages.info(
+            request,
+            f"Return RET-{existing.return_number} is already open for this order "
+            f"({existing.get_status_display()}). Add the items to it rather than "
+            f"opening a second one.")
+        return redirect('business:return_detail', existing.id)
 
     from orders.models import ReturnRequest, ReturnItem
     import uuid
@@ -4550,12 +4574,19 @@ def return_update_status(request, return_id):
         return redirect('business:return_detail', ret.id)
 
     # A seller decides their own return and moves it through the handling steps.
-    # What they cannot do is declare that we refunded their customer.
+    # What they cannot do is declare that we refunded their customer, or that a
+    # driver is on the way.
     if new_status in STAFF_ONLY_RETURN_STATUSES and not request.user.is_staff:
-        messages.error(
-            request,
-            "A refund is recorded by EzzyDelivery once the money has actually gone "
-            "back. Approve the return and our team will settle it.")
+        if new_status == 'pickup_scheduled':
+            messages.error(
+                request,
+                "A collection is scheduled by EzzyDelivery — approve the return "
+                "and our team will raise the pickup order and send a driver.")
+        else:
+            messages.error(
+                request,
+                "A refund is recorded by EzzyDelivery once the money has actually gone "
+                "back. Approve the return and our team will settle it.")
         return redirect('business:return_detail', ret.id)
 
     ret.status = new_status

@@ -41,6 +41,11 @@ ORDER_STATUS_BY_CLIENT = [
         ('ready_to_pickup', 'Ready to pickup'),
         ('publish', 'Published'),
         ('delivered', 'Delivered'),
+        # The parcel went out and came back without ever reaching the customer.
+        # Distinct from 'cancelled' (nobody drove) and from 'delivered' (an order
+        # delivered and only later returned for alteration keeps its delivery —
+        # the terminal-status guard in delivery.signals is what protects it).
+        ('returned', 'Returned'),
         ('cancelled', 'Cancelled'),
     ]
 
@@ -75,6 +80,10 @@ COD_STATUS_BY_STAFF = [
 ORDER_TYPE_CHOICES = [
         ('normal_delivery', 'Normal Delivery'),
         ('pick_and_drop', 'Pick and Drop'),
+        # The reverse trip: goods come back FROM the customer TO the seller. The
+        # customer fields on such an order are where the driver collects, and
+        # pickup_location is where he drops off — see delivery/selectors.py.
+        ('return_pickup', 'Return Pickup — Collect from Customer'),
     ]
 
 # Why a replacement is going out. Deliberately NOT ReturnRequest.RETURN_REASON_CHOICES:
@@ -148,6 +157,17 @@ class Order(models.Model):
         default=0, help_text="How many times a waybill has been printed — reprints are expected, not errors.")
     dl_included = models.BooleanField(default=True)
     dl_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Where dl_amount came from. 'rate_card' follows the client's distance bands and
+    # is re-priced whenever the distance changes; 'manual' is a figure staff typed
+    # and is never overwritten. Blank is the legacy/imported state: a non-zero
+    # fee there is kept, a zero one is filled from the rate card.
+    DL_AMOUNT_SOURCE_CHOICES = [
+        ('', 'Not set'),
+        ('rate_card', 'Distance rate card'),
+        ('manual', 'Set by staff'),
+    ]
+    dl_amount_source = models.CharField(
+        max_length=10, choices=DL_AMOUNT_SOURCE_CHOICES, blank=True, default='')
     order_type = models.CharField(
         max_length=20, choices=ORDER_TYPE_CHOICES, default='normal_delivery',
         db_index=True,  # INDEX: the P2P staff list filters the whole table on this
@@ -1449,7 +1469,13 @@ class ImportLog(models.Model):
 # =============================================================================
 
 class ReturnRequest(models.Model):
-    """Track return requests for delivered orders."""
+    """A claim against goods coming back from a customer.
+
+    Two kinds, told apart by `order`: the ordinary one is raised against an
+    order we delivered, and a standalone one (order=None) is raised by staff for
+    a client whose goods we never carried. The standalone kind keeps its own
+    collection address, because there is no outbound order to copy one from.
+    """
     RETURN_REASON_CHOICES = [
         ('wrong_item', 'Wrong Item Received'),
         ('damaged', 'Item Damaged'),
@@ -1472,7 +1498,15 @@ class ReturnRequest(models.Model):
         ('closed', 'Closed'),
     ]
     return_number = models.CharField(max_length=64, unique=True, db_index=True)
-    order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='return_requests')
+    # NULL means EzzyDelivery never carried these goods — a standalone claim
+    # raised by staff for a client whose own courier (or counter sale) put the
+    # parcel with the customer. There is then no outbound order to read an
+    # address, a charge or a line list off, so the claim carries its own below.
+    order = models.ForeignKey(
+        'Order', on_delete=models.CASCADE, related_name='return_requests',
+        null=True, blank=True,
+        help_text="The outbound order these goods went out on. Null when we did "
+                  "not deliver them.")
     business = models.ForeignKey('business.Business', on_delete=models.CASCADE, related_name='return_requests')
     reason = models.CharField(max_length=30, choices=RETURN_REASON_CHOICES)
     reason_notes = models.TextField(blank=True, default='')
@@ -1486,6 +1520,50 @@ class ReturnRequest(models.Model):
         'Order', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='source_return',
         help_text="The replacement order sent for this return, if goods were re-sent.")
+    # The collection job raised for this claim. Nullable because a claim can be
+    # rejected, refunded without collecting, or closed after the customer posted
+    # the goods back themselves. This FK is also the only link between the two
+    # orders: the claim knows the original (`order`) and the collection.
+    pickup_order = models.OneToOneField(
+        'Order', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='source_return_pickup',
+        help_text="The return-pickup order raised to collect these goods, if one was.")
+    # --- Standalone claim: goods EzzyDelivery never delivered -----------------
+    # Only read when `order` is None. The order is always the better source when
+    # there is one, so nothing here is a second copy of a field we already hold —
+    # read both through the claim_* properties below rather than branching at
+    # every call site.
+    external_reference = models.CharField(
+        max_length=64, blank=True, default='',
+        help_text="The client's own order or invoice number for goods we did not "
+                  "deliver. Shown where an order number would be.")
+    customer_name = models.CharField(max_length=100, blank=True, default='')
+    customer_phone = models.CharField(max_length=100, blank=True, default='')
+    customer_whatsapp = models.CharField(max_length=100, blank=True, default='')
+    customer_address = models.CharField(max_length=255, blank=True, default='')
+    dl_zone = models.PositiveIntegerField(blank=True, null=True, default=None)
+    dl_street = models.PositiveIntegerField(blank=True, null=True, default=None)
+    dl_building = models.PositiveIntegerField(blank=True, null=True, default=None)
+    latitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
+    # Where the collected goods are dropped. On an order-backed claim this is the
+    # outbound order's own pickup location; here somebody has to choose it.
+    pickup_location = models.ForeignKey(
+        'business.PickupLocation', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='standalone_return_requests',
+        help_text="Where the driver drops the collected goods. Standalone claims only.")
+    package_description = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text="What is coming back. Stands in for the order lines a "
+                  "standalone claim does not have.")
+    package_qty = models.PositiveIntegerField(default=0)
+    # What the client pays for the collection trip. An order-backed claim
+    # defaults to what they paid for the outbound one; there is no outbound one
+    # here, so staff name the figure when they raise the claim.
+    collection_charge = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Default charge for the collection. Staff can still override "
+                  "it when they schedule the pickup.")
     reviewed_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_returns')
     reviewed_at = models.DateTimeField(null=True, blank=True)
     review_notes = models.TextField(blank=True, default='')
@@ -1498,6 +1576,97 @@ class ReturnRequest(models.Model):
 
     def __str__(self):
         return f"RET-{self.return_number}"
+
+    # --- One reading of the claim, whether or not we delivered the goods ------
+    # Every consumer (the collection service, both consoles, the seller's page)
+    # wants the same six answers: who to collect from, where, and where it goes.
+    # These resolve them once so no call site has to know which kind of claim it
+    # is holding.
+
+    @property
+    def is_standalone(self):
+        """True when EzzyDelivery never delivered these goods."""
+        return self.order_id is None
+
+    def _src(self, name):
+        """The order's value when there is an order, else the claim's own."""
+        return getattr(self.order if self.order_id else self, name)
+
+    @property
+    def claim_customer_name(self):
+        return self._src('customer_name')
+
+    @property
+    def claim_customer_phone(self):
+        return self._src('customer_phone')
+
+    @property
+    def claim_customer_whatsapp(self):
+        return self._src('customer_whatsapp')
+
+    @property
+    def claim_customer_address(self):
+        return self._src('customer_address')
+
+    @property
+    def claim_zone(self):
+        return self._src('dl_zone')
+
+    @property
+    def claim_street(self):
+        return self._src('dl_street')
+
+    @property
+    def claim_building(self):
+        return self._src('dl_building')
+
+    @property
+    def claim_latitude(self):
+        return self._src('latitude')
+
+    @property
+    def claim_longitude(self):
+        return self._src('longitude')
+
+    @property
+    def claim_pickup_location(self):
+        """Where the collected goods are dropped — the client's counter."""
+        if self.order_id:
+            return self.order.pickup_location
+        return self.pickup_location
+
+    @property
+    def claim_package_description(self):
+        return self._src('package_description')
+
+    @property
+    def claim_package_qty(self):
+        return self._src('package_qty')
+
+    @property
+    def claim_charge(self):
+        """The default charge for the collection trip.
+
+        An order-backed claim charges what the outbound trip did; a standalone
+        one charges whatever staff typed when they raised it.
+        """
+        if self.order_id:
+            return self.order.dl_amount
+        return self.collection_charge
+
+    @property
+    def reference_label(self):
+        """One line naming what this claim is against, for a page heading.
+
+        A standalone claim has no order number to show, and a bare return number
+        tells a client nothing — their own reference is the only thing both
+        sides recognise.
+        """
+        if self.order_id:
+            return f"Order #{self.order.order_number}"
+        if self.external_reference:
+            return f"Ref {self.external_reference} — not delivered by EzzyDelivery"
+        return "Goods not delivered by EzzyDelivery"
 
 
 class ReturnItem(models.Model):

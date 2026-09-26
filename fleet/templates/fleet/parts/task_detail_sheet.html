@@ -241,9 +241,9 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
 
         <!-- COD Toggle -->
         <div id="tdCodSection" class="td-form-group" style="display:none;">
-            <label class="td-form-label"><i class="fa-solid fa-money-bill-wave me-1"></i>COD Collection</label>
+            <label class="td-form-label"><i class="fa-solid fa-money-bill-wave me-1"></i>Amount to Collect</label>
             <div class="td-toggle-row">
-                <span>Collected COD?</span>
+                <span>Collected the amount?</span>
                 <label class="td-switch">
                     <input type="checkbox" id="tdCodCollected" onchange="toggleCodAmount(this)">
                     <span class="td-switch__track"></span>
@@ -381,6 +381,15 @@ the photo requirement is shared), plus the destination the driver has to take it
                 you still hold the goods and settles any later dispute.</span>
         </div>
 
+        {# The customer pays for the trip even though they kept nothing. Prefilled #}
+        {# with this job's charge; the driver can correct it to what he actually took. #}
+        <div class="td-form-group" id="tdReturnFeeGroup" hidden>
+            <label class="td-form-label"><i class="fa-solid fa-money-bill-wave me-1"></i>Amount Collected (QR)</label>
+            <input type="number" id="tdReturnFee" class="td-form-input" placeholder="0.00" step="0.01" min="0">
+            <span class="td-nr-help__note"><i class="fa-solid fa-circle-info"></i>
+                Hand this in with your COD. Leave it at 0 if the customer paid nothing.</span>
+        </div>
+
         <button id="tdReturnedBtn" class="fleet-btn td-confirm-btn td-confirm-btn--warning" onclick="submitReturned()">
             <i class="fa-solid fa-rotate-left me-2"></i>Confirm Returning
         </button>
@@ -493,7 +502,7 @@ the photo requirement is shared), plus the destination the driver has to take it
         <p class="td-form-label" style="margin-bottom:0.75rem;">Mark items the customer <strong>returned</strong>. Leave qty 0 for items delivered.</p>
         <div id="tdPartialItemList" style="margin-bottom:1rem;"></div>
         <div class="td-form-group" id="tdPartialCodGroup" style="display:none;">
-            <label class="td-form-label"><i class="fa-solid fa-money-bill-wave me-1"></i>Actual COD Collected <span style="color:var(--fleet-grey-400);font-weight:400">(reduced for returned items)</span></label>
+            <label class="td-form-label"><i class="fa-solid fa-money-bill-wave me-1"></i>Actual Amount Collected <span style="color:var(--fleet-grey-400);font-weight:400">(reduced for returned items)</span></label>
             <input type="number" id="tdPartialCodInput" class="td-form-input" step="0.01" min="0" placeholder="0.00">
             <label class="td-form-label mt-2"><i class="fa-solid fa-credit-card me-1"></i>Payment Mode</label>
             <div class="td-payment-methods">
@@ -635,7 +644,7 @@ the photo requirement is shared), plus the destination the driver has to take it
                 (d.zone ? '\n📍 Zone ' + d.zone : '') +
                 (d.street ? ', St ' + d.street : '') +
                 (d.building ? ', Bldg ' + d.building : '') +
-                (d.cod ? '\n💵 COD: ' + d.cod + ' QR' : '') +
+                (d.cod ? '\n💵 Amount to pay: ' + d.cod + ' QR' : '') +
                 (verifyUrl ? '\n\n📍 Please verify your delivery address:\n' + verifyUrl : '') +
                 '\n\nYour delivery is on its way. Please be available. Thank you! 🚚'
             );
@@ -725,7 +734,7 @@ the photo requirement is shared), plus the destination the driver has to take it
         const codBox = document.getElementById('tdCodBox');
         const ernBox = document.getElementById('tdEarnBox');
         if (d.cod !== null && d.cod !== undefined && d.cod !== '') {
-            document.getElementById('tdCod').textContent = 'COD ' + d.cod + ' QR';
+            document.getElementById('tdCod').textContent = 'Collect ' + d.cod + ' QR';
             codBox.classList.toggle('td-cod-badge--zero', !(parseFloat(d.cod) > 0));
             codBox.style.display = '';
         } else { codBox.style.display = 'none'; }
@@ -952,6 +961,7 @@ the photo requirement is shared), plus the destination the driver has to take it
     // Current task id (set when sheet opens)
     let _tdCurrentTaskId = null;
     let _tdCurrentTaskNum = null;
+    let _tdCurrentCharge = 0;
 
     // Take an unclaimed pool task straight from the sheet. Same endpoint the
     // Tasks page Take button uses — the task number stands in for the label scan.
@@ -1043,6 +1053,7 @@ the photo requirement is shared), plus the destination the driver has to take it
     window.openTaskDetail = function(e, card) {
         _tdCurrentTaskId = card.dataset.id;
         _tdCurrentTaskNum = card.dataset.tasknum;
+        _tdCurrentCharge = card.dataset.charge || 0;
         // Set Edit Loc link
         var editLocBtn = document.getElementById('tdUpdateLocBtn');
         if (editLocBtn) editLocBtn.href = '/fleet/tasks/' + _tdCurrentTaskId + '/edit-location/';
@@ -1519,6 +1530,19 @@ the photo requirement is shared), plus the destination the driver has to take it
     // The parcel is coming back with the driver. Distinct from Failed: the goods
     // stay in the driver's hands, so the server opens a custody row and the RMA.
     window.openTdReturned = function() {
+        // The customer pays for the trip on a return, so ask for it here and
+        // prefill this job's own charge. Hidden entirely when the job is unpriced,
+        // rather than showing a driver a 0.00 box he has to reason about.
+        const charge = parseFloat(_tdCurrentCharge) || 0;
+        const feeGroup = document.getElementById('tdReturnFeeGroup');
+        const feeInput = document.getElementById('tdReturnFee');
+        if (charge > 0) {
+            feeInput.value = charge.toFixed(2);
+            feeGroup.hidden = false;
+        } else {
+            feeInput.value = '';
+            feeGroup.hidden = true;
+        }
         document.getElementById('tdReturnedOverlay').classList.add('open');
         document.getElementById('tdReturnedSheet').classList.add('open');
     };
@@ -1555,6 +1579,8 @@ the photo requirement is shared), plus the destination the driver has to take it
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const fd = new FormData();
         fd.append('status', 'returned_to_shipper');
+        const returnFee = parseFloat(document.getElementById('tdReturnFee').value) || 0;
+        if (returnFee > 0) fd.append('fee_collected', returnFee.toFixed(2));
         fd.append('failure_reason', reasonKey);
         fd.append('failure_notes', notes);
         const selectedBtn = document.querySelector('#tdReturnReasonGrid .td-reason-btn.selected');

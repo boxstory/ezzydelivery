@@ -1,5 +1,5 @@
 {% extends "wf_dashboard_base.html" %}
-{% load static workforce_tags %}
+{% load static workforce_tags custom_filters %}
 {% comment %}
 Purpose: Staff review queue for driver applications — expand a case, approve / review / reject, WhatsApp nudge
 Used by: workforce.views.driver_verification_list at /workforce/driver-verification/
@@ -283,6 +283,7 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                     <div class="dvm__case-col">
                         <span class="dvm__case-head">Driver details</span>
                         <div class="dvm__case-field"><span>License no.</span><strong>{{ driver.driver_license_number|default:"—" }}</strong></div>
+                        <div class="dvm__case-field"><span>Sponsor</span><strong>{{ driver.driver_sponsor|default:"—" }}</strong></div>
                         <div class="dvm__case-field"><span>Languages</span><strong>{{ driver.get_driver_languages_display|default:"—" }}</strong></div>
                         <div class="dvm__case-field"><span>WhatsApp</span><strong>{{ driver.profile.whatsapp|default:"—" }}</strong></div>
                         <div class="dvm__case-field"><span>Nationality</span><strong>{{ driver.profile.nationlity|default:"—" }}</strong></div>
@@ -333,6 +334,16 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                     <a href="{% url 'workforce:driver_detail' driver.driver_id %}" class="uvl__btn uvl__btn--detail">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i> Full profile
                     </a>
+                    {% if driver.reminder_phone %}
+                    <button type="button" class="uvl__btn uvl__btn--wa-chat dvm__wa-btn"
+                            data-wa-phone="{{ driver.reminder_phone|whatsapp_number }}"
+                            data-wa-display="{{ driver.reminder_phone }}"
+                            data-wa-name="{{ driver.profile.first_name|default:'' }}"
+                            data-wa-full="{{ driver.user.get_full_name|default:driver.user.email }}"
+                            title="Write a WhatsApp message to {{ driver.reminder_phone }}">
+                        <i class="fa-brands fa-whatsapp"></i> WhatsApp
+                    </button>
+                    {% endif %}
                     {% if driver.app_incomplete and driver.profile.verification_status != 'verified' %}
                     <button type="button" class="uvl__btn uvl__btn--wa dvm__remind-btn"
                             data-driver-id="{{ driver.driver_id }}"
@@ -489,6 +500,54 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
             <button type="button" class="uvl__btn uvl__btn--review" id="uvlRemindCancelBtn">Cancel</button>
             <button type="button" class="uvl__btn uvl__btn--wa" id="uvlRemindSendBtn" disabled>
                 <i class="fa-brands fa-whatsapp"></i> Send reminder
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ WHATSAPP COMPOSE POPUP ============ -->
+{% comment %}
+Compose-then-open, not send. The reminder modal above POSTs to the backend and is
+logged against the driver; this one hands the finished text to wa.me so the staff
+member sends it from their own WhatsApp. Keeping that distinction visible in the
+wording matters — ops need to know which messages leave a trail on the record.
+{% endcomment %}
+<div class="uvl__modal__overlay" id="uvlWaOverlay">
+    <div class="uvl__modal">
+        <div class="uvl__modal__header uvl__modal__header--wa">
+            <div class="uvl__modal__header-icon"><i class="fa-brands fa-whatsapp"></i></div>
+            <div>
+                <h3 class="uvl__modal__title">Message on WhatsApp</h3>
+                <p class="uvl__modal__subtitle" id="uvlWaWho">—</p>
+            </div>
+            <button type="button" class="uvl__modal__close" id="uvlWaClose"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="uvl__modal__body">
+            <div class="uvl__modal__info">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>Opens WhatsApp with this text ready to send. It is sent from your own
+                      number and is <strong>not</strong> recorded on the driver's file.</span>
+            </div>
+
+            <div class="uvl__modal__field">
+                <label class="uvl__modal__field-label">Quick messages</label>
+                <div class="dvm__wa-presets" id="uvlWaPresets">
+                    <button type="button" class="dvm__wa-preset" data-preset="greeting">Greeting</button>
+                    <button type="button" class="dvm__wa-preset" data-preset="docs">Documents unclear</button>
+                    <button type="button" class="dvm__wa-preset" data-preset="vehicle">Vehicle details</button>
+                    <button type="button" class="dvm__wa-preset" data-preset="call">Ask to call</button>
+                </div>
+            </div>
+
+            <div class="uvl__modal__field">
+                <label class="uvl__modal__field-label" for="uvlWaText">Message</label>
+                <textarea id="uvlWaText" class="dvm__wa-text" rows="5"></textarea>
+            </div>
+        </div>
+        <div class="uvl__modal__footer">
+            <button type="button" class="uvl__btn uvl__btn--review" id="uvlWaCancelBtn">Cancel</button>
+            <button type="button" class="uvl__btn uvl__btn--wa" id="uvlWaOpenBtn">
+                <i class="fa-brands fa-whatsapp"></i> Open WhatsApp
             </button>
         </div>
     </div>
@@ -742,6 +801,81 @@ document.addEventListener('DOMContentLoaded', function() {
             if (btn.disabled) return;
             openRemindModal(btn);
         });
+    });
+
+    /* ---------- WHATSAPP COMPOSE POPUP ---------- */
+    // Compose-then-hand-off. wa.me does the sending, so this only has to get the
+    // text right and open the tab from inside the click that asked for it —
+    // window.open() outside a user gesture is what popup blockers eat.
+    var waOverlay = document.getElementById('uvlWaOverlay');
+    var waText    = document.getElementById('uvlWaText');
+    var waPhone   = null;
+
+    var WA_PRESETS = {
+        greeting: function (name) {
+            return 'Hi' + name + ', this is EzzyDelivery about your driver application. '
+                 + 'Do you have a moment?';
+        },
+        docs: function (name) {
+            return 'Hi' + name + ', this is EzzyDelivery. We are reviewing your driver '
+                 + 'application, but we could not read one of your documents clearly. '
+                 + 'Could you upload a clearer photo? https://ezzydelivery.qa/join_us/driver/';
+        },
+        vehicle: function (name) {
+            return 'Hi' + name + ', this is EzzyDelivery about your driver application. '
+                 + 'Could you confirm the vehicle you will be delivering with, and its '
+                 + 'plate number?';
+        },
+        call: function (name) {
+            return 'Hi' + name + ', this is EzzyDelivery about your driver application. '
+                 + 'When would be a good time to call you today?';
+        }
+    };
+
+    function waName(btn) {
+        // ", Ahmed" reads naturally; a nameless row must not render "Hi ,".
+        var n = (btn.dataset.waName || '').trim();
+        return n ? ' ' + n : '';
+    }
+
+    function openWaModal(btn) {
+        waPhone = btn.dataset.waPhone || '';
+        var display = btn.dataset.waDisplay || waPhone;
+        var full = (btn.dataset.waFull || '').trim();
+
+        document.getElementById('uvlWaWho').textContent =
+            (full ? full + ' · ' : '') + display;
+
+        waText.value = WA_PRESETS.greeting(waName(btn));
+        waText.dataset.name = waName(btn);
+        openModal(waOverlay);
+        waText.focus();
+    }
+
+    document.getElementById('uvlWaClose').addEventListener('click', function () { closeModal(waOverlay); });
+    document.getElementById('uvlWaCancelBtn').addEventListener('click', function () { closeModal(waOverlay); });
+    waOverlay.addEventListener('click', function (e) { if (e.target === waOverlay) closeModal(waOverlay); });
+
+    document.getElementById('uvlWaPresets').addEventListener('click', function (e) {
+        var chip = e.target.closest('.dvm__wa-preset');
+        if (!chip) return;
+        var build = WA_PRESETS[chip.dataset.preset];
+        if (build) waText.value = build(waText.dataset.name || '');
+        waText.focus();
+    });
+
+    document.getElementById('uvlWaOpenBtn').addEventListener('click', function () {
+        if (!waPhone) return;
+        var body = waText.value.trim();
+        window.open(
+            'https://wa.me/' + waPhone + (body ? '?text=' + encodeURIComponent(body) : ''),
+            '_blank', 'noopener'
+        );
+        closeModal(waOverlay);
+    });
+
+    document.querySelectorAll('.dvm__wa-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { openWaModal(btn); });
     });
 
     /* ---------- EVENT DELEGATION ---------- */

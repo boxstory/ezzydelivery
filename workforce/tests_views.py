@@ -1084,11 +1084,6 @@ class WfSellerManagementTest(WorkforceTestMixin, TestCase):
         resp = self.client.get(reverse('workforce:sellers_list'))
         self.assertEqual(resp.status_code, 200)
 
-    def test_sellers_pending_loads(self):
-        """#83: Pending sellers loads"""
-        resp = self.client.get(reverse('workforce:sellers_pending'))
-        self.assertEqual(resp.status_code, 200)
-
     def test_sellers_active_loads(self):
         """#84: Active sellers loads"""
         resp = self.client.get(reverse('workforce:sellers_active'))
@@ -1169,11 +1164,6 @@ class WfDriverManagementTest(WorkforceTestMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         # The roster is active-only, so the hero tally is the approved count.
         self.assertIn('active_count', resp.context)
-
-    def test_drivers_pending_loads(self):
-        """#93: Pending drivers loads"""
-        resp = self.client.get(reverse('workforce:drivers_pending'))
-        self.assertEqual(resp.status_code, 200)
 
     def test_drivers_active_loads(self):
         """#94: Active drivers loads"""
@@ -1589,6 +1579,36 @@ class DeliveryAppControlTests(WorkforceTestMixin, TestCase):
         self.assertEqual(self.business.pod_kind, 'both')
         self.assertTrue(self.business.live_tracking_enabled)
 
+    def test_save_sets_where_collected_goods_go(self):
+        resp = self.client.post(self.save_url, {
+            'business_id': self.business.business_id,
+            'delivered': '0', 'failed': '0', 'kind': 'photo', 'tracking': '0',
+            'collect_dest': 'hub',
+        })
+        self.assertTrue(resp.json()['success'])
+        self.business.refresh_from_db()
+        self.assertEqual(self.business.return_collection_destination, 'hub')
+        # The other return question keeps its own answer.
+        self.assertEqual(self.business.return_destination, 'hub')
+
+    def test_a_payload_without_the_field_leaves_it_alone(self):
+        self.business.return_collection_destination = 'hub'
+        self.business.save(update_fields=['return_collection_destination'])
+        self.client.post(self.save_url, {
+            'business_id': self.business.business_id,
+            'delivered': '1', 'failed': '0', 'kind': 'photo', 'tracking': '0',
+        })
+        self.business.refresh_from_db()
+        self.assertEqual(self.business.return_collection_destination, 'hub')
+
+    def test_an_unknown_destination_is_refused(self):
+        resp = self.client.post(self.save_url, {
+            'business_id': self.business.business_id,
+            'delivered': '0', 'failed': '0', 'kind': 'photo', 'tracking': '0',
+            'collect_dest': 'mars',
+        })
+        self.assertFalse(resp.json()['success'])
+
     def test_save_toggles_live_tracking_on_its_own(self):
         # The tracking switch is independent of the proof rules.
         self.client.post(self.save_url, {
@@ -1673,6 +1693,20 @@ class DeliveryAppControlSaveAllTests(WorkforceTestMixin, TestCase):
     def _row(biz, delivered=False, failed=False, kind='photo', tracking=False):
         return {'business_id': biz.business_id, 'delivered': delivered,
                 'failed': failed, 'kind': kind, 'tracking': tracking}
+
+    def test_bulk_save_carries_the_collection_destination(self):
+        row = self._row(self.a)
+        row['collect_dest'] = 'hub'
+        self.assertTrue(self._post([row]).json()['success'])
+        self.a.refresh_from_db()
+        self.assertEqual(self.a.return_collection_destination, 'hub')
+
+    def test_bulk_save_without_the_field_leaves_it_alone(self):
+        self.a.return_collection_destination = 'hub'
+        self.a.save(update_fields=['return_collection_destination'])
+        self.assertTrue(self._post([self._row(self.a, delivered=True)]).json()['success'])
+        self.a.refresh_from_db()
+        self.assertEqual(self.a.return_collection_destination, 'hub')
 
     def test_saves_several_rows_at_once(self):
         resp = self._post([

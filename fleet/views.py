@@ -61,6 +61,7 @@ from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from core.decorators import driver_required
+from fleet.access import driver_dashboard_required, has_dashboard_access
 from core.exports import set_export_filename, safe_csv_writer
 from core.pagination import paginate, other_params
 
@@ -125,6 +126,7 @@ def fleets(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_dashboard(request):
     """
     Display driver dashboard with wallet statistics.
@@ -507,6 +509,7 @@ def vehicle_update(request, vehicle_id):
 
 # cod_collection ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@driver_dashboard_required
 def cod_collection(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -551,6 +554,9 @@ def cod_collection(request):
             dl_task_status__in=['delivered', 'partial_delivery']
         ).filter(
             Q(cod_collected=True) | Q(order__cod_amount=0)
+            # A cash delivery fee is the driver's to hand back even on a job that
+            # carried no COD, so the row has to be on the manifest to be settled.
+            | Q(fee_collected_amount__gt=0)
         ).select_related('order', 'order__business', 'dl_to_address')
         if date_cutoff:
             cod_in_hand_qs = cod_in_hand_qs.filter(completed_at__gte=date_cutoff)
@@ -558,8 +564,14 @@ def cod_collection(request):
         cod_in_hand_list = cod_in_hand_qs.order_by(sort_field)
 
         # Total reflects real cash only — zero-COD rows sum to 0 so they are excluded.
+        # Cash delivery fees are added on: the driver was handed one figure at the
+        # door and hands one figure back, so this total has to match what
+        # WalletService.live_cod_in_hand() says he is carrying.
         cod_in_hand_total = cod_in_hand_qs.filter(cod_collected=True).aggregate(
             total=Sum('cod_collected_amount')
+        )['total'] or 0
+        cod_in_hand_total += cod_in_hand_qs.aggregate(
+            total=Sum('fee_collected_amount')
         )['total'] or 0
         cod_in_hand_count = cod_in_hand_list.count()
 
@@ -658,6 +670,7 @@ def cod_collection(request):
 # COD Submission ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def cod_submission(request):
     """Handle COD submission - redirects GET to cod_collection, processes POST"""
     try:
@@ -926,6 +939,7 @@ def cod_submission(request):
 # COD Export --------------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def cod_export(request):
     """Export COD in hand report as CSV or PDF, and optionally submit COD settlement"""
     import csv
@@ -1158,6 +1172,7 @@ def cod_export(request):
 # COD Transaction Detail (AJAX) ------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def cod_transaction_detail(request):
     """Return JSON with the delivery tasks linked to a COD transaction"""
     from django.http import JsonResponse
@@ -1248,6 +1263,7 @@ def cod_transaction_detail(request):
 # COD Transaction PDF ------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def cod_transaction_pdf(request):
     """Generate PDF report for a specific COD transaction"""
     from io import BytesIO
@@ -1431,6 +1447,7 @@ def cod_transaction_pdf(request):
 # Earnings View ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def driver_earnings(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -1653,6 +1670,7 @@ def driver_earnings(request):
 # Transaction Detail ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def transaction_detail_page(request, txn_code):
     """Render detail page for a single transaction with related orders"""
     from datetime import timedelta
@@ -1712,6 +1730,7 @@ def transaction_detail_page(request, txn_code):
 # Transaction History ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def transaction_history(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -1763,6 +1782,7 @@ def transaction_history(request):
 # Finance Summary ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_finance_summary(request):
     """Finance overview dashboard for drivers"""
     try:
@@ -1861,6 +1881,7 @@ def fleet_finance_summary(request):
 # Performance & Analytics ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def driver_performance(request):
     """Comprehensive performance dashboard for drivers"""
     try:
@@ -1953,6 +1974,7 @@ def driver_performance(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def driver_reports(request):
     """Generate and download various reports"""
     try:
@@ -2007,6 +2029,7 @@ def driver_reports(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def driver_analytics(request):
     """Advanced analytics and visualizations"""
     try:
@@ -2317,6 +2340,7 @@ def _scan_match_task(code, driver=None):
 
 
 @login_required(login_url='account_login')
+@driver_dashboard_required
 def scan_resolve(request):
     """
     Look up a scanned label and report what this driver can do with it —
@@ -2444,6 +2468,7 @@ def scan_resolve(request):
 
 
 @login_required(login_url='account_login')
+@driver_dashboard_required
 def pickup_scanner(request):
     """
     Display the pickup task scanner page with camera access.
@@ -2479,6 +2504,7 @@ def pickup_scanner(request):
 
 
 @login_required(login_url='account_login')
+@driver_dashboard_required
 def pickup_scan_process(request):
     """
     Process a scanned barcode/QR code for pickup confirmation.
@@ -2826,6 +2852,7 @@ def driver_help(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def driver_tasks(request):
     """
     PWA task list for drivers — replaces delivery:all_delivery_tasks.
@@ -2856,6 +2883,9 @@ def driver_tasks(request):
         # The card reads the booking for a receiver-pays fee; without this every P2P
         # row on the page costs an extra query.
         'order__p2p_booking',
+        # task.route_origin / route_destination walk these. A hub leg collects from
+        # the warehouse, and the address row is the only truth on a return leg.
+        'dl_address_update', 'hub_warehouse', 'hub_warehouse__warehouse',
     ).prefetch_related(
         'assigneddriver_set', 'assigneddriver_set__driver',
         'order__order_items', 'order__order_items__product', 'task_qrcode',
@@ -3091,6 +3121,7 @@ def driver_tasks(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_task_take_scan(request):
     """
     AJAX: Driver takes a task via QR/barcode scan.
@@ -3210,6 +3241,7 @@ def fleet_task_take_scan(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_task_scan_take_any(request):
     """
     AJAX: Driver scans any package label to take that task — no card tapped first.
@@ -3330,6 +3362,7 @@ def fleet_task_scan_take_any(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_assign_driver(request):
     """
     AJAX: Driver self-assigns to a task.
@@ -3342,6 +3375,7 @@ def fleet_assign_driver(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_accept_task(request):
     """
     AJAX: Accept an assigned task (status assigned → accepted).
@@ -3353,6 +3387,7 @@ def fleet_accept_task(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_start_ride(request):
     """
     AJAX: Start ride — update task to out_for_delivery.
@@ -3402,6 +3437,7 @@ def fleet_start_ride(request):
 @login_required(login_url='/accounts/login/')
 @driver_required
 @transaction.atomic
+@driver_dashboard_required
 def fleet_partial_delivery(request, task_id):
     """
     AJAX: Record a partial delivery — driver delivered some items, customer returned others.
@@ -3508,6 +3544,16 @@ def fleet_partial_delivery(request, task_id):
         except Exception:
             pass
 
+    # The partial sheet asks for the same ONE figure as a full delivery (COD +
+    # any delivery fee due at the door). Split it the same way, or the fee is
+    # booked as the client's COD and paid onward to them. See delivery/collect.py.
+    fee_val = Decimal('0')
+    if cod_val > 0:
+        from delivery import collect as delivery_collect
+        cod_part, fee_part = delivery_collect.split_collected(task, cod_val)
+        if fee_part > 0:
+            cod_val, fee_val = cod_part, fee_part
+
     task._status_actor         = 'driver'
     task.dl_task_status        = 'partial_delivery'
     task.completed_at          = timezone.now()
@@ -3520,6 +3566,14 @@ def fleet_partial_delivery(request, task_id):
     if not task.driver_id:
         task.driver_id = driver.pk
         update_fields.append('driver')
+    # Set before the COD block: is_electronic_only() below reads it, so a Fawran
+    # COD with a cash fee is not closed out as if the driver held nothing.
+    if fee_val > 0 and not (task.fee_collected_amount or 0):
+        task.fee_collected_amount = fee_val
+        task.fee_collected_at = timezone.now()
+        update_fields += ['fee_collected_amount', 'fee_collected_at']
+    else:
+        fee_val = Decimal('0')
     if cod_val > 0:
         task.cod_collected        = True
         task.cod_collected_amount = cod_val
@@ -3581,6 +3635,20 @@ def fleet_partial_delivery(request, task_id):
             payment_method=task.payment_method or None,
         )
 
+    if fee_val > 0:
+        from fleet.wallet_service import WalletService
+        WalletService.record_transaction(
+            driver=driver,
+            transaction_type='fee_collection',
+            amount=fee_val,
+            description=f"Delivery fee collected in cash for {order.order_number} (partial delivery)",
+            delivery_task=task,
+            created_by=request.user,
+            payment_method='cash',
+            business=order.business,
+        )
+        WalletService.sync_cod_in_hand(driver)
+
     # Auto-create ReturnRequest for returned items
     returned_order_items = [(item, returned_map[item.id]) for item in all_items if item.id in returned_map]
     if returned_order_items:
@@ -3625,6 +3693,7 @@ def fleet_partial_delivery(request, task_id):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_postpone_task(request):
     """
     AJAX: Postpone (reschedule) a delivery task to a new date.
@@ -3716,6 +3785,7 @@ def fleet_postpone_task(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_task_timeline(request, task_id):
     """
     AJAX: Return status/activity timeline for a delivery task.
@@ -3842,6 +3912,7 @@ def fleet_task_timeline(request, task_id):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_task_navigation(request, task_id):
     """
     Navigation map for a delivery task.
@@ -3912,12 +3983,14 @@ def fleet_task_navigation(request, task_id):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_task_edit_location(request, task_id):
     """Edit delivery location: zone, street, building, and paste Google Maps link."""
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
         task = delivery_models.DeliveryTask.objects.select_related(
-            'order', 'dl_to_address'
+            'order', 'dl_to_address', 'dl_address_update',
+            'hub_warehouse', 'hub_warehouse__warehouse',
         ).get(id=task_id, driver=driver)
     except (fleet_models.Driver.DoesNotExist, delivery_models.DeliveryTask.DoesNotExist):
         messages.error(request, "Task not found.")
@@ -3968,8 +4041,12 @@ def fleet_task_edit_location(request, task_id):
             task.address_accuracy = 'by_driver'
             task.save(update_fields=['address_accuracy'])
 
-        # Also update Order fields
-        order = task.order
+        # Also update Order fields — but only when this leg is actually going to
+        # the customer. On a return leg the driver is correcting the CLIENT's
+        # office; writing that onto the Order would overwrite the buyer's pin and
+        # stamp it 'by_driver', silently corrupting the address of a delivery that
+        # already happened.
+        order = task.order if task.route_destination.is_customer else None
         if order:
             old_lat, old_lng = order.latitude, order.longitude
             old_accuracy = order.coords_accuracy or ''
@@ -4008,6 +4085,7 @@ def fleet_task_edit_location(request, task_id):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_resolve_location(request):
     """AJAX: resolve a Google Maps short link or Plus Code to lat/lng."""
     if request.method != 'POST':
@@ -4068,6 +4146,7 @@ def fleet_resolve_location(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def fleet_tasks_map(request):
     """Full-screen map view showing all active delivery task locations for the driver."""
     from delivery import models as delivery_models
@@ -4091,6 +4170,8 @@ def fleet_tasks_map(request):
     ).select_related(
         'order', 'order__business', 'dl_to_address',
         'order__pickup_location',
+        # Same route resolution the task list does — see driver_tasks.
+        'dl_address_update', 'hub_warehouse', 'hub_warehouse__warehouse',
     ).prefetch_related(
         'order__order_items', 'order__order_items__product',
         'order__address_verifications',
@@ -4122,9 +4203,10 @@ def fleet_tasks_map(request):
     # Build zone number -> name lookup
     zone_numbers = set()
     for t in tasks:
-        if t.order.dl_zone:
+        zone = t.route_destination.zone
+        if zone:
             try:
-                zone_numbers.add(int(t.order.dl_zone))
+                zone_numbers.add(int(zone))
             except (ValueError, TypeError):
                 pass
     zone_name_map = {
@@ -4134,17 +4216,15 @@ def fleet_tasks_map(request):
 
     pins = []
     for t in tasks:
-        lat = None
-        lng = None
-        # Try order-level coords first, then dl_to_address
-        if t.order.latitude and t.order.longitude:
-            lat = float(t.order.latitude)
-            lng = float(t.order.longitude)
-        elif t.dl_to_address and t.dl_to_address.dl_latitude and t.dl_to_address.dl_longitude:
-            lat = float(t.dl_to_address.dl_latitude)
-            lng = float(t.dl_to_address.dl_longitude)
+        # Order coords first, then the address row — except on a leg that is not
+        # going to the customer, where route_destination has already ruled the
+        # order's pin out. Pinning the map by hand here is what put a return leg
+        # on the buyer's house.
+        dest = t.route_destination
+        lat = float(dest.latitude) if dest.latitude else None
+        lng = float(dest.longitude) if dest.longitude else None
 
-        zone_val = t.order.dl_zone or ''
+        zone_val = dest.zone or ''
         try:
             zone_name = zone_name_map.get(int(zone_val), '') if zone_val else ''
         except (ValueError, TypeError):
@@ -4162,10 +4242,10 @@ def fleet_tasks_map(request):
             'customer_phone': t.order.customer_phone or '',
             'zone': zone_val,
             'zone_name': zone_name,
-            'street': t.order.dl_street or '',
-            'building': t.order.dl_building or '',
-            'address': t.order.customer_address or '',
-            'coords_accuracy': t.order.coords_accuracy or '',
+            'street': dest.street or '',
+            'building': dest.building or '',
+            'address': dest.address_text or '',
+            'coords_accuracy': (t.order.coords_accuracy or '') if dest.is_customer else '',
             'lat': lat,
             'lng': lng,
         })
@@ -4200,6 +4280,7 @@ def fleet_tasks_map(request):
 
 @login_required(login_url='/accounts/login/')
 @driver_required
+@driver_dashboard_required
 def upload_delivery_proof(request, task_id):
     """Driver uploads proof of delivery photo."""
     from delivery.models import DeliveryProof
@@ -4482,6 +4563,7 @@ def _get_request_driver(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_dashboard_required
 def driver_pickups(request):
     """
     Pickup tab — the driver's first-mile list, separate from delivery tasks.
@@ -4555,6 +4637,7 @@ def driver_pickups(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_dashboard_required
 def accept_pickup(request):
     """Claim a pickup — atomic, first tap wins. POST: pickup_id."""
     from delivery.models import PickupTask
@@ -4592,6 +4675,7 @@ def accept_pickup(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_dashboard_required
 def pickup_scan_collect(request):
     """
     Scan a package QR/barcode on the Pickup > Mine tab to mark it collected.
@@ -4680,6 +4764,7 @@ def pickup_scan_collect(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_dashboard_required
 def update_pickup_status(request):
     """Forward-only pickup progress. POST: pickup_id, status in {in_progress, arrived, collected}."""
     from delivery.models import PickupTask
@@ -4755,6 +4840,7 @@ def update_pickup_status(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_dashboard_required
 def route_pickup(request):
     """
     Execute the preset disposition after collection.
@@ -4795,6 +4881,7 @@ def route_pickup(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_dashboard_required
 def confirm_pickup_transfer(request):
     """Target driver confirms an incoming hand-off. POST: pickup_id."""
     from delivery.models import PickupTask
@@ -4816,6 +4903,7 @@ def confirm_pickup_transfer(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_dashboard_required
 def pickup_transfer_targets(request):
     """Approved drivers selectable as transfer targets (excludes self). GET ?q= filter."""
     driver = _get_request_driver(request)
@@ -4842,6 +4930,7 @@ def pickup_transfer_targets(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_dashboard_required
 def p2p_mark_fee_collected(request):
     """A driver confirms they took the P2P delivery fee in cash at pickup.
 
@@ -4912,6 +5001,7 @@ def p2p_mark_fee_collected(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_dashboard_required
 def p2p_mark_fee_collected_at_delivery(request):
     """A driver confirms they took the P2P delivery fee in cash at the door.
 
@@ -4980,3 +5070,98 @@ def p2p_mark_fee_collected_at_delivery(request):
 
     return JsonResponse({'success': True, 'fee_status': 'collected_cash',
                          'amount': str(booking.fee_amount)})
+
+
+# =============================================================================
+# DRIVER OPPORTUNITIES
+#
+# The only work-facing surface a verified driver can reach before ops clear them
+# to work, so neither view carries @driver_dashboard_required. The gate in
+# fleet/access.py redirects here, and gating this page would loop.
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def opportunities(request):
+    """Open shifts a driver can put their hand up for, plus the standing offers."""
+    from fleet.opportunities import open_slots_for, interest_for
+    from fleet.proposals import driver_app_proposals
+
+    try:
+        driver = fleet_models.Driver.objects.select_related('user', 'profile').get(
+            user_id=request.user.id
+        )
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, "Driver profile not found. Please create one first.")
+        return redirect('core:main_dashboard')
+
+    slots = open_slots_for(driver)
+    rows = [{'slot': s, 'interest': interest_for(s, driver)} for s in slots]
+
+    # Standing offers marketing publishes (fleet.DriverProposal) — adverts, not
+    # bookings, so they carry no interest row and nothing to accept here.
+    proposals = list(driver_app_proposals())
+
+    # What the driver has already raised a hand for, including slots that have
+    # since filled or closed — they should still be able to see where they stand.
+    my_interests = (
+        fleet_models.DriverOpportunityInterest.objects
+        .filter(driver=driver)
+        .exclude(status='withdrawn')
+        .select_related('slot', 'slot__opportunity')
+        .order_by('slot__starts_at')
+    )
+
+    return render(request, 'fleet/opportunities_pwa.html', {
+        'driver': driver,
+        'rows': rows,
+        'proposals': proposals,
+        'my_interests': my_interests,
+        'has_dashboard_access': has_dashboard_access(driver),
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def opportunity_interest(request):
+    """Raise or withdraw a hand for one slot (POST, JSON)."""
+    from fleet.opportunities import (
+        express_interest, withdraw_interest, REFUSAL_MESSAGES as SLOT_MESSAGES,
+    )
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'}, status=404)
+
+    slot_code = (request.POST.get('slot_code') or '').strip()
+    action = (request.POST.get('action') or 'interested').strip()
+
+    slot = fleet_models.DriverOpportunitySlot.objects.select_related(
+        'opportunity').filter(slot_code=slot_code).first()
+    if not slot:
+        return JsonResponse({'success': False, 'error': 'Shift not found'}, status=404)
+
+    if action == 'withdraw':
+        interest = withdraw_interest(driver, slot)
+        if interest and interest.status == 'confirmed':
+            return JsonResponse({
+                'success': False,
+                'error': 'You are already confirmed for this shift. Contact operations to change it.',
+            }, status=400)
+        return JsonResponse({'success': True, 'status': 'withdrawn'})
+
+    note = (request.POST.get('note') or '')[:300]
+    interest, reason = express_interest(driver, slot, note=note)
+    if reason:
+        return JsonResponse(
+            {'success': False, 'error': SLOT_MESSAGES[reason], 'code': reason}, status=400)
+
+    return JsonResponse({
+        'success': True,
+        'status': interest.status,
+        'places_left': slot.places_left,
+    })

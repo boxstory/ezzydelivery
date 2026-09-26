@@ -101,6 +101,33 @@
 }
 .mpt__key:first-child { margin-left: 0; }
 
+/* Stacked legend — used whenever a point has a time as well as a name: what
+   the point is on the first line, when it was recorded on the second. Reads
+   across as a sequence, which is what a trail or a before/after pair is. */
+.mpt__legend--stacked {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.3rem 1.1rem;
+}
+.mpt__legend__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+    line-height: 1.3;
+}
+.mpt__legend__name {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.mpt__legend--stacked .mpt__key { margin-left: 0; }
+.mpt__legend__time {
+    /* Sits under the label text, clear of the swatch. */
+    padding-left: 0.95rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--brand-grey-500, #777);
+}
+
 /* ── Modal ───────────────────────────────────────────────────────────── */
 /* The map opens over the page rather than inside the row: a table cell is far
    too narrow to judge whether a pin is on the right building. */
@@ -169,6 +196,21 @@
 .mpt__modal-body .mpt__map--sm,
 .mpt__modal-body .mpt__map--lg { height: min(68vh, 32rem); }
 
+/* Footer slot: whatever decision the page wants taken while the map is up.
+   Deliberately unstyled beyond the rule — the borrowed block keeps the skin it
+   has on its own page, so a verdict looks the same in the map as in the list. */
+.mpt__modal-foot {
+    flex: none;
+    border-top: 1px solid var(--brand-grey-300, #d6d9df);
+}
+.mpt__modal-foot > * { margin: 0; }
+.mpt__modal-foot[hidden] { display: none; }
+/* With a footer the card is taller, so the map hands back the difference
+   instead of pushing the buttons off the bottom of a laptop screen. */
+.mpt__modal--acts .mpt__modal-body .mpt__map,
+.mpt__modal--acts .mpt__modal-body .mpt__map--sm,
+.mpt__modal--acts .mpt__modal-body .mpt__map--lg { height: min(52vh, 26rem); }
+
 body.mpt-modal-open { overflow: hidden; }
 
 @media (max-width: 575px) {
@@ -176,6 +218,9 @@ body.mpt-modal-open { overflow: hidden; }
     .mpt__modal-body .mpt__map,
     .mpt__modal-body .mpt__map--sm,
     .mpt__modal-body .mpt__map--lg { height: 60vh; }
+    .mpt__modal--acts .mpt__modal-body .mpt__map,
+    .mpt__modal--acts .mpt__modal-body .mpt__map--sm,
+    .mpt__modal--acts .mpt__modal-body .mpt__map--lg { height: 42vh; }
 }
 
 .mpt__error {

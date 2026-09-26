@@ -247,18 +247,28 @@ function bulkPublishApp(taskIds) {
 // Bulk update status
 function bulkUpdateStatus(taskIds, status) {
     if (confirm('Update status to "' + status.replace('_', ' ') + '" for ' + taskIds.length + ' task(s)?')) {
-        fetch('/workforce/tasks/bulk-update-status/', {
+        var payload = { task_ids: taskIds, status: status };
+        var send = function() { return fetch('/workforce/tasks/bulk-update-status/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCsrfToken()
             },
-            body: JSON.stringify({ task_ids: taskIds, status: status })
+            body: JSON.stringify(payload)
         })
         .then(function(response) { return response.json(); })
         .then(function(data) {
+            // Delivered with money due: confirm the COD + delivery fee, then resend.
+            if (data.needs_confirmation) {
+                if (window.wfConfirmDoorCollection(data)) {
+                    payload.confirm_collection = true;
+                    return send();
+                }
+                showToast('Cancelled — nothing was changed', 'warning');
+                return;
+            }
             if (data.success) {
-                showToast('Status updated successfully', 'success');
+                showToast(data.message || 'Status updated successfully', 'success');
                 location.reload();
             } else {
                 showToast(data.error || data.message || 'Error updating status', 'error');
@@ -267,7 +277,8 @@ function bulkUpdateStatus(taskIds, status) {
         .catch(function(error) {
             showToast('Error updating status', 'error');
             console.error('Error:', error);
-        });
+        }); };
+        send();
     }
 }
 

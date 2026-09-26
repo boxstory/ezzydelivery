@@ -11,28 +11,36 @@ Notes: Include inside the opening <div> tag. Expects `card` (DeliveryTask) and `
     data-business="{{ card.order.business.business_name|default:'' }}"
     data-customer="{% if addr %}{{ addr.full_name|default:card.order.customer_name|default:'' }}{% else %}{{ card.order.customer_name|default:'' }}{% endif %}"
     data-phone="{% if addr %}{{ addr.mobile_no|default:card.order.customer_phone|default:'' }}{% else %}{{ card.order.customer_phone|default:'' }}{% endif %}"
-    data-pickup="{{ card.order.pickup_location.pickup_location_title|default:'' }}"
-    data-pickup-lat="{{ card.order.pickup_location.pickup_lat|default:'' }}"
-    data-pickup-lng="{{ card.order.pickup_location.pickup_lon|default:'' }}"
-    data-zone="{{ card.order.dl_zone|default:'' }}{% if not card.order.dl_zone and addr %}{{ addr.dl_zone|default:'' }}{% endif %}"
-    data-street="{{ card.order.dl_street|default:'' }}{% if not card.order.dl_street and addr %}{{ addr.dl_street|default:'' }}{% endif %}"
-    data-building="{{ card.order.dl_building|default:'' }}{% if not card.order.dl_building and addr %}{{ addr.dl_building|default:'' }}{% endif %}"
-    data-unit="{% if addr %}{{ addr.dl_unit|default:'' }}{% endif %}"
-    data-area="{% if addr %}{{ addr.area_name|default:'' }}{% endif %}"
+    data-pickup="{{ card.route_origin.label|default:'' }}"
+    data-pickup-lat="{{ card.route_origin.latitude|default_if_none:'' }}"
+    data-pickup-lng="{{ card.route_origin.longitude|default_if_none:'' }}"
+    data-zone="{{ card.route_destination.zone|default_if_none:'' }}"
+    data-street="{{ card.route_destination.street|default_if_none:'' }}"
+    data-building="{{ card.route_destination.building|default_if_none:'' }}"
+    data-unit="{{ card.route_destination.unit|default_if_none:'' }}"
+    data-area="{{ card.route_destination.area|default_if_none:'' }}"
     data-ptype="{% if addr %}{% if addr.is_villa_compound %}Villa{% elif addr.is_flat %}Apartment{% elif addr.is_office %}Office{% endif %}{% endif %}"
     data-timeslot="{% if addr %}{{ addr.time_slot|default:'' }}{% endif %}"
-    data-cod="{{ card.order.cod_amount|default_if_none:'' }}"
+    {% comment %}The ONE figure the driver is asked for: the customer's COD plus any
+    delivery fee settled in cash at this door. The driver never splits it — the server
+    does, in delivery/collect.py, so our fee is not paid onward to the client.{% endcomment %}
+    data-cod="{{ card.collect_amount.total|default_if_none:'' }}"
+    {% comment %}This job's delivery charge. The return sheet prefills the cash prompt
+    with it, because on a return the customer pays for the trip that was made.{% endcomment %}
+    data-charge="{{ card.billable_charge|default_if_none:'' }}"
     data-items="{{ card.order.order_items.count }}"
     data-product-desc="{{ card.order.package_description|default:'' }}"
     data-product-qty="{{ card.order.package_qty|default:'' }}"
     data-earn="{{ card.driver_earnings|default:'' }}"
     data-notes="{{ card.order.order_notes|default:'' }}"
     data-office-note="{{ card.driver_note|default:'' }}"
-    data-address="{{ card.order.customer_address|default:'' }}"
+    data-address="{{ card.route_destination.address_text|default:'' }}"
     data-tasknum="{{ card.dl_task_number|default:'' }}"
-    data-lat="{{ card.order.latitude|default:'' }}{% if not card.order.latitude and addr %}{{ addr.dl_latitude|default:'' }}{% endif %}"
-    data-lng="{{ card.order.longitude|default:'' }}{% if not card.order.longitude and addr %}{{ addr.dl_longitude|default:'' }}{% endif %}"
-    data-coords-accuracy="{{ card.order.coords_accuracy|default:'' }}"
+    data-lat="{{ card.route_destination.latitude|default_if_none:'' }}"
+    data-lng="{{ card.route_destination.longitude|default_if_none:'' }}"
+    {% comment %}The pin-accuracy badge grades the CUSTOMER's pin. A return leg
+    is not going to the customer, so the grade describes the wrong place.{% endcomment %}
+    data-coords-accuracy="{% if card.route_destination.is_customer %}{{ card.order.coords_accuracy|default:'' }}{% endif %}"
     data-order-id="{{ card.order.id }}"
     {% comment %}Still in the pool and claimable — the sheet turns this into a Take button. The server re-checks the same rule in fleet_task_take_scan.{% endcomment %}
     data-takeable="{% if not card.driver_id and card.dl_task_publish %}1{% else %}0{% endif %}"
@@ -52,4 +60,4 @@ Notes: Include inside the opening <div> tag. Expects `card` (DeliveryTask) and `
     warehouse links per task, which would be an N+1 across a 30-card list. The exact hub
     is staff's problem on the returns console; the driver only needs hub vs merchant.{% endcomment %}
     data-return-dest="{{ card.order.business.get_return_destination_display|default:'' }}"
-    data-verify-url="{% with av=card.order.address_verifications.first %}{% with phone=addr.mobile_no|default:card.order.customer_phone|default:'' %}{% if av and av.verification_token and phone %}{{ request.scheme }}://{{ request.get_host }}{% url 'verify_location_short' phone|cut:'/' av.verification_token %}{% endif %}{% endwith %}{% endwith %}"
+    data-verify-url="{% if card.route_destination.is_customer %}{% with av=card.order.address_verifications.first %}{% with phone=addr.mobile_no|default:card.order.customer_phone|default:'' %}{% if av and av.verification_token and phone %}{{ request.scheme }}://{{ request.get_host }}{% url 'verify_location_short' phone|cut:'/' av.verification_token %}{% endif %}{% endwith %}{% endwith %}{% endif %}"

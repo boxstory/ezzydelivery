@@ -1,0 +1,6 @@
+{% comment %}
+Purpose: The method(s) one collected figure came in by, inline after the amount — "· Cash".
+Used by: workforce/parts/delivery_task_detail.html, workforce/order_detail.html (COD and fee rows).
+Notes: A mixed hand-over lists each part — "· Cash 600.00 + Fawran 25.00".
+{% endcomment %}
+{% if rows %}<span class="dtd__field__method text-body-secondary fw-normal">·{% for method, amount in rows %}{% if not forloop.first %} +{% endif %} {% if method == 'fawran' %}Fawran{% elif method == 'pos' %}POS{% elif method == 'card' %}Card{% else %}Cash{% endif %}{% if rows|length > 1 %} {{ amount|floatformat:2 }}{% endif %}{% endfor %}</span>{% endif %}

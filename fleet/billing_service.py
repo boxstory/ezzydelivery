@@ -1,7 +1,8 @@
 # Purpose: The receivable leg — bill a business for delivery charges, take payment, void.
 # Used by: the Charges to Collect console, the charge invoice screens (staff + seller) and their actions.
-# Notes: A task's fee is recovered EITHER by withholding it from a COD payout (settled_delivery_charge)
-#        OR by a charge invoice (charge_invoice) — never both. billable_tasks() is the single gate.
+# Notes: A task's fee is recovered by exactly ONE of: withholding it from a COD payout
+#        (settled_delivery_charge), a charge invoice (charge_invoice), or the driver taking it in
+#        cash at the door (fee_collected_amount) — never two. billable_tasks() is the single gate.
 
 from decimal import Decimal
 
@@ -21,7 +22,12 @@ from fleet.wallet_service import WalletService
 
 # A completed job is billable whether the customer paid COD or prepaid — the
 # fee is earned either way. Same statuses the driver and payout legs use.
-BILLABLE_STATUSES = ['delivered', 'partial_delivery']
+#
+# 'returned_to_shipper' is a completed job too: the driver made the full trip
+# and the parcel came back through us. The client is billed the delivery charge
+# for it exactly as for a drop, and the driver is paid for it on the same rule.
+# It is NOT the same as 'failed', which stays retryable and never opens a return.
+BILLABLE_STATUSES = ['delivered', 'partial_delivery', 'returned_to_shipper']
 
 VALID_KINDS = {k for k, _ in BusinessChargeInvoiceLine.KIND_CHOICES}
 KIND_NAMES = dict(BusinessChargeInvoiceLine.KIND_CHOICES)
@@ -50,6 +56,10 @@ def billable_tasks(business_id=None, date_from=None, date_to=None,
         dl_task_status__in=BILLABLE_STATUSES,
         charge_invoice__isnull=True,
         settled_delivery_charge__isnull=True,
+        # The third way a fee can already be recovered: the driver took it in cash
+        # at the door. Invoicing it as well would bill a customer's payment to the
+        # client — the same "never both" rule as the two exclusions around it.
+        fee_collected_amount=0,
     ).exclude(
         cod_client_settle_txn__payout_deductions__kind='delivery_charge'
     ).annotate(fee=BILLABLE_CHARGE).filter(fee__gt=0)
@@ -95,6 +105,16 @@ def _clean_extras(extras):
             'amount': amount,
         })
     return lines
+
+
+def _invoice_line_label(task):
+    """What one billed job is called on the client's invoice."""
+    order = getattr(task, 'order', None)
+    ref = (getattr(order, 'order_number', '') or task.dl_task_number
+           or str(task.id))
+    if task.dl_task_status == 'returned_to_shipper':
+        return f"Returned delivery {ref}"
+    return f"Delivery {ref}"
 
 
 @transaction.atomic
@@ -174,10 +194,10 @@ def issue_charge_invoice(business, task_ids=None, extras=None, created_by=None,
             delivery_task=t,
             charge_txn=delivery_txn,
             kind='delivery_charge',
-            label=(
-                f"Delivery {t.order.order_number}" if t.order and t.order.order_number
-                else f"Delivery {t.dl_task_number or t.id}"
-            )[:120],
+            # A returned parcel is billed at the delivery rate but it was not a
+            # delivery, and the client reads this line on their invoice. Saying
+            # "Delivery" for a parcel they got back is how a charge gets disputed.
+            label=_invoice_line_label(t)[:120],
             amount=Decimal(str(t.fee)),
         )
         for t in locked

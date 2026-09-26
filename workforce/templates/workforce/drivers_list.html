@@ -118,6 +118,14 @@ Notes: Filters swap #main-content over HTMX and push the URL; the roster shows a
                     </label>
                     {% include "workforce/parts/components/_multiselect_filter.html" with field_name="crm_stage" label="CRM Stage" icon="diagram-project" choices=crm_stage_choices selected=selected_crm_stages all_text="All CRM Stages" %}
                 </div>
+                {# Third status axis: cleared to work. "Approved but not yet on the road"
+                   is a real cohort that no driver_status value expresses. #}
+                <div class="drl__filter-group">
+                    <label class="drl__filter-label">
+                        <i class="fa-solid fa-id-badge"></i> Dashboard Access
+                    </label>
+                    {% include "workforce/parts/components/_multiselect_filter.html" with field_name="access" label="Dashboard Access" icon="id-badge" choices=access_choices selected=selected_access all_text="Any Access" %}
+                </div>
                 <div class="drl__filter-group">
                     <label for="sortSelect" class="drl__filter-label">
                         <i class="fa-solid fa-arrow-down-wide-short"></i> Sort by
@@ -213,6 +221,11 @@ Notes: Filters swap #main-content over HTMX and push the URL; the roster shows a
                                 {{ driver.driver_status }}
                             </span>
                             {% include "workforce/parts/components/_driver_crm_stage.html" %}
+                            {% if driver.driver_status == 'approved' and not driver.dashboard_access_enabled %}
+                            <div class="drl__no-access" title="Verified, but ops have not cleared this driver to work">
+                                <i class="fa-solid fa-lock"></i> No app access
+                            </div>
+                            {% endif %}
                         </td>
                         <td>
                             <span class="dra__avail-badge dra__avail-badge--{{ driver.driver_availability }}">

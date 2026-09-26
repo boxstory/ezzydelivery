@@ -39,31 +39,57 @@
   <div class="wfnote wfnote--inset" id="warehouse_transaction_list_card_notes"
        data-wfnote-src="{% url 'workforce:page_notes' 'warehouse_transaction_list_card_notes' %}" hidden></div>
 
-  <!-- Filter -->
+  <!-- Filter & Search -->
   <div class="wh__filter-bar">
     <form method="GET" class="wh__filter-form">
+      <div class="wh__filter-group wh__filter-group--lg">
+        <label class="wh__filter-label" for="search">Search</label>
+        <input type="text" class="wh__filter-input" id="search" name="search" value="{{ search }}"
+               placeholder="Txn #, reference, product, SKU, bin, notes...">
+      </div>
+      <div class="wh__filter-group">
+        <label class="wh__filter-label" for="date_from">From</label>
+        <input type="date" class="wh__filter-input" id="date_from" name="date_from" value="{{ date_from }}">
+      </div>
+      <div class="wh__filter-group">
+        <label class="wh__filter-label" for="date_to">To</label>
+        <input type="date" class="wh__filter-input" id="date_to" name="date_to" value="{{ date_to }}">
+      </div>
       <div class="wh__filter-group">
         <label class="wh__filter-label">Transaction Type</label>
-        <select name="type" id="type" class="wh__filter-select">
-          <option value="">All Types</option>
-          {% for type_val, type_label in transaction_types %}
-          <option value="{{ type_val }}" {% if selected_type == type_val %}selected{% endif %}>{{ type_label }}</option>
-          {% endfor %}
-        </select>
+        {% include "workforce/parts/components/_multiselect_filter.html" with field_name="type" label="Transaction Type" icon="exchange-alt" choices=transaction_types selected=selected_types all_text="All Types" %}
       </div>
       <div class="wh__filter-group">
         <label class="wh__filter-label">Warehouse</label>
-        <select name="warehouse" id="warehouse" class="wh__filter-select">
-          <option value="">All Warehouses</option>
-          {% for wh in warehouses %}
-          <option value="{{ wh.id }}" {% if selected_warehouse == wh.id|stringformat:'s' %}selected{% endif %}>{{ wh.name }}</option>
-          {% endfor %}
-        </select>
+        {% include "workforce/parts/components/_multiselect_filter.html" with field_name="warehouse" label="Warehouse" icon="warehouse" choices=warehouse_choices selected=selected_warehouses all_text="All Warehouses" %}
       </div>
-      <div class="wh__filter-group--sm">
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Direction</label>
+        {% include "workforce/parts/components/_multiselect_filter.html" with field_name="direction" label="Direction" icon="arrow-right-arrow-left" choices=direction_choices selected=selected_directions all_text="In &amp; Out" %}
+      </div>
+      {% if ref_choices %}
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Source</label>
+        {% include "workforce/parts/components/_multiselect_filter.html" with field_name="ref" label="Source" icon="link" choices=ref_choices selected=selected_refs all_text="All Sources" %}
+      </div>
+      {% endif %}
+      {% if is_staff and business_choices %}
+      <div class="wh__filter-group wh__filter-group--wide">
+        <label class="wh__filter-label">Business</label>
+        {% include "workforce/parts/components/_multiselect_filter.html" with field_name="business" label="Business" icon="store" choices=business_choices selected=selected_businesses all_text="All Businesses" %}
+      </div>
+      {% endif %}
+      <input type="hidden" name="per_page" value="{{ per_page }}">
+      <div class="wh__filter-group--sm d-flex align-items-center gap-2">
         <button type="submit" class="wh__filter-btn">
           <i class="fas fa-filter"></i> Filter
+          {% if active_filters %}<span class="wh__count-badge wh__count-badge--inline">{{ active_filters }}</span>{% endif %}
         </button>
+        {% if active_filters %}
+        <a href="{% url 'warehouse:transaction_list' %}" class="wh__filter-reset">
+          <i class="fas fa-xmark"></i> Reset
+        </a>
+        {% endif %}
       </div>
     </form>
   </div>
@@ -75,7 +101,11 @@
         <i class="fas fa-list"></i>
         <span>Transaction History</span>
       </div>
-      <span class="wh__count-badge">{{ transactions.paginator.count|default:0 }} transactions</span>
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <span class="wh__tally">In <strong class="wh__amount--positive">+{{ total_in }}</strong></span>
+        <span class="wh__tally">Out <strong class="wh__amount--negative">-{{ total_out }}</strong></span>
+        <span class="wh__count-badge">{{ transactions.paginator.count|default:0 }} transactions</span>
+      </div>
     </div>
     <div class="wh__table-wrap">
       <table class="wh__table">
@@ -110,6 +140,9 @@
             <td class="wh__td">
               <span class="wh__product-name wh__product-name--clamp2" title="{{ txn.product.item_name }}">{{ txn.product.item_name|truncatechars:80 }}</span>
               <div class="wh__meta">SKU: {{ txn.product.item_sku|default:"-" }}</div>
+              {% if is_staff and txn.product.business %}
+              <div class="wh__meta">{{ txn.product.business.business_code|default:txn.product.business.business_name }}</div>
+              {% endif %}
             </td>
             <td class="wh__td">
               <span class="wh__muted">{{ txn.warehouse.name }}</span>

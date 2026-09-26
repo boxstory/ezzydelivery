@@ -5,9 +5,14 @@ Notes: Include as the first children of the .task-card div. Expects `card` (Deli
 {% endcomment %}
 <script type="application/json" class="task-products-data">{% spaceless %}[{% for item in card.order.order_items.all %}{"name":"{{ item.display_name|escapejs }}","brand":"{% if item.product %}{{ item.product.brand_name|default:''|escapejs }}{% endif %}","sku":"{% if item.product %}{{ item.product.item_sku|default:''|escapejs }}{% endif %}","qty":{{ item.quantity }}{% if item.unit_price %},"price":"{{ item.unit_price }}"{% endif %}{% if item.product and item.notes %},"note":"{{ item.notes|escapejs }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]{% endspaceless %}
 </script>
-{% with av=card.order.address_verifications.first %}
+{% with av=card.order.address_verifications.first dest=card.route_destination %}
+{% comment %}The detail sheet prefers the "order_*" keys below over the card's data-*
+attributes, so they are the ones that actually drive the plate and the Waze/Maps links.
+They carry route_destination, not the raw Order, because on a leg that is not going to
+the customer the Order still describes the buyer — see delivery/selectors.py. For a
+customer leg the two are identical, so the raw fields stay as they were.{% endcomment %}
 <script type="application/json" class="task-address-data">{% spaceless %}{
-  {% if av %}
+  {% if av and dest.is_customer %}
   "result":"{{ av.verification_result }}",
   "verified_address":"{{ av.verified_address|default:''|escapejs }}",
   "zone":"{{ av.zone_number|default:'' }}",
@@ -23,6 +28,7 @@ Notes: Include as the first children of the .task-card div. Expects `card` (Deli
   "dl_lat":"{% if addr %}{{ addr.dl_latitude|default:'' }}{% endif %}",
   "dl_lng":"{% if addr %}{{ addr.dl_longitude|default:'' }}{% endif %}",
   "dl_pluscode":"{% if addr %}{{ addr.dl_pluscode|default:''|escapejs }}{% endif %}",
+  {% if dest.is_customer %}
   "order_lat":"{{ card.order.latitude|default:'' }}",
   "order_lng":"{{ card.order.longitude|default:'' }}",
   "order_zone":"{{ card.order.dl_zone|default:'' }}",
@@ -30,6 +36,17 @@ Notes: Include as the first children of the .task-card div. Expects `card` (Deli
   "order_building":"{{ card.order.dl_building|default:'' }}",
   "coords_accuracy":"{{ card.order.coords_accuracy|default:'' }}",
   "qnas_status":"{{ card.order.qnas_status|default:'' }}"
+  {% else %}
+  {% comment %}Accuracy and QNAS both grade the CUSTOMER's pin, so they say nothing
+  about this drop-off and are left blank rather than shown against the wrong place.{% endcomment %}
+  "order_lat":"{{ dest.latitude|default_if_none:'' }}",
+  "order_lng":"{{ dest.longitude|default_if_none:'' }}",
+  "order_zone":"{{ dest.zone|default_if_none:'' }}",
+  "order_street":"{{ dest.street|default_if_none:'' }}",
+  "order_building":"{{ dest.building|default_if_none:'' }}",
+  "coords_accuracy":"",
+  "qnas_status":""
+  {% endif %}
 }{% endspaceless %}
 </script>
 <script type="application/json" class="task-items-data">[{% for item in card.order.order_items.all %}{"id":{{ item.id }},"name":"{{ item.display_name|escapejs }}","qty":{{ item.quantity }}}{% if not forloop.last %},{% endif %}{% endfor %}]</script>

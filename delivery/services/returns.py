@@ -205,6 +205,50 @@ def resolve_return_destination(task):
     return ReturnDestination(DEST_HUB, hub_location, None, source, fallback_reason)
 
 
+def resolve_collection_destination(task):
+    """Where goods COLLECTED BACK from a customer are taken. Never raises.
+
+    The sibling of resolve_return_destination, and deliberately a separate
+    function reading a separate field: that one answers "we failed to deliver
+    this, where does it go" and every client sits on its 'hub' default. A
+    collection is the opposite journey — the customer is handing goods back — and
+    defaults to the client's own counter, so reusing the other field would have
+    re-routed every failed delivery the day collections started honouring it.
+
+    Same precedence shape: the client's preference, then a usable pickup
+    location, then the hub with the reason recorded. Returns a ReturnDestination.
+    """
+    business = _business_for(task)
+    order = getattr(task, 'order', None)
+
+    preference = getattr(business, 'return_collection_destination',
+                         DEST_BUSINESS) or DEST_BUSINESS
+
+    if preference == DEST_BUSINESS:
+        if order is not None:
+            location = _usable_pickup_location(order)
+            if location is not None:
+                return _business(location, 'business.return_collection_destination')
+
+        hub_location, source = resolve_hub_for_task(task)
+        raw = getattr(order, 'pickup_location', None) if order is not None else None
+        if raw is None:
+            reason = 'collection configured for the client but the order has no pickup location'
+        elif raw.is_fulfilment_center:
+            reason = 'pickup location is a fulfilment centre — routed to hub instead'
+        else:
+            reason = f'pickup location is {raw.pickup_status} — cannot receive collections'
+        logger.info(
+            "Collection destination fell back to hub for task %s: %s",
+            getattr(task, 'pk', '?'), reason,
+        )
+        return ReturnDestination(DEST_HUB, hub_location, None, source, reason)
+
+    hub_location, source = resolve_hub_for_task(task)
+    fallback_reason = '' if hub_location is not None else 'no warehouse location resolvable'
+    return ReturnDestination(DEST_HUB, hub_location, None, source, fallback_reason)
+
+
 def log_custody_history(custody, old_status, new_status, actor=None, notes=''):
     """
     Append a custody transition to OrderStatusHistory. Mirrors
@@ -290,7 +334,13 @@ def open_custody_for_task(task, actor=None, notes='', return_request=None):
     if existing is not None:
         return existing, False
 
-    destination = resolve_return_destination(task)
+    # A collection is going the other way — goods the customer is handing back —
+    # and reads its own preference. Chosen here so no caller has to know which
+    # resolver a leg wants.
+    if getattr(task, 'task_leg', None) == COLLECT_LEG:
+        destination = resolve_collection_destination(task)
+    else:
+        destination = resolve_return_destination(task)
     order = task.order
     opened_status = CUSTODY_WITH_DRIVER if task.driver_id else CUSTODY_DISPUTED
     if not task.driver_id:
@@ -404,6 +454,19 @@ def open_return_for_task(task, *, actor=None, reason='other', reason_notes='',
                 ['the status change did not stick — nothing was returned'],
             )
 
+        # A collection that comes back undelivered is NOT a new return. Opening one
+        # would raise a claim against the collection order itself — a return of a
+        # return, which the console can then send another driver to collect, and so
+        # on. The goods simply never left the customer; the original claim is still
+        # the open one, and staff re-schedule from there.
+        from delivery.selectors import COLLECT_LEG
+        if task.task_leg == COLLECT_LEG:
+            return ReturnOutcome(
+                None, False, None, False, ZERO,
+                ['a return pickup that failed is not a new return — '
+                 're-schedule the collection on the original claim'],
+            )
+
         # Idempotency. A double-submit must not open two RMAs or refund twice.
         existing = ParcelCustody.objects.filter(
             task=task, status__in=CUSTODY_OPEN_STATES,
@@ -506,6 +569,11 @@ def open_return_for_task(task, *, actor=None, reason='other', reason_notes='',
 # The task_leg that carries a parcel from a hub shelf back to the client. Must
 # match DeliveryTask.TASK_LEG_CHOICES; delivery/earnings.py prices it.
 RETURN_LEG = 'return_to_client'
+
+# The leg that collects goods back off a customer. A literal rather than an import
+# from delivery.selectors: business/models.py imports this module at module level
+# precisely because it pulls in no models of its own, and selectors would break that.
+COLLECT_LEG = 'collect_from_customer'
 
 # Appended to the originating task's number, with no dash on purpose: the list
 # ordering in delivery/ordering.py strips everything up to the LAST dash, so
@@ -641,9 +709,13 @@ def forward_to_client(custody, *, actor=None, pickup_location=None, notes=''):
             # Published on creation: the whole point is that any driver can take
             # it. Staff can still unpublish it from the task page.
             dl_task_publish=True,
-            # Nothing is owed on the way back. The COD on the original leg was
-            # already reversed by open_return_for_task.
-            dl_price=0,
+            # No COD on the way back — that was reversed by open_return_for_task.
+            # The DELIVERY CHARGE is a different question: a run raised on a later
+            # day is a second trip on a second date, so it is its own billable job
+            # at the outward rate. Raised the same day it is part of the trip the
+            # client is already being charged for, and billing it again would
+            # charge one journey twice.
+            dl_price=_return_leg_charge(origin_task),
         )
 
         forward = ParcelCustody.objects.create(
@@ -672,6 +744,23 @@ def forward_to_client(custody, *, actor=None, pickup_location=None, notes=''):
         task_number, custody.pk, order.order_number, forward.destination_label,
     )
     return ForwardOutcome(forward, task, '')
+
+
+def _return_leg_charge(origin_task):
+    """What the run back out to the client bills, in QAR.
+
+    Zero on the day of the outward trip — the client is already paying for that
+    journey — and the outward rate on any later day, because the parcel then
+    costs us a second driver and a second trip. A verified charge on the outward
+    leg wins over its raw price, the same way every other reader resolves it.
+    """
+    from django.utils import timezone
+    from delivery.charges import billable_charge
+
+    outward_date = getattr(origin_task, 'dl_task_date', None)
+    if outward_date and outward_date == timezone.localdate():
+        return 0
+    return billable_charge(origin_task)
 
 
 def sync_return_leg_custody(task, actor=None):
@@ -729,4 +818,62 @@ def sync_return_leg_custody(task, actor=None):
         logger.warning(
             "Return-leg custody sync failed for task %s: %s",
             getattr(task, 'pk', '?'), e)
+        return None
+
+
+def sync_collection_custody(task, actor=None):
+    """Keep a collection's custody row in step with its task.
+
+    Called from delivery.signals on every save of a `collect_from_customer` task.
+    The driver picking the goods up off the customer IS the custody opening, and
+    his drop-off IS the hand-over — staff should never have to repeat either.
+
+    Mapping, and why:
+      picked up / on the road → with_driver (he has the customer's goods)
+      delivered               → received    (the hub or the client signed for them)
+
+    A collection routed to a hub therefore lands as received/hub, which is exactly
+    what the console's forward queue looks for — so the run back out to the client
+    is raised by the same button that handles every other parcel on our shelf.
+    Never raises: a bookkeeping failure must not roll back the driver.
+    """
+    from delivery.models import ParcelCustody
+
+    if getattr(task, 'task_leg', None) != COLLECT_LEG:
+        return None
+
+    try:
+        status = task.dl_task_status
+
+        # Nothing is in anyone's hands until the driver has collected.
+        if status in ('pending', 'for_review', 'assigned', 'accepted'):
+            return None
+
+        custody = ParcelCustody.objects.filter(
+            task=task, status__in=CUSTODY_OPEN_STATES).first()
+        if custody is None:
+            if status in ('cancelled', 'rejected', 'failed', 'returned_to_shipper'):
+                # He never got them — there is nothing to track.
+                return None
+            custody, _ = open_custody_for_task(
+                task, actor=actor, notes='opened by the collection leg')
+
+        if status == 'delivered':
+            target = CUSTODY_RECEIVED
+        elif status in ('failed', 'returned_to_shipper', 'cancelled', 'rejected'):
+            # He has them and the drop-off did not happen; he is still liable.
+            target = CUSTODY_WITH_DRIVER
+        else:
+            target = CUSTODY_WITH_DRIVER
+
+        if custody.driver_id != task.driver_id:
+            custody.driver_id = task.driver_id
+            custody.save(update_fields=['driver', 'updated_at'])
+
+        if custody.status != target:
+            set_custody_status(custody, target, actor=actor,
+                               notes=f'collection task is {status}')
+        return custody
+    except Exception as e:
+        logger.warning("Collection custody sync failed for task %s: %s", task.pk, e)
         return None

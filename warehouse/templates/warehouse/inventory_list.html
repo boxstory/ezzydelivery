@@ -206,26 +206,46 @@
 
     <div class="wh__table-wrap">
       <table class="wh__table">
+        {% comment %}
+        Fifteen columns did not fit a laptop without a sideways scroll, so related
+        facts are stacked two-deep inside one cell instead: identity, codes, origin,
+        stock and money. Nothing was dropped — every field and every sort control
+        that had its own column is still here, the merged headers just carry two
+        sort buttons apiece.
+        {% endcomment %}
         <thead>
           <tr>
             {% if is_staff %}
             <th class="wh__th whsel__col"><input type="checkbox" id="warehouse_inventory_check_all" title="Select all on this page" aria-label="Select all rows on this page"></th>
             {% endif %}
-            <th class="wh__th">Image</th>
-            <th class="wh__th wh__th--sortable {% if sort_field == 'name' %}wh__th--sorted{% endif %}" data-sort="name">Product Details<i class="fas fa-sort{% if sort_field == 'name' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
-            <th class="wh__th wh__th--sortable {% if sort_field == 'brand' %}wh__th--sorted{% endif %}" data-sort="brand">Brand<i class="fas fa-sort{% if sort_field == 'brand' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
-            <th class="wh__th wh__th--sortable {% if sort_field == 'sku' %}wh__th--sorted{% endif %}" data-sort="sku">SKU / Barcode<i class="fas fa-sort{% if sort_field == 'sku' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
-            <th class="wh__th wh__th--sortable {% if sort_field == 'category' %}wh__th--sorted{% endif %}" data-sort="category">Category<i class="fas fa-sort{% if sort_field == 'category' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
-            {% comment %}Sorting by variant group puts a product's siblings next to each other, which is what you want before printing a set of labels.{% endcomment %}
-            <th class="wh__th wh__th--sortable {% if sort_field == 'variant' %}wh__th--sorted{% endif %}" data-sort="variant">Variant<i class="fas fa-sort{% if sort_field == 'variant' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
-            <th class="wh__th wh__th--sortable {% if sort_field == 'warehouse' %}wh__th--sorted{% endif %}" data-sort="warehouse">Warehouse<i class="fas fa-sort{% if sort_field == 'warehouse' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
-            <th class="wh__th wh__th--sortable {% if sort_field == 'location' %}wh__th--sorted{% endif %}" data-sort="location">Location<i class="fas fa-sort{% if sort_field == 'location' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
-            <th class="wh__th wh__th--center wh__th--sortable {% if sort_field == 'price' %}wh__th--sorted{% endif %}" data-sort="price">Price<i class="fas fa-sort{% if sort_field == 'price' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
-            <th class="wh__th wh__th--center wh__th--sortable {% if sort_field == 'on_hand' %}wh__th--sorted{% endif %}" data-sort="on_hand">On Hand<i class="fas fa-sort{% if sort_field == 'on_hand' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
-            <th class="wh__th wh__th--center wh__th--sortable {% if sort_field == 'reserved' %}wh__th--sorted{% endif %}" data-sort="reserved">Reserved<i class="fas fa-sort{% if sort_field == 'reserved' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
-            <th class="wh__th wh__th--center">Available</th>
-            <th class="wh__th wh__th--center">Value</th>
-            <th class="wh__th wh__th--center">Actions</th>
+            <th class="wh__th">
+              <span class="d-inline-flex flex-column align-items-start gap-1">
+                <button type="button" class="wh__sort {% if sort_field == 'name' %}wh__sort--on{% endif %}" data-sort="name">Product<i class="fas fa-sort{% if sort_field == 'name' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></button>
+                {% comment %}Sorting by variant group puts a product's siblings next to each other, which is what you want before printing a set of labels.{% endcomment %}
+                <button type="button" class="wh__sort {% if sort_field == 'variant' %}wh__sort--on{% endif %}" data-sort="variant">Variant<i class="fas fa-sort{% if sort_field == 'variant' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></button>
+              </span>
+            </th>
+            <th class="wh__th wh__th--codes wh__th--sortable {% if sort_field == 'sku' %}wh__th--sorted{% endif %}" data-sort="sku">SKU / Barcode<i class="fas fa-sort{% if sort_field == 'sku' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            <th class="wh__th">
+              <span class="d-inline-flex flex-column align-items-start gap-1">
+                <button type="button" class="wh__sort {% if sort_field == 'brand' %}wh__sort--on{% endif %}" data-sort="brand">Brand<i class="fas fa-sort{% if sort_field == 'brand' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></button>
+                <button type="button" class="wh__sort {% if sort_field == 'category' %}wh__sort--on{% endif %}" data-sort="category">Category<i class="fas fa-sort{% if sort_field == 'category' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></button>
+              </span>
+            </th>
+            <th class="wh__th">
+              <span class="d-inline-flex flex-column align-items-start gap-1">
+                <button type="button" class="wh__sort {% if sort_field == 'warehouse' %}wh__sort--on{% endif %}" data-sort="warehouse">Warehouse<i class="fas fa-sort{% if sort_field == 'warehouse' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></button>
+                <button type="button" class="wh__sort {% if sort_field == 'location' %}wh__sort--on{% endif %}" data-sort="location">Location<i class="fas fa-sort{% if sort_field == 'location' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></button>
+              </span>
+            </th>
+            <th class="wh__th wh__th--center">
+              <span class="d-inline-flex flex-column align-items-center gap-1">
+                <button type="button" class="wh__sort {% if sort_field == 'on_hand' %}wh__sort--on{% endif %}" data-sort="on_hand">On Hand<i class="fas fa-sort{% if sort_field == 'on_hand' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></button>
+                <button type="button" class="wh__sort {% if sort_field == 'reserved' %}wh__sort--on{% endif %}" data-sort="reserved">Res / Avail<i class="fas fa-sort{% if sort_field == 'reserved' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></button>
+              </span>
+            </th>
+            <th class="wh__th wh__th--center wh__th--sortable {% if sort_field == 'price' %}wh__th--sorted{% endif %}" data-sort="price">Price / Value<i class="fas fa-sort{% if sort_field == 'price' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %} wh__sort-icon"></i></th>
+            <th class="wh__th wh__th--center wh__th--actions">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -239,50 +259,69 @@
                      aria-label="Select {{ stock.product.item_name }}">
             </td>
             {% endif %}
+
+            {% comment %}Identity: the picture, the name, and everything that tells two variants apart.{% endcomment %}
             <td class="wh__td">
-              {% if stock.product.product_image %}
-              <img src="{{ stock.product.product_image.url }}" alt="{{ stock.product.item_name }}" class="wh__product-img">
-              {% else %}
-              <div class="wh__product-img-placeholder"><i class="fas fa-image"></i></div>
-              {% endif %}
-            </td>
-            <td class="wh__td">
-              <span class="wh__product-name">{{ stock.product.item_name }}</span>
-              <div class="wh__meta">
-                ID: <code class="wh__code">{{ stock.product.product_id|default:"-" }}</code>
-                {% if stock.product.size %} | Size: {{ stock.product.size }}{% endif %}
-                {% if stock.product.color %} | {{ stock.product.color.color_variant }}{% endif %}
-              </div>
-              {% with vcount=variant_counts|get_item:stock.product.variant_group %}
-              {% if vcount > 1 %}
-              <div class="wh__meta">
-                <span class="wh__badge wh__badge--muted"><i class="fas fa-layer-group"></i> 1 of {{ vcount }} variants</span>
-              </div>
-              {% endif %}
-              {% endwith %}
-              {% with aliases=stock.product.get_client_names_list %}
-              {% if aliases %}
-              <div class="wh__meta mt-1">
-                <i class="fas fa-tags text-muted me-1" style="font-size:0.7rem"></i>{% for alias in aliases %}<span class="wh__badge wh__badge--muted me-1" style="font-size:0.65rem">{{ alias }}</span>{% endfor %}
-              </div>
-              {% endif %}
-              {% endwith %}
-              {% if stock.quantity_on_hand <= stock.reorder_point %}
-              <span class="wh__badge wh__badge--warning"><i class="fas fa-exclamation-triangle"></i> Low Stock</span>
-              {% endif %}
-            </td>
-            <td class="wh__td">
-              {% if stock.product.brand_logo %}
               <div class="d-flex align-items-center gap-2">
-                <img src="{{ stock.product.brand_logo.url }}" alt="{{ stock.product.brand_name }}" class="wh__product-img" style="width:30px;height:30px;">
-                <span class="wh__muted">{{ stock.product.brand_name|default:"-" }}</span>
+                {% if stock.product.product_image %}
+                <img src="{{ stock.product.product_image.url }}" alt="{{ stock.product.item_name }}" class="wh__product-img">
+                {% else %}
+                <div class="wh__product-img-placeholder"><i class="fas fa-image"></i></div>
+                {% endif %}
+                <div class="wh__cell-body">
+                  <div class="d-flex flex-wrap align-items-center gap-1">
+                    <span class="wh__product-name">{{ stock.product.item_name }}</span>
+                    {% if stock.quantity_on_hand <= stock.reorder_point %}
+                    <span class="wh__badge wh__badge--warning"><i class="fas fa-exclamation-triangle"></i> Low Stock</span>
+                    {% endif %}
+                  </div>
+                  <div class="wh__meta d-flex flex-wrap align-items-center gap-1">
+                    <code class="wh__code">{{ stock.product.product_id|default:"-" }}</code>
+                    {% with variant=stock.product.display_variant %}
+                    {% if variant %}<span class="wh__badge wh__badge--muted">{{ variant }}</span>{% endif %}
+                    {% endwith %}
+                    {% if stock.product.size %}<span>Size: {{ stock.product.size }}</span>{% endif %}
+                    {% if stock.product.color %}<span>{{ stock.product.color.color_variant }}</span>{% endif %}
+                    {% with vcount=variant_counts|get_item:stock.product.variant_group %}
+                    {% if vcount > 1 %}
+                    <span class="wh__badge wh__badge--muted"><i class="fas fa-layer-group"></i> 1 of {{ vcount }} variants</span>
+                    {% endif %}
+                    {% endwith %}
+                    {% with aliases=stock.product.get_client_names_list %}
+                    {% if aliases %}
+                    <i class="fas fa-tags" title="Client names for this product"></i>{% for alias in aliases %}<span class="wh__badge wh__badge--muted">{{ alias }}</span>{% endfor %}
+                    {% endif %}
+                    {% endwith %}
+                  </div>
+                </div>
               </div>
-              {% else %}
-              <span class="wh__muted">{{ stock.product.brand_name|default:"-" }}</span>
-              {% endif %}
             </td>
+
+            {% comment %}Codes: the two things a scanner can resolve — and, next to them,
+            the buttons that put those codes on a sticker. Label printing lives with the
+            code it prints, not in the generic Actions column.{% endcomment %}
             <td class="wh__td">
-              <code class="wh__code">{{ stock.product.item_sku|default:"-" }}</code>
+              <div class="d-flex flex-wrap align-items-center gap-1">
+                <code class="wh__code">{{ stock.product.item_sku|default:"-" }}</code>
+                {% if is_staff %}
+                <a href="{% url 'warehouse:print_product_labels' %}?stock_ids={{ stock.id }}"
+                   class="wh__action-btn wh__action-btn--xs"
+                   target="_blank" rel="noopener"
+                   title="Print QR label for this variant">
+                  <i class="fas fa-qrcode"></i><span class="visually-hidden">Print label for this variant</span>
+                </a>
+                {% with vcount=variant_counts|get_item:stock.product.variant_group %}
+                {% if vcount > 1 %}
+                <a href="{% url 'warehouse:print_product_labels' %}?variant_group={{ stock.product.variant_group|urlencode }}"
+                   class="wh__action-btn wh__action-btn--xs"
+                   target="_blank" rel="noopener"
+                   title="Print a label for all {{ vcount }} variants of this product">
+                  <i class="fas fa-layer-group"></i>{{ vcount }}<span class="visually-hidden">Print labels for all {{ vcount }} variants</span>
+                </a>
+                {% endif %}
+                {% endwith %}
+                {% endif %}
+              </div>
               {% if stock.product.barcode %}
               <div class="wh__meta"><i class="fas fa-barcode"></i> {{ stock.product.barcode }}</div>
               {% else %}
@@ -290,41 +329,55 @@
               <div class="wh__meta"><span class="wh__badge wh__badge--warning"><i class="fas fa-barcode"></i> No barcode</span></div>
               {% endif %}
             </td>
+
+            {% comment %}Who makes it, and the shelf-family it belongs to.{% endcomment %}
             <td class="wh__td">
-              {% if stock.product.product_category %}
-              <span class="wh__badge wh__badge--info">{{ stock.product.product_category.category_name }}</span>
-              {% else %}
-              <span class="wh__muted">-</span>
-              {% endif %}
+              <div class="d-flex flex-column align-items-start gap-1">
+                <span class="d-inline-flex align-items-center gap-1 wh__muted">
+                  {% if stock.product.brand_logo %}
+                  <img src="{{ stock.product.brand_logo.url }}" alt="{{ stock.product.brand_name }}" class="wh__product-img wh__product-img--xs">
+                  {% endif %}
+                  {{ stock.product.brand_name|default:"-" }}
+                </span>
+                {% if stock.product.product_category %}
+                <span class="wh__badge wh__badge--info">{{ stock.product.product_category.category_name }}</span>
+                {% else %}
+                <span class="wh__meta">No category</span>
+                {% endif %}
+              </div>
             </td>
+
+            {% comment %}Where the units physically sit: building, then bin.{% endcomment %}
             <td class="wh__td">
-              {% with variant=stock.product.display_variant %}
-              {% if variant %}<span class="wh__badge wh__badge--muted">{{ variant }}</span>
-              {% else %}<span class="wh__muted">—</span>{% endif %}
-              {% endwith %}
+              <div class="d-flex flex-column align-items-start gap-1">
+                <span class="wh__muted">{{ stock.warehouse.name }}</span>
+                <span class="wh__badge wh__badge--muted"><i class="fas fa-location-dot"></i> {{ stock.location.code|default:"Default" }}</span>
+              </div>
             </td>
-            <td class="wh__td"><span class="wh__muted">{{ stock.warehouse.name }}</span></td>
-            <td class="wh__td"><span class="wh__badge wh__badge--muted">{{ stock.location.code|default:"Default" }}</span></td>
+
+            {% comment %}One count column: what is on the shelf, then how much of it is already
+            spoken for. Available is on-hand MINUS reserved (StockLevel.quantity_available) —
+            the old column added the two, which overstated what could be sold.{% endcomment %}
             <td class="wh__td wh__td--center">
-              <span class="wh__amount--success">{{ stock.product.item_price|default:0 }} QAR</span>
-              {% if stock.product.unit %}
-              <div class="wh__meta">/{{ stock.product.unit.unit_variant }}</div>
-              {% endif %}
+              <div class="d-flex flex-column align-items-center gap-1">
+                <strong class="{% if stock.quantity_on_hand <= stock.reorder_point %}wh__amount--negative{% else %}wh__amount--positive{% endif %}">{{ stock.quantity_on_hand }}</strong>
+                <span class="wh__meta">Res {{ stock.quantity_reserved }} &middot; Avail <strong>{{ stock.quantity_available }}</strong></span>
+              </div>
             </td>
+
+            {% comment %}Unit price, then what the whole shelf of it is worth.{% endcomment %}
             <td class="wh__td wh__td--center">
-              <strong class="{% if stock.quantity_on_hand <= stock.reorder_point %}wh__amount--negative{% else %}wh__amount--positive{% endif %}">
-                {{ stock.quantity_on_hand }}
-              </strong>
+              <div class="d-flex flex-column align-items-center gap-1">
+                <span class="wh__amount--success">{{ stock.product.item_price|default:0 }} QAR{% if stock.product.unit %}<span class="wh__meta">/{{ stock.product.unit.unit_variant }}</span>{% endif %}</span>
+                {% widthratio stock.quantity_on_hand 1 stock.product.item_price as item_value %}
+                <span class="wh__meta">Value <strong>{{ item_value|floatformat:2 }} QAR</strong></span>
+              </div>
             </td>
-            <td class="wh__td wh__td--center"><span class="wh__muted">{{ stock.quantity_reserved }}</span></td>
+
             <td class="wh__td wh__td--center">
-              <span class="wh__badge wh__badge--primary">{{ stock.quantity_on_hand|add:stock.quantity_reserved|default:stock.quantity_on_hand }}</span>
-            </td>
-            <td class="wh__td wh__td--center">
-              {% widthratio stock.quantity_on_hand 1 stock.product.item_price as item_value %}
-              <strong class="wh__amount--success">{{ item_value|floatformat:2 }} QAR</strong>
-            </td>
-            <td class="wh__td wh__td--center">
+              {% comment %}Packed, not stacked: three pills on their own lines made every row
+              113px tall and pushed the list down to eight visible items.{% endcomment %}
+              <div class="d-flex flex-wrap justify-content-center gap-1">
               <button type="button" class="wh__action-btn wh__action-btn--pill js-view-stock"
                       data-detail-url="{% url 'warehouse:stock_level_detail_modal' stock.id %}"
                       title="Quick View">
@@ -339,29 +392,12 @@
                  hx-push-url="true">
                 <i class="fas fa-chart-line"></i> Details
               </a>
-              {% if is_staff %}
-              <a href="{% url 'warehouse:print_product_labels' %}?stock_ids={{ stock.id }}"
-                 class="wh__action-btn wh__action-btn--pill"
-                 target="_blank" rel="noopener"
-                 title="Print QR label for this variant">
-                <i class="fas fa-qrcode"></i> Label
-              </a>
-              {% with vcount=variant_counts|get_item:stock.product.variant_group %}
-              {% if vcount > 1 %}
-              <a href="{% url 'warehouse:print_product_labels' %}?variant_group={{ stock.product.variant_group|urlencode }}"
-                 class="wh__action-btn wh__action-btn--pill"
-                 target="_blank" rel="noopener"
-                 title="Print a label for all {{ vcount }} variants of this product">
-                <i class="fas fa-layer-group"></i> All {{ vcount }}
-              </a>
-              {% endif %}
-              {% endwith %}
-              {% endif %}
+              </div>
             </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="{% if is_staff %}15{% else %}14{% endif %}" class="wh__empty">
+            <td colspan="{% if is_staff %}8{% else %}7{% endif %}" class="wh__empty">
               <i class="fas fa-boxes"></i>
               <p>No inventory items found</p>
               <p class="wh__meta">Start by receiving stock into your warehouse</p>
@@ -435,7 +471,9 @@
   const currentSort = '{{ sort_field }}';
   const currentDir  = '{{ sort_dir }}';
 
-  document.querySelectorAll('.wh__th--sortable[data-sort]').forEach(function (th) {
+  // Two kinds of sort control now: a whole column head, and the paired buttons
+  // inside a merged head (Brand / Category, Warehouse / Location, ...).
+  document.querySelectorAll('.wh__th--sortable[data-sort], .wh__sort[data-sort]').forEach(function (th) {
     th.addEventListener('click', function () {
       const field = th.dataset.sort;
       const dir   = (field === currentSort && currentDir === 'asc') ? 'desc' : 'asc';

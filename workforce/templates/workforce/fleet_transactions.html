@@ -433,9 +433,14 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
                                 {% if txn.payment_method == 'atm' %}<i class="fa-solid fa-credit-card"></i> ATM{% endif %}
                             </div>
                             {% endif %}
+                            {% if txn.transaction_type == 'cod_collection' and txn.delivery_task %}
+                            {% with charge=txn.delivery_task.known_charge %}
+                            <div class="ftr__dl-charge" title="Delivery charge">DL {% if charge is not None %}{{ charge }}{% else %}{{ txn.delivery_task.order.dl_amount|default:0 }}{% endif %}</div>
+                            {% endwith %}
+                            {% endif %}
                         </td>
                         <td class="ftr__td--after">
-                            {% if txn.transaction_type == 'cod_collection' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}
+                            {% if txn.transaction_type == 'cod_collection' or txn.transaction_type == 'fee_collection' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}
                                 {% comment %}Only cash is ever "in hand" — electronic COD reaches Ezzy
                                 at collection, so its rows are structurally zero and were reading as
                                 broken. Each electronic row appears only if it ever carries a value.{% endcomment %}
@@ -471,7 +476,7 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
                                     </span>
                                 </div>
                                 {% endif %}
-                            {% elif txn.transaction_type == 'cod_collection' %}
+                            {% elif txn.transaction_type == 'cod_collection' or txn.transaction_type == 'fee_collection' %}
                                 {% if txn.is_received and txn.is_verified %}
                                 <span class="ftr__txn-type ftr__txn-type--settlement"><i class="fa-solid fa-circle-check me-1"></i>Settled</span>
                                 {% elif txn.delivery_task and txn.delivery_task.cod_submission_txn and txn.delivery_task.cod_submission_txn.is_received and txn.delivery_task.cod_submission_txn.is_verified %}
@@ -545,7 +550,7 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
                                 </span>
                                 {% endif %}
                             </div>
-                            {% elif txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_collection' %}
+                            {% elif txn.transaction_type == 'cod_driver_settle' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_collection' or txn.transaction_type == 'fee_collection' %}
                             <div class="ftr__act-row">
                                 <button type="button" class="ftr__act ftr__act--receive"
                                         onclick="openCodDrawer({{ txn.id }}, '{{ txn.transaction_code|default:txn.id }}', {{ txn.is_received|yesno:'true,false' }}, {{ txn.is_verified|yesno:'true,false' }})">

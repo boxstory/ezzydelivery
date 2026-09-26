@@ -113,6 +113,11 @@ def create_pickup_task_if_needed(order, source=''):
             return None, 'business_not_active'
         if getattr(order, 'is_hub_delivery', False):
             return None, 'hub_delivery_order'  # staff HubPickupBatch flow handles collection
+        # A return pickup's goods are at the CUSTOMER. First-mile would send a
+        # driver to the seller to collect a parcel that is not there — and the
+        # seller is this order's drop-off, not its origin.
+        if order.order_type == 'return_pickup':
+            return None, 'return_pickup_order'
 
         pickup_location = order.pickup_location
         if not pickup_location:

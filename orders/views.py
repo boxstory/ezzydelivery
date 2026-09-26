@@ -1738,6 +1738,22 @@ def order_details(request, order_id):
             'replacement_reasons': _orders_models.REPLACEMENT_REASON_CHOICES,
         })
 
+        # Returns. The page knew about replacements and nothing at all about
+        # claims, so a seller with a return already open saw no trace of it and
+        # clicked Request Return again. It also warns when a replacement would
+        # send a second driver for goods a collection is already coming for —
+        # warn, not block: which one to keep is an ops call.
+        data.update({
+            'order_returns': list(
+                order.return_requests.select_related('pickup_order')
+                .order_by('-created_at')),
+            'open_return': orders_services.open_return_for_order(order),
+            'collection_jobs': [
+                job for job in orders_services.jobs_collecting_from(order)
+                if job['kind'] == 'collection'
+            ],
+        })
+
         # Check if this is being loaded in a slide-in panel (via HTMX or query param)
         is_panel = request.GET.get('panel') == '1'
         is_htmx = request.headers.get('HX-Request') == 'true'

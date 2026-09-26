@@ -1,0 +1,353 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff form that raises a return claim for goods EzzyDelivery never delivered.
+Used by: workforce_views.returns_request_create at /workforce/returns/requests/new/
+Notes: Every other claim copies its address from the order we carried; this one has no such
+       order, so the address typed here IS the claim (ReturnRequest's standalone block). The
+       drop-off list holds every client's addresses at once and is filtered in the browser —
+       picking a client re-filters it, and changing client clears a now-foreign choice.
+       Address helpers (qnasValidateAndFill / whatsappLocationFill / locDropHandle) and the
+       .qnas-plate / .oap__loc-drop styling already ship with wf_dashboard_base.
+{% endcomment %}
+
+{% block title %}New Return - Staff Dashboard{% endblock title %}
+
+{% block content %}
+<div class="col-12">
+  <div class="wfpage">
+
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Reverse logistics &middot; Paperwork</span>
+        <h1 class="wfhero__title">New return &mdash; not delivered by us</h1>
+        <span class="wfhero__sub">
+          For goods a client's own courier delivered
+          <span class="wfhero__sep">&middot;</span> a return on an order we carried starts from
+          <a href="{% url 'workforce:returns_requests_list' %}">the order itself</a>
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <nav class="wfhero__actions">
+          <a href="{% url 'workforce:returns_requests_list' %}" class="wfhero__ghost">
+            <i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Return requests
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <form method="post" id="workforce_returns_form_create" novalidate>
+      {% csrf_token %}
+      <div class="row g-3">
+
+        <div class="col-12 col-lg-6">
+          <div class="card h-100">
+            <div class="card-header">
+              <strong><i class="fa-solid fa-store me-2" aria-hidden="true"></i>Client &amp; goods</strong>
+            </div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label class="form-label" for="workforce_returns_select_business">
+                  Client <span class="text-danger">*</span>
+                </label>
+                <select class="form-select" id="workforce_returns_select_business" name="business" required>
+                  <option value="">Select a client…</option>
+                  {% for b in businesses %}
+                  <option value="{{ b.business_id }}"
+                          {% if form.business == b.business_id|stringformat:"s" %}selected{% endif %}>
+                    {{ b.business_name }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label" for="workforce_returns_select_dropoff">
+                  Deliver the goods to <span class="text-danger">*</span>
+                </label>
+                <select class="form-select" id="workforce_returns_select_dropoff"
+                        name="pickup_location" data-no-select2 required>
+                  <option value="">Pick a client first…</option>
+                  {% for loc in locations %}
+                  <option value="{{ loc.id }}" data-business="{{ loc.business_id }}"
+                          {% if form.pickup_location == loc.id|stringformat:"s" %}selected{% endif %}>
+                    {{ loc.pickup_location_title }}{% if loc.locality %} — {{ loc.locality }}{% endif %}
+                  </option>
+                  {% endfor %}
+                </select>
+                <div class="form-text">Where the driver drops what he collects — the client's counter.</div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label" for="workforce_returns_input_reference">Client's own reference</label>
+                <input type="text" class="form-control" id="workforce_returns_input_reference"
+                       name="external_reference" maxlength="64" value="{{ form.external_reference|default:'' }}"
+                       placeholder="Their order or invoice number">
+                <div class="form-text">Shown wherever an order number would be. We have no order of our own here.</div>
+              </div>
+
+              <div class="row g-2">
+                <div class="col-8">
+                  <label class="form-label" for="workforce_returns_input_package">What is coming back</label>
+                  <input type="text" class="form-control" id="workforce_returns_input_package"
+                         name="package_description" maxlength="255"
+                         value="{{ form.package_description|default:'' }}" placeholder="e.g. 2 dresses, boxed">
+                </div>
+                <div class="col-4">
+                  <label class="form-label" for="workforce_returns_input_qty">Pieces</label>
+                  <input type="number" class="form-control" id="workforce_returns_input_qty"
+                         name="package_qty" min="0" max="10000" value="{{ form.package_qty|default:'1' }}">
+                </div>
+              </div>
+
+              <div class="row g-2 mt-1">
+                <div class="col-6">
+                  <label class="form-label" for="workforce_returns_select_reason">
+                    Reason <span class="text-danger">*</span>
+                  </label>
+                  <select class="form-select" id="workforce_returns_select_reason" name="reason" required>
+                    <option value="">Select…</option>
+                    {% for value, label in reason_choices %}
+                    <option value="{{ value }}" {% if form.reason == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="workforce_returns_input_charge">Charge the client (QAR)</label>
+                  <input type="number" step="0.01" min="0" class="form-control"
+                         id="workforce_returns_input_charge" name="collection_charge"
+                         value="{{ form.collection_charge|default:'' }}" placeholder="0.00">
+                  <div class="form-text">Can still be changed when the pickup is scheduled.</div>
+                </div>
+              </div>
+
+              <div class="mt-3">
+                <label class="form-label" for="workforce_returns_input_reason_notes">Notes</label>
+                <textarea class="form-control" rows="2" id="workforce_returns_input_reason_notes"
+                          name="reason_notes" placeholder="What the client told us">{{ form.reason_notes|default:'' }}</textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card h-100">
+            <div class="card-header">
+              <strong><i class="fa-solid fa-location-dot me-2" aria-hidden="true"></i>Collect from</strong>
+            </div>
+            <div class="card-body">
+              <p class="text-muted small">
+                The customer holding the goods. This is where the driver goes — the trip runs
+                backwards, so this address is the origin, not the destination.
+              </p>
+
+              <div class="qnas-plate mb-3">
+                <div class="qnas-plate__cell">
+                  <span class="qnas-plate__tag">Zone</span>
+                  <span class="qnas-plate__num qnas-plate__num--empty" id="workforce_returns_plate_zone">—</span>
+                </div>
+                <span class="qnas-plate__div">/</span>
+                <div class="qnas-plate__cell">
+                  <span class="qnas-plate__tag">Street</span>
+                  <span class="qnas-plate__num qnas-plate__num--empty" id="workforce_returns_plate_street">—</span>
+                </div>
+                <span class="qnas-plate__div">/</span>
+                <div class="qnas-plate__cell">
+                  <span class="qnas-plate__tag">Building</span>
+                  <span class="qnas-plate__num qnas-plate__num--empty" id="workforce_returns_plate_building">—</span>
+                </div>
+                <div class="qnas-plate__name qnas-plate__name--empty" id="workforce_returns_plate_zonewrap">
+                  <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                  <span id="workforce_returns_plate_zonename">Zone name not resolved</span>
+                </div>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label" for="workforce_returns_input_customer">Customer name</label>
+                  <input type="text" class="form-control" id="workforce_returns_input_customer"
+                         name="customer_name" maxlength="100" value="{{ form.customer_name|default:'' }}">
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label" for="workforce_returns_input_phone">Phone</label>
+                  <input type="text" class="form-control" id="workforce_returns_input_phone"
+                         name="customer_phone" maxlength="100" value="{{ form.customer_phone|default:'' }}">
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label" for="workforce_returns_input_whatsapp">WhatsApp</label>
+                  <input type="text" class="form-control" id="workforce_returns_input_whatsapp"
+                         name="customer_whatsapp" maxlength="100" value="{{ form.customer_whatsapp|default:'' }}"
+                         placeholder="Same as phone">
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label" for="workforce_returns_input_address">Address</label>
+                <textarea class="form-control" rows="2" id="workforce_returns_input_address"
+                          name="customer_address" maxlength="255"
+                          placeholder="Flat, building, area">{{ form.customer_address|default:'' }}</textarea>
+                <div class="form-text">A phone, an address or a zone — at least one, or the driver cannot find them.</div>
+              </div>
+
+              <div class="row g-2 align-items-end mb-3">
+                <div class="col-4 col-md-3">
+                  <label class="form-label" for="workforce_returns_input_zone">Zone</label>
+                  <input type="number" class="form-control" id="workforce_returns_input_zone"
+                         name="dl_zone" min="0" value="{{ form.dl_zone|default:'' }}">
+                </div>
+                <div class="col-4 col-md-3">
+                  <label class="form-label" for="workforce_returns_input_street">Street</label>
+                  <input type="number" class="form-control" id="workforce_returns_input_street"
+                         name="dl_street" min="0" value="{{ form.dl_street|default:'' }}">
+                </div>
+                <div class="col-4 col-md-3">
+                  <label class="form-label" for="workforce_returns_input_building">Building</label>
+                  <input type="number" class="form-control" id="workforce_returns_input_building"
+                         name="dl_building" min="0" value="{{ form.dl_building|default:'' }}">
+                </div>
+                <div class="col-12 col-md-3">
+                  <button type="button" class="btn btn-sm btn-outline-warning w-100"
+                          id="workforce_returns_btn_qnas"
+                          onclick="qnasValidateAndFill({zoneId:'workforce_returns_input_zone', streetId:'workforce_returns_input_street', buildingId:'workforce_returns_input_building', latId:'workforce_returns_input_lat', lngId:'workforce_returns_input_lng', zoneNameId:'workforce_returns_input_zonename', resultId:'workforce_returns_txt_qnas', btnId:'workforce_returns_btn_qnas', mapId:'workforce_returns_link_map', accuracyId:'workforce_returns_input_accuracy', accuracyBadgeId:'workforce_returns_txt_accuracy'})">
+                    <i class="fa-solid fa-satellite-dish me-1" aria-hidden="true"></i>Validate
+                  </button>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label" for="workforce_returns_input_locpaste">Paste / drop shared location</label>
+                <div class="oap__loc-drop" id="workforce_returns_box_locdrop"
+                     ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+                     ondrop="locDropHandle(event, {latId:'workforce_returns_input_lat', lngId:'workforce_returns_input_lng', mapId:'workforce_returns_link_map', accuracyId:'workforce_returns_input_accuracy', accuracyBadgeId:'workforce_returns_txt_accuracy', resultId:'workforce_returns_txt_loc', inputId:'workforce_returns_input_locpaste'})">
+                  <i class="fa-solid fa-location-dot oap__loc-drop__icon" aria-hidden="true"></i>
+                  <input type="text" id="workforce_returns_input_locpaste"
+                         class="form-control form-control-sm oap__loc-drop__input"
+                         placeholder="Paste a WhatsApp / Google Maps link, or drop the shared location here"
+                         oninput="whatsappLocationFill(this.value, {latId:'workforce_returns_input_lat', lngId:'workforce_returns_input_lng', mapId:'workforce_returns_link_map', accuracyId:'workforce_returns_input_accuracy', accuracyBadgeId:'workforce_returns_txt_accuracy', resultId:'workforce_returns_txt_loc'})">
+                </div>
+                <div id="workforce_returns_txt_loc" class="mt-1"></div>
+              </div>
+
+              <div class="row g-2 align-items-end">
+                <div class="col-4">
+                  <label class="form-label" for="workforce_returns_input_lat">Latitude</label>
+                  <input type="text" class="form-control" id="workforce_returns_input_lat"
+                         name="latitude" value="{{ form.latitude|default:'' }}" placeholder="--" readonly>
+                </div>
+                <div class="col-4">
+                  <label class="form-label" for="workforce_returns_input_lng">Longitude</label>
+                  <input type="text" class="form-control" id="workforce_returns_input_lng"
+                         name="longitude" value="{{ form.longitude|default:'' }}" placeholder="--" readonly>
+                </div>
+                <div class="col-3">
+                  <label class="form-label" for="workforce_returns_input_zonename">Zone name</label>
+                  <input type="text" class="form-control" id="workforce_returns_input_zonename"
+                         placeholder="Auto-filled" readonly>
+                </div>
+                <div class="col-1">
+                  <a id="workforce_returns_link_map" href="#" target="_blank" rel="noopener"
+                     class="btn btn-sm btn-outline-secondary disabled" title="View on Google Maps">
+                    <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i>
+                  </a>
+                </div>
+              </div>
+              <input type="hidden" id="workforce_returns_input_accuracy" name="coords_accuracy" value="">
+              <div class="d-flex gap-2 mt-2">
+                <span id="workforce_returns_txt_accuracy"></span>
+                <div id="workforce_returns_txt_qnas"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="d-flex flex-wrap gap-2 justify-content-end">
+            <a href="{% url 'workforce:returns_requests_list' %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="workforce_returns_btn_create">
+              <i class="fa-solid fa-rotate-left me-1" aria-hidden="true"></i>Raise return
+            </button>
+          </div>
+          <p class="text-muted small text-end mt-2 mb-0">
+            The claim opens approved. Schedule the pickup on the returns desk to send a driver.
+          </p>
+        </div>
+
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+(function () {
+    // The drop-off list holds every client's addresses at once, so it is filtered
+    // here rather than by reloading the page each time a client is picked.
+    const bizSel = document.getElementById('workforce_returns_select_business');
+    const dropSel = document.getElementById('workforce_returns_select_dropoff');
+    if (!bizSel || !dropSel) return;
+
+    const all = Array.from(dropSel.querySelectorAll('option[data-business]'));
+    const placeholder = dropSel.querySelector('option:not([data-business])');
+
+    function filterDropoffs() {
+        const biz = bizSel.value;
+        let shown = 0;
+        all.forEach(opt => {
+            const mine = biz && opt.dataset.business === biz;
+            opt.hidden = !mine;
+            opt.disabled = !mine;
+            if (mine) shown += 1;
+        });
+        // A choice left over from another client would submit an address that
+        // client does not own; the service refuses it, so clear it here instead.
+        const current = dropSel.selectedOptions[0];
+        if (current && current.dataset.business && current.hidden) dropSel.value = '';
+        if (placeholder) {
+            placeholder.textContent = !biz
+                ? 'Pick a client first…'
+                : (shown ? 'Select an address…' : 'This client has no usable address');
+        }
+    }
+
+    bizSel.addEventListener('change', filterDropoffs);
+    filterDropoffs();
+
+    // Mirror the typed numbers onto the plate, the same signature the order
+    // screens use. qnasValidateAndFill fills the inputs; this keeps the plate
+    // honest whether they were typed or resolved.
+    const plate = {
+        workforce_returns_input_zone: 'workforce_returns_plate_zone',
+        workforce_returns_input_street: 'workforce_returns_plate_street',
+        workforce_returns_input_building: 'workforce_returns_plate_building',
+    };
+    function paintPlate() {
+        Object.entries(plate).forEach(([inputId, cellId]) => {
+            const input = document.getElementById(inputId);
+            const cell = document.getElementById(cellId);
+            if (!input || !cell) return;
+            const value = (input.value || '').trim();
+            cell.textContent = value || '—';
+            cell.classList.toggle('qnas-plate__num--empty', !value);
+        });
+        const name = document.getElementById('workforce_returns_input_zonename');
+        const label = document.getElementById('workforce_returns_plate_zonename');
+        const wrap = document.getElementById('workforce_returns_plate_zonewrap');
+        if (name && label && wrap) {
+            const value = (name.value || '').trim();
+            label.textContent = value || 'Zone name not resolved';
+            wrap.classList.toggle('qnas-plate__name--empty', !value);
+        }
+    }
+    Object.keys(plate).forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.addEventListener('input', paintPlate);
+    });
+    // QNAS validate and the location paste set these fields programmatically and
+    // fire no input event — reconcile the plate from the live values every
+    // second, the same way the staff order form keeps its plate honest.
+    setInterval(paintPlate, 1000);
+    paintPlate();
+})();
+</script>
+{% endblock extra_js %}

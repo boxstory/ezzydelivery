@@ -58,128 +58,17 @@
   padding-inline: 0.5rem 1.4rem;
 }
 
-/* The facets are multi-selects, and they follow the worked pattern from the
-   .pg-filter__row bar in workforce.css. These rules cover the no-summary state —
-   nothing picked, or the initialiser did not run. Three traps, all load-bearing:
-   the control is capped to the bar's height and scrolls inside, so stacking six
-   stages cannot push the row out of line; the tags are absolutely-positioned-×
-   chips, which Select2 reserves no room for; and Select2 4.1 builds the inline
-   search as an auto-sizing <textarea> that computes ~88px tall — left alone it
-   renders the picker as a tall blank box with the placeholder pushed out of
-   sight, which is exactly what this page did before these rules. */
+/* Density deltas over the shared multi-facet rules in crm.css: this bar runs at
+   --crm-ctl-h 2rem with 0.75rem type, one step tighter than the leads tables, so
+   only the type sizes are restated here. */
 .crmm .select2-container.ez-filter-select .select2-selection--multiple[data-facet-summary]::before {
   font-size: 0.75rem;
 }
-.crmm .select2-container.ez-filter-select .select2-selection--multiple {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 0.2rem;
-  min-height: var(--crm-ctl-h);
-  max-height: var(--crm-ctl-h);
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 0 0.25rem;
-  border: 1px solid var(--crm-line-2);
-  border-radius: 6px;
-}
-.crmm .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__rendered {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  flex-wrap: nowrap;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
-  overflow: hidden;
-}
 .crmm .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice {
-  position: relative;
-  /* min-width keeps a tag legible instead of letting it collapse to "Ap…" when a
-     second one is picked; the pair shrink together rather than the first losing. */
-  flex: 0 1 auto;
-  min-width: 4.25rem;
-  max-width: 6.5rem;
-  margin: 0;
-  padding: 0 0.3rem 0 1rem;
   font-size: 0.68rem;
-  line-height: 1.15rem;
-  color: var(--crm-ink);
-  background: var(--crm-canvas);
-  border: 1px solid var(--crm-line-2);
-  border-radius: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.crmm .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice__remove {
-  position: absolute;
-  left: 0.15rem;
-  top: 50%;
-  transform: translateY(-50%);
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: 0.75rem;
-  line-height: 1;
-  color: var(--crm-muted);
-}
-.crmm .select2-container.ez-filter-select .select2-selection--multiple .select2-selection__choice__remove:hover {
-  color: var(--brand-danger);
-  background: none;
-}
-/* The inline search is a caret parking spot here, not a field anyone types a
-   paragraph into — it yields its width to the summary instead of competing. */
-.crmm .select2-container.ez-filter-select .select2-search--inline {
-  display: flex;
-  align-items: center;
-  flex: 0 1 1.5rem;
-  min-width: 0.9rem;
-}
-/* Until something is picked that field IS the control's label: Select2 hangs the
-   placeholder off it, so a 1.5rem basis printed "All s" and left four facets
-   looking like they had lost their names. It only steps aside once there is a
-   summary to step aside for. */
-.crmm .select2-container.ez-filter-select .select2-selection--multiple:not([data-facet-summary]) .select2-search--inline {
-  flex: 1 1 auto;
 }
 .crmm .select2-container.ez-filter-select .select2-search--inline .select2-search__field {
-  height: 1.4rem !important;
-  min-height: 0;
-  margin: 0;
-  padding: 0;
   font-size: 0.75rem;
-  line-height: 1.4rem;
-  resize: none;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.crmm .select2-container.ez-filter-select .select2-search--inline .select2-search__field::placeholder {
-  color: var(--crm-muted);
-}
-/* The caret would otherwise blink inside a box still reading "All stages",
-   while every single-value picker beside it keeps its search in the dropdown. */
-.crmm .select2-container.ez-filter-select .select2-search__field:placeholder-shown {
-  caret-color: transparent;
-}
-/* Without an arrow the tag box reads as a text field, not something you open. */
-.crmm .select2-container.ez-filter-select .select2-selection--multiple::after {
-  content: "";
-  flex: 0 0 auto;
-  width: 0;
-  height: 0;
-  margin-left: auto;
-  margin-right: 0.15rem;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid var(--crm-muted);
-}
-/* Engaged state for the multi picker — the single-select rule next door only
-   matches .select2-selection--single. */
-.crmm .crm__facet-select--on + .select2-container.ez-filter-select .select2-selection--multiple {
-  border-color: var(--crm-ink);
-  box-shadow: inset 0 0 0 1px var(--crm-ink);
 }
 
 .crmm .crm__filters > .crmm__btn--go { height: var(--crm-ctl-h); font-size: 0.75rem; padding: 0 0.7rem; }

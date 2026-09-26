@@ -17,11 +17,15 @@ ZoneArea = delivery_models.ZoneArea
 logger = logging.getLogger(__name__)
 
 # Terminal order statuses — don't overwrite these
-TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled']
+TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled', 'returned']
 
 # The leg that carries a returned parcel from a hub shelf back out to the client.
 # Several customer-facing side effects below are deliberately skipped for it.
 from delivery.services.returns import RETURN_LEG  # noqa: E402
+# Legs whose customer-facing messages must stay silent — the return run and the
+# return pickup. Both are defined next to the route resolver that knows which
+# end of a leg the customer is on.
+from delivery.selectors import COLLECT_LEG, CUSTOMER_SILENT_LEGS  # noqa: E402
 
 
 @receiver(pre_save, sender=DeliveryTask)
@@ -122,6 +126,15 @@ def _sync_order_status_from_task(task):
             update_fields.append('order_status')
             logger.info(f"Order {order.order_number} synced to 'cancelled' from delivery task {task.dl_task_number}")
 
+        elif task.dl_task_status == 'returned_to_shipper':
+            # The parcel went out and came back. Only ever reached here for an
+            # order that was NOT already delivered — the terminal guard above
+            # returns first — so an order delivered and later returned for
+            # alteration keeps its delivery, its delivered_at and its charge.
+            order.order_status = 'returned'
+            update_fields.append('order_status')
+            logger.info(f"Order {order.order_number} synced to 'returned' from delivery task {task.dl_task_number}")
+
         if update_fields:
             # Use update_fields to avoid triggering unrelated order signals
             order.save(update_fields=update_fields)
@@ -192,8 +205,10 @@ def _send_customer_notification(task, old_status, new_status):
     }
     # The recipient of every message in EVENT_MAP is the end customer. On a return
     # run the parcel is going back to the MERCHANT, so "your order is on its way"
-    # and "delivered" would both be lies told to the person who never got it.
-    if task.task_leg == RETURN_LEG:
+    # and "delivered" would both be lies told to the person who never got it. On a
+    # return pickup the customer is the one HANDING goods over, so the same bodies
+    # describe the wrong direction.
+    if task.task_leg in CUSTOMER_SILENT_LEGS:
         return
 
     entry = EVENT_MAP.get(new_status)
@@ -597,6 +612,22 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
         except Exception as e:
             logger.warning(f"Return-leg custody sync failed for task {instance.pk}: {e}")
 
+    # A return pickup's claim follows its task for the same reason: the driver
+    # collecting the goods and handing them to the seller IS the claim's progress,
+    # so nobody should have to repeat it on the returns console.
+    if not created and instance.task_leg == COLLECT_LEG:
+        try:
+            from orders.services import sync_return_pickup_claim
+            sync_return_pickup_claim(instance)
+        except Exception as e:
+            logger.warning(f"Return-pickup claim sync failed for task {instance.pk}: {e}")
+        try:
+            from delivery.services.returns import sync_collection_custody
+            sync_collection_custody(
+                instance, actor=getattr(instance, '_status_changed_by', None))
+        except Exception as e:
+            logger.warning(f"Collection custody sync failed for task {instance.pk}: {e}")
+
     # Sync delivery task status → order status (for all non-creation saves)
     if not created:
         old_status = getattr(instance, '_old_dl_task_status', None)
@@ -619,6 +650,21 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
                         delivery_task=instance)
                 except Exception as e:
                     logger.warning(f"Pickup cleanup failed for task {instance.pk}: {e}")
+
+            # The replacement has reached the customer, so the original items can
+            # now be collected. A second trip with its own two ends, rather than
+            # the old exchange leg that told the driver to carry goods away and
+            # then modelled nothing about where they went.
+            if (new_status == 'delivered' and instance.task_leg != COLLECT_LEG
+                    and getattr(instance.order, 'collect_back', False)):
+                try:
+                    from orders.services import raise_collect_back_collection
+                    raise_collect_back_collection(
+                        instance.order,
+                        user=getattr(instance, '_status_changed_by', None))
+                except Exception as e:
+                    logger.warning(
+                        f"Collect-back collection failed for task {instance.pk}: {e}")
 
         # Fire COD collected trigger when delivered (incl. partial) with COD
         if old_status is not None and new_status in ('delivered', 'partial_delivery') and instance.cod_collected and instance.cod_collected_amount:
@@ -713,7 +759,7 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
                 wa_key = wa_trigger_map.get(new_status)
                 # Same reasoning as _send_customer_notification: these reach the
                 # customer, and a return run has nothing to tell them.
-                if wa_key and instance.task_leg != RETURN_LEG:
+                if wa_key and instance.task_leg not in CUSTOMER_SILENT_LEGS:
                     execute_flows_for_trigger(wa_key, task=instance)
             except Exception as e:
                 logger.warning(f"Auto flow execution failed for status change {instance.pk}: {e}")
@@ -722,7 +768,7 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
     if not created:
         old_publish = getattr(instance, '_old_dl_task_publish', None)
         if (old_publish is False and instance.dl_task_publish is True
-                and instance.task_leg != RETURN_LEG):
+                and instance.task_leg not in CUSTOMER_SILENT_LEGS):
             _send_location_verification_on_publish(instance)
 
             # Fire auto flows for task publish and location verification triggers

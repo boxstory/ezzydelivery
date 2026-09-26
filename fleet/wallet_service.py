@@ -89,6 +89,9 @@ class WalletService:
         DRIVER_WALLET_TYPES = [
             'earning', 'cod_collection', 'cod_deposit', 'cod_driver_settle',
             'cod_return', 'settlement', 'deduction', 'bonus', 'adjustment',
+            # Cash in the driver's pocket exactly like a COD collection, so it has
+            # to lock the driver row and be re-derived by sync_cod_in_hand too.
+            'fee_collection',
         ]
 
         with transaction.atomic():
@@ -184,7 +187,8 @@ class WalletService:
                     'wallet_balance_after', 'cod_in_hand_after', 'pending_earnings_after',
                 ])
 
-            if driver and transaction_type in ('cod_collection', 'cod_deposit', 'cod_driver_settle'):
+            if driver and transaction_type in ('cod_collection', 'fee_collection',
+                                               'cod_deposit', 'cod_driver_settle'):
                 WalletService.recalculate_cod_balances(driver)
                 trans.refresh_from_db()
 
@@ -309,8 +313,11 @@ class WalletService:
             # part of a hand-in, while a mixed collection still owes its cash
             # portion. task_cash_leg() returns 0 for the electronic-only ones,
             # so they drop out of both loops below on their own.
+            # A P2P job can carry a cash fee and no COD at all; keying only off
+            # cod_collected would leave that money permanently stuck with the driver.
             base_qs = DeliveryTask.objects.select_for_update().filter(
-                driver=driver, cod_collected=True, cod_settled=False
+                Q(cod_collected=True) | Q(fee_collected_amount__gt=0),
+                driver=driver, cod_settled=False,
             )
             settled_task_ids = []
             settled_amount = Decimal('0')
@@ -417,10 +424,14 @@ class WalletService:
         tasks fall back to debiting the deposit amount against cash. Fawran/POS
         are already in Ezzy's bank, so any deposit sweeps them off the ledger.
         """
+        # fee_collection is our delivery fee taken in cash at the door. It sits in
+        # the driver's pocket and goes back on the same hand-in as the COD (see
+        # live_cod_in_hand), so it has to move the running cash balance too.
         txns = list(
             DriverTransaction.objects.filter(
                 driver=driver,
-                transaction_type__in=['cod_collection', 'cod_deposit', 'cod_driver_settle']
+                transaction_type__in=['cod_collection', 'fee_collection',
+                                      'cod_deposit', 'cod_driver_settle']
             ).select_related('delivery_task').order_by('created_at')
         )
 
@@ -433,9 +444,9 @@ class WalletService:
                 cod_submission_txn_id__in=deposit_ids
             ).values_list(
                 'cod_submission_txn_id', 'payment_method',
-                'payment_split', 'cod_collected_amount',
+                'payment_split', 'cod_collected_amount', 'fee_collected_amount',
             )
-            for txn_id, method, split, total in rows:
+            for txn_id, method, split, total, fee in rows:
                 bucket = settled_by_txn.setdefault(
                     txn_id,
                     {'cash': Decimal('0'), 'fawran': Decimal('0'), 'pos': Decimal('0')})
@@ -449,6 +460,8 @@ class WalletService:
                 key = 'fawran' if method == 'fawran' else (
                     'pos' if method in ('pos', 'card') else 'cash')
                 bucket[key] += total or Decimal('0')
+                # The cash fee went in on the same hand-in, whatever the COD method.
+                bucket['cash'] += fee or Decimal('0')
 
         running_cash = Decimal('0')
         running_fawran = Decimal('0')
@@ -474,6 +487,19 @@ class WalletService:
                         or t.cod_pos_after != running_pos
                         or t.cod_bank_after != running_bank
                         or t.cod_atm_after != running_atm):
+                    t.cod_cash_after = running_cash
+                    t.cod_fawran_after = running_fawran
+                    t.cod_pos_after = running_pos
+                    t.cod_bank_after = running_bank
+                    t.cod_atm_after = running_atm
+                    to_update.append(t)
+                continue
+
+            if t.transaction_type == 'fee_collection':
+                split = t.delivery_task.payment_split if t.delivery_task else None
+                if WalletService.split_cash_leg(split) is None:
+                    running_cash += abs(t.amount)
+                if t.cod_cash_after != running_cash:
                     t.cod_cash_after = running_cash
                     t.cod_fawran_after = running_fawran
                     t.cod_pos_after = running_pos
@@ -541,8 +567,9 @@ class WalletService:
         WalletService.recalculate_cod_balances(driver)
         latest = DriverTransaction.objects.filter(
             driver=driver,
-            transaction_type__in=['cod_collection', 'cod_deposit', 'cod_driver_settle']
-        ).order_by('-created_at').first()
+            transaction_type__in=['cod_collection', 'fee_collection',
+                                  'cod_deposit', 'cod_driver_settle']
+        ).order_by('-created_at', '-id').first()
         cash = latest.cod_cash_after if latest else Decimal('0')
         fawran = latest.cod_fawran_after if latest else Decimal('0')
         pos = latest.cod_pos_after if latest else Decimal('0')
@@ -1126,13 +1153,23 @@ class WalletService:
 
     @staticmethod
     def task_cash_leg(task):
-        """Cash a driver is holding for one collected task (0 for electronic)."""
+        """Cash a driver is holding for one collected task (0 for electronic).
+
+        A delivery fee taken at the door is always cash and is always the
+        driver's to hand back, even on a task whose COD went through Fawran or a
+        card — so it is added outside the electronic short-circuit below.
+
+        Except on a mixed split: the driver enters the split against the ONE
+        figure he collected (COD + fee), so its cash leg already holds whatever
+        part of the fee came in cash. Adding the fee again counted it twice.
+        """
+        fee = Decimal(str(getattr(task, 'fee_collected_amount', 0) or 0))
         mixed = WalletService.split_cash_leg(task.payment_split)
         if mixed is not None:
             return mixed
         if (task.payment_method or '') in WalletService.ELECTRONIC_METHODS:
-            return Decimal('0.00')
-        return Decimal(str(task.cod_collected_amount or 0))
+            return fee
+        return Decimal(str(task.cod_collected_amount or 0)) + fee
 
     @staticmethod
     def is_electronic_only(task):
@@ -1185,7 +1222,22 @@ class WalletService:
             delivery_task_id__in=base.values('id'),
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-        return max(plain + mixed_cash - abs(refunded), Decimal('0.00'))
+        # Our own delivery fee, taken in cash at the door. It is not the client's
+        # money and never settles onward to them, but it IS in the driver's pocket
+        # and has to come back on the same hand-in — he was given one figure to
+        # collect and does not know which half is which. Keyed off its own field so
+        # a task can carry a fee with no COD and still be submittable.
+        # A mixed split's cash leg already includes any fee paid in cash (the split
+        # is entered against COD + fee), so those tasks are left out here — see
+        # task_cash_leg().
+        fees = delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            cod_settled=False,
+            fee_collected_amount__gt=0,
+        ).exclude(id__in=mixed_ids).aggregate(
+            total=Sum('fee_collected_amount'))['total'] or Decimal('0.00')
+
+        return max(plain + mixed_cash + fees - abs(refunded), Decimal('0.00'))
 
     @staticmethod
     def sync_cod_in_hand(driver, save=True):

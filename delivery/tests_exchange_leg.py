@@ -102,11 +102,21 @@ class ExchangeFeeTests(TestCase):
 
 
 class ExchangeLegWiringTests(TestCase):
-    def test_collect_back_publishes_an_exchange_leg(self):
+    """Since 2026-09-23 collect_back no longer makes an exchange leg.
+
+    That leg carried goods away from a customer and modelled nothing about where
+    they went — no destination, no custody, no record that a driver was holding a
+    seller's stock. The original is now collected by its own task with two real
+    ends, raised when the replacement is delivered. The fee branches below stay,
+    because tasks raised before the change are still on the road.
+    """
+
+    def test_collect_back_no_longer_publishes_an_exchange_leg(self):
         _, order, staff = _fixtures()
         new = services.create_replacement_order(
             order, reason='size_exchange', collect_back=True, user=staff, publish=True)
-        self.assertEqual(new.delivery_task.first().task_leg, 'exchange')
+        self.assertEqual(new.delivery_task.first().task_leg, 'single')
+        self.assertTrue(new.collect_back, 'the seller\'s request must still be recorded')
 
     def test_a_plain_replacement_stays_a_single_leg(self):
         _, order, staff = _fixtures()
@@ -121,7 +131,7 @@ class ExchangeLegWiringTests(TestCase):
         self.assertEqual(new.delivery_task.count(), 0)
         self.assertTrue(new.collect_back)
 
-    def test_a_pick_and_drop_exchange_keeps_both_writes(self):
+    def test_a_pick_and_drop_replacement_keeps_both_writes(self):
         """The client-side zero must not clobber the leg the signal set.
 
         These come from two different places — the leg from the task-creation
@@ -132,7 +142,7 @@ class ExchangeLegWiringTests(TestCase):
         new = services.create_replacement_order(
             order, reason='size_exchange', collect_back=True, user=staff, publish=True)
         task = new.delivery_task.first()
-        self.assertEqual(task.task_leg, 'exchange')
+        self.assertEqual(task.task_leg, 'single')
         self.assertEqual(task.verified_delivery_charge, Decimal('0.00'))
         self.assertEqual(task.dl_price, Decimal('60.00'))
 
@@ -152,7 +162,8 @@ class ExchangeBannerTests(TestCase):
             driver_id=idx, user=drv_user, profile=drv_profile,
             driver_code=f'ED{idx}', driver_phone='2', driver_whatsapp='2',
             driver_languages='english', driver_license_number=f'L{idx}',
-            driver_status='approved', cod_in_hand=Decimal('0.00'))
+            driver_status='approved', dashboard_access_enabled=True,
+            cod_in_hand=Decimal('0.00'))
         task = delivery_models.DeliveryTask.objects.create(
             dl_task_number=f'EX-B-{idx}', order=order, business=business,
             driver=driver, dl_task_status='accepted', task_leg=leg,

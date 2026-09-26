@@ -6,10 +6,12 @@ from fleet import models as fleet_models
 @admin.register(fleet_models.Driver)
 class DriverAdmin(admin.ModelAdmin):
     list_display = ('user', 'driver_code', 'driver_phone',
-                    'driver_whatsapp', 'driver_status', 'driver_availability',
+                    'driver_whatsapp', 'driver_status', 'dashboard_access_enabled',
+                    'driver_availability',
                     'wallet_balance', 'cod_in_hand', 'pending_earnings', 'created_at')
-    list_filter = ('driver_status', 'driver_availability', 'job_type', 'created_at', 'updated_at')
-    search_fields = ('driver_code', 'driver_license_number', 'driver_phone', 'driver_whatsapp',
+    list_filter = ('driver_status', 'dashboard_access_enabled', 'driver_availability',
+                   'job_type', 'created_at', 'updated_at')
+    search_fields = ('driver_code', 'driver_license_number', 'driver_sponsor', 'driver_phone', 'driver_whatsapp',
                      'driver_status', 'job_type', 'driver_bio', 'driver_languages',
                      'driver_reviews', 'driver_availability', 'work_time_slabs',
                      'profile__user_number', 'user__username', 'user__first_name',
@@ -27,9 +29,16 @@ class DriverAdmin(admin.ModelAdmin):
                       'driver_phone', 'driver_whatsapp', 'driver_bio')
         }),
         ('License & Status', {
-            'fields': ('driver_license_number', 'driver_languages', 'driver_status',
+            'fields': ('driver_license_number', 'driver_sponsor', 'driver_languages', 'driver_status',
                       'driver_availability', 'job_type', 'work_time_slabs',
                       'driver_rating', 'driver_rating_count')
+        }),
+        # Cleared to work — sits apart from account standing on purpose. Ops normally
+        # grant this at /workforce/drivers/<id>/, which records who did it and when;
+        # editing it here skips that trail.
+        ('Dashboard Access', {
+            'fields': ('dashboard_access_enabled', 'dashboard_access_granted_at',
+                      'dashboard_access_granted_by'),
         }),
         ('COD Wallet System', {
             'fields': ('wallet_balance', 'credit_limit', 'cod_in_hand',
@@ -358,3 +367,59 @@ class ReceiptTemplateAdmin(admin.ModelAdmin):
                      'created_by__username')
     list_filter = ('template_type', 'paper_size', 'is_default', 'is_active')
     raw_id_fields = ('created_by',)
+
+
+# =============================================================================
+# DRIVER OPPORTUNITIES
+#
+# Ops normally work these on /workforce/fleet/opportunities/. Admin is kept
+# registered because a posting is plain content — unlike driver access, nothing
+# here needs an audit trail the console would otherwise own.
+# =============================================================================
+
+class DriverOpportunitySlotInline(admin.TabularInline):
+    model = fleet_models.DriverOpportunitySlot
+    extra = 1
+    fields = ('starts_at', 'ends_at', 'time_slab', 'capacity', 'status', 'slot_code')
+    readonly_fields = ('slot_code',)
+
+
+@admin.register(fleet_models.DriverOpportunity)
+class DriverOpportunityAdmin(admin.ModelAdmin):
+    list_display = ('title', 'status', 'job_type', 'vehicle_type',
+                    'pickup_location', 'published_at', 'closes_at')
+    list_filter = ('status', 'job_type', 'vehicle_type', 'created_at')
+    search_fields = ('title', 'description', 'pay_note')
+    filter_horizontal = ('zone_groups',)
+    inlines = [DriverOpportunitySlotInline]
+    list_select_related = ('pickup_location',)
+
+
+@admin.register(fleet_models.DriverOpportunitySlot)
+class DriverOpportunitySlotAdmin(admin.ModelAdmin):
+    list_display = ('slot_code', 'opportunity', 'starts_at', 'ends_at',
+                    'capacity', 'confirmed_count', 'status')
+    list_filter = ('status', 'time_slab', 'starts_at')
+    search_fields = ('slot_code', 'opportunity__title')
+    readonly_fields = ('slot_code', 'confirmed_count', 'places_left')
+    list_select_related = ('opportunity',)
+
+
+@admin.register(fleet_models.DriverOpportunityInterest)
+class DriverOpportunityInterestAdmin(admin.ModelAdmin):
+    list_display = ('driver', 'slot', 'status', 'created_at', 'decided_at', 'decided_by')
+    list_filter = ('status', 'created_at')
+    search_fields = ('driver__driver_code', 'slot__slot_code', 'slot__opportunity__title')
+    list_select_related = ('driver', 'slot', 'slot__opportunity', 'decided_by')
+    readonly_fields = ('rider_shift',)
+
+
+@admin.register(fleet_models.DriverProposal)
+class DriverProposalAdmin(admin.ModelAdmin):
+    list_display = ('title', 'status', 'job_type', 'vehicle_type', 'pay_package',
+                    'show_in_driver_app', 'show_on_careers', 'display_order',
+                    'published_at', 'closes_at')
+    list_filter = ('status', 'show_in_driver_app', 'show_on_careers',
+                   'job_type', 'vehicle_type')
+    search_fields = ('title', 'ref_code', 'headline', 'description', 'pay_package')
+    filter_horizontal = ('zone_groups',)

@@ -5,6 +5,7 @@ from payroll import views as payroll_views
 from fleet import views_pay as fleet_pay_views
 from workforce import dispatch_views
 from workforce import crm_views
+from workforce import marketing_views
 from workforce import device_views
 from delivery import views as delivery_views
 from orders import views as orders_views
@@ -35,7 +36,6 @@ urlpatterns = [
 
     # Sellers section urls -------------------------------------------------------------------
     path('sellers/', workforce_views.sellers_list, name='sellers_list'),
-    path('sellers/pending/', workforce_views.sellers_pending, name='sellers_pending'),
     path('sellers/active/', workforce_views.sellers_active, name='sellers_active'),
     path('sellers/inactive/', workforce_views.sellers_inactive, name='sellers_inactive'),
     path('sellers/api-configs/', workforce_views.wf_seller_api_configs, name='wf_seller_api_configs'),
@@ -65,7 +65,6 @@ urlpatterns = [
 
     # Drivers section urls -------------------------------------------------------------------
     path('drivers/', workforce_views.drivers_list, name='drivers_list'),
-    path('drivers/pending/', workforce_views.drivers_pending, name='drivers_pending'),
     path('drivers/active/', workforce_views.drivers_active, name='drivers_active'),
     path('drivers/inactive/', workforce_views.drivers_inactive, name='drivers_inactive'),
     path('drivers/<int:driver_id>/', workforce_views.driver_detail, name='driver_detail'),
@@ -74,6 +73,8 @@ urlpatterns = [
     path('drivers/<int:driver_id>/toggle-status/', workforce_views.driver_toggle_status, name='driver_toggle_status'),
     path('drivers/<int:driver_id>/work-pref/', workforce_views.driver_set_work_pref, name='driver_set_work_pref'),
     path('drivers/<int:driver_id>/set-status/', workforce_views.driver_set_status, name='driver_set_status'),
+    path('drivers/<int:driver_id>/dashboard-access/', workforce_views.driver_set_dashboard_access, name='driver_set_dashboard_access'),
+    path('drivers/<int:driver_id>/wa-thread/', workforce_views.driver_wa_thread, name='driver_wa_thread'),
     path('drivers/<int:driver_id>/vehicle/add/', workforce_views.driver_vehicle_save, name='driver_vehicle_add'),
     path('drivers/<int:driver_id>/vehicle/<int:vehicle_id>/edit/', workforce_views.driver_vehicle_save, name='driver_vehicle_edit'),
     path('drivers/<int:driver_id>/vehicle/<int:vehicle_id>/delete/', workforce_views.driver_vehicle_delete, name='driver_vehicle_delete'),
@@ -219,7 +220,9 @@ urlpatterns = [
     path('returns/<int:custody_id>/destination/', workforce_views.returns_custody_set_destination, name='returns_custody_set_destination'),
     path('returns/<int:custody_id>/forward/', workforce_views.returns_custody_forward, name='returns_custody_forward'),
     path('returns/requests/', workforce_views.returns_requests_list, name='returns_requests_list'),
+    path('returns/requests/new/', workforce_views.returns_request_create, name='returns_request_create'),
     path('returns/requests/<int:return_id>/status/', workforce_views.returns_request_set_status, name='returns_request_set_status'),
+    path('returns/requests/<int:return_id>/schedule-pickup/', workforce_views.returns_request_schedule_pickup, name='returns_request_schedule_pickup'),
     path('returns/bulk-receive/', workforce_views.returns_custody_bulk_receive, name='returns_custody_bulk_receive'),
     path('returns/open/<int:task_id>/', workforce_views.returns_custody_open, name='returns_custody_open'),
 
@@ -257,6 +260,15 @@ urlpatterns = [
 
     # Fleet Accounts URLs
     path('fleet/driver-tasks/', workforce_views.wf_driver_tasks, name='wf_driver_tasks'),
+
+    # Driver opportunities — postings, their dated slots, and who raised a hand
+    path('fleet/opportunities/', workforce_views.wf_opportunities, name='wf_opportunities'),
+    path('fleet/opportunities/new/', workforce_views.wf_opportunity_edit, name='wf_opportunity_new'),
+    path('fleet/opportunities/<int:opportunity_id>/', workforce_views.wf_opportunity_detail, name='wf_opportunity_detail'),
+    path('fleet/opportunities/<int:opportunity_id>/edit/', workforce_views.wf_opportunity_edit, name='wf_opportunity_edit'),
+    path('fleet/opportunities/<int:opportunity_id>/slots/add/', workforce_views.wf_opportunity_slot_save, name='wf_opportunity_slot_save'),
+    path('fleet/opportunities/slots/<int:slot_id>/delete/', workforce_views.wf_opportunity_slot_delete, name='wf_opportunity_slot_delete'),
+    path('fleet/opportunities/interest/<int:interest_id>/decide/', workforce_views.wf_opportunity_interest_decide, name='wf_opportunity_interest_decide'),
     path('fleet/cod-in-hand/', workforce_views.fleet_cod_in_hand, name='fleet_cod_in_hand'),
     path('fleet/location-reviews/', workforce_views.delivery_location_reviews, name='delivery_location_reviews'),
     path('fleet/location-reviews/action/', workforce_views.delivery_location_review_action, name='delivery_location_review_action'),
@@ -308,8 +320,9 @@ urlpatterns = [
     path('fleet/tasks/<int:task_id>/cod-correct/', workforce_views.fleet_task_cod_correct, name='fleet_task_cod_correct'),
     path('fleet/tasks/<int:task_id>/cod-reconcile/', workforce_views.fleet_task_cod_reconcile, name='fleet_task_cod_reconcile'),
 
-    # COD bookkeeping ledger (all COD transactions, filterable)
-    path('fleet/cod-ledger/', workforce_views.cod_ledger, name='cod_ledger'),
+    # Cash ledger (all COD transactions, filterable). The route name stays
+    # cod_ledger because department permissions are stored against it.
+    path('fleet/cash-ledger/', workforce_views.cod_ledger, name='cod_ledger'),
     path('fleet/cod-legacy-reconciliation/', workforce_views.cod_legacy_reconciliation, name='cod_legacy_reconciliation'),
 
     # COD Settlement Report URLs
@@ -444,6 +457,19 @@ urlpatterns = [
     path('forms/pricing-inquiries/<int:inquiry_id>/quote-price/', workforce_views.pricing_inquiry_quote_price, name='pricing_inquiry_quote_price'),
     path('forms/pricing-inquiries/<int:inquiry_id>/add-activity/', workforce_views.pricing_inquiry_add_activity, name='pricing_inquiry_add_activity'),
     path('forms/pricing-inquiries/<int:inquiry_id>/delete-activity/<int:activity_id>/', workforce_views.pricing_inquiry_delete_activity, name='pricing_inquiry_delete_activity'),
+
+    # Driver proposals — the recruitment offer marketing publishes to the driver
+    # app and the public careers page (fleet.DriverProposal)
+    path('marketing/driver-proposals/',
+         marketing_views.wf_driver_proposals, name='wf_driver_proposals'),
+    path('marketing/driver-proposals/new/',
+         marketing_views.wf_driver_proposal_edit, name='wf_driver_proposal_new'),
+    path('marketing/driver-proposals/<int:proposal_id>/edit/',
+         marketing_views.wf_driver_proposal_edit, name='wf_driver_proposal_edit'),
+    path('marketing/driver-proposals/<int:proposal_id>/status/',
+         marketing_views.wf_driver_proposal_status, name='wf_driver_proposal_status'),
+    path('marketing/driver-proposals/<int:proposal_id>/delete/',
+         marketing_views.wf_driver_proposal_delete, name='wf_driver_proposal_delete'),
 
     # CRM Leads
     path('crm/leads/board/', crm_views.crm_leads_board, name='crm_leads_board'),

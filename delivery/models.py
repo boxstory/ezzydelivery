@@ -31,6 +31,7 @@ Related:
 
 import datetime
 from django.db import models
+from django.utils.functional import cached_property
 
 from core import models as core_models
 from orders import models as orders_models
@@ -310,6 +311,19 @@ class DeliveryTask(models.Model):
         null=True, blank=True,
         help_text="When COD was collected"
     )
+    # Our own delivery fee, taken in cash at the door on a job that is not billed
+    # to a client invoice. Deliberately NOT folded into cod_collected_amount: that
+    # figure is the CLIENT's money and settles onward to the business, so a fee
+    # hidden inside it would pay our revenue away. The driver still holds one pile
+    # of cash and hands it back in one submission — see delivery/collect.py.
+    fee_collected_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00,
+        help_text="Delivery fee collected from the customer in cash (Ezzy revenue)"
+    )
+    fee_collected_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the cash delivery fee was collected"
+    )
     cod_settled = models.BooleanField(
         default=False,
         help_text="Whether COD has been submitted/settled with admin"
@@ -565,9 +579,14 @@ class DeliveryTask(models.Model):
         # has to reach the client, usually with a different driver from the one
         # who brought it in. Raised by delivery.services.returns.forward_to_client.
         ('return_to_client', 'Return — Hub to Client'),
+        # The reverse trip: collect goods the customer is sending back and carry
+        # them to the seller. The only leg whose ORIGIN is the customer, which is
+        # why delivery/selectors.py resolves both ends of a task rather than
+        # assuming merchant -> customer.
+        ('collect_from_customer', 'Return — Collect from Customer'),
     ]
     task_leg = models.CharField(
-        max_length=20, choices=TASK_LEG_CHOICES, default='single',
+        max_length=24, choices=TASK_LEG_CHOICES, default='single',
         help_text="Leg type: 'single' = standard delivery. 'hub_delivery' = Leg 2 of hub model."
     )
     source_pickup_task = models.ForeignKey(
@@ -620,6 +639,38 @@ class DeliveryTask(models.Model):
 
     def __str__(self):
         return f"{self.order}-{self.dl_task_number}"
+
+    # The two ends of this leg's trip, resolved per leg type. Cached because the
+    # card template reads several fields off each one and every read would
+    # otherwise re-walk the FKs. See delivery/selectors.py for why a hub leg and
+    # a return leg cannot use the order's pickup location or the order's pin.
+    @cached_property
+    def route_origin(self):
+        from delivery.selectors import task_origin
+        return task_origin(self)
+
+    @cached_property
+    def route_destination(self):
+        from delivery.selectors import task_destination
+        return task_destination(self)
+
+    # The one figure the driver is asked for at this door, and its parts. Cached
+    # because the card, the strip and the detail sheet each read it.
+    @cached_property
+    def collect_amount(self):
+        from delivery.collect import amount_to_collect
+        return amount_to_collect(self)
+
+    @property
+    def collected_total(self):
+        """Everything the driver actually took at this door, both halves.
+
+        The single figure he was shown and handed back. Kept as a property rather
+        than a stored column so it can never disagree with its two parts.
+        """
+        from decimal import Decimal
+        return (Decimal(str(self.cod_collected_amount or 0))
+                + Decimal(str(self.fee_collected_amount or 0)))
 
     @property
     def has_cod(self):

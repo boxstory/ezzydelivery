@@ -38,6 +38,8 @@ TOKEN_GROUPS = [
             ('order_items', 'Item list, e.g. "Shirt x2, Cap x1"'),
             ('order_total', 'Value of the order items, e.g. 250.00'),
             ('cod_amount', 'Cash to collect, e.g. 150.00 (blank when nothing to collect)'),
+            ('delivery_fee', 'Delivery fee the customer pays at the door (blank when the client pays it)'),
+            ('amount_to_pay', 'Total the driver will ask for: COD + door delivery fee, e.g. 170.00'),
             ('payment_method', '"Cash on Delivery" or "Prepaid"'),
         ],
     },
@@ -169,6 +171,8 @@ def build_context(order, task=None, body=''):
         'package_description': order.package_description or '',
         'cod_amount': cod,
         'payment_method': 'Cash on Delivery' if cod else 'Prepaid',
+        'delivery_fee': '',
+        'amount_to_pay': cod,
         # Delivery
         'task_number': (getattr(task, 'dl_task_number', '') or '') if task else '',
         'tracking_link': '',
@@ -196,6 +200,17 @@ def build_context(order, task=None, body=''):
             ctx['tracking_link'] = f'{_site_url()}/track/{task.tracking_token}/'
         ctx['failure_reason'] = _choice_label(task, 'failure_reason', task.failure_reason)
         ctx['reschedule_date'] = _date(task.reschedule_date)
+
+    # The figure the driver's app asks for, so the message and the door agree.
+    # Priced off the task; before one exists there is nothing to add to the COD.
+    priced_task = task
+    if priced_task is None and order.pk:
+        priced_task = order.delivery_task.filter(task_leg__in=('single', 'hub_delivery')).first()
+    if priced_task is not None:
+        from delivery.collect import amount_to_collect
+        due = amount_to_collect(priced_task)
+        ctx['delivery_fee'] = _money(due.fee_due)
+        ctx['amount_to_pay'] = _money(due.total)
 
     used = set(_TOKEN_RE.findall(body or ''))
 

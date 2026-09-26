@@ -468,6 +468,13 @@ def accept_task(request):
                 logger.warning(f"Unapproved driver {driver.driver_id} tried to accept task {task_id}")
                 return JsonResponse({"success": False, "error": "Your driver account is not approved yet"})
 
+            # Approval is only half of it — ops grant dashboard access separately,
+            # and a driver who is verified but not yet cleared may not take work.
+            from fleet.access import has_dashboard_access, NOT_GRANTED_MESSAGE
+            if not has_dashboard_access(driver):
+                logger.warning(f"Driver {driver.driver_id} without dashboard access tried to accept task {task_id}")
+                return JsonResponse({"success": False, "error": NOT_GRANTED_MESSAGE})
+
             # Get task by ID
             task = delivery_models.DeliveryTask.objects.get(id=task_id)
             logger.info(f"Task found: {task.id}, status={task.dl_task_status}, driver={task.driver_id}")

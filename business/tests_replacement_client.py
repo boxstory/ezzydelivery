@@ -110,12 +110,12 @@ class ClientReplacementViewTests(TestCase):
         self.assertTrue(orders_models.Order.objects.get(replaces=order).collect_back)
 
     def test_collect_back_survives_staff_publication(self):
-        """The seller's request has to reach the driver, not just the order row.
+        """The seller's request has to reach a driver, not just the order row.
 
-        The client path stores collect_back on a draft with no task. Only when staff
-        publish it does a task exist, and if that task is born 'single' the driver
-        never sees the collect-the-original banner and the round trip is paid as an
-        ordinary drop — the seller's tick would have been silently discarded.
+        The client path stores collect_back on a draft with no task. It used to be
+        honoured by making that task an 'exchange' leg; since 2026-09-23 it is
+        honoured by raising a separate collection once the replacement is
+        delivered, so what this guards is that the tick survives to that point.
         """
         from orders.status_actions import apply_ready_and_publish
 
@@ -128,7 +128,20 @@ class ClientReplacementViewTests(TestCase):
 
         task = new.delivery_task.first()
         self.assertIsNotNone(task)
-        self.assertEqual(task.task_leg, 'exchange')
+        self.assertEqual(task.task_leg, 'single')
+        new.refresh_from_db()
+        self.assertTrue(new.collect_back)
+
+        # ...and the tick is what raises the collection when it lands.
+        task.dl_task_status = 'out_for_delivery'
+        task._status_actor = 'staff'
+        task.save()
+        task.dl_task_status = 'delivered'
+        task._status_actor = 'staff'
+        task.save()
+        self.assertTrue(
+            orders_models.Order.objects.filter(
+                order_type='return_pickup', business=new.business).exists())
 
     def test_an_ordinary_replacement_is_not_an_exchange(self):
         """Guards the other direction: no collect_back, no round-trip pay."""
@@ -234,16 +247,29 @@ class ReturnStatusGateTests(TestCase):
         business, order, owner, _ = _business()
         ret = self._ret(business, order)
         self.client.force_login(owner)
+        self._post(ret, 'received')
+        ret.refresh_from_db()
+        self.assertEqual(ret.status, 'received')
+
+    def test_a_seller_cannot_schedule_their_own_collection(self):
+        """'pickup_scheduled' used to be a handling step like any other. Since
+        orders.services.create_return_pickup_order it asserts a real collection
+        order exists and a driver is on the way, which is EzzyDelivery's to say —
+        a seller setting it by hand would promise a trip nobody is making."""
+        business, order, owner, _ = _business()
+        ret = self._ret(business, order)
+        self.client.force_login(owner)
         self._post(ret, 'pickup_scheduled')
         ret.refresh_from_db()
-        self.assertEqual(ret.status, 'pickup_scheduled')
+        self.assertEqual(ret.status, 'pending')
+        self.assertIsNone(ret.pickup_order_id)
 
     def test_a_viewer_cannot_even_move_it_through_handling(self):
         """The permission gate covers every write, not just the money one."""
         business, order, _, idx = _business()
         ret = self._ret(business, order)
         self.client.force_login(_member(business, idx, 'viewer'))
-        self._post(ret, 'pickup_scheduled')
+        self._post(ret, 'received')
         ret.refresh_from_db()
         self.assertEqual(ret.status, 'pending')
 

@@ -46,7 +46,7 @@ class DriverJoinForm(SanitizedModelForm):
     """
 
     sanitize_collapse_whitespace = ('driver_phone', 'driver_whatsapp',
-                                    'driver_license_number')
+                                    'driver_license_number', 'driver_sponsor')
 
     class Meta:
         model = fleet_models.Driver
@@ -56,16 +56,19 @@ class DriverJoinForm(SanitizedModelForm):
             'driver_languages',
             'has_driver_license',
             'driver_license_number',
+            'driver_sponsor',
             'driver_bio',
         ]
         labels = {
             "driver_bio": "About Skills & Experience",
+            "driver_sponsor": "Sponsor / Company",
             "has_driver_license": "I have a valid driving license",
         }
         widgets = {
             "driver_bio": forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Write about your skills and experience...'}),
             "has_driver_license": forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
             "driver_license_number": forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 1234567'}),
+            "driver_sponsor": forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Company on your QID'}),
         }
 
     def __init__(self, *args, **kwargs):

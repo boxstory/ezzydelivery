@@ -147,6 +147,12 @@ Each task should have select_related: order, driver, business, pickup_location, 
                                    the driver once he is already at the door. #}
                                 <span class="dl-table__leg-flag" title="Exchange - the driver hands over the replacement and brings the original back">
                                     <i class="fa-solid fa-right-left"></i>Exchange
+                                </span>{% endif %}{% if dl.task_leg == 'collect_from_customer' %}
+                                {# Runs backwards: collects at the customer, drops at the client or a
+                                   hub. Dispatch has to see that before assigning, or it reads as an
+                                   ordinary drop and gets routed like one. #}
+                                <span class="dl-table__leg-flag" title="Collection - the driver picks the goods up from the customer and takes them back">
+                                    <i class="fa-solid fa-rotate-left"></i>Collection
                                 </span>{% endif %}</span>
                             <span class="dl-table__order-num" title="{{ dl.order.client_order_code }}">{{ dl.order.client_order_code|default:"—"|truncatechars:14 }}</span>
                         </div>

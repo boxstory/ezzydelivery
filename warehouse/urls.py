@@ -92,6 +92,8 @@ urlpatterns = [
     # Warehouse Pickup/Dispatch Locations
     path('warehouse-locations/', warehouse_views.warehouse_location_list, name='warehouse_location_list'),
     path('warehouse-locations/add/', warehouse_views.warehouse_location_add, name='warehouse_location_add'),
+    path('warehouse-locations/<int:pk>/edit/', warehouse_views.warehouse_location_edit, name='warehouse_location_edit'),
+    path('warehouse-locations/<int:pk>/delete/', warehouse_views.warehouse_location_delete, name='warehouse_location_delete'),
 
     # Storage Locations (for inventory)
     path('locations/', warehouse_views.location_list, name='location_list'),

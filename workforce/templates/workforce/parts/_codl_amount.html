@@ -1,0 +1,14 @@
+{% comment %}
+Purpose: One line of the ledger's COD / DL fee cell: label and amount.
+Used by: workforce/templates/workforce/cod_ledger.html (called twice per row, a=COD txn then a=fee txn).
+Notes: A missing or zero amount shows a dash. The payment method lives in the Taken at door receipt, not here.
+{% endcomment %}
+{% load humanize %}
+<span class="codl__amts-line">
+  <span class="codl__amts-label">{{ label }}</span>
+  {% if a and a.amount %}
+    <span class="{% if a.amount < 0 %}codl__debit{% else %}codl__credit{% endif %}">{{ a.amount|floatformat:2|intcomma }}</span>
+  {% else %}
+    <span class="codl__muted">—</span>
+  {% endif %}
+</span>

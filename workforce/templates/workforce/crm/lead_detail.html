@@ -9,40 +9,55 @@
 {#        Carries the shared wfnote__ page-notes card under the hero, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260922d" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20260923c" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
 <div class="crm crmd col-12" id="workforce_crm_detail_div_root">
 
+  {% comment %} The band is navy — staff-hero.css paints any *__hero that colour and
+     loads after this page's stylesheet — so everything in here is built for a dark
+     surface. Two lines: who this is, then the state they are in. The identity line
+     carries the name and the channel it arrived on; the state line carries the stage
+     badge and the facts that decide what happens next (owner, when it landed).
+     No middle-dot meta string: each fact is its own plate, so the eye can find one. {% endcomment %}
   <!-- HERO (back link sits in the action row, just before the help button) -->
   <div class="crmd__hero">
     <div class="crmd__hero-info">
-      <h1 class="crmd__hero-name">{{ lead.company_name|default:lead.contact_name|default:lead.phone|default:"Lead" }}</h1>
-      <div class="crmd__hero-sub">
-        {% if lead.contact_name %}<i class="fa-solid fa-user"></i> {{ lead.contact_name }} &nbsp;·&nbsp;{% endif %}
+      <div class="crmd__hero-id">
+        {% comment %} A lead with no company and no contact is named by its phone
+           number, and a number is set as a number: tabular mono, tracked out so
+           the digits can be read back over a call. A company name is not. {% endcomment %}
+        <h1 class="crmd__hero-name{% if not lead.company_name and not lead.contact_name %} crmd__hero-name--num{% endif %}">{{ lead.company_name|default:lead.contact_name|default:lead.phone|default:"Lead" }}</h1>
         <span class="crm__source crm__source--{{ lead.source }}">{{ lead.get_source_display }}</span>
         {% if lead.category == 'driver' %}
-        &nbsp;<span class="crm__cat crm__cat--driver"><i class="fa-solid fa-motorcycle"></i> Driver</span>
+        <span class="crm__cat crm__cat--driver"><i class="fa-solid fa-motorcycle"></i> Driver</span>
         {% endif %}
-        &nbsp;·&nbsp;<i class="fa-solid fa-calendar"></i> {{ lead.created_at|date:"d M Y" }}
-        &nbsp;·&nbsp;
-        <span id="workforce_crm_detail_span_assignee">
-          {% if lead.assigned_to %}{{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }}{% else %}Unassigned{% endif %}
-        </span>
       </div>
-      <div class="crmd__hero-badges">
-        <span class="crm__stage crm__stage--sw-{{ lead.stage_swatch }}" id="workforce_crm_detail_span_stage">
+      <div class="crmd__hero-facts">
+        <span class="crm__stage crm__stage--sw-{{ lead.stage_swatch }} crmd__hero-plate" id="workforce_crm_detail_span_stage">
           <i class="fa-solid fa-circle"></i>{{ lead.stage_label }}
         </span>
         {% if lead.is_overdue %}
-        <span class="crm__stage crm__stage--overdue"><i class="fa-solid fa-triangle-exclamation"></i>Follow-up overdue</span>
+        <span class="crm__stage crm__stage--overdue crmd__hero-plate crmd__hero-plate--alert"><i class="fa-solid fa-triangle-exclamation"></i>Follow-up overdue</span>
         {% endif %}
         {% if lead.converted_business %}
-        <a class="crm__stage crm__stage--won" href="{% url 'workforce:seller_detail' lead.converted_business_id %}">
+        <a class="crm__stage crm__stage--won crmd__hero-plate" href="{% url 'workforce:seller_detail' lead.converted_business_id %}">
           <i class="fa-solid fa-store"></i>Business #{{ lead.converted_business_id }}
         </a>
         {% endif %}
+        {% if lead.company_name and lead.contact_name %}
+        <span class="crmd__hero-fact" title="Contact person">
+          <i class="fa-solid fa-user" aria-hidden="true"></i>{{ lead.contact_name }}
+        </span>
+        {% endif %}
+        <span class="crmd__hero-fact" title="Owner">
+          <i class="fa-solid fa-user-check" aria-hidden="true"></i>
+          <span id="workforce_crm_detail_span_assignee">{% if lead.assigned_to %}{{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }}{% else %}Unassigned{% endif %}</span>
+        </span>
+        <span class="crmd__hero-fact" title="Lead created">
+          <i class="fa-solid fa-calendar" aria-hidden="true"></i>{{ lead.created_at|date:"d M Y" }}
+        </span>
       </div>
     </div>
     <div class="crmd__hero-actions">
@@ -539,9 +554,50 @@
       </div>
       {% endif %}
 
+      {% comment %} The activity log sits with the conversation, not with the
+         controls: both are the record of what has already happened, and reading
+         them together is how staff reconstruct a lead. The right rail is left as
+         the things that CHANGE this lead. {% endcomment %}
+      <!-- TIMELINE -->
+      <div class="crm__panel">
+        <div class="crm__panel-hd">
+          <i class="fa-solid fa-timeline"></i><h3>Timeline</h3>
+          <span class="crmd__count" id="workforce_crm_detail_span_activity_count">{{ activities|length }}</span>
+        </div>
+        <div class="crm__panel-body crm__panel-body--flush">
+          <div id="workforce_crm_detail_div_timeline">
+            {% for activity in activities %}
+            <div class="crmd__tl-item crmd__tl-item--{{ activity.activity_type }}" data-activity-id="{{ activity.pk }}">
+              <div class="crmd__tl-dot"></div>
+              <div class="crmd__tl-card">
+                <div class="crmd__tl-head">
+                  <span class="crmd__tl-type">{{ activity.get_activity_type_display }}</span>
+                  <span class="crmd__tl-time">{{ activity.created_at|date:"d M, H:i" }}</span>
+                  {% if activity.created_by == request.user or request.user.profile.is_superadmin %}
+                  <button class="crmd__tl-del" data-delete-activity="{{ activity.pk }}">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                  {% endif %}
+                </div>
+                <p class="crmd__tl-text">{{ activity.body }}</p>
+                {% if activity.created_by %}
+                <div class="crmd__tl-by">{{ activity.created_by.get_full_name|default:activity.created_by.username }}</div>
+                {% endif %}
+              </div>
+            </div>
+            {% empty %}
+            <div class="crmd__tl-empty" id="workforce_crm_detail_div_timeline_empty">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+              <p>No activity yet</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <!-- RIGHT: manage + timeline -->
+    <!-- RIGHT: the controls that change this lead -->
     <div class="crmd__right">
 
       {% if lead.category == 'driver' %}
@@ -669,7 +725,8 @@
                       rows="3" placeholder="Internal notes about this lead…">{{ lead.notes }}</textarea>
           </div>
 
-          <button class="crm__btn crm__btn--primary w-100" id="workforce_crm_detail_btn_save">
+          {# Ink, not yellow: the page already spends its one yellow on the hero WhatsApp CTA. #}
+          <button class="crm__btn crm__btn--ink w-100" id="workforce_crm_detail_btn_save">
             <i class="fa-solid fa-floppy-disk"></i> Save Changes
           </button>
           <div class="crmd__feedback" id="workforce_crm_detail_div_feedback"></div>
@@ -697,43 +754,6 @@
             <i class="fa-solid fa-plus"></i> Add
           </button>
           <span class="crmd__feedback" id="workforce_crm_detail_span_activity_feedback"></span>
-        </div>
-      </div>
-
-      <!-- TIMELINE -->
-      <div class="crm__panel">
-        <div class="crm__panel-hd">
-          <i class="fa-solid fa-timeline"></i><h3>Timeline</h3>
-          <span class="crmd__count" id="workforce_crm_detail_span_activity_count">{{ activities|length }}</span>
-        </div>
-        <div class="crm__panel-body crm__panel-body--flush">
-          <div id="workforce_crm_detail_div_timeline">
-            {% for activity in activities %}
-            <div class="crmd__tl-item crmd__tl-item--{{ activity.activity_type }}" data-activity-id="{{ activity.pk }}">
-              <div class="crmd__tl-dot"></div>
-              <div class="crmd__tl-card">
-                <div class="crmd__tl-head">
-                  <span class="crmd__tl-type">{{ activity.get_activity_type_display }}</span>
-                  <span class="crmd__tl-time">{{ activity.created_at|date:"d M, H:i" }}</span>
-                  {% if activity.created_by == request.user or request.user.profile.is_superadmin %}
-                  <button class="crmd__tl-del" data-delete-activity="{{ activity.pk }}">
-                    <i class="fa-solid fa-trash-can"></i>
-                  </button>
-                  {% endif %}
-                </div>
-                <p class="crmd__tl-text">{{ activity.body }}</p>
-                {% if activity.created_by %}
-                <div class="crmd__tl-by">{{ activity.created_by.get_full_name|default:activity.created_by.username }}</div>
-                {% endif %}
-              </div>
-            </div>
-            {% empty %}
-            <div class="crmd__tl-empty" id="workforce_crm_detail_div_timeline_empty">
-              <i class="fa-solid fa-clock-rotate-left"></i>
-              <p>No activity yet</p>
-            </div>
-            {% endfor %}
-          </div>
         </div>
       </div>
 
@@ -778,5 +798,5 @@
     csrfToken: "{{ csrf_token }}"
   };
 </script>
-<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260922c"></script>
+<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260922f"></script>
 {% endblock %}

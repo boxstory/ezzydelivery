@@ -67,6 +67,14 @@ urlpatterns = [
      path('profile/',
           fleet_views.driver_profile_mobile, name='driver_profile_mobile'),
 
+     # Opportunities — the board a verified driver sees before ops clear them to
+     # work. Never gate these with driver_dashboard_required: fleet/access.py
+     # redirects here, so gating it would loop.
+     path('opportunities/',
+          fleet_views.opportunities, name='opportunities'),
+     path('opportunities/interest/',
+          fleet_views.opportunity_interest, name='opportunity_interest'),
+
      # Performance & Reports
      path('performance/',
           fleet_views.driver_performance, name='driver_performance'),

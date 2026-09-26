@@ -106,7 +106,9 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                 <i class="fa-solid fa-paper-plane me-1"></i> Publish to Task
             </button>
             {% endif %}
-            {% if order.order_status != 'cancelled' and order.order_status != 'publish' and order.order_status != 'delivered' %}
+            {% comment %}'returned' is terminal like delivered and cancelled — the parcel
+            already went out and came back, so there is nothing left to cancel.{% endcomment %}
+            {% if order.order_status != 'cancelled' and order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'returned' %}
             <button type="button"
                     class="wod__btn wod__btn--danger"
                     id="wod_btn_cancel"
@@ -237,6 +239,8 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                                 <span class="badge bg-success">Published</span>
                                 {% elif order.order_status == 'delivered' %}
                                 <span class="badge bg-success">Delivered</span>
+                                {% elif order.order_status == 'returned' %}
+                                <span class="badge bg-warning text-dark">Returned</span>
                                 {% elif order.order_status == 'cancelled' %}
                                 <span class="badge bg-danger">Cancelled</span>
                                 {% else %}
@@ -309,6 +313,56 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                 </div>
             </div>
 
+            <!-- Pickup Location -->
+            <div class="wod__card">
+                <div class="wod__card-header wod__card-header--primary">
+                    <i class="fa-solid fa-store me-2"></i>
+                    <span class="wod__section-label">Pickup Location</span>
+                </div>
+                <div class="wod__card-body">
+                    {% with pl=order.pickup_location %}
+                    {% if pl %}
+                    <div class="wod__pickup-box">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <p class="mb-0 fw-semibold"><i class="fa-solid fa-store me-1 text-primary"></i>{{ pl.pickup_location_title }}{% if pl.locality %} <span class="text-muted fw-normal small">· {{ pl.locality }}</span>{% endif %}</p>
+                            {% comment %} Trip length — not the driver-to-drop proximity distance the
+                               status timeline below reports. Shared component, so this and
+                               every list on the site quote it the same way. {% endcomment %}
+                            {% include "includes/components/_route_distance.html" with order=order label="drive to drop" %}
+                        </div>
+                        <div class="row g-2 mt-1 small">
+                            <div class="col-12 col-md-4">
+                                <span class="text-muted">Zone / Street / Building</span>
+                                <div>{{ pl.pickup_zone_no|default:"-" }} / {{ pl.pickup_street_no|default:"-" }} / {{ pl.pickup_building_no|default:"-" }}</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <span class="text-muted">Contact</span>
+                                <div>{{ pl.contact_name|default:"-" }}{% if pl.contact_phone %} · {{ pl.contact_phone }}{% endif %}</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <span class="text-muted">Pin</span>
+                                <div class="d-flex align-items-center gap-2">
+                                    {% if pl.pickup_lat and pl.pickup_lon %}
+                                    <a href="https://www.google.com/maps?q={{ pl.pickup_lat }},{{ pl.pickup_lon }}" target="_blank" rel="noopener" title="Open pickup in Google Maps"><i class="fa-solid fa-map-location-dot"></i> Google Maps</a>
+                                    {% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-pickup" lat=pl.pickup_lat lon=pl.pickup_lon label="Pickup location" size="sm" %}
+                                    {% else %}
+                                    <span class="text-muted">No pin</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    {% comment %} No pickup = no start point, so no distance and no rate-card fee. {% endcomment %}
+                    <div class="alert alert-warning mb-0 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <span><i class="fa-solid fa-triangle-exclamation me-1"></i>No pickup location set — the distance and distance-based fee can't be worked out.</span>
+                        <a class="btn btn-sm btn-outline-dark" href="{% url 'workforce:order_edit' order.id %}"><i class="fa-solid fa-pen me-1"></i>Set pickup</a>
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+
             <!-- Delivery Address -->
             <div class="wod__card">
                 <div class="wod__card-header wod__card-header--primary">
@@ -338,20 +392,6 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                         </div>
                     </div>
                     <div class="row g-3">
-                        {% if order.pickup_location %}
-                        <div class="col-12">
-                            <div class="wod__pickup-box d-flex flex-wrap align-items-center justify-content-between gap-2">
-                                <div>
-                                    <label class="form-label text-muted small mb-1">Pickup Location</label>
-                                    <p class="mb-0 fw-semibold"><i class="fa-solid fa-store me-1 text-primary"></i>{{ order.pickup_location.pickup_location_title }}{% if order.pickup_location.locality %} <span class="text-muted fw-normal small">· {{ order.pickup_location.locality }}</span>{% endif %}</p>
-                                </div>
-                                {% comment %} Trip length — not the driver-to-drop proximity distance the
-                                   status timeline below reports. Shared component, so this and
-                                   every list on the site quote it the same way. {% endcomment %}
-                                {% include "includes/components/_route_distance.html" with order=order label="drive to drop" %}
-                            </div>
-                        </div>
-                        {% endif %}
                         <div class="col-12">
                             <div class="wod__delivery-box">
                                 <div class="row g-3">
@@ -616,6 +656,26 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                         <span class="fw-bold">Total:</span>
                         <strong class="text-success fs-5">{{ order.cod_amount|add:order.dl_amount }} QAR</strong>
                     </div>
+                    {% comment %}What the driver actually took at the door, as two figures
+                    rather than one. The driver is shown a single Collect amount and never
+                    splits it himself — the split happens server-side in delivery/collect.py —
+                    so this is the only place the two halves are legible. They are different
+                    money: COD settles onward to the client, the fee is ours.{% endcomment %}
+                    {% if delivery_task %}
+                    <hr>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>COD Collected:</span>
+                        <strong>{{ delivery_task.cod_collected_amount|default:"0.00" }} QAR {% include 'workforce/parts/_collected_methods.html' with rows=collected_by_method.cod %}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Delivery Fee Collected:</span>
+                        <strong>{{ delivery_task.fee_collected_amount|default:"0.00" }} QAR {% include 'workforce/parts/_collected_methods.html' with rows=collected_by_method.fee %}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="fw-bold">Collected by Driver:</span>
+                        <strong class="fs-6">{{ delivery_task.collected_total|default:"0.00" }} QAR</strong>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -676,6 +736,10 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                         {% if delivery_task.cod_collected_amount %}
                         — COD collected: <strong>{{ delivery_task.cod_collected_amount }} QR</strong>
                         (original: {{ order.cod_amount }} QR)
+                        {% endif %}
+                        {% if delivery_task.fee_collected_amount %}
+                        — delivery fee collected: <strong>{{ delivery_task.fee_collected_amount }} QR</strong>
+                        (not billed to the client)
                         {% endif %}
                         <br>
                         {% for ri in return_req.return_items.select_related %}
@@ -941,8 +1005,12 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                 <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="wod_repl_collect_back">
                     <label class="form-check-label" for="wod_repl_collect_back">
-                        Driver takes the original items back on the same visit
+                        Collect the original items back
                     </label>
+                    <div class="wod__repl-hint">
+                        A collection task is raised once this replacement is delivered —
+                        its own trip, with its own pickup and drop-off.
+                    </div>
                 </div>
 
                 <div class="mb-3">

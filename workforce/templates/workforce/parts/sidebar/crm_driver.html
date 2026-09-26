@@ -7,7 +7,6 @@
 {% url 'workforce:crm_whatsapp_inbox' as u_crm_inbox %}
 {% url 'workforce:crm_driver_reports' as u_crm_driver_reports %}
 {% url 'workforce:driver_verification_list' as u_driver_verification_list %}
-{% url 'workforce:drivers_pending' as u_drivers_pending %}
 {% url 'workforce:crm_driver_stages_manage' as u_crm_driver_stages %}
 {% url 'workforce:crm_driver_map' as u_crm_driver_map %}
 {% with active="crm_driver_leads_board,crm_driver_leads_list,crm_driver_stages_manage,crm_driver_reports,crm_driver_map" %}
@@ -22,11 +21,10 @@
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_driver_board" url=u_crm_driver_board icon="fa-solid fa-table-columns" label="Driver Board" active_names="crm_driver_leads_board" badge_var=crm_driver_overdue_count badge_key="crm_driver_overdue" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_driver_list" url=u_crm_driver_list icon="fa-solid fa-table-list" label="Driver Leads" active_names="crm_driver_leads_list" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_driver_map" url=u_crm_driver_map icon="fa-solid fa-map-location-dot" label="Driver Map" active_names="crm_driver_map" %}
-      {# Where the recruitment funnel is actually decided. Operations owns both #}
-      {# pages, so they only appear for staff who can open them. #}
+      {# Where the recruitment funnel is actually decided. Operations owns this #}
+      {# page, so it only appears for staff who can open it. #}
       {% if wf_dept_ops %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_drv_verify" url=u_driver_verification_list icon="fa-solid fa-id-card" label="Driver Verification" %}
-      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_drv_pending" url=u_drivers_pending icon="fa-solid fa-clock" label="Pending Drivers" %}
       {% endif %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_drv_inbox" url=u_crm_inbox icon="fa-brands fa-whatsapp" label="WhatsApp Inbox" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_drv_reports" url=u_crm_driver_reports icon="fa-solid fa-chart-column" label="Reports" active_names="crm_driver_reports" %}

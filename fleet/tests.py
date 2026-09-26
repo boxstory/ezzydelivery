@@ -67,6 +67,11 @@ class DriverTestMixin:
             'driver_languages': 'english',
             'driver_license_number': 'LIC12345',
             'driver_status': driver_status,
+            # Approved in a fixture means "a driver who works" — the same thing the
+            # production backfill said about every driver approved before dashboard
+            # access became a separate permission. A test that wants the not-yet-
+            # cleared state passes dashboard_access_enabled=False explicitly.
+            'dashboard_access_enabled': driver_status == 'approved',
             'credit_limit': Decimal(str(credit_limit)),
             'wallet_balance': Decimal('0.00'),
             'cod_in_hand': Decimal('0.00'),

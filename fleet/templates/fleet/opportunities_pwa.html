@@ -1,0 +1,265 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Driver opportunities board — the standing offers marketing publishes, then the open shifts a verified driver can put their hand up for.
+Used by: fleet.views.opportunities (fleet:opportunities)
+Notes: The gate in fleet/access.py redirects here, so this page must never require dashboard access. Proposals are
+       adverts (fleet.DriverProposal) — read-only on purpose, with no interest button; shifts below are the bookable part.
+{% endcomment %}
+
+{% block title %}Opportunities{% endblock %}
+{% block page_title %}Opportunities{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'fleet/css/fleet-opportunities.css' %}?v=20260924a">
+{% endblock %}
+
+{% block header_actions %}
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()" title="Refresh">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+{% endblock %}
+
+{% block content %}
+
+{% if not has_dashboard_access %}
+<div class="fopp__notice fleet-fade-in">
+    <i class="fa-solid fa-circle-info fopp__notice-icon"></i>
+    <div>
+        <div class="fopp__notice-title">Your account is verified</div>
+        <div class="fopp__notice-text">
+            Full app access hasn't been switched on yet. In the meantime, tell us which
+            shifts below you can work — operations will be in touch.
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if proposals %}
+<div class="fopp__section-title">Offers for drivers</div>
+<ul class="fopp__proplist fleet-slide-up">
+    {% for proposal in proposals %}
+    <li class="fopp__prop">
+        <div class="fopp__prop-head">
+            <div class="fopp__title">{{ proposal.title }}</div>
+            {% if proposal.pay_package %}
+            <span class="fopp__prop-pay">{{ proposal.pay_package }}</span>
+            {% endif %}
+        </div>
+
+        {% if proposal.headline %}
+        <div class="fopp__prop-headline">{{ proposal.headline }}</div>
+        {% endif %}
+
+        {% if proposal.description %}
+        <div class="fopp__desc">{{ proposal.description|linebreaksbr }}</div>
+        {% endif %}
+
+        <div class="fopp__meta">
+            {% if proposal.job_type %}
+            <span class="fopp__meta-item">
+                <i class="fa-solid fa-briefcase"></i>{{ proposal.get_job_type_display }}
+            </span>
+            {% endif %}
+            {% if proposal.vehicle_type %}
+            <span class="fopp__meta-item">
+                <i class="fa-solid fa-truck"></i>{{ proposal.get_vehicle_type_display }}
+            </span>
+            {% endif %}
+            {% for zone in proposal.zone_groups.all %}
+            <span class="fopp__meta-item">
+                <i class="fa-solid fa-location-dot"></i>{{ zone }}
+            </span>
+            {% empty %}
+            <span class="fopp__meta-item">
+                <i class="fa-solid fa-location-dot"></i>Anywhere in Qatar
+            </span>
+            {% endfor %}
+        </div>
+
+        {% if proposal.perk_list %}
+        <div class="fopp__prop-block">
+            <div class="fopp__prop-block-label">What you get</div>
+            <ul class="fopp__prop-points">
+                {% for perk in proposal.perk_list %}
+                <li>{{ perk }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if proposal.requirement_list %}
+        <div class="fopp__prop-block">
+            <div class="fopp__prop-block-label">What we need</div>
+            <ul class="fopp__prop-points">
+                {% for requirement in proposal.requirement_list %}
+                <li>{{ requirement }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div class="fopp__prop-foot">
+            Interested? Message operations on WhatsApp and we will set it up.
+            {% if proposal.closes_at %}
+            <span class="fopp__prop-closes">Offer ends {{ proposal.closes_at|date:"d M Y" }}</span>
+            {% endif %}
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if my_interests %}
+<div class="fopp__section-title">Your shifts</div>
+<div class="fleet-card fleet-slide-up fopp__mine-card">
+    {% for interest in my_interests %}
+    <div class="fopp__mine">
+        <div>
+            <div class="fopp__mine-title">{{ interest.slot.opportunity.title }}</div>
+            <div class="fopp__mine-when">
+                {{ interest.slot.starts_at|date:"D d M, H:i" }} – {{ interest.slot.ends_at|date:"H:i" }}
+            </div>
+        </div>
+        <span class="fopp__state fopp__state--{{ interest.status }}">
+            {{ interest.get_status_display }}
+        </span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="fopp__section-title">Open shifts</div>
+
+{% if rows %}
+<ul class="fopp__list fleet-slide-up">
+    {% for row in rows %}
+    <li class="fopp__card{% if row.slot.time_slab and row.slot.time_slab in driver.work_time_slab_list %} fopp__card--match{% endif %}"
+        data-slot="{{ row.slot.slot_code }}">
+
+        <div class="fopp__card-head">
+            <div class="fopp__title">{{ row.slot.opportunity.title }}</div>
+            {% if row.slot.time_slab and row.slot.time_slab in driver.work_time_slab_list %}
+            <span class="fopp__match-flag">Your hours</span>
+            {% endif %}
+        </div>
+
+        <div class="fopp__when">
+            {{ row.slot.starts_at|date:"D d M" }} · {{ row.slot.starts_at|date:"H:i" }} – {{ row.slot.ends_at|date:"H:i" }}
+        </div>
+
+        {% if row.slot.opportunity.description %}
+        <div class="fopp__desc">{{ row.slot.opportunity.description }}</div>
+        {% endif %}
+
+        <div class="fopp__meta">
+            {% if row.slot.opportunity.vehicle_type %}
+            <span class="fopp__meta-item">
+                <i class="fa-solid fa-truck"></i>{{ row.slot.opportunity.get_vehicle_type_display }}
+            </span>
+            {% endif %}
+            {% if row.slot.opportunity.job_type %}
+            <span class="fopp__meta-item">
+                <i class="fa-solid fa-briefcase"></i>{{ row.slot.opportunity.get_job_type_display }}
+            </span>
+            {% endif %}
+            {% for zone in row.slot.opportunity.zone_groups.all %}
+            <span class="fopp__meta-item">
+                <i class="fa-solid fa-location-dot"></i>{{ zone }}
+            </span>
+            {% endfor %}
+            {% if row.slot.opportunity.pay_note %}
+            <span class="fopp__meta-item">
+                <i class="fa-solid fa-money-bill-wave"></i>{{ row.slot.opportunity.pay_note }}
+            </span>
+            {% endif %}
+            <span class="fopp__meta-item">
+                <i class="fa-solid fa-user-group"></i>
+                <span class="fopp__places{% if row.slot.places_left == 1 %} fopp__places--last{% endif %}">
+                    {{ row.slot.places_left }} place{{ row.slot.places_left|pluralize }} left
+                </span>
+            </span>
+        </div>
+
+        <div class="fopp__actions">
+            {% if row.interest and row.interest.status != 'withdrawn' %}
+                <span class="fopp__state fopp__state--{{ row.interest.status }}">
+                    {{ row.interest.get_status_display }}
+                </span>
+                {% if row.interest.status != 'confirmed' %}
+                <button type="button"
+                        class="fleet-btn fleet-btn--ghost fleet-btn--sm fopp__btn fopp__btn--withdraw"
+                        data-action="withdraw" data-slot="{{ row.slot.slot_code }}">
+                    Withdraw
+                </button>
+                {% endif %}
+            {% else %}
+                <button type="button"
+                        class="fleet-btn fleet-btn--dark fopp__btn"
+                        data-action="interested" data-slot="{{ row.slot.slot_code }}">
+                    <i class="fa-solid fa-hand"></i> I'm interested
+                </button>
+            {% endif %}
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div class="fopp__empty fleet-fade-in">
+    <i class="fa-solid fa-calendar-day"></i>
+    <div class="fopp__empty-title">No open shifts right now</div>
+    <div class="fopp__empty-text">
+        Check back soon — new work is posted here as it comes in.
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Raise or withdraw a hand. The house pattern for CSRF on the PWA is the
+// csrf-token meta tag in pwa_base.html — not a cookie read.
+(function () {
+    const endpoint = "{% url 'fleet:opportunity_interest' %}";
+    const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    document.addEventListener('click', function (event) {
+        const btn = event.target.closest('[data-action][data-slot]');
+        if (!btn) return;
+
+        const action = btn.dataset.action;
+        const slot = btn.dataset.slot;
+
+        btn.disabled = true;
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+        const body = new FormData();
+        body.append('slot_code', slot);
+        body.append('action', action);
+
+        fetch(endpoint, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+            body: body,
+        })
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+            if (data.success) {
+                window.location.reload();
+                return;
+            }
+            btn.disabled = false;
+            btn.innerHTML = original;
+            alert(data.error || 'Could not save that. Please try again.');
+        })
+        .catch(function () {
+            btn.disabled = false;
+            btn.innerHTML = original;
+            alert('Network problem. Please try again.');
+        });
+    });
+})();
+</script>
+{% endblock %}
