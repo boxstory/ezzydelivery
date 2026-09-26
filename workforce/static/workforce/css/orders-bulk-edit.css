@@ -1,0 +1,278 @@
+/*
+ * Purpose: Bulk edit grid for order location + delivery fee (obe__ block).
+ * Used by: workforce/templates/workforce/orders_bulk_edit.html
+ * Notes: Hero and card-header come from staff-hero.css; the filter bar is crm.css's crm__facets.
+ *        Table cells restate font-size with !important to beat orders.css's global 12px tbody rule.
+ */
+
+/* crm__facets reads --crm-ctl-h, which crm.css declares on .crm — not on this page's wrapper. */
+.obe {
+  --crm-ctl-h: 2.25rem;
+}
+
+/* The facet bar is a fixed-track grid that runs off the side next to the sidebar; let it wrap. */
+.obe .crm__facets {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  margin: 0.375rem 0;
+}
+
+.obe__filter-btn {
+  height: var(--crm-ctl-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  font-size: 0.82rem;
+}
+
+/* ---- Fill bar ---------------------------------------------------------- */
+.obe__fill {
+  background: var(--brand-white);
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-sm);
+  padding: 0.375rem 0.75rem;
+  margin-bottom: 0.375rem;
+}
+
+.obe__fill-count {
+  display: flex;
+  flex-direction: column;
+  min-width: 4.5rem;
+  padding-right: 0.75rem;
+  border-right: 1px solid var(--brand-grey-200);
+}
+
+.obe__fill-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--brand-navy);
+}
+
+.obe__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.obe__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500);
+}
+
+.obe__hint {
+  font-size: 0.75rem;
+  color: var(--brand-grey-500);
+  margin-top: 0.375rem;
+}
+
+/* ---- Inputs ------------------------------------------------------------ */
+.obe__in {
+  min-height: 2.1rem;
+  font-size: 0.82rem;
+}
+
+.obe__in:focus {
+  border-color: var(--brand-primary);
+  box-shadow: none;
+}
+
+/* Scoped under .obe: mobile-app.css sets input[type="text"] { width: 100% } (0,1,1), which
+   beats a single class and stretches every input to its cell. */
+.obe .obe__in--num { width: 4.75rem; }
+.obe .obe__in--pin { width: 7.5rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.obe .obe__in--fee { width: 5.75rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.obe .obe__in--pickup {
+  width: auto;
+  min-width: 10rem;
+  max-width: 14rem;
+  padding-right: 2rem;          /* keep long location names clear of the arrow */
+  text-overflow: ellipsis;
+}
+
+.obe__in--changed {
+  border-color: var(--brand-primary-text);
+  background-color: var(--brand-accent);
+}
+
+/* ---- Buttons ----------------------------------------------------------- */
+.obe__btn {
+  min-height: 2.1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-400);
+  color: var(--brand-grey-800);
+}
+
+.obe__btn:hover:not(:disabled) {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+  color: var(--brand-grey-800);
+}
+
+.obe__btn-save {
+  min-height: 2.1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary-dark);
+  color: var(--brand-black);
+}
+
+.obe__btn-save:hover:not(:disabled) {
+  background: var(--brand-primary-dark);
+  color: var(--brand-black);
+}
+
+.obe__btn-save--busy {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+/* ---- Grid -------------------------------------------------------------- */
+.obe__card {
+  border: 1px solid var(--brand-grey-200);
+  border-radius: var(--brand-radius-sm);
+  overflow: hidden;
+}
+
+.obe__table > thead > tr > th {
+  background-color: var(--brand-navy) !important;
+  color: var(--brand-white) !important;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  border: 0;
+  padding: 0.5rem 0.375rem;
+}
+
+.obe__table > tbody > tr > td {
+  font-size: 0.82rem !important;
+  color: var(--brand-grey-800);
+  border-bottom: 1px solid var(--brand-grey-200);
+  padding: 0.375rem;
+}
+
+.obe__table > tbody > tr:hover > td {
+  background-color: var(--brand-grey-50);
+}
+
+.obe__table > tbody > tr.obe__row--dirty > td {
+  background-color: var(--brand-accent);
+}
+
+.obe__table > tbody > tr.obe__row--dirty > td:first-child {
+  box-shadow: inset 3px 0 0 var(--brand-primary);
+}
+
+.obe__col-tick { width: 2rem; }
+
+.obe__table .obe__sub {
+  font-size: 0.75rem !important;
+  color: var(--brand-grey-500);
+}
+
+.obe__table .obe__sub--warn {
+  color: var(--brand-warning-text);
+}
+
+.obe__addr { min-width: 11rem; max-width: 16rem; }
+
+.obe__addr-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.obe__table > tbody > tr > td.obe__locked {
+  color: var(--brand-grey-600);
+}
+
+/* Sits under the order number so the outcome is in view however far the grid is scrolled. */
+.obe__result { max-width: 11rem; margin-top: 0.2rem; }
+.obe__result:empty { display: none; }
+
+/* Result marks: swatch + text, never a filled pill. */
+.obe__status {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.obe__status::before {
+  content: "";
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  margin-top: 0.3em;
+  border-radius: 50%;
+}
+
+.obe__status--ok { color: var(--brand-success); }
+.obe__status--ok::before { background: var(--brand-success-light); }
+.obe__status--warn { color: var(--brand-warning-text); }
+.obe__status--warn::before { background: var(--brand-warning); }
+.obe__status--err { color: var(--brand-danger-dark); }
+.obe__status--err::before { background: var(--brand-danger); }
+.obe__status--idle { color: var(--brand-grey-500); }
+.obe__status--idle::before { background: var(--brand-grey-400); }
+
+/* ---- Sticky save bar --------------------------------------------------- */
+.obe__savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin-top: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--brand-navy);
+  border-radius: var(--brand-radius-sm);
+  box-shadow: var(--brand-shadow-md);
+}
+
+.obe__savebar-text {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--brand-white);
+}
+
+.obe__savebar .obe__btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: var(--brand-white);
+}
+
+.obe__savebar .obe__btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: var(--brand-primary);
+  color: var(--brand-white);
+}
+
+@media (max-width: 575.98px) {
+  .obe__fill-count {
+    border-right: 0;
+    padding-right: 0;
+    min-width: 100%;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.375rem;
+  }
+  .obe__field { flex: 1 1 40%; }
+  .obe .obe__fill .obe__in--num,
+  .obe .obe__fill .obe__in--fee,
+  .obe .obe__fill .obe__in--pickup { width: 100%; max-width: none; }
+}
+
+/* Order numbers read as one code — never break them across lines. */
+.obe__table a.wfmono { white-space: nowrap; }

@@ -58,6 +58,7 @@ _OPS = [
     'order_detail', 'order_edit', 'order_item_add', 'order_item_update', 'order_item_delete',
     'cancel_order', 'duplicate_order', 'create_replacement_order', 'partial_return_order', 'delete_order',
     'publish_order_to_delivery', 'update_order_status', 'bulk_update_order_status',
+    'wf_orders_bulk_edit', 'wf_orders_bulk_edit_save',
     'add_order_comment', 'update_order_coords', 'update_order_zone', 'assign_driver_to_order',
     'submit_to_task', 'order_autoflow_status',
     # Customer delivery comms (not marketing — these are order notifications)

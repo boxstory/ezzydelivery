@@ -468,9 +468,20 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
     <!-- Tab: Orders -->
     <div id="panel-orders" class="sld__panel">
         <h3 class="sld__section-title">
-            <i class="fa-solid fa-box sld__section-icon"></i> Recent Orders
+            <i class="fa-solid fa-box sld__section-icon"></i> Orders
         </h3>
-        {% if recent_orders %}
+        {% comment %}Every order for this client, returned and cancelled included. Links carry
+        #orders so a reload lands back on this tab.{% endcomment %}
+        <nav class="d-flex flex-wrap gap-2 mb-3" aria-label="Filter orders by status" id="workforce_seller_orders_nav_status">
+            <a href="?#orders" class="sld__action-btn {% if not orders_status %}sld__action-btn--on{% endif %}" {% if not orders_status %}aria-current="true"{% endif %}>All <span class="wfmono">{{ order_stats.total_orders|default:0 }}</span></a>
+            <a href="?ostatus=to_review#orders" class="sld__action-btn {% if orders_status == 'to_review' %}sld__action-btn--on{% endif %}">Hold for Review <span class="wfmono">{{ order_stats.to_review_orders|default:0 }}</span></a>
+            <a href="?ostatus=ready_to_pickup#orders" class="sld__action-btn {% if orders_status == 'ready_to_pickup' %}sld__action-btn--on{% endif %}">Ready to pickup <span class="wfmono">{{ order_stats.ready_orders|default:0 }}</span></a>
+            <a href="?ostatus=publish#orders" class="sld__action-btn {% if orders_status == 'publish' %}sld__action-btn--on{% endif %}">Published <span class="wfmono">{{ order_stats.active_orders|default:0 }}</span></a>
+            <a href="?ostatus=delivered#orders" class="sld__action-btn {% if orders_status == 'delivered' %}sld__action-btn--on{% endif %}">Delivered <span class="wfmono">{{ order_stats.delivered_orders|default:0 }}</span></a>
+            <a href="?ostatus=returned#orders" class="sld__action-btn {% if orders_status == 'returned' %}sld__action-btn--on{% endif %}">Returned <span class="wfmono">{{ order_stats.returned_orders|default:0 }}</span></a>
+            <a href="?ostatus=cancelled#orders" class="sld__action-btn {% if orders_status == 'cancelled' %}sld__action-btn--on{% endif %}">Cancelled <span class="wfmono">{{ order_stats.cancelled_orders|default:0 }}</span></a>
+        </nav>
+        {% if seller_orders %}
         <div class="sld__table-wrap">
             <table class="sld__table">
                 <thead>
@@ -479,14 +490,17 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                         <th>Customer</th>
                         <th>Status</th>
                         <th>COD</th>
-                        <th>Date</th>
+                        <th>Fee</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for order in recent_orders %}
+                    {% for order in seller_orders %}
                     <tr>
-                        <td><span class="sld__order-id">{{ order.order_number|default:order.client_order_code|truncatechars:20 }}</span></td>
+                        <td>
+                            <span class="sld__order-id">{{ order.order_number|default:order.client_order_code|truncatechars:20 }}</span>
+                            <div class="sld__customer-phone" title="Order date">{{ order.created_at|date:"d M Y" }}</div>
+                        </td>
                         <td>
                             <div class="sld__customer-name">{{ order.customer_name|default:"N/A" }}</div>
                             {% if order.customer_phone %}
@@ -494,12 +508,20 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                             {% endif %}
                         </td>
                         <td>
-                            <span class="sld__badge {% if order.order_status == 'delivered' %}sld__badge--success{% elif order.order_status == 'pending' %}sld__badge--warning{% elif order.order_status == 'cancelled' or order.order_status == 'failed' %}sld__badge--danger{% else %}sld__badge--muted{% endif %}">
-                                {{ order.order_status|title }}
+                            <span class="sld__badge {% if order.order_status == 'delivered' %}sld__badge--success{% elif order.order_status == 'pending' or order.order_status == 'returned' %}sld__badge--warning{% elif order.order_status == 'cancelled' or order.order_status == 'failed' %}sld__badge--danger{% else %}sld__badge--muted{% endif %}">
+                                {{ order.get_order_status_display }}
                             </span>
+                            {% if order.order_status == 'delivered' or order.order_status == 'returned' %}
+                            {% with done=order.delivered_at|default:order.leg_done_at %}
+                            {% if done %}<div class="sld__customer-phone" title="{% if order.order_status == 'returned' %}Returned{% else %}Delivered{% endif %} date">{{ done|date:"d M Y" }}</div>{% endif %}
+                            {% endwith %}
+                            {% endif %}
                         </td>
                         <td>{{ order.cod_amount|default:0|floatformat:0 }} QAR</td>
-                        <td class="sld__date-cell">{{ order.created_at|date:"d M Y" }}</td>
+                        <td>
+                            <div>{{ order.dl_amount|default:0|floatformat:"-2" }} QAR</div>
+                            <div class="sld__customer-phone">{% if order.dl_amount_source == 'rate_card' %}Rate card{% elif order.dl_amount_source == 'manual' %}Set by staff{% elif order.dl_amount %}Imported{% else %}Not set{% endif %}</div>
+                        </td>
                         <td class="text-end">
                             <div class="sld__row-actions">
                                 <a href="{% url 'workforce:order_detail' order.id %}" class="sld__row-btn" title="View order" aria-label="View order">
@@ -521,10 +543,15 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                 </tbody>
             </table>
         </div>
+        {% if seller_orders.paginator.num_pages > 1 %}
+        <div class="mt-2">
+            {% include "includes/components/_pagination.html" with page_obj=seller_orders filter_params=orders_filter_params page_param="orders_page" show_per_page="false" %}
+        </div>
+        {% endif %}
         {% else %}
         <div class="sld__empty-msg">
             <i class="fa-solid fa-box"></i>
-            No orders yet
+            {% if orders_status %}No orders with this status{% else %}No orders yet{% endif %}
         </div>
         {% endif %}
 
@@ -534,6 +561,9 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                 <i class="fa-solid fa-external-link"></i> View All Orders
             </a>
             {% endif %}
+            <a href="{% url 'workforce:wf_orders_bulk_edit' %}?business={{ business.business_id }}" class="sld__action-btn">
+                <i class="fa-solid fa-pen-to-square"></i> Edit Location &amp; Fee
+            </a>
             <a href="{% url 'workforce:wf_mapping_manager' %}?business={{ business.business_id }}" class="sld__action-btn">
                 <i class="fa-solid fa-diagram-project"></i> Column Mapping
             </a>
@@ -2218,6 +2248,8 @@ document.querySelectorAll('.sld__tab').forEach(function(btn) {
 
 (function openTabFromHash() {
     var tab = (window.location.hash || '').replace('#', '');
+    // The orders pager's links carry no #orders, so land on that tab from its params.
+    if (!tab && /[?&](orders_page|ostatus)=/.test(window.location.search)) tab = 'orders';
     if (!tab) return;
     var btn = document.querySelector('.sld__tab[data-tab="' + tab + '"]');
     if (btn) btn.click();

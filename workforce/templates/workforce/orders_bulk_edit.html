@@ -1,0 +1,256 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff grid for correcting many orders' drop address, pin, pickup point and delivery fee at once
+Used by: workforce_views.orders_bulk_edit at /workforce/orders/bulk-edit/ (saves via orders_bulk_edit_save)
+Notes: Only changed fields are sent. A typed fee is pinned 'manual' so the distance rate card leaves it;
+       0 hands the order back to the rate card. Delivered/returned orders keep the fee editable (it still
+       bills) but lock the address; an invoiced or paid-out charge locks the fee.
+{% endcomment %}
+
+{% block title %}Bulk Edit Location &amp; Fee - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+{% comment %}crm.css carries the shared staff filter bar (crm__facets / crm__facet-select).{% endcomment %}
+<link href="{% static 'workforce/css/crm.css' %}?v=20260923c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/orders-bulk-edit.css' %}?v=20260926c" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+{% csrf_token %}
+<div class="col-12">
+  <div class="wfpage obe" id="workforce_obe_page"
+       data-save-url="{% url 'workforce:wf_orders_bulk_edit_save' %}"
+       data-max-rows="{{ max_rows }}">
+
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Orders &middot; Corrections</span>
+        <h1 class="wfhero__title">Bulk Edit Location &amp; Fee</h1>
+        <span class="wfhero__sub">
+          Fix zone, street, building, pin, pickup point and delivery fee across many orders
+          <span class="wfhero__sep">&middot;</span> a fee of 0 goes back to the client's rate card
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <div class="wfhero__tallies">
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ total_count }}</span>
+            <span class="wfhero__tally-lbl">In view</span>
+          </div>
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ zero_fee_count }}</span>
+            <span class="wfhero__tally-lbl">No fee</span>
+          </div>
+        </div>
+        <nav class="wfhero__actions">
+          <a href="{% url 'workforce:wf_orders_all' %}" class="wfhero__ghost">
+            <i class="fa-solid fa-list me-1" aria-hidden="true"></i>All Orders
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <form method="GET" class="crm__facets" id="workforce_obe_form_filters">
+      {% if ids_filter %}<input type="hidden" name="ids" value="{{ ids_filter }}">{% endif %}
+      <select name="status" class="crm__facet-select {% if status_filter != 'open' %}crm__facet-select--on{% endif %}"
+              data-no-select2 onchange="this.form.submit()" aria-label="Order status">
+        <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open orders</option>
+        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All statuses</option>
+        {% for value, label in status_choices %}
+        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="business" class="crm__facet-select {% if business_filter %}crm__facet-select--on{% endif %}"
+              data-no-select2 onchange="this.form.submit()" aria-label="Client">
+        <option value="">All clients</option>
+        {% for b in businesses %}
+        <option value="{{ b.business_id }}" {% if business_filter == b.business_id|stringformat:"s" %}selected{% endif %}>{{ b.business_name }}</option>
+        {% endfor %}
+      </select>
+      <select name="fee" class="crm__facet-select {% if fee_filter %}crm__facet-select--on{% endif %}"
+              data-no-select2 onchange="this.form.submit()" aria-label="Fee">
+        <option value="">Any fee</option>
+        <option value="zero" {% if fee_filter == 'zero' %}selected{% endif %}>No fee (0)</option>
+        <option value="rate_card" {% if fee_filter == 'rate_card' %}selected{% endif %}>From rate card</option>
+        <option value="manual" {% if fee_filter == 'manual' %}selected{% endif %}>Set by staff</option>
+      </select>
+      <input type="text" name="zone" value="{{ zone_filter }}" class="crm__facet-select" inputmode="numeric"
+             placeholder="Zone no." aria-label="Zone number">
+      <input type="date" name="date_from" value="{{ date_from }}" class="crm__facet-select" aria-label="Order date from">
+      <input type="date" name="date_to" value="{{ date_to }}" class="crm__facet-select" aria-label="Order date to">
+      <input type="search" name="search" value="{{ search }}" class="crm__facet-select"
+             placeholder="Order, customer, phone…" aria-label="Search">
+      <button type="submit" class="btn btn-sm btn-outline-secondary obe__filter-btn">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Filter
+      </button>
+    </form>
+
+    {% if ids_filter %}
+    <div class="alert alert-info py-2 mb-2 d-flex flex-wrap align-items-center gap-2" id="workforce_obe_note_ids">
+      <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+      Showing the orders you ticked on All Orders.
+      <a href="{% url 'workforce:wf_orders_bulk_edit' %}">Show all open orders</a>
+    </div>
+    {% endif %}
+
+    <section class="obe__fill" id="workforce_obe_section_fill" aria-label="Fill ticked rows">
+      <div class="d-flex flex-wrap align-items-end gap-2">
+        <div class="obe__fill-count">
+          <span class="obe__fill-num" id="workforce_obe_text_ticked">0</span>
+          <span class="obe__label">rows ticked</span>
+        </div>
+        <label class="obe__field">
+          <span class="obe__label">Fee (QAR)</span>
+          <input type="text" inputmode="decimal" class="form-control form-control-sm obe__in obe__in--fee" id="workforce_obe_fill_fee" placeholder="—">
+        </label>
+        <label class="obe__field">
+          <span class="obe__label">Zone</span>
+          <input type="text" inputmode="numeric" class="form-control form-control-sm obe__in obe__in--num" id="workforce_obe_fill_zone" placeholder="—">
+        </label>
+        <label class="obe__field">
+          <span class="obe__label">Street</span>
+          <input type="text" inputmode="numeric" class="form-control form-control-sm obe__in obe__in--num" id="workforce_obe_fill_street" placeholder="—">
+        </label>
+        <label class="obe__field">
+          <span class="obe__label">Building</span>
+          <input type="text" inputmode="numeric" class="form-control form-control-sm obe__in obe__in--num" id="workforce_obe_fill_building" placeholder="—">
+        </label>
+        <label class="obe__field">
+          <span class="obe__label">Pickup location</span>
+          <select class="form-select form-select-sm obe__in obe__in--pickup" id="workforce_obe_fill_pickup" data-no-select2 disabled
+                  title="Tick rows from one client to pick their pickup location">
+            <option value="">— one client only —</option>
+          </select>
+        </label>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-sm obe__btn" id="workforce_obe_btn_fill" disabled>
+            <i class="fa-solid fa-fill-drip me-1" aria-hidden="true"></i>Fill ticked rows
+          </button>
+          <button type="button" class="btn btn-sm obe__btn" id="workforce_obe_btn_ratecard" disabled
+                  title="Set the fee to 0 so the client's distance rate card prices these orders">
+            <i class="fa-solid fa-ruler me-1" aria-hidden="true"></i>Fee back to rate card
+          </button>
+        </div>
+      </div>
+      <p class="obe__hint mb-0">Blank fill fields are left alone. A changed zone, street or building with no pin typed is placed from QNAS on save.</p>
+    </section>
+
+    <div class="card obe__card">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0 obe__table" id="workforce_obe_table_orders">
+          <thead>
+            <tr>
+              <th scope="col" class="obe__col-tick">
+                <input type="checkbox" class="form-check-input" id="workforce_obe_check_all" aria-label="Tick all rows">
+              </th>
+              <th scope="col">Order</th>
+              <th scope="col">Client</th>
+              <th scope="col">Fee</th>
+              <th scope="col">Dist.</th>
+              <th scope="col">Customer / address</th>
+              <th scope="col">Zone</th>
+              <th scope="col">Street</th>
+              <th scope="col">Bldg</th>
+              <th scope="col">Pin (lat / lng)</th>
+              <th scope="col">Pickup</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in rows %}
+            <tr class="obe__row" data-order-id="{{ order.id }}" data-business-id="{{ order.business_id }}">
+              <td>
+                <input type="checkbox" class="form-check-input obe__tick" aria-label="Tick order {{ order.order_number }}">
+              </td>
+              <td>
+                <a href="{% url 'workforce:order_detail' order.id %}" class="wfmono" target="_blank" rel="noopener">{{ order.order_number }}</a>
+                <div class="obe__sub">{{ order.get_order_status_display }}</div>
+                <div class="obe__result" data-cell="result" role="status"></div>
+              </td>
+              <td>{{ order.business.business_name }}</td>
+              <td>
+                {% if order.fee_lock %}
+                <span class="wfmono">{{ order.dl_amount }}</span>
+                <div class="obe__sub"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>{{ order.fee_lock }}</div>
+                {% else %}
+                <input type="text" inputmode="decimal" class="form-control form-control-sm obe__in obe__in--fee" data-field="dl_amount" value="{{ order.dl_amount }}" aria-label="Delivery fee">
+                {% endif %}
+                <div class="obe__sub" data-cell="source" data-source="{{ order.dl_amount_source }}">
+                  {% if order.dl_amount_source == 'rate_card' %}Rate card{% elif order.dl_amount_source == 'manual' %}Set by staff{% elif order.dl_amount %}Kept (imported){% else %}Not set{% endif %}
+                </div>
+                {% if order.verified_charge is not None %}
+                <div class="obe__sub obe__sub--warn">Verified {{ order.verified_charge }}</div>
+                {% endif %}
+              </td>
+              <td class="wfmono text-nowrap" data-cell="distance">{% if order.route_distance_km is not None %}{{ order.route_distance_km }} km{% else %}—{% endif %}</td>
+              <td class="obe__addr">
+                <div>{{ order.customer_name|default:"—" }}</div>
+                <div class="obe__sub obe__addr-text" title="{{ order.customer_address }}">{{ order.customer_address|default:"No address text" }}</div>
+                <div class="obe__sub" data-cell="area">{{ order.delivery_area_name }}</div>
+              </td>
+              {% if order.location_lock %}
+              <td colspan="4" class="obe__locked">
+                <span class="wfmono">{{ order.dl_zone|default:"—" }} / {{ order.dl_street|default:"—" }} / {{ order.dl_building|default:"—" }}</span>
+                <div class="obe__sub"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>{{ order.location_lock }}</div>
+              </td>
+              <td class="obe__locked">{{ order.pickup_location.pickup_location_title|default:"—" }}</td>
+              {% else %}
+              <td><input type="text" inputmode="numeric" class="form-control form-control-sm obe__in obe__in--num" data-field="dl_zone" value="{{ order.dl_zone|default_if_none:'' }}" aria-label="Zone"></td>
+              <td><input type="text" inputmode="numeric" class="form-control form-control-sm obe__in obe__in--num" data-field="dl_street" value="{{ order.dl_street|default_if_none:'' }}" aria-label="Street"></td>
+              <td><input type="text" inputmode="numeric" class="form-control form-control-sm obe__in obe__in--num" data-field="dl_building" value="{{ order.dl_building|default_if_none:'' }}" aria-label="Building"></td>
+              <td>
+                <div class="d-flex flex-column gap-1">
+                  <input type="text" inputmode="decimal" class="form-control form-control-sm obe__in obe__in--pin" data-field="latitude" value="{% if order.latitude is not None %}{{ order.latitude|floatformat:'6u' }}{% endif %}" placeholder="lat" aria-label="Latitude">
+                  <input type="text" inputmode="decimal" class="form-control form-control-sm obe__in obe__in--pin" data-field="longitude" value="{% if order.longitude is not None %}{{ order.longitude|floatformat:'6u' }}{% endif %}" placeholder="lng" aria-label="Longitude">
+                </div>
+                <div class="obe__sub" data-cell="accuracy">{{ order.get_coords_accuracy_display|default:"" }}</div>
+              </td>
+              <td>
+                <select class="form-select form-select-sm obe__in obe__in--pickup" data-field="pickup_location" data-no-select2 aria-label="Pickup location">
+                  {% if not order.pickup_location_id %}<option value="" selected>— none —</option>{% endif %}
+                  {% for loc in order.pickup_options %}
+                  <option value="{{ loc.id }}" {% if loc.id == order.pickup_location_id %}selected{% endif %}>{{ loc.label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="11">
+                <div class="empty-state">
+                  <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+                  <p class="mb-0">No orders match these filters.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if page_obj.paginator.num_pages > 1 %}
+      <div class="card-footer">
+        {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="obe__savebar" id="workforce_obe_bar_save" hidden>
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <span class="obe__savebar-text" id="workforce_obe_text_dirty" role="status" aria-live="polite">0 rows changed</span>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm obe__btn" id="workforce_obe_btn_discard">Discard changes</button>
+          <button type="button" class="btn btn-sm obe__btn-save" id="workforce_obe_btn_save">
+            <i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>Save changes
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{{ pickups_by_business|json_script:"workforce_obe_data_pickups" }}
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'workforce/js/orders-bulk-edit.js' %}?v=20260926a"></script>
+{% endblock extra_js %}

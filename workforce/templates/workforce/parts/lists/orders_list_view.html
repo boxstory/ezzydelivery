@@ -254,6 +254,9 @@ Notes: One template, several routes — the queryset differs per view but the co
                 </button>
                 {% include "workforce/parts/components/_export_selectall.html" with total=orders.paginator.count noun="orders" limit=5000 %}
                 {% endif %}
+                <button type="button" class="btn" onclick="orderListOpenBulkEdit()" title="Edit location and delivery fee for the selected orders">
+                    <i class="fa-solid fa-pen-to-square"></i> Bulk Edit
+                </button>
                 <button type="button" class="btn btn-clear" onclick="clearOrderSelection()">
                     <i class="fa-solid fa-xmark"></i> Clear
                 </button>
@@ -746,6 +749,13 @@ Notes: One template, several routes — the queryset differs per view but the co
             selectAllCheckbox.checked = checkboxes.length === allCheckboxes.length && allCheckboxes.length > 0;
             selectAllCheckbox.indeterminate = checkboxes.length > 0 && checkboxes.length < allCheckboxes.length;
         }
+    }
+
+    // Open the bulk location/fee grid on just the ticked orders
+    function orderListOpenBulkEdit() {
+        if (selectedOrders.length === 0) return;
+        const ids = selectedOrders.map(o => parseInt(o.id, 10)).filter(Boolean).join(',');
+        window.location.href = "{% url 'workforce:wf_orders_bulk_edit' %}?ids=" + ids;
     }
 
     // Clear selection

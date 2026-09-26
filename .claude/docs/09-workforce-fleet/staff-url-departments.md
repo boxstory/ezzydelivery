@@ -59,6 +59,8 @@ These cannot be locked to one department: they are the landing page or AJAX help
 | `publish_order_to_delivery` | `orders/<id>/publish/` |
 | `update_order_status` | `orders/<id>/update-status/` |
 | `bulk_update_order_status` | `orders/bulk-update-status/` |
+| `wf_orders_bulk_edit` | `orders/bulk-edit/` |
+| `wf_orders_bulk_edit_save` | `orders/bulk-edit/save/` |
 | `add_order_comment` | `orders/<id>/add-comment/` |
 | `update_order_coords` | `orders/<id>/update-coords/` |
 | `update_order_zone` | `order/<id>/update-zone/` |

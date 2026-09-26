@@ -59,6 +59,7 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 import csv
 import os
 import re
@@ -21404,6 +21405,7 @@ def seller_detail(request, business_id):
         ready_orders=Count('id', filter=Q(order_status='ready_to_pickup')),
         active_orders=Count('id', filter=Q(order_status='publish')),
         delivered_orders=Count('id', filter=Q(order_status='delivered')),
+        returned_orders=Count('id', filter=Q(order_status='returned')),
         cancelled_orders=Count('id', filter=Q(order_status='cancelled')),
     )
 
@@ -21444,8 +21446,30 @@ def seller_detail(request, business_id):
         business=business
     ).only(
         'id', 'order_number', 'client_order_code', 'order_status',
-        'cod_amount', 'customer_name', 'customer_phone', 'created_at'
+        'cod_amount', 'dl_amount', 'dl_amount_source',
+        'customer_name', 'customer_phone', 'created_at'
     ).order_by('-created_at')[:10]
+
+    # The Orders tab lists every order, returned and cancelled included, paged on its
+    # own parameter so it never collides with another pager on this page. ?ostatus=
+    # narrows it to one status; the chips above the table show the counts.
+    orders_status = (request.GET.get('ostatus') or '').strip()
+    if orders_status not in dict(orders_models.ORDER_STATUS_BY_CLIENT):
+        orders_status = ''
+    # A returned order never gets delivered_at, so its date comes from the
+    # customer-bound leg finishing — the same leg the driver was paid for.
+    from django.db.models import Max
+    seller_orders_qs = orders_models.Order.objects.filter(business=business).only(
+        'id', 'order_number', 'client_order_code', 'order_status',
+        'cod_amount', 'dl_amount', 'dl_amount_source',
+        'customer_name', 'customer_phone', 'created_at', 'delivered_at'
+    ).annotate(
+        leg_done_at=Max('delivery_task__completed_at', filter=Q(
+            delivery_task__task_leg__in=('single', 'hub_delivery'))),
+    ).order_by('-created_at')
+    if orders_status:
+        seller_orders_qs = seller_orders_qs.filter(order_status=orders_status)
+    seller_orders, _ = core_paginate(request, seller_orders_qs, default=50, page_param='orders_page')
 
     # Get delivery task statistics
     delivery_stats = delivery_models.DeliveryTask.objects.filter(
@@ -21677,6 +21701,9 @@ def seller_detail(request, business_id):
         'recent_orders_count': recent_orders_count,
         'last_7_days_orders': last_7_days_orders,
         'recent_orders': recent_orders,
+        'seller_orders': seller_orders,
+        'orders_status': orders_status,
+        'orders_filter_params': other_params(request, 'orders_page'),
         'avg_orders_per_month': avg_orders_per_month,
         'documents': documents,
         'products_list': products_list,
@@ -24882,6 +24909,477 @@ def _rebuild_order_package_from_items(order):
     order.package_qty = sum(it.quantity for it in items)
     order.save(update_fields=['package_description', 'package_qty'])
     _push_order_package_to_tasks(order)
+
+
+# --- Bulk edit: delivery location + fee -----------------------------------------
+# One grid for fixing many orders' drop address, pin, pickup point and delivery
+# fee at once. Every save funnels through the same rules as order_edit: a typed fee
+# is pinned 'manual' so the distance rate card leaves it alone, and the task's
+# dl_price (what the client is actually billed) follows it.
+
+# A QNAS lookup can take 10s and nginx cuts every response at 60s, so one save is
+# capped in rows and in geocoding time. A row that runs out of budget is not saved
+# at all (never an address with a stale pin) and the grid keeps it for the next Save.
+BULK_EDIT_MAX_ROWS = 100
+_BULK_EDIT_GEOCODE_BUDGET_S = 35
+
+# Legs that drive to the customer, so their address row is the order's drop
+# address. A return or hub leg goes somewhere else — see delivery/selectors.py.
+_BULK_EDIT_ADDRESS_LEGS = ('single', 'hub_delivery', 'exchange')
+# Legs billed from the order's fee — same set order_edit pushes dl_price onto.
+_BULK_EDIT_FEE_LEGS = ('single', 'hub_delivery')
+
+# Loose box around Qatar. Catches swapped lat/lng and pins typed for another country.
+_QATAR_LAT = (Decimal('24.4'), Decimal('26.3'))
+_QATAR_LNG = (Decimal('50.7'), Decimal('51.7'))
+
+_BULK_EDIT_LABELS = {
+    'dl_zone': 'Zone', 'dl_street': 'Street', 'dl_building': 'Building',
+    'latitude': 'Lat', 'longitude': 'Lng', 'coords_accuracy': 'Pin Source',
+    'pickup_location_id': 'Pickup Location', 'dl_amount': 'DL Amount',
+}
+
+
+def _bulk_edit_location_lock(order):
+    """Why this order's address can't be edited here, or '' when it can."""
+    from delivery.client_rates import CLOSED_ORDER_STATUSES
+    if order.order_status in CLOSED_ORDER_STATUSES:
+        return f'Order is {order.get_order_status_display().lower()} — address locked'
+    return ''
+
+
+def _bulk_edit_fee_lock(order, fee_tasks):
+    """Why this order's fee can't be edited here, or '' when it can.
+
+    Delivered and returned orders stay editable: fees are often corrected after
+    the drop, and the client invoice bills whatever the task carries. What locks
+    it is the charge having left the building — on an invoice or in a payout.
+    """
+    if order.order_type != 'normal_delivery':
+        return 'Priced on its own desk (P2P / return pickup)'
+    if order.order_status == 'cancelled':
+        return 'Order is cancelled'
+    for task in fee_tasks:
+        if task.charge_invoice_id:
+            return f'Charge is on an invoice (task {task.dl_task_number})'
+        if task.settled_delivery_charge is not None:
+            return f'Charge already paid out (task {task.dl_task_number})'
+    return ''
+
+
+def _bulk_edit_fee_tasks(order):
+    return list(order.delivery_task.filter(task_leg__in=_BULK_EDIT_FEE_LEGS).only(
+        'id', 'dl_task_number', 'task_leg', 'dl_task_status', 'charge_invoice_id',
+        'settled_delivery_charge', 'verified_delivery_charge', 'order_id'))
+
+
+def _bulk_edit_snapshot(order):
+    return {
+        'dl_zone': order.dl_zone, 'dl_street': order.dl_street,
+        'dl_building': order.dl_building,
+        'latitude': str(order.latitude or ''), 'longitude': str(order.longitude or ''),
+        'coords_accuracy': order.coords_accuracy or '',
+        'pickup_location_id': order.pickup_location_id,
+        'dl_amount': Decimal(str(order.dl_amount or 0)),
+    }
+
+
+def _bulk_edit_row_values(order):
+    """The stored figures the grid redraws a row from after a save."""
+    return {
+        'dl_zone': order.dl_zone, 'dl_street': order.dl_street,
+        'dl_building': order.dl_building,
+        'latitude': str(order.latitude) if order.latitude is not None else '',
+        'longitude': str(order.longitude) if order.longitude is not None else '',
+        'coords_accuracy': order.coords_accuracy or '',
+        'coords_accuracy_display': order.get_coords_accuracy_display() if order.coords_accuracy else '',
+        'pickup_location': order.pickup_location_id,
+        'dl_amount': str(order.dl_amount or Decimal('0.00')),
+        'dl_amount_source': order.dl_amount_source or '',
+        'route_distance_km': str(order.route_distance_km) if order.route_distance_km is not None else '',
+        'delivery_area_name': order.delivery_area_name or '',
+    }
+
+
+def _sync_task_fee_from_order(order):
+    """Put the order's fee on the task the client is billed from.
+
+    Same rule as order_edit: customer-bound legs only (a return leg is priced on
+    its own), never once the charge is on an invoice or in a payout. Terminal
+    tasks are included on purpose — a fee corrected after delivery must still bill.
+    """
+    return delivery_models.DeliveryTask.objects.filter(
+        order=order, task_leg__in=_BULK_EDIT_FEE_LEGS,
+        charge_invoice__isnull=True, settled_delivery_charge__isnull=True,
+    ).update(dl_price=order.dl_amount or 0)
+
+
+def _sync_task_address_from_order(order):
+    """Copy the order's drop address and pin onto its open customer-bound legs.
+
+    order_edit never did this, so the driver app's address row kept the old
+    zone/street/building. Resolved through task_address(), not either FK directly.
+    """
+    tasks = delivery_models.DeliveryTask.objects.filter(
+        order=order, task_leg__in=_BULK_EDIT_ADDRESS_LEGS,
+    ).exclude(dl_task_status__in=_TASK_TERMINAL_STATUSES).select_related(
+        'dl_address_update', 'dl_to_address')
+    for task in tasks:
+        addr = task_address(task)
+        if not addr:
+            continue
+        addr.dl_zone = order.dl_zone
+        addr.dl_street = order.dl_street
+        addr.dl_building = order.dl_building
+        fields = ['dl_zone', 'dl_street', 'dl_building']
+        if order.latitude is not None and order.longitude is not None:
+            addr.dl_latitude = order.latitude
+            addr.dl_longitude = order.longitude
+            fields += ['dl_latitude', 'dl_longitude']
+        addr.save(update_fields=fields)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@ensure_csrf_cookie
+def orders_bulk_edit(request):
+    """Staff grid for correcting many orders' location and delivery fee at once.
+
+    Filters narrow the grid; ?ids= comes from the All Orders selection bar. Open
+    orders by default — delivered/returned ones can be pulled in to fix a fee
+    before invoicing, with their address locked.
+    """
+    from django.db.models import Prefetch
+    from delivery.client_rates import CLOSED_ORDER_STATUSES
+
+    business_filter = (request.GET.get('business') or '').strip()
+    status_filter = (request.GET.get('status') or 'open').strip()
+    zone_filter = (request.GET.get('zone') or '').strip()
+    fee_filter = (request.GET.get('fee') or '').strip()
+    search = (request.GET.get('search') or '').strip()
+    date_from = (request.GET.get('date_from') or '').strip()
+    date_to = (request.GET.get('date_to') or '').strip()
+    ids_raw = (request.GET.get('ids') or '').strip()
+
+    qs = orders_models.Order.objects.select_related(
+        'business', 'pickup_location',
+    ).prefetch_related(
+        Prefetch('delivery_task',
+                 queryset=delivery_models.DeliveryTask.objects.filter(
+                     task_leg__in=_BULK_EDIT_FEE_LEGS).only(
+                     'id', 'dl_task_number', 'task_leg', 'charge_invoice_id',
+                     'settled_delivery_charge', 'verified_delivery_charge', 'order_id'),
+                 to_attr='fee_tasks'),
+    ).order_by('-id')
+
+    order_ids = [int(x) for x in ids_raw.split(',') if x.strip().isdigit()][:500]
+    if order_ids:
+        # An explicit selection wins over the status default — staff ticked these.
+        qs = qs.filter(id__in=order_ids)
+        if status_filter == 'open' and 'status' not in request.GET:
+            status_filter = 'all'
+
+    valid_statuses = [c[0] for c in orders_models.ORDER_STATUS_BY_CLIENT]
+    if status_filter == 'open':
+        qs = qs.exclude(order_status__in=CLOSED_ORDER_STATUSES)
+    elif status_filter in valid_statuses:
+        qs = qs.filter(order_status=status_filter)
+    else:
+        status_filter = 'all'
+
+    if business_filter.isdigit():
+        qs = qs.filter(business_id=int(business_filter))
+    if zone_filter.isdigit():
+        qs = qs.filter(dl_zone=int(zone_filter))
+    if fee_filter == 'zero':
+        qs = qs.filter(dl_amount=0)
+    elif fee_filter in ('rate_card', 'manual'):
+        qs = qs.filter(dl_amount_source=fee_filter)
+    for raw, lookup in ((date_from, 'order_date__gte'), (date_to, 'order_date__lte')):
+        try:
+            qs = qs.filter(**{lookup: datetime.strptime(raw, '%Y-%m-%d').date()})
+        except ValueError:
+            pass
+    if search:
+        qs = qs.filter(
+            Q(order_number__icontains=search)
+            | Q(client_order_code__icontains=search)
+            | Q(customer_name__icontains=search)
+            | Q(customer_phone__icontains=search)
+            | Q(customer_address__icontains=search)
+        )
+
+    page_obj = paginate_queryset(request, qs, 50)
+    rows = list(page_obj.object_list)
+    for order in rows:
+        order.fee_lock = _bulk_edit_fee_lock(order, order.fee_tasks)
+        order.location_lock = _bulk_edit_location_lock(order)
+        order.verified_charge = next(
+            (t.verified_delivery_charge for t in order.fee_tasks
+             if t.verified_delivery_charge is not None), None)
+
+    # Each row's pickup dropdown lists only its own client's addresses, plus the
+    # one it already has even if that row is now inactive or a P2P one-off.
+    business_ids = {o.business_id for o in rows}
+    pickups = {}
+    for loc in business_models.PickupLocation.objects.filter(
+            business_id__in=business_ids).filter(
+            Q(is_p2p=False, pickup_status='active')
+            | Q(id__in=[o.pickup_location_id for o in rows if o.pickup_location_id])
+    ).order_by('-is_default', 'pickup_location_title'):
+        pickups.setdefault(str(loc.business_id), []).append({
+            'id': loc.id,
+            'label': loc.pickup_location_title + (' (hub)' if loc.is_fulfilment_center else ''),
+        })
+    for order in rows:
+        order.pickup_options = pickups.get(str(order.business_id), [])
+
+    context = {
+        'page_title': 'Bulk Edit Location & Fee',
+        'page_obj': page_obj,
+        'rows': rows,
+        'total_count': page_obj.paginator.count,
+        'zero_fee_count': qs.filter(dl_amount=0).count(),
+        'pickups_by_business': pickups,
+        'businesses': business_models.Business.objects.only(
+            'business_id', 'business_name').order_by('business_name'),
+        'status_choices': orders_models.ORDER_STATUS_BY_CLIENT,
+        'business_filter': business_filter,
+        'status_filter': status_filter,
+        'zone_filter': zone_filter,
+        'fee_filter': fee_filter,
+        'search': search,
+        'date_from': date_from,
+        'date_to': date_to,
+        'ids_filter': ','.join(str(i) for i in order_ids),
+        'max_rows': BULK_EDIT_MAX_ROWS,
+    }
+    return render(request, 'workforce/orders_bulk_edit.html', context)
+
+
+def _bulk_edit_parse_row(order, row, geocode_state):
+    """Apply one grid row to ``order`` in memory.
+
+    Returns (errors, warnings, pin_source, deferred). Nothing is saved here; a row
+    with any error is not saved at all, so a half-applied edit is impossible.
+    """
+    errors, warnings = [], []
+
+    location_keys = ('dl_zone', 'dl_street', 'dl_building', 'latitude', 'longitude')
+    touches_location = any(k in row for k in location_keys) or 'pickup_location' in row
+    location_lock = _bulk_edit_location_lock(order)
+    if touches_location and location_lock:
+        errors.append(location_lock)
+
+    address_changed = False
+    for field in ('dl_zone', 'dl_street', 'dl_building'):
+        if field not in row:
+            continue
+        raw = str(row[field] if row[field] is not None else '').strip()
+        if raw == '':
+            value = None
+        elif raw.isdigit() and int(raw) < 100000:
+            value = int(raw)
+        else:
+            errors.append(f'{_BULK_EDIT_LABELS[field]} must be a whole number')
+            continue
+        if value != getattr(order, field):
+            setattr(order, field, value)
+            address_changed = True
+
+    pin_typed = False
+    if 'latitude' in row or 'longitude' in row:
+        lat_raw = str(row.get('latitude') or '').strip()
+        lng_raw = str(row.get('longitude') or '').strip()
+        if lat_raw or lng_raw:
+            try:
+                lat, lng = Decimal(lat_raw), Decimal(lng_raw)
+            except (InvalidOperation, ValueError):
+                errors.append('Lat and Lng must both be numbers')
+            else:
+                if not (_QATAR_LAT[0] <= lat <= _QATAR_LAT[1]
+                        and _QATAR_LNG[0] <= lng <= _QATAR_LNG[1]):
+                    errors.append('Pin is outside Qatar — lat/lng swapped?')
+                elif lat != order.latitude or lng != order.longitude:
+                    order.latitude, order.longitude = lat, lng
+                    order.coords_accuracy = 'by_staff'
+                    pin_typed = True
+
+    if 'pickup_location' in row:
+        raw = str(row['pickup_location'] or '').strip()
+        if raw and raw != str(order.pickup_location_id or ''):
+            if raw.isdigit() and business_models.PickupLocation.objects.filter(
+                    id=int(raw), business_id=order.business_id).exists():
+                order.pickup_location_id = int(raw)
+            else:
+                errors.append("Pickup location does not belong to this order's client")
+
+    if 'dl_amount' in row:
+        raw = str(row['dl_amount'] if row['dl_amount'] is not None else '').strip()
+        try:
+            fee = Decimal(raw) if raw else Decimal('0')
+        except (InvalidOperation, ValueError):
+            fee = None
+        if fee is None or fee < 0 or fee > Decimal('9999'):
+            errors.append('Fee must be a number between 0 and 9999')
+        elif fee != Decimal(str(order.dl_amount or 0)):
+            fee_lock = _bulk_edit_fee_lock(order, _bulk_edit_fee_tasks(order))
+            if fee_lock:
+                errors.append(fee_lock)
+            else:
+                _set_order_fee_from_post(order, raw or '0')
+
+    if errors:
+        return errors, warnings, '', False
+
+    # The address moved and nobody typed a pin: place it from QNAS, or the pin
+    # keeps pointing at the old building while the plate shows the new one.
+    pin_source = 'Staff bulk edit' if pin_typed else ''
+    if address_changed and not pin_typed and order.dl_zone:
+        import time
+        key = (order.dl_zone, order.dl_street, order.dl_building)
+        if key not in geocode_state['cache']:
+            if time.monotonic() - geocode_state['started'] > _BULK_EDIT_GEOCODE_BUDGET_S:
+                return [], [], '', True
+            from orders.signals import _geocode_address_from_qnas
+            geocode_state['cache'][key] = _geocode_address_from_qnas(*key)
+        lat, lng, tier = geocode_state['cache'][key]
+        if lat is not None and lng is not None:
+            order.latitude, order.longitude = lat, lng
+            order.coords_accuracy = tier
+            pin_source = 'Staff bulk edit (QNAS)'
+        else:
+            warnings.append('QNAS could not place this address — pin unchanged')
+
+    return errors, warnings, pin_source, False
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_http_methods(["POST"])
+def orders_bulk_edit_save(request):
+    """Save the changed rows from the bulk edit grid.
+
+    Body: {"rows": [{"id": 1, "dl_zone": "..", "dl_amount": ".." , ...}]} with only
+    the fields that changed. Each order commits on its own, so one bad row never
+    blocks the rest; the response reports every row and its stored values.
+    """
+    import time
+    from django.db import transaction
+
+    try:
+        payload = json.loads(request.body or b'{}')
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid request body'}, status=400)
+    rows = payload.get('rows') if isinstance(payload, dict) else None
+    if not isinstance(rows, list) or not rows:
+        return JsonResponse({'success': False, 'error': 'No rows to save'}, status=400)
+    if len(rows) > BULK_EDIT_MAX_ROWS:
+        return JsonResponse({
+            'success': False,
+            'error': f'Save at most {BULK_EDIT_MAX_ROWS} rows at a time ({len(rows)} sent)',
+        }, status=400)
+
+    ids = [int(r['id']) for r in rows
+           if isinstance(r, dict) and str(r.get('id', '')).isdigit()]
+    orders = {o.id: o for o in orders_models.Order.objects.select_related(
+        'business', 'pickup_location').filter(id__in=ids)}
+
+    geocode_state = {'started': time.monotonic(), 'cache': {}}
+    results = []
+    counts = {'saved': 0, 'unchanged': 0, 'error': 0, 'deferred': 0}
+
+    for row in rows:
+        row_id = row.get('id') if isinstance(row, dict) else None
+        order = orders.get(int(row_id)) if str(row_id or '').isdigit() else None
+        if order is None:
+            results.append({'id': row_id, 'status': 'error', 'message': 'Order not found'})
+            counts['error'] += 1
+            continue
+
+        before = _bulk_edit_snapshot(order)
+        try:
+            errors, warnings, pin_source, deferred = _bulk_edit_parse_row(
+                order, row, geocode_state)
+            if deferred:
+                order.refresh_from_db()
+                results.append({'id': order.id, 'status': 'deferred',
+                                'message': 'Not saved yet — time ran out looking up addresses. Press Save again.'})
+                counts['deferred'] += 1
+                continue
+            if errors:
+                order.refresh_from_db()
+                results.append({'id': order.id, 'status': 'error', 'message': '; '.join(errors),
+                                'values': _bulk_edit_row_values(order)})
+                counts['error'] += 1
+                continue
+
+            after = _bulk_edit_snapshot(order)
+            if after == before:
+                results.append({'id': order.id, 'status': 'unchanged', 'message': 'No change',
+                                'values': _bulk_edit_row_values(order)})
+                counts['unchanged'] += 1
+                continue
+
+            with transaction.atomic():
+                order._status_changed_by = request.user
+                order.save()
+                # Distance, area and the rate card all write back through queryset
+                # updates in orders.signals; read them so the grid shows what stuck.
+                order.refresh_from_db()
+                after = _bulk_edit_snapshot(order)
+
+                address_fields = ('dl_zone', 'dl_street', 'dl_building', 'latitude', 'longitude')
+                if any(before[f] != after[f] for f in address_fields):
+                    _sync_task_address_from_order(order)
+                if before['dl_amount'] != after['dl_amount']:
+                    _sync_task_fee_from_order(order)
+                    verified = next((t.verified_delivery_charge for t in _bulk_edit_fee_tasks(order)
+                                     if t.verified_delivery_charge is not None), None)
+                    if verified is not None and verified != after['dl_amount']:
+                        warnings.append(
+                            f'Client Charges already verified {verified} — re-verify there to bill the new fee')
+
+                if (before['latitude'], before['longitude']) != (after['latitude'], after['longitude']):
+                    location_history.log_location_update(
+                        order, source=pin_source or 'Staff bulk edit', actor=request.user,
+                        old_lat=before['latitude'] or None, old_lng=before['longitude'] or None,
+                        old_accuracy=before['coords_accuracy'],
+                        new_lat=order.latitude, new_lng=order.longitude,
+                        new_accuracy=order.coords_accuracy or '',
+                        note=f'Zone {order.dl_zone}'
+                             + (f' / Street {order.dl_street}' if order.dl_street else '')
+                             + (f' / Building {order.dl_building}' if order.dl_building else ''),
+                    )
+
+                changes = [
+                    f"{_BULK_EDIT_LABELS[k]}: {before[k] or '—'} → {after[k] or '—'}"
+                    for k in _BULK_EDIT_LABELS if str(before[k]) != str(after[k])
+                ]
+                orders_models.OrderStatusHistory.objects.create(
+                    order=order,
+                    field_name='order_edited',
+                    old_value='',
+                    new_value='edited',
+                    old_display='',
+                    new_display=f'{len(changes)} field{"s" if len(changes) != 1 else ""} changed (bulk edit)',
+                    changed_by=request.user,
+                    notes=('Bulk edit: ' + ', '.join(changes))[:255],
+                )
+        except Exception:
+            logger.exception('Bulk edit failed for order %s', order.pk)
+            results.append({'id': order.id, 'status': 'error',
+                            'message': 'Could not save this order — see the server log'})
+            counts['error'] += 1
+            continue
+
+        results.append({'id': order.id, 'status': 'saved',
+                        'message': '; '.join(warnings) or 'Saved',
+                        'warning': bool(warnings),
+                        'values': _bulk_edit_row_values(order)})
+        counts['saved'] += 1
+
+    return JsonResponse({'success': True, 'counts': counts, 'rows': results})
 
 
 @login_required

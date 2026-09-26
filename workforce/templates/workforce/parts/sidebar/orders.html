@@ -5,7 +5,8 @@
 {% url 'workforce:wf_orders_print_labels' as u_wf_orders_print_labels %}
 {% url 'workforce:wf_orders_to_publish' as u_wf_orders_to_publish %}
 {% url 'workforce:wf_orders_reported' as u_wf_orders_reported %}
-{% with active="wf_orders_all,wf_orders_p2p,wf_orders_print_labels,wf_orders_to_publish,wf_orders_reported,wf_orders_add,order_detail,order_edit,orders_pending_verification" %}
+{% url 'workforce:wf_orders_bulk_edit' as u_wf_orders_bulk_edit %}
+{% with active="wf_orders_all,wf_orders_p2p,wf_orders_print_labels,wf_orders_to_publish,wf_orders_reported,wf_orders_add,order_detail,order_edit,orders_pending_verification,wf_orders_bulk_edit" %}
 <li id="workforce_sidebar_menu_orders" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_orders" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-orders" data-title="Orders">
     <i class="fa-solid fa-box me-2"></i>
@@ -18,6 +19,7 @@
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_add" url=u_wf_orders_add icon="fa-solid fa-plus" label="Add Order" active_names="wf_orders_add" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_all" url=u_wf_orders_all icon="fa-solid fa-list" label="All Orders List" active_names="wf_orders_all,order_detail,order_edit" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_p2p" url=u_wf_orders_p2p icon="fa-solid fa-route" label="P2P Orders" active_names="wf_orders_p2p" badge_var=p2p_pending_count badge_default_zero=True badge_key="p2p_pending" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_bulk_edit" url=u_wf_orders_bulk_edit icon="fa-solid fa-pen-to-square" label="Bulk Edit Location & Fee" active_names="wf_orders_bulk_edit" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_print_labels" url=u_wf_orders_print_labels icon="fa-solid fa-print" label="Print Labels" active_names="wf_orders_print_labels" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_to_publish" url=u_wf_orders_to_publish icon="fa-solid fa-spinner" label="Publish to Task" active_names="wf_orders_to_publish" badge_var=pending_publish_count badge_default_zero=True badge_key="pending_publish" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_wf_orders_reported" url=u_wf_orders_reported icon="fa-solid fa-flag" label="Reported" active_names="wf_orders_reported" %}
