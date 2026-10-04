@@ -73,7 +73,9 @@ from core.departments import (
     ADMIN as dept_ADMIN, FIN as dept_FIN, MKT as dept_MKT, OPS as dept_OPS,
 )
 from core.pagination import paginate as core_paginate, other_params
+from core.destination import is_foreign, order_country
 from django.views.decorators.http import require_http_methods, require_POST
+from PIL import Image
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 import json
 import logging
@@ -83,7 +85,7 @@ from django.core.paginator import (
     PageNotAnInteger,
 )
 from django.urls import reverse
-from django.db.models import Count, F, Q
+from django.db.models import Count, Exists, F, OuterRef, Q
 
 from business import integration_fields
 from business import models as business_models
@@ -558,11 +560,44 @@ def filter_display_labels(c_status, dl_task_status, date_preset):
 DRIVER_FILTER_UNASSIGNED = 'none'
 
 
-def driver_filter_choices():
-    """Approved drivers for the picker, in reading order."""
-    return fleet_models.Driver.objects.filter(
-        driver_status='approved'
-    ).select_related('user').order_by('user__first_name', 'user__last_name')
+def driver_filter_choices(include_ids=None):
+    """Drivers the picker offers: the working fleet, app sign-in or not.
+
+    The pool is every approved driver plus anyone who already carries a
+    delivery task. Both halves matter: an approved driver is someone dispatch
+    can hand a job to, and a driver who has tasks owns work that is on the page
+    right now even if the account was blocked afterwards — a filter that cannot
+    name them hides rows the operator is looking at.
+
+    This was briefly narrowed to drivers holding an active DriverDevice ("can
+    open the app right now"), which turned out to be the wrong question: a
+    device row is revoked the moment the driver signs in on a new handset and
+    the replacement sits at `pending` until the WhatsApp code lands, so the
+    busiest driver on the board vanished from every list mid-verification, and
+    drivers who were never issued a device at all never appeared. App access is
+    now reported on the option instead of deciding who is on it (`has_app`, the
+    same flag the live map shows).
+
+    `include_ids` re-admits drivers already picked on the current querystring,
+    whatever their fleet or app state. Without it a selected driver drops out
+    of the <select>, so the next submit silently discards a filter the page is
+    visibly applying and the applied chip falls back to a bare primary key.
+    """
+    has_tasks = Exists(delivery_models.DeliveryTask.objects.filter(
+        driver_id=OuterRef('driver_id')))
+    has_app = Exists(fleet_models.DriverDevice.objects.filter(
+        user_id=OuterRef('user_id'),
+        status=fleet_models.DriverDevice.STATUS_ACTIVE))
+    condition = Q(driver_status='approved') | Q(has_tasks=True)
+    ids = [int(v) for v in (include_ids or []) if str(v).isdigit()]
+    if ids:
+        condition |= Q(driver_id__in=ids)
+    # EXISTS rather than a join: a driver has one active device and many
+    # revoked ones, and joining either table would multiply the rows.
+    return fleet_models.Driver.objects.annotate(
+        has_tasks=has_tasks, has_app=has_app,
+    ).filter(condition).select_related('user').order_by(
+        'user__first_name', 'user__last_name')
 
 
 def driver_filter_values(request):
@@ -621,7 +656,10 @@ def driver_filter_labels(picked, drivers=None):
     if not picked:
         return []
     if drivers is None:
-        drivers = driver_filter_choices()
+        ids = [int(v) for v in picked
+               if v != DRIVER_FILTER_UNASSIGNED and v.isdigit()]
+        drivers = fleet_models.Driver.objects.filter(
+            driver_id__in=ids).select_related('user')
     names = {}
     for d in drivers:
         full = f'{d.user.first_name} {d.user.last_name}'.strip() if d.user_id else ''
@@ -699,7 +737,7 @@ def apply_order_list_filters(request, orders):
     if date_preset:
         filter_params_list.append(f'datePreset={date_preset}')
 
-    drivers = driver_filter_choices()
+    drivers = driver_filter_choices(drivers_picked)
     context = {
         'all_businesses': business_models.Business.objects.all().order_by('business_name'),
         'filters': {
@@ -1098,7 +1136,7 @@ def all_orders(request):
         filter_params_list.append(f'sort={sort}')
 
     drivers_picked = picked['drivers']
-    all_drivers = driver_filter_choices()
+    all_drivers = driver_filter_choices(drivers_picked)
     filter_params = '&'.join(filter_params_list + driver_filter_params(drivers_picked))
 
     wa_data = _apply_wa_route(_fetch_whatsapp_instances(), 'orders_tasks')
@@ -2794,6 +2832,17 @@ def import_api_orders(request):
                         continue
 
                     o = shopify.Order.find(pid)
+
+                    # Staff picked these ids by hand, so refuse with a reason
+                    # rather than dropping them silently.
+                    if is_foreign(o, api):
+                        skipped += 1
+                        errors.append(
+                            f'{pid}: ships to {order_country(o) or "an unknown country"} '
+                            f'— outside Qatar, not imported'
+                        )
+                        continue
+
                     shipping = getattr(o, 'shipping_address', None)
                     billing = getattr(o, 'billing_address', None)
                     addr = shipping or billing
@@ -2931,6 +2980,16 @@ def import_api_orders(request):
                         errors.append(f"#{pid}: HTTP {r.status_code}")
                         continue
                     o = r.json()
+
+                    # Woo sends shipping.country as bare ISO2, no country_code key.
+                    if is_foreign(o, api):
+                        skipped += 1
+                        errors.append(
+                            f'#{pid}: ships to {order_country(o) or "an unknown country"} '
+                            f'— outside Qatar, not imported'
+                        )
+                        continue
+
                     billing = o.get('billing', {})
                     shipping = o.get('shipping', {})
                     addr_parts = [
@@ -6669,7 +6728,7 @@ def dl_list_all(request):
         'filter_params': filter_params,
         'per_page': request.GET.get('per_page', '50'),
         'filters': filters,
-        'driver_choices': driver_filter_choices(),
+        'driver_choices': driver_filter_choices(filters['driver']),
         'driver_selected': filters['driver'],
         # Print-sheet export: CSV via the shared column picker, plus the A4 sheet.
         'sheet_print_url': reverse('workforce:dl_tasks_print_sheet'),
@@ -7072,7 +7131,7 @@ def fulfilled_clients_tasks(request):
         'page_icon': 'fa-truck-ramp-box',
         'list_type': 'fulfilled',
         'show_filters': True,
-        'driver_choices': driver_filter_choices(),
+        'driver_choices': driver_filter_choices(drivers_picked),
         'driver_selected': drivers_picked,
         'filter_params': dl_task_filter_params(
             code, customer, driver_name, drivers_picked,
@@ -7167,7 +7226,7 @@ def non_fulfilled_clients_tasks(request):
         'page_icon': 'fa-truck-fast',
         'list_type': 'non_fulfilled',
         'show_filters': True,
-        'driver_choices': driver_filter_choices(),
+        'driver_choices': driver_filter_choices(drivers_picked),
         'driver_selected': drivers_picked,
         'filter_params': dl_task_filter_params(
             code, customer, driver_name, drivers_picked,
@@ -7275,7 +7334,7 @@ def dl_list_incompleted_details(request):
         'list_type': 'incompleted',
         'show_filters': True,
         'show_failure_reason': True,
-        'driver_choices': driver_filter_choices(),
+        'driver_choices': driver_filter_choices(drivers_picked),
         'driver_selected': drivers_picked,
         'filter_params': dl_task_filter_params(
             code, customer, driver_name, drivers_picked,
@@ -10197,6 +10256,12 @@ def assign_driver_to_task(request, task_id):
             task._status_changed_by = request.user  # names the staffer on the timeline row
             task.save()
 
+            # Any claim row from the previous holder has to go with them — it
+            # passes the driver-side ownership checks on its own, so a stale one
+            # leaves two drivers able to work the same task.
+            delivery_models.AssignedDriver.objects.filter(
+                dl_task=task).exclude(driver=driver).delete()
+
         driver_name = driver.user.get_full_name() if driver.user else driver.driver_code
 
         return JsonResponse({
@@ -10223,19 +10288,53 @@ def assign_driver_to_task(request, task_id):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def unassign_driver_from_task(request, task_id):
-    """AJAX endpoint to unassign driver from delivery task"""
+    """AJAX endpoint to unassign driver from delivery task.
+
+    Taking the driver off puts the task back in the open pool, so the status
+    resets with it. That is a backward move the forward-only staff rule blocks,
+    which is why the save names `unassign` as the actor — without it the guard
+    reverted the status and the task sat there reading 'accepted' with nobody
+    on it, invisible to every driver.
+    """
     from django.db import transaction
+    from delivery.state_machine import TERMINAL_STATUSES, UNASSIGN_RESET_STATUS
     try:
         with transaction.atomic():
             task = get_object_or_404(
                 delivery_models.DeliveryTask.objects.select_for_update(),
                 id=task_id)
+
+            # A closed task keeps the driver who closed it: the payout, the
+            # client invoice and the outcome history are all built from that
+            # name. Correcting one means assigning the right driver, not
+            # emptying the field.
+            if task.dl_task_status in TERMINAL_STATUSES:
+                return JsonResponse({
+                    'success': False,
+                    'error': (f'This task is already {task.get_dl_task_status_display()} — '
+                              'the driver who closed it stays on the record. '
+                              'Assign the correct driver instead if it is wrong.'),
+                }, status=400)
+
             task.driver = None
-            task.dl_task_status = 'pending'
-            task._status_actor = 'staff'
+            task.dl_task_status = UNASSIGN_RESET_STATUS
+            task.dl_task_status_client = 'for_review'
+            task._status_actor = 'unassign'
             task._status_changed_by = request.user
             task.save()
-        return JsonResponse({'success': True, 'message': 'Driver unassigned successfully', 'task_id': task.id})
+
+            # The claim row outlives the FK: `AssignedDriver` alone is enough to
+            # pass every driver-side ownership check (start ride, deliver,
+            # collect COD), so leaving it behind means the removed driver still
+            # holds the task.
+            delivery_models.AssignedDriver.objects.filter(dl_task=task).delete()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Driver unassigned successfully',
+            'task_id': task.id,
+            'new_status': task.dl_task_status,
+        })
     except Exception as e:
         logger.exception("Error unassigning driver from task %s: %s", task_id, str(e))
         return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'}, status=400)
@@ -10903,12 +11002,16 @@ def business_verification_list(request):
         businesses = businesses.filter(profile__verification_status=verification_filter)
 
     if search:
-        businesses = businesses.filter(
+        search_q = (
             Q(business_name__icontains=search) |
             Q(business_email__icontains=search) |
             Q(business_phone__icontains=search) |
             Q(profile__user__email__icontains=search)
         )
+        # A bare number is also a business id — the seller page links here that way.
+        if search.isdigit():
+            search_q |= Q(business_id=int(search))
+        businesses = businesses.filter(search_q)
 
     # Sort presets. Named rather than column-toggled: this is a card queue, not a
     # table, so one option is a whole reading of the list. The three original keys
@@ -11129,8 +11232,10 @@ def _driver_application_sections(d, zone_groups_exist=None):
         {'label': 'Work preferences', 'done': work_ok,
          'detail': d.get_job_type_display() if d.job_type else 'Not set',
          'todo': 'choose full-time or part-time'},
+        # `wide` — a driver can pick every zone group, so this detail runs far
+        # longer than the others and gets a row of its own on the manifest.
         {'label': 'Zones', 'done': zones_ok, 'detail': zone_detail,
-         'todo': 'pick at least one delivery zone'},
+         'todo': 'pick at least one delivery zone', 'wide': True},
         {'label': 'Timing', 'done': True, 'detail': timing_detail, 'todo': ''},
         {'label': 'Documents', 'done': has_selfie and id_count >= 2,
          'detail': f'Selfie {"uploaded" if has_selfie else "missing"} · {id_count}/2 IDs',
@@ -11278,6 +11383,18 @@ def driver_remind_completion(request, driver_id):
 
 # Newest application first — shared so the export lists cases in review order too.
 DRIVER_VERIFICATION_ORDER = ('-profile__verification_applied_at', '-driver_id')
+
+# Reading order for the document strip in an expanded case: the selfie first
+# (it is what a reviewer matches the ID photos against), then the IDs in the
+# order the public application asks for them. Anything untyped sinks to the end.
+DRIVER_DOC_REVIEW_ORDER = {
+    'Selfie': 0,
+    'QID': 1,
+    'Passport': 2,
+    'Driving License': 3,
+    'Istimara': 4,
+    'National Identification': 5,
+}
 
 
 def _driver_verification_queue(request):
@@ -11430,6 +11547,18 @@ def driver_verification_list(request):
             d.driver_whatsapp or d.profile.whatsapp or d.driver_phone or ''
         ).strip()
         d.last_reminder = (d.driver_meta or {}).get('profile_reminder', {}).get('at', '')
+
+        # Document strip for the expanded case — the prefetch already carries the
+        # rows, so this only orders them and stamps the same expiry reading the
+        # documents desk uses (expiry_state / days_left / has_back).
+        d.review_docs = _stamp_document_state(sorted(
+            d.driver_document.all(),
+            key=lambda doc: (
+                DRIVER_DOC_REVIEW_ORDER.get(doc.document_type, 9),
+                doc.document_type or '',
+                doc.id,
+            ),
+        ))
 
     # Map view — one pin per applicant who let the browser capture a location at
     # registration. Built from the whole filtered set, not just the current page,
@@ -11687,12 +11816,22 @@ def user_verification_list(request):
             for tm in team_list
             if tm.team_status == 'pending' and tm.team_verifed
         ])
+        business = businesses_by_user.get(profile.user_id)
+        driver = drivers_by_user.get(profile.user_id)
+        # Which role the card should present. Passed in from the rows already
+        # fetched above so resolve_role_kind costs no extra query per card.
+        role_kind = core_models.resolve_role_kind(profile, business, driver)
         data = {
             'profile': profile,
             # Show the record whenever it exists: is_business/is_driver are only set
             # once an application is accepted, so gating on them hides applicants.
-            'business': businesses_by_user.get(profile.user_id),
-            'driver': drivers_by_user.get(profile.user_id),
+            'business': business,
+            'driver': driver,
+            'role_kind': role_kind,
+            # A record left behind by a role the user no longer holds — staff
+            # still need to see it, but it must not read as their current role.
+            'stale_business': business is not None and role_kind != 'business',
+            'stale_driver': driver is not None and role_kind != 'driver',
             'user': profile.user,
             'team_memberships': team_list,
             'pending_teams_json': pending_teams_json,
@@ -11820,6 +11959,7 @@ def apply_verification_status(profile, new_status, user, data=None):
                         'driver_name': (f"{profile.first_name or ''} {profile.last_name or ''}".strip()
                                         or profile.username or ''),
                         'driver_phone': driver.driver_phone or '',
+                        'driver_whatsapp': driver.driver_whatsapp or '',
                     })
                 except Exception as e:
                     logger.warning(f"Auto flow failed for driver approved {driver.pk}: {e}")
@@ -11849,6 +11989,8 @@ def apply_verification_status(profile, new_status, user, data=None):
                     'driver_name': (f"{profile.first_name or ''} {profile.last_name or ''}".strip()
                                     or profile.username or ''),
                     'driver_phone': (driver.driver_phone if driver else '') or profile.phone or '',
+                    'driver_whatsapp': ((driver.driver_whatsapp if driver else '')
+                                        or profile.whatsapp or ''),
                     'rejection_reason': rejection_reason or '',
                 })
             except Exception as e:
@@ -11890,6 +12032,148 @@ def update_verification_status(request, profile_id):
         raise
     except Exception as e:
         logger.exception("Error updating verification status for profile %s: %s", profile_id, str(e))
+        return JsonResponse({
+            'success': False,
+            'error': f'Error: {type(e).__name__}: {str(e)}'
+        }, status=400)
+
+
+# Role labels for the staff role-correction endpoint below. 'user' is the
+# no-role state: neither a seller nor a driver, just a signed-up account.
+USER_ROLE_LABELS = [
+    ('business', 'Business'),
+    ('driver', 'Driver'),
+    ('user', 'User (no role)'),
+]
+
+
+def _current_user_role(profile):
+    """The role a profile currently holds, as one of USER_ROLE_LABELS' keys."""
+    if profile.is_business:
+        return 'business'
+    if profile.is_driver:
+        return 'driver'
+    return 'user'
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@api_staff_required
+def change_user_role(request, profile_id):
+    """Staff correction for a sign-up filed under the wrong role.
+
+    A user who applied as a driver but is really a seller (or the reverse) cannot
+    fix it themselves: core.views.join_business turns away anyone with is_driver
+    set, and core.views.join_us_driver turns away anyone with is_business set. So
+    this flips the two flags, optionally closes the record the wrong application
+    left behind, and can send the user back to apply again under the new role.
+
+    Payload:
+        role               'business' | 'driver' | 'user' (required)
+        close_existing     bool — reject the driver row / deactivate the business
+                           row that no longer matches the role (default True)
+        reset_verification bool — send them back to 'incomplete' so they re-apply
+                           under the new role (default True)
+    """
+    from core import models as core_models
+    from django.db import transaction
+
+    try:
+        profile = get_object_or_404(
+            core_models.Profile.objects.select_related('user'), id=profile_id)
+
+        data = json.loads(request.body or '{}')
+        new_role = (data.get('role') or '').strip()
+        valid_roles = [key for key, _ in USER_ROLE_LABELS]
+        if new_role not in valid_roles:
+            return JsonResponse({
+                'success': False,
+                'error': f'Invalid role. Must be one of: {", ".join(valid_roles)}'
+            }, status=400)
+
+        # A staff account's access comes from is_staff and the department flags,
+        # not from these two; flipping them here would only confuse the record.
+        if profile.is_staff:
+            return JsonResponse({
+                'success': False,
+                'error': 'This is a staff account — change staff access on the staff page instead.'
+            }, status=400)
+
+        old_role = _current_user_role(profile)
+        if old_role == new_role:
+            return JsonResponse({
+                'success': False,
+                'error': f'This user is already filed as {dict(USER_ROLE_LABELS)[new_role]}.'
+            }, status=400)
+
+        close_existing = data.get('close_existing', True)
+        reset_verification = data.get('reset_verification', True)
+
+        business = business_models.Business.objects.filter(user_id=profile.user_id).first()
+        driver = fleet_models.Driver.objects.filter(user_id=profile.user_id).first()
+
+        actions = []
+
+        with transaction.atomic():
+            profile.is_business = (new_role == 'business')
+            profile.is_driver = (new_role == 'driver')
+
+            # Only claim the new role's profile is finished when the record that
+            # backs it actually exists — otherwise the user is routed straight
+            # past the registration form they still have to fill in.
+            if new_role == 'business' and business is None:
+                profile.is_business_profile_completed = False
+            if new_role == 'driver' and driver is None:
+                profile.is_driver_profile_completed = False
+
+            actions.append(
+                f"Role changed from {dict(USER_ROLE_LABELS)[old_role]} to "
+                f"{dict(USER_ROLE_LABELS)[new_role]}")
+
+            if close_existing and new_role != 'driver' and driver is not None:
+                driver.driver_status = 'rejected'
+                driver.driver_availability = 'offline'
+                # Road clearance sits on top of driver_status and has to come off
+                # with it, or a closed application keeps its task access.
+                driver.dashboard_access_enabled = False
+                driver.save(update_fields=[
+                    'driver_status', 'driver_availability', 'dashboard_access_enabled'])
+                driver.driver_vehicle.filter(vehicle_status='active').update(
+                    vehicle_status='inactive')
+                actions.append(f"Driver application {driver.driver_code or driver.pk} closed")
+
+            if close_existing and new_role != 'business' and business is not None:
+                business.business_status = 'inactive'
+                business.save(update_fields=['business_status'])
+                actions.append(f"Business {business.business_code or business.pk} set to inactive")
+
+            if reset_verification:
+                profile.verification_status = 'incomplete'
+                profile.verification_applied_at = None
+                profile.verified_at = None
+                profile.verified_by = None
+                profile.rejection_reason = None
+                actions.append("Verification reset to Incomplete — user re-applies in the new role")
+
+            profile.save()
+
+        logger.info(
+            "Profile %s (user %s) role changed %s -> %s by staff user %s; %s",
+            profile.id, profile.user_id, old_role, new_role, request.user.id,
+            '; '.join(actions))
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Role changed to {dict(USER_ROLE_LABELS)[new_role]}',
+            'profile_id': profile.id,
+            'old_role': old_role,
+            'new_role': new_role,
+            'actions': actions,
+        })
+    except Http404:
+        raise
+    except Exception as e:
+        logger.exception("Error changing role for profile %s: %s", profile_id, str(e))
         return JsonResponse({
             'success': False,
             'error': f'Error: {type(e).__name__}: {str(e)}'
@@ -12060,7 +12344,7 @@ def tasks_followup_list(request):
     current_sort = sort_param.replace('-desc', '').replace('-asc', '')
 
     # Get active drivers for filter dropdown
-    active_drivers = driver_filter_choices()
+    active_drivers = driver_filter_choices(driver_filter)
 
     # Staleness ("chase") tiers — how long since the last update. Drives the hero
     # backlog-shape strip and the per-row urgency gutter. Fresh <24h, Aging 1-3d, Stale 3d+.
@@ -12291,7 +12575,7 @@ def tasks_upcoming_list(request):
         else:
             _t.upcoming_reason = 'future'
 
-    active_drivers = driver_filter_choices()
+    active_drivers = driver_filter_choices(driver_filter)
 
     # Build filter params for pagination
     filter_params_nosort = ''
@@ -14544,43 +14828,44 @@ def earnings_verification_action(request):
     })
 
 
-@login_required(login_url='/accounts/login/')
-@staff_required
-def client_charge_verification(request):
-    """Client-side mirror of Earnings Verification — the charge billed to the business.
+def _client_charge_scope(params):
+    """The filtered task set behind the Client Charges console.
 
-    Same working shape as the driver leg: one row per delivered task, the
-    system figure (``dl_price``) shown read-only beside an editable verified
-    figure, bulk set/verify/publish/reject over a checkbox selection, and the
-    driver's activity trail alongside so staff judge the whole job before
-    agreeing a charge.
+    Shared by the list page and the bulk action so "select all matching" can
+    never act on a different set of rows than the page offered a count for.
+    ``params`` is a QueryDict — request.GET on the list, the filter string the
+    action posts back.
 
-    The verified figure is what the business payout deducts. Publishing here
-    books nothing — unlike driver earnings, no transaction is created; the
-    charge is only posted when the payout runs.
+    Returns ``(queryset, filters)``. The queryset is built BEFORE the status
+    cut, because the status cards count the whole queue for the current
+    filters; ``_client_charge_selection`` applies the cut.
     """
-    from django.db.models import Sum
     from delivery import models as delivery_models
     from delivery.charges import BILLABLE_CHARGE
     from datetime import datetime as _datetime, timedelta
 
-    business_id = request.GET.get('business', '')
-    status_filter = request.GET.get('status', 'pending')
-    search_q = (request.GET.get('q') or '').strip()[:80]
-    speed_filter = (request.GET.get('speed') or '').strip()[:40]
-    category_filter = (request.GET.get('category') or '').strip()[:40]
-    zone_filter = (request.GET.get('zone') or '').strip()[:10]
-    sort_key = (request.GET.get('sort') or 'recent').strip()
+    business_id = params.get('business', '')
+    status_filter = params.get('status', 'pending')
+    search_q = (params.get('q') or '').strip()[:80]
+    speed_filter = (params.get('speed') or '').strip()[:40]
+    category_filter = (params.get('category') or '').strip()[:40]
+    zone_filter = (params.get('zone') or '').strip()[:10]
+    sort_key = (params.get('sort') or 'recent').strip()
     # Mirror the page sizes paginate_queryset accepts, so the dropdown can
     # never show a size the pager would silently ignore.
-    per_page = request.GET.get('per_page', '')
+    per_page = params.get('per_page', '')
     if per_page not in ('10', '25', '50', '100'):
         per_page = ''
     # Money bounds are read as Decimal so ?amount_min=abc never 500s.
-    amount_min = safe_decimal(request.GET.get('amount_min'), default=None, minimum=0)
-    amount_max = safe_decimal(request.GET.get('amount_max'), default=None, minimum=0)
+    amount_min = safe_decimal(params.get('amount_min'), default=None, minimum=0)
+    amount_max = safe_decimal(params.get('amount_max'), default=None, minimum=0)
+    # Driving distance, in km, off the stored pickup→drop figure on the order.
+    # A row with no computed distance drops out of a bounded search, which is
+    # right: an unmeasured job cannot be said to be under or over a limit.
+    dist_min = safe_decimal(params.get('dist_min'), default=None, minimum=0)
+    dist_max = safe_decimal(params.get('dist_max'), default=None, minimum=0)
 
-    days = safe_int(request.GET.get('days'), default=90, minimum=1, maximum=365)
+    days = safe_int(params.get('days'), default=90, minimum=1, maximum=365)
 
     def _parse_date(raw):
         try:
@@ -14588,8 +14873,8 @@ def client_charge_verification(request):
         except (TypeError, ValueError):
             return None
 
-    date_from = _parse_date(request.GET.get('from'))
-    date_to = _parse_date(request.GET.get('to'))
+    date_from = _parse_date(params.get('from'))
+    date_to = _parse_date(params.get('to'))
 
     # An explicit from/to window replaces the rolling period — the two would
     # otherwise fight, and the dates staff typed are the more specific intent.
@@ -14615,6 +14900,10 @@ def client_charge_verification(request):
     ).filter(window).select_related(
         'order', 'order__business', 'pickup_location', 'dl_to_address',
         'charge_verified_by', 'driver', 'driver__user',
+        # delivery/selectors.py resolves both ends of a task from these — a
+        # collection leg starts at the customer and a hub leg at a dock row, so
+        # neither can be read off order.pickup_location.
+        'hub_warehouse', 'hub_warehouse__warehouse', 'order__pickup_location',
     ).annotate(billable_amount=BILLABLE_CHARGE)
 
     if business_id:
@@ -14639,6 +14928,11 @@ def client_charge_verification(request):
     if amount_max is not None:
         tasks = tasks.filter(billable_amount__lte=amount_max)
 
+    if dist_min is not None:
+        tasks = tasks.filter(order__route_distance_km__gte=dist_min)
+    if dist_max is not None:
+        tasks = tasks.filter(order__route_distance_km__lte=dist_max)
+
     if search_q:
         text_match = (
             Q(dl_task_number__icontains=search_q)
@@ -14655,6 +14949,76 @@ def client_charge_verification(request):
         if amount_term is not None:
             text_match |= Q(billable_amount=amount_term) | Q(dl_price=amount_term)
         tasks = tasks.filter(text_match)
+
+    return tasks, {
+        'business_id': business_id,
+        'status_filter': status_filter,
+        'search_q': search_q,
+        'speed_filter': speed_filter,
+        'category_filter': category_filter,
+        'zone_filter': zone_filter,
+        'sort_key': sort_key,
+        'per_page': per_page,
+        'amount_min': amount_min,
+        'amount_max': amount_max,
+        'dist_min': dist_min,
+        'dist_max': dist_max,
+        'days': days,
+        'date_from': date_from,
+        'date_to': date_to,
+        'window': window,
+    }
+
+
+def _client_charge_selection(params):
+    """Exactly the rows the current filter matches, status cut included.
+
+    What "all" means for the select-all-matching action.
+    """
+    tasks, f = _client_charge_scope(params)
+    status_filter = f['status_filter']
+    if status_filter and status_filter != 'all':
+        tasks = tasks.filter(charge_verification_status=status_filter)
+    return tasks
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def client_charge_verification(request):
+    """Client-side mirror of Earnings Verification — the charge billed to the business.
+
+    Same working shape as the driver leg: one row per delivered task, the
+    system figure (``dl_price``) shown read-only beside an editable verified
+    figure, bulk set/verify/publish/reject over a checkbox selection, and the
+    driver's activity trail alongside so staff judge the whole job before
+    agreeing a charge.
+
+    The verified figure is what the business payout deducts. Publishing here
+    books nothing — unlike driver earnings, no transaction is created; the
+    charge is only posted when the payout runs.
+    """
+    from django.db.models import Sum
+    from delivery import models as delivery_models
+    from delivery.charges import BILLABLE_CHARGE
+    from datetime import datetime as _datetime, timedelta
+
+    tasks, _f = _client_charge_scope(request.GET)
+    business_id = _f['business_id']
+    status_filter = _f['status_filter']
+    search_q = _f['search_q']
+    speed_filter = _f['speed_filter']
+    category_filter = _f['category_filter']
+    zone_filter = _f['zone_filter']
+    sort_key = _f['sort_key']
+    per_page = _f['per_page']
+    amount_min = _f['amount_min']
+    amount_max = _f['amount_max']
+    dist_min = _f['dist_min']
+    dist_max = _f['dist_max']
+    days = _f['days']
+    date_from = _f['date_from']
+    date_to = _f['date_to']
+    window = _f['window']
 
     # Counts are taken before the status cut, so the three status cards keep
     # showing the whole queue for the current filters instead of zeroing out
@@ -14703,6 +15067,10 @@ def client_charge_verification(request):
         'status_desc': ('-charge_verification_status', _delivered_desc),
         'speed_asc': ('dl_speed', _delivered_desc),
         'speed_desc': ('-dl_speed', _delivered_desc),
+        # Distance sits on the order, not the task. Nulls go last in BOTH
+        # directions — a job with no computed distance is not the shortest one.
+        'dist_asc': (F('order__route_distance_km').asc(nulls_last=True), '-id'),
+        'dist_desc': (F('order__route_distance_km').desc(nulls_last=True), '-id'),
     }
     if sort_key not in SORT_OPTIONS:
         sort_key = 'recent'
@@ -14719,6 +15087,10 @@ def client_charge_verification(request):
         'date': ('date_asc', 'date_desc', 'desc'),
         'delivered': ('oldest', 'recent', 'desc'),
         'service': ('speed_asc', 'speed_desc', 'asc'),
+        # Second sort in the same header: the Service cell prints the distance on
+        # its lower line, so the km link belongs beside Service, not in a column
+        # of its own.
+        'distance': ('dist_asc', 'dist_desc', 'desc'),
         'calculated': ('calc_asc', 'calc_desc', 'desc'),
         'verified': ('amount_asc', 'amount_desc', 'desc'),
         'status': ('status_asc', 'status_desc', 'asc'),
@@ -14754,23 +15126,58 @@ def client_charge_verification(request):
     for task in tasks_paginated:
         task.activity_log = logs_by_task.get(task.id, [])
 
-    # Drop leg for the Route column. The task's own dl_to_address FK is usually
-    # null (the address row is written against the order, not the task), and
-    # even when it exists area_name is typically blank — so the zone number
-    # comes from the order and the area name from the ZoneName table.
+    # Both ends of the Route column come from delivery/selectors.py, never from
+    # order.pickup_location: a return pickup runs customer → seller and a hub leg
+    # starts at a dock row, so reading the merchant as the origin printed those
+    # trips backwards. The selectors already encode which way each leg faces.
+    from delivery.selectors import task_origin, task_destination
+
     def _zone_int(value):
         try:
             return int(str(value).strip())
         except (TypeError, ValueError):
             return None
 
+    # A leg that is not a plain merchant → customer drop is named on the row.
+    # Only the exceptions are labelled, so the badge means something.
+    LEG_LABELS = {
+        'collect_from_customer': 'Collect from customer',
+        'return_to_client': 'Return to client',
+        'exchange': 'Exchange',
+        'hub_delivery': 'Hub leg',
+    }
+
     page_zone_nums = set()
     for task in tasks_paginated:
-        zone = _zone_int(getattr(task.dl_to_address, 'dl_zone', None)) \
-            or _zone_int(getattr(task.order, 'dl_zone', None))
-        task.drop_zone = zone
-        if zone:
-            page_zone_nums.add(zone)
+        origin = task_origin(task)
+        dest = task_destination(task)
+
+        task.leg_label = LEG_LABELS.get(task.task_leg or 'single', '')
+
+        # The origin resolver returns a label but no zone — it comes from
+        # whichever end that leg actually starts at.
+        if task.task_leg == 'collect_from_customer':
+            task.route_from = origin.label or 'Customer'
+            task.pickup_zone = _zone_int(getattr(task.order, 'dl_zone', None))
+        else:
+            # The label and the zone must come from the SAME pickup row. The task
+            # carries its own FK and the order carries another; they agree on all
+            # but a couple of rows, but the task's is null on ~6% so the order's
+            # is the fallback rather than printing "No pickup" over a known one.
+            pickup = (getattr(task.order, 'pickup_location', None)
+                      or task.pickup_location)
+            task.route_from = (getattr(pickup, 'pickup_location_title', '')
+                               or origin.label or '')
+            task.pickup_zone = _zone_int(getattr(pickup, 'pickup_zone_no', None))
+
+        task.drop_zone = _zone_int(dest.zone)
+        # address_text is the named end (a client office); for a customer drop it
+        # is their own words about the flat, which the area name says better.
+        task.drop_label = '' if dest.is_customer else (dest.address_text or '')
+        task._dest_area = (dest.area or '').strip()
+        for z in (task.pickup_zone, task.drop_zone):
+            if z:
+                page_zone_nums.add(z)
 
     zone_names = dict(
         delivery_models.ZoneName.objects.filter(zone_number__in=page_zone_nums)
@@ -14778,10 +15185,11 @@ def client_charge_verification(request):
     ) if page_zone_nums else {}
 
     for task in tasks_paginated:
-        task.drop_area = (
-            (getattr(task.dl_to_address, 'area_name', '') or '').strip()
-            or zone_names.get(task.drop_zone, '')
-        )
+        task.drop_area = (task.drop_label
+                          or task._dest_area
+                          or zone_names.get(task.drop_zone, ''))
+        if not task.route_from:
+            task.route_from = zone_names.get(task.pickup_zone, '')
 
     # Keep the filters alive across pages — the shared pagination component
     # appends this to every page link. `page` is deliberately absent so the
@@ -14796,6 +15204,8 @@ def client_charge_verification(request):
         ('q', search_q),
         ('amount_min', '' if amount_min is None else amount_min),
         ('amount_max', '' if amount_max is None else amount_max),
+        ('dist_min', '' if dist_min is None else dist_min),
+        ('dist_max', '' if dist_max is None else dist_max),
         ('speed', speed_filter),
         ('category', category_filter),
         ('zone', zone_filter),
@@ -14839,6 +15249,8 @@ def client_charge_verification(request):
         'search_q': search_q,
         'amount_min': request.GET.get('amount_min', '') if amount_min is not None else '',
         'amount_max': request.GET.get('amount_max', '') if amount_max is not None else '',
+        'dist_min': request.GET.get('dist_min', '') if dist_min is not None else '',
+        'dist_max': request.GET.get('dist_max', '') if dist_max is not None else '',
         'date_from': request.GET.get('from', '') if date_from else '',
         'date_to': request.GET.get('to', '') if date_to else '',
         'speed_choices': delivery_models.DeliveryTask.DL_SPEED_CHOICES,
@@ -14880,22 +15292,51 @@ def client_charge_verification_action(request):
         return JsonResponse({'error': 'POST required'}, status=405)
 
     MAX_CHARGE = Decimal('10000')
+    # Ceiling for "select all matching". Higher than the 500 the browser may post
+    # as ids, because the set is resolved here rather than carried in the body —
+    # but still bounded, so a filter nobody narrowed cannot walk the whole table.
+    MAX_SELECT_ALL = 3000
 
     action = request.POST.get('action', '')
+    select_all = request.POST.get('select_all') == '1'
     task_ids = request.POST.getlist('task_ids[]')
     charge_updates = request.POST.get('charge_updates', '{}')
 
     if action not in ('set_amount', 'verify', 'publish', 'reject'):
         return JsonResponse({'error': 'Unknown action'}, status=400)
+
+    if select_all:
+        # The page offered a count, not 500 checkboxes. Rebuild the set from the
+        # same helper the list used so the rows acted on are exactly the rows
+        # that count promised — a posted id list would silently stop at one page.
+        from django.http import QueryDict
+        posted_filters = request.POST.get('filters', '').strip()
+        # An empty string is NOT "no filter": the scope helper would fall back to
+        # its own defaults (pending, last 90 days, every business) and act on far
+        # more than the page showed. The page always posts at least a status.
+        if not posted_filters:
+            return JsonResponse(
+                {'error': 'Could not read the current filter — reload the page and try again'},
+                status=400)
+        task_ids = list(
+            _client_charge_selection(QueryDict(posted_filters))
+            .values_list('id', flat=True)
+        )
+        if len(task_ids) > MAX_SELECT_ALL:
+            return JsonResponse({
+                'error': f'{len(task_ids):,} deliveries match — narrow the filter '
+                         f'to {MAX_SELECT_ALL:,} or fewer',
+            }, status=400)
+    else:
+        if len(task_ids) > 500:
+            return JsonResponse({'error': 'Maximum 500 deliveries at once'}, status=400)
+        try:
+            task_ids = [int(t) for t in task_ids]
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'Invalid delivery reference'}, status=400)
+
     if not task_ids:
         return JsonResponse({'error': 'No deliveries selected'}, status=400)
-    if len(task_ids) > 500:
-        return JsonResponse({'error': 'Maximum 500 deliveries at once'}, status=400)
-
-    try:
-        task_ids = [int(t) for t in task_ids]
-    except (TypeError, ValueError):
-        return JsonResponse({'error': 'Invalid delivery reference'}, status=400)
 
     try:
         charges_dict = json.loads(charge_updates) if charge_updates else {}
@@ -15874,6 +16315,7 @@ def cod_settlement_action(request):
                         execute_flows_for_trigger('staff_cod_settled', extra_context={
                             'driver_name': driver.driver_name or '',
                             'driver_phone': driver.driver_phone or '',
+                            'driver_whatsapp': driver.driver_whatsapp or '',
                             'cod_amount': str(cod_amount),
                         })
                     except Exception as e:
@@ -16360,6 +16802,10 @@ def cod_business_settlement_action(request):
                         execute_flows_for_trigger('business_cod_settled', extra_context={
                             'business_name': business.business_name or '',
                             'business_phone': getattr(business, 'business_phone', '') or '',
+                            # 'phone' is the key the "person this event is about"
+                            # recipient reads; without it that option resolved nothing.
+                            'phone': getattr(business, 'business_phone', '') or '',
+                            'business_whatsapp': getattr(business, 'business_whatsapp', '') or '',
                             'cod_amount': str(amount - total_deductions),
                             'gross_amount': str(amount),
                             'deductions_total': str(total_deductions),
@@ -17809,19 +18255,39 @@ def fleet_transactions(request):
                         if t.transaction_type in ['cod_deposit', 'cod_driver_settle']]
         if deposit_txns:
             splits = {t.id: {'cash': Decimal('0'), 'pos': Decimal('0'),
-                             'fawran': Decimal('0'), 'total': Decimal('0')}
+                             'fawran': Decimal('0'), 'dl': Decimal('0'),
+                             'total': Decimal('0')}
                       for t in deposit_txns}
+            # The delivery fee taken in cash (DL) settles on the same hand-in,
+            # including on jobs with no COD at all (a returned delivery), so it
+            # gets its own line instead of vanishing from the breakdown.
             rows = delivery_models.DeliveryTask.objects.filter(
-                cod_submission_txn_id__in=list(splits), cod_collected=True,
+                Q(cod_collected=True) | Q(fee_collected_amount__gt=0),
+                cod_submission_txn_id__in=list(splits),
             ).values_list('cod_submission_txn_id', 'payment_method',
-                          'payment_split', 'cod_collected_amount')
-            for txn_id, method, split, amount in rows:
+                          'payment_split', 'cod_collected_amount',
+                          'fee_collected_amount', 'cod_collected')
+            for txn_id, method, split, amount, fee, collected in rows:
                 bucket = splits[txn_id]
+                fee = fee or Decimal('0')
+                bucket['dl'] += fee
                 cash_leg = WalletService.split_cash_leg(split)
                 if cash_leg is not None:
-                    bucket['cash'] += cash_leg
-                    bucket['pos'] += Decimal(str(split.get('pos') or 0))
-                    bucket['fawran'] += Decimal(str(split.get('fawran') or 0))
+                    # A mixed split was entered against COD + fee as one figure,
+                    # so the fee is inside it: take it out of cash first, then
+                    # out of whichever electronic leg paid the rest.
+                    legs = {'cash': cash_leg,
+                            'fawran': Decimal(str(split.get('fawran') or 0)),
+                            'pos': Decimal(str(split.get('pos') or 0))}
+                    left = fee
+                    for key in ('cash', 'fawran', 'pos'):
+                        take = min(left, legs[key])
+                        legs[key] -= take
+                        left -= take
+                    for key, value in legs.items():
+                        bucket[key] += value
+                elif not collected:
+                    continue
                 elif method in ('cash', 'pos', 'fawran'):
                     bucket[method] += amount or Decimal('0')
                 else:
@@ -17830,7 +18296,8 @@ def fleet_transactions(request):
                 bucket = splits[txn.id]
                 # Precomputed so the template never chains the `add` filter,
                 # which truncates decimals via int().
-                bucket['total'] = bucket['cash'] + bucket['pos'] + bucket['fawran']
+                bucket['total'] = (bucket['cash'] + bucket['pos']
+                                   + bucket['fawran'] + bucket['dl'])
                 txn.settlement_split = bucket
 
     # Bank-reconciliation state for the rows on this page. Only a collection
@@ -17929,11 +18396,13 @@ def fleet_transactions(request):
     zero_cod_pending_count = 0
     zero_cod_truncated = False
     if selected_driver and view_type == 'cod' and not task_search:
+        # Returns carry no cash either and close on the same hand-in.
         zct_qs = delivery_models.DeliveryTask.objects.filter(
+            Q(order__cod_amount=0, dl_task_status__in=['delivered', 'partial_delivery'])
+            | Q(dl_task_status='returned_to_shipper')
+            | Q(dl_task_status='delivered', task_leg='return_to_client'),
             driver=selected_driver,
-            order__cod_amount=0,
             cod_collected=False,
-            dl_task_status__in=['delivered', 'partial_delivery'],
         ).select_related('order', 'business', 'order__business')
         if date_from:
             zct_qs = zct_qs.filter(completed_at__date__gte=date_from)
@@ -18795,16 +19264,37 @@ def fleet_transaction_cod_details(request, txn_id):
         #
         # order__cod_amount=0 is load-bearing: without it a COD order whose
         # collection FAILED would be pulled in as if it were prepaid.
+        #
+        # The hand-in covers every job the driver finished in the period, so the
+        # manifest is: cash jobs (COD and/or a cash delivery fee), prepaid drops
+        # and returns. Tasks the deposit settled by FK are always on it — a
+        # returned job's cash fee settles that way and carries no COD at all.
+        from fleet.wallet_service import WalletService
         settled_tasks = delivery_models.DeliveryTask.objects.filter(
             driver=txn.driver,
             cod_settled=True,
-            cod_settled_at__gte=txn.created_at - window,
-            cod_settled_at__lte=txn.created_at + window,
         ).filter(
-            Q(cod_collected=True) | Q(cod_collected=False, order__cod_amount=0)
+            Q(cod_submission_txn=txn)
+            | (Q(cod_settled_at__gte=txn.created_at - window,
+                 cod_settled_at__lte=txn.created_at + window)
+               & (Q(cod_collected=True)
+                  | Q(fee_collected_amount__gt=0)
+                  | Q(cod_collected=False, order__cod_amount=0)
+                  | Q(dl_task_status='returned_to_shipper')
+                  | Q(task_leg='return_to_client')))
         ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')
 
         for d in settled_tasks:
+            cash = WalletService.task_cash_leg(d)
+            is_return = WalletService.is_return_task(d)
+            if cash > 0:
+                kind = 'cash'
+            elif d.cod_collected and d.payment_method == 'fawran':
+                kind = 'fawran'
+            elif d.cod_collected:
+                kind = 'card'
+            else:
+                kind = 'return' if is_return else 'prepaid'
             tasks.append({
                 'task_id': d.id,
                 'task_number': d.dl_task_number or '-',
@@ -18813,9 +19303,16 @@ def fleet_transaction_cod_details(request, txn_id):
                 'customer': d.order.customer_name if d.order else '-',
                 'location': d.dl_to_address.area_name if d.dl_to_address else '-',
                 'delivered_at': d.completed_at.strftime('%d %b %Y, %H:%M') if d.completed_at else '-',
-                'amount': float(d.cod_collected_amount or 0),
+                # Cash handed in for this job (COD cash + cash fee), the same
+                # figure the deposit total is made of.
+                'amount': float(cash),
+                'cod_amount': float(d.cod_collected_amount or 0),
+                'fee_amount': float(d.fee_collected_amount or 0),
+                'kind': kind,
+                'is_return': is_return,
+                'status': d.get_dl_task_status_display(),
                 'cod_settled': d.cod_settled,
-                'is_prepaid': not d.cod_collected,
+                'is_prepaid': kind != 'cash',
             })
     elif txn.transaction_type == 'cod_collection' and txn.delivery_task:
         d = txn.delivery_task
@@ -18857,8 +19354,15 @@ def fleet_transaction_cod_details(request, txn_id):
         # split counts are what let the UI caption it honestly.
         'tasks_count': len(tasks),
         'tasks_total': sum(t['amount'] for t in tasks),
+        # The DL (cash delivery fee) part of that cash total, so the drawer can
+        # say "COD x + DL y". Capped at the row's cash so a fee paid by Fawran
+        # inside a mixed split is never counted as cash handed in.
+        'dl_total': sum(min(t.get('fee_amount', 0), t['amount'])
+                        for t in tasks if not t['is_prepaid']),
         'cash_count': sum(1 for t in tasks if not t['is_prepaid']),
-        'prepaid_count': sum(1 for t in tasks if t['is_prepaid']),
+        'prepaid_count': sum(1 for t in tasks if t.get('kind') == 'prepaid'),
+        'return_count': sum(1 for t in tasks if t.get('kind') == 'return'),
+        'electronic_count': sum(1 for t in tasks if t.get('kind') in ('fawran', 'card')),
     })
 
 
@@ -18925,17 +19429,11 @@ def mark_prepaid_settled(request):
     except fleet_models.Driver.DoesNotExist:
         return JsonResponse({'error': 'Driver not found'}, status=404)
 
-    # Scoped to this driver and to genuinely-prepaid delivered tasks. A caller
-    # cannot settle someone else's task, a COD task, or a task whose collection
-    # merely failed — order__cod_amount=0 is what separates "nothing was owed"
-    # from "something was owed and not collected".
-    qs = delivery_models.DeliveryTask.objects.filter(
-        driver=driver,
-        cod_settled=False,
-        cod_collected=False,
-        order__cod_amount=0,
-        dl_task_status__in=['delivered', 'partial_delivery'],
-    )
+    # Scoped to this driver and to no-cash jobs (prepaid drops and returns). A
+    # caller cannot settle someone else's task, a COD task, a job that took a
+    # cash fee, or a delivery whose collection merely failed.
+    from fleet.wallet_service import WalletService
+    qs = WalletService.no_cash_settle_tasks(driver)
     if task_ids:
         ids = [int(t) for t in task_ids if str(t).isdigit()]
         if not ids:
@@ -19404,11 +19902,10 @@ def bulk_settle_transactions(request):
             #
             # Same cod_settled_at as the cash leg so both show up in this
             # submission's details drawer, which matches on that timestamp.
-            prepaid_swept = DeliveryTask.objects.filter(
-                driver=driver, cod_settled=False, cod_collected=False,
-                dl_task_status__in=['delivered', 'partial_delivery'],
-                order__cod_amount=0,
-            ).update(cod_settled=True, cod_settled_at=settlement_datetime)
+            # Returns ride along the same way (WalletService.no_cash_settle_tasks).
+            from fleet.wallet_service import WalletService
+            prepaid_swept = WalletService.no_cash_settle_tasks(driver).update(
+                cod_settled=True, cod_settled_at=settlement_datetime)
 
         # Update earnings balance and last_settlement_date
         if earnings_settled > 0:
@@ -20014,6 +20511,9 @@ def staff_reports(request):
 # Window (days) inside which an ID document counts as "expiring soon" — long
 # enough that ops can chase a renewal before the driver is grounded.
 DOC_EXPIRY_SOON_DAYS = 30
+# The CRM driver-lead page warns earlier: an applicant being onboarded now should not
+# start work on an ID that lapses within their first quarter.
+LEAD_DOC_EXPIRY_SOON_DAYS = 90
 
 
 def _stamp_document_state(documents):
@@ -20069,6 +20569,8 @@ def driver_documents_list(request):
     search_query = request.GET.get('search', '').strip()
     view_type = request.GET.get('view', 'card')  # 'card' or 'table'
     driver_filter = request.GET.get('driver', '').strip()
+    # ?missing=expiry — the staff to-do list: documents that should carry an expiry and do not
+    missing = 'expiry' if request.GET.get('missing') == 'expiry' else ''
 
     # Start with all driver documents
     documents = fleet_models.DriverDocument.objects.select_related('driver', 'driver__user', 'driver__profile').all()
@@ -20097,8 +20599,18 @@ def driver_documents_list(request):
             Q(driver__driver_code__icontains=search_query)
         )
 
-    # Order by most recent
-    documents = documents.order_by('-created_at')
+    # Totals are taken before the missing-expiry narrowing, so the header keeps
+    # describing the whole list while staff work through the to-do view.
+    totals_base = documents
+
+    if missing:
+        # A selfie never has an expiry, so it is never "missing" one. Rows where
+        # the image check read a date come first: those take one look to fill.
+        documents = (documents.filter(document_expiry_date__isnull=True)
+                     .exclude(document_type='Selfie')
+                     .order_by(F('ai_expiry_date').desc(nulls_last=True), '-created_at'))
+    else:
+        documents = documents.order_by('-created_at')
 
     # Paginate results
     page_obj = paginate_queryset(request, documents, items_per_page=50)
@@ -20109,13 +20621,14 @@ def driver_documents_list(request):
     today = timezone.localdate()
     soon_cutoff = today + timedelta(days=DOC_EXPIRY_SOON_DAYS)
     doc_totals = {
-        'total': documents.count(),
-        'expired': documents.filter(document_expiry_date__lt=today).count(),
-        'soon': documents.filter(
+        'total': totals_base.count(),
+        'expired': totals_base.filter(document_expiry_date__lt=today).count(),
+        'soon': totals_base.filter(
             document_expiry_date__gte=today,
             document_expiry_date__lte=soon_cutoff,
         ).count(),
-        'no_expiry': documents.filter(document_expiry_date__isnull=True).count(),
+        # Selfies carry no expiry by nature — counting them here buried the real gaps.
+        'no_expiry': totals_base.filter(document_expiry_date__isnull=True).exclude(document_type='Selfie').count(),
     }
 
     # Carry the active filters through the pager so page 2 is still the same list.
@@ -20123,10 +20636,12 @@ def driver_documents_list(request):
         ('search', search_query),
         ('driver', driver_filter),
         ('view', view_type),
+        ('missing', missing),
     ) if v})
 
     context = {
         'page_title': 'Driver ID Documents',
+        'missing': missing,
         'documents': page_obj,
         'search_query': search_query,
         'view_type': view_type,
@@ -20839,6 +21354,7 @@ def wf_get_api_config(request, api_id):
             'fetch_products_url': api.fetch_products_url or '',
             'fetch_products_list_path': api.fetch_products_list_path or '',
             'fetch_enabled': api.fetch_enabled,
+            'import_qatar_only': api.import_qatar_only,
             'product_column_mapping': api.product_column_mapping or {},
             'is_verify_api': api.is_verify_api,
             'is_default': api.is_default,
@@ -20890,6 +21406,12 @@ def wf_update_api_config(request, api_id):
             if api.fetch_enabled != new_pull:
                 api.fetch_enabled = new_pull
                 changed.append('fetch_enabled')
+
+        if 'import_qatar_only' in request.POST:
+            new_qa_only = request.POST.get('import_qatar_only') in ('1', 'true', 'on', 'yes')
+            if api.import_qatar_only != new_qa_only:
+                api.import_qatar_only = new_qa_only
+                changed.append('import_qatar_only')
 
         new_pm = _product_mapping_from_post(request.POST, api.product_column_mapping)
         if new_pm is not None and new_pm != (api.product_column_mapping or {}):
@@ -20973,6 +21495,7 @@ def wf_create_api_config(request, business_id):
                 setattr(api, f, _api_field_value(f, request.POST.get(f)))
 
         api.fetch_enabled = request.POST.get('fetch_enabled') in ('1', 'true', 'on', 'yes')
+        api.import_qatar_only = request.POST.get('import_qatar_only') in ('1', 'true', 'on', 'yes')
         api.product_column_mapping = _product_mapping_from_post(request.POST) or None
         api.is_default = request.POST.get('is_default') in ('1', 'true', 'on', 'yes')
         api.is_verify_api = False
@@ -23769,40 +24292,22 @@ def drivers_inactive(request):
     return render(request, 'workforce/drivers_inactive.html', context)
 
 
-# How many weeks the driver detail performance chart covers. 12 keeps the bars
-# readable in the overview card while still showing a season's worth of trend.
-PERFORMANCE_WEEKS = 12
+# How many days the driver detail performance chart covers. 30 gives a month of
+# day-by-day trend while keeping each column wide enough to read in the card.
+PERFORMANCE_DAYS = 30
 
 
-@login_required(login_url='/accounts/login/')
-@staff_required
-def driver_detail(request, driver_id):
+def driver_document_cards(driver, soon_days=DOC_EXPIRY_SOON_DAYS):
+    """One applicant's documents, resolved for display.
+
+    Returns a list of plain dicts, not DriverDocument rows: whether a file is
+    really there, whether it can be shown inline, and how its expiry reads are
+    all decided here rather than in a template. Shared by the staff driver
+    record and the CRM driver-lead page so the two cannot drift.
     """
-    View for viewing comprehensive driver details including
-    documents, vehicles, transactions, and delivery stats.
-    """
-    from django.db.models import Count, Sum, Q
-    from django.utils import timezone
-    from datetime import timedelta
-
-    # Fetch driver with all related data
-    driver = get_object_or_404(
-        fleet_models.Driver.objects.select_related(
-            'user', 'profile'
-        ).prefetch_related(
-            'driver_vehicle',
-            'driver_document',
-        ),
-        driver_id=driver_id
-    )
-
-    # Get vehicles
-    vehicles = driver.driver_vehicle.all()
-
-    # Get documents and check if files actually exist
-    raw_documents = driver.driver_document.all()
+    _today = timezone.localdate()
     documents = []
-    for doc in raw_documents:
+    for doc in driver.driver_document.all():
         doc_dict = {
             'id': doc.id,
             'document_type': doc.document_type,
@@ -23834,7 +24339,59 @@ def driver_detail(request, driver_id):
         doc_dict['back_is_image'] = bool(
             doc_dict['document_file_back'] and doc_dict['document_file_back'].name.lower().endswith(_image_exts)
         )
+        # Expiry state is resolved here, not in the template: `now` in this
+        # context is a datetime and the field is a date, so a template-side
+        # `expiry < now` raises, Django swallows it, and an expired document
+        # silently rendered as "Expires ..." in green.
+        exp = doc_dict['document_expiry_date']
+        doc_dict['is_expired'] = bool(exp and exp < _today)
+        doc_dict['expires_soon'] = bool(
+            exp and not doc_dict['is_expired'] and (exp - _today).days <= soon_days
+        )
+        doc_dict['days_to_expiry'] = (exp - _today).days if exp else None
+        # Image check (fleet/document_verify.py): what the scan says vs what was typed
+        doc_dict['ai_status'] = doc.ai_status
+        doc_dict['ai_status_label'] = doc.ai_status_label
+        doc_dict['ai_document_no'] = doc.ai_document_no
+        doc_dict['ai_expiry_date'] = doc.ai_expiry_date
+        doc_dict['ai_note'] = doc.ai_note
+        doc_dict['verified_at'] = doc.verified_at
+        doc_dict['verified_by_name'] = doc.verified_by_name
+        # A parked original means this side has been cropped and can be put back
+        doc_dict['has_original'] = bool(doc.document_file_original and doc.document_file_original.name)
+        doc_dict['has_back_original'] = bool(
+            doc.document_file_back_original and doc.document_file_back_original.name)
         documents.append(doc_dict)
+    return documents
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_detail(request, driver_id):
+    """
+    View for viewing comprehensive driver details including
+    documents, vehicles, transactions, and delivery stats.
+    """
+    from django.db.models import Count, Sum, Q
+    from django.utils import timezone
+    from datetime import timedelta
+
+    # Fetch driver with all related data
+    driver = get_object_or_404(
+        fleet_models.Driver.objects.select_related(
+            'user', 'profile'
+        ).prefetch_related(
+            'driver_vehicle',
+            'driver_document',
+        ),
+        driver_id=driver_id
+    )
+
+    # Get vehicles
+    vehicles = driver.driver_vehicle.all()
+
+    # Get documents and check if files actually exist
+    documents = driver_document_cards(driver)
 
     # Get delivery task statistics
     delivery_stats = delivery_models.DeliveryTask.objects.filter(
@@ -23871,43 +24428,42 @@ def driver_detail(request, driver_id):
         driver=driver
     ).select_related('business').order_by('-created_at')[:10]
 
-    # --- Performance trend: completed vs failed per week, last 12 weeks ---------
+    # --- Performance trend: completed vs failed per day, last 30 days ----------
     # Bucketed on dl_task_date (the delivery date), not completed_at: dl_task_date
     # is set on every row while completed_at is empty on nearly all cancellations,
     # so a completed_at chart would silently drop them. Grouping matches the
     # Delivery Summary card below it so the two reconcile.
-    from django.db.models.functions import TruncWeek
-
     today = timezone.localdate()
-    this_week = today - timedelta(days=today.weekday())          # Monday, like TruncWeek
-    first_week = this_week - timedelta(weeks=PERFORMANCE_WEEKS - 1)
-    week_rows = {
-        r['week']: r
+    first_day = today - timedelta(days=PERFORMANCE_DAYS - 1)
+    day_rows = {
+        r['dl_task_date']: r
         for r in delivery_models.DeliveryTask.objects.filter(
             driver=driver,
-            dl_task_date__gte=first_week,
+            dl_task_date__gte=first_day,
             dl_task_date__lte=today,   # dl_task_date can be scheduled ahead — never chart the future
-        ).annotate(week=TruncWeek('dl_task_date')).values('week').annotate(
+        ).values('dl_task_date').annotate(
             completed=Count('id', filter=Q(dl_task_status__in=['delivered', 'partial_delivery'])),
             failed=Count('id', filter=Q(dl_task_status__in=['failed', 'cancelled'])),
         )
     }
-    # Every week inside the window gets a bucket — a quiet week is a zero column,
+    # Every day inside the window gets a bucket — a day off is a zero column,
     # not a missing one that would shift the trend left.
-    weeks = [first_week + timedelta(weeks=i) for i in range(PERFORMANCE_WEEKS)]
-    # ...but a driver who joined six weeks ago should not read as six weeks of
-    # failure, so the empty run before their first task is dropped. Gaps in the
-    # middle and at the end stay — those are real quiet weeks.
-    while weeks and weeks[0] not in week_rows:
-        weeks.pop(0)
+    days = [first_day + timedelta(days=i) for i in range(PERFORMANCE_DAYS)]
+    # ...but a driver who joined a week ago should not read as three weeks of
+    # nothing, so the empty run before their first task is dropped. Gaps in the
+    # middle and at the end stay — those are real quiet days.
+    while days and days[0] not in day_rows:
+        days.pop(0)
 
-    completed_series = [week_rows[w]['completed'] if w in week_rows else 0 for w in weeks]
-    failed_series = [week_rows[w]['failed'] if w in week_rows else 0 for w in weeks]
+    completed_series = [day_rows[d]['completed'] if d in day_rows else 0 for d in days]
+    failed_series = [day_rows[d]['failed'] if d in day_rows else 0 for d in days]
     window_completed = sum(completed_series)
     window_failed = sum(failed_series)
     window_total = window_completed + window_failed
     performance_chart = {
-        'weeks': [w.strftime('%-d %b') for w in weeks],
+        'days': [d.strftime('%-d %b') for d in days],
+        # Axis carries the day number only; the tooltip keeps the full date.
+        'day_numbers': [d.strftime('%-d') for d in days],
         'completed': completed_series,
         'failed': failed_series,
         'has_data': window_total > 0,
@@ -23916,13 +24472,12 @@ def driver_detail(request, driver_id):
         'window_total': window_total,
         'window_rate': round(window_completed / window_total * 100, 1) if window_total else 0,
         'window_label': (
-            '%s – %s' % (weeks[0].strftime('%-d %b'), weeks[-1].strftime('%-d %b'))
-            if weeks else ''
+            '%s – %s' % (days[0].strftime('%-d %b'), days[-1].strftime('%-d %b'))
+            if days else ''
         ),
-        # The trailing column is a week that has not finished yet, so it is
-        # always short. Flagged rather than hidden — dropping it would throw
-        # away this week's work.
-        'current_week_open': bool(weeks) and weeks[-1] == this_week,
+        # The trailing column is today, which has not finished yet, so it is
+        # usually short. Flagged rather than hidden.
+        'today_open': bool(days) and days[-1] == today,
     }
 
 
@@ -24042,7 +24597,9 @@ def driver_detail(request, driver_id):
             if new_status and new_status != old_driver_status:
                 try:
                     from core.auto_flow_executor import execute_flows_for_trigger
-                    ctx = {'driver_name': driver.driver_name or '', 'driver_phone': driver.driver_phone or ''}
+                    ctx = {'driver_name': driver.driver_name or '',
+                           'driver_phone': driver.driver_phone or '',
+                           'driver_whatsapp': driver.driver_whatsapp or ''}
                     if new_status == 'approved':
                         execute_flows_for_trigger('staff_driver_approved', extra_context=ctx)
                     elif new_status == 'suspended':
@@ -24068,9 +24625,24 @@ def driver_detail(request, driver_id):
     # zones are prefetched because zone_count / zone_numbers_display hit them per row.
     driver_zone_groups = driver.preferred_zone_groups.prefetch_related('zones').order_by('display_order', 'name')
 
+    # Asked through fleet.access, never re-derived here: the access card states
+    # what the driver may actually reach, so it must read the same rule the
+    # fleet gate enforces (approved AND cleared).
+    from fleet.access import has_dashboard_access
+
+    # Leads tab: the CRM cards bound to this driver. Only when none is live do we
+    # offer number-matched unbound cards to connect (see connect_lead_to_driver).
+    from crm import services as crm_services
+    crm_leads = list(driver.crm_leads.select_related('merged_into', 'assigned_to').order_by('-created_at'))
+    crm_lead_matches = [] if any(not l.merged_into_id for l in crm_leads) \
+        else crm_services.lead_candidates_for_driver(driver)
+
     context = {
         'page_title': f'Driver: {driver.user.first_name} {driver.user.last_name}',
+        'crm_leads': crm_leads,
+        'crm_lead_matches': crm_lead_matches,
         'driver': driver,
+        'driver_cleared_to_work': has_dashboard_access(driver),
         'vehicles': vehicles,
         'documents': documents,
         'all_zone_groups': all_zone_groups,
@@ -24078,7 +24650,7 @@ def driver_detail(request, driver_id):
         'delivery_stats': delivery_stats,
         'success_rate': success_rate,
         'performance_chart': performance_chart,
-        'performance_weeks': PERFORMANCE_WEEKS,
+        'performance_days': PERFORMANCE_DAYS,
         'recent_tasks_count': recent_tasks_count,
         'last_7_days_tasks': last_7_days_tasks,
         'recent_tasks': recent_tasks,
@@ -24126,6 +24698,28 @@ def driver_set_status(request, driver_id):
     driver.driver_status = new_status
     driver.save(update_fields=['driver_status'])
     return JsonResponse({'success': True, 'status': new_status})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def driver_connect_crm_lead(request, driver_id):
+    """Leads tab "Connect": bind a number-matched CRM card to this driver."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    import json as _json
+    from crm.models import Lead
+    from crm import services as crm_services
+    try:
+        lead_id = int(_json.loads(request.body).get('lead_id'))
+    except (ValueError, TypeError, AttributeError):
+        return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
+    driver = get_object_or_404(fleet_models.Driver.objects.select_related('profile'), driver_id=driver_id)
+    lead = get_object_or_404(Lead, pk=lead_id)
+    try:
+        crm_services.connect_lead_to_driver(lead, driver, user=request.user)
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    return JsonResponse({'success': True})
 
 
 def _apply_dashboard_access(driver, enabled, actor):
@@ -24299,6 +24893,22 @@ def driver_document_save(request, driver_id, document_id=None):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+@require_POST
+def driver_document_verify(request, driver_id, document_id):
+    """Staff verify a document by eye, or take a verification back (AJAX POST, action=verify|unverify).
+    The fallback for when the AI image check could not read the scan or got it wrong."""
+    from fleet.document_verify import staff_unverify, staff_verify
+
+    doc = get_object_or_404(fleet_models.DriverDocument, id=document_id, driver__driver_id=driver_id)
+    if request.POST.get('action') == 'unverify':
+        staff_unverify(doc)
+    else:
+        staff_verify(doc, request.user)
+    return JsonResponse({'success': True})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 def driver_document_delete(request, driver_id, document_id):
     """Delete a driver document (AJAX POST)."""
     if request.method != 'POST':
@@ -24306,6 +24916,108 @@ def driver_document_delete(request, driver_id, document_id):
     doc = get_object_or_404(fleet_models.DriverDocument, id=document_id, driver__driver_id=driver_id)
     doc.delete()
     return JsonResponse({'success': True, 'message': 'Document deleted'})
+
+
+# Sides a staff crop can touch: the model field, and where its pre-crop
+# original is parked so the crop stays undoable.
+_DOC_CROP_SIDES = {
+    'front': ('document_file', 'document_file_original'),
+    'back': ('document_file_back', 'document_file_back_original'),
+}
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def driver_document_crop(request, driver_id, document_id):
+    """Replace a document photo with a staff-cropped version (AJAX POST).
+
+    The crop itself happens in the browser; this only validates the resulting
+    image and swaps it in. The first crop parks the untouched upload in the
+    *_original field by pointing at its existing path — no bytes are copied,
+    and `restore` puts it back.
+    """
+    doc = get_object_or_404(
+        fleet_models.DriverDocument, id=document_id, driver__driver_id=driver_id)
+
+    side = request.POST.get('side', 'front')
+    if side not in _DOC_CROP_SIDES:
+        return JsonResponse({'success': False, 'error': 'Unknown document side'}, status=400)
+    field, backup_field = _DOC_CROP_SIDES[side]
+
+    current = getattr(doc, field)
+    if not current or not current.name:
+        return JsonResponse({'success': False, 'error': 'There is no photo on this side to crop'}, status=400)
+    # The shipped placeholder is not a real upload — cropping it would promote
+    # a number-only row into one that looks like it has a document on file.
+    if side == 'front' and not doc.has_real_file:
+        return JsonResponse({'success': False, 'error': 'No photo has been uploaded for this document'}, status=400)
+
+    uploaded = request.FILES.get('image')
+    if not uploaded:
+        return JsonResponse({'success': False, 'error': 'No cropped image was received'}, status=400)
+    error = _validate_document_upload(uploaded)
+    if error:
+        return JsonResponse({'success': False, 'error': error}, status=400)
+    # These bytes arrive as a canvas blob, so prove they decode as an image
+    # before they replace a document of record.
+    try:
+        Image.open(uploaded).verify()
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'That file is not a readable image'}, status=400)
+    uploaded.seek(0)
+
+    if not getattr(doc, backup_field):
+        setattr(doc, backup_field, current.name)
+    setattr(doc, field, uploaded)
+    doc.save()
+
+    logger.info('Driver document %s (%s) cropped by %s', doc.id, side, request.user.username)
+    return JsonResponse({
+        'success': True,
+        'message': 'Crop saved',
+        'url': getattr(doc, field).url,
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_POST
+def driver_document_crop_restore(request, driver_id, document_id):
+    """Put back the pre-crop original and drop the cropped copy."""
+    doc = get_object_or_404(
+        fleet_models.DriverDocument, id=document_id, driver__driver_id=driver_id)
+
+    side = request.POST.get('side', 'front')
+    if side not in _DOC_CROP_SIDES:
+        return JsonResponse({'success': False, 'error': 'Unknown document side'}, status=400)
+    field, backup_field = _DOC_CROP_SIDES[side]
+
+    backup = getattr(doc, backup_field)
+    if not backup or not backup.name:
+        return JsonResponse({'success': False, 'error': 'There is no original to restore'}, status=400)
+
+    cropped = getattr(doc, field)
+    cropped_name = cropped.name if cropped else ''
+    storage = cropped.storage if cropped else backup.storage
+
+    setattr(doc, field, backup.name)
+    setattr(doc, backup_field, None)
+    doc.save()
+
+    # Safe to drop only now that the row points at the original again
+    if cropped_name and cropped_name != backup.name:
+        try:
+            storage.delete(cropped_name)
+        except Exception:
+            logger.exception('Could not delete cropped file %s', cropped_name)
+
+    logger.info('Driver document %s (%s) crop reverted by %s', doc.id, side, request.user.username)
+    return JsonResponse({
+        'success': True,
+        'message': 'Original restored',
+        'url': getattr(doc, field).url,
+    })
 
 
 # =============================================================================
@@ -25411,7 +26123,7 @@ def order_edit(request, order_id):
             # Fire auto flow for order edit
             try:
                 from core.auto_flow_executor import execute_flows_for_trigger
-                execute_flows_for_trigger('staff_order_edit', extra_context={
+                execute_flows_for_trigger('staff_order_edit', order=order, extra_context={
                     'order_number': order.order_number or '',
                     'customer_name': order.customer_name or '',
                     'customer_phone': order.customer_phone or '',
@@ -27342,6 +28054,18 @@ def tasks_live_map(request):
     reachable_driver_ids = fleet_models.DriverPushSubscription.driver_ids_reachable(
         all_relevant_driver_ids)
 
+    # Who can actually open the driver app right now. A driver is limited to one
+    # live device, so an 'active' DriverDevice row is exactly that: signed in on
+    # a phone we have verified. It is not the same question as 'approved' (that
+    # is fleet size) or 'has GPS' (that is whether the app reported in lately) —
+    # a driver can be approved for months and never have installed the PWA.
+    app_driver_ids = set(
+        fleet_models.Driver.objects.filter(
+            driver_id__in=all_relevant_driver_ids,
+            user__driver_devices__status=fleet_models.DriverDevice.STATUS_ACTIVE,
+        ).values_list('driver_id', flat=True)
+    )
+
     # Build per-driver active tasks list (excludes terminal statuses) for popup display.
     # A driver carrying thirty open tasks used to render all thirty inside the map
     # popup, which grew taller than the map itself. The popup now carries only the
@@ -27372,16 +28096,15 @@ def tasks_live_map(request):
             trimmed.append(row)
         driver_active_tasks_map[did] = trimmed
 
-    for loc in latest_locs:
-        drivers_with_gps.add(loc.driver_id)
+    def gps_marker(loc, last_known=False):
         driver = driver_map.get(loc.driver_id)
-        active_tasks = driver_active_tasks_map.get(loc.driver_id, [])
+        seen = timezone.localtime(loc.created_at)
         # Two different ages, and conflating them is what made the map lie.
         # minutes_ago is how long since the driver's app last reported in —
         # that is what greys the marker. fix_minutes_ago is how old the position
         # itself is: a parked driver keeps reporting the same fix, and that is
         # not the same failure as an app that has gone silent.
-        driver_locations.append({
+        return {
             'driver_id': loc.driver_id,
             'driver_name': str(driver) if driver else f'Driver #{loc.driver_id}',
             'lat': float(loc.latitude),
@@ -27389,29 +28112,64 @@ def tasks_live_map(request):
             'accuracy': loc.accuracy,
             'coarse': not loc.is_precise,
             'speed': loc.speed,
-            'updated': loc.created_at.strftime('%H:%M'),
+            'updated': seen.strftime('%H:%M'),
+            'last_seen': seen.strftime('%a %d %b, %H:%M'),
+            'last_known': last_known,
             'minutes_ago': int((timezone.now() - loc.created_at).total_seconds() / 60),
             'fix_minutes_ago': int((timezone.now() - loc.at).total_seconds() / 60),
             'has_gps': True,
             'nav': _nav_handoff_payload(nav_handoffs.get(loc.driver_id)),
             'can_ping': loc.driver_id in reachable_driver_ids,
+            'has_app': loc.driver_id in app_driver_ids,
             'task_count': driver_task_counts.get(loc.driver_id, 0),
-            'active_tasks': active_tasks,
-        })
+            'active_tasks': driver_active_tasks_map.get(loc.driver_id, []),
+        }
 
-    # For drivers with active tasks but no GPS pings, show at task location
-    # Also include approved drivers with no tasks and no GPS (listed in filter, not on map)
+    for loc in latest_locs:
+        drivers_with_gps.add(loc.driver_id)
+        driver_locations.append(gps_marker(loc))
+
+    # Drivers working in this range whose app has been silent for over two
+    # hours. Their newest stored fix is still where they were last seen, so it
+    # is drawn as a stale marker with its real time. It used to be the address
+    # of whichever task the queryset returned first, finished ones included:
+    # a driver who worked all Saturday sat on a Friday customer's door with no
+    # time on it. One index probe per driver (driverloc_driver_ts_idx).
+    silent_ids = active_driver_ids - drivers_with_gps
+    if silent_ids:
+        newest_fix = fleet_models.DriverLocation.objects.filter(
+            driver_id=OuterRef('driver_id'),
+        ).order_by('-created_at').values('id')[:1]
+        last_fix_ids = fleet_models.Driver.objects.filter(
+            driver_id__in=silent_ids,
+        ).annotate(last_fix_id=Subquery(newest_fix)).values_list('last_fix_id', flat=True)
+        for loc in fleet_models.DriverLocation.objects.filter(
+                id__in=[i for i in last_fix_ids if i]):
+            drivers_with_gps.add(loc.driver_id)
+            driver_locations.append(gps_marker(loc, last_known=True))
+
+    # A driver whose phone has never reported a position is drawn at their
+    # newest open task. A closed task is where they were, not where they are,
+    # so with no open task they are listed in the filter but not drawn — the
+    # same as approved drivers with no tasks and no GPS.
+    from delivery.state_machine import TERMINAL_STATUSES
     for driver_id in (active_driver_ids | approved_driver_ids) - drivers_with_gps:
         driver = driver_map.get(driver_id)
         fallback_lat = fallback_lng = None
-        for t in tasks:
-            if t.driver_id == driver_id and fallback_lat is None:
-                if t.order.latitude and t.order.longitude:
-                    fallback_lat = float(t.order.latitude)
-                    fallback_lng = float(t.order.longitude)
-                elif t.dl_to_address and t.dl_to_address.dl_latitude and t.dl_to_address.dl_longitude:
-                    fallback_lat = float(t.dl_to_address.dl_latitude)
-                    fallback_lng = float(t.dl_to_address.dl_longitude)
+        open_tasks = sorted(
+            (t for t in tasks
+             if t.driver_id == driver_id and t.dl_task_status not in TERMINAL_STATUSES),
+            key=lambda t: t.updated_at, reverse=True,
+        )
+        for t in open_tasks:
+            if t.order.latitude and t.order.longitude:
+                fallback_lat = float(t.order.latitude)
+                fallback_lng = float(t.order.longitude)
+                break
+            if t.dl_to_address and t.dl_to_address.dl_latitude and t.dl_to_address.dl_longitude:
+                fallback_lat = float(t.dl_to_address.dl_latitude)
+                fallback_lng = float(t.dl_to_address.dl_longitude)
+                break
         active_tasks = driver_active_tasks_map.get(driver_id, [])
         driver_locations.append({
             'driver_id': driver_id,
@@ -27425,6 +28183,7 @@ def tasks_live_map(request):
             'has_gps': False,
             'nav': _nav_handoff_payload(nav_handoffs.get(driver_id)),
             'can_ping': driver_id in reachable_driver_ids,
+            'has_app': driver_id in app_driver_ids,
             'task_count': driver_task_counts.get(driver_id, 0),
             'active_tasks': active_tasks,
         })
@@ -27459,11 +28218,12 @@ def tasks_live_map(request):
                     'lng': lng,
                     'accuracy': None,
                     'speed': None,
-                    'updated': latest_task.updated_at.strftime('%H:%M'),
+                    'updated': timezone.localtime(latest_task.updated_at).strftime('%H:%M'),
                     'minutes_ago': minutes_ago,
                     'has_gps': False,
                     'nav': _nav_handoff_payload(nav_handoffs.get(driver_id)),
                     'can_ping': driver_id in reachable_driver_ids,
+                    'has_app': driver_id in app_driver_ids,
                     'task_count': driver_task_counts.get(driver_id, 0),
                     'active_tasks': active_tasks,
                     'last_status': latest_task.get_dl_task_status_display(),
@@ -31453,6 +32213,7 @@ TRIGGER_DOMAINS = {
     'staff_order_verify': 'order',
     'staff_orders_imported': 'order',
     'staff_temp_orders_transferred': 'order',
+    'business_unapproved_order': 'order',
     'sys_sync_order_status': 'order',
     'sys_create_qr_code': 'order',
     'sys_create_shipping_label': 'order',
@@ -31945,6 +32706,52 @@ def auto_flows_list(request):
 
 
 @login_required(login_url='account_login')
+def _flow_trigger_key(trigger_id):
+    """trigger_key for a posted trigger id, or '' when there is no valid one."""
+    from core.models import AutoTriggerConfig
+    try:
+        row = AutoTriggerConfig.objects.filter(id=int(trigger_id)).first()
+    except (TypeError, ValueError):
+        return ''
+    return row.trigger_key if row else ''
+
+
+def _flow_recipient_ctx(trigger_key):
+    """Send To options for this trigger, plus the scope map for every other one.
+
+    The picker is rendered from core.auto_flow_triggers rather than spelled out
+    in the template: the list, the greying-out and the save check have to agree,
+    and three copies of it is how the form came to offer recipients that no
+    amount of waiting would ever deliver to.
+    """
+    from core.auto_flow_triggers import recipient_groups, scope_map
+    from core.models import AutoTriggerConfig
+
+    keys = list(AutoTriggerConfig.objects.values_list('trigger_key', flat=True))
+    return {
+        'recipient_groups': recipient_groups(trigger_key or ''),
+        'recipient_scope': scope_map(keys),
+    }
+
+
+def _flow_recipient_problem(trigger_key, recipient):
+    """Error string when this trigger can never feed this recipient, else ''.
+
+    The form greys these out, but a disabled option is a hint, not a lock — a
+    stale tab or a hand-made POST would otherwise store a flow that fires
+    forever and sends nothing.
+    """
+    from core.auto_flow_triggers import allowed_recipients, recipients_for
+
+    if recipient in allowed_recipients(trigger_key):
+        return ''
+    row = next((r for r in recipients_for(trigger_key) if r['value'] == recipient), None)
+    if row is None:
+        return 'Unknown "Send To" option.'
+    return (f'"{row["label"]}" cannot be used with this trigger \u2014 {row["reason"]}. '
+            f'Pick a recipient this trigger can actually reach.')
+
+
 @superuser_required
 def auto_flow_add(request):
     """Add a new automation flow."""
@@ -31963,6 +32770,7 @@ def auto_flow_add(request):
                 'businesses': businesses,
                 'error': 'All fields are required.',
                 'form_data': request.POST,
+                **_flow_recipient_ctx(_flow_trigger_key(trigger_id)),
             })
 
         # Build trigger_conditions
@@ -32032,7 +32840,24 @@ def auto_flow_add(request):
                 'businesses': businesses,
                 'error': 'Invalid trigger selected.',
                 'form_data': request.POST,
+                **_flow_recipient_ctx(''),
             })
+
+        if action_type == 'whatsapp_message':
+            problem = _flow_recipient_problem(
+                trigger.trigger_key, action_config.get('recipient', ''))
+            if problem:
+                triggers = AutoTriggerConfig.objects.all()
+                action_types = AutoFlow.ACTION_TYPE_CHOICES
+                businesses = business_models.Business.objects.filter(
+                    business_status='active').order_by('business_name')
+                return render(request, 'workforce/auto_flow_add.html', {
+                    'triggers': triggers, 'action_types': action_types,
+                    'businesses': businesses,
+                    'error': problem,
+                    'form_data': request.POST,
+                    **_flow_recipient_ctx(trigger.trigger_key),
+                })
 
         AutoFlow.objects.create(
             name=name,
@@ -32052,6 +32877,7 @@ def auto_flow_add(request):
         'action_types': action_types,
         'businesses': businesses,
         'wa_instances': wa_instances,
+        **_flow_recipient_ctx(''),
     })
 
 
@@ -32081,6 +32907,7 @@ def auto_flow_edit(request, flow_id):
                 'error': 'All fields are required.',
                 'form_data': request.POST,
                 'editing': True, 'flow': flow,
+                **_flow_recipient_ctx(_flow_trigger_key(trigger_id)),
             })
 
         # Build trigger_conditions
@@ -32150,7 +32977,25 @@ def auto_flow_edit(request, flow_id):
                 'error': 'Invalid trigger selected.',
                 'form_data': request.POST,
                 'editing': True, 'flow': flow,
+                **_flow_recipient_ctx(flow.trigger.trigger_key),
             })
+
+        if action_type == 'whatsapp_message':
+            problem = _flow_recipient_problem(
+                trigger.trigger_key, action_config.get('recipient', ''))
+            if problem:
+                triggers = AutoTriggerConfig.objects.all()
+                action_types = AutoFlow.ACTION_TYPE_CHOICES
+                businesses = business_models.Business.objects.filter(
+                    business_status='active').order_by('business_name')
+                return render(request, 'workforce/auto_flow_add.html', {
+                    'triggers': triggers, 'action_types': action_types,
+                    'businesses': businesses,
+                    'error': problem,
+                    'form_data': request.POST,
+                    'editing': True, 'flow': flow,
+                    **_flow_recipient_ctx(trigger.trigger_key),
+                })
 
         flow.name = name
         flow.trigger = trigger
@@ -32226,6 +33071,7 @@ def auto_flow_edit(request, flow_id):
         'editing': True,
         'flow': flow,
         'wa_instances': wa_instances,
+        **_flow_recipient_ctx(flow.trigger.trigger_key),
     })
 
 
@@ -33367,17 +34213,17 @@ def whatsapp_composer_templates(request):
     }
 
     templates = []
-    for key, default in message_templates.TEMPLATE_DEFAULTS.items():
-        if default.get('section') != section:
+    # list_templates, not TEMPLATE_DEFAULTS: a message staff added on the
+    # Messages page is a row, not a code entry, and this picker is the only
+    # place it goes out.
+    for tpl in message_templates.list_templates():
+        if tpl['section'] != section or not tpl['is_enabled']:
             continue
-        tpl = message_templates.get_template(key)
-        if not tpl['is_enabled']:
-            continue
-        body = message_templates.render_template(key, **context) or ''
+        body = message_templates.format_template(tpl, **context) or ''
         if not body:
             continue
         templates.append({
-            'key': key,
+            'key': tpl['key'],
             # The picker prints this in front of the label so the option a staffer
             # picks names the same message the Messages page edits.
             'msg_id': tpl['msg_id'],
@@ -35404,6 +36250,95 @@ def wf_ai_models_api(request):
 # Message Templates
 # ---------------------------------------------------------------------------
 
+def _custom_message_add(request):
+    """Create a message a staff member wrote on the Messages page.
+
+    Always a composer starter on one sender route: the send window's template
+    picker reads every enabled body registered for a section, so a row created
+    here shows up on the orders, task, lead and driver pages of that route with
+    no code change. An automatic send is deliberately NOT offered — that needs a
+    trigger in code to fire it, which is what an AutoFlow is for.
+    """
+    from django.contrib import messages as django_messages
+    from django.db import IntegrityError
+
+    from core.message_templates import (
+        CUSTOM_DESCRIPTION_MAX, CUSTOM_LABEL_MAX, make_custom_key,
+        next_custom_msg_id,
+    )
+    from core.models import MessageTemplate, WhatsAppSenderRoute
+
+    page = reverse('workforce:wf_message_templates')
+    label = request.POST.get('label', '').strip()[:CUSTOM_LABEL_MAX]
+    section = request.POST.get('section', '').strip()
+    description = request.POST.get('description', '').strip()[:CUSTOM_DESCRIPTION_MAX]
+    body = request.POST.get('body', '').strip()
+
+    if not label or not body:
+        django_messages.error(request, 'A new message needs a name and a body.')
+        return redirect(page)
+    if section not in dict(WhatsAppSenderRoute.SECTION_CHOICES):
+        django_messages.error(
+            request, 'Pick which group the message belongs to — that is the number it sends from.')
+        return redirect(page)
+
+    # Two staff adding at the same moment would collide on the unique key or
+    # reuse a C-number; both are settled by taking the next free one and retrying
+    # rather than by handing anyone a 500 on a form they filled in correctly.
+    for _ in range(3):
+        try:
+            row = MessageTemplate.objects.create(
+                key=make_custom_key(label),
+                label=label,
+                description=description,
+                section=section,
+                body=body,
+                msg_id=next_custom_msg_id(),
+                is_custom=True,
+                is_enabled=True,
+                updated_by=request.user,
+            )
+            break
+        except IntegrityError:
+            row = None
+    if row is None:
+        django_messages.error(request, 'Could not save that message — try again.')
+        return redirect(page)
+
+    django_messages.success(
+        request,
+        f'{row.msg_id} added. It is now in the send window\'s template list for '
+        f'{dict(WhatsAppSenderRoute.SECTION_CHOICES)[section]}.')
+    return redirect(f'{page}#msg-{row.key}')
+
+
+def _custom_message_delete(request):
+    """Delete a staff-written message.
+
+    Gated on is_custom: the same POST aimed at a shipped key would otherwise
+    throw away someone's reworded customer text and silently restore the
+    default. Those are retired with the switch, never deleted.
+    """
+    from django.contrib import messages as django_messages
+
+    from core.message_templates import custom_row
+
+    page = reverse('workforce:wf_message_templates')
+    key = request.POST.get('template_key', '').strip()
+    row = custom_row(key)
+    if row is None:
+        django_messages.error(
+            request,
+            'Only a message you added here can be deleted. A message that ships with '
+            'the platform is switched off instead.')
+        return redirect(page)
+
+    msg_id, label = row.msg_id, (row.label or row.key)
+    row.delete()
+    django_messages.success(request, f'{msg_id} {label} deleted.')
+    return redirect(page)
+
+
 @login_required(login_url='account_login')
 @superuser_required
 def wf_message_templates(request):
@@ -35415,16 +36350,28 @@ def wf_message_templates(request):
     (staff edit) — nothing here touches .env, so no server reload is involved.
     """
     from core.message_templates import (
-        MANUAL_COMPOSERS, TEMPLATE_DEFAULTS, list_templates, placeholder_list,
-        validate_body,
+        CUSTOM_DESCRIPTION_MAX, CUSTOM_LABEL_MAX, CUSTOM_PLACEHOLDERS,
+        MANUAL_COMPOSERS, TEMPLATE_DEFAULTS, custom_row, list_templates,
+        placeholder_list, validate_body,
     )
     from core.models import MessageTemplate, WhatsAppSenderRoute
     from core.whatsapp_utils import get_fleet_instance, get_route_instance
 
     if request.method == 'POST':
         is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+        action = (request.POST.get('action') or 'save').strip()
+        # Add and delete re-render the page (a new card has to appear, a deleted
+        # one has to go), so they are plain posts and never the card's fetch.
+        if action == 'add':
+            return _custom_message_add(request)
+        if action == 'delete':
+            return _custom_message_delete(request)
+
         key = request.POST.get('template_key', '').strip()
-        if key not in TEMPLATE_DEFAULTS:
+        # A key is saveable when the code ships it, or when it is a message
+        # staff wrote here. Anything else is a stale form or a typed URL.
+        row = custom_row(key)
+        if key not in TEMPLATE_DEFAULTS and row is None:
             msg = 'Unknown message template.'
             if is_ajax:
                 return JsonResponse({'success': False, 'message': msg}, status=400)
@@ -35433,6 +36380,18 @@ def wf_message_templates(request):
             return redirect('workforce:wf_message_templates')
 
         body = request.POST.get('body', '').strip()
+        # Nothing is shipped behind a staff-written message, so an empty box is
+        # not "follow the default" — it is a message that sends nothing. The
+        # switch is how one is retired.
+        if row is not None and not body:
+            msg = ('A message you wrote needs a body — switch it off instead of '
+                   'emptying it, or delete it.')
+            if is_ajax:
+                return JsonResponse({'success': False, 'message': msg}, status=400)
+            from django.contrib import messages as django_messages
+            django_messages.error(request, msg)
+            return redirect('workforce:wf_message_templates')
+
         problem = validate_body(key, body) if body else ''
         if problem:
             if is_ajax:
@@ -35442,23 +36401,30 @@ def wf_message_templates(request):
             return redirect('workforce:wf_message_templates')
         # Blank (or an untouched copy of the shipped text) stores nothing, so
         # the row keeps following the code default.
-        if body == TEMPLATE_DEFAULTS[key]['body'].strip():
+        if row is None and body == TEMPLATE_DEFAULTS[key]['body'].strip():
             body = ''
         # Templates whose on/off belongs to a trigger render no switch, so the
         # field is absent from this POST — reading it would silently disable
         # them on every save.
-        if TEMPLATE_DEFAULTS[key].get('toggle_owner'):
+        if row is None and TEMPLATE_DEFAULTS[key].get('toggle_owner'):
             is_enabled = True
         else:
             is_enabled = request.POST.get('is_enabled') in ('1', 'on', 'true')
-        MessageTemplate.objects.update_or_create(
-            key=key,
-            defaults={
-                'body': body,
-                'is_enabled': is_enabled,
-                'updated_by': request.user,
-            },
-        )
+        defaults = {
+            'body': body,
+            'is_enabled': is_enabled,
+            'updated_by': request.user,
+        }
+        if row is not None:
+            # Its name and note live on the row, not in code, so they are part
+            # of the same save. A blank name would leave the card titled with
+            # its raw key, so the old one stands.
+            label = request.POST.get('label', '').strip()[:CUSTOM_LABEL_MAX]
+            if label:
+                defaults['label'] = label
+            defaults['description'] = (
+                request.POST.get('description', '').strip()[:CUSTOM_DESCRIPTION_MAX])
+        MessageTemplate.objects.update_or_create(key=key, defaults=defaults)
         msg = 'Message saved.' if body else 'Message reset to the default text.'
         if is_ajax:
             return JsonResponse({'success': True, 'message': msg, 'key': key})
@@ -35515,14 +36481,29 @@ def wf_message_templates(request):
         groups[sec]['templates'].append(tpl)
     template_groups = [groups[s] for s in order]
 
+    # The Add panel's group picker. Names the number each group sends from, so
+    # choosing a group is the same decision as choosing the sender — which is
+    # what it actually is.
+    add_sections = []
+    for sec, label in WhatsAppSenderRoute.SECTION_CHOICES:
+        inst = get_route_instance(sec)
+        add_sections.append({
+            'value': sec,
+            'label': label,
+            'sender': (inst.phone_number or inst.instance_name) if inst else 'Default sender',
+        })
+
     return render(request, 'workforce/message_templates.html', {
         'message_templates': templates,
         'template_groups': template_groups,
+        'add_sections': add_sections,
+        'custom_placeholders': placeholder_list(CUSTOM_PLACEHOLDERS),
         'stats': {
             'total': len(templates),
             'edited': sum(1 for t in templates if t['is_customised']),
             'off': sum(1 for t in templates if not t['is_enabled']),
             'auto': sum(1 for t in templates if t['kind'] == 'auto'),
+            'custom': sum(1 for t in templates if t.get('is_custom')),
         },
     })
 
@@ -37722,7 +38703,7 @@ def wf_orders_p2p(request):
         filter_params_list.append(f'sort={sort}')
     filter_params_list += driver_filter_params(picked['drivers'])
 
-    all_drivers = driver_filter_choices()
+    all_drivers = driver_filter_choices(picked['drivers'])
     return render(request, 'workforce/parts/lists/orders_p2p_list_view.html', {
         'orders': orders,
         'tally': tally,
@@ -38362,7 +39343,8 @@ def returns_requests_list(request):
     qs = ReturnRequest.objects.select_related(
         'order', 'business', 'reviewed_by', 'pickup_order',
         'order__pickup_location', 'pickup_location',
-    ).prefetch_related('return_items__order_item').order_by('-created_at')
+    ).prefetch_related('return_items__order_item__product',
+                       'return_items__product').order_by('-created_at')
 
     status_counts = dict(
         ReturnRequest.objects.values_list('status').annotate(cnt=Count('id')))
@@ -38461,26 +39443,69 @@ def returns_requests_list(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 @ensure_csrf_cookie
-def returns_request_create(request):
-    """Raise a claim for goods EzzyDelivery never delivered — staff only.
+def returns_task_create(request, locked_mode=None):
+    """Raise a return — the claim and, in the same submit, the driver's trip.
 
-    Every other claim on this desk starts from an order we carried: the seller
-    presses "Request Return" on it, or a driver fails a delivery and one opens
-    itself. A client whose own courier (or shop counter) put the parcel with the
-    customer has no such order, so there is nothing anywhere to press — and the
-    collection they want is a perfectly ordinary trip for us to make.
+    Until this page there was no one place a return was born. A seller pressed
+    "Request Return" on an order, or staff typed a standalone claim here, and
+    then somebody had to find that claim on the returns desk and press Schedule
+    pickup before any driver could see it. Two pages, two decisions, and the gap
+    between them is where collections sat forgotten.
 
-    The address typed here IS the claim; the claim stores it rather than reading
-    an order (orders.services.create_standalone_return_request). After that it
-    behaves like any other: the same Schedule pickup button raises the same
-    backwards-running collection order.
+    Two modes, because a return has exactly two shapes:
 
-    Not offered to sellers on purpose. A wrong address here sends a driver to a
-    door with nothing behind it, and nothing upstream has checked it.
+    * ``order``      — goods we carried. The order holds the customer, the
+                       lines, the seller's counter and the charge, so nothing is
+                       retyped and nothing can be typed wrong.
+    * ``standalone`` — goods a client's own courier delivered. There is no order
+                       to copy, so the address typed here IS the claim
+                       (orders.services.create_standalone_return_request).
+
+    Both land in orders.return_intake.raise_return, which the seller console
+    calls too — the two forms cannot drift apart. Staff's collection publishes
+    straight into the driver pool; a seller's does not.
+
+    `locked_mode` pins the page to one mode, which is how the old
+    /workforce/returns/requests/new/ URL keeps behaving exactly as it did.
     """
-    from core.validators import sanitize_text
+    from orders import return_intake
     from orders.models import ReturnRequest
-    from orders.services import create_standalone_return_request
+    from orders.services import can_schedule_return_pickup, open_return_for_order
+
+    form = request.POST if request.method == 'POST' else request.GET
+    mode = locked_mode or return_intake.resolve_mode(form.get('mode'))
+
+    # Typed on the form in order mode, or carried in the ?order= of a link from
+    # an order page. Resolved on GET too, so the page can show what it found
+    # before anything is created.
+    order_ref = (form.get('order_ref') or form.get('order') or '').strip()
+    # A search may be a number or a customer's mobile, and a mobile can name
+    # several orders — but a SUBMIT only ever acts on an exact number, so the
+    # shortlist is a GET-time thing and a post that matches nothing exactly is
+    # refused rather than guessed at.
+    candidates = []
+    # Scoped to one client, always. A mobile number is not unique across
+    # clients, so an unscoped search would show another seller's customer and
+    # their order to whoever typed the digits.
+    lookup_business = business_models.Business.objects.filter(
+        business_id=safe_int(form.get('business'), default=0)).first()
+    if mode != 'order' or lookup_business is None:
+        order = None
+    elif request.method == 'POST':
+        order = return_intake.find_order(order_ref, business=lookup_business)
+    else:
+        order, candidates = return_intake.search_orders(
+            order_ref, business=lookup_business)
+
+    order_claim = open_return_for_order(order) if order is not None else None
+    order_blocker = ''
+    if order is not None:
+        # The same gate the returns desk applies, run before anything is
+        # written: a button that is shown must correspond to a call that works.
+        probe = ReturnRequest(business=order.business, order=order)
+        ok, why = can_schedule_return_pickup(order_claim or probe)
+        if not ok:
+            order_blocker = why
 
     businesses = business_models.Business.objects.filter(
         business_status='active').order_by('business_name')
@@ -38496,77 +39521,105 @@ def returns_request_create(request):
                  .order_by('business__business_name', '-is_default',
                            'pickup_location_title'))
 
-    form = {}
     if request.method == 'POST':
-        form = request.POST
-
-        business = business_models.Business.objects.filter(
-            business_id=safe_int(form.get('business'), default=0)).first()
-        location = business_models.PickupLocation.objects.filter(
-            id=safe_int(form.get('pickup_location'), default=0)).first()
-
-        # Same normalisation the staff order form applies, so a collection card
-        # reads like every other card in the driver's app.
-        customer_name = sanitize_text(form.get('customer_name', ''), True)
-        customer_address = sanitize_text(form.get('customer_address', ''), True)
-        if contains_arabic(customer_name):
-            customer_name = translate_to_english(customer_name)
-        if contains_arabic(customer_address):
-            customer_address = translate_to_english(customer_address)
-        customer_phone = convert_arabic_numerals(
-            sanitize_text(form.get('customer_phone', ''), True))
-        raw_whatsapp = sanitize_text(form.get('customer_whatsapp', ''), True)
-        customer_whatsapp = format_whatsapp_number(raw_whatsapp or customer_phone)
-
         try:
-            if business is None:
+            if mode == 'order' and lookup_business is None:
                 raise ValidationError("Pick the client this return belongs to.")
-            ret = create_standalone_return_request(
-                business,
-                reason=form.get('reason', ''),
-                reason_notes=sanitize_text(form.get('reason_notes', '')),
-                pickup_location=location,
-                customer_name=customer_name,
-                customer_phone=customer_phone,
-                customer_whatsapp=customer_whatsapp,
-                customer_address=customer_address,
-                zone=safe_int(form.get('dl_zone'), default=None),
-                street=safe_int(form.get('dl_street'), default=None),
-                building=safe_int(form.get('dl_building'), default=None),
-                latitude=safe_decimal(form.get('latitude')),
-                longitude=safe_decimal(form.get('longitude')),
-                external_reference=sanitize_text(
-                    form.get('external_reference', ''), True),
-                package_description=sanitize_text(
-                    form.get('package_description', ''), True),
-                package_qty=safe_int(form.get('package_qty'), default=0,
-                                     minimum=0, maximum=10000),
-                collection_charge=safe_decimal(form.get('collection_charge')),
+            if mode == 'order' and order is None:
+                raise ValidationError(
+                    "No order of that client matches. Check the number, or "
+                    "raise the return without an order.")
+            if order is not None and order_blocker:
+                raise ValidationError(order_blocker)
+
+            business = order.business if order is not None else (
+                business_models.Business.objects.filter(
+                    business_id=safe_int(form.get('business'), default=0)).first())
+
+            ret, collection, reused = return_intake.raise_return(
+                post=form,
                 user=request.user,
+                business=business,
+                order=order,
+                publish=True,
+                cod_reversal=safe_decimal(form.get('cod_reversal_amount')),
             )
         except ValidationError as exc:
             messages.error(request, '; '.join(exc.messages))
         except Exception:
-            logger.exception("Standalone return creation failed")
+            logger.exception("Return intake failed (mode=%s)", mode)
             messages.error(request, "Could not raise this return. Try again.")
         else:
+            opened = ("Added to the return already open for this order"
+                      if reused else f"Return {ret.return_number} raised")
+            if collection is not None:
+                # Same timeline entry the Schedule pickup button writes, so one
+                # order tells the whole story however the trip was raised.
+                _return_pickup_history(ret, collection, request.user)
+                messages.success(
+                    request,
+                    f"{opened} for {ret.business.business_name}. Collection "
+                    f"{collection.order_number} is in the driver pool.")
+                return redirect('workforce:order_detail', collection.id)
+
             messages.success(
                 request,
-                f"Return {ret.return_number} raised for "
-                f"{ret.business.business_name}. Schedule the pickup to send a "
-                f"driver.")
+                f"{opened} for {ret.business.business_name}. Schedule the "
+                f"pickup to send a driver.")
             return redirect(
                 f"{reverse('workforce:returns_requests_list')}"
                 f"?status=all&search={ret.return_number}")
 
     context = {
-        'page_title': 'New return — not delivered by us',
+        'page_title': 'New return',
+        'mode': mode,
+        'locked_mode': locked_mode,
+        'order': order,
+        'order_ref': order_ref,
+        'order_claim': order_claim,
+        'order_blocker': order_blocker,
+        'candidates': candidates,
+        'lookup_business': lookup_business,
+        'return_lines': return_intake.order_lines(order),
         'businesses': businesses,
         'locations': locations,
         'reason_choices': ReturnRequest.RETURN_REASON_CHOICES,
-        'form': form,
+        'form': form if request.method == 'POST' else {},
+        'is_staff_console': True,
     }
-    return render(request, 'workforce/returns_request_create.html', context)
+    return render(request, 'workforce/returns_task_create.html', context)
+
+
+def returns_request_create(request):
+    """The standalone-only door onto the page above.
+
+    Kept because the returns desk, the sidebar and the seller-facing copy all
+    point here for "goods we never delivered"; pinning the mode means that link
+    still lands on exactly the form it always did.
+    """
+    return returns_task_create(request, locked_mode='standalone')
+
+
+def _return_pickup_history(ret, collection, user):
+    """Write the timeline entry a scheduled collection leaves behind.
+
+    Shared with returns_request_schedule_pickup so the trail does not depend on
+    which button raised the trip. A standalone claim has no outbound order to
+    write onto, so the collection itself carries the entry — the only order that
+    trip ever had. Never raises: a missing history line must not undo a
+    collection that exists.
+    """
+    try:
+        orders_models.OrderStatusHistory.objects.create(
+            order=ret.order or collection,
+            field_name='return_status',
+            old_value='', new_value='pickup_scheduled',
+            old_display='', new_display='Pickup Scheduled',
+            changed_by=user,
+            notes=f'{ret.return_number}: collection {collection.order_number}'[:255],
+        )
+    except Exception as e:
+        logger.warning("Return pickup history failed for %s: %s", ret.pk, e)
 
 
 @require_http_methods(["POST"])
@@ -38616,20 +39669,10 @@ def returns_request_schedule_pickup(request, return_id):
             {'success': False, 'error': 'Could not raise the collection.'}, status=500)
 
     # Same timeline the seller and the custody desk write to, so one order tells
-    # the whole story rather than three systems each keeping half of it. A
-    # standalone claim has no outbound order to write onto, so the collection
-    # itself carries the entry — the only order that trip ever had.
-    try:
-        orders_models.OrderStatusHistory.objects.create(
-            order=ret.order or order,
-            field_name='return_status',
-            old_value='', new_value='pickup_scheduled',
-            old_display='', new_display='Pickup Scheduled',
-            changed_by=request.user,
-            notes=f'{ret.return_number}: collection {order.order_number}'[:255],
-        )
-    except Exception as e:
-        logger.warning("Return pickup history failed for %s: %s", ret.pk, e)
+    # the whole story rather than three systems each keeping half of it. Shared
+    # with returns_task_create so the trail does not depend on which button
+    # raised the trip.
+    _return_pickup_history(ret, order, request.user)
 
     return JsonResponse({
         'success': True,
@@ -39214,6 +40257,7 @@ def driver_wa_thread(request, driver_id):
     from django.utils import timezone
     from workforce.crm_views import wa_identifiers_for
     from crm import services as crm_services
+    from whatsapp import label_access
 
     driver = get_object_or_404(
         fleet_models.Driver.objects.select_related('user', 'profile'),
@@ -39237,6 +40281,9 @@ def driver_wa_thread(request, driver_id):
         if crm_services.wa_read_blocked((idents, lid_pairs)):
             return JsonResponse({'success': True, 'messages': [], 'phone': phone,
                                  'note': 'This number belongs to a platform account.'})
+        if label_access.identifiers_hidden(request.user, list(idents) + [lid for _s, lid in lid_pairs]):
+            return JsonResponse({'success': True, 'messages': [], 'phone': phone,
+                                 'note': label_access.REFUSAL})
     except Exception:
         logger.exception('driver wa thread: read gate failed for driver %s', driver_id)
         return JsonResponse({'success': False, 'error': 'Could not check this number.'},
@@ -39264,9 +40311,12 @@ def driver_wa_thread(request, driver_id):
         return JsonResponse({'success': False, 'error': 'Could not load the conversation.'},
                             status=500)
 
+    from whatsapp.secrets import redact_text
+
     out = []
     for r in rows:
-        body = (r.body or '').strip()
+        # Codes are redacted at ingest; this also covers rows stored before that.
+        body, _ = redact_text((r.body or '').strip())
         # Media is flagged, not rendered: the media proxy is lead-scoped, and a
         # reviewer only needs to know a photo exists before opening WhatsApp.
         has_media = bool(r.media_file) or bool(r.media_url)

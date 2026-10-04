@@ -2,12 +2,15 @@
 # Used by: python manage.py test core.tests_driver_apply
 # Notes: Everything goes through the real multipart POST, since the bugs these cover live in the view's document loop.
 
+from datetime import date, timedelta
+
 from allauth.socialaccount.models import SocialApp
 from django.contrib.auth import get_user_model
 from django.contrib.sites.models import Site
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from core import models as core_models
 from core.views import MAX_UPLOAD_SIZE
@@ -46,8 +49,8 @@ class DriverApplyPostTest(TestCase):
 
     def profile_fields(self):
         return {
-            'first_name': 'Ashiraf', 'last_name': 'Waluboga',
-            'phone': '31029502', 'whatsapp': '97431029502',
+            'first_name': 'Testname', 'last_name': 'Applicant',
+            'phone': '30000000', 'whatsapp': '97430000000',
             'nationlity': 'Ugandan', 'zone_name': 'Souq Waqif',
             'address': 'Building 6, Street 30', 'date_of_birth': '1995-12-26',
         }
@@ -118,7 +121,7 @@ class DriverApplyPostTest(TestCase):
         resp = self.client.post(self.url, data, follow=True)
 
         profile = core_models.Profile.objects.get(user=self.user)
-        self.assertEqual(profile.first_name, 'Ashiraf')       # draft still saved
+        self.assertEqual(profile.first_name, 'Testname')       # draft still saved
         self.assertEqual(profile.zone_name, 'Souq Waqif')
         self.assertEqual(self.driver().driver_document.count(), 0)   # bad photo dropped
         self.assertIn('not saved', resp.content.decode())
@@ -156,12 +159,109 @@ class DriverApplyPostTest(TestCase):
         self.assertEqual(
             driver.driver_meta['registration_location']['lat'], 25.2854)
 
+    # --- document expiry dates --------------------------------------------
+
+    def test_draft_save_keeps_a_typed_expiry_date_without_a_file(self):
+        data = self.profile_fields()
+        data.update({'action': 'save', 'veh-vehicle_type': 'car',
+                     'doc_exp_QID': '2029-04-30'})
+        self.client.post(self.url, data)
+
+        doc = self.driver().driver_document.get(document_type='QID')
+        self.assertEqual(doc.document_expiry_date, date(2029, 4, 30))
+
+    def test_expiry_typed_later_lands_on_the_existing_photo_row(self):
+        self.client.post(self.url, dict(
+            self.profile_fields(), action='save', **{'doc_QID': photo('qid.jpg')}))
+        self.client.post(self.url, dict(
+            self.profile_fields(), action='save', doc_exp_QID='2030-01-15'))
+
+        doc = self.driver().driver_document.get(document_type='QID')
+        self.assertEqual(doc.document_expiry_date, date(2030, 1, 15))
+        self.assertIn('qid', doc.document_file.name.lower())
+
+    def test_expiry_and_number_save_together_on_a_submit(self):
+        data = self.full_payload(**{
+            'doc_Selfie': photo('selfie.jpg'),
+            'doc_QID': photo('qid.jpg'),
+            'doc_Driving_License': photo('dl.jpg'),
+            'doc_no_QID': '29335632728', 'doc_exp_QID': '2031-07-01',
+            'doc_exp_Driving_License': '2028-02-29',
+        })
+        self.client.post(self.url, data)
+
+        docs = {d.document_type: d for d in self.driver().driver_document.all()}
+        self.assertEqual(docs['QID'].document_no, '29335632728')
+        self.assertEqual(docs['QID'].document_expiry_date, date(2031, 7, 1))
+        self.assertEqual(docs['Driving License'].document_expiry_date, date(2028, 2, 29))
+
+    def test_an_unreadable_expiry_date_is_dropped_without_losing_the_section(self):
+        """A non-date-input browser can post anything — the draft must still save."""
+        data = self.profile_fields()
+        data.update({'action': 'save', 'veh-vehicle_type': 'car',
+                     'doc_no_QID': '29335632728', 'doc_exp_QID': '30/04/2029'})
+        resp = self.client.post(self.url, data, follow=True)
+
+        doc = self.driver().driver_document.get(document_type='QID')
+        self.assertEqual(doc.document_no, '29335632728')
+        self.assertIsNone(doc.document_expiry_date)
+        self.assertIn('could not be read', resp.content.decode())
+
+    def test_an_expired_document_is_recorded_and_flagged_not_refused(self):
+        past = (timezone.localdate() - timedelta(days=30)).isoformat()
+        data = self.full_payload(**{
+            'doc_Selfie': photo('selfie.jpg'),
+            'doc_QID': photo('qid.jpg'),
+            'doc_Driving_License': photo('dl.jpg'),
+            'doc_exp_QID': past,
+        })
+        resp = self.client.post(self.url, data, follow=True)
+
+        # Accepted, not blocked
+        self.assertTrue(core_models.Profile.objects.get(user=self.user).is_driver)
+        doc = self.driver().driver_document.get(document_type='QID')
+        self.assertEqual(doc.document_expiry_date.isoformat(), past)
+        self.assertIn('has expired', resp.content.decode())
+
+    def test_a_blank_expiry_never_wipes_one_already_on_file(self):
+        self.client.post(self.url, dict(
+            self.profile_fields(), action='save', doc_exp_QID='2029-04-30'))
+        self.client.post(self.url, dict(
+            self.profile_fields(), action='save', doc_exp_QID='', doc_no_QID='29335632728'))
+
+        doc = self.driver().driver_document.get(document_type='QID')
+        self.assertEqual(doc.document_expiry_date, date(2029, 4, 30))
+
     def test_submit_without_a_selfie_is_refused(self):
         data = self.full_payload(**{
             'doc_QID': photo('qid.jpg'), 'doc_Driving_License': photo('dl.jpg')})
         resp = self.client.post(self.url, data, follow=True)
         self.assertFalse(core_models.Profile.objects.get(user=self.user).is_driver)
         self.assertIn('selfie photo is required', resp.content.decode())
+
+    # --- a stray is_business flag must not lock an applicant out ----------
+
+    def test_stray_business_flag_does_not_block_a_driver_applicant(self):
+        self.client.post(self.url, dict(self.profile_fields(), action='save',
+                                        **{'veh-vehicle_type': 'car'}))
+        core_models.Profile.objects.filter(user=self.user).update(is_business=True)
+
+        resp = self.client.post(self.url, dict(
+            self.profile_fields(), action='save', doc_no_QID='29335632728'), follow=True)
+        self.assertNotIn('already registered as a business', resp.content.decode())
+        self.assertTrue(self.driver().driver_document.filter(
+            document_type='QID', document_no='29335632728').exists())
+
+    def test_a_real_business_owner_is_still_blocked(self):
+        from business.models import Business
+        profile = core_models.Profile.objects.create(user=self.user, is_business=True)
+        Business.objects.create(user=self.user, profile=profile,
+                                business_id=987654, business_name='Shop')
+
+        resp = self.client.post(self.url, dict(self.profile_fields(), action='save'),
+                                follow=True)
+        self.assertIn('already registered as a business', resp.content.decode())
+        self.assertFalse(fleet_models.Driver.objects.filter(user=self.user).exists())
 
 
 @override_settings(MEDIA_ROOT='/tmp/ezzy-test-media')
@@ -193,6 +293,19 @@ class DriverApplyContextTest(TestCase):
         self.assertFalse(items['Istimara']['has_file'])
         self.assertFalse(resp.context['progress']['sec4_complete'])
         self.assertEqual(resp.context['progress']['sec4_ids'], 0)
+
+
+    def test_a_saved_expiry_date_prefills_the_date_input(self):
+        self.client.post(self.url, {
+            'action': 'save', 'first_name': 'Rai', 'phone': '77450564',
+            'doc_exp_Istimara': '2029-04-30',
+        })
+        resp = self.client.get(self.url)
+        items = {d['type']: d for d in resp.context['doc_list']}
+
+        self.assertEqual(items['Istimara']['doc'].document_expiry_date, date(2029, 4, 30))
+        self.assertIn('name="doc_exp_Istimara"', resp.content.decode())
+        self.assertIn('value="2029-04-30"', resp.content.decode())
 
 
 @override_settings(MEDIA_ROOT='/tmp/ezzy-test-media')
@@ -260,8 +373,8 @@ class DriverApplySponsorTest(TestCase):
 
     def test_a_draft_save_keeps_the_sponsor(self):
         self.client.post(self.url, {
-            'action': 'save', 'first_name': 'Ashiraf', 'last_name': 'Waluboga',
-            'phone': '31029502', 'whatsapp': '97431029502',
+            'action': 'save', 'first_name': 'Testname', 'last_name': 'Applicant',
+            'phone': '30000000', 'whatsapp': '97430000000',
             'veh-vehicle_type': 'car',
             'driver_sponsor': '  Qatar Star Trading WLL  ',
         })
@@ -271,8 +384,8 @@ class DriverApplySponsorTest(TestCase):
 
     def test_the_saved_sponsor_comes_back_on_the_form(self):
         self.client.post(self.url, {
-            'action': 'save', 'first_name': 'Ashiraf', 'last_name': 'Waluboga',
-            'phone': '31029502', 'whatsapp': '97431029502',
+            'action': 'save', 'first_name': 'Testname', 'last_name': 'Applicant',
+            'phone': '30000000', 'whatsapp': '97430000000',
             'veh-vehicle_type': 'car', 'driver_sponsor': 'Doha Logistics Co',
         })
 

@@ -56,7 +56,8 @@ class Command(BaseCommand):
 
         for lead in candidates:
             phone = crm_services.normalize_phone(lead.phone)
-            override = crm_services.normalize_phone(lead.wa_chat_override or '')
+            links = lead.wa_link_values
+            override = crm_services.normalize_phone(links[0]) if links else ''
             base = override or phone
             if not base:
                 continue
@@ -97,9 +98,12 @@ class Command(BaseCommand):
                     lid_counterparties = {c for c in counterparties if c.endswith('@lid')}
                     if lid_counterparties:
                         resolved_lid = next(iter(lid_counterparties)).replace('@lid', '')
-                        if resolved_lid and resolved_lid != lead.wa_chat_override:
-                            lead.wa_chat_override = resolved_lid[:50]
-                            lead.save(update_fields=['wa_chat_override', 'updated_at'])
+                        if resolved_lid and resolved_lid not in lead.wa_link_values:
+                            # Point the link that was tried at the lid its messages use.
+                            if override:
+                                crm_services.repoint_wa_link(lead, override, resolved_lid)
+                            else:
+                                crm_services.add_wa_link(lead, resolved_lid, session=session)
                             lid_resolved += 1
                             note = f' [unmapped LID resolved: {resolved_lid}]'
                     self.stdout.write(

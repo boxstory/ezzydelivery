@@ -216,6 +216,12 @@ SESSION_COOKIE_NAME = 'ezzy_sessionid'  # Custom session cookie name for added s
 # without a deploy.
 DRIVER_DEVICE_ENFORCEMENT = config('DRIVER_DEVICE_ENFORCEMENT', default=True, cast=bool)
 
+# Approved drivers cannot use the app with location off or blocked: a
+# full-screen "turn on location" screen covers every driver page until the
+# phone gives a fix. A flag for the same reason as above — a browser that
+# misreports location would otherwise lock the whole fleet out mid-shift.
+DRIVER_GPS_REQUIRED = config('DRIVER_GPS_REQUIRED', default=True, cast=bool)
+
 # Weak-password nudge — set False to switch the interstitial off without a deploy
 WEAK_PASSWORD_WARNING_ENABLED = config('WEAK_PASSWORD_WARNING_ENABLED', default=True, cast=bool)
 
@@ -265,6 +271,9 @@ if TESTING:
     # Every driver fixture would otherwise land on the new-device gate instead of
     # the page under test. fleet.tests_device turns it back on explicitly.
     DRIVER_DEVICE_ENFORCEMENT = False
+    # A test browser has no location, so the location lock would cover every
+    # driver page the Selenium suite clicks through.
+    DRIVER_GPS_REQUIRED = False
 
 ROOT_URLCONF = 'ezzydelivery.urls'
 
@@ -936,6 +945,9 @@ except Exception:
 CRM_TRIAGE_AI_PROVIDER = config('CRM_TRIAGE_AI_PROVIDER', default='groq')
 CRM_TRIAGE_AI_MODEL    = config('CRM_TRIAGE_AI_MODEL',    default='openai/gpt-oss-120b')
 
+# Driver document image check (fleet/document_verify.py): reads number + expiry off the scan.
+DOC_VERIFY_AI_MODEL = config('DOC_VERIFY_AI_MODEL', default='claude-sonnet-5')
+
 AI_AGENT_MODEL = config('AI_AGENT_MODEL', default='claude-sonnet-4-6')
 AI_AGENT_MAX_TOKENS = config('AI_AGENT_MAX_TOKENS', default=4096, cast=int)
 
@@ -1073,3 +1085,13 @@ PUSH_TTL_SECONDS = config('PUSH_TTL_SECONDS', default=600, cast=int)
 # is a notification on a phone in a moving vehicle, and a dispatcher watching a
 # frozen marker will press the button far more often than the driver can answer.
 DRIVER_LOCATION_REQUEST_COOLDOWN = config('DRIVER_LOCATION_REQUEST_COOLDOWN', default=120, cast=int)
+
+# A test run must never reach a real WhatsApp number. The driver-apply tests once
+# used a real applicant's number and messaged him 78 times, because a submit
+# test sends the thank-you through the live Evolution API. Tests that exercise
+# sending mock requests; anything unmocked now fails fast on a dead host.
+if TESTING:
+    EVOLUTION_URL = 'http://evolution.test.invalid'
+    WAHA_BASE_URL = 'http://waha.test.invalid'
+    N8N_AI_AGENT_WEBHOOK_URL = ''
+    N8N_WHATSAPP_WEBHOOK_URL = ''

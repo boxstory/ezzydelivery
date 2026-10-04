@@ -11,6 +11,11 @@ _PLATFORM_CREDENTIALS = ['api_key', 'api_secret', 'api_access_token', 'api_versi
 _STORE_LOCATION = ['site_api_url', 'site_contry']
 _ENDPOINT_PATHS = ['order_api_endpoint', 'product_api_endpoint']
 
+# Only on the platforms whose import actually honours it (core.destination is
+# wired into the Shopify and WooCommerce pull paths). Offering the box on a
+# platform with no filter behind it would be a promise we do not keep.
+_DESTINATION_FILTER = ['import_qatar_only']
+
 # A custom REST integration authenticates against the SELLER's API with the key
 # their site issued us, so none of the platform credential fields above apply —
 # showing them is what made merchants paste their key into the wrong box.
@@ -28,7 +33,8 @@ PRODUCT_MAP_FIELDS = [
 
 PLATFORMS = {
     'shopify': {
-        'fields': _PLATFORM_CREDENTIALS + _STORE_LOCATION + _ENDPOINT_PATHS,
+        'fields': (_PLATFORM_CREDENTIALS + _STORE_LOCATION + _ENDPOINT_PATHS
+                   + _DESTINATION_FILTER),
         'labels': {
             'api_key': 'Client ID (Shopify Custom App API key)',
             'api_secret': 'Client Secret (Shopify Custom App API secret key)',
@@ -44,7 +50,8 @@ PLATFORMS = {
     # Shopify's two setup paths need different credentials; the form resolves to
     # this variant when the merchant picks "Custom App".
     'shopify_custom_app': {
-        'fields': ['api_access_token'] + _STORE_LOCATION + _ENDPOINT_PATHS,
+        'fields': (['api_access_token'] + _STORE_LOCATION + _ENDPOINT_PATHS
+                   + _DESTINATION_FILTER),
         'labels': {
             'api_access_token': 'Admin API Access Token (starts with shpat_)',
             'site_api_url': 'Store URL (e.g. mystore.myshopify.com)',
@@ -56,7 +63,8 @@ PLATFORMS = {
         },
     },
     'woocommerce': {
-        'fields': ['api_key', 'api_secret'] + _STORE_LOCATION + _ENDPOINT_PATHS,
+        'fields': (['api_key', 'api_secret'] + _STORE_LOCATION + _ENDPOINT_PATHS
+                   + _DESTINATION_FILTER),
         'labels': {'site_api_url': 'Store URL (with https://)'},
         'autofill': {
             'order_api_endpoint': '/wp-json/wc/v3/orders',

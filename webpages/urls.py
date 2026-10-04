@@ -3,7 +3,7 @@ from webpages import views as webpages_views
 from delivery import views as delivery_views
 from orders import views as orders_views
 from core import views as core_views
-from django.views.generic import TemplateView
+from django.views.generic import RedirectView, TemplateView
 
 
 
@@ -17,6 +17,13 @@ urlpatterns = [
     path('join_driver/', core_views.join_driver, name='join_driver'),
     path('privacy/', webpages_views.privacy, name='privacy'),
     path('careers/', webpages_views.careers, name='careers'),
+    # Driver jobs live on their own page: it is the link the fleet desk sends on
+    # WhatsApp, so it must open on a phone showing driver work and nothing else.
+    path('careers/drivers/', webpages_views.careers_drivers, name='careers_drivers'),
+    # Short, keyword-clean alias for sharing — canonical stays /careers/drivers/
+    path('driver-jobs/',
+         RedirectView.as_view(pattern_name='webpages:careers_drivers', permanent=True),
+         name='careers_drivers_short'),
 
     path('fulfillment/', webpages_views.fulfillment, name='fulfillment'),
     path('qcommerce/', webpages_views.qcommerce, name='qcommerce'),

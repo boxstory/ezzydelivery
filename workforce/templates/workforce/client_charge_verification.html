@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'workforce/css/client_charge_verification.css' %}?v=20260831a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/client_charge_verification.css' %}?v=20261002h" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -163,18 +163,38 @@
                  placeholder="Task, order, client ref, customer, phone, or amount">
         </div>
         {% comment %} Amount bounds run against the billable figure — the verified
-           charge when one is set, the calculated one otherwise. {% endcomment %}
-        <div class="ccv__filter ccv__filter--amt">
-          <label for="workforce_charges_filter_amount_min" class="ccv__field-label">Amount ≥</label>
-          <input type="number" name="amount_min" id="workforce_charges_filter_amount_min"
-                 class="form-control form-control-sm" value="{{ amount_min }}"
-                 step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+           charge when one is set, the calculated one otherwise. Min and max are one
+           control: four separate ≥/≤ boxes in a row read as four unrelated filters. {% endcomment %}
+        <div class="ccv__filter ccv__filter--range">
+          <label for="workforce_charges_filter_amount_min" class="ccv__field-label">Amount · QAR</label>
+          <div class="input-group input-group-sm">
+            <input type="number" name="amount_min" id="workforce_charges_filter_amount_min"
+                   class="form-control" value="{{ amount_min }}"
+                   step="0.01" min="0" inputmode="decimal" placeholder="Min"
+                   aria-label="Smallest charge, in QAR">
+            <span class="input-group-text ccv__range-sep" aria-hidden="true">–</span>
+            <input type="number" name="amount_max" id="workforce_charges_filter_amount_max"
+                   class="form-control" value="{{ amount_max }}"
+                   step="0.01" min="0" inputmode="decimal" placeholder="Max"
+                   aria-label="Largest charge, in QAR">
+          </div>
         </div>
-        <div class="ccv__filter ccv__filter--amt">
-          <label for="workforce_charges_filter_amount_max" class="ccv__field-label">Amount ≤</label>
-          <input type="number" name="amount_max" id="workforce_charges_filter_amount_max"
-                 class="form-control form-control-sm" value="{{ amount_max }}"
-                 step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+        {% comment %} Driving distance is the stored pickup→drop figure on the order
+           (the km shown under each task code). A job with no computed distance is
+           not matched by either bound. {% endcomment %}
+        <div class="ccv__filter ccv__filter--range">
+          <label for="workforce_charges_filter_dist_min" class="ccv__field-label">Distance · km</label>
+          <div class="input-group input-group-sm">
+            <input type="number" name="dist_min" id="workforce_charges_filter_dist_min"
+                   class="form-control" value="{{ dist_min }}"
+                   step="0.1" min="0" inputmode="decimal" placeholder="Min"
+                   aria-label="Shortest driving distance, in km">
+            <span class="input-group-text ccv__range-sep" aria-hidden="true">–</span>
+            <input type="number" name="dist_max" id="workforce_charges_filter_dist_max"
+                   class="form-control" value="{{ dist_max }}"
+                   step="0.1" min="0" inputmode="decimal" placeholder="Max"
+                   aria-label="Longest driving distance, in km">
+          </div>
         </div>
         <div class="ccv__filter">
           <label for="workforce_charges_filter_speed" class="ccv__field-label">Service</label>
@@ -238,6 +258,15 @@
           <span>Select all</span>
         </label>
         <span class="ccv__bar-count" id="workforce_charges_selected_count">0 selected</span>
+        {% comment %} The checkbox only reaches the rows on this page. Once they are
+           all ticked and the filter matches more, this offers the whole set — the
+           action then rebuilds it server-side from the filter, not from 500 ids. {% endcomment %}
+        <button type="button" class="ccv__bar-all" id="workforce_charges_select_matching" hidden>
+          Select all {{ stats.match_count|intcomma }} matching this filter
+        </button>
+        <button type="button" class="ccv__bar-all ccv__bar-all--off" id="workforce_charges_select_page" hidden>
+          Just this page
+        </button>
 
         <div class="ccv__bulk-set">
           <label for="workforce_charges_bulk_amount" class="ccv__field-label">Set selected to</label>
@@ -272,9 +301,15 @@
                 <a class="ccv__sort{% if sort_columns.delivered.dir %} ccv__sort--{{ sort_columns.delivered.dir }}{% endif %}"
                    href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.delivered.key }}">Delivered</a>
               </th>
+              {% comment %} Two sorts, one header: the cell below prints the service on
+                 its first line and the driving distance on its second, so both are
+                 sortable from where they are read. {% endcomment %}
               <th class="ccv__th-sort">
                 <a class="ccv__sort{% if sort_columns.service.dir %} ccv__sort--{{ sort_columns.service.dir }}{% endif %}"
                    href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.service.key }}">Service</a>
+                <a class="ccv__sort ccv__sort--sub{% if sort_columns.distance.dir %} ccv__sort--{{ sort_columns.distance.dir }}{% endif %}"
+                   href="?{% if sort_params %}{{ sort_params }}&amp;{% endif %}sort={{ sort_columns.distance.key }}"
+                   title="Sort by driving distance">km</a>
               </th>
               <th class="ccv__th-sort ccv__num">
                 <a class="ccv__sort{% if sort_columns.calculated.dir %} ccv__sort--{{ sort_columns.calculated.dir }}{% endif %}"
@@ -303,7 +338,15 @@
                        data-locked="{% if task.charge_verification_status == 'published' or task.cod_client_settled %}1{% else %}0{% endif %}">
               </td>
               <td class="ccv__mono">
-                {{ task.dl_task_number|default:task.id }}
+                {% comment %} Opens in a new tab on purpose: staff check a job against its
+                   task page and come back to the selection they were part-way through —
+                   navigating away would drop every tick on the page. {% endcomment %}
+                <a href="{% url 'workforce:delivery_task_detail' task.id %}"
+                   class="ccv__task-link" target="_blank" rel="noopener"
+                   title="Open task {{ task.dl_task_number|default:task.id }} in a new tab">
+                  {{ task.dl_task_number|default:task.id }}
+                  <i class="fa-solid fa-arrow-up-right-from-square ccv__task-link-icon" aria-hidden="true"></i>
+                </a>
                 {% comment %} The task code is minted from the order number, so the two
                    match on virtually every row — only print it when it actually differs
                    and carries something the line above does not. {% endcomment %}
@@ -316,6 +359,12 @@
                   {{ task.order.customer_name|default:"—"|truncatechars:22 }}
                 </div>
                 <div class="ccv__line-desc">{{ task.order.customer_phone|default:"—" }}</div>
+                {% comment %} Only non-standard legs are named: a badge on every row
+                   would say nothing. This is what tells staff the job collected from
+                   the customer rather than delivering to them. {% endcomment %}
+                {% if task.leg_label %}
+                <span class="ccv__leg">{{ task.leg_label }}</span>
+                {% endif %}
               </td>
               <td>
                 <div class="ccv__truncate" title="{{ task.order.business.business_name|default:'' }}">
@@ -329,14 +378,15 @@
                   {{ task.order.client_order_code|default:task.order.platform_id|default:"—" }}
                 </div>
               </td>
+              {% comment %} Both ends are resolved in the view through delivery/selectors.py,
+                 so a leg that runs the other way (a return pickup collects from the
+                 customer and delivers to the seller) prints in the order the driver
+                 actually travels it. {% endcomment %}
               <td class="ccv__route">
-                <span class="ccv__route-leg">
-                  {{ task.pickup_location.pickup_location_title|default:"No pickup"|truncatechars:20 }}
-                  <span class="ccv__zone">Z{{ task.pickup_location.pickup_zone_no|default:"–" }}</span>
+                <span class="ccv__route-leg" title="{{ task.route_from }}">
+                  {{ task.route_from|default:"No pickup"|truncatechars:20 }}
+                  <span class="ccv__zone">Z{{ task.pickup_zone|default:"–" }}</span>
                 </span>
-                {% comment %} drop_zone / drop_area are resolved in the view — the
-                   task's dl_to_address FK is usually null and area_name blank, so
-                   the zone comes off the order and the name off ZoneName. {% endcomment %}
                 <span class="ccv__route-leg" title="{{ task.drop_area }}">
                   {{ task.drop_area|default:"No drop"|truncatechars:20 }}
                   <span class="ccv__zone">Z{{ task.drop_zone|default:"–" }}</span>
@@ -449,6 +499,11 @@
 {% block extra_js %}
 <script>
   const workforceChargeActionUrl = "{% url 'workforce:client_charge_verification_action' %}";
+  // What "all matching" means: the live filter, posted back so the server
+  // resolves the same rows this page counted.
+  const workforceChargeFilters = "{{ filter_params|escapejs }}";
+  const workforceChargeMatchCount = {{ stats.match_count|default:0 }};
+  const workforceChargeMatchTotal = "{{ stats.match_total|floatformat:2 }}";
 </script>
-<script src="{% static 'workforce/js/client-charge-verification.js' %}?v=20260824a"></script>
+<script src="{% static 'workforce/js/client-charge-verification.js' %}?v=20261002a"></script>
 {% endblock %}

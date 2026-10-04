@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Public driver jobs page — every live driver offer, the pay, and how to apply. The link the fleet desk shares on WhatsApp.
+Used by: webpages.views.careers_drivers (/careers/drivers/, short URL /driver-jobs/)
+Notes: Shares careers.css (wpk__) with /careers/, which now carries office roles only. Offers are styled for the
+       navy lane, so they must stay inside it. JobPosting JSON-LD is built in the view — one posting per live
+       offer, none at all when nothing is open, because a posting for a vacancy that does not exist is a penalty.
+{% endcomment %}
+
+{% block title %}Driver Jobs in Qatar - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link href="{% static 'webpages/css/careers.css' %}?v=20261002b" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+
+<!-- Hero: one job family, stated plainly. No office roles on this page at all. -->
+<section id="webpages_cdrv_section_hero" class="wpk__hero">
+  <div class="container">
+    <div class="row g-4 align-items-end">
+      <div class="col-12 col-lg-7">
+        <div class="wpk__hero-kicker mb-2">Now hiring &mdash; {% now "F Y" %}</div>
+        <h1 id="webpages_cdrv_header_main" class="wpk__hero-title mb-3">Driver jobs in Qatar.</h1>
+        <p class="wpk__hero-sub mb-0">
+          EzzyDelivery moves parcels across every zone in Qatar and takes on drivers
+          every week. Drive your own car, bike or van, pick the zones you know, and
+          get paid for every delivery you complete.
+        </p>
+      </div>
+      <div class="col-12 col-lg-5">
+        <dl class="wpk__facts ms-lg-auto">
+          <div class="wpk__fact">
+            <dt class="wpk__fact-key">Where</dt>
+            <dd class="wpk__fact-val mb-0">Doha, Al Wakrah, Lusail</dd>
+          </div>
+          <div class="wpk__fact">
+            <dt class="wpk__fact-key">Intake</dt>
+            <dd class="wpk__fact-val mb-0">Open every week</dd>
+          </div>
+          <div class="wpk__fact">
+            <dt class="wpk__fact-key">Open offers</dt>
+            <dd class="wpk__fact-val mb-0">{{ driver_proposals|length }} listed</dd>
+          </div>
+          <div class="wpk__fact">
+            <dt class="wpk__fact-key">Approval</dt>
+            <dd class="wpk__fact-val mb-0">Usually 2 working days</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="container py-5">
+
+  <!-- The lane: how to join, then what is actually open. Same navy surface as
+       /careers/ used before the split, so an offer card needs no new styling. -->
+  <section id="webpages_cdrv_section_apply" class="wpk__lane mb-5">
+    <div class="row g-4">
+      <div class="col-12 col-lg-7">
+        <div class="wpk__lane-ref mb-1">EZY-FLT-03</div>
+        <h2 class="wpk__lane-title mb-2">Drive with Ezzy</h2>
+        <div class="wpk__lane-open mb-3">Hiring continuously, full time or part time, all zones</div>
+        <p class="wpk__lane-lead mb-0">
+          No CV and no waiting for a vacancy to open &mdash; drivers apply straight
+          through the app funnel. Keep your QID, driving licence and vehicle papers
+          handy, the form asks for photos of them.
+        </p>
+      </div>
+
+      <div class="col-12 col-lg-5">
+        <div class="d-flex flex-column gap-3">
+          <div class="wpk__step">
+            <span class="wpk__step-num" aria-hidden="true">1</span>
+            <span class="wpk__step-text">Sign in with Google &mdash; it takes a minute</span>
+          </div>
+          <div class="wpk__step">
+            <span class="wpk__step-num" aria-hidden="true">2</span>
+            <span class="wpk__step-text">Add your vehicle, QID and licence</span>
+          </div>
+          <div class="wpk__step">
+            <span class="wpk__step-num" aria-hidden="true">3</span>
+            <span class="wpk__step-text">Get approved, then start taking deliveries</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-3 mt-4">
+      <a class="wpk__lane-cta" id="webpages_cdrv_link_apply"
+         href="{% url 'core:join_driver_start' %}">Start driver application</a>
+      <span class="wpk__lane-hint">Approval usually lands within two working days</span>
+    </div>
+
+    {% comment %}
+    Driver offers — fleet.DriverProposal rows written by marketing at
+    /workforce/marketing/driver-proposals/ and ticked "show on careers". The same
+    rows appear in the driver app; this page never filters them itself.
+    {% endcomment %}
+    <div class="wpk__offers-head mt-4 mb-3">
+      {% if driver_proposals %}
+      Open offers right now &mdash; {{ driver_proposals|length }}
+      {% else %}
+      Open offers right now
+      {% endif %}
+    </div>
+
+    {% if driver_proposals %}
+    <div id="webpages_cdrv_list_offers" class="d-flex flex-column gap-3">
+      {% for proposal in driver_proposals %}
+      <article class="wpk__offer">
+        <div class="row g-3 align-items-start">
+          <div class="col-12 col-md-8">
+            {% if proposal.ref_code %}
+            <div class="wpk__offer-ref mb-1">{{ proposal.ref_code }}</div>
+            {% endif %}
+            <h3 class="wpk__offer-title mb-1">{{ proposal.title }}</h3>
+            <div class="wpk__offer-terms">
+              {% if proposal.job_type %}{{ proposal.get_job_type_display|lower|capfirst }}{% else %}Any schedule{% endif %},
+              {% if proposal.vehicle_type %}{{ proposal.get_vehicle_type_display|lower }}{% else %}any vehicle{% endif %}
+            </div>
+          </div>
+          {% if proposal.pay_package %}
+          <div class="col-12 col-md-4">
+            <div class="wpk__offer-pay align-items-md-end">
+              <span class="wpk__offer-pay-label">Pay</span>
+              <span class="wpk__offer-pay-value">{{ proposal.pay_package }}</span>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if proposal.headline and proposal.headline != proposal.title %}
+        <p class="wpk__offer-headline mt-3 mb-0">{{ proposal.headline }}</p>
+        {% endif %}
+        {% if proposal.description %}
+        <p class="wpk__offer-desc mt-2 mb-0">{{ proposal.description|linebreaksbr }}</p>
+        {% endif %}
+
+        <div class="mt-3">
+          <div class="wpk__offer-block-label mb-2">Zones</div>
+          <div class="wpk__zones">
+            {% for zone in proposal.zone_groups.all %}
+            <span class="wpk__zone">{{ zone }}</span>
+            {% empty %}
+            <span class="wpk__zone">Anywhere in Qatar</span>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if proposal.perk_list or proposal.requirement_list %}
+        <div class="row g-3 mt-1">
+          {% if proposal.perk_list %}
+          <div class="col-12{% if proposal.requirement_list %} col-md-6{% endif %}">
+            <div class="wpk__offer-block-label mb-2">What you get</div>
+            <ul class="wpk__offer-points">
+              {% for perk in proposal.perk_list %}
+              <li>{{ perk }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+          {% if proposal.requirement_list %}
+          <div class="col-12{% if proposal.perk_list %} col-md-6{% endif %}">
+            <div class="wpk__offer-block-label mb-2">What we need</div>
+            <ul class="wpk__offer-points">
+              {% for requirement in proposal.requirement_list %}
+              <li>{{ requirement }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
+          {% comment %}
+          Quiet on purpose: the lane's yellow CTA above is the page's one accent,
+          and three offers each shouting in yellow would cancel it out.
+          {% endcomment %}
+          <a class="wpk__offer-apply" href="{% url 'core:join_driver_start' %}">Apply for this offer</a>
+          {% if proposal.closes_at %}
+          <span class="wpk__offer-closes-inline">Open until {{ proposal.closes_at|date:"d M Y" }}</span>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    {% comment %}
+    No published offer does not mean no work: driver intake runs continuously, so
+    the empty state still points at the application rather than turning a reader away.
+    {% endcomment %}
+    <div id="webpages_cdrv_list_offers" class="wpk__offers-empty">
+      No named offer is listed this week, but driver intake is always open. Apply
+      and the fleet team will match you to the zones and hours you want.
+    </div>
+    {% endif %}
+
+  </section>
+
+  <section class="mb-5">
+    <div class="wpk__head mb-4">
+      <h2 class="wpk__head-title">Why drive with us</h2>
+    </div>
+    <div class="row g-4">
+      <div class="col-6 col-lg-3">
+        <div class="wpk__term">
+          <div class="wpk__term-label mb-1">Paid per delivery</div>
+          <p class="wpk__term-text mb-0">Every completed drop is tracked in your driver app and settled with the fleet desk.</p>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="wpk__term">
+          <div class="wpk__term-label mb-1">Your own hours</div>
+          <p class="wpk__term-text mb-0">No fixed shifts. Go online when it suits you and take the tasks you want.</p>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="wpk__term">
+          <div class="wpk__term-label mb-1">Zones you know</div>
+          <p class="wpk__term-text mb-0">Tell us the areas you drive and we route your tasks there wherever we can.</p>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="wpk__term">
+          <div class="wpk__term-label mb-1">A real team</div>
+          <p class="wpk__term-text mb-0">Doha based dispatchers on WhatsApp, not a call centre in another country.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-0">
+    <div class="wpk__head mb-4">
+      <h2 class="wpk__head-title">What you need to start</h2>
+      <span class="wpk__head-note">Same for every offer above</span>
+    </div>
+    <div class="row g-4">
+      <div class="col-6 col-lg-3">
+        <div class="wpk__term">
+          <div class="wpk__term-label mb-1">A vehicle</div>
+          <p class="wpk__term-text mb-0">Car, motorbike or van &mdash; yours or a rental, with valid Istimara.</p>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="wpk__term">
+          <div class="wpk__term-label mb-1">Qatar licence</div>
+          <p class="wpk__term-text mb-0">A valid Qatar driving licence for the vehicle you will deliver with.</p>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="wpk__term">
+          <div class="wpk__term-label mb-1">QID</div>
+          <p class="wpk__term-text mb-0">Your Qatar ID, plus one more document photo &mdash; passport or licence.</p>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="wpk__term">
+          <div class="wpk__term-label mb-1">A smartphone</div>
+          <p class="wpk__term-text mb-0">With WhatsApp, for your tasks, navigation and approval updates.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Closing band: what happens after the form, and the one pointer back to office roles -->
+<section class="wpk__apply">
+  <div class="container">
+    <div class="row g-4 g-lg-5">
+      <div class="col-12 col-lg-7">
+        <div class="wpk__route">
+          <div class="wpk__route-title mb-3">What happens after you apply</div>
+          <ol class="wpk__route-list">
+            <li class="wpk__route-stop">
+              <div class="wpk__route-label">You fill the form</div>
+              <div class="wpk__route-hint">About 5 minutes, on your phone, no office visit</div>
+            </li>
+            <li class="wpk__route-stop">
+              <div class="wpk__route-label">We check your documents</div>
+              <div class="wpk__route-hint">QID, licence and vehicle papers, by a person</div>
+            </li>
+            <li class="wpk__route-stop">
+              <div class="wpk__route-label">Approval on WhatsApp</div>
+              <div class="wpk__route-hint">Usually within two working days</div>
+            </li>
+            <li class="wpk__route-stop wpk__route-stop--last">
+              <div class="wpk__route-label">Your first delivery</div>
+              <div class="wpk__route-hint">Tasks arrive in the driver app the day you go online</div>
+            </li>
+          </ol>
+
+          <div class="d-flex flex-wrap align-items-center gap-3 mt-4">
+            <a class="wpk__lane-cta" href="{% url 'core:join_driver_start' %}">Start driver application</a>
+            <a class="wpk__route-alt" href="{% url 'core:join_driver_start_ar' %}" hreflang="ar" lang="ar">بالعربية</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-5">
+        <div class="wpk__route">
+          <div class="wpk__aside">
+            <div class="wpk__aside-title mb-1">Not looking to drive?</div>
+            <p class="wpk__aside-text mb-0">
+              Office and field seats in Doha &mdash; business development, leads and
+              operations &mdash; are listed on our
+              <a href="{% url 'webpages:careers' %}">careers page</a>.
+            </p>
+          </div>
+          <div class="wpk__aside mt-4">
+            <div class="wpk__aside-title mb-1">Questions first?</div>
+            <p class="wpk__aside-text mb-0">
+              Read the <a href="{% url 'core:join_driver_start' %}">driver FAQ</a> or
+              <a href="{% url 'webpages:contactus' %}">get in touch</a> &mdash; the fleet
+              team answers on WhatsApp.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock content %}
+
+{% block extra_js %}
+{% comment %}
+One JobPosting per live offer, built in the view so marketing's free text is
+escaped on the way in. Nothing open means no JobPosting at all — Google treats a
+posting for a vacancy that does not exist as a quality problem.
+{% endcomment %}
+{% if job_postings_schema %}
+<script type="application/ld+json">{{ job_postings_schema }}</script>
+{% endif %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://ezzydelivery.qa/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Careers",
+      "item": "https://ezzydelivery.qa/careers/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "Driver Jobs",
+      "item": "https://ezzydelivery.qa/careers/drivers/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What driver jobs are open at EzzyDelivery Qatar?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Driver intake runs every week across Doha, Al Wakrah and Lusail, for car, motorbike and van drivers, full time or part time. Named offers with their pay package are listed on this page whenever the fleet team is recruiting for a specific package."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How much do delivery drivers earn in Qatar with EzzyDelivery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "You are paid for every completed delivery, and each listed offer shows its own pay package. Your earnings are tracked drop by drop in the driver app and settled with the fleet desk."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What do I need to apply as a delivery driver?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A vehicle you can deliver with, a valid Qatar driving licence, your QID and one more ID document, and a smartphone with WhatsApp. The online application asks for photos of the documents."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How long does driver approval take?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A completed application is normally reviewed within two working days, and the fleet team confirms your approval on WhatsApp. You can then go online in the driver app and start accepting delivery tasks."
+      }
+    }
+  ]
+}
+</script>
+{% endblock extra_js %}

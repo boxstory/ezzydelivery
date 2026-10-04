@@ -6,6 +6,10 @@ Purpose: Build or edit one automation flow — trigger + conditions on the left,
 Used by: workforce_views.auto_flow_add / auto_flow_edit at /workforce/auto-flows/add/ and /edit/<id>/
 Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on load; the hero
        help button toggles it via the delegated handler in workforce.js.
+       Send To is scoped to the trigger: the options are rendered from core/auto_flow_triggers.py
+       (never hardcoded here) and re-scoped client-side from the wa_recipient_scope json_script
+       when the trigger changes. The same module refuses the save, so a stale form cannot store
+       a recipient the trigger can never feed.
 {% endcomment %}
 
 {% block extra_css %}
@@ -308,36 +312,22 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Send To</label>
-                                <select class="form-select" name="wa_recipient" onchange="toggleRecipientFields(this.value)">
-                                    <optgroup label="Customer">
-                                        <option value="customer" {% if form_data.wa_recipient == 'customer' %}selected{% endif %}>Customer — Order Phone</option>
-                                        <option value="customer_whatsapp" {% if form_data.wa_recipient == 'customer_whatsapp' %}selected{% endif %}>Customer — WhatsApp Number</option>
+                                <select class="form-select" id="waRecipient" name="wa_recipient"
+                                        onchange="toggleRecipientFields(this.value)">
+                                    {% for group in recipient_groups %}
+                                    <optgroup label="{{ group.label }}">
+                                        {% for rec in group.rows %}
+                                        <option value="{{ rec.value }}" data-label="{{ rec.label }}"
+                                                {% if not rec.available %}disabled{% endif %}
+                                                {% if form_data.wa_recipient == rec.value %}selected{% endif %}>
+                                            {{ rec.label }}{% if not rec.available %} — {{ rec.reason }}{% endif %}
+                                        </option>
+                                        {% endfor %}
                                     </optgroup>
-                                    <optgroup label="Driver">
-                                        <option value="driver" {% if form_data.wa_recipient == 'driver' %}selected{% endif %}>Assigned Driver — Phone</option>
-                                        <option value="driver_whatsapp" {% if form_data.wa_recipient == 'driver_whatsapp' %}selected{% endif %}>Assigned Driver — WhatsApp</option>
-                                        <option value="all_active_drivers" {% if form_data.wa_recipient == 'all_active_drivers' %}selected{% endif %}>All Active Drivers</option>
-                                        <option value="zone_drivers" {% if form_data.wa_recipient == 'zone_drivers' %}selected{% endif %}>Drivers in Same Zone</option>
-                                        <option value="available_drivers" {% if form_data.wa_recipient == 'available_drivers' %}selected{% endif %}>All Available Drivers</option>
-                                    </optgroup>
-                                    <optgroup label="Seller / Business">
-                                        <option value="seller" {% if form_data.wa_recipient == 'seller' %}selected{% endif %}>Seller — Business Phone</option>
-                                        <option value="seller_owner" {% if form_data.wa_recipient == 'seller_owner' %}selected{% endif %}>Seller — Owner Phone</option>
-                                    </optgroup>
-                                    <optgroup label="Lead / Applicant">
-                                        <option value="context_phone" {% if form_data.wa_recipient == 'context_phone' %}selected{% endif %}>Person this event is about (lead / driver applicant)</option>
-                                    </optgroup>
-                                    <optgroup label="Staff">
-                                        <option value="staff_ops" {% if form_data.wa_recipient == 'staff_ops' %}selected{% endif %}>Operations Staff</option>
-                                        <option value="staff_fin" {% if form_data.wa_recipient == 'staff_fin' %}selected{% endif %}>Finance Staff</option>
-                                        <option value="staff_mkt" {% if form_data.wa_recipient == 'staff_mkt' %}selected{% endif %}>Marketing / Sales Staff</option>
-                                        <option value="staff_all" {% if form_data.wa_recipient == 'staff_all' %}selected{% endif %}>All Staff Members</option>
-                                    </optgroup>
-                                    <optgroup label="Custom">
-                                        <option value="custom" {% if form_data.wa_recipient == 'custom' %}selected{% endif %}>Custom Phone Number</option>
-                                        <option value="custom_group" {% if form_data.wa_recipient == 'custom_group' %}selected{% endif %}>WhatsApp Group ID</option>
-                                    </optgroup>
+                                    {% endfor %}
                                 </select>
+                                {# What the chosen trigger can reach — rewritten by scopeRecipients() #}
+                                <div class="alert alert-info py-2 px-3 mt-2 mb-0 small" id="waRecipientNote"></div>
                             </div>
                             <div class="mb-3" id="waCustomPhoneWrap" style="display:none;">
                                 <label class="form-label fw-bold" id="waCustomPhoneLabel">Custom Phone Number</label>
@@ -566,6 +556,8 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
     </form>
 </div>
 
+{{ recipient_scope|json_script:"wa_recipient_scope" }}
+
 <script>
 function showActionConfig() {
     document.querySelectorAll('.action-config-panel').forEach(p => p.style.display = 'none');
@@ -587,6 +579,8 @@ function updateTriggerInfo() {
 
     // Hide all category-specific condition panels
     document.querySelectorAll('.trigger-cond-panel').forEach(p => p.style.display = 'none');
+
+    scopeRecipients();
 
     if (opt && opt.value && opt.dataset.desc) {
         // Show info panel
@@ -643,6 +637,52 @@ function toggleRecipientFields(val) {
     document.getElementById('waGroupIdWrap').style.display = val === 'custom_group' ? 'block' : 'none';
 }
 
+// --- Send To follows the trigger ---
+// Every trigger hands the flow engine something different — a delivery task, an
+// order, one person's phone, or nothing at all — and a recipient it cannot feed
+// does not fail here, it fails months later as "No phone numbers resolved" in the
+// log. So the options that cannot work are greyed out with the reason, rather than
+// left to be discovered. The map comes from core/auto_flow_triggers.py; the same
+// module refuses the save, because a disabled option is a hint, not a lock.
+const WA_SCOPE = JSON.parse(document.getElementById('wa_recipient_scope').textContent);
+const WA_NOTE_CLASS = {ok: 'alert-info', warn: 'alert-warning', danger: 'alert-danger'};
+
+function scopeRecipients() {
+    const sel = document.getElementById('waRecipient');
+    const note = document.getElementById('waRecipientNote');
+    if (!sel) return;
+    const trigOpt = document.getElementById('triggerSelect').selectedOptions[0];
+    const scope = WA_SCOPE[trigOpt ? (trigOpt.dataset.key || '') : ''];
+
+    if (!scope) {
+        // No trigger picked yet: nothing is known about what it carries, so
+        // everything stays selectable rather than half of it being greyed out.
+        sel.querySelectorAll('option').forEach(function (o) {
+            o.disabled = false;
+            o.textContent = o.dataset.label;
+        });
+        note.textContent = 'Pick a trigger first — it decides who this message can be sent to.';
+        note.className = 'alert alert-secondary py-2 px-3 mt-2 mb-0 small';
+        return;
+    }
+
+    sel.querySelectorAll('option').forEach(function (o) {
+        const ok = scope.allowed.indexOf(o.value) !== -1;
+        const label = scope.labels[o.value] || o.dataset.label;
+        o.disabled = !ok;
+        o.textContent = ok ? label : label + ' — ' + (scope.reasons[o.value] || 'not available for this trigger');
+    });
+
+    const current = sel.selectedOptions[0];
+    if (!current || current.disabled) {
+        sel.value = scope.default;
+        toggleRecipientFields(sel.value);
+    }
+    note.textContent = scope.note.text;
+    note.className = 'alert ' + (WA_NOTE_CLASS[scope.note.level] || 'alert-info')
+                   + ' py-2 px-3 mt-2 mb-0 small';
+}
+
 // Show/hide conditional fields
 document.addEventListener('change', function(e) {
     if (e.target.name === 'wa_recipient') {
@@ -658,7 +698,7 @@ document.addEventListener('change', function(e) {
 
 document.addEventListener('DOMContentLoaded', function() {
     showActionConfig();
-    updateTriggerInfo();
+    updateTriggerInfo();   // calls scopeRecipients() for the trigger already chosen
 });
 </script>
 {% endblock content %}

@@ -1,0 +1,747 @@
+/*
+ * Purpose: Console skin for the client order detail slide-in — panel shell, section heads, route, spec rows, payment plate, actions.
+ * Used by: orders/order_all_list.html and orders/order_pending_list.html, over the `odp__` base in orders.css.
+ * Notes: Scoped to `.order-detail-panel--console` / `.odp--console`. orders.css is loaded on the STAFF base too, and
+ *        workforce.css carries its own `odp__` copy for workforce/order_detail_panel.html — so nothing here may be
+ *        written unscoped, or the staff panel moves with it.
+ */
+
+/* ============================================================================
+   PANEL SHELL
+   The header was a slate gradient (#1e293b → #0f172a) while the hero two
+   pixels below it was --brand-navy — two different darks stacked. One navy.
+   ============================================================================ */
+.order-detail-panel--console .order-detail-panel-header {
+  padding: 0.625rem 0.875rem;
+  background: var(--brand-gradient-navy);
+  border-bottom: 2px solid var(--brand-primary);
+}
+
+.order-detail-panel--console .order-detail-panel-header h5 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.order-detail-panel--console .order-detail-panel-header h5 i {
+  color: var(--brand-primary);
+  font-size: 0.8rem;
+}
+
+/* A 16px .btn-close is under the 44px touch floor on the phone, where this
+   panel is full width and the close button is the only way out of it. */
+.order-detail-panel--console .order-detail-panel-header .btn-close {
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: -0.375rem -0.25rem -0.375rem 0;
+  border-radius: 0.375rem;
+  background-size: 0.75rem;
+}
+
+.order-detail-panel--console .order-detail-panel-header .btn-close:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Was 20px/12px — odd on both axes and off the 0.375rem grid. */
+.order-detail-panel--console .order-detail-panel-body { padding: 0.75rem; }
+
+@media (max-width: 767.98px) {
+  .order-detail-panel--console .order-detail-panel-body { padding: 0.625rem; }
+}
+
+/* ============================================================================
+   HERO
+   ============================================================================ */
+.odp--console .odp__hero {
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.4rem;
+}
+
+.odp--console .odp__order-num {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
+.odp--console .odp__hero-meta { gap: 0.75rem; }
+
+.odp--console .odp__meta-item {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.odp--console .odp__meta-item i { color: rgba(255, 255, 255, 0.5); }
+
+/* ============================================================================
+   SECTION HEADS
+   Measured, every one of these icons was rgb(247,192,0) on white — raw
+   --brand-primary as an icon on a light surface, 1.68:1, which Brand Kit rule 5
+   forbids outright. They are also decoration: a user glyph in front of the word
+   CUSTOMER repeats the label. So they stay (nothing is removed) but they go
+   quiet in grey ink and the label leads, which leaves the panel's one yellow
+   for the COD plate.
+   ============================================================================ */
+.odp--console .odp__section-head {
+  gap: 0.375rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  color: var(--brand-grey-550);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.3125rem;
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.odp--console .odp__section-head i {
+  font-size: 0.7rem;
+  color: var(--brand-grey-450);
+}
+
+.odp--console .odp__section { margin-bottom: 0.875rem; }
+
+/* ============================================================================
+   CUSTOMER
+   ============================================================================ */
+.odp--console .odp__customer-name {
+  font-size: 0.9375rem;
+  color: var(--brand-grey-800);
+}
+
+.odp--console .odp__contact-btn {
+  min-height: 2rem;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* The phone number is the thing somebody reads off this panel and dials. */
+.odp--console .odp__contact-btn--phone {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-300);
+  color: var(--brand-grey-800);
+}
+
+.odp--console .odp__contact-btn--phone:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+  color: var(--brand-grey-800);
+}
+
+/* ============================================================================
+   ROUTE
+   The two stops were a blue disc (#dbeafe/#2563eb) and a PINK one
+   (#fce7f3/#db2777). Pink is not a Brand Kit colour at all, and a pair of
+   pastel discs is the "candy" the house style rejects. Origin and destination
+   now read as one family: the origin is quiet, the destination is navy.
+   ============================================================================ */
+.odp--console .odp__route-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.6rem;
+  border: 0;
+}
+
+.odp--console .odp__route-icon--pickup {
+  background: var(--brand-grey-150);
+  border: 1px solid var(--brand-grey-300);
+  color: var(--brand-grey-550);
+}
+
+.odp--console .odp__route-icon--dropoff {
+  background: var(--brand-navy);
+  border: 1px solid var(--brand-navy);
+  color: #fff;
+}
+
+/* A solid hairline reads as one trip; the dashed 2px rule read as a divider. */
+.odp--console .odp__route-line {
+  width: 1px;
+  height: 1.125rem;
+  background: var(--brand-grey-300);
+  margin-left: 0.75rem;
+}
+
+.odp--console .odp__route-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--brand-grey-450);
+}
+
+.odp--console .odp__route-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+}
+
+.odp--console .odp__route-addr {
+  font-size: 0.75rem;
+  color: var(--brand-grey-550);
+}
+
+.odp--console .odp__route-map-link {
+  min-height: 1.875rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--brand-grey-300);
+  border-radius: 0.375rem;
+  background: var(--brand-grey-50);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-navy);
+}
+
+.odp--console .odp__route-map-link:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+  color: var(--brand-navy);
+}
+
+/* ============================================================================
+   SPEC ROWS — Zone / Street / Bldg / Lat-Lng / Distance / Accuracy.
+   These are read-only facts, but they were grey filled boxes 53px tall with
+   the label and the value BOTH at 12px, so nothing led. Hairline rows now,
+   with the Brand Kit's label/value scale (0.68 vs 0.8125/600) doing the work.
+   ============================================================================ */
+.odp--console .odp__route-info .odt__field--compact {
+  padding: 0.25rem 0 0.3125rem;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--brand-grey-200);
+  border-radius: 0;
+}
+
+.odp--console .odt__field__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-grey-450);
+}
+
+.odp--console .odt__field__label i { color: var(--brand-grey-400); }
+
+.odp--console .odt__field--compact .odt__field__value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+}
+
+/* Anything anyone would read aloud — a zone, a street, a co-ordinate — is set
+   in the console's mono face, as it is everywhere else in this product. */
+.odp--console .odt__field__value--bold,
+.odp--console .odt__field__value--mono {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-weight: 700;
+}
+
+/* ============================================================================
+   PAYMENT — the panel's ONE warm surface (Brand Kit recipe 8). The status
+   beside it was a red-on-pink pill; the house status system is a swatch and a
+   word, so the amount keeps the eye and the state stops shouting over it.
+   ============================================================================ */
+.odp--console .odp__cod {
+  padding: 0.625rem 0.875rem;
+  background: linear-gradient(135deg, #fffbeb, var(--brand-warning-bg));
+  border: 1px solid #fde68a;
+  border-radius: 0.4rem;
+}
+
+.odp--console .odp__cod-value {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.odp--console .odp__cod-status .ob__ {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0;
+  background: none !important;
+  border: 0 !important;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-grey-650) !important;
+}
+
+.odp--console .odp__cod-status .ob__ i { display: none; }
+
+.odp--console .odp__cod-status .ob__::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-grey-400);
+  flex-shrink: 0;
+}
+
+.odp--console .odp__cod-status .ob__--cod-pending::before { background: var(--brand-warning); }
+.odp--console .odp__cod-status .ob__--cod-collected::before { background: var(--brand-success); }
+.odp--console .odp__cod-status .ob__--cod-partial::before { background: var(--brand-warning); }
+.odp--console .odp__cod-status .ob__--cod-settled::before { background: var(--brand-info); }
+
+.odp--console .odp__cod-fee {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  color: var(--brand-grey-550);
+}
+
+/* ============================================================================
+   SPEC BLOCK — Package / Qty / COD. Was an inline-styled #fff8e1 slab with a
+   #f5c542 border, a SECOND yellow surface repeating the COD figure already
+   shown above it. Same rows, same data, quiet hairlines.
+   (The inline styles it carried also broke hard rule 1.)
+   ============================================================================ */
+.odp--console .odp__spec {
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+
+.odp--console .odp__spec-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3125rem 0.625rem;
+}
+
+.odp--console .odp__spec-row + .odp__spec-row { border-top: 1px solid var(--brand-grey-200); }
+
+.odp--console .odp__spec-icon {
+  width: 0.875rem;
+  font-size: 0.7rem;
+  color: var(--brand-grey-400);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.odp--console .odp__spec-label {
+  min-width: 3.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-grey-450);
+}
+
+.odp--console .odp__spec-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+}
+
+.odp--console .odp__spec-value--num {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-weight: 700;
+}
+
+.odp--console .odp__subhead {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-grey-450);
+  margin: 0.625rem 0 0.25rem;
+}
+
+/* ============================================================================
+   PRODUCT ITEMS — zebra fill out, hairlines in; the price is a figure.
+   ============================================================================ */
+.odp--console .odp__items {
+  gap: 0;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+
+.odp--console .odp__item,
+.odp--console .odp__item:nth-child(odd) {
+  padding: 0.375rem 0.625rem;
+  background: #fff;
+}
+
+.odp--console .odp__item + .odp__item { border-top: 1px solid var(--brand-grey-200); }
+
+.odp--console .odp__item-name {
+  font-size: 0.8125rem;
+  color: var(--brand-grey-800);
+  overflow-wrap: anywhere;
+}
+
+.odp--console .odp__item-qty {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--brand-grey-550);
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-250);
+  border-radius: 0.25rem;
+  padding: 0.0625rem 0.3125rem;
+}
+
+.odp--console .odp__item-price {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   DELIVERY TASK
+   ============================================================================ */
+.odp--console .odp__dl-task-num {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.odp--console .odp__dl-task-num i { color: var(--brand-grey-400); }
+
+.odp--console .odp__dl-completed {
+  padding: 0.1875rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.odp--console .odp__dl-time {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  color: var(--brand-grey-500);
+}
+
+.odp--console .odp__reconfirm-btn {
+  min-height: 2.125rem;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 0.375rem;
+}
+
+/* ============================================================================
+   ACTIONS — the panel body runs to about 1600px, so these sat below a full
+   screen of scrolling. Pinned to the bottom of the scroll container, they are
+   reachable from anywhere in it.
+   ============================================================================ */
+.odp--console .odp__actions {
+  position: sticky;
+  bottom: -0.75rem;
+  z-index: 2;
+  gap: 0.5rem;
+  margin: 1rem -0.75rem -0.75rem;
+  padding: 0.625rem 0.75rem;
+  background: #fff;
+  border-top: 1px solid var(--brand-grey-200);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.odp--console .odp__action-btn {
+  min-height: 2.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 0.375rem;
+}
+
+@media (max-width: 767.98px) {
+  .odp--console .odp__actions {
+    bottom: -0.625rem;
+    margin: 1rem -0.625rem -0.625rem;
+    padding: 0.625rem;
+  }
+}
+
+/* ============================================================================
+   TIMELINE — the shared odt__ timeline is reused as-is; it only needs to stop
+   carrying a card border inside a panel that is already a card.
+   ============================================================================ */
+.odp--console .odp__section--timeline .odt__card {
+  border-color: var(--brand-grey-200);
+  border-radius: 0.4rem;
+  box-shadow: none;
+}
+
+.odp--console .odt__timeline__title {
+  font-size: 0.8125rem;
+  color: var(--brand-grey-800);
+}
+
+.odp--console .odt__timeline__time {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  color: var(--brand-grey-450);
+}
+
+.odp--console .odt__timeline__desc {
+  font-size: 0.72rem;
+  color: var(--brand-grey-550);
+}
+
+/* ============================================================================
+   LATE FIXES — found by measuring the rendered panel, not by reading the CSS.
+   ============================================================================ */
+/* .odp__route-info is a flex column, so giving the map link a surface made it
+   stretch the full panel width and read as a section bar rather than a button. */
+.odp--console .odp__route-map-link {
+  align-self: flex-start;
+  width: fit-content;
+}
+
+/* The coordinate pair beside the map button — a figure, so it is set in mono
+   and does not wrap mid-number. */
+.odp--console .mpt__text {
+  font-family: var(--bcon-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--brand-grey-800);
+  white-space: nowrap;
+}
+
+/* The AI-parse control sits inside the DROP-OFF label, where it was a bright
+   tile competing with the heading it belongs to. */
+.odp--console .odp__route-label .aim__parse-btn {
+  min-height: 1.5rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.68rem;
+  vertical-align: middle;
+}
+
+/* Measured on a 390px viewport: the Lat/Lng · Distance · Accuracy row is three
+   nowrap flex items sharing 366px, so the coordinate pair (~140px of mono) blew
+   out of its 151px box and the row grew to 73.7px against the 49.2px of the
+   rows above it. Only THAT row needs to wrap — Zone # / Zone Name above it
+   reads fine as a pair, and wrapping every row stacked it needlessly. */
+@media (max-width: 575.98px) {
+  .odp--console .odp__route-info .odt__field-row:has(> .odt__field--compact:nth-child(3)) {
+    flex-wrap: wrap;
+  }
+
+  .odp--console .odp__route-info .odt__field-row:has(> .odt__field--compact:nth-child(3)) > .odt__field--compact-wide {
+    flex: 1 1 100%;
+  }
+
+  .odp--console .odp__route-info .odt__field-row:has(> .odt__field--compact:nth-child(3)) > .odt__field--compact:not(.odt__field--compact-wide) {
+    flex: 1 1 calc(50% - 0.1875rem);
+    min-width: 0;
+  }
+
+  /* Belt and braces: where :has is unavailable the row stays nowrap, so the
+     coordinates must at least be allowed to break rather than overflow. */
+  .odp--console .mpt__text { white-space: normal; overflow-wrap: anywhere; }
+}
+
+/* ============================================================================
+   PHONE
+   ============================================================================ */
+
+/* business.css carries `@media (max-width:576px){ .d-flex.gap-2 {flex-direction:column} }`
+   — written for a confirm dialog, but it matches site-wide. The three Delivery
+   Task rows use `d-flex … gap-2`, so on a phone they turned into centred
+   columns: the task code, the status chip and Reconfirm all sat centre-aligned
+   in a panel where everything else is flush left. Row is correct at every
+   width, so this is not behind a breakpoint — at exactly 576px only one of the
+   two media queries would have applied. */
+.odp--console .odp__delivery .d-flex.gap-2 {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.odp--console .odp__delivery .d-flex.gap-2 .btn { width: auto; margin-bottom: 0; }
+
+@media (max-width: 767.98px) {
+  /* --- Touch targets. Brand Kit rule 11 puts the floor at 44px; measured, the
+     phone button was 32, WhatsApp 32, View on Map 30, Reconfirm 34 and the two
+     footer actions 37.2. These are the things a finger goes for. --- */
+  .odp--console .odp__contact-btn,
+  .odp--console .odp__route-map-link,
+  .odp--console .odp__reconfirm-btn,
+  .odp--console .odp__action-btn {
+    min-height: 2.75rem;
+    padding-inline: 0.875rem;
+  }
+
+  .odp--console .odp__contact-btn { font-size: 0.85rem; }
+
+  /* The two contact actions are the most-tapped things in the panel — each
+     takes half the row rather than shrink-wrapping to its text. */
+  .odp--console .odp__contact-row { gap: 0.5rem; }
+  .odp--console .odp__contact-btn { flex: 1 1 0; justify-content: center; }
+
+  /* --- Product rows. The name, the qty chip and the price were one nowrap
+     flex row with a wrapping middle, which pushed the chip onto its own line
+     under a truncated name and left the price floating beside the gap. One
+     line for the name, one for the figures. --- */
+  .odp--console .odp__item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+
+  .odp--console .odp__item-info {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .odp--console .odp__item-name { flex: 1 1 100%; }
+
+  .odp--console .odp__item-price {
+    align-self: flex-end;
+    font-size: 0.875rem;
+  }
+
+  /* --- Co-ordinates sit with their map button, not a line above it. --- */
+  .odp--console .odt__field__value--mono {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  /* --- The AI-parse control lives inside the DROP-OFF heading; 24px is not a
+     tap target, but 44 would double the height of the heading it sits in. --- */
+  .odp--console .odp__route-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .odp--console .odp__route-label .aim__parse-btn {
+    min-height: 2rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.72rem;
+  }
+
+  /* --- Footer: the primary carries more weight than the secondary. --- */
+  .odp--console .odp__actions { gap: 0.5rem; }
+  .odp--console .odp__action-btn--primary { flex: 2 1 0; }
+  .odp--console .odp__action-btn--secondary { flex: 1 1 0; }
+}
+
+/* ============================================================================
+   ROUTE GEOMETRY
+   orders.css stacks the marker ABOVE its stop at every width, with the comment
+   "so info gets 100% parent width" — which leaves each disc orphaned on its own
+   line above the label it belongs to, and the connector rail joining nothing.
+   A two-column grid puts the marker beside its stop and still gives the info
+   column a full 100% of its own track, so the field rows below lose nothing
+   they were using: measured at 390px the stop goes 366 → 334, and the widest
+   thing in it (the mono coordinate pair plus its map button) needs about 190.
+   ============================================================================ */
+.odp--console .odp__route-stop {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  column-gap: 0.5rem;
+  align-items: start;
+}
+
+@media (max-width: 767.98px) {
+  /* --- Product rows again: with the name on its own line, the qty chip and the
+     price each took a line of their own, three lines per item. `display:
+     contents` lifts the name and the chip out of .odp__item-info so all three
+     are siblings in one wrapping row — name across the top, then the chip and
+     the price facing each other on one line. --- */
+  .odp--console .odp__item {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 0.25rem;
+  }
+
+  .odp--console .odp__item-info { display: contents; }
+
+  .odp--console .odp__item-name { flex: 1 1 100%; }
+
+  .odp--console .odp__item-qty { margin-right: auto; }
+
+  .odp--console .odp__item-price { align-self: center; }
+}
+
+/* ============================================================================
+   ALIGNMENT — ONE RULE FOR CONTAINERS, ONE FOR TEXT
+   Measured on a 390px viewport, the panel had ELEVEN distinct left edges. The
+   worst of it is invisible until you measure: because each Font Awesome glyph
+   is a different width and the head used a flex gap, the five section titles
+   started at 26.6, 27.6, 29.6, 30.6 and 30.6 — nothing lined up with anything.
+   The route block then sat 36px further in again (14 / 46) than every other
+   section, and text inside the boxes landed at 21, 25 and 43.
+
+   Everything below collapses that onto two edges:
+     10px — every container: section heads, plates, boxes, cards, the hero.
+     30px — every piece of text, in a box or not.
+   The 20px between them is a real gutter, which is also exactly where the
+   route's markers and their connecting rail now live.
+   ============================================================================ */
+
+/* A fixed slot, so the glyph's own width stops deciding where the title
+   starts. gap:0 because the slot already carries the spacing. */
+.odp--console .odp__section-head { gap: 0; }
+
+.odp--console .odp__section-head i {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  text-align: left;
+}
+
+/* Text-level content, indented to the gutter. */
+.odp--console .odp__customer-name,
+.odp--console .odp__contact-row,
+.odp--console .odp__subhead,
+.odp--console .odp__delivery,
+.odp--console .odp__notes {
+  padding-left: 1.25rem;
+}
+
+/* Boxes keep their edge at 10 and carry the gutter as padding, so their rows
+   start on the same rule as text that is not in a box. The 1px is the box's own
+   border: without it every boxed row sat one pixel right of every unboxed one,
+   which is not visible but is exactly the kind of drift that stops a screen
+   looking machined. The :nth-child is not decorative — the zebra rule earlier in
+   this file is (0,3,0) and a plain (0,2,0) padding lost to it. */
+.odp--console .odp__cod,
+.odp--console .odp__spec .odp__spec-row,
+.odp--console .odp__items .odp__item,
+.odp--console .odp__items .odp__item:nth-child(odd) {
+  padding-left: calc(1.25rem - 1px);
+}
+
+/* The route's markers ARE the gutter: a 1.25rem track from 10 to 30, with the
+   stop's text starting at 30 like everything else. This replaces the earlier
+   1.5rem + 0.5rem grid, which put route text at 46. */
+.odp--console .odp__route { padding-left: 0; }
+
+.odp--console .odp__route-stop {
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  column-gap: 0;
+}
+
+.odp--console .odp__route-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 0.5rem;
+}
+
+/* Centred in the 20px gutter, so the rail runs through both markers. */
+.odp--console .odp__route-line {
+  margin-left: 0.625rem;
+  transform: translateX(-0.5px);
+}
+
+/* The task number's own "#" glyph pushed the code to 41. Every other glyph in
+   this panel — section heads, route markers — sits in the 10→30 gutter with its
+   text on the rule; this one now does too. */
+.odp--console .odp__dl-task-num {
+  display: inline-flex;
+  align-items: center;
+  margin-left: -1.25rem;
+}
+
+.odp--console .odp__dl-task-num i {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  text-align: left;
+}

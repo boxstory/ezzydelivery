@@ -693,6 +693,145 @@ class DriverWriteBackAuthorizationTests(TestCase):
         self.assertIn('nothing was sent to an applicant', body['warning'])
 
 
+class BulkStageMoveTests(TestCase):
+    """The leads list's bulk bar. It runs the same helper as a board drag, so the
+    interesting cases are the ones only a bulk run can reach: the board boundary,
+    the cap, and a write-back column being refused for the whole run at once."""
+
+    URL = '/workforce/crm/leads/bulk-stage/'
+
+    def setUp(self):
+        cache.delete(STAGE_CACHE_KEY)
+        self.leads = [
+            Lead.objects.create(
+                category=Lead.CATEGORY_DRIVER, phone=f'9745500{n:04d}',
+                contact_name=f'Applicant {n}', stage=Lead.DRIVER_STAGE_APPLIED,
+            )
+            for n in range(3)
+        ]
+
+    def _staff(self, username, **depts):
+        from core.models import Profile
+        user = User.objects.create_user(username, password='x', is_staff=True)
+        profile, _ = Profile.objects.get_or_create(user=user)
+        for field, value in depts.items():
+            setattr(profile, field, value)
+        profile.save()
+        return user
+
+    def _post(self, user, payload):
+        self.client.force_login(user)
+        return self.client.post(
+            self.URL, data=payload, content_type='application/json',
+            HTTP_HOST='ezzydelivery.qa', secure=True,
+        )
+
+    def test_moves_every_ticked_lead(self):
+        ops = self._staff('bulkops', dept_operations=True)
+        response = self._post(ops, {
+            'ids': [lead.pk for lead in self.leads],
+            'stage': Lead.DRIVER_STAGE_NEW,
+            'category': Lead.CATEGORY_DRIVER,
+        })
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body['success'])
+        self.assertEqual(body['moved'], 3)
+        for lead in self.leads:
+            lead.refresh_from_db()
+            self.assertEqual(lead.stage, Lead.DRIVER_STAGE_NEW)
+
+    def test_lead_already_there_counts_as_unchanged(self):
+        ops = self._staff('bulkops2', dept_operations=True)
+        self.leads[0].stage = Lead.DRIVER_STAGE_NEW
+        self.leads[0].save(update_fields=['stage'])
+        body = self._post(ops, {
+            'ids': [lead.pk for lead in self.leads],
+            'stage': Lead.DRIVER_STAGE_NEW,
+            'category': Lead.CATEGORY_DRIVER,
+        }).json()
+        self.assertEqual(body['moved'], 2)
+        self.assertEqual(body['unchanged'], 1)
+
+    def test_id_from_the_other_board_is_ignored(self):
+        """A hand-written id must not reach across the category boundary — the same
+        rule the CSV export follows."""
+        ops = self._staff('bulkops3', dept_operations=True)
+        business = Lead.objects.create(
+            category=Lead.CATEGORY_BUSINESS, phone='97444440000',
+            company_name='Doha Sweets', stage=Lead.STAGE_NEW,
+        )
+        body = self._post(ops, {
+            'ids': [self.leads[0].pk, business.pk],
+            'stage': Lead.DRIVER_STAGE_NEW,
+            'category': Lead.CATEGORY_DRIVER,
+        }).json()
+        self.assertEqual(body['moved'], 1)
+        business.refresh_from_db()
+        self.assertEqual(business.stage, Lead.STAGE_NEW)
+
+    def test_stage_from_the_other_board_is_refused(self):
+        ops = self._staff('bulkops4', dept_operations=True)
+        response = self._post(ops, {
+            'ids': [self.leads[0].pk],
+            'stage': Lead.STAGE_WON,          # a business column
+            'category': Lead.CATEGORY_DRIVER,
+        })
+        self.assertEqual(response.status_code, 400)
+        self.leads[0].refresh_from_db()
+        self.assertEqual(self.leads[0].stage, Lead.DRIVER_STAGE_APPLIED)
+
+    def test_marketing_cannot_bulk_approve_drivers(self):
+        """The list page must not be the way around the Operations gate that the
+        board already enforces — and the refusal stops the run, moving nobody."""
+        marketer = self._staff('bulkmkt', dept_marketing=True)
+        response = self._post(marketer, {
+            'ids': [lead.pk for lead in self.leads],
+            'stage': Lead.DRIVER_STAGE_APPROVED,
+            'category': Lead.CATEGORY_DRIVER,
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assertIn('Operations desk', response.json()['error'])
+        for lead in self.leads:
+            lead.refresh_from_db()
+            self.assertEqual(lead.stage, Lead.DRIVER_STAGE_APPLIED)
+
+    def test_run_is_capped(self):
+        from workforce.crm_views import MAX_BULK_STAGE_LEADS
+        ops = self._staff('bulkops5', dept_operations=True)
+        response = self._post(ops, {
+            'ids': list(range(1, MAX_BULK_STAGE_LEADS + 50)),
+            'stage': Lead.DRIVER_STAGE_NEW,
+            'category': Lead.CATEGORY_DRIVER,
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('batches', response.json()['error'])
+
+    def test_nothing_ticked_is_refused(self):
+        ops = self._staff('bulkops6', dept_operations=True)
+        response = self._post(ops, {
+            'ids': [], 'stage': Lead.DRIVER_STAGE_NEW,
+            'category': Lead.CATEGORY_DRIVER,
+        })
+        self.assertEqual(response.status_code, 400)
+
+    def test_get_is_refused(self):
+        ops = self._staff('bulkops7', dept_operations=True)
+        self.client.force_login(ops)
+        response = self.client.get(self.URL, HTTP_HOST='ezzydelivery.qa', secure=True)
+        self.assertEqual(response.status_code, 405)
+
+    def test_bulk_bar_is_on_the_driver_list_page(self):
+        ops = self._staff('bulkops8', dept_operations=True)
+        self.client.force_login(ops)
+        page = self.client.get('/workforce/crm/leads/drivers/',
+                               HTTP_HOST='ezzydelivery.qa', secure=True)
+        self.assertEqual(page.status_code, 200)
+        html = page.content.decode()
+        self.assertIn('data-bulk-stage', html)
+        self.assertIn(self.URL, html)
+
+
 class WhatsAppSecretTests(TestCase):
     """Auth codes must never be stored, and a platform account's conversation must
     not be openable from the CRM."""
@@ -1139,6 +1278,73 @@ class LeadMergeTests(TestCase):
                               {'child_id': pricing.pk})
         self.assertTrue(response.json()['success'])
 
+    def test_merge_fills_blank_notes_and_adds_whatsapp_numbers(self):
+        from crm.models import LeadWaLink
+        pricing = Lead.objects.create(category=Lead.CATEGORY_BUSINESS,
+                                      source=Lead.SOURCE_PRICING, phone='55000123',
+                                      notes='Wants a quote for 200/month')
+        LeadWaLink.objects.create(lead=pricing, identifier='97433334444', label='Office')
+        services.merge_leads(self.wa, pricing, self.staff)
+        self.wa.refresh_from_db()
+        self.assertEqual(self.wa.notes, 'Wants a quote for 200/month')
+        self.assertIn('97433334444', self.wa.wa_link_values)
+        # Same number in another format is not added as an extra link
+        self.assertNotIn('55000123', self.wa.wa_link_values)
+
+    def test_unmerge_takes_back_what_the_merge_filled_unless_changed(self):
+        from crm.models import LeadWaLink
+        pricing = Lead.objects.create(category=Lead.CATEGORY_BUSINESS,
+                                      source=Lead.SOURCE_PRICING, phone='55000123',
+                                      company_name='Filled Co', notes='from pricing',
+                                      assigned_to=self.staff)
+        LeadWaLink.objects.create(lead=pricing, identifier='97433334444')
+        services.merge_leads(self.wa, pricing, self.staff)
+        self.wa.refresh_from_db()
+        self.wa.notes = 'Staff rewrote this after the merge'
+        self.wa.save(update_fields=['notes'])
+
+        pricing.refresh_from_db()
+        ok, error = services.unmerge_lead(pricing, self.staff)
+        self.assertTrue(ok, error)
+        self.wa.refresh_from_db(); pricing.refresh_from_db()
+        self.assertEqual(self.wa.company_name, '')
+        self.assertIsNone(self.wa.assigned_to_id)
+        self.assertEqual(self.wa.notes, 'Staff rewrote this after the merge')
+        self.assertNotIn('97433334444', self.wa.wa_link_values)
+        self.assertEqual(pricing.merge_filled, {})
+        self.assertEqual(pricing.company_name, 'Filled Co')   # the child is untouched
+
+    def test_differences_listed_and_value_can_be_taken(self):
+        self.wa.company_name = 'Old Name'
+        self.wa.save(update_fields=['company_name'])
+        pricing = Lead.objects.create(category=Lead.CATEGORY_BUSINESS,
+                                      source=Lead.SOURCE_PRICING, phone='55000123',
+                                      company_name='New Name', contact_name='Same Person')
+        services.merge_leads(self.wa, pricing, self.staff)
+        self.wa.refresh_from_db(); pricing.refresh_from_db()
+        diffs = services.merge_differences(self.wa, pricing)
+        # Same contact and same phone (different format) are not conflicts
+        self.assertEqual([d['field'] for d in diffs], ['company_name'])
+
+        response = self._post(f'/workforce/crm/leads/{self.wa.pk}/merge/adopt/',
+                              {'child_id': pricing.pk, 'field': 'company_name'})
+        self.assertTrue(response.json()['success'])
+        self.wa.refresh_from_db()
+        self.assertEqual(self.wa.company_name, 'New Name')
+        response = self._post(f'/workforce/crm/leads/{self.wa.pk}/merge/adopt/',
+                              {'child_id': pricing.pk, 'field': 'driver_id'})
+        self.assertEqual(response.status_code, 400)
+
+    def test_detail_timeline_includes_merged_cards_entries(self):
+        pricing = Lead.objects.create(category=Lead.CATEGORY_BUSINESS,
+                                      source=Lead.SOURCE_PRICING, phone='55000123')
+        LeadActivity.objects.create(lead=pricing, body='Called from the pricing card')
+        services.merge_leads(self.wa, pricing, self.staff)
+        response = self.client.get(f'/workforce/crm/leads/{self.wa.pk}/',
+                                   HTTP_HOST='ezzydelivery.qa', secure=True)
+        self.assertContains(response, 'Called from the pricing card')
+        self.assertContains(response, f'from #{pricing.pk}')
+
     def test_unmerge_refuses_a_card_that_is_not_a_child(self):
         stranger = Lead.objects.create(category=Lead.CATEGORY_BUSINESS, phone='97400001111')
         response = self._post(f'/workforce/crm/leads/{self.wa.pk}/unmerge/',
@@ -1525,7 +1731,8 @@ class WaTriageTests(TestCase):
                 {'confidence': 0.9, 'reason': 'asks for pricing'},
                 session='ezzy6000', from_number='123456789012345@lid')
         self.assertEqual(lead.wa_session, 'ezzy6000')
-        self.assertEqual(lead.wa_chat_override, '123456789012345')
+        self.assertEqual(lead.wa_link_values, ['123456789012345'])
+        self.assertEqual(lead.wa_links.get().session, 'ezzy6000')
         self.assertIn('I need delivery pricing', lead.notes)
 
     def test_promote_files_the_lead_and_records_why(self):
@@ -1541,3 +1748,326 @@ class WaTriageTests(TestCase):
         self.assertIn('97%', note.body)
         self.assertIn('asks about driver salary', note.body)
         self.assertIn('Driver board', note.body)
+
+
+class LeadWaLinkTests(TestCase):
+    """A lead can talk from several WhatsApp numbers (owner, office, accounts…);
+    each linked number joins its chat to the lead without replacing the others."""
+
+    LID = '123456789012345'
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user('linker', is_staff=True)
+        self.lead = Lead.objects.create(source=Lead.SOURCE_MANUAL, company_name='Pearl Trading',
+                                        phone='33112233')
+
+    def test_linking_adds_instead_of_replacing(self):
+        services.add_wa_link(self.lead, '97455667788', session='default', label='Office', user=self.user)
+        services.add_wa_link(self.lead, self.LID, session='Ezzy6000', label='Owner', user=self.user)
+        self.assertEqual(self.lead.wa_link_values, ['97455667788', self.LID])
+        self.assertEqual(list(self.lead.wa_links.values_list('label', flat=True)), ['Office', 'Owner'])
+
+    def test_every_linked_number_feeds_the_conversation(self):
+        from workforce.crm_views import _lead_wa_identifiers
+        services.add_wa_link(self.lead, '97455667788', label='Office')
+        services.add_wa_link(self.lead, self.LID, label='Owner')
+        idents, _ = _lead_wa_identifiers(self.lead)
+        self.assertIn('97433112233', idents)          # the lead's own phone
+        self.assertIn('55667788', idents)             # the office number, both forms
+        self.assertIn(f'{self.LID}@lid', idents)      # the owner's private id
+        # A lid is never expanded into a made-up 974 number.
+        self.assertNotIn('974' + self.LID[-8:], idents)
+
+    def test_remove_clears_the_legacy_field_too(self):
+        self.lead.wa_chat_override = self.LID
+        self.lead.save(update_fields=['wa_chat_override'])
+        self.assertEqual(self.lead.wa_link_values, [self.LID])
+        self.assertTrue(services.remove_wa_link(self.lead, self.LID))
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.wa_link_values, [])
+
+    def test_inbox_finds_the_lead_through_its_second_number(self):
+        from whatsapp import chat_panel
+        services.add_wa_link(self.lead, self.LID, session='default', label='Office')
+        found = chat_panel.connected_leads('default', f'{self.LID}@lid')
+        self.assertEqual([(l.pk, how, label) for l, how, label in found], [(self.lead.pk, 'linked', 'Office')])
+
+    def test_inbox_link_and_unlink_keep_other_numbers(self):
+        from whatsapp import chat_panel
+        services.add_wa_link(self.lead, '97455667788', label='Owner')
+        chat_panel.link_lead(self.lead, 'default', f'{self.LID}@lid', self.user, label='Office')
+        self.assertEqual(self.lead.wa_link_values, ['97455667788', self.LID])
+        self.assertTrue(chat_panel.unlink_lead(self.lead, 'default', f'{self.LID}@lid', self.user))
+        self.assertEqual(self.lead.wa_link_values, ['97455667788'])
+        # The lead's own phone is not a link and cannot be unlinked from the inbox.
+        self.assertFalse(chat_panel.unlink_lead(self.lead, 'default', '97433112233@c.us', self.user))
+
+    def test_numbers_report_the_account_registered_on_them(self):
+        from core.models import Profile
+        owner = User.objects.create_user('owner1')
+        Profile.objects.update_or_create(user=owner, defaults={'phone': '+974 5566 7788', 'first_name': 'Aisha'})
+        services.add_wa_link(self.lead, '97455667788', label='Owner')
+        rows = {r['identifier']: r for r in services.lead_wa_numbers(self.lead)}
+        # Lead.save() stores a bare 8-digit phone with its 974 code.
+        self.assertEqual(rows['97433112233']['label'], 'Primary')
+        self.assertEqual([a['user_id'] for a in rows['97455667788']['accounts']], [owner.pk])
+        self.assertTrue(rows['97455667788']['blocked'])
+        self.assertEqual(rows['97433112233']['accounts'], [])
+
+
+class DriverBoardApplicationFacetTests(TestCase):
+    """The driver board's application facets — job type, uploaded documents,
+    working hours, language and preferred zone — and the search box's reach into
+    the application behind the card.
+
+    Each test asserts on the set of cards the board actually renders (the columns
+    it hands the template), not on a queryset, so a facet that filters correctly
+    but never reaches the page still fails.
+    """
+
+    URL = '/workforce/crm/leads/board/drivers/'
+
+    def setUp(self):
+        cache.delete(STAGE_CACHE_KEY)
+        from core.models import Profile
+        from delivery.models import ZoneGroup
+        from fleet.models import Driver, DriverDocument
+
+        self.staff = User.objects.create_user('facetstaff', password='x',
+                                              is_staff=True, is_superuser=True)
+        self.client.force_login(self.staff)
+
+        self.north = ZoneGroup.objects.create(name='North Doha', is_active=True)
+        self.south = ZoneGroup.objects.create(name='South Doha', is_active=True)
+
+        def applicant(n, name, **driver_kwargs):
+            user = User.objects.create_user(f'facet{n}', password='x')
+            profile, _ = Profile.objects.get_or_create(
+                user=user, defaults={'whatsapp': f'9745500{n:04d}'})
+            # driver_id is a manually-assigned PK (see core.views.join_driver).
+            driver = Driver.objects.create(
+                driver_id=9500 + n, user=user, profile=profile,
+                driver_phone=f'5500{n:04d}', driver_whatsapp=f'9745500{n:04d}',
+                driver_status='pending', **driver_kwargs)
+            lead = Lead.objects.create(
+                category=Lead.CATEGORY_DRIVER, source=Lead.SOURCE_MANUAL,
+                phone=f'5500{n:04d}', contact_name=name, driver=driver,
+                stage=Lead.DRIVER_STAGE_UNDER_REVIEW,
+            )
+            return driver, lead
+
+        self.full_driver, self.full_lead = applicant(
+            1, 'Full Timer', job_type='full_time', work_time_slabs='morning,evening',
+            driver_languages='english')
+        self.part_driver, self.part_lead = applicant(
+            2, 'Part Timer', job_type='part_time', work_time_slabs='night',
+            driver_languages='hindi')
+        # Everything left blank — the applicant who still has to be chased.
+        self.blank_driver, self.blank_lead = applicant(
+            3, 'Blank One', job_type='', work_time_slabs='', driver_languages='')
+
+        self.full_driver.preferred_zone_groups.add(self.north, self.south)
+        self.part_driver.preferred_zone_groups.add(self.south)
+
+        # Full Timer is document-complete: a selfie plus two distinct ID types,
+        # each holding a real uploaded file. Part Timer has a selfie only, so the
+        # set is short of the bar. Blank One has nothing.
+        for doc_type in ('Selfie', 'QID', 'Passport'):
+            DriverDocument.objects.create(
+                driver=self.full_driver, document_type=doc_type, document_no=f'F-{doc_type}',
+                document_file=f'core/driver/9501/documents/{doc_type}/real.png')
+        DriverDocument.objects.create(
+            driver=self.part_driver, document_type='Selfie', document_no='P-Selfie',
+            document_file='core/driver/9502/documents/Selfie/real.png')
+        # A row carrying only a typed number: its file is the shipped placeholder,
+        # so it must not count as an upload.
+        DriverDocument.objects.create(
+            driver=self.part_driver, document_type='QID', document_no='P-QID',
+            document_file='core/driver/default/doc_default.png')
+
+        # A card with no application behind it at all — the 'none' option on every
+        # facet has to reach this one too, not just a driver who left a field blank.
+        self.unbound = Lead.objects.create(
+            category=Lead.CATEGORY_DRIVER, source=Lead.SOURCE_MANUAL,
+            phone='55009999', contact_name='No Application',
+            stage=Lead.DRIVER_STAGE_NEW,
+        )
+
+        self.handles = {
+            self.full_lead.pk: 'Full Timer',
+            self.part_lead.pk: 'Part Timer',
+            self.blank_lead.pk: 'Blank One',
+            self.unbound.pk: 'No Application',
+        }
+
+    def cards(self, **params):
+        """The set of cards the board renders, across all columns, named by the
+        setUp handle rather than by contact_name: reconcile rewrites the name on a
+        driver card (it appends the driver code), so a name assertion would be
+        testing the reconcile's wording instead of the filter."""
+        response = self.client.get(self.URL, params, HTTP_HOST='ezzydelivery.qa', secure=True)
+        self.assertEqual(response.status_code, 200)
+        return {self.handles.get(lead.pk, lead.pk)
+                for column in response.context['columns'] for lead in column['leads']}
+
+    def test_job_type_filters_and_ors_its_ticks(self):
+        self.assertEqual(self.cards(job='full_time'), {'Full Timer'})
+        self.assertEqual(self.cards(job=['full_time', 'part_time']),
+                         {'Full Timer', 'Part Timer'})
+
+    def test_job_type_none_covers_blank_and_unbound(self):
+        self.assertEqual(self.cards(job='none'), {'Blank One', 'No Application'})
+
+    def test_document_states_partition_the_board(self):
+        self.assertEqual(self.cards(docs='complete'), {'Full Timer'})
+        # Selfie only, plus a row whose file is the placeholder — not complete.
+        self.assertEqual(self.cards(docs='partial'), {'Part Timer'})
+        self.assertEqual(self.cards(docs='none'), {'Blank One', 'No Application'})
+        # Every card lands in exactly one bucket: the three together are the board.
+        self.assertEqual(self.cards(docs=['complete', 'partial', 'none']), self.cards())
+
+    def test_hours_language_and_zone(self):
+        self.assertEqual(self.cards(slab='morning'), {'Full Timer'})
+        self.assertEqual(self.cards(slab=['morning', 'night']),
+                         {'Full Timer', 'Part Timer'})
+        self.assertEqual(self.cards(language='hindi'), {'Part Timer'})
+        self.assertEqual(self.cards(zone=str(self.north.pk)), {'Full Timer'})
+        self.assertEqual(self.cards(zone=str(self.south.pk)),
+                         {'Full Timer', 'Part Timer'})
+
+    def test_zone_filter_never_repeats_a_card(self):
+        """Preferred zones are a reverse many-to-many — Full Timer picked two, and
+        without the distinct the board would draw that card twice."""
+        response = self.client.get(
+            self.URL, {'zone': [str(self.north.pk), str(self.south.pk)]},
+            HTTP_HOST='ezzydelivery.qa', secure=True)
+        drawn = [self.handles.get(lead.pk, lead.pk)
+                 for column in response.context['columns'] for lead in column['leads']]
+        self.assertEqual(sorted(drawn), ['Full Timer', 'Part Timer'])
+
+    def test_facets_are_anded_with_each_other(self):
+        self.assertEqual(self.cards(job='full_time', docs='complete'), {'Full Timer'})
+        # Full Timer is the only full-timer, and their docs are complete, so asking
+        # for a full-timer with nothing uploaded is an empty board, not everything.
+        self.assertEqual(self.cards(job='full_time', docs='none'), set())
+
+    def test_unknown_values_narrow_nothing(self):
+        """A hand-edited or stale URL must not empty the board."""
+        everything = self.cards()
+        self.assertEqual(self.cards(job='bogus', docs='bogus', slab='x',
+                                    language='y', zone='999999'), everything)
+        response = self.client.get(self.URL, {'job': 'bogus'},
+                                   HTTP_HOST='ezzydelivery.qa', secure=True)
+        self.assertFalse(response.context['filters_on'])
+        self.assertEqual(response.context['active_filters'], [])
+
+    def test_each_chip_drops_only_its_own_tick(self):
+        response = self.client.get(
+            self.URL, {'job': ['full_time', 'part_time'], 'docs': 'complete'},
+            HTTP_HOST='ezzydelivery.qa', secure=True)
+        chips = response.context['active_filters']
+        self.assertEqual([c['label'] for c in chips],
+                         ['Job type', 'Job type', 'Documents'])
+        self.assertEqual([c['value'] for c in chips],
+                         ['Full Time', 'Part Time', 'Complete'])
+        # Removing "Full Time" keeps the other job tick and the documents facet.
+        removed = chips[0]['remove_url']
+        self.assertIn('job=part_time', removed)
+        self.assertNotIn('job=full_time', removed)
+        self.assertIn('docs=complete', removed)
+
+    def test_search_finds_the_number_on_the_application(self):
+        """A driver who applied from one number and chats from another was
+        unfindable by the number staff had in hand."""
+        self.part_driver.driver_whatsapp = '97466551122'
+        self.part_driver.save(update_fields=['driver_whatsapp'])
+        self.assertEqual(self.cards(search='66551122'), {'Part Timer'})
+        # The lead's own phone still matches.
+        self.assertEqual(self.cards(search='55000001'), {'Full Timer'})
+
+    def test_business_board_offers_no_application_facets(self):
+        """A business lead has no application behind it, so the facets must not
+        appear there — and must not narrow that board if a URL carries them."""
+        response = self.client.get('/workforce/crm/leads/board/', {'job': 'full_time'},
+                                   HTTP_HOST='ezzydelivery.qa', secure=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['job_choices'], [])
+        self.assertEqual(response.context['zone_choices'], [])
+        self.assertFalse(response.context['filters_on'])
+
+
+class MarketingDeadLinkTests(TestCase):
+    """Marketing works the CRM pages but cannot open the Operations pages they
+    point at (driver record, seller page, verification queues), so those links
+    render for Operations only — never as a link that ends in "no access"."""
+
+    def setUp(self):
+        cache.delete(STAGE_CACHE_KEY)
+        from core.models import Profile
+        from fleet.models import Driver
+
+        applicant = User.objects.create_user('dlapplicant', password='x')
+        profile, _ = Profile.objects.get_or_create(
+            user=applicant, defaults={'whatsapp': '97455881122'})
+        self.driver = Driver.objects.create(
+            driver_id=9301, user=applicant, profile=profile,
+            driver_phone='55881122', driver_whatsapp='55881122',
+            driver_languages='en', driver_status='pending',
+        )
+        self.driver_lead = Lead.objects.create(
+            category=Lead.CATEGORY_DRIVER, phone='97455881122',
+            contact_name='DL Applicant', stage=Lead.DRIVER_STAGE_APPLIED,
+            driver=self.driver,
+        )
+        self.business = Business.objects.create(
+            business_id=654321, business_name='Dead Link Trading', business_status='pending')
+        self.biz_lead = Lead.objects.create(
+            category=Lead.CATEGORY_BUSINESS, phone='97455881133',
+            company_name='Dead Link Trading', converted_business=self.business,
+        )
+
+    def _staff(self, username, **depts):
+        from core.models import Profile
+        user = User.objects.create_user(username, password='x', is_staff=True)
+        profile, _ = Profile.objects.get_or_create(user=user)
+        profile.is_staff = True
+        for field, value in depts.items():
+            setattr(profile, field, value)
+        profile.save()
+        self.client.force_login(user)
+        return user
+
+    def _get(self, url):
+        resp = self.client.get(url, HTTP_HOST='ezzydelivery.qa', secure=True)
+        self.assertEqual(resp.status_code, 200, url)
+        return resp.content.decode()
+
+    def _pages(self):
+        return {
+            'driver_lead': self._get(f'/workforce/crm/leads/{self.driver_lead.pk}/'),
+            'biz_lead': self._get(f'/workforce/crm/leads/{self.biz_lead.pk}/'),
+            'driver_board': self._get('/workforce/crm/leads/board/drivers/'),
+            'dashboard': self._get('/workforce/dashboard/'),
+        }
+
+    def test_marketing_sees_no_operations_links(self):
+        self._staff('dlmkt', dept_marketing=True)
+        pages = self._pages()
+        self.assertNotIn(f'href="/workforce/drivers/{self.driver.driver_id}/"', pages['driver_lead'])
+        self.assertNotIn('Open driver profile', pages['driver_lead'])
+        self.assertNotIn('workforce_crm_detail_btn_docadd', pages['driver_lead'])
+        self.assertNotIn(f'href="/workforce/sellers/{self.business.business_id}/"', pages['biz_lead'])
+        self.assertIn(f'Business #{self.business.business_id}', pages['biz_lead'])
+        self.assertNotIn('/workforce/verification/', pages['driver_board'])
+        self.assertNotIn('workforce_sidebar_mob_section_verifications', pages['dashboard'])
+        self.assertNotIn('/workforce/verification/', pages['dashboard'])
+
+    def test_operations_keeps_every_link(self):
+        self._staff('dlops', dept_operations=True, dept_marketing=True)
+        pages = self._pages()
+        self.assertIn('Open driver profile', pages['driver_lead'])
+        self.assertIn('workforce_crm_detail_btn_docadd', pages['driver_lead'])
+        self.assertIn(f'href="/workforce/sellers/{self.business.business_id}/"', pages['biz_lead'])
+        self.assertIn('/workforce/verification/drivers/', pages['driver_board'])
+        self.assertIn('workforce_sidebar_mob_section_verifications', pages['dashboard'])

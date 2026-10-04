@@ -316,8 +316,7 @@ def promote(phone, category, verdict, session='', from_number=''):
 
     sender = crm_services.normalize_phone(from_number)
     if sender and sender != crm_services.normalize_phone(phone):
-        lead.wa_chat_override = sender[:50]
-        fields.append('wa_chat_override')
+        crm_services.add_wa_link(lead, sender, session=session or '')
     if session and not lead.wa_session:
         lead.wa_session = session[:64]
         fields.append('wa_session')

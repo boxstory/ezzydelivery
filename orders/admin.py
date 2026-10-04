@@ -139,10 +139,10 @@ class PublicLinkSourceAdmin(admin.ModelAdmin):
 
 @admin.register(orders_models.ReturnItem)
 class ReturnItemAdmin(admin.ModelAdmin):
-    list_display = ('return_request', 'order_item', 'quantity_returned')
+    list_display = ('return_request', 'order_item', 'product', 'quantity_returned')
     search_fields = ('return_request__return_number',)
-    list_select_related = ('return_request', 'order_item')
-    raw_id_fields = ('return_request', 'order_item')
+    list_select_related = ('return_request', 'order_item', 'product')
+    raw_id_fields = ('return_request', 'order_item', 'product')
 
 @admin.register(orders_models.ReturnRequest)
 class ReturnRequestAdmin(admin.ModelAdmin):

@@ -23,6 +23,29 @@ from core.email_normalize import EmailNormalizedModel
 from core.validators import image_validators
 
 
+
+def resolve_role_kind(profile, business, driver):
+    """Which role a profile is working towards, given its business/driver rows.
+
+    The flags win when one is set: after staff correct a sign-up filed under the
+    wrong role (workforce.views.change_user_role), the abandoned record is still
+    on file, and reading the records first would keep presenting a seller as a
+    driver. With no flag set the records decide instead, because an applicant
+    part-way through registration has a row before the flag is ever written.
+
+    Returns 'business', 'driver', or '' for an account holding neither.
+    """
+    if profile.is_business:
+        return 'business'
+    if profile.is_driver:
+        return 'driver'
+    if business is not None:
+        return 'business'
+    if driver is not None:
+        return 'driver'
+    return ''
+
+
 class Profile(EmailNormalizedModel, models.Model):
     """
     Extended user profile model for EzzyDelivery platform.
@@ -323,16 +346,35 @@ class Profile(EmailNormalizedModel, models.Model):
         except Exception:
             return 0
 
+    def role_kind(self):
+        """Which role record this profile is currently working towards.
+
+        Convenience wrapper: a list page that has already fetched the two rows
+        in bulk should call resolve_role_kind() with them instead, or this adds
+        two queries per row.
+        """
+        from business.models import Business
+        from fleet.models import Driver
+        return resolve_role_kind(
+            self,
+            Business.objects.filter(profile=self).first(),
+            Driver.objects.filter(profile=self).first(),
+        )
+
     def get_role_profile_completion_percentage(self):
-        """Completion of whichever role record this user has.
+        """Completion of the record for the role this user currently holds.
 
         Replaces adding the two percentages together, which reported over 100%
-        for anyone holding both a business and a driver record.
+        for anyone holding both a business and a driver record, and follows
+        role_kind() so an abandoned record's progress is never reported as the
+        progress of the role the user is actually in.
         """
-        return max(
-            self.get_business_profile_completion_percentage(),
-            self.get_driver_profile_completion_percentage(),
-        )
+        kind = self.role_kind()
+        if kind == 'business':
+            return self.get_business_profile_completion_percentage()
+        if kind == 'driver':
+            return self.get_driver_profile_completion_percentage()
+        return 0
 
     def can_apply_for_verification(self):
         """Check if user can apply for verification"""
@@ -782,6 +824,18 @@ class MessageTemplate(models.Model):
     here only exists once someone edits or switches off that message on the
     Message Templates page — an absent row means "use the code default", so a
     fresh install sends the right thing with no seeding step.
+
+    Two kinds of row live in this table:
+
+    * ``is_custom=False`` — an OVERRIDE of a shipped key. The label, section,
+      placeholders and send sites all come from the code registry; only the
+      wording and the switch are stored here.
+    * ``is_custom=True`` — a message a staff member wrote on the page. Nothing
+      in code knows its key, so the row carries its own label and section, and
+      the only place it goes out is the WhatsApp send window's template picker
+      for that section. That is why it is a composer starter and never an
+      automatic send: an automatic message needs a trigger in code to fire it,
+      which is what an AutoFlow is for.
     """
 
     key = models.CharField(
@@ -796,6 +850,28 @@ class MessageTemplate(models.Model):
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='message_templates_updated')
+
+    # --- staff-written messages only (is_custom=True) ----------------------
+    # An override row leaves every field below blank and reads them from the
+    # code registry instead, so nothing here can quietly contradict it.
+    is_custom = models.BooleanField(
+        default=False,
+        help_text='Written by staff on the Messages page (no code default behind it).')
+    label = models.CharField(
+        max_length=120, blank=True, default='',
+        help_text='Name on the card and in the send window picker.')
+    description = models.CharField(
+        max_length=300, blank=True, default='',
+        help_text='Optional note on when to use it.')
+    section = models.CharField(
+        max_length=30, blank=True, default='',
+        choices=WhatsAppSenderRoute.SECTION_CHOICES,
+        help_text='Sender route it belongs to — decides the number it sends from.')
+    msg_id = models.CharField(
+        max_length=10, blank=True, default='',
+        help_text='Staff-facing ID in its own C-series, so it can never collide '
+                  'with a code M-number.')
+    created_at = models.DateTimeField(null=True, blank=True, auto_now_add=True)
 
     class Meta:
         ordering = ['key']

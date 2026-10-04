@@ -458,9 +458,9 @@ class PageOverrideTests(DepartmentTestMixin, TestCase):
 
 class AutoTriggerDepartmentTests(DepartmentTestMixin, TestCase):
     """
-    /workforce/auto-triggers/ is open to every desk but shows only that desk's
-    rows. These tests are the guarantee behind that sentence — if the page ever
-    leaks another department's triggers, or lets a desk toggle them, they fail.
+    /workforce/auto-triggers/ is super-admin only (since 2026-10-04). Before
+    that every desk opened it and saw its own rows; these tests fail if any
+    desk can read the catalogue or change a trigger or sender route again.
     """
 
     def setUp(self):
@@ -474,104 +474,87 @@ class AutoTriggerDepartmentTests(DepartmentTestMixin, TestCase):
             trigger_key='t_admin_case', label='Admin Case Trigger',
             category='system', department=ADMIN)
 
-    # --- what each desk can see ---------------------------------------
+    def _desk_users(self):
+        for code in (OPS, FIN, MKT):
+            user, _ = self.make_staff(f'at{code}', [code])
+            yield code, user
+        user, _ = self.make_staff('atall', [OPS, FIN, MKT])
+        yield 'all-desks', user
 
-    def test_ops_staff_open_the_page(self):
-        user, _ = self.make_staff('atops', [OPS])
-        res = self.login_as(user).get(reverse('workforce:auto_triggers_list'))
-        self.assertEqual(res.status_code, 200)
+    # --- who can open the page ----------------------------------------
 
-    def test_ops_staff_see_only_ops_triggers(self):
-        user, _ = self.make_staff('atops2', [OPS])
-        html = self.login_as(user).get(
-            reverse('workforce:auto_triggers_list')).content.decode()
-        self.assertIn('t_ops_case', html)
-        self.assertNotIn('t_fin_case', html)
-        self.assertNotIn('t_admin_case', html)
-
-    def test_finance_staff_see_only_finance_triggers(self):
-        user, _ = self.make_staff('atfin', [FIN])
-        html = self.login_as(user).get(
-            reverse('workforce:auto_triggers_list')).content.decode()
-        self.assertIn('t_fin_case', html)
-        self.assertNotIn('t_ops_case', html)
-
-    def test_superadmin_sees_every_department(self):
-        user, _ = self.make_staff('atboss', [], superadmin=True)
-        html = self.login_as(user).get(
-            reverse('workforce:auto_triggers_list')).content.decode()
-        for key in ('t_ops_case', 't_fin_case', 't_admin_case'):
-            self.assertIn(key, html)
+    def test_every_desk_is_refused_the_page(self):
+        for code, user in self._desk_users():
+            res = self.login_as(user).get(reverse('workforce:auto_triggers_list'))
+            self.assertEqual(res.status_code, 302, code)
 
     def test_staff_with_no_department_are_refused(self):
         user, _ = self.make_staff('atnodesk', [])
         res = self.login_as(user).get(reverse('workforce:auto_triggers_list'))
         self.assertEqual(res.status_code, 302)
 
-    def test_new_triggers_default_to_admin_only(self):
-        """A trigger nobody classified must not surface on a desk by accident."""
+    def test_superadmin_sees_every_department(self):
+        user, _ = self.make_staff('atboss', [], superadmin=True)
+        res = self.login_as(user).get(reverse('workforce:auto_triggers_list'))
+        self.assertEqual(res.status_code, 200)
+        html = res.content.decode()
+        for key in ('t_ops_case', 't_fin_case', 't_admin_case'):
+            self.assertIn(key, html)
+
+    def test_new_triggers_default_to_admin(self):
         fresh = core_models.AutoTriggerConfig.objects.create(
             trigger_key='t_unclassified', label='Fresh', category='system')
         self.assertEqual(fresh.department, ADMIN)
-        user, _ = self.make_staff('atops3', [OPS])
-        html = self.login_as(user).get(
-            reverse('workforce:auto_triggers_list')).content.decode()
-        self.assertNotIn('t_unclassified', html)
 
-    # --- what each desk can change ------------------------------------
+    # --- who can change anything --------------------------------------
 
-    def test_desk_toggles_its_own_trigger(self):
+    def test_desk_cannot_toggle_even_its_own_trigger(self):
         user, _ = self.make_staff('atops4', [OPS])
         res = self.login_as(user).post(
             reverse('workforce:auto_trigger_toggle'),
             data=json.dumps({'trigger_key': 't_ops_case'}),
-            content_type='application/json')
-        self.assertEqual(res.status_code, 200)
+            content_type='application/json', HTTP_ACCEPT='application/json')
+        self.assertEqual(res.status_code, 403)
         self.ops_trigger.refresh_from_db()
-        self.assertFalse(self.ops_trigger.is_enabled)
+        self.assertTrue(self.ops_trigger.is_enabled)
 
-    def test_desk_cannot_toggle_another_departments_trigger(self):
-        user, _ = self.make_staff('atops5', [OPS])
+    def test_desk_cannot_edit_a_trigger(self):
+        user, _ = self.make_staff('atops6', [OPS])
+        res = self.login_as(user).post(
+            reverse('workforce:auto_trigger_update'),
+            data=json.dumps({'trigger_key': 't_ops_case', 'label': 'Hijacked'}),
+            content_type='application/json', HTTP_ACCEPT='application/json')
+        self.assertEqual(res.status_code, 403)
+        self.ops_trigger.refresh_from_db()
+        self.assertEqual(self.ops_trigger.label, 'Ops Case Trigger')
+
+    def test_desk_cannot_toggle_a_sender_route(self):
+        user, _ = self.make_staff('atmkt7', [MKT])
+        res = self.login_as(user).post(
+            reverse('workforce:whatsapp_sender_route_toggle'),
+            data=json.dumps({'section': 'marketing_campaigns'}),
+            content_type='application/json', HTTP_ACCEPT='application/json')
+        self.assertEqual(res.status_code, 403)
+
+    def test_superadmin_toggles_a_trigger(self):
+        user, _ = self.make_staff('atboss2', [], superadmin=True)
         res = self.login_as(user).post(
             reverse('workforce:auto_trigger_toggle'),
             data=json.dumps({'trigger_key': 't_fin_case'}),
             content_type='application/json')
-        self.assertEqual(res.status_code, 403)
+        self.assertEqual(res.status_code, 200)
         self.fin_trigger.refresh_from_db()
-        self.assertTrue(self.fin_trigger.is_enabled)
+        self.assertFalse(self.fin_trigger.is_enabled)
 
-    def test_desk_cannot_edit_another_departments_trigger(self):
-        user, _ = self.make_staff('atops6', [OPS])
-        res = self.login_as(user).post(
-            reverse('workforce:auto_trigger_update'),
-            data=json.dumps({'trigger_key': 't_fin_case', 'label': 'Hijacked'}),
-            content_type='application/json')
-        self.assertEqual(res.status_code, 403)
-        self.fin_trigger.refresh_from_db()
-        self.assertEqual(self.fin_trigger.label, 'Fin Case Trigger')
+    # --- the menu matches ---------------------------------------------
 
-    # --- sender routes are split the same way -------------------------
+    def test_sidebar_hides_auto_triggers_from_desks(self):
+        for code, user in self._desk_users():
+            html = self.login_as(user).get(reverse('workforce:wf_dashboard')).content.decode()
+            self.assertNotIn('workforce_sidebar_link_auto_triggers', html, code)
+            self.assertNotIn('workforce_sidebar_mob_link_auto_triggers', html, code)
 
-    def test_ops_owns_the_orders_route_only(self):
-        user, _ = self.make_staff('atops7', [OPS])
-        client = self.login_as(user)
-        html = client.get(reverse('workforce:auto_triggers_list')).content.decode()
-        self.assertIn('route_orders_tasks', html)
-        self.assertNotIn('route_marketing_campaigns', html)
-
-        self.assertEqual(client.post(
-            reverse('workforce:whatsapp_sender_route_toggle'),
-            data=json.dumps({'section': 'orders_tasks'}),
-            content_type='application/json').status_code, 200)
-        self.assertEqual(client.post(
-            reverse('workforce:whatsapp_sender_route_toggle'),
-            data=json.dumps({'section': 'marketing_campaigns'}),
-            content_type='application/json').status_code, 403)
-
-    def test_marketing_sees_its_own_routes(self):
-        user, _ = self.make_staff('atmkt', [MKT])
-        html = self.login_as(user).get(
-            reverse('workforce:auto_triggers_list')).content.decode()
-        self.assertIn('route_marketing_campaigns', html)
-        self.assertIn('route_crm_leads', html)
-        self.assertNotIn('route_orders_tasks', html)
+    def test_sidebar_shows_auto_triggers_to_superadmin(self):
+        user, _ = self.make_staff('atboss3', [], superadmin=True)
+        html = self.login_as(user).get(reverse('workforce:wf_dashboard')).content.decode()
+        self.assertIn('workforce_sidebar_link_auto_triggers', html)

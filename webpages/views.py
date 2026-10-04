@@ -53,6 +53,7 @@ Related:
 import logging
 import random
 import uuid
+from datetime import timedelta
 from urllib.parse import quote
 from django.forms.fields import DateTimeField
 from django.shortcuts import get_object_or_404, redirect, render
@@ -967,8 +968,11 @@ def contactus(request):
 
 @ratelimit(key='ip', rate=PUBLIC_FORM_RATE, method='POST', block=False)
 def careers(request):
-    from fleet.proposals import careers_proposals
+    """Office roles in Doha, and the application form that answers them.
 
+    Driver work lives on careers_drivers() below; this page keeps only a pointer
+    to it so a driver who lands here is one click from the right page.
+    """
     meta = SEOMetadata.get_careers_meta()
     f = CareersForm(request.POST or None)
     if request.method == 'POST':
@@ -980,13 +984,106 @@ def careers(request):
             messages.success(request, "Successful Submission")
             return redirect('/')
 
-    # Driver offers marketing publishes (fleet.DriverProposal). The same rows are
-    # shown inside the driver app; which surface gets which offer is decided by
-    # fleet/proposals.py, never by a filter written here.
+    # Driver work is NOT on this page — it lives at /careers/drivers/ (the link
+    # the fleet desk shares on WhatsApp). This page only carries the office seats
+    # and the application form that answers them.
     return render(request, 'webpages/careers.html', {
         'seo': meta,
         'form': f,
-        'driver_proposals': list(careers_proposals()),
+    })
+
+
+# Employment types a DriverProposal.job_type maps to in JobPosting schema. A
+# blank job_type is an open advert, so it claims all three rather than none.
+_SCHEMA_EMPLOYMENT_TYPES = {
+    'full_time': ['FULL_TIME'],
+    'part_time': ['PART_TIME'],
+    'flexible': ['FULL_TIME', 'PART_TIME', 'CONTRACTOR'],
+    '': ['FULL_TIME', 'PART_TIME', 'CONTRACTOR'],
+}
+
+
+def _proposal_job_posting(proposal, date_posted, valid_through):
+    """One live driver offer as a schema.org JobPosting dict.
+
+    Google wants a JobPosting per vacancy, not one for the page, so each
+    published offer emits its own. Free text written by marketing goes in
+    unchanged — safe_json() escapes it on the way into the script tag.
+    """
+    lines = [part for part in (proposal.headline, proposal.description) if part]
+    if proposal.perk_list:
+        lines.append('What you get: ' + '; '.join(proposal.perk_list))
+    if proposal.requirement_list:
+        lines.append('What we need: ' + '; '.join(proposal.requirement_list))
+    if proposal.pay_package:
+        lines.append('Pay: ' + proposal.pay_package)
+    zones = [str(z) for z in proposal.zone_groups.all()]
+    lines.append('Zones: ' + (', '.join(zones) if zones else 'Anywhere in Qatar'))
+
+    posting = {
+        '@context': 'https://schema.org',
+        '@type': 'JobPosting',
+        'title': proposal.title,
+        'inLanguage': 'en',
+        'url': f'{SEOMetadata.SITE_URL}/careers/drivers/',
+        'description': ''.join(f'<p>{line}</p>' for line in lines),
+        'datePosted': date_posted,
+        'employmentType': _SCHEMA_EMPLOYMENT_TYPES.get(
+            proposal.job_type, _SCHEMA_EMPLOYMENT_TYPES['']),
+        'directApply': True,
+        'hiringOrganization': {
+            '@type': 'Organization',
+            'name': 'EzzyDelivery',
+            'sameAs': SEOMetadata.SITE_URL,
+            'logo': f'{SEOMetadata.SITE_URL}/static/webpages/img/ezzy-logo-sqr-round.png',
+        },
+        'jobLocation': {
+            '@type': 'Place',
+            'address': {
+                '@type': 'PostalAddress',
+                'addressLocality': 'Doha',
+                'addressCountry': 'QA',
+            },
+        },
+    }
+    # An advert's closing time is its real validThrough; without one it falls
+    # back to the page's rolling 60-day window so the posting never goes stale.
+    posting['validThrough'] = (
+        proposal.closes_at.strftime('%Y-%m-%d') if proposal.closes_at else valid_through)
+    if proposal.ref_code:
+        posting['identifier'] = {
+            '@type': 'PropertyValue',
+            'name': 'EzzyDelivery',
+            'value': proposal.ref_code,
+        }
+    return posting
+
+
+def careers_drivers(request):
+    """Public driver jobs page — every open driver offer, and how to apply.
+
+    Split out of /careers/ so the fleet desk has one link to send a driver on
+    WhatsApp that shows driver work only. It is a public, indexed page (sitemap
+    + JobPosting schema), not a hidden link; office roles stay on /careers/.
+
+    The offers are the same fleet.DriverProposal rows the driver app shows —
+    fleet/proposals.py decides which surface sees which offer, never a filter
+    written here.
+    """
+    from fleet.proposals import careers_proposals
+
+    proposals = list(careers_proposals())
+    now = timezone.now()
+    date_posted = now.strftime('%Y-%m-%d')
+    valid_through = (now + timedelta(days=60)).strftime('%Y-%m-%d')
+
+    return render(request, 'webpages/careers_drivers.html', {
+        'seo': SEOMetadata.get_careers_drivers_meta(),
+        'driver_proposals': proposals,
+        'job_valid_through': valid_through,
+        'job_postings_schema': safe_json([
+            _proposal_job_posting(p, date_posted, valid_through) for p in proposals
+        ]) if proposals else '',
     })
 
 

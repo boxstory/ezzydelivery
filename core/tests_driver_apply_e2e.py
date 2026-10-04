@@ -84,10 +84,10 @@ class DriverApplySubmitBrowserTest(StaticLiveServerTestCase):
             or core_models.Profile(user=self.user)
         profile.username = self.user.username
         profile.email = self.user.email
-        profile.first_name = 'Ashiraf'
-        profile.last_name = 'Waluboga'
-        profile.phone = '31029502'
-        profile.whatsapp = '97431029502'
+        profile.first_name = 'Testname'
+        profile.last_name = 'Applicant'
+        profile.phone = '30000000'
+        profile.whatsapp = '97430000000'
         profile.nationlity = 'Ugandan'
         profile.zone_name = 'Souq Waqif'
         profile.address = 'Building 6, Street 30'
@@ -199,7 +199,7 @@ class DriverApplySubmitBrowserTest(StaticLiveServerTestCase):
 
         page.click('[data-step-btn="1"]')          # steppers only go backwards
         page.wait_for_selector('[data-wiz-step="1"].cja__wiz-step--active')
-        page.fill('input[name="first_name"]', 'Ashiraf Edited')
+        page.fill('input[name="first_name"]', 'Testname Edited')
         page.click('#core_join_driver_btn_next')
 
         # Server redirects to ?step=2; the swapped document opens on that section
@@ -209,4 +209,4 @@ class DriverApplySubmitBrowserTest(StaticLiveServerTestCase):
 
         self.assertEqual(
             core_models.Profile.objects.get(pk=self.profile.pk).first_name,
-            'Ashiraf Edited')
+            'Testname Edited')

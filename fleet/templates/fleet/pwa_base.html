@@ -25,6 +25,9 @@
 
     <!-- AI Tools CSS (shared modal, results, progress) -->
     <link rel="stylesheet" href="{% static 'ai_agent/css/ai-tools.css' %}?v=20260317k" type="text/css" />
+    {% if driver_gps_required %}
+    <link rel="stylesheet" href="{% static 'fleet/css/gps-gate.css' %}?v=20261004a">
+    {% endif %}
 
     {% block extra_css %}{% endblock %}
 
@@ -158,7 +161,7 @@
                     <span class="fleet-bottom-nav__icon">
                         <i class="fa-solid fa-money-bill-wave"></i>
                     </span>
-                    <span class="fleet-bottom-nav__label">COD</span>
+                    <span class="fleet-bottom-nav__label">Cash</span>
                 </a>
 
                 <a href="{% url 'fleet:driver_profile_mobile' %}" class="fleet-bottom-nav__item fleet-bottom-nav__item--profile {% if request.resolver_match.url_name in 'driver_profile_mobile,driver_earnings,transaction_history,fleet_finance_summary,driver_performance,driver_reports,driver_analytics' %}active{% endif %}">
@@ -298,9 +301,14 @@
     </script>
 
     <!-- EzzyGPS — the driver's single GPS consumer, shared with fleet_dashboard_base.html -->
+    {% if driver_gps_required %}{% include "fleet/parts/gps_gate.html" %}{% endif %}
     <script>window.EZZY_GPS_CONFIG = { onDuty: {{ driver_on_duty|yesno:"true,false" }} };</script>
     <script src="{% static 'fleet/js/ezzy-gps-queue.js' %}?v=20260802a"></script>
-    <script src="{% static 'fleet/js/ezzy-gps.js' %}?v=20260903c"></script>
+    <script src="{% static 'fleet/js/ezzy-gps.js' %}?v=20261004a"></script>
+    {% if driver_gps_required %}
+    <!-- Location lock — approved drivers cannot use the app with location off -->
+    <script src="{% static 'fleet/js/ezzy-gps-gate.js' %}?v=20261004a"></script>
+    {% endif %}
 
     <!-- EzzyPush — Web Push registration + the fix taken when a driver answers
          a "where are you?" notification. Loaded after EzzyGPS: it calls stamp(). -->

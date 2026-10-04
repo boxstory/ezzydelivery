@@ -304,7 +304,10 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
         # Fire auto flows for order creation
         try:
             from core.auto_flow_executor import execute_flows_for_trigger
-            execute_flows_for_trigger('staff_order_create', extra_context={
+            # order=instance, not context alone: the customer/seller/zone
+            # recipients resolve off the Order object, so a flow built to
+            # message the customer on order create resolved no phone at all.
+            execute_flows_for_trigger('staff_order_create', order=instance, extra_context={
                 'order_number': instance.order_number or '',
                 'customer_name': instance.customer_name or '',
                 'customer_phone': instance.customer_phone or '',
@@ -378,7 +381,7 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
             # Fire auto flows for order verify
             try:
                 from core.auto_flow_executor import execute_flows_for_trigger
-                execute_flows_for_trigger('staff_order_verify', extra_context={
+                execute_flows_for_trigger('staff_order_verify', order=instance, extra_context={
                     'order_number': instance.order_number or '',
                     'customer_name': instance.customer_name or '',
                     'customer_phone': instance.customer_phone or '',
@@ -446,7 +449,7 @@ def order_post_save_receiver(sender, instance, created, *args, **kwargs):
             # Fire wa_order_cancelled auto flows
             try:
                 from core.auto_flow_executor import execute_flows_for_trigger
-                execute_flows_for_trigger('wa_order_cancelled', extra_context={
+                execute_flows_for_trigger('wa_order_cancelled', order=instance, extra_context={
                     'order_number': instance.order_number or '',
                     'customer_name': instance.customer_name or '',
                     'customer_phone': instance.customer_phone or '',

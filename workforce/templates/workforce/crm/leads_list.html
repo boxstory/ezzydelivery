@@ -8,7 +8,7 @@
 {#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260923c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20261003e" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -213,6 +213,43 @@
       </form>
     </div>
 
+    <!-- BULK STAGE BAR -->
+    {# Reads the same row ticks the export and the Documents dialog read, so the #}
+    {# desk ticks once and picks an action. Deliberately outside the filter form: #}
+    {# a select inside it would be serialised into the pushed query string, and a #}
+    {# stray ?bulk_stage= on every filter change reads as a filter that did nothing. #}
+    {# Ticked rows only — never "all matching", which is an export-scope idea. #}
+    <div class="crml__bulk" data-bulk-stage hidden
+         data-bulk-url="{% url 'workforce:crm_leads_bulk_stage' %}"
+         data-bulk-category="{{ list_category }}"
+         data-bulk-max="{{ bulk_stage_cap }}">
+      <span class="crml__bulk-label">
+        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+        Move <strong data-bulk-count>0</strong> selected to
+      </span>
+      <select class="crm__facet-select crml__bulk-select" data-bulk-select
+              aria-label="Stage to move the selected leads into">
+        <option value="">Choose a stage…</option>
+        {% for row in stage_rows %}
+        {# The column's own confirm text and reason flag ride along, exactly as they #}
+        {# do on a board drop target — a staff-created decision column prompts here too. #}
+        <option value="{{ row.key }}"
+                {% if row.confirm_text %}data-confirm="{{ row.confirm_text }}"{% endif %}
+                {% if row.needs_reason %}data-needs-reason="1"{% endif %}
+                {% if row.write_back %}data-write-back="1"{% endif %}>
+          {{ row.label }}{% if row.write_back %} — writes back to the applicant{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <button type="button" class="crm__btn crm__btn--ink crm__btn--sm" data-bulk-apply disabled>
+        <i class="fa-solid fa-check" aria-hidden="true"></i> Apply
+      </button>
+      <button type="button" class="crm__btn crm__btn--sm" data-bulk-clear>
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i> Clear
+      </button>
+      <span class="crml__bulk-note">Ticked rows only, up to {{ bulk_stage_cap }} at a time.</span>
+    </div>
+
     <!-- RESULT META -->
     <div class="crm__resultbar">
       Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} leads
@@ -311,4 +348,6 @@
 {% include "workforce/parts/components/_export_columns_modal.html" %}
 {% if can_download_documents %}{% include "workforce/crm/parts/_documents_modal.html" %}{% endif %}
 <script src="{% static 'workforce/js/export-columns.js' %}?v=20260921e"></script>
+{# Loaded after export-columns.js: the bulk bar reads the row ticks that script owns. #}
+<script src="{% static 'workforce/js/crm-bulk-stage.js' %}?v=20260929a"></script>
 {% endblock %}

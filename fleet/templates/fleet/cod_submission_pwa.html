@@ -1,8 +1,8 @@
 {% extends "fleet/pwa_base.html" %}
 {% load static fleet_extras %}
 
-{% block title %}Submit COD{% endblock %}
-{% block page_title %}Submit COD{% endblock %}
+{% block title %}Submit Cash{% endblock %}
+{% block page_title %}Submit Cash{% endblock %}
 
 {% block content %}
 {% if messages %}
@@ -14,7 +14,7 @@ window.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endif %}
-<!-- COD Amount Card -->
+<!-- Cash Amount Card -->
 <div class="fleet-card--gradient fleet-fade-in">
     <div style="text-align: center; padding: var(--spacing-lg) 0 var(--spacing-sm);">
         <div style="font-size: var(--font-size-sm); opacity: 0.9; margin-bottom: var(--spacing-sm);">
@@ -56,8 +56,13 @@ window.addEventListener('DOMContentLoaded', function() {
                     <td class="text-end fw-semibold" style="background: transparent; color: inherit;">{{ pos_cod_amount|floatformat:2|default:"0.00" }}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.35);">
-                    <td style="background: transparent; color: inherit;"><i class="fa-solid fa-box-open me-2"></i>Zero COD (Prepaid)</td>
-                    <td class="text-center" style="background: transparent; color: inherit;">{{ zero_cod_count|default:0 }}</td>
+                    <td style="background: transparent; color: inherit;"><i class="fa-solid fa-box-open me-2"></i>Prepaid</td>
+                    <td class="text-center" style="background: transparent; color: inherit;" id="codPrepaidCount">{{ zero_cod_count|default:0 }}</td>
+                    <td class="text-end fw-semibold" style="background: transparent; color: inherit;">0.00</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.35);">
+                    <td style="background: transparent; color: inherit;"><i class="fa-solid fa-rotate-left me-2"></i>Returns</td>
+                    <td class="text-center" style="background: transparent; color: inherit;">{{ return_count|default:0 }}</td>
                     <td class="text-end fw-semibold" style="background: transparent; color: inherit;">0.00</td>
                 </tr>
                 <tr style="font-weight: 700;">
@@ -151,7 +156,7 @@ window.addEventListener('DOMContentLoaded', function() {
             <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
                 <h3 class="fleet-card__title" style="margin:0;">
                     <i class="fa-solid fa-list-check me-2"></i>
-                    Orders (<span id="codOrderCount">{{ selected_orders|length }}</span>)
+                    Orders (<span id="codOrderCount">{{ manifest_tasks|length }}</span>)
                 </h3>
                 <div style="display:flex; align-items:center; gap:6px;">
                     <select id="codDatePreset" class="fleet-input" style="font-size:0.75rem; padding:4px 8px; width:auto;">
@@ -179,25 +184,36 @@ window.addEventListener('DOMContentLoaded', function() {
         </div>
 
         <ul class="fleet-list" id="codOrderList" style="margin: 0; max-height: 300px; overflow-y: auto;">
-            {% for order in selected_orders %}
-            <li class="fleet-list-item cod-order-item" data-cod="{{ order.cod_amount|floatformat:2 }}" data-delivery-id="{{ order_to_delivery|get_item:order.id }}" data-date="{{ order_to_date|get_item:order.id }}" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;">
+            {% for task in manifest_tasks %}
+            <li class="fleet-list-item cod-order-item" data-kind="{{ task.row_kind }}" data-cash="{{ task.cash_leg|floatformat:2 }}" data-delivery-id="{{ task.id }}" data-date="{{ task.completed_at|date:'Y-m-d' }}" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;">
                 <div class="fleet-list-item__content" style="flex:1;min-width:0;">
-                    <div class="fleet-list-item__title" style="font-size: var(--font-size-sm);">#{{ order.order_number }}</div>
+                    <div class="fleet-list-item__title" style="font-size: var(--font-size-sm);">#{{ task.order.order_number|default:task.dl_task_number }}</div>
                     <div class="fleet-list-item__subtitle" style="font-size: 0.625rem;">
-                        {{ order.customer_name|default:"—" }} · {{ order.customer_phone|default:"" }}
+                        {{ task.order.customer_name|default:"—" }} · {{ task.order.customer_phone|default:"" }}
+                        {% if task.row_kind == 'prepaid' %}· <i class="fa-solid fa-box-open"></i> Prepaid
+                        {% elif task.row_kind == 'return' %}· <i class="fa-solid fa-rotate-left"></i> Return
+                        {% elif task.row_kind == 'fawran' %}· <i class="fa-solid fa-mobile-screen"></i> Fawran
+                        {% elif task.row_kind == 'card' %}· <i class="fa-solid fa-credit-card"></i> Card{% endif %}
+                        {% if task.row_kind == 'cash' and task.is_return %}· <i class="fa-solid fa-rotate-left"></i> Return{% endif %}
                     </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-                    <span style="font-size: var(--font-size-base); font-weight: 700; color: var(--fleet-success);">
-                        {{ order.cod_amount|floatformat:2 }}
+                    <span style="font-size: var(--font-size-base); font-weight: 700; color: {% if task.row_kind == 'cash' %}var(--fleet-success){% else %}var(--fleet-grey-400){% endif %};">
+                        {{ task.row_amount|floatformat:2 }}
                     </span>
+                    {% if task.row_kind == 'cash' %}
                     <button type="button" class="cod-remove-btn" onclick="removeOrder(this)" title="Remove">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
+                    {% endif %}
                 </div>
             </li>
             {% endfor %}
         </ul>
+        <div class="d-flex justify-content-between align-items-center" style="padding: var(--spacing-md) var(--spacing-lg); border-top: 1px solid var(--fleet-grey-200); font-weight: 700;">
+            <span>Total Cash</span>
+            <span><span id="codListTotal">{{ cash_cod_amount|floatformat:2|default:"0.00" }}</span> QR</span>
+        </div>
     </div>
 
     <!-- Submit Button -->
@@ -211,31 +227,45 @@ window.addEventListener('DOMContentLoaded', function() {
 
 
 <script>
-    // Fawran/card already with Ezzy and zero-COD rows — constant part of the
+    // Fawran/card already with Ezzy and prepaid rows — constant part of the
     // settle totals; only the cash portion changes when orders are excluded.
-    const ELECTRONIC_COD_TOTAL = parseFloat("{{ fawran_cod_amount|floatformat:2|default:'0.00' }}") + parseFloat("{{ pos_cod_amount|floatformat:2|default:'0.00' }}");
-    const NON_CASH_ORDERS = parseInt("{{ fawran_cod_count|default:0 }}", 10) + parseInt("{{ pos_cod_count|default:0 }}", 10) + parseInt("{{ zero_cod_count|default:0 }}", 10);
+    const ELECTRONIC_TOTAL = parseFloat("{{ fawran_cod_amount|floatformat:2|default:'0.00' }}") + parseFloat("{{ pos_cod_amount|floatformat:2|default:'0.00' }}");
+    // Prepaid, Fawran and card rows are settled with the hand-in whatever is
+    // selected, so their counts stay fixed; only cash rows change the totals.
+    const NON_CASH_ORDERS = parseInt("{{ fawran_cod_count|default:0 }}", 10) + parseInt("{{ pos_cod_count|default:0 }}", 10) + parseInt("{{ zero_cod_count|default:0 }}", 10) + parseInt("{{ return_count|default:0 }}", 10);
 
-    function updateTotals(cashTotal, cashCount) {
-        amountInput.value = cashTotal.toFixed(2);
-        const grand = (cashTotal + ELECTRONIC_COD_TOTAL).toFixed(2);
+    // Recompute the cash total from the rows still selected.
+    function recalcFromRows() {
+        let cash = 0, cashRows = 0;
+        document.querySelectorAll('.cod-order-item:not(.removing)').forEach(li => {
+            if (li.style.display === 'none') return;
+            if (li.dataset.kind !== 'cash') return;
+            cash += parseFloat(li.dataset.cash) || 0;
+            cashRows++;
+        });
+        const listTotal = document.getElementById('codListTotal');
+        if (listTotal) listTotal.textContent = cash.toFixed(2);
+        // No cash left selected — nothing to hand in.
+        submitBtn.disabled = cashRows === 0;
+        submitBtn.innerHTML = cashRows === 0
+            ? '<i class="fa-solid fa-ban me-2"></i>No Cash Selected'
+            : '<i class="fa-solid fa-check-circle me-2"></i>Confirm Submission';
+        amountInput.value = cash.toFixed(2);
+        const grand = (cash + ELECTRONIC_TOTAL).toFixed(2);
         document.getElementById('codTotalDisplay').textContent = grand;
         const totalCell = document.getElementById('codTotalAmountCell');
         if (totalCell) totalCell.textContent = grand;
         const cashEl = document.getElementById('codCashDisplay');
-        if (cashEl) cashEl.textContent = cashTotal.toFixed(2);
-        if (typeof cashCount === 'number') {
-            const cc = document.getElementById('codCashCount');
-            if (cc) cc.textContent = cashCount;
-            const to = document.getElementById('codTotalOrders');
-            if (to) to.textContent = cashCount + NON_CASH_ORDERS;
-        }
+        if (cashEl) cashEl.textContent = cash.toFixed(2);
+        const cc = document.getElementById('codCashCount');
+        if (cc) cc.textContent = cashRows;
+        const to = document.getElementById('codTotalOrders');
+        if (to) to.textContent = cashRows + NON_CASH_ORDERS;
     }
 
     function removeOrder(btn) {
         const li = btn.closest('.cod-order-item');
         const deliveryId = li.dataset.deliveryId;
-        const codAmt = parseFloat(li.dataset.cod) || 0;
 
         // Animate out
         li.classList.add('removing');
@@ -250,15 +280,9 @@ window.addEventListener('DOMContentLoaded', function() {
         const remaining = document.querySelectorAll('.cod-order-item:not(.removing)').length;
         document.getElementById('codOrderCount').textContent = remaining;
 
-        // Update total amount (cash portion only; electronic stays constant)
-        const currentCash = parseFloat(amountInput.value) || 0;
-        updateTotals(Math.max(0, currentCash - codAmt), remaining);
+        // Update totals (cash only; electronic stays constant)
+        recalcFromRows();
 
-        // Disable submit if no orders left
-        if (remaining === 0) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fa-solid fa-ban me-2"></i>No Orders Selected';
-        }
 
         if (typeof haptic === 'function') haptic([5]);
     }
@@ -273,7 +297,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
         // Validate
         if (!receivedByInput.value.trim()) {
-            showToast('Please enter who received the COD', 'warning');
+            showToast('Please enter who received the cash', 'warning');
             receivedByInput.focus();
             return;
         }
@@ -285,7 +309,7 @@ window.addEventListener('DOMContentLoaded', function() {
         }
 
         // Confirm submission
-        if (!confirm(`Confirm COD submission of ${amount.toFixed(2)} QR?`)) {
+        if (!confirm(`Confirm cash submission of ${amount.toFixed(2)} QR?`)) {
             return;
         }
 
@@ -299,7 +323,7 @@ window.addEventListener('DOMContentLoaded', function() {
             form.submit();
 
             // Show success
-            showToast('COD submitted successfully!', 'success');
+            showToast('Cash submitted successfully!', 'success');
         } catch (error) {
             console.error('Submission error:', error);
             showToast('Submission failed. Please try again.', 'danger');
@@ -363,7 +387,7 @@ window.addEventListener('DOMContentLoaded', function() {
         if (preset !== 'custom') customRange.style.display = 'none';
 
         const allItems = document.querySelectorAll('.cod-order-item:not(.removing)');
-        let visibleCount = 0, visibleTotal = 0;
+        let visibleCount = 0;
 
         allItems.forEach(li => {
             const itemDate = li.dataset.date || '';
@@ -378,21 +402,17 @@ window.addEventListener('DOMContentLoaded', function() {
                 visible = true;
             }
             li.style.display = visible ? '' : 'none';
-            if (visible) { visibleCount++; visibleTotal += parseFloat(li.dataset.cod) || 0; }
+            if (visible) visibleCount++;
         });
 
         document.getElementById('codOrderCount').textContent = visibleCount;
-        updateTotals(visibleTotal, visibleCount);
+        recalcFromRows();
 
         const visibleIds = Array.from(allItems)
             .filter(li => li.style.display !== 'none')
             .map(li => li.dataset.deliveryId).filter(Boolean);
         document.querySelector('input[name="delivery_ids"]').value = visibleIds.join(',');
 
-        submitBtn.disabled = visibleCount === 0;
-        submitBtn.innerHTML = visibleCount === 0
-            ? '<i class="fa-solid fa-ban me-2"></i>No Orders Selected'
-            : '<i class="fa-solid fa-check-circle me-2"></i>Confirm Submission';
     }
 
     datePreset.addEventListener('change', applyDateFilter);

@@ -7,6 +7,7 @@ import logging
 from celery import shared_task
 
 from business.suspension import SUSPENDED_STATUSES, SUSPENSION_MESSAGE, is_business_suspended
+from core.destination import is_foreign, order_country
 
 logger = logging.getLogger(__name__)
 
@@ -989,6 +990,7 @@ def _sync_api_source(api_settings):
 
     created, updated = 0, 0
     seen_pids = set()
+    skipped_foreign = 0
 
     for o in live_orders:
         pid = str(o['platform_id'])
@@ -997,6 +999,19 @@ def _sync_api_source(api_settings):
         status = 'imported' if already_imported else 'new'
 
         defaults = _api_row_to_temp_defaults(o, business, api_type)
+
+        # A store selling across the GCC offers us orders we cannot deliver. The
+        # row is still staged, as 'skipped' rather than 'new': deleting it would
+        # destroy the answer to "why is order X not in my import list?", which is
+        # the same reason ezzy_api.store_pull keeps its status drops visible.
+        destination = None
+        if status == 'new' and is_foreign(o, api_settings):
+            status = 'skipped'
+            destination = order_country(o) or 'unknown'
+            skipped_foreign += 1
+            if isinstance(defaults.get('raw_row'), dict):
+                defaults['raw_row']['_skip_reason'] = f'outside_service_area:{destination}'
+
         defaults['status'] = status
 
         if pid in existing:
@@ -1030,6 +1045,13 @@ def _sync_api_source(api_settings):
     })
 
     _stamp_source_sync(api_settings, len(seen_pids))
+
+    if skipped_foreign:
+        logger.info(
+            '%s sync for business %s: %s of %s order(s) staged as skipped — '
+            'shipping outside Qatar (import_qatar_only is on)',
+            api_type, business.business_id, skipped_foreign, len(seen_pids),
+        )
 
     return created, updated
 

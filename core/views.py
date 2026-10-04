@@ -44,6 +44,7 @@ import os
 import secrets
 from datetime import datetime, timedelta
 from django.utils import timezone as dj_timezone
+from django.utils.dateparse import parse_date
 from functools import wraps
 
 from allauth.account.views import SignupView
@@ -457,6 +458,7 @@ def _fire_driver_application_submitted(driver, profile, is_new):
             'driver_name': name,
             'driver_phone': phone,
             'phone': phone,
+            'driver_whatsapp': driver.driver_whatsapp or phone,
             'is_new_application': 'yes' if is_new else 'no',
             'driver_url': f"https://ezzydelivery.qa/workforce/drivers/{driver.driver_id}/",
         })
@@ -500,10 +502,16 @@ def join_driver(request):
         if profile.is_staff:
             messages.warning(request, "Staff accounts cannot apply as drivers.")
             return redirect('workforce:wf_dashboard')
-        already_business = profile.is_business
         driver = fleet_models.Driver.objects.filter(user_id=request.user.id).first()
         if driver:
             primary_vehicle = driver.driver_vehicle.first()
+        # The is_business flag alone is not proof — old role pickers set it
+        # without creating a Business, which locked driver applicants out of
+        # their own form. Block only a real business with no driver application.
+        already_business = bool(
+            profile.is_business and driver is None
+            and Business.objects.filter(user_id=request.user.id).exists()
+        )
         is_verified_driver = bool(
             driver and profile.is_driver and profile.verification_status == 'verified'
         )
@@ -540,11 +548,26 @@ def join_driver(request):
             )
         uploaded = {}
         typed_doc_nos = {}
+        typed_doc_expiry = {}
+        expired_docs = []
         for doc_type in APPLY_DOC_TYPES:
             key = doc_type.replace(' ', '_')
             doc_no = (request.POST.get(f'doc_no_{key}') or '').strip()
             if doc_no:
                 typed_doc_nos[doc_type] = doc_no
+            # Expiry: an <input type="date"> sends ISO, but a browser that falls
+            # back to a text box can send anything — an unreadable date is dropped
+            # with a note rather than throwing away the rest of the section.
+            exp_raw = (request.POST.get(f'doc_exp_{key}') or '').strip()
+            if exp_raw:
+                exp_val = parse_date(exp_raw)
+                if exp_val:
+                    typed_doc_expiry[doc_type] = exp_val
+                    if exp_val < dj_timezone.localdate():
+                        expired_docs.append(doc_type)
+                else:
+                    upload_warnings.append(
+                        f"{doc_type}: that expiry date could not be read — please pick it again.")
             f = request.FILES.get(f'doc_{key}')
             if f:
                 ok, err = validate_image_upload(f)
@@ -613,6 +636,7 @@ def join_driver(request):
                     driver is not None or not is_partial_save or uploaded
                     or vehicle_selected
                     or bool(typed_doc_nos)
+                    or bool(typed_doc_expiry)
                     or bool((request.POST.get('driver_license_number') or '').strip())
                     or bool((request.POST.get('driver_sponsor') or '').strip())
                     or request.POST.get('has_driver_license') == 'on'
@@ -694,6 +718,7 @@ def join_driver(request):
                     for doc_type in APPLY_DOC_TYPES:
                         f = uploaded.get(doc_type)
                         doc_no = typed_doc_nos.get(doc_type, '')
+                        doc_exp = typed_doc_expiry.get(doc_type)
                         doc = fleet_models.DriverDocument.objects.filter(
                             driver=driver, document_type=doc_type).first()
                         # A typed number is kept on its own — applicants often fill
@@ -701,7 +726,7 @@ def join_driver(request):
                         # and a discarded number reads as "the form lost my data".
                         # Such a row keeps the placeholder image, so docs_with_image()
                         # still refuses to count it as an uploaded document.
-                        if not f and not doc_no:
+                        if not f and not doc_no and not doc_exp:
                             continue
                         if doc is None:
                             doc = fleet_models.DriverDocument(
@@ -714,6 +739,8 @@ def join_driver(request):
                             doc.document_file = f
                         if doc_no:
                             doc.document_no = doc_no
+                        if doc_exp:
+                            doc.document_expiry_date = doc_exp
                         doc.save()
 
             for warn in upload_warnings:
@@ -728,6 +755,19 @@ def join_driver(request):
                 if not upload_warnings:
                     messages.success(request, "Progress saved! You can continue your application anytime.")
             else:
+                # An expired ID never blocks the application — it is recorded and
+                # said out loud, so the applicant is not surprised at review.
+                if expired_docs:
+                    names = ", ".join(expired_docs)
+                    plural = len(expired_docs) > 1
+                    messages.warning(request, (
+                        f"Heads up: your {names} "
+                        f"{'have' if plural else 'has'} expired by the "
+                        f"{'dates' if plural else 'date'} you entered. We will still review "
+                        f"your application — please renew "
+                        f"{'them' if plural else 'it'} and upload the new "
+                        f"{'copies' if plural else 'copy'} when you can."
+                    ))
                 logger.info(f"Driver application submitted for user {request.user.id} (new={is_new_driver})")
                 _notify_driver_application_received(driver, profile)
                 _fire_driver_application_submitted(driver, profile, is_new_driver)
@@ -777,9 +817,23 @@ def join_driver(request):
         'Selfie': 'fa-camera', 'QID': 'fa-id-card', 'Passport': 'fa-passport',
         'Driving License': 'fa-id-badge', 'Istimara': 'fa-car',
     }
+    def _preview_url(row, uploaded):
+        """Media URL of an already-saved photo, for the tile thumbnail.
+
+        Only a real upload gets one — the shipped placeholder must never be
+        shown back as if the applicant had sent it.
+        """
+        if not uploaded or not row or not row.document_file:
+            return ''
+        try:
+            return row.document_file.url
+        except ValueError:
+            return ''
+
     doc_list = [
         {'type': dt, 'key': dt.replace(' ', '_'), 'doc': all_docs.get(dt),
          'has_file': dt in docs_uploaded,
+         'preview_url': _preview_url(all_docs.get(dt), dt in docs_uploaded),
          'icon': DOC_ICONS.get(dt, 'fa-file')}
         for dt in APPLY_DOC_TYPES
     ]
@@ -923,6 +977,18 @@ def join_driver(request):
             'step': 4, 'section': 'Documents',
             'label': 'Document numbers',
             'hint': ', '.join(missing_doc_nos),
+        })
+    # Same one-row treatment for expiry dates — they drive the staff expiry
+    # report, so an uploaded ID without one is a real gap, just not a blocking one.
+    missing_doc_expiry = [
+        dt for dt in ID_DOC_TYPES
+        if dt in docs_uploaded and not (all_docs.get(dt) and all_docs[dt].document_expiry_date)
+    ]
+    if missing_doc_expiry:
+        missing_optional.append({
+            'step': 4, 'section': 'Documents',
+            'label': 'Document expiry dates',
+            'hint': ', '.join(missing_doc_expiry),
         })
 
     first_missing_step = (missing_required or missing_optional or [{}])[0].get('step', 1)

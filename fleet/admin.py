@@ -423,3 +423,11 @@ class DriverProposalAdmin(admin.ModelAdmin):
                    'job_type', 'vehicle_type')
     search_fields = ('title', 'ref_code', 'headline', 'description', 'pay_package')
     filter_horizontal = ('zone_groups',)
+
+
+@admin.register(fleet_models.DriverProposalInterest)
+class DriverProposalInterestAdmin(admin.ModelAdmin):
+    list_display = ('driver', 'proposal', 'status', 'created_at', 'decided_by', 'decided_at')
+    list_filter = ('status', 'proposal')
+    search_fields = ('driver__driver_phone', 'driver__profile__first_name', 'proposal__title')
+    raw_id_fields = ('driver', 'decided_by')

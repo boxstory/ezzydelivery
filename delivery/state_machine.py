@@ -57,6 +57,13 @@ STATUS_STAGE = {
 
 _ALL_STATUSES = set(STATUS_STAGE.keys())
 
+#: Closed-out statuses. The task is finished and the driver named on it is what
+#: the payout, the client invoice and the outcome history are built from.
+TERMINAL_STATUSES = frozenset({
+    'delivered', 'partial_delivery', 'returned_to_shipper',
+    'failed', 'rejected', 'cancelled', 'dropsownlost',
+})
+
 # ---------------------------------------------------------------------------
 # Staff transitions — forward only + cancel from any stage
 # ---------------------------------------------------------------------------
@@ -74,8 +81,7 @@ def _build_staff_transitions():
                 forward.add(target)
         transitions[status] = forward
     # Terminal statuses — no forward moves for staff
-    for terminal in ('delivered', 'partial_delivery', 'returned_to_shipper',
-                     'failed', 'rejected', 'cancelled', 'dropsownlost'):
+    for terminal in TERMINAL_STATUSES:
         transitions[terminal] = set()
     return transitions
 
@@ -83,6 +89,9 @@ STAFF_TRANSITIONS = _build_staff_transitions()
 
 # Admin transitions — any status to any status (full override)
 ADMIN_TRANSITIONS = {status: _ALL_STATUSES - {status} for status in _ALL_STATUSES}
+
+#: Where a task lands when its driver is taken off it: back in the open pool.
+UNASSIGN_RESET_STATUS = 'pending'
 
 # ---------------------------------------------------------------------------
 # Driver transitions (fleet app / API)
@@ -156,6 +165,16 @@ def can_transition(old_status, new_status, actor='driver'):
             and new_status == 'returned_to_shipper' and actor in ('staff', 'admin')):
         return True, ''
 
+    # Taking the driver off a task hands it back to the pool. That is a move
+    # backward, and the forward-only staff rule would otherwise revert it
+    # silently — leaving the task reading 'accepted' with nobody on it. The
+    # unassign endpoints pass actor='unassign' so only this one reset opens up.
+    if actor == 'unassign':
+        if new_status == UNASSIGN_RESET_STATUS and old_status not in TERMINAL_STATUSES:
+            return True, ''
+        return False, _build_reason(old_status, new_status, actor,
+                                    get_allowed_transitions(old_status, actor))
+
     if actor == 'admin':
         transitions = ADMIN_TRANSITIONS
     elif actor == 'staff':
@@ -173,6 +192,10 @@ def can_transition(old_status, new_status, actor='driver'):
 
 def get_allowed_transitions(current_status, actor='driver'):
     """Return the set of valid next statuses from the current status for actor."""
+    if actor == 'unassign':
+        if current_status in TERMINAL_STATUSES:
+            return set()
+        return {UNASSIGN_RESET_STATUS}
     if actor == 'admin':
         transitions = ADMIN_TRANSITIONS
     elif actor == 'staff':

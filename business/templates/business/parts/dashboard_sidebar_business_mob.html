@@ -32,16 +32,16 @@
     <ul class="navbar-nav">
       <!-- ORDERS -->
       <li class="bsb__section">{% trans "Orders" %}</li>
-      <li class="nav-item {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}active{% endif %}">
-        <div class="nav-link d-flex align-items-center {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}active{% endif %}"
+      <li class="nav-item {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'add_return' or current_url == 'bulk_import_orders' %}active{% endif %}">
+        <div class="nav-link d-flex align-items-center {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'add_return' or current_url == 'bulk_import_orders' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-orders-mobile"
-             aria-expanded="{% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}true{% else %}false{% endif %}">
+             aria-expanded="{% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'add_return' or current_url == 'bulk_import_orders' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-basket-shopping me-2"></i>
           <span class="flex-fill text-start">{% trans "Orders" %}</span>
           <i class="fa-solid fa-caret-down ms-auto"></i>
         </div>
-        <div class="bsb__submenu collapse {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}show{% endif %}"
+        <div class="bsb__submenu collapse {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'add_return' or current_url == 'bulk_import_orders' %}show{% endif %}"
              id="submenu-orders-mobile">
           <a class="nav-link {% if current_url == 'orders_all_list' or current_url == 'orders_list' %}active{% endif %}" href="{% url 'orders:orders_all_list' %}">
             <i class="fa-solid fa-bars me-2"></i>
@@ -50,6 +50,14 @@
           <a class="nav-link {% if current_url == 'add_order' %}active{% endif %}" href="{% url 'orders:add_order' %}">
             <i class="fa-solid fa-plus me-2"></i>
             <span>{% trans "Add Orders" %}</span>
+          </a>
+          <a class="nav-link {% if current_url == 'add_return' %}active{% endif %}" href="{% url 'orders:add_return' %}">
+            <i class="fa-solid fa-rotate-left me-2"></i>
+            <span>{% trans "Return Pickup" %}</span>
+          </a>
+          <a class="nav-link {% if current_url == 'returns_list' or current_url == 'return_detail' %}active{% endif %}" href="{% url 'business:returns_list' %}">
+            <i class="fa-solid fa-box-open me-2"></i>
+            <span>{% trans "My Returns" %}</span>
           </a>
           <a class="nav-link {% if current_url == 'bulk_import_orders' %}active{% endif %}" href="{% url 'orders:bulk_import_orders' %}">
             <i class="fa-solid fa-file-import me-2"></i>

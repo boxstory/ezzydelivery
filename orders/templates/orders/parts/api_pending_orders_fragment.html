@@ -150,6 +150,9 @@
 <div class="text-center text-muted py-3 small">
     <i class="fa-solid fa-cloud me-1"></i>
     No new {{ api_orders_platform|title }} orders to import.
+    {% if hidden_foreign_count %}
+    <div class="mt-1">{{ hidden_foreign_count }} recent order{{ hidden_foreign_count|pluralize }} ship outside Qatar and {{ hidden_foreign_count|pluralize:"is,are" }} not shown.</div>
+    {% endif %}
     <button type="button" class="btn btn-sm btn-link"
             hx-get="{% url 'orders:orders_api_pending_list' %}"
             hx-target="#orders_api_pending_panel"

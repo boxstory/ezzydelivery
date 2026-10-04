@@ -32,6 +32,9 @@ Related:
     - business.views: Views that use these forms
 """
 
+import re
+
+import requests
 from urllib import request
 from django import forms
 from django.contrib.auth.models import User
@@ -47,6 +50,94 @@ from business import models as business_models
 from business.permissions import BusinessPermissions, ROLE_PERMISSIONS
 from core.forms_base import SanitizedForm, SanitizedFormMixin, SanitizedModelForm
 from core.net_guard import validate_public_url
+
+
+def resolve_shopify_store_url(url):
+    """Resolve a Shopify store URL to its canonical .myshopify.com form.
+
+    Returns (normalised_url, error_message); exactly one is None.
+
+    Both the Admin API and the OAuth token endpoint only answer on the permanent
+    handle. A custom domain answers the token POST with a 301 to
+    admin.shopify.com, requests replays it as GET, drops the body, and the login
+    page it lands on returns HTTP 200 -- so raise_for_status() passes and the
+    merchant sees only a JSON parse error after approving the app. Catch it here
+    at save time instead.
+    """
+    # Lowercase before stripping the scheme: a pasted "HTTPS://Store.MyShopify.com"
+    # would otherwise keep its scheme and be read as the host "https:".
+    host = re.sub(r'^https?://', '', (url or '').strip().lower()).strip('/')
+    host = host.split('/')[0].split('?')[0]
+    if not host:
+        return '', None
+    if host.endswith('.myshopify.com'):
+        return f'https://{host}', None
+
+    # A custom domain publishes the handle in its storefront HTML as
+    # Shopify.shop, so read it rather than making the merchant hunt for it.
+    try:
+        resp = requests.get(f'https://{host}/', timeout=6)
+        match = re.search(r'Shopify\.shop\s*=\s*"([^"]+\.myshopify\.com)"', resp.text)
+        if match:
+            return f'https://{match.group(1).lower()}', None
+    except requests.exceptions.RequestException:
+        pass
+
+    return None, (
+        'Use your permanent .myshopify.com store address here, not a custom '
+        'domain. Find it in Shopify admin → Settings → Domains, shown as '
+        '"myshopify.com URL" (for example mystore.myshopify.com). The Shopify API '
+        'only answers on that address.'
+    )
+
+
+def check_shopify_oauth_app(store_url, client_id):
+    """Ask Shopify whether this Client ID is really an OAuth app.
+
+    Returns an error message, or None when the ID is usable.
+
+    Catches the mistake that cost a real client two failed attempts: pasting the
+    API key of a Custom App created under Shopify admin -> Apps -> Develop apps.
+    Those keys are 32 hex characters and look exactly like a Client ID, but they
+    are not OAuth applications, so Shopify answers the authorize redirect with an
+    unexplained "Oops, something went wrong" page the merchant cannot act on.
+
+    We send a deliberately invalid authorization code: Shopify validates the
+    application before the code, so 'application_cannot_be_found' identifies a
+    bad Client ID while the expected 'invalid_request' means the app exists. The
+    Client SECRET cannot be checked this way -- Shopify rejects the bad code
+    before it ever looks at the secret -- which is why the secret is checked by
+    shape instead.
+    """
+    host = re.sub(r'^https?://', '', (store_url or '').strip().lower()).strip('/')
+    host = host.split('/')[0]
+    if not host or not client_id:
+        return None
+
+    try:
+        resp = requests.post(
+            f'https://{host}/admin/oauth/access_token',
+            json={'client_id': client_id, 'client_secret': 'preflight',
+                  'code': 'preflight'},
+            timeout=8, allow_redirects=False,
+        )
+    except requests.exceptions.RequestException:
+        # Fail open. A slow resolver or a blip must not stop a merchant saving
+        # perfectly good credentials; the OAuth flow itself still reports errors.
+        return None
+
+    if 'application_cannot_be_found' not in (resp.text or ''):
+        return None
+
+    return (
+        'Shopify does not recognise this Client ID, so the authorization step '
+        'cannot start. The usual cause is pasting the API key of a Custom App '
+        '(Shopify admin → Settings → Apps and sales channels → Develop apps). '
+        'A Custom App cannot use OAuth: either switch the setup method above to '
+        '"Custom App" and paste its Admin API access token (shpat_…) instead, or '
+        'create an app in the Shopify Dev/Partner Dashboard and copy its Client '
+        'ID from there.'
+    )
 
 # Local aliases for commonly used models
 Business = business_models.Business
@@ -317,6 +408,7 @@ class businessApiSettingsForm(SanitizedModelForm):
             'order_api_endpoint',
             'product_api_endpoint',
             'site_contry',
+            'import_qatar_only',
             # Custom REST pull — we fetch orders from the seller's own site
             'fetch_orders_url',
             'fetch_auth_style',
@@ -344,6 +436,7 @@ class businessApiSettingsForm(SanitizedModelForm):
             "order_api_endpoint": "Order API URL",
             "product_api_endpoint": "Product API URL",
             "site_contry": "Country",
+            "import_qatar_only": "Import Qatar orders only",
             "fetch_orders_url": "Order Fetch URL (we call this)",
             "fetch_auth_style": "How to send your API key",
             "fetch_auth_name": "Header / parameter name",
@@ -379,6 +472,10 @@ class businessApiSettingsForm(SanitizedModelForm):
                                     "are ignored — this is what stops us booking a delivery for an "
                                     "order you already delivered or cancelled. Empty takes every order.",
             "fetch_enabled": "When off, the connection can still be tested and pulled by hand.",
+            "import_qatar_only": "Tick this if your store sells outside Qatar. Orders shipping "
+                                 "anywhere else are then left out of the import lists, so you are "
+                                 "never offered a delivery we cannot make. Off means every order "
+                                 "is listed, whatever its destination.",
             "tiktok_shop_id": "Obtained from TikTok Shop OAuth authorization",
             "tiktok_shop_cipher": "Obtained from TikTok Shop OAuth authorization",
             "tiktok_refresh_token": "Used to refresh access token before expiry",
@@ -394,6 +491,10 @@ class businessApiSettingsForm(SanitizedModelForm):
             'order_api_endpoint': forms.TextInput(attrs={'class': 'form-control'}),
             'product_api_endpoint': forms.TextInput(attrs={'class': 'form-control'}),
             'site_contry': forms.TextInput(attrs={'class': 'form-control'}),
+            # Plain checkbox, not a Bootstrap switch: .business-dashboard pins
+            # input[type=checkbox] to 1rem with !important, so a switch renders
+            # as an unstyled box on every client page.
+            'import_qatar_only': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'fetch_orders_url': forms.URLInput(attrs={
                 'class': 'form-control', 'placeholder': 'https://yourshop.com/api/orders'}),
             'fetch_auth_style': forms.Select(attrs={'class': 'form-select', 'id': 'fetch_auth_style_select'}),
@@ -515,6 +616,16 @@ class businessApiSettingsForm(SanitizedModelForm):
         # Shopify: enforce the credentials the chosen setup path actually needs,
         # so a half-filled form fails here instead of as a 401 from Shopify later.
         if api_type == 'shopify':
+            # Normalise the store URL to the .myshopify.com handle. Only on a
+            # change, so an unrelated edit never pays for the storefront fetch.
+            store_url = cleaned_data.get('site_api_url')
+            if store_url and (not self.instance.pk or 'site_api_url' in self.changed_data):
+                resolved, url_error = resolve_shopify_store_url(store_url)
+                if url_error:
+                    self.add_error('site_api_url', url_error)
+                elif resolved:
+                    cleaned_data['site_api_url'] = resolved
+
             mode = cleaned_data.get('shopify_setup_mode') or 'oauth'
             if mode == 'custom_app':
                 if not cleaned_data.get('api_access_token'):
@@ -524,12 +635,46 @@ class businessApiSettingsForm(SanitizedModelForm):
                         'It starts with "shpat_".',
                     )
             else:
-                if not cleaned_data.get('api_key'):
+                client_id = (cleaned_data.get('api_key') or '').strip()
+                client_secret = (cleaned_data.get('api_secret') or '').strip()
+                if not client_id:
                     self.add_error('api_key', 'Client ID is required to connect Shopify via OAuth.')
-                if not cleaned_data.get('api_secret'):
+                if not client_secret:
                     self.add_error('api_secret', 'Client Secret is required to connect Shopify via OAuth.')
                 if not cleaned_data.get('site_api_url'):
                     self.add_error('site_api_url', 'Store URL is required to connect Shopify via OAuth.')
+
+                # The secret cannot be verified against Shopify (it rejects the
+                # probe's code before reading the secret), so check its shape. A
+                # real client pasted the Client ID into both boxes and the flow
+                # only failed later, at HMAC verification, with no clue why.
+                if client_id and client_secret:
+                    if client_secret == client_id:
+                        self.add_error(
+                            'api_secret',
+                            'This is the same value as the Client ID. The Client Secret '
+                            'is a separate value shown underneath it in Shopify, and it '
+                            'starts with "shpss_".',
+                        )
+                    elif re.fullmatch(r'[0-9a-f]{32}', client_secret.lower()):
+                        self.add_error(
+                            'api_secret',
+                            'That looks like an API key, not a Client Secret. The Client '
+                            'Secret starts with "shpss_" — copy the "Client secret" field '
+                            'in Shopify, not the Client ID.',
+                        )
+
+                # Ask Shopify whether the Client ID is an OAuth app at all, so a
+                # Custom App key is refused here instead of sending the merchant
+                # to an unexplained Shopify error page. Only when it changed.
+                store_for_check = cleaned_data.get('site_api_url')
+                creds_changed = (not self.instance.pk
+                                 or 'api_key' in self.changed_data
+                                 or 'site_api_url' in self.changed_data)
+                if client_id and store_for_check and creds_changed and not self.errors:
+                    app_error = check_shopify_oauth_app(store_for_check, client_id)
+                    if app_error:
+                        self.add_error('api_key', app_error)
 
         # Validate TikTok Shop specific requirements
         if api_type == 'tiktokshop':

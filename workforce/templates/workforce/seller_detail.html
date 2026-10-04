@@ -668,6 +668,12 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                         <span class="sld__badge {% if business.profile.verification_status == 'verified' %}sld__badge--success{% elif business.profile.verification_status == 'pending' %}sld__badge--warning{% else %}sld__badge--danger{% endif %}">
                             {{ business.profile.verification_status|title }}
                         </span>
+                        {% if business.profile.verification_status != 'verified' %}
+                        <a href="{% url 'workforce:business_verification_list' %}?search={{ business.business_id }}&status=all"
+                           id="workforce_seller_link_verification" class="ms-2 small">
+                            Go to verification <i class="fa-solid fa-arrow-right"></i>
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
@@ -1644,6 +1650,17 @@ Notes: Most panel actions save over AJAX without reloading. Carries the shared w
                                 <label class="form-label small fw-semibold">Product ID</label>
                                 <input type="text" class="form-control form-control-sm" name="pm_platform_id" id="sldApiEditPmPid" placeholder="e.g. id">
                             </div>
+                            <div class="col-12 sld__api-field-group" data-field="import_qatar_only">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="import_qatar_only" value="1" id="sldApiEditQatarOnly">
+                                    <label class="form-check-label small" for="sldApiEditQatarOnly">
+                                        Import Qatar orders only
+                                    </label>
+                                </div>
+                                <div class="form-text small">For a store that sells across the GCC: orders shipping elsewhere are left out of the import lists.</div>
+                                <hr class="my-2">
+                            </div>
+
                             <div class="col-12 sld__api-field-group" data-field="fetch_enabled">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="fetch_enabled" value="1" id="sldApiEditFetchEnabled">
@@ -2675,6 +2692,7 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
         fetch_products_list_path: document.getElementById('sldApiEditFetchProdPath'),
     };
     var fetchEnabledChk = document.getElementById('sldApiEditFetchEnabled');
+    var qatarOnlyChk = document.getElementById('sldApiEditQatarOnly');
     // Product field paths are posted as pm_<field> and stored as one JSON mapping.
     var productMapFields = {
         item_name: document.getElementById('sldApiEditPmName'),
@@ -2803,6 +2821,7 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
                     });
                     defaultChk.checked = !!a.is_default;
                     if (fetchEnabledChk) fetchEnabledChk.checked = !!a.fetch_enabled;
+                    if (qatarOnlyChk) qatarOnlyChk.checked = !!a.import_qatar_only;
                     var pm = a.product_column_mapping || {};
                     Object.keys(productMapFields).forEach(function(k) {
                         if (productMapFields[k]) productMapFields[k].value = pm[k] || '';
@@ -2826,6 +2845,7 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
         // An unticked checkbox posts nothing, so the server would read "absent"
         // as "unchanged" and automatic pulling could never be switched off.
         fd.set('fetch_enabled', (fetchEnabledChk && fetchEnabledChk.checked) ? '1' : '0');
+        fd.set('import_qatar_only', (qatarOnlyChk && qatarOnlyChk.checked) ? '1' : '0');
         if (!defaultChk.checked) fd.set('is_default', '0');
         editSaveBtn.disabled = true;
         editSaveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>' + (isAdd ? 'Creating' : 'Saving');

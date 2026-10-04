@@ -688,6 +688,30 @@
    the basis, which left 69px missing and bumped the facets to a second line. */
 .crmb__filters .crm__search { flex: 0 0 18rem; width: 18rem; max-width: 18rem; }
 
+/* The driver board carries five facets the business board has no data for — the rest
+   of the application behind the card: job type, uploaded documents, working hours,
+   language, preferred zone. Nine controls in the single row above would measure past
+   1500px and shove the scope readout off the card, so this bar flows them over two
+   rows and lets the search field sit beside the block.
+
+   The track stays a FIXED 8.25rem in both steps. Select2's percentage width
+   contributes nothing to intrinsic sizing (see .crm__facets), so repeat(auto-fit, …)
+   inside this shrink-to-fit form measures no container to fit against and collapses to
+   one column — the same failure the fixed track was introduced to fix.
+
+   Held above the phone breakpoints on purpose: the 767.98px rule below restacks the
+   facets two-up, and it would lose to these two-class selectors on order alone. */
+@media (min-width: 768px) {
+  .crmb__filters--rich { flex-wrap: wrap; }
+  .crmb__filters--rich .crm__facets {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(4, 8.25rem);
+  }
+}
+@media (min-width: 1200px) {
+  .crmb__filters--rich .crm__facets { grid-template-columns: repeat(5, 8.25rem); }
+}
+
 /* Scope readout — banked right, never wider than it needs to be. */
 .crmb__scope {
   display: flex;
@@ -1316,6 +1340,15 @@
 /* Manual chat linker — folded into the conversation panel, so one WhatsApp panel
    instead of two saying the same thing */
 .crmd__linker { border-bottom: 1px solid var(--crm-line); background: var(--crm-canvas); }
+/* A lead's WhatsApp numbers: primary phone + labelled extras (owner, office…). */
+.crmd__numbers { list-style: none; margin: 0; padding: 0.5rem 1rem; border-bottom: 1px solid var(--crm-line); }
+.crmd__number { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.625rem; padding: 0.3125rem 0; font-size: 0.8125rem; }
+.crmd__number + .crmd__number { border-top: 1px dashed var(--crm-line); }
+.crmd__number-label { font-weight: 600; min-width: 5rem; }
+.crmd__number-id { font-variant-numeric: tabular-nums; }
+.crmd__number-sess, .crmd__number-note { color: var(--crm-muted, #6b7280); font-size: 0.75rem; }
+.crmd__number-acct { font-size: 0.75rem; border: 1px solid var(--crm-line); border-radius: 0.25rem; padding: 0 0.375rem; }
+.crmd__number-remove { margin-left: auto; font-size: 0.72rem; padding: 0.125rem 0.5rem; }
 .crmd__linker-btn { margin-left: auto; font-size: 0.72rem; padding: 0.25rem 0.6rem; }
 
 /* Refresh sits ahead of the linker, so it takes over pushing the pair right. */
@@ -1860,6 +1893,16 @@
 }
 .crmd__merge-lbl i { margin-right: 0.25rem; }
 .crmd__merge-lbl--warn { color: #92400e; text-transform: none; letter-spacing: 0; font-weight: 600; }
+.crmd__merge-lbl--parent {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--brand-warning-text);
+  background: var(--brand-warning-bg);
+  border: 1px solid var(--brand-warning-alt);
+  border-left: 4px solid var(--brand-warning);
+  border-radius: 6px;
+}
+.crmd__merge-lbl--parent a { font-weight: 700; color: inherit; text-decoration: underline; }
 .crmd__mergecard {
   padding: 0.375rem;
   background: var(--crm-canvas);
@@ -1878,6 +1921,34 @@
   margin-top: 0.375rem; padding-top: 0.375rem;
   border-top: 1px solid var(--crm-line);
 }
+/* Where an absorbed card disagrees with the parent — the merge kept the parent's value. */
+.crmd__mergediff {
+  margin-top: 0.375rem; padding-top: 0.375rem;
+  border-top: 1px solid var(--crm-line);
+}
+.crmd__mergediff-hd { font-size: 0.7rem; font-weight: 600; color: var(--brand-warning-text); }
+.crmd__mergediff-hd i { margin-right: 0.25rem; }
+.crmd__mergediff-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 0.25rem 0.5rem; align-items: end;
+  padding: 0.375rem 0; border-bottom: 1px dashed var(--crm-line);
+}
+.crmd__mergediff-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.crmd__mergediff-lbl {
+  grid-column: 1 / -1; font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--crm-muted);
+}
+.crmd__mergediff-vals { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; }
+.crmd__mergediff-val { font-size: 0.75rem; color: var(--crm-ink-2); overflow-wrap: anywhere; }
+.crmd__mergediff-val--theirs { color: var(--crm-ink); font-weight: 600; }
+.crmd__mergediff-tag {
+  display: inline-block; min-width: 2.75rem; margin-right: 0.375rem;
+  font-size: 0.64rem; font-weight: 600; color: var(--crm-muted); font-variant-numeric: tabular-nums;
+}
+.crmd__tl-from {
+  font-size: 0.66rem; font-weight: 600; color: var(--crm-ink-2);
+  padding: 0 0.3rem; border: 1px solid var(--crm-line-2); border-radius: 4px; text-decoration: none;
+}
+.crmd__tl-from:hover { color: var(--crm-ink); border-color: var(--crm-ink-2); }
 .crmd__mergecand {
   display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap;
   padding: 0.375rem;
@@ -2056,6 +2127,75 @@
 .crm__filters > .wfsel__count[hidden],
 .crm__filters > .wfsel__all[hidden] { display: none; }
 
+/* ── BULK STAGE BAR ───────────────────────────────────────────────────────── */
+/* Appears only once rows are ticked, between the filters and the result line —
+   the same place the desk is already looking after ticking. A well rather than a
+   card: it is an instrument row like the filters, not a second console. */
+.crml__bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0 0;
+  padding: 0.5rem 0.65rem;
+  background: var(--crm-well);
+  border: 1px solid var(--crm-line-2);
+  border-radius: 8px;
+}
+.crml__bulk[hidden] { display: none; }
+.crml__bulk-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  color: var(--crm-ink-2);
+  white-space: nowrap;
+}
+.crml__bulk-label strong { color: var(--crm-ink); }
+.crml__bulk-label i { color: var(--crm-muted); }
+/* Wide enough for the longest column label plus its write-back suffix, but still
+   a control on the row — not a full-width field. */
+.crml__bulk-select { min-width: 15rem; max-width: 100%; }
+.crml__bulk-note {
+  font-size: 0.7rem;
+  color: var(--crm-muted);
+  margin-left: auto;
+}
+@media (max-width: 575px) {
+  .crml__bulk-select { min-width: 0; flex: 1 1 100%; }
+  .crml__bulk-note { margin-left: 0; flex: 1 1 100%; }
+}
+
+/* ── TOAST ────────────────────────────────────────────────────────────────── */
+/* Appended to the body, not to the console, so it outlives the HTMX swap that
+   follows a bulk write — which is the whole point of reporting the result here
+   instead of inside the bar. Tokens are brand-level for the same reason: outside
+   .crm, the --crm-* custom properties do not resolve. */
+.crm__toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  z-index: 1080;
+  max-width: min(46rem, calc(100vw - 2rem));
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  background: var(--brand-navy);
+  color: var(--brand-white);
+  border: 1px solid var(--brand-navy-light);
+  box-shadow: 0 10px 30px rgba(0, 31, 63, 0.28);
+  font-family: var(--brand-font-primary);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  opacity: 0;
+  transform: translateX(-50%) translateY(0.5rem);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.crm__toast.is-on { opacity: 1; transform: translateX(-50%) translateY(0); }
+.crm__toast--err { background: var(--brand-danger-dark); border-color: var(--brand-danger); }
+@media (prefers-reduced-motion: reduce) {
+  .crm__toast { transition: none; }
+}
+
 /* Tick column: as narrow as the box, and never the target of a row click. */
 .crm__table th.wfsel__cell,
 .crm__table td.wfsel__cell {
@@ -2074,3 +2214,118 @@
    included, so these two mutually-exclusive choices read as "tick both". Matching
    !important is the only way past it without touching the brand sheet. */
 .crmdoc__shapes input[type="radio"] { border-radius: 50% !important; }
+
+/* ── DRIVER-LEAD DOCUMENTS ────────────────────────────────────────────────── */
+/* One row of document cards in the wide column: scan on top, facts below, the
+   whole card is the target — the scan opens in the viewer dialog. More cards than
+   fit scroll sideways rather than wrapping, so the panel keeps one row's height.
+   Nothing here is coloured except an expiry that has run out or is about to. */
+.crmdoc__list {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(9.5rem, 1fr);
+  border: 1px solid var(--crm-line);
+  border-radius: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.crmdoc__row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.6rem;
+  background: var(--brand-white);
+  border: 0;
+  border-right: 1px solid var(--crm-line);
+  text-align: left;
+  cursor: pointer;
+}
+.crmdoc__row:last-child { border-right: 0; }
+.crmdoc__row:hover { background: var(--crm-canvas); }
+.crmdoc__row:focus-visible { outline: 0; box-shadow: var(--crm-focus); }
+
+.crmdoc__thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  border: 1px solid var(--crm-line-2);
+  background: var(--crm-well);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--crm-muted);
+  font-size: 1.25rem;
+}
+.crmdoc__thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.crmdoc__text { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1 1 auto; }
+.crmdoc__type { font-size: 0.8rem; font-weight: 700; color: var(--crm-ink); }
+/* A document number is read back digit by digit, so it is set as a number. */
+.crmdoc__no {
+  font-family: var(--brand-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  color: var(--crm-ink-2);
+  overflow-wrap: anywhere;
+}
+.crmdoc__tag {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--crm-muted);
+  margin-top: 0.1rem;
+}
+.crmdoc__tag--expired { color: var(--crm-alert); }
+.crmdoc__tag--soon { color: #9a6b00; }
+.crmdoc__tag--missing { color: var(--crm-muted); font-style: italic; }
+.crmdoc__tag--verified { color: var(--brand-success); }
+.crmdoc__tag--unverified { color: var(--crm-ink-2); }
+.crmdoc__chev { display: none; }  /* a card is obviously clickable; the row chevron is not needed */
+
+/* ── DOCUMENT DIALOGS ─────────────────────────────────────────────────────── */
+.crmdoc__modal { border: 1px solid var(--crm-line-2); border-radius: 10px; }
+.crmdoc__modal .modal-title { font-size: 0.95rem; font-weight: 700; color: var(--crm-ink); }
+.crmdoc__modal .form-label { font-size: 0.7rem; font-weight: 700; color: var(--crm-ink-2); }
+
+/* Front/back switch — two plain tabs, not chips. */
+.crmdoc__sides { display: flex; gap: 0.35rem; margin-bottom: 0.6rem; }
+.crmdoc__side {
+  padding: 0.25rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--crm-ink-2);
+  background: var(--brand-white);
+  border: 1px solid var(--crm-line-2);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.crmdoc__side.is-active { background: var(--crm-ink); border-color: var(--crm-ink); color: var(--brand-white); }
+
+/* The scan gets the room; the dialog scrolls rather than shrinking it to a stamp. */
+.crmdoc__stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--crm-well);
+  border: 1px solid var(--crm-line);
+  border-radius: 8px;
+  padding: 0.5rem;
+  min-height: 12rem;
+}
+.crmdoc__stage img { max-width: 100%; max-height: 62vh; object-fit: contain; }
+/* Cropper sizes itself to the stage's outer box, so padding would push the photo past the edge. */
+.crmdoc__stage.is-editing { padding: 0; }
+.crmdoc__stage-empty { margin: 0; font-size: 0.78rem; color: var(--crm-ink-2); text-align: center; }
+
+.crmdoc__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.75rem;
+  margin: 0.75rem 0 0;
+}
+.crmdoc__facts dt { font-size: 0.68rem; font-weight: 700; color: var(--crm-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.crmdoc__facts dd { margin: 0; font-size: 0.78rem; color: var(--crm-ink); overflow-wrap: anywhere; }
+
+.crmdoc__hint { margin: 0.6rem 0 0; font-size: 0.7rem; color: var(--crm-muted); }
+.crmdoc__err { margin: 0.5rem 0 0; font-size: 0.75rem; font-weight: 600; color: var(--crm-alert); }

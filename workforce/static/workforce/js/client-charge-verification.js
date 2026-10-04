@@ -1,7 +1,9 @@
 /* Purpose: Client delivery-charge console behaviour — row selection, bulk amount, verify/publish/reject. */
 /* Used by: workforce/templates/workforce/client_charge_verification.html */
 /* Notes: Every figure is re-validated server-side; the tape total is display only. Published rows are locked
-   in the markup and are also skipped by the server, so a stale page can never rewrite an agreed charge. */
+   in the markup and are also skipped by the server, so a stale page can never rewrite an agreed charge.
+   "Select all matching" posts the filter instead of ids — the server rebuilds the set, so the action covers
+   every page, not just the visible one. Any single checkbox click drops back to a plain page selection. */
 
 (function () {
   'use strict';
@@ -29,8 +31,17 @@
     const tape = document.getElementById('workforce_charges_tape');
     const tapeCount = document.getElementById('workforce_charges_tape_count');
     const tapeTotal = document.getElementById('workforce_charges_tape_total');
+    const btnMatching = document.getElementById('workforce_charges_select_matching');
+    const btnPage = document.getElementById('workforce_charges_select_page');
 
     if (!boxes.length) return;
+
+    // True once staff ask for every matching row, not just this page. The id
+    // list is then irrelevant — the server resolves the set from the filter.
+    let allMatching = false;
+    const matchCount = typeof workforceChargeMatchCount === 'number'
+      ? workforceChargeMatchCount : boxes.length;
+    const hasMorePages = matchCount > boxes.length;
 
     function update() {
       const checked = selected();
@@ -41,27 +52,63 @@
         total += parseFloat(raw) || 0;
       });
 
-      if (count) count.textContent = checked.length + ' selected';
-      if (tapeCount) tapeCount.textContent = checked.length;
-      if (tapeTotal) tapeTotal.textContent = total.toFixed(2);
+      const pageFull = checked.length === boxes.length && checked.length > 0;
+      // The count and the tape total have to say what will actually be acted
+      // on, or the confirm box promises one number and the server does another.
+      const shown = allMatching ? matchCount : checked.length;
+      const shownTotal = allMatching ? workforceChargeMatchTotal : total.toFixed(2);
+
+      if (count) {
+        count.textContent = allMatching
+          ? shown + ' selected — every page'
+          : shown + ' selected';
+      }
+      if (tapeCount) tapeCount.textContent = shown;
+      if (tapeTotal) tapeTotal.textContent = shownTotal;
       if (tape) tape.hidden = checked.length === 0;
 
       [btnSet, btnVerify, btnPublish, btnReject].forEach(function (b) {
         if (b) b.disabled = checked.length === 0;
       });
       if (selectAll) {
-        selectAll.checked = checked.length === boxes.length && checked.length > 0;
-        selectAll.indeterminate = checked.length > 0 && checked.length < boxes.length;
+        selectAll.checked = pageFull;
+        selectAll.indeterminate = checked.length > 0 && !pageFull;
       }
+      // Offer the whole set only once this page is fully ticked and there is
+      // more to take; the way back out shows while it is active.
+      if (btnMatching) btnMatching.hidden = !(pageFull && hasMorePages && !allMatching);
+      if (btnPage) btnPage.hidden = !allMatching;
     }
 
     if (selectAll) {
       selectAll.addEventListener('change', function () {
+        allMatching = false;
         boxes.forEach(function (cb) { cb.checked = selectAll.checked; });
         update();
       });
     }
-    boxes.forEach(function (cb) { cb.addEventListener('change', update); });
+    boxes.forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        // Touching one row is a page selection again — acting on every page
+        // after someone unticked a row would be the opposite of what they did.
+        allMatching = false;
+        update();
+      });
+    });
+
+    if (btnMatching) {
+      btnMatching.addEventListener('click', function () {
+        allMatching = true;
+        boxes.forEach(function (cb) { cb.checked = true; });
+        update();
+      });
+    }
+    if (btnPage) {
+      btnPage.addEventListener('click', function () {
+        allMatching = false;
+        update();
+      });
+    }
 
     document.querySelectorAll('.ccv__amount-input').forEach(function (input) {
       input.addEventListener('input', function () {
@@ -96,17 +143,29 @@
     function bulkAction(action, label, button) {
       const checked = selected();
       if (!checked.length) return;
+      const n = allMatching ? matchCount : checked.length;
       const locked = checked.filter(function (cb) { return cb.dataset.locked === '1'; }).length;
       let msg = label.charAt(0).toUpperCase() + label.slice(1) +
-                ' ' + checked.length + ' delivery charge(s)?';
+                ' ' + n + ' delivery charge(s)?';
+      if (allMatching) {
+        msg += '\n\nThis covers every page of the current filter, not just the '
+             + checked.length + ' rows on screen.';
+      }
       if (locked) msg += '\n\n' + locked + ' already published and will be skipped.';
       if (!confirm(msg)) return;
 
       const updates = {};
       const body = new FormData();
       body.append('action', action);
+      if (allMatching) {
+        // No ids: the server rebuilds the set from this filter. Figures typed on
+        // the visible rows still travel — rows on other pages have none, and the
+        // server falls back to their calculated charge exactly as it always has.
+        body.append('select_all', '1');
+        body.append('filters', workforceChargeFilters);
+      }
       checked.forEach(function (cb) {
-        body.append('task_ids[]', cb.value);
+        if (!allMatching) body.append('task_ids[]', cb.value);
         const input = document.getElementById('workforce_charges_input_' + cb.value);
         if (input && !input.readOnly) updates[cb.value] = input.value;
       });
@@ -142,14 +201,22 @@
           bulkAmount.focus();
           return;
         }
+        const n = allMatching ? matchCount : checked.length;
         if (!confirm('Set the client charge to ' + amount.toFixed(2) + ' QAR on ' +
-                     checked.length + ' delivery(ies)?\n\nAlready-published rows are skipped.')) {
+                     n + ' delivery(ies)?' +
+                     (allMatching ? '\n\nEvery page of the current filter.' : '') +
+                     '\n\nAlready-published rows are skipped.')) {
           return;
         }
         const body = new FormData();
         body.append('action', 'set_amount');
         body.append('bulk_amount', amount.toFixed(2));
-        checked.forEach(function (cb) { body.append('task_ids[]', cb.value); });
+        if (allMatching) {
+          body.append('select_all', '1');
+          body.append('filters', workforceChargeFilters);
+        } else {
+          checked.forEach(function (cb) { body.append('task_ids[]', cb.value); });
+        }
         body.append('csrfmiddlewaretoken', csrf());
         post(body, [btnSet]);
       });

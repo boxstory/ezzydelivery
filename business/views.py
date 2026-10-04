@@ -1011,6 +1011,27 @@ def business_settings_api_add(request, business_id):
             # Set business before saving (excluded from form for security)
             api_settings = form.save(commit=False)
             api_settings.business = business
+
+            # A double-submit once created two identical connections 14 seconds
+            # apart, and nothing showed which one the import would use. Checked
+            # here rather than in the form because the form never sees the
+            # business — the line above is where it is attached. The URL is
+            # already normalised to the .myshopify.com handle by now, so a custom
+            # domain and its handle are recognised as the same store.
+            twin = business_models.BusinessApiSettings.objects.filter(
+                business=business,
+                api_type=api_settings.api_type,
+                site_api_url__iexact=(api_settings.site_api_url or '').strip(),
+            ).first()
+            if twin and (api_settings.site_api_url or '').strip():
+                messages.error(
+                    request,
+                    "This store is already connected on this account. Edit that "
+                    "connection instead of adding a second one for the same store.",
+                )
+                return redirect('business:business_settings_api_list',
+                                business_id=business_id)
+
             api_settings.save()
             logger.info(f'API settings added successfully for business_id={business_id}')
 
@@ -1511,9 +1532,16 @@ def shopify_oauth_start(request, business_id, api_id):
     request.session['shopify_oauth_api_id'] = api_id
     request.session['shopify_oauth_business_id'] = business_id
 
-    shop_domain = api_settings.site_api_url.replace('https://', '').replace('http://', '').rstrip('/')
+    shop_domain = api_settings.shop_domain()
     client_id = api_settings.api_key
-    scopes = 'read_orders,read_products,read_fulfillments,read_shipping'
+    # Exactly what the import actually calls, no more: /orders.json,
+    # /products.json and /customers/<id>.json. read_customers was missing, so
+    # OAuth stores imported every order with a blank customer name, phone and
+    # address (the 403 is swallowed by a status_code == 200 check). The granted
+    # scopes are baked into the token, so a change here needs a re-authorize.
+    # read_fulfillments and read_shipping were requested but never used:
+    # fulfillment_status is a field on the order, covered by read_orders.
+    scopes = 'read_orders,read_products,read_customers'
     # Pinned, not derived from the request: Shopify matches redirect_uri against
     # the app whitelist exactly, so it must not shift with the browsing host
     # (apex vs www) or the merchant gets "redirect_uri is not whitelisted".
@@ -1577,15 +1605,34 @@ def shopify_oauth_callback(request):
             return redirect('business:business_settings_api_list', business_id=business_id)
 
     # Exchange code for permanent access token
-    shop_domain = api_settings.site_api_url.replace('https://', '').replace('http://', '').rstrip('/')
+    shop_domain = api_settings.shop_domain()
     token_url = f"https://{shop_domain}/admin/oauth/access_token"
 
     try:
+        # allow_redirects=False is load-bearing. A store URL that is not the
+        # canonical .myshopify.com handle (a custom domain, or www) answers this
+        # POST with a 301 to admin.shopify.com; requests then replays it as GET,
+        # drops the JSON body and lands on a login page that returns HTTP 200.
+        # raise_for_status() passes and the merchant sees nothing but a JSON
+        # parse error after having already approved the app on Shopify.
         response = requests.post(token_url, json={
             'client_id': api_settings.api_key,
             'client_secret': api_settings.api_secret,
             'code': code,
-        }, timeout=30)
+        }, timeout=30, allow_redirects=False)
+        if response.is_redirect:
+            logger.error(
+                f'Shopify OAuth token exchange redirected for business {business_id}: '
+                f'{token_url} -> {response.headers.get("Location")}'
+            )
+            messages.error(
+                request,
+                "Shopify redirected the connection away from your store. The Store "
+                "URL must be your permanent .myshopify.com address (Shopify admin "
+                "→ Settings → Domains → \"myshopify.com URL\"), not a "
+                "custom domain. Fix the Store URL and connect again.",
+            )
+            return redirect('business:business_settings_api_list', business_id=business_id)
         response.raise_for_status()
         data = response.json()
         access_token = data.get('access_token')
@@ -1593,6 +1640,15 @@ def shopify_oauth_callback(request):
         if access_token:
             api_settings.api_access_token = access_token
             api_settings.is_verify_api = True
+            # The order import requires is_verify_api AND is_default, so a token
+            # on its own produced "No store integration is connected" on a
+            # successful connection — it silently stranded a live client. Adopt
+            # the default only when the business has none; never steal it from a
+            # connection the seller deliberately chose.
+            if not business_models.BusinessApiSettings.objects.filter(
+                business=api_settings.business, is_default=True,
+            ).exclude(pk=api_settings.pk).exists():
+                api_settings.is_default = True
             api_settings.save()
             logger.info(f'Shopify OAuth successful for business {business_id} - token saved')
             messages.success(request, f"Shopify connected successfully! Access token obtained.")
@@ -4373,7 +4429,8 @@ def return_detail(request, return_id):
         ReturnRequest.objects.select_related(
             'order', 'business', 'reviewed_by', 'pickup_location',
             'pickup_order', 'pickup_order__pickup_location',
-        ).prefetch_related('return_items__order_item__product'),
+        ).prefetch_related('return_items__order_item__product',
+                           'return_items__product'),
         id=return_id, business=business
     )
 
@@ -4600,6 +4657,10 @@ def return_update_status(request, return_id):
     if new_status == 'approved':
         for ri in ret.return_items.select_related('order_item').all():
             oi = ri.order_item
+            if oi is None:
+                # A hand-added line: goods that never went out on an order of
+                # ours, so there is no outbound quantity to mark returned.
+                continue
             oi.quantity_returned = (oi.quantity_returned or 0) + ri.quantity_returned
             if oi.quantity_returned >= oi.quantity:
                 oi.delivery_status = 'returned'

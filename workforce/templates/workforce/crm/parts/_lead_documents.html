@@ -1,0 +1,76 @@
+{# Purpose: Compact uploaded-documents list for a driver lead — thumbnail, type, number, expiry; a row opens the viewer popup. #}
+{# Used by: workforce/templates/workforce/crm/lead_detail.html (context: driver, driver_documents) #}
+{# Notes: crmdoc__ namespace in crm.css. Rows carry their own data-* payload so the popup needs no second request; #}
+{#        the Edit button inside the popup posts to workforce:driver_document_edit, the same endpoint the driver record uses. #}
+
+<div class="crm__panel">
+  <div class="crm__panel-hd">
+    <i class="fa-solid fa-id-card"></i><h3>Documents</h3>
+    <span class="crmd__count">{{ driver_documents|length }}</span>
+  </div>
+  <div class="crm__panel-body">
+    {% if driver_documents %}
+    <div class="crmdoc__list" id="workforce_crm_detail_div_documents">
+      {% for doc in driver_documents %}
+      <button type="button" class="crmdoc__row"
+              {% include "workforce/parts/_doc_viewer_attrs.html" %}>
+        <span class="crmdoc__thumb">
+          {% if doc.file_is_image %}
+          <img src="{{ doc.document_file.url }}" loading="lazy"
+               alt="{{ doc.document_type|default:'Document' }} {{ doc.document_no }} scan">
+          {% elif doc.document_file %}
+          <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+          {% else %}
+          <i class="fa-regular fa-image" aria-hidden="true"></i>
+          {% endif %}
+        </span>
+        <span class="crmdoc__text">
+          <span class="crmdoc__type">{{ doc.document_type|default:"Document" }}</span>
+          {% comment %} A selfie carries no number — it is identified by whose face it is. {% endcomment %}
+          {% if doc.document_type == 'Selfie' %}
+          <span class="crmdoc__no">{{ driver.driver_name }}</span>
+          {% else %}
+          <span class="crmdoc__no">{{ doc.document_no|default:"No number on file" }}</span>
+          {% endif %}
+          {% comment %} Expiry is the one fact that decides whether this scan is still
+             worth anything, so it carries the row's only colour. {% endcomment %}
+          {% if doc.is_expired %}
+          <span class="crmdoc__tag crmdoc__tag--expired">Expired {{ doc.document_expiry_date|date:"d M Y" }}</span>
+          {% elif doc.expires_soon %}
+          <span class="crmdoc__tag crmdoc__tag--soon">Expires in {{ doc.days_to_expiry }} day{{ doc.days_to_expiry|pluralize }}</span>
+          {% elif doc.document_expiry_date %}
+          <span class="crmdoc__tag">Valid to {{ doc.document_expiry_date|date:"d M Y" }}</span>
+          {% elif doc.document_type != 'Selfie' %}
+          <span class="crmdoc__tag crmdoc__tag--missing">No expiry recorded</span>
+          {% endif %}
+          {% if not doc.document_file %}
+          <span class="crmdoc__tag crmdoc__tag--missing">Number only — no scan uploaded</span>
+          {% endif %}
+          {% comment %} Verification flag — every card with a scan carries exactly one:
+             verified (AI match or staff "Mark verified" in the popup), a failed AI
+             read, a check still running, or plainly not verified yet. {% endcomment %}
+          {% if doc.verified_at or doc.ai_status == 'verified' %}
+          <span class="crmdoc__tag crmdoc__tag--verified"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Verified{% if doc.verified_by_name %} · {{ doc.verified_by_name }}{% endif %}</span>
+          {% elif doc.ai_status == 'mismatch' or doc.ai_status == 'unreadable' or doc.ai_status == 'error' %}
+          <span class="crmdoc__tag crmdoc__tag--expired" title="{{ doc.ai_note }}"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> {{ doc.ai_status_label }}</span>
+          {% elif doc.ai_status == 'pending' %}
+          <span class="crmdoc__tag"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Checking image…</span>
+          {% elif doc.document_file %}
+          <span class="crmdoc__tag crmdoc__tag--unverified"><i class="fa-regular fa-circle" aria-hidden="true"></i> Not verified</span>
+          {% endif %}
+        </span>
+        <span class="crmdoc__chev"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+      </button>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="crmd__appnote">No documents uploaded yet. The applicant adds these in the last section of the driver form.</p>
+    {% endif %}
+
+    {% if wf_dept_ops %}
+    <button type="button" class="crm__btn w-100 mt-3" id="workforce_crm_detail_btn_docadd">
+      <i class="fa-solid fa-plus"></i> Add document
+    </button>
+    {% endif %}
+  </div>
+</div>

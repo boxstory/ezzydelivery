@@ -393,3 +393,89 @@
     border-radius: var(--brand-radius-sm, 0.5rem);
 }
 .wmt__idnote .wmt__id { flex-shrink: 0; }
+
+/* ── Add panel: a staff-written message ──
+   Drawn as a sheet, not a card, so it never reads as one more message in the
+   list while it is open — navy rule on top, same hairline grey as the cards. */
+.wmt__add {
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    background: #fff;
+    border: 1px solid var(--wmt-line-strong);
+    border-top: 3px solid var(--brand-navy, #001f3f);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+.wmt__add[hidden] { display: none; }
+.wmt__add-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.375rem;
+    margin-bottom: 0.625rem;
+    border-bottom: 1px solid var(--wmt-line-strong);
+}
+.wmt__add-title {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--wmt-ink);
+    margin: 0;
+}
+.wmt__add-close {
+    margin-left: auto;
+    background: none;
+    border: 0;
+    padding: 0.125rem 0.25rem;
+    font-size: 0.875rem;
+    color: var(--wmt-ink-soft);
+    border-radius: 0.25rem;
+}
+.wmt__add-close:hover { color: var(--wmt-ink); background: var(--brand-grey-100, #fafafa); }
+.wmt__add-foot {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--wmt-line);
+}
+.wmt__add .form-select { font-size: 0.75rem; border-color: var(--wmt-line-strong); }
+.wmt__add .form-select:focus,
+.wmt__add .form-control:focus { border-color: var(--brand-primary, #f7c000); box-shadow: none; }
+
+/* "optional" next to a label — quieter than the label, never a badge. */
+.wmt__opt {
+    font-weight: 500;
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--wmt-ink-soft);
+}
+
+/* A message this desk wrote, as opposed to one that ships with the platform.
+   Navy-on-white swatch: it is an origin, not a health state. */
+.wmt__state--own { color: var(--brand-navy, #001f3f); font-weight: 600; }
+.wmt__state--own::before {
+    background: #fff;
+    border: 2px solid var(--brand-navy, #001f3f);
+    box-sizing: border-box;
+}
+
+/* Delete: only ever on a message staff added themselves, so it stays a quiet
+   ghost until hover rather than shouting on every one of those cards. */
+.wmt__btn-danger {
+    background: #fff;
+    border: 1px solid var(--wmt-line-strong);
+    color: var(--brand-danger, #dc2626);
+    font-size: 0.75rem; font-weight: 600;
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+}
+.wmt__btn-danger:hover:not(:disabled) {
+    background: var(--brand-danger, #dc2626);
+    border-color: var(--brand-danger, #dc2626);
+    color: #fff;
+}

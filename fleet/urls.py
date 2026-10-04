@@ -74,6 +74,8 @@ urlpatterns = [
           fleet_views.opportunities, name='opportunities'),
      path('opportunities/interest/',
           fleet_views.opportunity_interest, name='opportunity_interest'),
+     path('opportunities/proposal-interest/',
+          fleet_views.proposal_interest, name='proposal_interest'),
 
      # Performance & Reports
      path('performance/',

@@ -252,7 +252,7 @@
                 <a href="tel:{{ addr.mobile_no }}" class="task-card__icon-btn task-card__icon-btn--call" title="{{ addr.mobile_no }}">
                     <i class="fa-solid fa-phone"></i>
                 </a>
-                <a href="#" onclick="waMessage(this, '{{ addr.mobile_no }}', '{{ card.order.order_number|default:card.id }}', '{{ card.route_destination.zone|default_if_none:'' }}', '{{ card.route_destination.street|default_if_none:'' }}', '{{ card.route_destination.building|default_if_none:'' }}', '{{ card.order.cod_amount|default:'' }}'); return false;" class="task-card__icon-btn task-card__icon-btn--wa">
+                <a href="#" onclick="waMessage(this, '{{ addr.mobile_no }}', '{{ card.order.order_number|default:card.id }}', '{{ card.route_destination.zone|default_if_none:'' }}', '{{ card.route_destination.street|default_if_none:'' }}', '{{ card.route_destination.building|default_if_none:'' }}', '{{ card.collect_amount.0|default:'' }}'); return false;" class="task-card__icon-btn task-card__icon-btn--wa">
                     <i class="fa-brands fa-whatsapp"></i>
                 </a>
             </div>
@@ -261,7 +261,7 @@
                 <a href="tel:{{ card.order.customer_phone }}" class="task-card__icon-btn task-card__icon-btn--call" title="{{ card.order.customer_phone }}">
                     <i class="fa-solid fa-phone"></i>
                 </a>
-                <a href="#" onclick="waMessage(this, '{{ card.order.customer_phone }}', '{{ card.order.order_number|default:card.id }}', '{{ card.route_destination.zone|default_if_none:'' }}', '{{ card.route_destination.street|default_if_none:'' }}', '{{ card.route_destination.building|default_if_none:'' }}', '{{ card.order.cod_amount|default:'' }}'); return false;" class="task-card__icon-btn task-card__icon-btn--wa">
+                <a href="#" onclick="waMessage(this, '{{ card.order.customer_phone }}', '{{ card.order.order_number|default:card.id }}', '{{ card.route_destination.zone|default_if_none:'' }}', '{{ card.route_destination.street|default_if_none:'' }}', '{{ card.route_destination.building|default_if_none:'' }}', '{{ card.collect_amount.0|default:'' }}'); return false;" class="task-card__icon-btn task-card__icon-btn--wa">
                     <i class="fa-brands fa-whatsapp"></i>
                 </a>
             </div>
@@ -704,8 +704,13 @@
         if (street) msg += ', Street ' + street;
         if (building) msg += ', Bldg ' + building;
         if (zone || street || building) msg += '\n';
-        if (cod) msg += '💵 COD: ' + cod + ' QR\n';
+        if (cod && parseFloat(cod) > 0) msg += '💵 Amount to Pay: ' + cod + ' QR\n';
         msg += '\nYour delivery is on its way. Please be available to receive it. Thank you! 🚚';
+        // Same rule as the whatsapp_number filter: digits only, drop a 00 dial-out
+        // prefix, and a bare 8-digit number is Qatar local so it needs 974.
+        phone = String(phone || '').replace(/\D/g, '');
+        if (phone.startsWith('00')) phone = phone.slice(2);
+        if (phone.length === 8) phone = '974' + phone;
         const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
         if (window.EzzyGPS && EzzyGPS.navHandoff) EzzyGPS.navHandoff.openUrl(url);
         window.open(url, '_blank');

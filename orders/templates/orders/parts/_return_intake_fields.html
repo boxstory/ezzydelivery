@@ -1,0 +1,57 @@
+{% comment %}
+Purpose: The decision half of a return form — why the goods are coming back, what the trip costs and whether a driver goes now.
+Used by: workforce/returns_task_create.html (staff desk) and orders/order_return_add.html (seller console), in both of their modes.
+Notes: One partial because the four consoles-and-modes must post identical field names — orders.return_intake reads them.
+       show_charge is off on the seller console: what a client pays for a collection is not theirs to type.
+{% endcomment %}
+<div class="row g-3">
+  <div class="col-12 {% if show_charge %}col-md-6{% endif %}">
+    <label class="form-label" for="returns_intake_select_reason">
+      Reason <span class="text-danger">*</span>
+    </label>
+    <select class="form-select" id="returns_intake_select_reason" name="reason" required>
+      <option value="">Select…</option>
+      {% for value, label in reason_choices %}
+      <option value="{{ value }}" {% if form.reason == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {% if show_charge %}
+  <div class="col-12 col-md-6">
+    <label class="form-label" for="returns_intake_input_charge">Charge the client (QAR)</label>
+    <input type="number" step="0.01" min="0" class="form-control"
+           id="returns_intake_input_charge" name="collection_charge"
+           value="{{ form.collection_charge|default:'' }}" placeholder="{{ charge_placeholder|default:'0.00' }}">
+    <div class="form-text">{{ charge_note|default:"Leave blank to charge what the outbound trip did." }}</div>
+  </div>
+  {% endif %}
+
+  <div class="col-12">
+    <label class="form-label" for="returns_intake_input_notes">Notes</label>
+    <textarea class="form-control" rows="2" id="returns_intake_input_notes"
+              name="reason_notes" placeholder="{{ notes_placeholder|default:'What the client told us' }}">{{ form.reason_notes|default:'' }}</textarea>
+  </div>
+
+  <div class="col-12">
+    {% comment %}The one control on this form that costs money and moves a vehicle.
+    The wrapper is what each console hangs its "armed" treatment off — bare markup
+    here, so neither desk's skin leaks into the other.{% endcomment %}
+    <div class="returns-intake__decide">
+    <div class="form-check">
+      {% comment %}Plain checkbox, not a Bootstrap switch: .business-dashboard pins
+      input[type=checkbox] to 1rem with !important, so a switch never renders on the
+      seller console. Re-ticks itself from the post so a rejected form keeps the choice.{% endcomment %}
+      <input class="form-check-input" type="checkbox" value="1"
+             id="returns_intake_check_schedule" name="schedule_pickup"
+             {% if not form or form.schedule_pickup %}checked{% endif %}>
+      <label class="form-check-label" for="returns_intake_check_schedule">
+        <strong>Send a driver for it now</strong>
+      </label>
+    </div>
+    {% comment %}Outside the .form-check on purpose: mobile-app.css makes that a flex
+    row site-wide, which lays the note beside the label instead of under it.{% endcomment %}
+    <div class="form-text">{{ schedule_note }}</div>
+    </div>
+  </div>
+</div>

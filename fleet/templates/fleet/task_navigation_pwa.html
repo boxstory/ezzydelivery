@@ -118,8 +118,8 @@
             {% endif %}
             {% endif %}
             <div class="fleet-info-item" style="background:var(--fleet-warning-light); border-color:var(--fleet-warning);">
-                <div class="fleet-info-item__label" style="color:var(--fleet-warning);">COD Amount</div>
-                <div class="fleet-info-item__value">{{ task.order.cod_amount|default:0|floatformat:2 }} QR</div>
+                <div class="fleet-info-item__label" style="color:var(--fleet-warning);">Collect</div>
+                <div class="fleet-info-item__value">{{ task.collect_amount.0|floatformat:2 }} QR</div>
             </div>
         </div>
 
@@ -388,7 +388,7 @@
                 : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addressText);
             var customerName = '{{ dropoff.full_name|default:task.order.customer_name|default:""|escapejs }}';
             var orderNum = '{{ task.order.order_number|default:task.dl_task_number|escapejs }}';
-            var codAmount = '{{ task.order.cod_amount|default:""|escapejs }}';
+            var codAmount = '{{ task.collect_amount.0|default:""|escapejs }}';
             var greeting = customerName ? ('Dear ' + customerName + ',\n\n') : 'Dear Customer,\n\n';
             var msg = greeting
                 + 'This is a reminder from *EzzyDelivery* 🚚\n\n'
@@ -396,7 +396,7 @@
                 + '📍 Delivery Location:\n' + addressText + '\n'
                 + locUrl + '\n';
             if (codAmount && parseFloat(codAmount) > 0) {
-                msg += '\n💰 COD Amount: *' + parseFloat(codAmount).toFixed(2) + ' QR*\nPlease keep the exact amount ready.\n';
+                msg += '\n💰 Amount to Pay: *' + parseFloat(codAmount).toFixed(2) + ' QR*\nPlease keep the exact amount ready.\n';
             }
             var accLevel = '{{ task.order.coords_accuracy|default:""|escapejs }}';
             if (hasDropoff) {

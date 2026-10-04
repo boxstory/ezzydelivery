@@ -125,3 +125,84 @@ class CodInHandSSOTTest(TestCase):
                 WalletService.live_cod_in_hand(driver), Decimal('0.00'),
                 f'{method} should not count as in-hand',
             )
+
+
+class CodFeeSliceTest(TestCase):
+    """The DL fee inside the running cash balance.
+
+    cod_cash_after stays the whole pocket (COD + our fee) because that is what
+    the driver hands in; cod_fee_after says how much of it is ours, so the
+    staff ledger can show COD and DL as separate columns.
+    """
+
+    def _ledger(self, driver):
+        return list(
+            fleet_models.DriverTransaction.objects.filter(
+                driver=driver,
+                transaction_type__in=['cod_collection', 'fee_collection',
+                                      'cod_deposit', 'cod_driver_settle'],
+            ).order_by('created_at', 'id')
+        )
+
+    def _collect(self, idx, cod, fee):
+        driver, task, _, _ = _fixtures(idx=idx, cod=cod)
+        task.fee_collected_amount = fee
+        task.fee_collected_at = timezone.now()
+        task.save(update_fields=['fee_collected_amount', 'fee_collected_at'])
+        WalletService.record_transaction(
+            driver=driver, transaction_type='cod_collection', amount=cod,
+            description='COD', delivery_task=task, payment_method='cash')
+        WalletService.record_transaction(
+            driver=driver, transaction_type='fee_collection', amount=fee,
+            description='Fee', delivery_task=task, payment_method='cash')
+        return driver, task
+
+    def test_fee_is_tracked_beside_the_cash_it_sits_in(self):
+        driver, _ = self._collect(9310, Decimal('300.00'), Decimal('25.00'))
+        WalletService.recalculate_cod_balances(driver)
+        last = self._ledger(driver)[-1]
+        # The pocket is COD + fee; the slice names the fee half of it.
+        self.assertEqual(last.cod_cash_after, Decimal('325.00'))
+        self.assertEqual(last.cod_fee_after, Decimal('25.00'))
+        self.assertEqual(last.cod_cash_excl_fee, Decimal('300.00'))
+        self.assertEqual(last.cod_after_total, Decimal('325.00'))
+        self.assertEqual(last.cod_after_total_excl_fee, Decimal('300.00'))
+
+    def test_fee_slice_never_exceeds_the_cash(self):
+        driver, _ = self._collect(9311, Decimal('0.00'), Decimal('40.00'))
+        WalletService.recalculate_cod_balances(driver)
+        last = self._ledger(driver)[-1]
+        self.assertEqual(last.cod_fee_after, Decimal('40.00'))
+        self.assertEqual(last.cod_cash_excl_fee, Decimal('0.00'))
+
+    def test_electronic_cod_leaves_the_fee_on_cash(self):
+        driver, task, _, _ = _fixtures(idx=9312, cod=Decimal('200.00'),
+                                       payment_method='fawran')
+        task.fee_collected_amount = Decimal('15.00')
+        task.save(update_fields=['fee_collected_amount'])
+        WalletService.record_transaction(
+            driver=driver, transaction_type='cod_collection',
+            amount=Decimal('200.00'), description='COD',
+            delivery_task=task, payment_method='fawran')
+        WalletService.record_transaction(
+            driver=driver, transaction_type='fee_collection',
+            amount=Decimal('15.00'), description='Fee',
+            delivery_task=task, payment_method='cash')
+        WalletService.recalculate_cod_balances(driver)
+        last = self._ledger(driver)[-1]
+        # Fawran money never reached the driver's pocket; the fee did.
+        self.assertEqual(last.cod_fawran_after, Decimal('200.00'))
+        self.assertEqual(last.cod_cash_after, Decimal('15.00'))
+        self.assertEqual(last.cod_fee_after, Decimal('15.00'))
+        self.assertEqual(last.cod_cash_excl_fee, Decimal('0.00'))
+        self.assertEqual(last.cod_after_total_excl_fee, Decimal('200.00'))
+
+    def test_hand_in_clears_the_fee_with_the_cash(self):
+        driver, task = self._collect(9313, Decimal('300.00'), Decimal('25.00'))
+        WalletService.submit_cod_to_admin(
+            driver=driver, amount=Decimal('325.00'), delivery_ids=[task.id])
+        WalletService.recalculate_cod_balances(driver)
+        last = self._ledger(driver)[-1]
+        self.assertEqual(last.transaction_type, 'cod_deposit')
+        self.assertEqual(last.cod_cash_after, Decimal('0.00'))
+        self.assertEqual(last.cod_fee_after, Decimal('0.00'))

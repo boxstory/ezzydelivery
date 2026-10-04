@@ -305,6 +305,7 @@
 .wf-dpopup__meta { font-size: 12px; color: #6b7280; }
 .wf-dpopup__meta--stale { color: #ef4444; }
 .wf-dpopup__meta--nav { color: #7c3aed; font-weight: 700; }
+.wf-dpopup__meta--note { color: var(--brand-grey-400, #9ca3af); font-size: 11px; }
 
 .wf-dpopup__tasks { margin-top: 6px; padding-top: 6px; border-top: 1px solid #f3f4f6; }
 .wf-dpopup__tasks-title { font-size: 11px; font-weight: 700; color: #374151; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
@@ -360,52 +361,54 @@
 
 /* Two stacked date rows (icon / dash in a narrow gutter) then a full-width
    Apply — the panel is too narrow for the old single-line toolbar. */
+/* One row: from, separator, to, icon-only apply. The panel is 340px, which
+   leaves ~293px inside this card; a native date input needs 120px at 11px font
+   to show mm/dd/yyyy plus its picker glyph without clipping the year, so the
+   fixed parts are kept to ~47px and the two inputs split the rest (~123 each).
+   Widen anything here and the year digit gets cut off again. The leading
+   calendar icon was dropped for that budget — each input carries its own. */
 .map-daterange {
-    display: grid;
-    grid-template-columns: 14px 1fr;
+    display: flex;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 6px 8px;
+    gap: 4px;
     background: #fff;
-    padding: 10px;
+    padding: 8px;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     font-size: 12px;
 }
-.map-daterange__icon {
-    grid-column: 1;
-    justify-self: center;
-    color: #9ca3af;
-    font-size: 11px;
-}
 .map-daterange__input {
-    grid-column: 2;
-    width: 100%;
+    flex: 1 1 0;
+    width: auto;
     min-width: 0;
     border: 1px solid #e5e7eb;
     border-radius: 6px;
     outline: none;
-    padding: 5px 7px;
-    font-size: 12px;
+    padding: 5px 4px;
+    font-size: 11px;
     font-weight: 600;
     color: #374151;
     background: #fff;
     cursor: pointer;
 }
+.map-daterange__input::-webkit-calendar-picker-indicator { margin-left: 0; padding: 0 0 0 2px; }
 .map-daterange__input:focus { border-color: var(--brand-navy, #001f3f); }
-.map-daterange__sep { grid-column: 1; justify-self: center; }
-.map-daterange__sep { color: #d1d5db; font-weight: 400; }
+.map-daterange__sep { flex: 0 0 auto; color: #d1d5db; font-weight: 400; font-size: 10px; }
 .map-daterange__btn {
-    grid-column: 1 / -1;
-    width: 100%;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 30px;
     background: var(--brand-navy, #001f3f);
     color: #fff;
     border: none;
     border-radius: 6px;
-    padding: 7px 10px;
-    font-size: 11px;
-    font-weight: 700;
+    padding: 0;
+    font-size: 12px;
     cursor: pointer;
-    white-space: nowrap;
 }
 .map-daterange__btn:hover { background: #003366; }
 
@@ -552,6 +555,53 @@
     text-align: center;
     color: #9ca3af;
     font-size: 12px;
+}
+
+/* Dropdown header actions — shared by the pickup and driver panels.
+   The header is 340px wide at most, so the title and the actions sit on two
+   rows rather than competing for one. "Show All" keeps the blue link treatment
+   it has always had; the selection shortcuts stay quiet greys so the header
+   does not read as three equal buttons. */
+.map-pickup-filter__header,
+.map-driver-filter__header {
+    flex-wrap: wrap;
+    gap: 4px 8px;
+}
+.map-filter__acts {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+.map-filter__act {
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #6b7280;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+.map-filter__act:hover { background: #e5e7eb; color: #374151; }
+.map-filter__act--link {
+    background: none;
+    border: none;
+    padding: 2px 0;
+    font-size: 11px;
+    color: #3b82f6;
+}
+.map-filter__act--link:hover { background: none; color: #2563eb; text-decoration: underline; }
+
+/* A driver holding a live, verified sign-in on the driver app. */
+.map-driver-filter__app {
+    margin-left: auto;
+    color: #9ca3af;
+    font-size: 11px;
+    flex-shrink: 0;
 }
 
 /* ==========================================================================

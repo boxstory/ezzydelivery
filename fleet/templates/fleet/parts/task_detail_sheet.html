@@ -303,7 +303,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                 <button type="button" class="td-reason-btn" data-reason-key="customer_refused" onclick="selectReason(this)">Refused</button>
                 <button type="button" class="td-reason-btn" data-reason-key="wrong_address" onclick="selectReason(this)">Wrong Address</button>
                 <button type="button" class="td-reason-btn" data-reason-key="customer_not_home" onclick="selectReason(this)">Not Home</button>
-                <button type="button" class="td-reason-btn" data-reason-key="cod_amount_dispute" onclick="selectReason(this)">No COD Cash</button>
+                <button type="button" class="td-reason-btn" data-reason-key="cod_amount_dispute" onclick="selectReason(this)">No Cash</button>
                 <button type="button" class="td-reason-btn" data-reason-key="customer_requested_reschedule" onclick="selectReason(this)">Postponed</button>
                 <button type="button" class="td-reason-btn" data-reason-key="address_not_found" onclick="selectReason(this)">Address Not Found</button>
                 <button type="button" class="td-reason-btn" data-reason-key="vehicle_issue" onclick="selectReason(this)">Vehicle Issue</button>
@@ -360,7 +360,7 @@ the photo requirement is shared), plus the destination the driver has to take it
                 <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="customer_not_home" onclick="selectReturnReason(this)">Not Home</button>
                 <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="wrong_address" onclick="selectReturnReason(this)">Wrong Address</button>
                 <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="address_not_found" onclick="selectReturnReason(this)">Address Not Found</button>
-                <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="cod_amount_dispute" onclick="selectReturnReason(this)">No COD Cash</button>
+                <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="cod_amount_dispute" onclick="selectReturnReason(this)">No Cash</button>
                 <button type="button" class="td-reason-btn td-return-reason-btn" data-reason-key="other" onclick="selectReturnReason(this)">Other</button>
             </div>
             <input type="hidden" id="tdReturnReasonKey" value="">
@@ -387,7 +387,7 @@ the photo requirement is shared), plus the destination the driver has to take it
             <label class="td-form-label"><i class="fa-solid fa-money-bill-wave me-1"></i>Amount Collected (QR)</label>
             <input type="number" id="tdReturnFee" class="td-form-input" placeholder="0.00" step="0.01" min="0">
             <span class="td-nr-help__note"><i class="fa-solid fa-circle-info"></i>
-                Hand this in with your COD. Leave it at 0 if the customer paid nothing.</span>
+                Hand this in with the rest of your cash. Leave it at 0 if the customer paid nothing.</span>
         </div>
 
         <button id="tdReturnedBtn" class="fleet-btn td-confirm-btn td-confirm-btn--warning" onclick="submitReturned()">
@@ -637,7 +637,10 @@ the photo requirement is shared), plus the destination the driver has to take it
         // Phone
         const phoneRaw = d.phone;
         if (phoneRaw) {
-            const phoneClean = phoneRaw.replace(/[\s+]/g, '');
+            // Digits only, drop a 00 dial-out prefix; a bare 8-digit number is Qatar local.
+            let phoneClean = phoneRaw.replace(/\D/g, '');
+            if (phoneClean.startsWith('00')) phoneClean = phoneClean.slice(2);
+            if (phoneClean.length === 8) phoneClean = '974' + phoneClean;
             const verifyUrl = d.verifyUrl || '';
             const waUrl = 'https://wa.me/' + phoneClean + '?text=' + encodeURIComponent(
                 'Hello! 👋 This is EzzyDelivery.\n\n📦 Order: ' + (d.order||'—') +
@@ -1374,7 +1377,7 @@ the photo requirement is shared), plus the destination the driver has to take it
         const codCollected = document.getElementById('tdCodCollected').checked;
         const hasCod = codSection && codSection.style.display !== 'none';
         if (hasCod && !codCollected) {
-            showToast('⚠️ This order has COD. Please confirm COD collection first.', 'error');
+            showToast('⚠️ This order has an amount to collect. Please confirm the collection first.', 'error');
             document.getElementById('tdCodCollected').focus();
             // Highlight the COD section
             codSection.style.animation = 'none';
@@ -1398,7 +1401,7 @@ the photo requirement is shared), plus the destination the driver has to take it
             const fawran = parseFloat(document.getElementById('tdSplitFawran').value) || 0;
             const total = cash + pos + fawran;
             if (Math.abs(total - codAmt) > 0.01) {
-                showToast(`⚠️ Split payments (${total.toFixed(2)} QR) must equal COD amount (${codAmt.toFixed(2)} QR)`, 'error');
+                showToast(`⚠️ Split payments (${total.toFixed(2)} QR) must equal the collected amount (${codAmt.toFixed(2)} QR)`, 'error');
                 return;
             }
 
@@ -1809,7 +1812,7 @@ the photo requirement is shared), plus the destination the driver has to take it
 
         const actualCod = _tdPartialCod > 0 ? (parseFloat(document.getElementById('tdPartialCodInput').value) || 0) : 0;
         if (_tdPartialCod > 0 && actualCod > _tdPartialCod) {
-            showToast('COD collected cannot exceed original COD amount', 'warning');
+            showToast('Collected amount cannot exceed the amount to collect', 'warning');
             return;
         }
 

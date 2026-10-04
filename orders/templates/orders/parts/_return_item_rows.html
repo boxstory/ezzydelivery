@@ -1,0 +1,21 @@
+{% comment %}
+Purpose: "Add item" rows for a return — pick real products off the client's catalogue and say how many are coming back.
+Used by: parts/_return_standalone_fields.html and parts/_return_order_summary.html, on both the staff desk and the seller console.
+Notes: Posts the house names (inline_product_id[] / inline_quantity[]) that orders.return_intake.added_lines reads, the same
+       ones the two order forms use. data-business pins the catalogue when the client is already known; when it is blank the
+       JS reads the client picker instead and keeps the button disabled until one is chosen — searching with no client would
+       fall back to the staff member's own cached business and offer the wrong catalogue. Ownership is re-checked server-side.
+{% endcomment %}
+<div class="returns-intake__items" id="returns_intake_box_items"
+     data-business="{{ item_business_id|default:'' }}"
+     data-search-url="{% url 'orders:product_search_api' %}">
+  <div class="form-label mb-1">{{ items_label|default:"Add items" }}</div>
+  <p class="text-muted small">{{ items_hint }}</p>
+
+  <div id="returns_intake_rows_items"></div>
+
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="returns_intake_btn_additem">
+    <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add item
+  </button>
+  <div class="form-text" id="returns_intake_txt_additem"></div>
+</div>

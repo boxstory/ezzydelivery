@@ -1,6 +1,7 @@
-/* Purpose: CRM lead detail page actions — stage change, save assignee/follow-up/notes, contact edit, add/delete activity, AI summary.
+/* Purpose: CRM lead detail page actions — stage change, save assignee/follow-up/notes, contact edit, add/delete activity, AI summary, driver-document Add form (the viewer popup is doc_viewer.js).
    Used by: workforce/templates/workforce/crm/lead_detail.html (reads window.CRMD_CONFIG for URLs + CSRF).
-   Notes: All writes are fetch POST → JSON endpoints in workforce/crm_views.py; re-runs safely after HTMX swaps because it re-reads CRMD_CONFIG per action. */
+   Notes: All writes are fetch POST → JSON endpoints in workforce/crm_views.py; re-runs safely after HTMX swaps because it re-reads CRMD_CONFIG per action.
+          The document dialogs post instead to the fleet endpoints in workforce/views.py (driver_document_save) — the same ones the driver record uses. */
 
 (function () {
   'use strict';
@@ -110,10 +111,29 @@
       return;
     }
 
+    // Take one value from an absorbed card where it disagrees with this one
+    var adoptBtn = e.target.closest && e.target.closest('[data-adopt-field]');
+    if (adoptBtn) {
+      var fieldLabel = adoptBtn.getAttribute('data-adopt-label') || 'this field';
+      if (!confirm('Replace this card\'s ' + fieldLabel + ' with the value from #'
+                   + adoptBtn.getAttribute('data-adopt-child') + '?')) return;
+      post(adoptBtn.getAttribute('data-adopt-url'), {
+        child_id: adoptBtn.getAttribute('data-adopt-child'),
+        field: adoptBtn.getAttribute('data-adopt-field')
+      }).then(function (data) {
+        if (!data.success) { alert(data.error || 'Could not update'); return; }
+        flash('workforce_crm_detail_div_feedback', fieldLabel + ' updated — reloading');
+        setTimeout(function () { window.location.reload(); }, 700);
+      });
+      return;
+    }
+
     // Put an absorbed card back on the board on its own
     var unmergeBtn = e.target.closest && e.target.closest('[data-unmerge-child]');
     if (unmergeBtn) {
-      if (!confirm('Un-merge this card? It goes back on the board as its own lead.')) return;
+      if (!confirm('Un-merge this card? It goes back on the board as its own lead. Anything the '
+                   + 'merge filled in here (and WhatsApp numbers it added) is taken back, unless '
+                   + 'it has been changed since.')) return;
       post(unmergeBtn.getAttribute('data-unmerge-url'),
            { child_id: unmergeBtn.getAttribute('data-unmerge-child') }).then(function (data) {
         if (!data.success) { alert(data.error || 'Could not un-merge'); return; }
@@ -326,13 +346,30 @@
       if (searchInput) searchInput.value = phone;
       if (linkResults) linkResults.classList.remove('show');
       flash('workforce_crm_detail_span_link_feedback', 'Linking…');
-      post(cfg().urlLinkChat, { identifier: phone, session: waSession }).then(function (data) {
+      var labelInput = document.getElementById('workforce_crm_detail_input_wa_label');
+      var waLabel = labelInput ? labelInput.value.trim() : '';
+      post(cfg().urlLinkChat, { identifier: phone, session: waSession, label: waLabel }).then(function (data) {
         if (data.success) {
           flash('workforce_crm_detail_span_link_feedback', data.message || 'Linked.');
-          if (data.connected) setTimeout(function () { window.location.reload(); }, 900);
+          // Reload either way: the number is linked even when no messages exist yet,
+          // and the Numbers list has to show it.
+          setTimeout(function () { window.location.reload(); }, 900);
         } else {
           flash('workforce_crm_detail_span_link_feedback', data.error || 'Link failed', true);
         }
+      });
+      return;
+    }
+
+    // Unlink one of the lead's extra WhatsApp numbers
+    var unlinkBtn = e.target.closest && e.target.closest('[data-unlink-number]');
+    if (unlinkBtn) {
+      var num = unlinkBtn.getAttribute('data-unlink-number');
+      if (!window.confirm('Unlink ' + num + ' from this lead? Its chat will no longer show here.')) return;
+      unlinkBtn.disabled = true;
+      post(cfg().urlUnlinkChat, { identifier: num }).then(function (data) {
+        if (data.success) { window.location.reload(); }
+        else { unlinkBtn.disabled = false; window.alert(data.error || 'Could not unlink'); }
       });
       return;
     }
@@ -432,24 +469,26 @@
       cell.textContent = value || 'Not set';
       cell.classList.toggle('crmd__crow-val--empty', !value);
     });
-    var wrap = document.querySelector('[data-contact-read-phone]');
-    if (!wrap) return;
-    var phone = contact.phone || '';
-    wrap.textContent = '';
-    var el;
-    if (phone) {
-      el = document.createElement('a');
-      el.className = 'crmd__crow-tel';
-      el.href = 'tel:' + phone;
-    } else {
-      el = document.createElement('span');
-      el.className = 'crmd__crow-val--empty';
-    }
-    el.setAttribute('data-contact-read', 'phone');
-    el.textContent = phone || 'Not set';
-    wrap.appendChild(el);
-    var phoneInput = document.getElementById('workforce_crm_detail_input_phone');
-    if (phoneInput) phoneInput.value = phone;
+    ['phone', 'phone_2'].forEach(function (name) {
+      var wrap = document.querySelector('[data-contact-read-phone="' + name + '"]');
+      if (!wrap) return;
+      var phone = contact[name] || '';
+      wrap.textContent = '';
+      var el;
+      if (phone) {
+        el = document.createElement('a');
+        el.className = 'crmd__crow-tel';
+        el.href = 'tel:' + phone;
+      } else {
+        el = document.createElement('span');
+        el.className = 'crmd__crow-val--empty';
+      }
+      el.setAttribute('data-contact-read', name);
+      el.textContent = phone || 'Not set';
+      wrap.appendChild(el);
+      var input = document.querySelector('#workforce_crm_detail_form_contact input[name="' + name + '"]');
+      if (input) input.value = phone;
+    });
   }
 
   document.addEventListener('click', function (e) {
@@ -502,6 +541,78 @@
     timeline.prepend(item);
     bumpCount(1);
   }
+
+
+  // ─── DRIVER DOCUMENTS ───────────────────────────────────────────────────────
+  // Every row carries its own facts in data-*, so opening the viewer — and
+  // pre-filling the edit form from it — costs no second request. Elements are
+  // looked up at click time, never cached: HTMX replaces this markup on every
+  // navigation and a cached node would point at a detached dialog.
+  // The scan viewer itself (crop/rotate, fields, Verify) lives in doc_viewer.js,
+  // shared with the driver record page. This file keeps only the Add form.
+  function docModal(id) {
+    var el = document.getElementById(id);
+    if (!el || !window.bootstrap) return null;
+    return bootstrap.Modal.getOrCreateInstance(el);
+  }
+
+  // `row` null = adding a document rather than editing one.
+  function docOpenEditor(row) {
+    var title = document.getElementById('workforce_crm_detail_h_docedit_title');
+    var err = document.getElementById('workforce_crm_detail_p_docedit_err');
+    var form = document.getElementById('workforce_crm_detail_form_docedit');
+    if (form) form.reset();
+    if (err) { err.hidden = true; err.textContent = ''; }
+    if (title) title.textContent = row ? 'Edit document' : 'Add document';
+
+    var set = function (id, value) {
+      var el = document.getElementById(id);
+      if (el) el.value = value || '';
+    };
+    set('workforce_crm_detail_input_docedit_id', row ? row.docId : '');
+    set('workforce_crm_detail_select_docedit_type', row ? row.docType : '');
+    set('workforce_crm_detail_input_docedit_no', row ? row.docNo : '');
+    set('workforce_crm_detail_input_docedit_issued', row ? row.docIssued : '');
+    set('workforce_crm_detail_input_docedit_expiry', row ? row.docExpiry : '');
+
+    var modal = docModal('workforce_crm_detail_modal_docedit');
+    if (modal) modal.show();
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return;
+    if (e.target.closest('#workforce_crm_detail_btn_docadd')) { docOpenEditor(null); return; }
+  });
+
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form || form.id !== 'workforce_crm_detail_form_docedit') return;
+    e.preventDefault();
+
+    var idEl = document.getElementById('workforce_crm_detail_input_docedit_id');
+    var id = idEl ? idEl.value : '';
+    var url = id ? (cfg().urlDocEditBase || '') + id + '/edit/' : (cfg().urlDocAdd || '');
+    if (!url) return;
+
+    var err = document.getElementById('workforce_crm_detail_p_docedit_err');
+    var save = document.getElementById('workforce_crm_detail_btn_docsave');
+    if (err) { err.hidden = true; err.textContent = ''; }
+    if (save) save.disabled = true;
+
+    var fd = new FormData(form);
+    fd.append('csrfmiddlewaretoken', cfg().csrfToken || '');
+    fetch(url, { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.success) { window.location.reload(); return; }
+        if (save) save.disabled = false;
+        if (err) { err.textContent = data.error || 'Could not save this document.'; err.hidden = false; }
+      })
+      .catch(function () {
+        if (save) save.disabled = false;
+        if (err) { err.textContent = 'Could not reach the server. Try again.'; err.hidden = false; }
+      });
+  });
 
   function bumpCount(delta) {
     var badge = document.getElementById('workforce_crm_detail_span_activity_count');

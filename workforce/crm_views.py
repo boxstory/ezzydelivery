@@ -2,6 +2,7 @@
 # Used by: workforce/urls.py (crm/... routes); templates in workforce/templates/workforce/crm/.
 # Notes: Business logic lives in crm/services.py; JSON endpoints mirror the pricing_inquiry_update_status fetch-POST pattern.
 
+import json
 import logging
 import os
 import re
@@ -16,8 +17,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db import models
-from django.db.models import (Case, Count, F, IntegerField, Max, OuterRef, Q,
-                              Subquery, Value, When)
+from django.db.models import (Case, Count, Exists, F, IntegerField, Max,
+                              OuterRef, Q, Subquery, Value, When)
 from django.db.models.functions import Coalesce, Lower, NullIf, TruncMonth
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -81,15 +82,40 @@ def _search_term_q(term):
     A term that is mostly digits is treated as a phone number and matched on its
     last 8 (the Qatar local part), so '+974 3312 3456', '97433123456' and
     '33123456' all find the same card whichever form the row was stored in.
+
+    Every WhatsApp number a card can be reached on is covered, not just the one
+    typed into the lead: the manually linked numbers (crm.LeadWaLink, its legacy
+    single-value predecessor), and — for a driver applicant — the WhatsApp and
+    phone numbers on the application itself. A driver who applied from one number
+    and chats from another was unfindable by the number staff had in hand; the two
+    disagree on 46 of the 821 linked driver cards.
+
+    Matched as a subquery per relation rather than a join: `driver__` is to-one and
+    safe either way, but a joined match on the reverse wa_links would return the
+    same lead once per matching row.
     """
     digits = crm_services.normalize_phone(term)
     if len(digits) >= 7 and re.sub(r'[\s()+.\-]', '', term).isdigit():
-        return Q(phone__endswith=digits[-8:]) | Q(wa_chat_override__endswith=digits[-8:])
+        from crm.models import LeadWaLink
+        tail = digits[-8:]
+        return (
+            Q(phone__endswith=tail) | Q(phone_2__endswith=tail) | Q(wa_chat_override__endswith=tail)
+            | Q(pk__in=LeadWaLink.objects.filter(identifier__endswith=tail).values('lead_id'))
+            | Q(driver__driver_whatsapp__endswith=tail)
+            | Q(driver__driver_phone__endswith=tail)
+        )
+    # A non-numeric term is a name, so the driver's own name fields join the box:
+    # a card raised before the applicant filled in their contact name carries the
+    # name only on the application behind it.
     return (
         Q(company_name__icontains=term) |
         Q(contact_name__icontains=term) |
         Q(phone__icontains=term) |
-        Q(product_category__icontains=term)
+        Q(phone_2__icontains=term) |
+        Q(product_category__icontains=term) |
+        Q(driver__driver_code__icontains=term) |
+        Q(driver__user__first_name__icontains=term) |
+        Q(driver__user__last_name__icontains=term)
     )
 
 
@@ -179,14 +205,18 @@ def _annotate_wa_chats(leads):
     ident_map = {}   # message identifier -> [lead, ...]  (phone-based, session-independent)
     lid_map = {}     # (session, lid identifier) -> [lead, ...]
     phone_map = {}   # bare digit variant -> [lead, ...] (for lid lookup)
+    from django.db.models import prefetch_related_objects
+    leads = list(leads)
+    prefetch_related_objects(leads, 'wa_links')
     for lead in leads:
         lead.has_wa_chat = False
         phone = crm_services.normalize_phone(lead.phone)
-        override = crm_services.normalize_phone(getattr(lead, 'wa_chat_override', '') or '')
         variants = set()
         if phone:
             variants |= crm_services._phone_variants(phone)
-        if override:
+        for override in [crm_services.normalize_phone(v) for v in lead.wa_link_values]:
+            if not override:
+                continue
             variants.add(override)
             # Only expand it as a phone when it is one: a lid's last 8 digits
             # make a plausible 974 number that belongs to somebody else.
@@ -324,6 +354,194 @@ def _annotate_driver_vehicles(leads):
         lead.vehicle_type = vehicle_type
         lead.vehicle_label = labels.get(vehicle_type, '')
 
+
+# ── Application facets (driver board) ───────────────────────────────────
+# Everything a recruiter knows about an applicant beyond the card itself lives on
+# the driver application behind it (fleet.Driver), so these facets all reach
+# through Lead.driver. They deliberately reuse the keys, labels and semantics of
+# the driver verification queue's bar (workforce.views._apply_driver_filters): a
+# recruiter who filters "Part Time" there and here must get the same pool, and a
+# URL is readable between the two pages.
+#
+# 'none' on a facet means "nothing recorded" — a card with no application bound
+# yet, or one whose application left that question blank. It is offered because it
+# is the question a recruiter actually asks (who still has to be chased), and it
+# is never a value the applicant could have chosen.
+DRIVER_FACET_NONE = 'none'
+
+# Uploaded-documents state. The completeness rule is the public application's own
+# (workforce.views._driver_application_sections): a selfie plus two distinct ID
+# documents, each holding a real uploaded image rather than the placeholder the
+# model ships with or a row carrying only a typed document number.
+# Labels are one word because the facet track is a fixed 8.25rem and the control
+# shows the chosen option's own label — "Docs complete" rendered as "Docs co…".
+# What they are about is carried by the placeholder ("Any documents") and by the
+# chip, which prints the facet name beside the value ("DOCUMENTS · Complete").
+DOC_STATE_CHOICES = [
+    ('complete', 'Complete'),
+    ('partial', 'Partial'),
+    ('none', 'Missing'),
+]
+DOC_ID_TYPES_REQUIRED = 2
+
+
+def _job_type_choices():
+    from fleet.models import DRIVER_JOB_TYPE_CHOICES
+
+    return list(DRIVER_JOB_TYPE_CHOICES)
+
+
+def _slab_choices():
+    """Working-hours slabs, shortened. The model's labels carry the clock range
+    ('Morning (6 AM – 12 PM)'), which a fixed-width facet track cannot show."""
+    from fleet.models import WORK_TIME_SLAB_CHOICES
+
+    return [(key, label.split(' (')[0]) for key, label in WORK_TIME_SLAB_CHOICES]
+
+
+def _language_choices():
+    from fleet.models import Driver
+
+    return list(Driver.driver_languages_choices)
+
+
+def _zone_group_choices():
+    from delivery.models import ZoneGroup
+
+    return [(str(pk), name) for pk, name in
+            ZoneGroup.objects.filter(is_active=True).order_by('name').values_list('pk', 'name')]
+
+
+def _driver_facet_picks(request, zone_choices):
+    """The application facets as ticked on the bar, unknown values dropped.
+
+    One typo in a hand-edited URL narrows nothing rather than emptying the page —
+    the same contract the vehicle facet and the sort whitelist keep.
+
+    `zone_choices` is passed in rather than fetched: it is the one choice list that
+    costs a query, and the bar needs it three times per load (validating the ticks
+    here, labelling the chips, filling the select).
+    """
+    def chosen(param, valid):
+        allowed = set(valid) | {DRIVER_FACET_NONE}
+        return [v for v in request.GET.getlist(param) if v in allowed]
+
+    return {
+        'job': chosen('job', dict(_job_type_choices())),
+        'docs': [v for v in request.GET.getlist('docs') if v in dict(DOC_STATE_CHOICES)],
+        'slab': chosen('slab', dict(_slab_choices())),
+        'language': chosen('language', dict(_language_choices())),
+        'zone': chosen('zone', dict(zone_choices)),
+    }
+
+
+def _doc_state_annotations():
+    """The three reads the documents facet needs, as annotations on a Lead qs.
+
+    Kept in one place because the chip, the filter and any later readout must
+    agree on what "complete" means. Subqueries rather than joins: a driver holds
+    up to five document rows, and a joined count would multiply the lead.
+    """
+    from django.db.models import Count
+    from fleet.models import DriverDocument, docs_with_image
+
+    real = docs_with_image(DriverDocument.objects.filter(driver_id=OuterRef('driver_id')))
+    ids = (real.exclude(document_type='Selfie')
+           .values('driver_id')
+           .annotate(n=Count('document_type', distinct=True))
+           .values('n')[:1])
+    return {
+        'doc_has_selfie': Exists(real.filter(document_type='Selfie')),
+        'doc_has_any': Exists(real),
+        # Coalesced: no matching row at all makes the subquery NULL, and NULL >= 2
+        # is NULL, so an applicant with no documents would fall out of every
+        # bucket instead of landing in "No docs".
+        'doc_id_types': Coalesce(Subquery(ids, output_field=IntegerField()), Value(0)),
+    }
+
+
+def _apply_driver_facets(leads, picks):
+    """Narrow driver leads by the application behind the card.
+
+    Ticks within one facet are OR'd ("Full Time + Part Time" is one pool) and the
+    facets are AND'd with each other, which is how every other staff bar reads.
+
+    Returns (leads, needs_distinct). Preferred zones are a reverse many-to-many,
+    so a driver who picked three zones would otherwise put three copies of the
+    same card on the board; the caller applies the distinct.
+    """
+    needs_distinct = False
+
+    job = picks['job']
+    if job:
+        named = [v for v in job if v != DRIVER_FACET_NONE]
+        job_q = Q(driver__job_type__in=named) if named else Q()
+        if DRIVER_FACET_NONE in job:
+            # No application bound to the card yet, or one that left the question
+            # blank — both read as "job type not stated" to a recruiter.
+            job_q |= Q(driver__isnull=True) | Q(driver__job_type='')
+        leads = leads.filter(job_q)
+
+    docs = picks['docs']
+    if docs:
+        leads = leads.annotate(**_doc_state_annotations())
+        complete = Q(doc_has_selfie=True, doc_id_types__gte=DOC_ID_TYPES_REQUIRED)
+        docs_q = Q()
+        if 'complete' in docs:
+            docs_q |= complete
+        if 'partial' in docs:
+            # Something was uploaded but the set is short of the application's bar.
+            docs_q |= Q(doc_has_any=True) & ~complete
+        if 'none' in docs:
+            docs_q |= Q(doc_has_any=False)
+        leads = leads.filter(docs_q)
+
+    slab = picks['slab']
+    if slab:
+        # Stored as a comma-joined list of slab keys. The keys never substring into
+        # one another, so icontains per key is safe.
+        named = [v for v in slab if v != DRIVER_FACET_NONE]
+        slab_q = Q()
+        for key in named:
+            slab_q |= Q(driver__work_time_slabs__icontains=key)
+        if DRIVER_FACET_NONE in slab:
+            slab_q |= Q(driver__isnull=True) | Q(driver__work_time_slabs='')
+        leads = leads.filter(slab_q)
+
+    language = picks['language']
+    if language:
+        named = [v for v in language if v != DRIVER_FACET_NONE]
+        lang_q = Q(driver__driver_languages__in=named) if named else Q()
+        if DRIVER_FACET_NONE in language:
+            lang_q |= Q(driver__isnull=True) | Q(driver__driver_languages='')
+        leads = leads.filter(lang_q)
+
+    zone = picks['zone']
+    if zone:
+        named = [int(v) for v in zone if v != DRIVER_FACET_NONE]
+        zone_q = Q(driver__preferred_zone_groups__id__in=named) if named else Q()
+        if DRIVER_FACET_NONE in zone:
+            zone_q |= Q(driver__isnull=True) | Q(driver__preferred_zone_groups__isnull=True)
+        leads = leads.filter(zone_q)
+        needs_distinct = True
+
+    return leads, needs_distinct
+
+
+def _driver_facet_chip_specs(zone_choices):
+    """(param, chip label, {value: display}, label for 'none') per application
+    facet, for the removable chips on the right of the bar. Built from the same
+    choice lists the selects render from, so a chip can never name a value the bar
+    cannot show."""
+    return [
+        ('job', 'Job type', dict(_job_type_choices()), 'Not stated'),
+        ('docs', 'Documents', dict(DOC_STATE_CHOICES), ''),
+        ('slab', 'Hours', dict(_slab_choices()), 'Any time'),
+        ('language', 'Language', dict(_language_choices()), 'Not stated'),
+        ('zone', 'Zone', dict(zone_choices), 'No zone'),
+    ]
+
+
 def _render_leads_board(request, board_category, template):
     """Shared kanban builder behind the two board pages. The business sales pipeline
     and the driver recruitment pipeline are separate pages with their own URL, their
@@ -339,9 +557,19 @@ def _render_leads_board(request, board_category, template):
     # Vehicle is a recruitment question, so the facet exists only on the driver
     # board — a business lead has no application behind it to carry one.
     vehicle_filter = []
+    driver_picks = {key: [] for key in ('job', 'docs', 'slab', 'language', 'zone')}
+    zone_choices = _zone_group_choices() if is_driver_board else []
     if is_driver_board:
         vehicle_filter = [v.strip() for v in request.GET.getlist('vehicle') if v.strip()]
         leads = _apply_vehicle_filter(leads, vehicle_filter)
+
+        # The rest of the application: job type, uploaded documents, working
+        # hours, language, preferred zone. Same keys and meanings as the driver
+        # verification queue's bar, so a URL reads the same on both pages.
+        driver_picks = _driver_facet_picks(request, zone_choices)
+        leads, needs_distinct = _apply_driver_facets(leads, driver_picks)
+        if needs_distinct:
+            leads = leads.distinct()
 
     # When the card was raised — a preset is one pick, so this facet is a single
     # select rather than a checklist.
@@ -422,8 +650,9 @@ def _render_leads_board(request, board_category, template):
     # screen, and each engaged filter gets a chip that carries its own removal URL.
     staff_users = _staff_users()
     board_total = sum(c['count'] for c in columns)
+    driver_picks_on = any(driver_picks.values())
     filters_on = bool(search or source_filter or assigned_filter or vehicle_filter
-                      or date_from or date_to)
+                      or driver_picks_on or date_from or date_to)
     board_grand_total = board_total
     if filters_on:
         board_grand_total = (Lead.objects
@@ -473,6 +702,12 @@ def _render_leads_board(request, board_category, template):
         active_filters.append(_chip(
             'vehicle', 'Vehicle', vehicle_labels.get(value, 'No vehicle'), value))
 
+    # One chip per tick on the application facets, each dropping only its own tick.
+    for param, chip_label, value_labels, none_label in _driver_facet_chip_specs(zone_choices):
+        for value in driver_picks[param]:
+            display = value_labels.get(value) or none_label or value
+            active_filters.append(_chip(param, chip_label, display, value))
+
     if date_from or date_to:
         active_filters.append(_chip(
             ('datePreset', 'dateFrom', 'dateTo'), 'Created',
@@ -506,6 +741,14 @@ def _render_leads_board(request, board_category, template):
         'staff_users': staff_users,
         'source_choices': Lead.SOURCE_CHOICES,
         'category_choices': Lead.CATEGORY_CHOICES,
+        # Application facets — only the driver board renders these, so the choice
+        # lists are built only for that board (each is a query or an import).
+        'driver_picks': driver_picks,
+        'job_choices': _job_type_choices() if is_driver_board else [],
+        'doc_state_choices': DOC_STATE_CHOICES if is_driver_board else [],
+        'slab_choices': _slab_choices() if is_driver_board else [],
+        'language_choices': _language_choices() if is_driver_board else [],
+        'zone_choices': zone_choices,
         'closed_window_days': window_days,
         'today': timezone.localdate(),
         'board_total': board_total,
@@ -780,6 +1023,11 @@ def _render_leads_list(request, list_category):
         'category_filter': category_filter,
         'staff_users': _staff_users(),
         'stage_choices': stage_choices,
+        # The full column rows, not just (key, label): the bulk bar needs each
+        # column's confirm text and reason flag so a bulk move prompts exactly
+        # like a board drag into the same column.
+        'stage_rows': stage_rows,
+        'bulk_stage_cap': MAX_BULK_STAGE_LEADS,
         'source_choices': Lead.SOURCE_CHOICES,
         'category_choices': Lead.CATEGORY_CHOICES,
         'total_count': total_count,
@@ -913,6 +1161,7 @@ CRM_LEAD_BASE_COLUMNS = [
     ('company',    'Company',    lambda l: l.company_name or ''),
     ('contact',    'Contact',    lambda l: strip_tags(l.contact_name) or ''),
     ('phone',      'Phone',      lambda l: l.phone or ''),
+    ('phone_2',    '2nd mobile', lambda l: l.phone_2 or ''),
     ('stage',      'Stage',      lambda l: l.stage_label),
     ('source',     'Source',     lambda l: l.get_source_display()),
     ('assignee',   'Assignee',   _lead_assignee),
@@ -1393,12 +1642,14 @@ def wa_identifiers_for(raw_phone, raw_override=''):
                   a different person and must only match within its session.
     """
     phone = crm_services.normalize_phone(raw_phone)
-    override = crm_services.normalize_phone(raw_override or '')
+    # One override (legacy str) or every number linked to the lead (LeadWaLink).
+    raw_list = [raw_override] if isinstance(raw_override, str) else list(raw_override or ())
+    overrides = [o for o in (crm_services.normalize_phone(r or '') for r in raw_list) if o]
     idents = set()
     lid_pairs = set()
     if phone:
         idents |= crm_services._phone_variants(phone)
-    if override:
+    for override in overrides:
         idents.add(override)
         # A manual override is an operator asserting the mapping — trust it on
         # any session rather than guessing which one they meant.
@@ -1422,7 +1673,7 @@ def wa_identifiers_for(raw_phone, raw_override=''):
             lid_pairs.add((sess, lid))
             lid_pairs.add((sess, f'{lid}@lid'))
     except Exception:
-        logger.exception('crm: lid lookup failed for phone %s', phone or override)
+        logger.exception('crm: lid lookup failed for phone %s', phone or overrides)
     for p in list(idents):
         if '@' not in p:
             idents.add(f'{p}@c.us')
@@ -1430,8 +1681,8 @@ def wa_identifiers_for(raw_phone, raw_override=''):
 
 
 def _lead_wa_identifiers(lead):
-    """Identifiers for a Lead — the phone plus any manual chat override."""
-    return wa_identifiers_for(lead.phone, getattr(lead, 'wa_chat_override', '') or '')
+    """Identifiers for a Lead — the phone plus every manually linked number."""
+    return wa_identifiers_for(lead.phone, lead.wa_link_values)
 
 
 def _lead_wa_q(lead, session=''):
@@ -1460,7 +1711,7 @@ def _lead_wa_q(lead, session=''):
     return q
 
 
-def _lead_wa_session_stats(lead):
+def _lead_wa_session_stats(lead, user=None):
     """{session: {'count', 'last_at'}} for every number this lead has talked on.
 
     Feeds the number picker on the detail page: without the counts, switching
@@ -1469,7 +1720,7 @@ def _lead_wa_session_stats(lead):
     """
     # Same platform-account gate as the conversation itself — otherwise the
     # picker would leak "this number has 412 messages" for a blocked chat.
-    if crm_services.wa_read_blocked(_lead_wa_identifiers(lead)):
+    if crm_services.wa_read_blocked(_lead_wa_identifiers(lead), user):
         return {}
     wa_q = _lead_wa_q(lead)
     if wa_q is None:
@@ -1487,7 +1738,7 @@ def _lead_wa_session_stats(lead):
         return {}
 
 
-def _lead_wa_conversation(lead, session=''):
+def _lead_wa_conversation(lead, session='', user=None):
     """Full WhatsApp conversation for a lead's phone, oldest first, with media
     annotations (`media_kind`, `media_proxy`) on each row. Returns
     (messages, media_items) — media_items is the photo/video subset for the
@@ -1498,12 +1749,13 @@ def _lead_wa_conversation(lead, session=''):
 
     Not gated on WAHA_ENABLED (that flag gates sending): the message table is
     filled by the webhook regardless, same as the CRM inbox."""
-    if not lead.phone and not lead.wa_chat_override:
+    if not lead.phone and not lead.wa_link_values:
         return [], []
 
     # A lead whose number belongs to a platform account must not expose that
     # account's conversation (it carries auth messages) — same gate as the inbox.
-    if crm_services.wa_read_blocked(_lead_wa_identifiers(lead)):
+    # With `user`, a marketing-only chat stays hidden from other desks too.
+    if crm_services.wa_read_blocked(_lead_wa_identifiers(lead), user):
         return [], []
 
     wa_q = _lead_wa_q(lead, session)
@@ -1551,7 +1803,7 @@ def _lead_wa_conversation(lead, session=''):
     return messages, media_items
 
 
-def _lead_wa_session_choice(lead, requested):
+def _lead_wa_session_choice(lead, requested, user=None):
     """Which number the lead page shows → (session, options, changed, explicit).
 
     `session` is '' for the merged all-numbers view, otherwise a WAHA session
@@ -1576,7 +1828,7 @@ def _lead_wa_session_choice(lead, requested):
     """
     from whatsapp import sessions as wa_sessions
 
-    stats = _lead_wa_session_stats(lead)
+    stats = _lead_wa_session_stats(lead, user)
     live = wa_sessions.list_sessions()
     known = {s['name'] for s in live} | set(stats)
     default = wa_sessions.default_session()
@@ -1899,18 +2151,21 @@ def crm_lead_detail(request, lead_id):
     # so remembering a tab never touches updated_at — that field drives the
     # follow-up digests and must keep meaning "the lead moved".
     wa_session, wa_session_options, wa_session_changed, wa_session_explicit = (
-        _lead_wa_session_choice(lead, request.GET.get('session')))
+        _lead_wa_session_choice(lead, request.GET.get('session'), request.user))
     if wa_session_changed:
         stored = wa_session or Lead.WA_SESSION_ALL
         Lead.objects.filter(pk=lead.pk).update(wa_session=stored)
         lead.wa_session = stored
 
-    wa_messages, wa_media = _lead_wa_conversation(lead, wa_session)
+    wa_messages, wa_media = _lead_wa_conversation(lead, wa_session, request.user)
+
+    from fleet.models import DriverDocument
 
     # Driver leads: keep the pipeline stage in sync with the applicant's real
     # form status (the timeline) and show driver-funnel labels + the timeline.
     driver = None
     driver_sections = None
+    driver_documents = []
     stage_rows = crm_services.board_stages(lead.category)
     if lead.category == Lead.CATEGORY_DRIVER:
         driver = crm_services._driver_for_lead(lead)
@@ -1923,8 +2178,14 @@ def crm_lead_detail(request, lead_id):
             if (target and target != lead.stage and lead.stage not in manual
                     and not lead.stage_pinned):
                 crm_services.set_lead_stage(lead, target, None)
-            from workforce.views import _driver_application_sections
+            from workforce.views import (
+                LEAD_DOC_EXPIRY_SOON_DAYS, _driver_application_sections, driver_document_cards,
+            )
             driver_sections = _driver_application_sections(driver)
+            # The scans themselves, not just the "6/7 sections" tally — the desk
+            # reads an ID here to decide the stage, and used to have to open the
+            # driver record in another tab to see one.
+            driver_documents = driver_document_cards(driver, soon_days=LEAD_DOC_EXPIRY_SOON_DAYS)
     # LeadStage rows, not (key, label) tuples — the template needs each column's
     # confirm_text / needs_reason so the chips can prompt like the board does.
     stage_choices = stage_rows
@@ -1951,25 +2212,38 @@ def crm_lead_detail(request, lead_id):
     # check, so the desk can see WHY the number is what it is before quoting.
     pricing_check = _lead_pricing_check(lead.pricing_enquiry, user=request.user)
 
+    # "Two cards in one": what has been absorbed here, and where each absorbed card
+    # disagrees with this one (the merge kept this card's value without asking).
+    merged_children = list(
+        lead.merged_children.select_related('merged_by', 'assigned_to').order_by('created_at')
+    )
+    for child in merged_children:
+        child.merge_diffs = crm_services.merge_differences(lead, child)
+
     context = {
         'page_title': f'Lead – {lead.company_name or lead.contact_name or lead.phone}',
         'lead': lead,
-        'activities': lead.activities.select_related('created_by').order_by('-created_at'),
+        # Absorbed cards' entries are folded in, tagged with their card number in the
+        # template (activity.lead_id != lead.pk), so one timeline tells the whole story.
+        'activities': LeadActivity.objects.filter(
+            lead_id__in=[lead.pk] + [c.pk for c in merged_children]
+        ).select_related('created_by').order_by('-created_at'),
         'staff_users': _staff_users(),
         'stage_choices': stage_choices,
         # Untagged name for the WhatsApp composer — the customer never sees "ZyDrv".
         'lead_wa_name': strip_tags(lead.contact_name) or lead.company_name or '',
         'driver': driver,
         'driver_sections': driver_sections,
+        'driver_documents': driver_documents,
+        'document_type_choices': DriverDocument.document_choices,
         # "Two cards in one": what has been absorbed here, and what still could be.
-        'merged_children': list(
-            lead.merged_children.select_related('merged_by').order_by('created_at')
-        ),
+        'merged_children': merged_children,
         'duplicate_candidates': crm_services.duplicate_candidates(lead),
         'wa_messages': wa_messages,
         'wa_media': wa_media,
         'wa_session': wa_session,
         'wa_session_options': wa_session_options,
+        'wa_numbers': crm_services.lead_wa_numbers(lead),
         # Only a chosen number overrides the composer. Blank = keep the section
         # route from the Auto Triggers page, i.e. exactly today's behaviour.
         'wa_send_session': wa_session if wa_session_explicit else '',
@@ -1980,9 +2254,14 @@ def crm_lead_detail(request, lead_id):
         # another line" instead of the flatly wrong "this lead never wrote".
         'wa_total_messages': wa_session_options[0]['count'] if wa_session_options else 0,
         'pricing_check': pricing_check,
-        'ai_summary': lead.ai_summary,
+        # The summary is read from the conversation, so it is hidden with it.
+        'ai_summary': '' if crm_services.wa_read_blocked(_lead_wa_identifiers(lead), request.user) else lead.ai_summary,
         'ai_available': _ai_summary_available(),
         'today': timezone.localdate(),
+        # One URL serves both pipelines, so the sidebar cannot tell from the
+        # url_name which menu owns it — a driver card opened from the driver
+        # board used to light up CRM Business. The card's own board decides.
+        'crm_sidebar_board': lead.category,
     }
     return render(request, 'workforce/crm/lead_detail.html', context)
 
@@ -2039,8 +2318,9 @@ def _lead_wa_chat_targets(lead, session=''):
 
     if not targets:
         fallback_session = session or wa_sessions.default_session()
-        override = crm_services.normalize_phone(
-            getattr(lead, 'wa_chat_override', '') or '')
+        # The first linked number stands in when the lead's own phone is blank.
+        links = lead.wa_link_values
+        override = crm_services.normalize_phone(links[0]) if links else ''
         phone = crm_services.normalize_phone(lead.phone or '')
         if override and crm_services.is_lid_value(override):
             # A lid addresses a chat only on the session whose device issued it;
@@ -2078,13 +2358,13 @@ def crm_lead_chat_refresh(request, lead_id):
 
     # Same gate as the panel itself — a platform account's thread carries auth
     # messages and must not be pulled into view here.
-    if crm_services.wa_read_blocked(_lead_wa_identifiers(lead)):
+    if crm_services.wa_read_blocked(_lead_wa_identifiers(lead), request.user):
         return JsonResponse({'success': False, 'error': 'This chat is not readable here'}, status=403)
 
     # Resolve the same way the page does, but never persist: refreshing a panel
     # is not the staff member choosing a number.
     requested = request.POST.get('session') or request.GET.get('session') or ''
-    wa_session, _options, _changed, _explicit = _lead_wa_session_choice(lead, requested)
+    wa_session, _options, _changed, _explicit = _lead_wa_session_choice(lead, requested, request.user)
 
     pulled = 0
     pull_error = ''
@@ -2145,7 +2425,7 @@ def crm_lead_chat_refresh(request, lead_id):
 
     # Media bodies are downloaded by the per-minute archive_wa_media cron, so a
     # brand-new photo can land here as a link before its local copy exists.
-    wa_messages, _wa_media = _lead_wa_conversation(lead, wa_session)
+    wa_messages, _wa_media = _lead_wa_conversation(lead, wa_session, request.user)
     html = render_to_string(
         'workforce/crm/parts/_lead_chat_messages.html',
         {'wa_messages': wa_messages, 'lead': lead},
@@ -2173,7 +2453,7 @@ def crm_lead_ai_summary(request, lead_id):
     if request.POST.get('force') != '1' and lead.ai_summary:
         return JsonResponse({'success': True, 'summary': lead.ai_summary, 'cached': True})
 
-    wa_messages, _ = _lead_wa_conversation(lead)
+    wa_messages, _ = _lead_wa_conversation(lead, user=request.user)
     summary, error = crm_services.generate_lead_ai_summary(lead, wa_messages)
     if error:
         return JsonResponse({'success': False, 'error': error})
@@ -2195,13 +2475,15 @@ def crm_lead_wa_media(request, lead_id, msg_id):
     from django.http import Http404
 
     lead = get_object_or_404(Lead, pk=lead_id)
-    if not lead.phone and not lead.wa_chat_override:
+    if not lead.phone and not lead.wa_link_values:
         raise Http404
 
     from whatsapp.models import WhatsAppMessage
 
     wa_q = _lead_wa_q(lead)
     if wa_q is None:
+        raise Http404
+    if crm_services.wa_read_blocked(_lead_wa_identifiers(lead), request.user):
         raise Http404
     msg = get_object_or_404(WhatsAppMessage.objects.filter(wa_q), pk=msg_id)
     return _stream_wa_media(msg)
@@ -2240,7 +2522,8 @@ def crm_wa_contact_search(request):
 def crm_lead_link_chat(request, lead_id):
     """POST identifier=<phone|lid>: manually connect a lead to a WhatsApp chat when
     auto-matching by the lead's stored phone failed or picked the wrong number.
-    Saves the override on the lead, then immediately pulls that chat's history in
+    Adds the number as one of the lead's linked numbers (LeadWaLink, optional
+    `label` such as Owner/Office), then immediately pulls that chat's history in
     from WAHA (rather than waiting on the resync/cron sweep) so the conversation
     panel populates right away."""
     if request.method != 'POST':
@@ -2252,9 +2535,6 @@ def crm_lead_link_chat(request, lead_id):
     if not identifier:
         return JsonResponse({'success': False, 'error': 'A phone number or contact is required'}, status=400)
 
-    lead.wa_chat_override = identifier[:50]
-    lead.save(update_fields=['wa_chat_override', 'updated_at'])
-
     from whatsapp.models import WhatsAppContact
     from whatsapp.waha_backfill import pull_chat_history
     from whatsapp import sessions as wa_sessions
@@ -2262,6 +2542,10 @@ def crm_lead_link_chat(request, lead_id):
     # Which number this chat lives on. The typeahead sends back the session of
     # the row the operator picked; a hand-typed phone falls back to the default.
     session = wa_sessions.normalize(request.POST.get('session'))
+    # Adds a number rather than replacing one: a company can reach us from the
+    # owner's phone, the office phone and more, each its own chat.
+    label = (request.POST.get('label') or '').strip()[:40]
+    crm_services.add_wa_link(lead, identifier, session=session, label=label, user=request.user)
 
     variants = crm_services._phone_variants(identifier)
     contact = (
@@ -2299,13 +2583,12 @@ def crm_lead_link_chat(request, lead_id):
     if lid_counterparties:
         resolved_lid = next(iter(lid_counterparties)).replace('@lid', '')
         if resolved_lid and resolved_lid != identifier:
-            lead.wa_chat_override = resolved_lid[:50]
-            lead.save(update_fields=['wa_chat_override', 'updated_at'])
+            crm_services.repoint_wa_link(lead, identifier, resolved_lid)
 
     LeadActivity.objects.create(
         lead=lead, activity_type=LeadActivity.TYPE_NOTE,
         body=(
-            f'WhatsApp chat manually linked ({raw_identifier})'
+            f'WhatsApp chat linked ({raw_identifier}{" — " + label if label else ""})'
             + (f' — {seen} message(s) pulled in' if seen else ' — no messages found on WhatsApp yet')
         ),
         created_by=request.user,
@@ -2326,6 +2609,25 @@ def crm_lead_link_chat(request, lead_id):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+def crm_lead_unlink_chat(request, lead_id):
+    """POST identifier=<phone|lid>: detach one linked WhatsApp number from a lead."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    lead = get_object_or_404(Lead, pk=lead_id)
+    identifier = crm_services.normalize_phone(request.POST.get('identifier', ''))
+    if not identifier:
+        return JsonResponse({'success': False, 'error': 'Which number?'}, status=400)
+    if not crm_services.remove_wa_link(lead, identifier):
+        return JsonResponse({'success': False, 'error': 'That number is not linked to this lead.'}, status=404)
+    LeadActivity.objects.create(
+        lead=lead, activity_type=LeadActivity.TYPE_NOTE,
+        body=f'WhatsApp number {identifier} unlinked', created_by=request.user,
+    )
+    return JsonResponse({'success': True})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 def crm_wa_media(request, msg_id):
     """Stream WAHA media for any message — used by the inbox chat preview, where no
     lead exists yet. Staff-gated, and refuses attachments from a platform account's
@@ -2334,7 +2636,7 @@ def crm_wa_media(request, msg_id):
 
     from whatsapp.models import WhatsAppMessage
     msg = get_object_or_404(WhatsAppMessage, pk=msg_id)
-    if crm_services.wa_read_blocked([msg.from_number, msg.to_number]):
+    if crm_services.wa_read_blocked([msg.from_number, msg.to_number], request.user):
         logger.warning('crm: blocked WA media read for platform account by user %s', request.user.pk)
         raise Http404
     return _stream_wa_media(msg)
@@ -2496,7 +2798,7 @@ def crm_wa_chat_preview(request):
     # AUTHORIZATION, not filtering: `sender` comes straight from the query string, so
     # without this any CRM-capable staff member could read a platform user's own
     # conversation — including the password-reset codes we send them.
-    blocked = crm_services.wa_read_blocked(idents)
+    blocked = crm_services.wa_read_blocked(idents, request.user)
     if blocked:
         logger.warning('crm: blocked WA chat read for platform account by user %s', request.user.pk)
         return JsonResponse({'success': False, 'error': blocked}, status=403)
@@ -2537,6 +2839,16 @@ def crm_wa_chat_preview(request):
     return JsonResponse({'success': True, 'messages': messages})
 
 
+def _lead_category(value):
+    """A posted/queried category narrowed to a real one.
+
+    Also what the sidebar reads (`crm_sidebar_board`) to decide whether CRM
+    Business or CRM Driver owns a page that both pipelines share.
+    """
+    value = (value or '').strip()
+    return value if value in {c for c, _ in Lead.CATEGORY_CHOICES} else Lead.CATEGORY_BUSINESS
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def crm_lead_create(request):
@@ -2552,7 +2864,8 @@ def crm_lead_create(request):
                 'error': 'Provide at least a company, contact name, or phone number.',
                 'form_data': request.POST,
                 'category_choices': Lead.CATEGORY_CHOICES,
-                'initial_category': request.POST.get('category', Lead.CATEGORY_BUSINESS),
+                'initial_category': _lead_category(request.POST.get('category')),
+                'crm_sidebar_board': _lead_category(request.POST.get('category')),
             }
             return render(request, 'workforce/crm/lead_form.html', context)
 
@@ -2564,7 +2877,8 @@ def crm_lead_create(request):
                 'error': date_error,
                 'form_data': request.POST,
                 'category_choices': Lead.CATEGORY_CHOICES,
-                'initial_category': request.POST.get('category', Lead.CATEGORY_BUSINESS),
+                'initial_category': _lead_category(request.POST.get('category')),
+                'crm_sidebar_board': _lead_category(request.POST.get('category')),
             }
             return render(request, 'workforce/crm/lead_form.html', context)
 
@@ -2580,6 +2894,7 @@ def crm_lead_create(request):
             company_name=company_name[:200],
             contact_name=contact_name[:100],
             phone=phone[:50],
+            phone_2=crm_services.normalize_phone(request.POST.get('phone_2', ''))[:50],
             product_category=request.POST.get('product_category', '').strip()[:200],
             notes=request.POST.get('notes', '').strip(),
             next_followup_at=followup,
@@ -2597,56 +2912,71 @@ def crm_lead_create(request):
         )
         return redirect('workforce:crm_lead_detail', lead.pk)
 
-    initial_category = request.GET.get('category', '').strip()
-    if initial_category not in {c for c, _ in Lead.CATEGORY_CHOICES}:
-        initial_category = Lead.CATEGORY_BUSINESS
+    initial_category = _lead_category(request.GET.get('category'))
     context = {
         'page_title': 'New Lead',
         'staff_users': _staff_users(),
         'category_choices': Lead.CATEGORY_CHOICES,
         'initial_category': initial_category,
+        'crm_sidebar_board': initial_category,
     }
     return render(request, 'workforce/crm/lead_form.html', context)
 
 
-@login_required(login_url='/accounts/login/')
-@staff_required
-def crm_lead_update_stage(request, lead_id):
-    """AJAX: move a lead to a new pipeline stage (board drag-drop + detail page)."""
-    if request.method != 'POST':
-        return JsonResponse({'error': 'POST required'}, status=405)
-    lead = get_object_or_404(Lead, pk=lead_id)
-    new_stage = request.POST.get('stage', '').strip()
-    rejection_reason = request.POST.get('rejection_reason', '').strip()
+# ── Stage moves ──────────────────────────────────────────────────────────────
+# One card or fifty, a stage move is the same act: it can rewrite a real driver's
+# verification status and WhatsApp them. Both entry points below go through
+# _apply_lead_stage so the department gate, the write-back and the pin rule can
+# never drift apart between the board and the list's bulk bar.
 
-    # A column that rewrites the driver's real verification status is the same
-    # privilege as the ops-only verification page (it activates vehicles and WhatsApps
-    # the applicant). This route is reachable by Marketing, so re-check the desk here
-    # rather than letting the board be a way around the department gate.
+
+def _write_back_denied(user, lead, target_stage):
+    """The reason this user may not move a card into this column, or ''.
+
+    A column that rewrites the driver's real verification status is the same
+    privilege as the ops-only verification page (it activates vehicles and
+    WhatsApps the applicant). The stage routes are reachable by Marketing, so the
+    desk is re-checked here rather than letting a board or a bulk bar be a way
+    around the department gate.
+    """
+    if lead.category != Lead.CATEGORY_DRIVER or not (target_stage and target_stage.write_back):
+        return ''
+    from core.departments import ADMIN, OPS, user_departments
+    if user_departments(user) & {OPS, ADMIN}:
+        return ''
+    return (
+        f'"{target_stage.label}" changes the driver\'s real application status '
+        'and notifies them, so it needs the Operations desk. Ask ops to make '
+        'this decision, or move the card to a column that does not write back.'
+    )
+
+
+def _apply_lead_stage(lead, new_stage, user, rejection_reason=''):
+    """Move one lead into a column and run everything that goes with it.
+
+    Returns {'ok': bool, 'error': str, 'status': int, 'warning': str,
+             'synced_driver': str|None}. The caller decides how to report it —
+    a JSON body for one card, a tally for a bulk run.
+    """
     target_stage = crm_services.get_stage(lead.category, new_stage)
-    if lead.category == Lead.CATEGORY_DRIVER and target_stage and target_stage.write_back:
-        from core.departments import ADMIN, OPS, user_departments
-        if not (user_departments(request.user) & {OPS, ADMIN}):
-            return JsonResponse({
-                'success': False,
-                'error': (
-                    f'"{target_stage.label}" changes the driver\'s real application status '
-                    'and notifies them, so it needs the Operations desk. Ask ops to make '
-                    'this decision, or move the card to a column that does not write back.'
-                ),
-            }, status=403)
+
+    denied = _write_back_denied(user, lead, target_stage)
+    if denied:
+        return {'ok': False, 'error': denied, 'status': 403, 'warning': '',
+                'synced_driver': None}
 
     try:
-        crm_services.set_lead_stage(lead, new_stage, request.user)
+        crm_services.set_lead_stage(lead, new_stage, user)
     except ValueError as exc:
-        return JsonResponse({'success': False, 'error': str(exc)}, status=400)
+        return {'ok': False, 'error': str(exc), 'status': 400, 'warning': '',
+                'synced_driver': None}
 
     # Driver leads: moving into a decision column updates the real applicant
     synced_driver = None
     sync_failed = False
     try:
         driver = crm_services.sync_driver_status_from_lead(
-            lead, request.user, rejection_reason=rejection_reason
+            lead, user, rejection_reason=rejection_reason
         )
         synced_driver = driver.driver_id if driver else None
     except Exception:
@@ -2670,25 +3000,154 @@ def crm_lead_update_stage(request, lead_id):
     conflict = crm_services.stage_move_conflict(lead, target_stage)
     warning = ''
     if conflict:
-        crm_services.pin_lead_stage(lead, request.user, conflict)
+        crm_services.pin_lead_stage(lead, user, conflict)
         warning = (
             f'{conflict} The card is pinned here and will stay put — use "Resume '
             'auto-filing" on the lead page to hand it back to the application status.'
         )
     elif lead.stage_pinned:
         # It agrees again, so there is nothing left to protect it from.
-        crm_services.unpin_lead_stage(lead, request.user)
+        crm_services.unpin_lead_stage(lead, user)
 
-    warning = f'{warning_prefix}{warning}'.strip()
+    return {
+        'ok': True,
+        'error': '',
+        'status': 200,
+        'warning': f'{warning_prefix}{warning}'.strip(),
+        'synced_driver': synced_driver,
+    }
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_lead_update_stage(request, lead_id):
+    """AJAX: move a lead to a new pipeline stage (board drag-drop + detail page)."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    lead = get_object_or_404(Lead, pk=lead_id)
+
+    result = _apply_lead_stage(
+        lead,
+        request.POST.get('stage', '').strip(),
+        request.user,
+        rejection_reason=request.POST.get('rejection_reason', '').strip(),
+    )
+    if not result['ok']:
+        return JsonResponse({'success': False, 'error': result['error']},
+                            status=result['status'])
 
     return JsonResponse({
         'success': True,
         'stage': lead.stage,
         'stage_display': lead.stage_label,
         'stage_swatch': lead.stage_swatch,
-        'synced_driver': synced_driver,
+        'synced_driver': result['synced_driver'],
         'pinned': lead.stage_pinned,
-        'warning': warning,
+        'warning': result['warning'],
+    })
+
+
+# A bulk move is deliberately capped. The bar acts on ticked rows only (never on
+# "everything matching the filter" — see workforce/js/export-columns.js), and a
+# page holds 50, so this is one page's worth with room for a wider per_page —
+# not a lever that re-files the whole pipeline, or WhatsApps hundreds of drivers,
+# in one click.
+MAX_BULK_STAGE_LEADS = 100
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_leads_bulk_stage(request):
+    """AJAX: move every ticked lead on a list page into one stage.
+
+    Same act as a board drag, repeated: it runs the identical helper per lead, so
+    a write-back column still needs the Operations desk and still messages each
+    matched applicant. Leads are looked up inside the posted category, so a
+    hand-written id can never reach across into the other pipeline.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body or '{}')
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Malformed request'}, status=400)
+
+    new_stage = str(data.get('stage') or '').strip()
+    category = str(data.get('category') or '').strip()
+    rejection_reason = str(data.get('rejection_reason') or '').strip()[:500]
+    raw_ids = data.get('ids') or []
+    if not isinstance(raw_ids, list):
+        return JsonResponse({'success': False, 'error': 'Malformed request'}, status=400)
+
+    if category not in {key for key, _label in Lead.CATEGORY_CHOICES}:
+        return JsonResponse({'success': False, 'error': 'Unknown lead category'}, status=400)
+    if not new_stage:
+        return JsonResponse({'success': False, 'error': 'Pick a stage first.'}, status=400)
+    if crm_services.get_stage(category, new_stage) is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'That stage is not a column on this board.',
+        }, status=400)
+
+    # Counted before anything is parsed: the message has to name what was actually
+    # sent, and an unbounded list should not be walked just to reject it.
+    if len(raw_ids) > MAX_BULK_STAGE_LEADS:
+        return JsonResponse({
+            'success': False,
+            'error': (f'{len(raw_ids)} leads is more than one bulk move may carry — '
+                      f'do it in batches of {MAX_BULK_STAGE_LEADS} or fewer.'),
+        }, status=400)
+    ids = {pk for pk in (safe_int(value, default=0) for value in raw_ids) if pk}
+    if not ids:
+        return JsonResponse({'success': False, 'error': 'Tick the leads you want to move.'}, status=400)
+
+    leads = list(Lead.objects.filter(pk__in=ids, category=category))
+    if not leads:
+        return JsonResponse({'success': False, 'error': 'None of those leads are on this board.'},
+                            status=404)
+
+    moved, unchanged, notified = 0, 0, 0
+    warnings, errors = [], []
+    for lead in leads:
+        if lead.stage == new_stage:
+            unchanged += 1
+            continue
+        result = _apply_lead_stage(lead, new_stage, request.user,
+                                  rejection_reason=rejection_reason)
+        if not result['ok']:
+            # One refusal applies to every lead in the run (the department gate is
+            # about the column, not the card), so say it once and stop rather than
+            # repeating it per row.
+            if result['status'] == 403:
+                return JsonResponse({'success': False, 'error': result['error']}, status=403)
+            errors.append(f'#{lead.pk}: {result["error"]}')
+            continue
+        moved += 1
+        if result['synced_driver']:
+            notified += 1
+        if result['warning']:
+            warnings.append(f'#{lead.pk}: {result["warning"]}')
+
+    label = crm_services.get_stage(category, new_stage).label
+    parts = [f'{moved} lead{"" if moved == 1 else "s"} moved to “{label}”']
+    if unchanged:
+        parts.append(f'{unchanged} already there')
+    if notified:
+        parts.append(f'{notified} applicant{"" if notified == 1 else "s"} updated and notified')
+    if errors:
+        parts.append(f'{len(errors)} failed')
+
+    return JsonResponse({
+        'success': True,
+        'message': ', '.join(parts) + '.',
+        'moved': moved,
+        'unchanged': unchanged,
+        'notified': notified,
+        # Capped: a pinned-card note per lead is the same sentence fifty times over.
+        'warnings': warnings[:5],
+        'warning_count': len(warnings),
+        'errors': errors[:5],
     })
 
 
@@ -2851,11 +3310,12 @@ def crm_lead_update(request, lead_id):
                 setattr(lead, field, value)
                 changes.append(('note', f'{field.replace("_", " ").title()} updated'))
 
-    if 'phone' in request.POST:
-        phone = crm_services.normalize_phone(request.POST.get('phone', ''))[:50]
-        if phone != lead.phone:
-            lead.phone = phone
-            changes.append(('note', 'Phone updated'))
+    for field, label in (('phone', 'Phone'), ('phone_2', '2nd mobile')):
+        if field in request.POST:
+            phone = crm_services.normalize_phone(request.POST.get(field, ''))[:50]
+            if phone != getattr(lead, field):
+                setattr(lead, field, phone)
+                changes.append(('note', f'{label} updated'))
 
     if changes:
         lead.save()
@@ -2881,6 +3341,7 @@ def crm_lead_update(request, lead_id):
             'company_name': lead.company_name or '',
             'contact_name': lead.contact_name or '',
             'phone': lead.phone or '',
+            'phone_2': lead.phone_2 or '',
             'product_category': lead.product_category or '',
         },
     })
@@ -3980,6 +4441,24 @@ def crm_lead_merge(request, lead_id):
         'merged_id': duplicate.pk,
         'children': primary.merged_children.count(),
     })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_lead_merge_adopt(request, lead_id):
+    """POST child_id=<pk>, field=<name>: take one value from an absorbed card onto this one."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    parent = get_object_or_404(Lead, pk=lead_id)
+    child = parent.merged_children.filter(pk=(request.POST.get('child_id') or '').strip()).first()
+    if child is None:
+        return JsonResponse({'success': False, 'error': 'That card is not merged into this one.'},
+                            status=400)
+    ok, error = crm_services.adopt_merged_value(
+        parent, child, (request.POST.get('field') or '').strip(), request.user)
+    if not ok:
+        return JsonResponse({'success': False, 'error': error}, status=400)
+    return JsonResponse({'success': True})
 
 
 @login_required(login_url='/accounts/login/')

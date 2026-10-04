@@ -43,6 +43,7 @@ _WAHA_TYPE_MAP = {
     'location': 'location',
     'sticker': 'sticker',
     'vcard': 'contact',
+    'multi_vcard': 'contact',
     'contact_card': 'contact',
 }
 
@@ -565,6 +566,35 @@ def _serialize_message(obj):
     }
 
 
+def _store_reaction(data):
+    """`message.reaction` event → one WhatsAppReaction row per (message, sender).
+
+    Only arrives once WAHA's WHATSAPP_HOOK_EVENTS lists `message.reaction`; an
+    empty `reaction.text` means the sender took their reaction back.
+    """
+    from .models import WhatsAppReaction
+    payload = data.get("payload") or {}
+    reaction = payload.get("reaction") if isinstance(payload, dict) else None
+    if not isinstance(reaction, dict) or not reaction.get("messageId"):
+        return JsonResponse({"ok": True, "ignored": "reaction without messageId"}, status=200)
+    if payload.get("fromMe") is True:
+        sender = 'me'
+    else:
+        who = payload.get("participant") or payload.get("from")
+        if isinstance(who, dict):
+            who = who.get("_serialized") or ''
+        sender = _strip_jid(who)
+    if not sender:
+        return JsonResponse({"ok": True, "ignored": "reaction without sender"}, status=200)
+    WhatsAppReaction.objects.update_or_create(
+        session=wa_sessions.normalize(data.get("session")),
+        message_id=str(reaction["messageId"])[:255],
+        sender=sender[:64],
+        defaults={'emoji': str(reaction.get("text") or '')[:32]},
+    )
+    return JsonResponse({"ok": True, "reaction": True}, status=200)
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def waha_webhook(request):
@@ -583,6 +613,8 @@ def waha_webhook(request):
             return JsonResponse({"ok": False, "error": "envelope must be object"}, status=400)
 
         event = data.get("event") or data.get("type")
+        if event == "message.reaction":
+            return _store_reaction(data)
         if event not in ("message", "message.any"):
             return JsonResponse({"ok": True, "ignored": "event"}, status=200)
 
@@ -631,6 +663,13 @@ def waha_webhook(request):
         # Validated, not trusted: the session name is written to the DB and
         # interpolated into WAHA URLs by downstream lookups.
         session = wa_sessions.normalize(data.get("session"))
+
+        # message.any also delivers our OWN outbound sends, auth codes included,
+        # so this path redacts like backfill and the outbound log do. Payload
+        # first, against the original body (see whatsapp/secrets.py).
+        from whatsapp.secrets import redact_payload, redact_text
+        data, _ = redact_payload(data, body)
+        body, _ = redact_text(body)
 
         # update_or_create on (session, waha_message_id) makes webhook
         # re-deliveries idempotent. The session MUST be part of the lookup:

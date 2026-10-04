@@ -1,0 +1,36 @@
+{% comment %}
+Purpose: The full-screen "turn on location" lock that covers the driver app while the phone will not give a GPS fix.
+Used by: fleet/pwa_base.html and templates/fleet_dashboard_base.html, under {% if driver_gps_required %} (approved drivers only).
+Notes: Hidden until fleet/js/ezzy-gps-gate.js sees location refused or switched off; it lifts itself on the first fix. It never asks for a fix itself — EzzyGPS does.
+{% endcomment %}
+<div id="fleet_gpsgate_overlay" class="fleet-gpsgate" role="alertdialog" aria-modal="true"
+     aria-labelledby="fleet_gpsgate_title" aria-describedby="fleet_gpsgate_text_reason" hidden>
+    <div class="fleet-gpsgate__panel">
+        <div class="fleet-gpsgate__icon" aria-hidden="true"><i class="fa-solid fa-location-crosshairs"></i></div>
+        <p class="fleet-gpsgate__kicker">Location required</p>
+        <h2 id="fleet_gpsgate_title" class="fleet-gpsgate__title">Turn on location</h2>
+        <p id="fleet_gpsgate_text_reason" class="fleet-gpsgate__reason">EzzyDelivery needs your location while you work.</p>
+
+        <ol id="fleet_gpsgate_list_android" class="fleet-gpsgate__steps">
+            <li>Swipe down from the top of the screen and turn on <strong>Location</strong>.</li>
+            <li>Tap <strong>Turn on location</strong> below, then choose <strong>Allow</strong>.</li>
+            <li>Still blocked? Open <strong>Chrome &rsaquo; &#8942; &rsaquo; Settings &rsaquo; Site settings &rsaquo; Location</strong> and set <strong>{{ request.get_host }}</strong> to <strong>Allow</strong>.</li>
+        </ol>
+        <ol id="fleet_gpsgate_list_ios" class="fleet-gpsgate__steps" hidden>
+            <li>Open <strong>Settings &rsaquo; Privacy &amp; Security &rsaquo; Location Services</strong> and turn it on.</li>
+            <li>In the same list open <strong>Safari Websites</strong> and choose <strong>While Using the App</strong>.</li>
+            <li>Come back, tap <strong>Turn on location</strong>, then choose <strong>Allow</strong>.</li>
+        </ol>
+
+        <button type="button" id="fleet_gpsgate_btn_retry" class="fleet-gpsgate__btn">
+            <i class="fa-solid fa-location-arrow" aria-hidden="true"></i> Turn on location
+        </button>
+        <p id="fleet_gpsgate_text_status" class="fleet-gpsgate__status" aria-live="polite"></p>
+
+        {% if driver_support_whatsapp %}
+        <a class="fleet-gpsgate__help" href="https://wa.me/{{ driver_support_whatsapp }}" target="_blank" rel="noopener">
+            <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Need help? Message support
+        </a>
+        {% endif %}
+    </div>
+</div>

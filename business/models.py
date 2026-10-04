@@ -37,6 +37,7 @@ Related Apps:
 """
 
 import os
+import re
 from django.conf import settings
 from django.db import models
 from core import models as core_models
@@ -464,6 +465,11 @@ class BusinessApiSettings(models.Model):
                   "other status are ignored. Empty means take every order returned.")
     fetch_enabled = models.BooleanField(default=False,
         help_text='Include this source in the hourly order pull.')
+    import_qatar_only = models.BooleanField(default=False,
+        help_text='Only import orders shipping to Qatar. For stores that sell across the '
+                  'GCC: orders going anywhere else are left out of the import lists '
+                  'instead of being offered as deliveries we cannot make. Off by default '
+                  'so an existing connection keeps behaving exactly as it did.')
 
     last_sync_at = models.DateTimeField(blank=True, null=True,
         help_text='Last successful sync fetch from this source (Google Sheet / Shopify / WooCommerce).')
@@ -486,7 +492,17 @@ class BusinessApiSettings(models.Model):
 
     def __str__(self):
         return self.business.business_name
-    
+
+    def shop_domain(self):
+        """Bare host for building Shopify Admin API and OAuth URLs.
+
+        Every caller used to inline the same scheme-strip, and they drifted: the
+        OAuth views stripped the trailing slash while the order import did not,
+        so a stored "https://host/" produced "https://host//admin/api/...".
+        Centralised here so the two can no longer disagree.
+        """
+        return re.sub(r'^https?://', '', (self.site_api_url or '').strip(),
+                      flags=re.IGNORECASE).strip('/')
 
 
 class BusinessLogo(models.Model):

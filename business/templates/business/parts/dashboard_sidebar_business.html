@@ -30,17 +30,17 @@
       <!-- ORDERS SECTION -->
       <li class="bsb__section-label">{% trans "Orders" %}</li>
       <li class="nav-item">
-        <a class="nav-link btn bsb__link--collapse {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}active{% endif %}"
+        <a class="nav-link btn bsb__link--collapse {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'add_return' or current_url == 'bulk_import_orders' %}active{% endif %}"
            data-bs-toggle="collapse"
            data-bs-target="#submenu-orders"
            data-label="{% trans "Orders" %}"
            href="#"
-           aria-expanded="{% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}true{% else %}false{% endif %}">
+           aria-expanded="{% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'add_return' or current_url == 'bulk_import_orders' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-basket-shopping me-2"></i>
           <span>{% trans "Orders" %}</span>
           <i class="fa-solid fa-chevron-down ms-auto bsb__icon--rotate"></i>
         </a>
-        <div class="collapse bsb__submenu {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}show{% endif %}" id="submenu-orders">
+        <div class="collapse bsb__submenu {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'add_return' or current_url == 'bulk_import_orders' %}show{% endif %}" id="submenu-orders">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a class="nav-link btn bsb__submenu-link {% if current_url == 'orders_all_list' or current_url == 'orders_list' %}active{% endif %}"
@@ -54,6 +54,22 @@
                  href="{% url 'orders:add_order' %}">
                 <i class="fa-solid fa-plus me-2"></i>
                 <span>{% trans "Add Orders" %}</span>
+              </a>
+            </li>
+            {% comment %}The reverse trip: a collection back from the customer. Sits next
+            to Add Orders because it is the same decision in the other direction.{% endcomment %}
+            <li class="nav-item">
+              <a class="nav-link btn bsb__submenu-link {% if current_url == 'add_return' %}active{% endif %}"
+                 href="{% url 'orders:add_return' %}">
+                <i class="fa-solid fa-rotate-left me-2"></i>
+                <span>{% trans "Return Pickup" %}</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn bsb__submenu-link {% if current_url == 'returns_list' or current_url == 'return_detail' %}active{% endif %}"
+                 href="{% url 'business:returns_list' %}">
+                <i class="fa-solid fa-box-open me-2"></i>
+                <span>{% trans "My Returns" %}</span>
               </a>
             </li>
             <li class="nav-item">

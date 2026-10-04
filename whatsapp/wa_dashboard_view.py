@@ -4,8 +4,9 @@ WAHA session-health ops dashboard.
 A single self-contained HTML page that polls /waha/api/sessions/<session>
 every 5 seconds and surfaces session status, linked phone, and a QR pane.
 
-Auth: htpasswd-gated by nginx upstream of /waha/wa-dashboard/. Do NOT add
-Django auth here.
+Auth: htpasswd-gated by nginx upstream of /waha/wa-dashboard/, AND a Django
+super-admin login (2026-10-04). Scanning a QR here links a device to a company
+number, so marketing staff get the inbox (/waha/wa-chats/) and nothing else.
 
 The browser talks to /waha/api/... directly; nginx reverse-proxies to the
 WAHA container with X-Api-Key injected, so the API key never reaches the
@@ -15,10 +16,14 @@ from django.http import HttpResponse
 from django.utils.html import escape
 from django.views.decorators.cache import never_cache
 
+from core.decorators import department_required
+from core.departments import ADMIN
+
 from . import sessions as wa_sessions
 
 
 @never_cache
+@department_required(ADMIN)
 def wa_dashboard(request):
     session = wa_sessions.from_request(request)
     html = (

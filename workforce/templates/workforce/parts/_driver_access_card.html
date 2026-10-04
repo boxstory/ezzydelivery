@@ -1,0 +1,91 @@
+{% comment %}
+Purpose: Driver clearance card — spells out what this driver may reach (fleet dashboard, PWA task work) and carries the grant/withdraw control.
+Used by: workforce/templates/workforce/driver_detail.html (Overview tab and Settings tab)
+Notes:   One flag, two surfaces. fleet/access.py gates the PWA pages AND the /api/v1/driver/ endpoints off the same
+         Driver.dashboard_access_enabled, so both rows read one value — they are listed apart because that is how ops
+         ask the question, not because they can differ. Included twice on a page, so every id carries {{ card_suffix }}
+         and the button is found by class, never by id.
+{% endcomment %}
+<div class="wdd__card" id="wdd_access_card_{{ card_suffix }}">
+    <div class="wdd__card__header">
+        <span><i class="fa-solid fa-id-badge"></i> Driver Access</span>
+    </div>
+    <div class="wdd__card__body">
+        <div class="wdd__pref__row">
+            <span class="wdd__pref__label">Cleared to work</span>
+            <span class="wdd__pref__value">
+                {% if driver_cleared_to_work %}
+                    Yes
+                {% elif driver.driver_status != 'approved' %}
+                    <span class="wdd__pref__value--muted">No — account is {{ driver.get_driver_status_display|lower }}</span>
+                {% else %}
+                    <span class="wdd__pref__value--muted">No — profile &amp; opportunities only</span>
+                {% endif %}
+            </span>
+        </div>
+
+        <div class="wdd__pref__row">
+            <span class="wdd__pref__label">Dashboard</span>
+            <span class="wdd__pref__value">
+                {% if driver_cleared_to_work %}
+                <span class="wdd__pref__flag wdd__pref__flag--on"><i class="fa-solid fa-circle-check"></i> Allowed</span>
+                {% else %}
+                <span class="wdd__pref__flag"><i class="fa-solid fa-lock"></i> Not allowed</span>
+                {% endif %}
+            </span>
+        </div>
+
+        <div class="wdd__pref__row">
+            <span class="wdd__pref__label">PWA tasks</span>
+            <span class="wdd__pref__value">
+                {% if driver_cleared_to_work %}
+                <span class="wdd__pref__flag wdd__pref__flag--on"><i class="fa-solid fa-circle-check"></i> Allowed</span>
+                {% else %}
+                <span class="wdd__pref__flag"><i class="fa-solid fa-lock"></i> Not allowed</span>
+                {% endif %}
+            </span>
+        </div>
+
+        <div class="wdd__pref__row">
+            <span class="wdd__pref__label">Opportunities</span>
+            <span class="wdd__pref__value">
+                <span class="wdd__pref__flag wdd__pref__flag--on"><i class="fa-solid fa-circle-check"></i> Always allowed</span>
+            </span>
+        </div>
+
+        {% if driver_cleared_to_work and driver.dashboard_access_granted_at %}
+        <div class="wdd__pref__row">
+            <span class="wdd__pref__label">Granted</span>
+            <span class="wdd__pref__value">
+                {{ driver.dashboard_access_granted_at|date:"d M Y, H:i" }}
+                {% if driver.dashboard_access_granted_by %}
+                    by {{ driver.dashboard_access_granted_by.username }}
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+
+        {% if driver.driver_status == 'approved' %}
+        <div class="wdd__pref__row wdd__pref__row--stack">
+            <button type="button" class="wdd__btn wdd__access-btn"
+                    id="wdd_access_btn_{{ card_suffix }}"
+                    data-enabled="{{ driver.dashboard_access_enabled|yesno:'1,0' }}"
+                    data-url="{% url 'workforce:driver_set_dashboard_access' driver.driver_id %}">
+                {% if driver.dashboard_access_enabled %}
+                    <i class="fa-solid fa-lock"></i> Withdraw access
+                {% else %}
+                    <i class="fa-solid fa-unlock"></i> Grant access
+                {% endif %}
+            </button>
+            <span class="wdd__pref__note">
+                One clearance covers both the dashboard and the PWA — tasks, pickups, COD and earnings.
+                The opportunities board stays open either way.
+            </span>
+        </div>
+        {% else %}
+        <span class="wdd__pref__note">
+            Access can only be granted once the driver is approved. Set the status to Approved in Settings first.
+        </span>
+        {% endif %}
+    </div>
+</div>

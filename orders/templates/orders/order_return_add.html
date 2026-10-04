@@ -1,0 +1,165 @@
+{% extends "business_dashboard_base.html" %}
+{% load static business_console i18n %}
+{% comment %}
+Purpose: The seller's form for booking a collection back from a customer — with one of their orders behind it, or without.
+Used by: orders_views.add_return at /orders/add_return/
+Notes: The sibling of order_add.html and its reverse: the customer is the origin, this client's counter the destination.
+       Shares every field with the staff desk through orders/parts/_return_* — the two must post identical names, so the
+       console skin lives entirely in business-return-intake.css under `.ortn` rather than in those partials.
+       No charge field on purpose: what a client pays for a collection is not theirs to type. The order lookup is a
+       GET form and must stay outside the POST form; nested forms are dropped by the browser without a word.
+{% endcomment %}
+
+{% block title %}{% trans "Book a Return Pickup" %}{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'business/css/business-return-intake.css' %}?v=20260926-4">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="flex-fill biz-dash__page ortn" id="orders_add_return_container_main">
+
+  {% bconheader eyebrow="Orders" live="Returns" icon="fa-solid fa-rotate-left" title="Book a Return Pickup" subtitle="Send a driver to collect goods back from your customer." %}
+    <a href="{% url 'business:returns_list' %}" class="bcon__btn bcon__btn--ghost">
+      <i class="fa-solid fa-list"></i> {% trans "My Returns" %}
+    </a>
+    <a href="{% url 'orders:add_order' %}" class="bcon__btn bcon__btn--ghost">
+      <i class="fa-solid fa-plus"></i> {% trans "New Order" %}
+    </a>
+  {% endbconheader %}
+
+  {% comment %}Same two links the yellow btn-group carried, with the difference
+  between them spelled out — "We delivered it" only tells you which one is true
+  if you already know what the form does with the answer.{% endcomment %}
+  <div class="ortn__routes" role="group" aria-label="{% trans 'Return type' %}">
+    <a href="?mode=order"
+       class="ortn__route {% if mode == 'order' %}ortn__route--on{% endif %}"
+       id="orders_add_return_link_mode_order"
+       {% if mode == 'order' %}aria-current="page"{% endif %}>
+      <span class="ortn__route-icon"><i class="fa-solid fa-link" aria-hidden="true"></i></span>
+      <span class="ortn__route-body">
+        <span class="ortn__route-title">{% trans "We delivered it" %}</span>
+        <span class="ortn__route-note">{% trans "Find the order and we copy the customer, the address and the lines off it." %}</span>
+      </span>
+      {% if mode == 'order' %}<i class="fa-solid fa-circle-check ortn__route-mark" aria-hidden="true"></i>{% endif %}
+    </a>
+    <a href="?mode=standalone"
+       class="ortn__route {% if mode != 'order' %}ortn__route--on{% endif %}"
+       id="orders_add_return_link_mode_standalone"
+       {% if mode != 'order' %}aria-current="page"{% endif %}>
+      <span class="ortn__route-icon"><i class="fa-solid fa-link-slash" aria-hidden="true"></i></span>
+      <span class="ortn__route-body">
+        <span class="ortn__route-title">{% trans "We did not deliver it" %}</span>
+        <span class="ortn__route-note">{% trans "No order of ours behind it — type where the goods are and where they go." %}</span>
+      </span>
+      {% if mode != 'order' %}<i class="fa-solid fa-circle-check ortn__route-mark" aria-hidden="true"></i>{% endif %}
+    </a>
+  </div>
+
+  {% if mode == 'order' %}
+    {% comment %}Order mode is the only one with a gate: nothing below the search
+    exists until an order resolves, so the rail says how far along that is.
+    Standalone gets none — every field is available at once and a rail there
+    would be decoration.{% endcomment %}
+    <ol class="ortn__steps" aria-label="{% trans 'Steps' %}">
+      <li class="ortn__step {% if order %}ortn__step--done{% else %}ortn__step--now{% endif %}">
+        <span class="ortn__step-no">{% if order %}<i class="fa-solid fa-check" aria-hidden="true"></i>{% else %}1{% endif %}</span>
+        <span>{% trans "Find the order" %}</span>
+      </li>
+      <li class="ortn__step-rule" aria-hidden="true"></li>
+      <li class="ortn__step {% if order and not order_blocker %}ortn__step--now{% endif %}">
+        <span class="ortn__step-no">2</span>
+        <span>{% trans "Check what is coming back" %}</span>
+      </li>
+      <li class="ortn__step-rule" aria-hidden="true"></li>
+      {% comment %}Only step 2 is ever "now" — 2 and 3 are both on screen once an
+      order resolves, and lighting both up says nothing about where to look.{% endcomment %}
+      <li class="ortn__step">
+        <span class="ortn__step-no">3</span>
+        <span>{% trans "Why, and send a driver" %}</span>
+      </li>
+    </ol>
+
+    {% include "orders/parts/_return_order_lookup.html" with lookup_url=request.path scope_note="Your own order number, or the code you gave it." %}
+
+    {% if order %}
+    <form method="post" id="orders_add_return_form_intake" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="order">
+      <input type="hidden" name="order_ref" value="{{ order.order_number }}">
+
+      {% include "orders/parts/_return_order_summary.html" %}
+
+      {% if not order_blocker %}
+      <div class="bcon__panel mb-3">
+        <div class="bcon__panel-head">
+          <h5 class="bcon__panel-title"><i class="fa-solid fa-rotate-left"></i> {% trans "Why it is coming back" %}</h5>
+        </div>
+        <div class="bcon__panel-body">
+          {% include "orders/parts/_return_intake_fields.html" with schedule_note="We will raise the collection and assign a driver. Leave it off to log the return without a pickup." %}
+        </div>
+      </div>
+
+      <div class="ortn__actions">
+        <span class="ortn__actions-note">{% trans "Our team reviews the collection before a driver is assigned." %}</span>
+        <a href="{% url 'business:returns_list' %}" class="bcon__btn bcon__btn--ghost">{% trans "Cancel" %}</a>
+        <button type="submit" class="bcon__btn bcon__btn--primary" id="orders_add_return_btn_create">
+          <i class="fa-solid fa-rotate-left"></i> {% trans "Book the pickup" %}
+        </button>
+      </div>
+      {% endif %}
+    </form>
+
+    {% else %}
+    {% comment %}Without this the page is the search box and then 700px of white,
+    which reads as a form that failed to load rather than one that is waiting.{% endcomment %}
+    <div class="ortn__wait" id="orders_add_return_box_waiting">
+      <i class="fa-solid fa-box-open ortn__wait-icon" aria-hidden="true"></i>
+      <div>
+        <p class="ortn__wait-title">{% trans "Find the order first" %}</p>
+        <ul class="ortn__wait-list">
+          <li>{% trans "We fill in the customer, their address and the items from that order." %}</li>
+          <li>{% trans "You untick anything they are keeping, and say why it is coming back." %}</li>
+          <li>{% trans "We raise the collection and our team assigns a driver." %}</li>
+        </ul>
+        <a href="?mode=standalone" class="ortn__wait-alt">
+          {% trans "Somebody else delivered these goods" %}
+          <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+  {% else %}
+    <form method="post" id="orders_add_return_form_intake" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="standalone">
+
+      {% include "orders/parts/_return_standalone_fields.html" %}
+
+      <div class="bcon__panel mt-3 mb-3">
+        <div class="bcon__panel-head">
+          <h5 class="bcon__panel-title"><i class="fa-solid fa-rotate-left"></i> {% trans "Why it is coming back" %}</h5>
+        </div>
+        <div class="bcon__panel-body">
+          {% include "orders/parts/_return_intake_fields.html" with schedule_note="We will raise the collection and assign a driver. Leave it off to log the return without a pickup." %}
+        </div>
+      </div>
+
+      <div class="ortn__actions">
+        <span class="ortn__actions-note">{% trans "Our team reviews the collection before a driver is assigned." %}</span>
+        <a href="{% url 'business:returns_list' %}" class="bcon__btn bcon__btn--ghost">{% trans "Cancel" %}</a>
+        <button type="submit" class="bcon__btn bcon__btn--primary" id="orders_add_return_btn_create">
+          <i class="fa-solid fa-rotate-left"></i> {% trans "Book the pickup" %}
+        </button>
+      </div>
+    </form>
+  {% endif %}
+
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+{% include "orders/parts/_return_standalone_js.html" %}
+{% include "orders/parts/_return_item_rows_js.html" %}
+{% endblock extra_js %}

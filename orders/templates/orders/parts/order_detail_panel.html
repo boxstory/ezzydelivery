@@ -1,6 +1,6 @@
 {% load custom_filters %}
 <!-- Order Detail Panel Content - Partial template for slide-in panel -->
-<div class="odp">
+<div class="odp odp--console">
   <!-- Hero Banner -->
   <div class="odp__hero">
     <div class="odp__hero-main">
@@ -114,7 +114,14 @@
             <div class="odt__field odt__field--compact odt__field--compact-wide">
               <span class="odt__field__label"><i class="fa-solid fa-crosshairs fa-xs"></i> Lat / Lng</span>
               <span class="odt__field__value odt__field__value--mono">
-                {% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-odp" lat=order.latitude lon=order.longitude label="Delivery location" text=order.latitude|floatformat:6|add:", "|add:order.longitude|floatformat:6 size="sm" %}
+                {% comment %}`add` coerces with int() and then falls back to `lhs + rhs`;
+                a str + Decimal raises, and Django's add swallows it and returns "". So
+                the longitude has to be a string BEFORE it becomes an argument — chained
+                as `add:order.longitude|floatformat:6` it is still the raw Decimal and the
+                whole coordinate rendered blank, leaving an empty-looking cell.{% endcomment %}
+                {% with lon_text=order.longitude|floatformat:6 %}
+                {% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-odp" lat=order.latitude lon=order.longitude label="Delivery location" text=order.latitude|floatformat:6|add:", "|add:lon_text size="sm" %}
+                {% endwith %}
               </span>
             </div>
             <div class="odt__field odt__field--compact">
@@ -175,29 +182,31 @@
       <i class="fa-solid fa-box-open"></i>
       <span>Package Description</span>
     </div>
-    <!-- Summary: Package / Qty / COD -->
-    <div class="d-flex flex-column gap-1 p-2 rounded mb-2" style="background:#fff8e1;border:1px solid #f5c542;">
+    {% comment %}Package / Qty / COD. Restates the COD figure shown in Payment
+    above, so it is a quiet spec block rather than a second warm slab competing
+    with it. Classes, not inline styles — see brandkit hard rule 1.{% endcomment %}
+    <div class="odp__spec mb-2">
       {% if order.package_description %}
-      <div class="d-flex align-items-center gap-2">
-        <i class="fa-solid fa-box-open" style="color:#c49000;font-size:0.7rem;"></i>
-        <span class="text-muted small" style="min-width:45px;">Package</span>
-        <span class="fw-medium small">{{ order.package_description }}</span>
+      <div class="odp__spec-row">
+        <i class="fa-solid fa-box-open odp__spec-icon" aria-hidden="true"></i>
+        <span class="odp__spec-label">Package</span>
+        <span class="odp__spec-value">{{ order.package_description }}</span>
       </div>
       {% endif %}
-      <div class="d-flex align-items-center gap-2">
-        <i class="fa-solid fa-cubes" style="color:#c49000;font-size:0.7rem;"></i>
-        <span class="text-muted small" style="min-width:45px;">Qty</span>
-        <span class="fw-semibold small">{% if order.package_qty %}{{ order.package_qty }}{% elif order_items %}{{ order_items|length }}{% else %}—{% endif %}</span>
+      <div class="odp__spec-row">
+        <i class="fa-solid fa-cubes odp__spec-icon" aria-hidden="true"></i>
+        <span class="odp__spec-label">Qty</span>
+        <span class="odp__spec-value odp__spec-value--num">{% if order.package_qty %}{{ order.package_qty }}{% elif order_items %}{{ order_items|length }}{% else %}—{% endif %}</span>
       </div>
-      <div class="d-flex align-items-center gap-2">
-        <i class="fa-solid fa-money-bill-wave text-success" style="font-size:0.7rem;"></i>
-        <span class="text-muted small" style="min-width:45px;">COD</span>
-        <span class="fw-semibold small">{{ order.cod_amount|default:0 }} QR</span>
+      <div class="odp__spec-row">
+        <i class="fa-solid fa-money-bill-wave odp__spec-icon" aria-hidden="true"></i>
+        <span class="odp__spec-label">COD</span>
+        <span class="odp__spec-value odp__spec-value--num">{{ order.cod_amount|default:0 }} QR</span>
       </div>
     </div>
     <!-- Product Items -->
     {% if order_items %}
-    <div class="small text-muted fw-semibold text-uppercase mb-1" style="letter-spacing:0.04em;font-size:0.6rem;">Product Items ({{ order_items|length }})</div>
+    <div class="odp__subhead">Product Items ({{ order_items|length }})</div>
     <div class="odp__items">
       {% for item in order_items %}
       {% with stock=item.stock_info %}

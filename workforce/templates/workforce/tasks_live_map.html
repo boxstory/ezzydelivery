@@ -9,7 +9,7 @@ Notes: Two-column shell (.lmap) — Leaflet canvas on the left, a fixed-width co
 {% endcomment %}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/live-map.css' %}?v=20260923b" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/live-map.css' %}?v=20261004a" rel="stylesheet" type="text/css" />
 {% endblock %}
 
 {% block content %}
@@ -54,11 +54,13 @@ Notes: Two-column shell (.lmap) — Leaflet canvas on the left, a fixed-width co
             <section class="lmap__group">
                 <div class="lmap__group-title">Date Range</div>
                 <div class="map-daterange">
-                    <i class="fa-solid fa-calendar-days map-daterange__icon" aria-hidden="true"></i>
                     <input type="date" id="wf-date-from" class="map-daterange__input" value="{{ date_from }}" aria-label="From date">
                     <span class="map-daterange__sep">—</span>
                     <input type="date" id="wf-date-to" class="map-daterange__input" value="{{ date_to }}" aria-label="To date">
-                    <button class="map-daterange__btn" onclick="applyDateFilter()">Apply</button>
+                    <button type="button" class="map-daterange__btn" onclick="applyDateFilter()"
+                            title="Apply date range" aria-label="Apply date range">
+                        <i class="fa fa-search" aria-hidden="true"></i>
+                    </button>
                 </div>
             </section>
 
@@ -76,7 +78,12 @@ Notes: Two-column shell (.lmap) — Leaflet canvas on the left, a fixed-width co
                     <div class="map-pickup-filter" id="wf-pickup-filter">
                         <div class="map-pickup-filter__header">
                             <span>Filter by Pickup</span>
-                            <span class="map-pickup-filter__clear" id="wf-pickup-filter-clear" onclick="clearPickupFilter(event)">Show All</span>
+                            <span class="map-filter__acts">
+                                <button type="button" class="map-filter__act" onclick="clearPickupSelection(event)"
+                                        title="Untick every pickup location">None</button>
+                                <button type="button" class="map-filter__act map-filter__act--link" id="wf-pickup-filter-clear"
+                                        onclick="clearPickupFilter(event)">Show All</button>
+                            </span>
                         </div>
                         <!-- Items injected by JS -->
                     </div>
@@ -91,7 +98,14 @@ Notes: Two-column shell (.lmap) — Leaflet canvas on the left, a fixed-width co
                     <div class="map-driver-filter" id="wf-driver-filter">
                         <div class="map-driver-filter__header">
                             <span>Filter Drivers</span>
-                            <span class="map-driver-filter__clear" id="wf-driver-filter-clear" onclick="clearDriverFilter(event)">Show All</span>
+                            <span class="map-filter__acts">
+                                <button type="button" class="map-filter__act" onclick="selectAppDrivers(event)"
+                                        title="Only drivers currently signed in on the driver app">App only</button>
+                                <button type="button" class="map-filter__act" onclick="clearDriverSelection(event)"
+                                        title="Untick every driver">None</button>
+                                <button type="button" class="map-filter__act map-filter__act--link" id="wf-driver-filter-clear"
+                                        onclick="clearDriverFilter(event)">Show All</button>
+                            </span>
                         </div>
                         <!-- Items injected by JS -->
                     </div>
@@ -357,6 +371,15 @@ Notes: Two-column shell (.lmap) — Leaflet canvas on the left, a fixed-width co
                         + ' — but this phone has never reported a position</div>';
                 }
                 if (d.updated) h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-clock me-1"></i>Updated ' + d.updated + '</div>';
+            } else if (d.last_known) {
+                // Silent for over two hours: the newest fix the phone ever sent.
+                // Name the day and time — "50h 3m ago" is arithmetic for the
+                // dispatcher, and a speed from that moment would read as live.
+                h += '<div class="wf-dpopup__meta wf-dpopup__meta--stale"><i class="fa-solid fa-satellite-dish me-1"></i>Last GPS: ' + escHtml(d.last_seen) + '</div>';
+                h += '<div class="wf-dpopup__meta wf-dpopup__meta--note"><i class="fa-solid fa-clock-rotate-left me-1"></i>Last known position — the app has not reported since</div>';
+                if (d.coarse) {
+                    h += '<div class="wf-dpopup__meta"><i class="fa-solid fa-circle-notch me-1"></i>Approximate position (±' + Math.round(d.accuracy) + 'm)</div>';
+                }
             } else {
                 h += '<div class="wf-dpopup__meta' + (stale ? ' wf-dpopup__meta--stale' : '') + '">';
                 h += '<i class="fa-solid fa-satellite-dish me-1"></i>';
@@ -482,7 +505,10 @@ Notes: Two-column shell (.lmap) — Leaflet canvas on the left, a fixed-width co
                 label.className = 'map-driver-filter__item';
                 label.innerHTML = '<input type="checkbox"' + (isChecked ? ' checked' : '') + ' data-driver-id="' + d.driver_id + '">'
                     + '<span class="map-driver-filter__dot' + dotClass + '"></span>'
-                    + '<span>' + d.driver_name + '</span>';
+                    + '<span>' + d.driver_name + '</span>'
+                    + (d.has_app
+                        ? '<i class="fa-solid fa-mobile-screen map-driver-filter__app" title="Signed in on the driver app"></i>'
+                        : '');
                 label.querySelector('input').addEventListener('change', onDriverFilterChange);
                 panel.appendChild(label);
             });
@@ -498,6 +524,32 @@ Notes: Two-column shell (.lmap) — Leaflet canvas on the left, a fixed-width co
             renderDrivers(drivers);
             renderTasks(allPins, false);
         }
+
+        // Untick everything. onDriverFilterChange turns an empty selection into an
+        // empty activeDriverIds (not null), so the map really does clear — null is
+        // reserved for "no filter at all".
+        window.clearDriverSelection = function(e) {
+            if (e) e.stopPropagation();
+            document.querySelectorAll('#wf-driver-filter input[type=checkbox]').forEach(function(cb) {
+                cb.checked = false;
+            });
+            onDriverFilterChange();
+        };
+
+        // Narrow to the drivers who can actually open the app right now. has_app
+        // comes from a live, verified device — not from being approved, and not
+        // from having pinged GPS lately.
+        window.selectAppDrivers = function(e) {
+            if (e) e.stopPropagation();
+            var appIds = {};
+            (drivers || []).forEach(function(d) {
+                if (d.has_app) appIds[String(d.driver_id)] = true;
+            });
+            document.querySelectorAll('#wf-driver-filter input[type=checkbox]').forEach(function(cb) {
+                cb.checked = !!appIds[String(cb.dataset.driverId)];
+            });
+            onDriverFilterChange();
+        };
 
         window.clearDriverFilter = function(e) {
             if (e) e.stopPropagation();
@@ -565,6 +617,14 @@ Notes: Two-column shell (.lmap) — Leaflet canvas on the left, a fixed-width co
             if (clearBtn) clearBtn.textContent = activePickupIds === null ? 'Show All' : 'Clear';
             renderTasks(allPins, false);
         }
+
+        window.clearPickupSelection = function(e) {
+            if (e) e.stopPropagation();
+            document.querySelectorAll('#wf-pickup-filter input[type=checkbox]').forEach(function(cb) {
+                cb.checked = false;
+            });
+            onPickupFilterChange();
+        };
 
         window.clearPickupFilter = function(e) {
             if (e) e.stopPropagation();

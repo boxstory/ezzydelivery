@@ -93,34 +93,62 @@ class ProposalVisibilityTests(TestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver'])
-class CareersPageProposalTests(TestCase):
-    """The public page renders only the offers published to it."""
+class DriverJobsPageProposalTests(TestCase):
+    """The public driver jobs page renders only the offers published to it.
 
-    def test_careers_page_shows_a_published_offer(self):
+    The offers moved off /careers/ to /careers/drivers/ so the fleet desk has a
+    driver-only link to share on WhatsApp — these tests follow them.
+    """
+
+    def test_page_shows_a_published_offer(self):
         make_proposal('Full-time bike rider — Doha', ref_code='EZY-DRV-01')
-        response = Client().get(reverse('webpages:careers'))
+        response = Client().get(reverse('webpages:careers_drivers'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Full-time bike rider')
         self.assertContains(response, 'EZY-DRV-01')
         self.assertContains(response, 'QAR 3,500/month')
         self.assertContains(response, 'Fuel allowance')
 
-    def test_careers_page_hides_an_app_only_offer(self):
+    def test_page_hides_an_app_only_offer(self):
         make_proposal('Inside the app only', show_on_careers=False)
-        response = Client().get(reverse('webpages:careers'))
+        response = Client().get(reverse('webpages:careers_drivers'))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'Inside the app only')
 
-    def test_careers_page_hides_a_draft(self):
+    def test_page_hides_a_draft(self):
         make_proposal('Unfinished wording', status='draft', published_at=None)
-        response = Client().get(reverse('webpages:careers'))
+        response = Client().get(reverse('webpages:careers_drivers'))
         self.assertNotContains(response, 'Unfinished wording')
 
-    def test_careers_page_renders_with_no_offers(self):
-        """No proposals at all must not break the page or show an empty heading."""
+    def test_page_renders_with_no_offers(self):
+        """No proposals at all must not break the page or claim a vacancy."""
+        response = Client().get(reverse('webpages:careers_drivers'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'driver intake is always open')
+        self.assertNotContains(response, 'JobPosting')
+
+    def test_published_offer_emits_a_job_posting(self):
+        """SEO: a live offer must reach the page as JobPosting JSON-LD."""
+        make_proposal('Van driver — Industrial Area', ref_code='EZY-DRV-07')
+        response = Client().get(reverse('webpages:careers_drivers'))
+        html = response.content.decode()
+        self.assertIn('application/ld+json', html)
+        self.assertIn('"@type": "JobPosting"', html)
+        self.assertIn('EZY-DRV-07', html)
+
+    def test_offers_are_no_longer_on_the_careers_page(self):
+        """The split is the point: an offer must not render on /careers/ as well."""
+        make_proposal('Full-time bike rider — Doha', ref_code='EZY-DRV-01')
         response = Client().get(reverse('webpages:careers'))
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, 'DRIVER OFFERS')
+        self.assertNotContains(response, 'Full-time bike rider')
+        self.assertContains(response, '/careers/drivers/')
+
+    def test_short_link_redirects_to_the_driver_page(self):
+        """The WhatsApp-friendly alias must land on the canonical page."""
+        response = Client().get('/driver-jobs/')
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response['Location'], reverse('webpages:careers_drivers'))
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver'])
@@ -181,6 +209,14 @@ class StaffProposalConsoleTests(TestCase):
         response = self.client.get(reverse('workforce:wf_driver_proposals'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Existing offer')
+
+    def test_list_carries_the_public_driver_jobs_link(self):
+        """The desk sends this link on WhatsApp, so the console must show it."""
+        response = self.client.get(reverse('workforce:wf_driver_proposals'))
+        html = response.content.decode()
+        self.assertIn('http://testserver/careers/drivers/', html)
+        self.assertIn('wa.me', html)
+        self.assertIn('Copy link', html)
 
     def test_create_saves_the_offer(self):
         response = self.client.post(reverse('workforce:wf_driver_proposal_new'), {

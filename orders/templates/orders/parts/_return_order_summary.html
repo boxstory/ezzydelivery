@@ -1,0 +1,89 @@
+{% comment %}
+Purpose: What a return against a found order will actually collect — customer, drop-off, and the lines coming back.
+Used by: workforce/returns_task_create.html and orders/order_return_add.html, inside the POST form.
+Notes: Nothing here is editable except the line quantities: every address and the default charge are read off the
+       order by ReturnRequest's claim_* resolvers, so retyping them could only introduce a wrong one.
+       items_scoped tells orders.return_intake the ticks are meaningful; without it, the whole parcel is assumed.
+{% endcomment %}
+<div class="card mb-3">
+  {% comment %}No gap-2 here or below: business.css turns every .d-flex.gap-2 into a
+  column under 576px, which on a phone stacks these rows instead of keeping them one
+  line. Margin utilities do the same spacing without tripping that rule.{% endcomment %}
+  <div class="card-header d-flex flex-wrap align-items-center">
+    <strong><i class="fa-solid fa-box me-2" aria-hidden="true"></i>Order <span class="returns-intake__ref">#{{ order.order_number }}</span></strong>
+    <span class="text-muted small ms-auto">{{ order.get_order_status_display }}</span>
+  </div>
+  <div class="card-body">
+    {% if order_claim %}
+    <div class="alert alert-info" role="alert">
+      Return <strong>{{ order_claim.return_number }}</strong> is already open for this order
+      ({{ order_claim.get_status_display }}). Submitting adds to that one rather than opening a
+      second — two claims for one parcel means two drivers sent for it.
+    </div>
+    {% endif %}
+
+    {% if order_blocker %}
+    <div class="alert alert-danger mb-0" role="alert">
+      <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>{{ order_blocker }}
+    </div>
+    {% else %}
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <div class="text-muted small returns-intake__key">Client</div>
+        <div class="returns-intake__val">{{ order.business.business_name }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small returns-intake__key">Collect from</div>
+        <div class="returns-intake__val">{{ order.customer_name|default:"—" }}</div>
+        <div class="text-muted small returns-intake__sub">{{ order.customer_phone|default:"" }}</div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="text-muted small returns-intake__key">At</div>
+        <div class="small returns-intake__val">{{ order.customer_address|default:"—" }}</div>
+        <div class="text-muted small returns-intake__sub">
+          {% if order.dl_zone %}Zone {{ order.dl_zone }}{% endif %}
+          {% if order.dl_street %} / St {{ order.dl_street }}{% endif %}
+          {% if order.dl_building %} / Bld {{ order.dl_building }}{% endif %}
+        </div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="text-muted small returns-intake__key">Deliver the goods to</div>
+        <div class="small returns-intake__val">{{ order.pickup_location.pickup_location_title|default:"—" }}</div>
+        <div class="text-muted small returns-intake__sub">The trip runs backwards — the customer is the origin.</div>
+      </div>
+    </div>
+
+    <hr>
+    {% if return_lines %}
+    <div class="form-label mb-1">What is coming back</div>
+    <p class="text-muted small">
+      Untick a line to leave it with the customer. Lines already returned are not listed.
+    </p>
+    <input type="hidden" name="items_scoped" value="1">
+    <div class="row g-2">
+      {% for line in return_lines %}
+      <div class="col-12 col-md-6">
+        <div class="d-flex align-items-center returns-intake__line">
+          <input class="form-check-input mt-0 me-2" type="checkbox" value="1"
+                 id="returns_intake_check_item_{{ line.item.id }}" name="item_{{ line.item.id }}" checked>
+          <label class="form-check-label flex-fill me-2" for="returns_intake_check_item_{{ line.item.id }}">
+            {{ line.label }}
+          </label>
+          <input type="number" class="form-control form-control-sm w-auto"
+                 id="returns_intake_input_qty_{{ line.item.id }}" name="qty_{{ line.item.id }}"
+                 min="0" max="{{ line.remaining }}" value="{{ line.remaining }}"
+                 aria-label="Quantity coming back">
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% comment %}Goods the customer is sending back that were never on this order — a gift,
+    a wrong item shipped by somebody else. They hang off the same claim.{% endcomment %}
+    <div class="mt-3">
+      {% include "orders/parts/_return_item_rows.html" with items_label="Something else coming back?" items_hint="Add anything the customer is returning that was not on this order." item_business_id=order.business.business_id %}
+    </div>
+    {% endif %}
+  </div>
+</div>

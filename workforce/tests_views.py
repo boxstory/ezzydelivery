@@ -21,7 +21,7 @@ Comprehensive View Test Suite for Staff/Workforce Dashboard
 import json
 from decimal import Decimal
 from datetime import date, timedelta
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -917,6 +917,74 @@ class WfDeliveryTaskTest(WorkforceTestMixin, TestCase):
         data = json.loads(resp.content)
         self.assertTrue(data['success'])
 
+    def test_unassign_driver_resets_accepted_task(self):
+        """Removing the driver from an accepted task puts it back in the pool.
+
+        The forward-only staff rule used to revert the status write, so the task
+        was left driverless but still reading 'accepted' — out of every driver's
+        list and out of the pool.
+        """
+        driver = self.create_driver()
+        # Straight to the DB: the pre_save guard refuses a jump to a mid-flow
+        # status, which is the very thing under test here.
+        delivery_models.DeliveryTask.objects.filter(pk=self.task.pk).update(
+            driver=driver, dl_task_status='accepted')
+        delivery_models.AssignedDriver.objects.create(
+            dl_task=self.task, driver=driver)
+
+        resp = self.client.post(
+            reverse('workforce:unassign_driver_from_task',
+                    kwargs={'task_id': self.task.id}),
+            json.dumps({}), content_type='application/json')
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(json.loads(resp.content)['success'])
+        self.task.refresh_from_db()
+        self.assertIsNone(self.task.driver_id)
+        self.assertEqual(self.task.dl_task_status, 'pending')
+        self.assertFalse(
+            delivery_models.AssignedDriver.objects.filter(
+                dl_task=self.task).exists(),
+            'the claim row alone still passes the driver ownership checks')
+
+    def test_unassign_driver_refused_on_closed_task(self):
+        """A delivered task keeps the driver it was paid out against."""
+        driver = self.create_driver()
+        delivery_models.DeliveryTask.objects.filter(pk=self.task.pk).update(
+            driver=driver, dl_task_status='delivered')
+
+        resp = self.client.post(
+            reverse('workforce:unassign_driver_from_task',
+                    kwargs={'task_id': self.task.id}),
+            json.dumps({}), content_type='application/json')
+
+        self.assertEqual(resp.status_code, 400)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.driver_id, driver.pk)
+        self.assertEqual(self.task.dl_task_status, 'delivered')
+
+    def test_assign_driver_clears_previous_claim_row(self):
+        """Reassigning drops the old driver's claim row, not just the FK."""
+        old_driver = self.create_driver(code='DRV-OLD')
+        new_driver = self.create_driver(code='DRV-NEW')
+        delivery_models.DeliveryTask.objects.filter(pk=self.task.pk).update(
+            driver=old_driver, dl_task_status='accepted')
+        delivery_models.AssignedDriver.objects.create(
+            dl_task=self.task, driver=old_driver)
+
+        resp = self.client.post(
+            reverse('workforce:assign_driver_to_task',
+                    kwargs={'task_id': self.task.id}),
+            json.dumps({'driver_id': new_driver.driver_id}),
+            content_type='application/json')
+
+        self.assertEqual(resp.status_code, 200)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.driver_id, new_driver.pk)
+        self.assertFalse(
+            delivery_models.AssignedDriver.objects.filter(
+                dl_task=self.task, driver=old_driver).exists())
+
     def test_assign_driver_to_task_no_id(self):
         """#73: Assign driver without ID → 400"""
         resp = self.client.post(
@@ -1181,6 +1249,49 @@ class WfDriverManagementTest(WorkforceTestMixin, TestCase):
             reverse('workforce:driver_detail',
                     kwargs={'driver_id': self.driver.driver_id}))
         self.assertEqual(resp.status_code, 200)
+
+    def test_driver_detail_marks_an_expired_document_as_expired(self):
+        """The tag used to read a date against a datetime, so it never fired."""
+        from datetime import timedelta
+        from django.utils import timezone as dj_tz
+        from fleet.models import DriverDocument
+
+        today = dj_tz.localdate()
+        DriverDocument.objects.create(
+            driver=self.driver, document_type='QID', document_no='1',
+            document_expiry_date=today - timedelta(days=5))
+        DriverDocument.objects.create(
+            driver=self.driver, document_type='Passport', document_no='2',
+            document_expiry_date=today + timedelta(days=10))
+        DriverDocument.objects.create(
+            driver=self.driver, document_type='Istimara', document_no='3',
+            document_expiry_date=today + timedelta(days=400))
+        DriverDocument.objects.create(
+            driver=self.driver, document_type='Driving License', document_no='4')
+
+        resp = self.client.get(
+            reverse('workforce:driver_detail',
+                    kwargs={'driver_id': self.driver.driver_id}))
+        state = {d['document_type']: d for d in resp.context['documents']}
+
+        self.assertTrue(state['QID']['is_expired'])
+        self.assertFalse(state['QID']['expires_soon'])
+
+        self.assertFalse(state['Passport']['is_expired'])
+        self.assertTrue(state['Passport']['expires_soon'])
+        self.assertEqual(state['Passport']['days_to_expiry'], 10)
+
+        self.assertFalse(state['Istimara']['is_expired'])
+        self.assertFalse(state['Istimara']['expires_soon'])
+
+        # No date at all is its own state, not "valid"
+        self.assertFalse(state['Driving License']['is_expired'])
+        self.assertIsNone(state['Driving License']['days_to_expiry'])
+
+        body = resp.content.decode()
+        self.assertIn('Expired', body)
+        self.assertIn('Expires in 10 days', body)
+        self.assertIn('No expiry date', body)
 
     def test_driver_detail_nonexistent(self):
         """#97: Nonexistent driver → 404"""
@@ -1782,6 +1893,108 @@ class DeliveryAppControlSaveAllTests(WorkforceTestMixin, TestCase):
         self.assertEqual(self._post([self._row(self.a, delivered=True)]).status_code, 302)
         self.a.refresh_from_db()
         self.assertFalse(self.a.pod_required_delivered)
+
+
+@override_settings(MEDIA_ROOT='/tmp/ezzy-test-media-crop')
+class DriverDocumentCropTests(WorkforceTestMixin, TestCase):
+    """Staff cropping rewrites the document photo, and must stay undoable."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user, self.profile = self.create_staff_user()
+        self.driver = self.create_driver()
+        self.staff_login()
+        self.doc = fleet_models.DriverDocument.objects.create(
+            driver=self.driver, document_type='QID', document_no='29205032883',
+            document_file=self._photo('qid.jpg', 400, 600))
+        self.crop_url = reverse('workforce:driver_document_crop', kwargs={
+            'driver_id': self.driver.driver_id, 'document_id': self.doc.id})
+        self.restore_url = reverse('workforce:driver_document_crop_restore', kwargs={
+            'driver_id': self.driver.driver_id, 'document_id': self.doc.id})
+
+    @staticmethod
+    def _photo(name, w, h):
+        """A real decodable JPEG — the endpoint verifies the bytes with Pillow."""
+        from io import BytesIO
+        from PIL import Image as PILImage
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        buf = BytesIO()
+        PILImage.new('RGB', (w, h), (120, 140, 160)).save(buf, format='JPEG')
+        return SimpleUploadedFile(name, buf.getvalue(), content_type='image/jpeg')
+
+    def test_crop_replaces_the_photo_and_parks_the_original(self):
+        original_name = self.doc.document_file.name
+        resp = self.client.post(self.crop_url, {
+            'side': 'front', 'image': self._photo('crop.jpg', 200, 150)})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+
+        self.doc.refresh_from_db()
+        self.assertNotEqual(self.doc.document_file.name, original_name)
+        self.assertEqual(self.doc.document_file_original.name, original_name)
+        # the untouched upload is still on disk, not overwritten
+        self.assertTrue(self.doc.document_file_original.storage.exists(original_name))
+
+    def test_a_second_crop_keeps_the_first_original_not_the_first_crop(self):
+        original_name = self.doc.document_file.name
+        self.client.post(self.crop_url, {'side': 'front', 'image': self._photo('c1.jpg', 300, 300)})
+        self.client.post(self.crop_url, {'side': 'front', 'image': self._photo('c2.jpg', 100, 100)})
+
+        self.doc.refresh_from_db()
+        self.assertEqual(self.doc.document_file_original.name, original_name)
+
+    def test_restore_puts_the_original_back_and_drops_the_crop(self):
+        original_name = self.doc.document_file.name
+        self.client.post(self.crop_url, {'side': 'front', 'image': self._photo('crop.jpg', 200, 150)})
+        self.doc.refresh_from_db()
+        cropped_name = self.doc.document_file.name
+
+        resp = self.client.post(self.restore_url, {'side': 'front'})
+        self.assertTrue(resp.json()['success'])
+
+        self.doc.refresh_from_db()
+        self.assertEqual(self.doc.document_file.name, original_name)
+        self.assertFalse(self.doc.document_file_original)
+        self.assertFalse(self.doc.document_file.storage.exists(cropped_name))
+
+    def test_restore_without_a_crop_is_refused(self):
+        resp = self.client.post(self.restore_url, {'side': 'front'})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('no original', resp.json()['error'].lower())
+
+    def test_a_file_that_is_not_an_image_is_refused(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        original_name = self.doc.document_file.name
+        resp = self.client.post(self.crop_url, {
+            'side': 'front',
+            'image': SimpleUploadedFile('crop.jpg', b'not an image', content_type='image/jpeg')})
+        self.assertEqual(resp.status_code, 400)
+
+        self.doc.refresh_from_db()
+        self.assertEqual(self.doc.document_file.name, original_name)
+        self.assertFalse(self.doc.document_file_original)
+
+    def test_an_unknown_side_is_refused(self):
+        resp = self.client.post(self.crop_url, {
+            'side': 'sideways', 'image': self._photo('crop.jpg', 50, 50)})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_cropping_a_side_with_no_photo_is_refused(self):
+        resp = self.client.post(self.crop_url, {
+            'side': 'back', 'image': self._photo('crop.jpg', 50, 50)})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('no photo', resp.json()['error'].lower())
+
+    def test_get_is_not_allowed(self):
+        self.assertEqual(self.client.get(self.crop_url).status_code, 405)
+
+    def test_a_signed_out_user_cannot_crop(self):
+        self.client.logout()
+        resp = self.client.post(self.crop_url, {
+            'side': 'front', 'image': self._photo('crop.jpg', 50, 50)})
+        self.assertIn(resp.status_code, (302, 403))
+        self.doc.refresh_from_db()
+        self.assertFalse(self.doc.document_file_original)
 
 
 class DashboardOnlineDriversTests(WorkforceTestMixin, TestCase):

@@ -1668,15 +1668,69 @@ class ReturnRequest(models.Model):
             return f"Ref {self.external_reference} — not delivered by EzzyDelivery"
         return "Goods not delivered by EzzyDelivery"
 
-
 class ReturnItem(models.Model):
-    """Individual items being returned as part of a ReturnRequest."""
+    """One line of goods coming back on a ReturnRequest.
+
+    Two kinds, and every read must go through the properties below rather than
+    reaching for `order_item`:
+
+    * A line OFF THE ORDER we delivered — `order_item` set. Its name, its
+      ordered quantity and its price come from that line, and approving the
+      claim writes `quantity_returned` back onto it.
+    * A line ADDED BY HAND — `order_item` None, `product` set. Goods that were
+      never on an order of ours: every line on a standalone claim, and the
+      extras on an order-backed one. There is no outbound line to write back
+      to, so nothing is.
+
+    `order_item` was mandatory until 2026-09-26. Anything still assuming it is
+    there will read None on a hand-added line.
+    """
     return_request = models.ForeignKey(ReturnRequest, on_delete=models.CASCADE, related_name='return_items')
-    order_item = models.ForeignKey('OrderItem', on_delete=models.CASCADE, related_name='return_items')
+    order_item = models.ForeignKey('OrderItem', on_delete=models.CASCADE,
+                                   related_name='return_items', null=True, blank=True,
+                                   help_text="The outbound line this came off, when there was one.")
+    product = models.ForeignKey(
+        product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True,
+        related_name='return_lines',
+        help_text="Set on a hand-added line. Read line_product, never this.")
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                     help_text="Hand-added lines only; an order line carries its own.")
     quantity_returned = models.PositiveIntegerField(default=1)
 
     class Meta:
         db_table = 'orders_returnitem'
 
     def __str__(self):
-        return f"{self.return_request} - {self.order_item} x{self.quantity_returned}"
+        return f"{self.return_request} - {self.display_name} x{self.quantity_returned}"
+
+    @property
+    def line_product(self):
+        """The product this line is, whichever kind of line it is."""
+        if self.order_item_id:
+            return self.order_item.product
+        return self.product
+
+    @property
+    def display_name(self):
+        if self.order_item_id:
+            return self.order_item.display_name
+        if self.product:
+            return self.product.item_name
+        return 'Item'
+
+    @property
+    def ordered_quantity(self):
+        """How many went out, or None for a line that never did."""
+        return self.order_item.quantity if self.order_item_id else None
+
+    @property
+    def line_unit_price(self):
+        if self.order_item_id:
+            return self.order_item.unit_price
+        if self.unit_price is not None:
+            return self.unit_price
+        return getattr(self.product, 'item_price', None) if self.product else None
+
+    @property
+    def line_notes(self):
+        return self.order_item.notes if self.order_item_id else ''

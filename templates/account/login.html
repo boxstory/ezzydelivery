@@ -100,15 +100,27 @@
                 {% if socialaccount_providers %}
                     {% for provider in socialaccount_providers %}
                         {% if provider.id == "google" %}
-                            <a id="account_login_btn_google" href="{% provider_login_url provider.id %}" class="auth__social-btn google">
-                                <i class="fa-brands fa-google"></i>
-                                <span>{% trans "Continue with Google" %}</span>
-                            </a>
+                            <form method="post" action="{% provider_login_url provider.id %}">
+                                {% csrf_token %}
+                                {% if redirect_field_value %}
+                                    <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+                                {% endif %}
+                                <button id="account_login_btn_google" type="submit" class="auth__social-btn google">
+                                    <i class="fa-brands fa-google"></i>
+                                    <span>{% trans "Continue with Google" %}</span>
+                                </button>
+                            </form>
                         {% elif provider.id == "facebook" %}
-                            <a id="account_login_btn_facebook" href="{% provider_login_url provider.id %}" class="auth__social-btn facebook">
-                                <i class="fa-brands fa-facebook"></i>
-                                <span>{% trans "Continue with Facebook" %}</span>
-                            </a>
+                            <form method="post" action="{% provider_login_url provider.id %}">
+                                {% csrf_token %}
+                                {% if redirect_field_value %}
+                                    <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+                                {% endif %}
+                                <button id="account_login_btn_facebook" type="submit" class="auth__social-btn facebook">
+                                    <i class="fa-brands fa-facebook"></i>
+                                    <span>{% trans "Continue with Facebook" %}</span>
+                                </button>
+                            </form>
                         {% endif %}
                     {% endfor %}
                 {% else %}

@@ -1,0 +1,598 @@
+/*
+ * Purpose: Console design layer for the seller's "Book a Return Pickup" form — route switch, step rail, panel skin, decision block.
+ * Used by: orders/order_return_add.html (both modes) at /orders/add_return/.
+ * Notes: Everything is scoped under `.ortn` because the form partials are SHARED with the staff desk
+ *        (workforce/returns_task_create.html), which must keep its own wf skin. Restyles Bootstrap `.card`
+ *        into bcon__panel geometry rather than editing the partials, so the two consoles cannot drift.
+ */
+
+/* ============================================================================
+   PANEL SKIN — the shared partials ship plain Bootstrap cards; inside this page
+   they read as Dispatch Manifest panels. Geometry copied from .bcon__panel
+   (business-console.css) so the hand-written .bcon__panel on the same page and
+   these are indistinguishable.
+
+   The !importants here are not preference. brandkit.css and brandkit-overrides
+   both ship `.card { border-radius: … !important }` and `.card-header {
+   background-color / padding … !important }` site-wide; measured, a plain
+   `.ortn .card-header` lost and kept the grey 16px/20px strip. An !important
+   declaration is only beaten by another, so matching the panel geometry needs
+   these. Everything that is NOT !important upstream is left plain below.
+   ============================================================================ */
+.ortn .card {
+  background: #fff;
+  border: 1px solid var(--brand-grey-200) !important;
+  border-radius: 0.4rem !important;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+/* A form panel is not a tile — it must not lift away from the cursor while
+   somebody is filling it in. (brandkit's .card:hover, not !important.) */
+.ortn .card:hover { box-shadow: none; transform: none; }
+
+.ortn .card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem !important;
+  margin: 0;
+  background-color: #fff !important;
+  border-bottom: 1px solid var(--brand-grey-200) !important;
+  border-radius: 0;
+}
+
+.ortn .card-header strong {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+}
+
+.ortn .card-header i { color: var(--brand-primary); font-size: 0.85rem; }
+
+.ortn .card-body { padding: 0.75rem; }
+
+/* Two panels side by side must end level even when one holds more fields — the
+   left one otherwise trails a white tail under its last control. */
+.ortn .card.h-100 { display: flex; flex-direction: column; }
+.ortn .card.h-100 .card-body { flex: 1 1 auto; }
+
+/* ============================================================================
+   ROUTE SWITCH — which kind of return this is.
+   Was a yellow .btn-group: two 43px slabs of --brand-primary competing with the
+   page's real accent and saying nothing about the difference between them. Each
+   route is now a card that states what that path actually does, and the choice
+   carries the page's one yellow as a left index edge — the same 3px edge the
+   console uses elsewhere to mark state.
+   ============================================================================ */
+.ortn__routes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.ortn__route {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-left: var(--bcon-edge) solid var(--brand-grey-300);
+  border-radius: 0.4rem;
+  text-decoration: none;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ortn__route:hover {
+  border-color: var(--brand-grey-400);
+  border-left-color: var(--brand-primary);
+  box-shadow: var(--brand-shadow-sm);
+}
+
+.ortn__route--on {
+  border-color: var(--brand-grey-300);
+  border-left-color: var(--brand-primary);
+  background: var(--brand-grey-50);
+}
+
+.ortn__route-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  background: var(--brand-grey-100);
+  color: var(--brand-grey-500);
+  font-size: 0.8rem;
+}
+
+.ortn__route--on .ortn__route-icon {
+  background: var(--brand-navy);
+  color: var(--brand-primary);
+}
+
+.ortn__route-body { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; }
+
+.ortn__route-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+  line-height: 1.2;
+}
+
+.ortn__route--on .ortn__route-title { color: var(--brand-navy); }
+
+.ortn__route-note {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--brand-grey-500);
+}
+
+/* The tick reads as "you are here", so it only exists on the live route. */
+.ortn__route-mark {
+  margin-left: auto;
+  align-self: center;
+  font-size: 0.7rem;
+  color: var(--brand-primary-text);
+}
+
+/* ============================================================================
+   STEP RAIL — order mode only, where the page genuinely has a before and after:
+   nothing below the search exists until an order resolves. Standalone has no
+   gate, so it gets no rail rather than a decorative one.
+   ============================================================================ */
+.ortn__steps {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+.ortn__step {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-grey-450);
+}
+
+.ortn__step-no {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  border: 1px solid var(--brand-grey-300);
+  font-family: var(--bcon-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--brand-grey-450);
+  background: #fff;
+}
+
+.ortn__step--now { color: var(--brand-navy); }
+.ortn__step--now .ortn__step-no {
+  background: var(--brand-navy);
+  border-color: var(--brand-navy);
+  color: #fff;
+}
+
+.ortn__step--done { color: var(--brand-grey-650); }
+.ortn__step--done .ortn__step-no {
+  background: var(--brand-success-bg);
+  border-color: var(--brand-success);
+  color: var(--brand-success);
+}
+
+.ortn__step-rule {
+  width: 1.25rem;
+  height: 1px;
+  background: var(--brand-grey-300);
+}
+
+/* ============================================================================
+   WAITING PANEL — what used to be 700px of empty white under the search box.
+   Says what the next two steps will ask for, so a seller who has not searched
+   yet knows the form has not failed to load.
+   ============================================================================ */
+.ortn__wait {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--brand-grey-50);
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.4rem;
+}
+
+.ortn__wait-icon {
+  flex: 0 0 auto;
+  font-size: 1.125rem;
+  color: var(--brand-grey-400);
+  line-height: 1.6;
+}
+
+.ortn__wait-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  margin: 0 0 0.25rem;
+}
+
+.ortn__wait-list {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--brand-grey-550);
+}
+
+.ortn__wait-list li + li { margin-top: 0.125rem; }
+
+.ortn__wait-alt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.375rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-navy);
+  text-decoration: none;
+}
+
+.ortn__wait-alt:hover { color: var(--brand-primary-text); gap: 0.5rem; }
+
+/* ============================================================================
+   FIELDS — sizes come from the Brand Kit legibility floors (label 0.72rem,
+   control 0.82rem / 2.1rem). Bootstrap keeps every base; these set brand ink,
+   brand focus and the 0.375rem spacing grid.
+   ============================================================================ */
+.ortn .form-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-grey-650);
+  margin-bottom: 0.25rem;
+}
+
+.ortn .form-control,
+.ortn .form-select {
+  min-height: 2.25rem;
+  font-size: 0.85rem;
+  color: var(--brand-grey-800);
+}
+
+/* No focus rule here on purpose: brandkit already gives every control the
+   brand's yellow focus border and ring with !important, and it is the right
+   one. Restating it would only be a declaration that has to be maintained. */
+
+.ortn textarea.form-control { min-height: 2.75rem; }
+
+.ortn .form-control[readonly] {
+  background: var(--brand-grey-50);
+  color: var(--brand-grey-550);
+}
+
+.ortn .form-text {
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--brand-grey-500);
+  margin-top: 0.25rem;
+}
+
+/* The lead paragraph above a panel's fields ("The customer holding the
+   goods…"). business.css forces every div inside .card-body to 0.75rem with
+   !important, so matching it takes the same weapon. */
+.ortn .card-body > p.text-muted.small,
+.ortn .card-body p.text-muted.small {
+  font-size: 0.75rem !important;
+  line-height: 1.45;
+  color: var(--brand-grey-500) !important;
+  margin-bottom: 0.625rem;
+}
+
+/* A .form-label used as a group heading rather than a field's label — "What is
+   coming back", "Items coming back". Reads as a rule across the panel. */
+.ortn .returns-intake__items > .form-label,
+.ortn .card-body > .form-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-grey-500);
+}
+
+/* ============================================================================
+   BUTTONS — every one of these carried Bootstrap's own yellow as TEXT on white
+   (measured: rgb(255,193,7), about 1.9:1). Brand Kit rule 5: yellow ink on a
+   light surface is --brand-primary-text, and a button needs a real surface.
+   ============================================================================ */
+.ortn .btn-outline-secondary,
+.ortn .btn-outline-warning {
+  background: var(--brand-grey-100);
+  border-color: var(--brand-grey-400) !important;
+  color: var(--brand-grey-800) !important;
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-height: 2.25rem;
+}
+
+.ortn .btn-outline-warning { color: var(--brand-primary-text) !important; }
+
+.ortn .btn-outline-secondary:hover,
+.ortn .btn-outline-warning:hover {
+  background: var(--brand-secondary) !important;
+  border-color: var(--brand-primary) !important;
+  color: var(--brand-grey-800) !important;
+}
+
+.ortn .btn-sm.btn-outline-secondary,
+.ortn .btn-sm.btn-outline-warning { min-height: 2.1rem; }
+
+/* "Find order" is the only thing that can happen on that panel — it gets the
+   navy primary surface, matching the page's submit. */
+.ortn .btn-outline-primary {
+  background: var(--brand-navy);
+  border-color: var(--brand-navy) !important;
+  color: var(--brand-primary) !important;
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-height: 2.25rem;
+}
+
+/* Yellow ON NAVY, not on white — 9.86:1, and the one place the Brand Kit says
+   raw --brand-primary is correct as text. It sits beside a 36px input, so the
+   padding is pinned rather than inherited from the 44px global .btn. */
+.ortn .btn-outline-primary:hover {
+  background-color: var(--brand-navy-light) !important;
+  border-color: var(--brand-navy-light) !important;
+  color: var(--brand-primary) !important;
+}
+
+/* The map link sits in the coordinate strip at button height, not link height. */
+.ortn #returns_intake_link_map { min-height: 2.25rem; }
+
+/* ============================================================================
+   ITEM ROWS — the shared "add item" block, given an edge so it reads as an
+   optional annexe to the panel rather than more fields.
+   ============================================================================ */
+.ortn .returns-intake__items {
+  padding: 0.625rem 0.75rem;
+  background: var(--brand-grey-50);
+  border: 1px dashed var(--brand-grey-300);
+  border-radius: 0.4rem;
+}
+
+.ortn .returns-intake__items > p.text-muted.small {
+  font-size: 0.72rem !important;
+  color: var(--brand-grey-500) !important;
+  margin-bottom: 0.5rem;
+}
+
+/* ============================================================================
+   DECISION BLOCK — "Send a driver for it now" is the one control on this form
+   that costs money and moves a vehicle. It was a bare checkbox with its label
+   jammed against it; here it is a tile that changes state when it is armed.
+   ============================================================================ */
+.ortn .returns-intake__decide {
+  padding: 0.625rem 0.75rem;
+  background: var(--brand-grey-50);
+  border: 1px solid var(--brand-grey-200);
+  border-left: var(--bcon-edge) solid var(--brand-grey-300);
+  border-radius: 0.4rem;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+/* :has is the only way to reach the container from the input's state; browsers
+   without it simply keep the resting border, which is still legible. */
+.ortn .returns-intake__decide:has(input:checked) {
+  background: var(--brand-accent);
+  border-left-color: var(--brand-primary);
+}
+
+.ortn .returns-intake__decide .form-check { display: flex; align-items: center; gap: 0.5rem; margin: 0; padding: 0; }
+
+/* .business-dashboard pins input[type=checkbox] to 1rem with !important, so the
+   box cannot grow — give the row the gap instead of asking the input for it. */
+.ortn .returns-intake__decide .form-check-input { margin: 0; flex: 0 0 auto; }
+
+.ortn .returns-intake__decide .form-check-label { font-size: 0.8125rem; color: var(--brand-grey-800); cursor: pointer; }
+
+.ortn .returns-intake__decide .form-text { margin-top: 0.25rem; margin-left: 1.5rem; }
+
+/* ============================================================================
+   ACTION BAR
+   ============================================================================ */
+.ortn__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  margin-bottom: 1.125rem;
+  border-top: 1px solid var(--brand-grey-200);
+}
+
+.ortn__actions-note {
+  margin-right: auto;
+  font-size: 0.72rem;
+  color: var(--brand-grey-500);
+}
+
+/* The submit measured 30px tall — under the 34px floor, on the page's primary
+   action. Both buttons now sit at the control height the fields use. */
+.ortn__actions .bcon__btn {
+  min-height: 2.25rem;
+  padding-inline: 0.875rem;
+  font-size: 0.8rem;
+}
+
+.ortn__actions .bcon__btn--ghost {
+  background: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-400);
+  color: var(--brand-grey-800);
+}
+
+.ortn__actions .bcon__btn--ghost:hover {
+  background: var(--brand-secondary);
+  border-color: var(--brand-primary);
+}
+
+/* ============================================================================
+   ORDER SUMMARY — the read-only facts copied off the order. Key over value,
+   mono for anything anyone would read aloud down a phone.
+   ============================================================================ */
+.ortn .card-header .badge { margin-left: auto; }
+
+.ortn .returns-intake__key {
+  font-size: 0.72rem !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-grey-500) !important;
+  margin-bottom: 0.125rem;
+}
+
+/* .card-body div is forced to 0.75rem with !important in business.css. */
+.ortn .returns-intake__val { font-size: 0.8125rem !important; font-weight: 600; color: var(--brand-grey-800); line-height: 1.35; }
+.ortn .returns-intake__sub { font-size: 0.72rem !important; color: var(--brand-grey-500) !important; line-height: 1.35; }
+
+/* ============================================================================
+   CANDIDATE SHORTLIST — when a mobile matches several orders.
+   ============================================================================ */
+.ortn .list-group-item { border-color: var(--brand-grey-200); padding: 0.5rem 0.75rem; }
+.ortn .list-group-item-action:hover { background: var(--brand-grey-50); }
+.ortn .list-group-item .fw-semibold { font-size: 0.8125rem; }
+
+/* ============================================================================
+   ALERTS — brand semantic pairs at console density, not Bootstrap's slabs.
+   ============================================================================ */
+.ortn .alert {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  border-radius: 0.4rem;
+  border-width: 1px;
+}
+
+/* Each .alert-* upstream is a three-declaration !important set, so a partial
+   override would mix one sheet's background with another's border. */
+.ortn .alert-warning {
+  background-color: var(--brand-warning-bg) !important;
+  border-color: #fde68a !important;
+  color: #92400e !important;
+}
+
+.ortn .alert-danger {
+  background-color: var(--brand-danger-bg) !important;
+  border-color: #fecaca !important;
+  color: var(--brand-danger-dark) !important;
+}
+
+.ortn .alert-info {
+  background-color: var(--brand-info-bg) !important;
+  border-color: #bfdbfe !important;
+  color: var(--brand-info-dark) !important;
+}
+
+.ortn .alert-secondary {
+  background-color: var(--brand-grey-50) !important;
+  border-color: var(--brand-grey-200) !important;
+  color: var(--brand-grey-650) !important;
+}
+
+/* ============================================================================
+   PHONE — the routes stack, and the action bar's buttons go full width so the
+   primary is not a 145px target at the bottom of a 2400px form.
+   ============================================================================ */
+@media (max-width: 767.98px) {
+  .ortn__routes { grid-template-columns: 1fr; }
+
+  .ortn__actions { flex-direction: column-reverse; align-items: stretch; }
+  .ortn__actions .bcon__btn { width: 100%; justify-content: center; }
+  .ortn__actions-note { margin: 0 0 0.25rem; text-align: center; }
+
+  .ortn .card-body { padding: 0.625rem; }
+}
+
+/* An order number is the thing a seller reads down a phone to our team, so it
+   is set in the console's mono face like every other reference here. */
+.ortn .returns-intake__ref {
+  font-family: var(--bcon-mono);
+  font-weight: 700;
+  color: var(--brand-navy);
+  margin-left: 0.2rem;
+}
+
+/* Line pickers: a row per item rather than four controls loose in a grid, so
+   the tick, the name and the quantity read as one decision. */
+.ortn .returns-intake__line {
+  padding: 0.375rem 0.5rem;
+  background: #fff;
+  border: 1px solid var(--brand-grey-200);
+  border-radius: 0.375rem;
+}
+
+/* Product names here are catalogue SKUs with no spaces in them
+   ("Ladeen_02_Ladeen_Melasma_gold_20ml_Serum"). A flex item defaults to
+   min-width:auto, so on a phone the name refused to shrink and shoved the
+   quantity box past the panel's right edge — measured, off screen. */
+.ortn .returns-intake__line .form-check-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  color: var(--brand-grey-800);
+  cursor: pointer;
+}
+
+.ortn .returns-intake__line .form-check-input { flex: 0 0 auto; }
+
+.ortn .returns-intake__line .form-control-sm {
+  flex: 0 0 auto;
+  width: 3.75rem;
+  min-height: 2rem;
+  font-size: 0.8rem;
+  text-align: center;
+  font-family: var(--bcon-mono);
+  font-weight: 700;
+}
+
+/* The order's status, sitting in the summary panel's header. The Brand Kit
+   status system is a swatch and a word, not a loud filled pill.
+   Matched on .ms-auto as well as .badge on purpose: this partial is shared and
+   has already carried the status as both a .badge and a plain .text-muted span,
+   and a rule that only knows one of them silently does nothing. */
+.ortn .card-header .badge,
+.ortn .card-header .ms-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0;
+  background: none !important;
+  font-size: 0.72rem !important;
+  font-weight: 600;
+  color: var(--brand-grey-650) !important;
+}
+
+.ortn .card-header .badge::before,
+.ortn .card-header .ms-auto::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-grey-400);
+}

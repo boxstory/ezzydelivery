@@ -270,13 +270,92 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                     <span class="dvm__case-head">Application form</span>
                     <div class="dvm__secs-row">
                         {% for sec in driver.app_sections %}
-                        <span class="dvm__sec {% if sec.done %}dvm__sec--done{% else %}dvm__sec--todo{% endif %}">
+                        {# sec.wide (Zones) gets a full row — the picked list is long text #}
+                        <span class="dvm__sec {% if sec.done %}dvm__sec--done{% else %}dvm__sec--todo{% endif %}{% if sec.wide %} dvm__sec--wide{% endif %}">
                             <i class="fa-solid {% if sec.done %}fa-circle-check{% else %}fa-circle-xmark{% endif %}" aria-hidden="true"></i>
                             <span class="dvm__sec-label">{{ sec.label }}</span>
                             <span class="dvm__sec-detail">{{ sec.detail }}</span>
                         </span>
                         {% endfor %}
                     </div>
+                </div>
+
+                <div class="dvm__papers">
+                    <span class="dvm__case-head">
+                        Documents
+                        <span class="dvm__papers-count">{{ driver.review_docs|length }}</span>
+                    </span>
+                    {% if driver.review_docs %}
+                    <div class="dvm__papers-grid">
+                        {% for doc in driver.review_docs %}
+                        <div class="dvm__paper dvm__paper--{{ doc.expiry_state }}">
+                            <div class="dvm__paper-shots">
+                                {% if doc.has_real_file %}
+                                <button type="button" class="dvm__paper-shot dvm__zoom"
+                                        data-zoom-src="{{ doc.document_file.url }}"
+                                        data-zoom-title="{{ doc.document_type|default:'Document' }} &middot; front"
+                                        data-zoom-who="{{ driver.user.get_full_name|default:driver.user.email }}{% if driver.driver_code %} &middot; {{ driver.driver_code }}{% endif %}">
+                                    <img src="{{ doc.document_file.url }}" loading="lazy" decoding="async"
+                                         alt="{{ doc.document_type|default:'Document' }} front for {{ driver.user.get_full_name|default:driver.user.email }}">
+                                    <span class="dvm__paper-side">Front</span>
+                                </button>
+                                {% else %}
+                                <span class="dvm__paper-shot dvm__paper-shot--none">
+                                    <i class="fa-solid fa-image" aria-hidden="true"></i>
+                                    <span>No scan</span>
+                                </span>
+                                {% endif %}
+                                {% if doc.has_back %}
+                                <button type="button" class="dvm__paper-shot dvm__zoom"
+                                        data-zoom-src="{{ doc.document_file_back.url }}"
+                                        data-zoom-title="{{ doc.document_type|default:'Document' }} &middot; back"
+                                        data-zoom-who="{{ driver.user.get_full_name|default:driver.user.email }}{% if driver.driver_code %} &middot; {{ driver.driver_code }}{% endif %}">
+                                    <img src="{{ doc.document_file_back.url }}" loading="lazy" decoding="async"
+                                         alt="{{ doc.document_type|default:'Document' }} back for {{ driver.user.get_full_name|default:driver.user.email }}">
+                                    <span class="dvm__paper-side">Back</span>
+                                </button>
+                                {% endif %}
+                            </div>
+                            <div class="dvm__paper-body">
+                                <span class="dvm__paper-type">{{ doc.document_type|default:"Untyped" }}</span>
+                                {% comment %}
+                                A selfie carries no number, issuer or expiry — those rows are
+                                only drawn when the document actually has that field, so the
+                                card does not read as three missing values.
+                                {% endcomment %}
+                                {% if doc.document_no %}<span class="dvm__paper-no">{{ doc.document_no }}</span>{% endif %}
+                                {% if doc.document_issued_from %}
+                                <span class="dvm__paper-field">
+                                    <span>Issued from</span><strong>{{ doc.document_issued_from }}</strong>
+                                </span>
+                                {% endif %}
+                                {% if doc.document_expiry_date or doc.document_type != 'Selfie' %}
+                                <span class="dvm__paper-field">
+                                    <span>Expiry</span>
+                                    <strong class="dvm__paper-exp dvm__paper-exp--{{ doc.expiry_state }}"
+                                            {% if doc.document_expiry_date %}title="{{ doc.document_expiry_date|date:'d M Y' }}{% if doc.days_left >= 0 %} &mdash; {{ doc.days_left }} day{{ doc.days_left|pluralize }} left{% else %}: expired{% endif %}"{% endif %}>
+                                        {% if doc.expiry_state == 'expired' %}Expired {{ doc.document_expiry_date|date:"d M Y" }}
+                                        {% elif doc.document_expiry_date %}{{ doc.document_expiry_date|date:"d M Y" }}
+                                        {% else %}Not set{% endif %}
+                                    </strong>
+                                </span>
+                                {% endif %}
+                                <span class="dvm__paper-field">
+                                    <span>Uploaded</span><strong>{{ doc.created_at|date:"d M Y" }}</strong>
+                                </span>
+                                <a class="dvm__paper-open" href="{% url 'workforce:driver_document_detail' doc.id %}">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open record
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="dvm__papers-empty">
+                        <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                        No documents uploaded yet &mdash; the applicant still owes a selfie and two IDs.
+                    </p>
+                    {% endif %}
                 </div>
 
                 <div class="dvm__case-grid">
@@ -550,6 +629,32 @@ wording matters — ops need to know which messages leave a trail on the record.
                 <i class="fa-brands fa-whatsapp"></i> Open WhatsApp
             </button>
         </div>
+    </div>
+</div>
+
+<!-- ============ DOCUMENT LENS (scan preview) ============ -->
+{% comment %}
+One overlay for the whole page — every scan thumbnail in an expanded case feeds
+its own url into it, so 50 cases do not ship 50 modals.
+{% endcomment %}
+<div class="dvm__lens" id="dvmLensOverlay" role="dialog" aria-modal="true" aria-label="Document scan">
+    <div class="dvm__lens-bar">
+        <span class="dvm__lens-title" id="dvmLensTitle"></span>
+        <span class="dvm__lens-who" id="dvmLensWho"></span>
+        <a class="dvm__lens-act" id="dvmLensOpen" href="#" target="_blank" rel="noopener"
+           title="Open the full-size file in a new tab">
+            <i class="fa-solid fa-up-right-from-square"></i> Full size
+        </a>
+        <button type="button" class="dvm__lens-act dvm__lens-act--turn" id="dvmLensTurn"
+                title="Rotate the scan 90&deg;">
+            <i class="fa-solid fa-rotate-right"></i> Rotate
+        </button>
+        <button type="button" class="dvm__lens-close" id="dvmLensClose" aria-label="Close preview">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    <div class="dvm__lens-stage">
+        <img class="dvm__lens-img" id="dvmLensImg" src="" alt="Document scan">
     </div>
 </div>
 
@@ -886,6 +991,57 @@ document.addEventListener('DOMContentLoaded', function() {
             else if (action === 'under_review') markUnderReview(this.dataset.profileId);
             else if (action === 'reject') openRejectModal(this);
         });
+    });
+
+    /* ---------- DOCUMENT LENS ---------- */
+    // Delegated: cases are rendered server-side and never re-drawn, but a single
+    // listener keeps 50 cases x N scans from binding hundreds of handlers.
+    var lens      = document.getElementById('dvmLensOverlay');
+    var lensImg   = document.getElementById('dvmLensImg');
+    var lensTitle = document.getElementById('dvmLensTitle');
+    var lensWho   = document.getElementById('dvmLensWho');
+    var lensOpen  = document.getElementById('dvmLensOpen');
+    var lensTurn  = document.getElementById('dvmLensTurn');
+    var lensAngle = 0;
+
+    function applyTurn() {
+        lensImg.classList.remove('dvm__lens-img--r90', 'dvm__lens-img--r180', 'dvm__lens-img--r270');
+        if (lensAngle) lensImg.classList.add('dvm__lens-img--r' + lensAngle);
+    }
+
+    function openLens(btn) {
+        lensImg.src = btn.dataset.zoomSrc || '';
+        lensTitle.textContent = btn.dataset.zoomTitle || 'Document';
+        lensWho.textContent = btn.dataset.zoomWho || '';
+        lensOpen.href = btn.dataset.zoomSrc || '#';
+        lensAngle = 0;
+        applyTurn();
+        lens.classList.add('dvm__lens--open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeLens() {
+        lens.classList.remove('dvm__lens--open');
+        lensImg.src = '';
+        document.body.style.overflow = '';
+    }
+
+    document.addEventListener('click', function (e) {
+        var shot = e.target.closest('.dvm__zoom');
+        if (shot) { openLens(shot); return; }
+    });
+    document.getElementById('dvmLensClose').addEventListener('click', closeLens);
+    lens.addEventListener('click', function (e) {
+        // The bar carries the actions; a click on the backdrop or the scan closes.
+        if (e.target.closest('.dvm__lens-bar')) return;
+        closeLens();
+    });
+    lensTurn.addEventListener('click', function () {
+        lensAngle = (lensAngle + 90) % 360;
+        applyTurn();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && lens.classList.contains('dvm__lens--open')) closeLens();
     });
 
     /* ---------- APPLICANT MAP ---------- */

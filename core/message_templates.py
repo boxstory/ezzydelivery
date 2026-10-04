@@ -3,7 +3,10 @@
 # Used by: core.whatsapp_utils senders, workforce.views (order/task composers, auto_triggers_list,
 #          wf_message_templates page), workforce.crm_views lead detail.
 # Notes: Defaults live here so a fresh install works with no DB rows; staff edits are
-#        stored in core.MessageTemplate under the same key and always win. Entries with
+#        stored in core.MessageTemplate under the same key and always win. Staff can also
+#        ADD a message on that page: it is stored as a core.MessageTemplate row with
+#        is_custom=True, carries its own label/section/C-number, and reaches the desk
+#        through the send window's template picker only. Entries with
 #        kind='composer' only pre-fill a textarea — switching one off gives staff a blank
 #        composer, it never blocks a send. Entries carrying `toggle_owner` have their
 #        on/off owned by an AutoTriggerConfig row, so the Messages page hides the switch.
@@ -32,6 +35,21 @@ CRM_WA_PRICING_LINK = 'crm_wa_pricing_link'
 
 KIND_AUTO = 'auto'
 KIND_COMPOSER = 'composer'
+
+# Staff-written messages (core.MessageTemplate with is_custom=True) are keyed
+# under this prefix so a key someone types on the Messages page can never
+# shadow one the code later ships, and so a custom row is recognisable in the
+# database without joining anything.
+CUSTOM_KEY_PREFIX = 'custom_'
+CUSTOM_LABEL_MAX = 120
+CUSTOM_DESCRIPTION_MAX = 300
+
+# The only placeholders a staff-written body may rely on: the send window fills
+# exactly these two before it hands the text to the composer, and it refuses to
+# send a body still carrying an unfilled {token}. Offering the page-specific
+# ones ({order_number}, {cod_amount}) would produce messages that cannot be
+# sent from the surface they were written for.
+CUSTOM_PLACEHOLDERS = 'customer_name, staff_name'
 
 TEMPLATE_DEFAULTS = {
     DRIVER_APPLICATION_THANKS: {
@@ -767,10 +785,50 @@ def get_template(key):
     """Return the effective template for ``key`` as a dict.
 
     Keys: msg_id, label, description, placeholders, body, is_enabled,
-    is_customised, kind, section, toggle_owner.
+    is_customised, is_custom, kind, section, toggle_owner.
     Falls back to the code default when no staff-edited row exists.
     """
     from core.models import MessageTemplate
+
+    return _resolve(key, MessageTemplate.objects.filter(key=key).first())
+
+
+def _custom_template(row):
+    """A staff-written message as the same dict a code entry resolves to.
+
+    ``default_body`` stays empty on purpose: there is no shipped text behind it,
+    and a "Restore default" that emptied the box would be a delete in disguise.
+    Always a composer starter — an automatic send needs a trigger in code to
+    fire it, so the page offers an AutoFlow for that instead.
+    """
+    return {
+        'key': row.key,
+        'msg_id': row.msg_id,
+        'label': row.label or row.key,
+        'description': row.description,
+        'placeholders': CUSTOM_PLACEHOLDERS,
+        'required': '',
+        'sender': 'default',
+        'kind': KIND_COMPOSER,
+        'section': row.section,
+        'toggle_owner': '',
+        'body': row.body,
+        'default_body': '',
+        'is_enabled': row.is_enabled,
+        # Nothing to compare against, so a staff-written body is always "theirs".
+        'is_customised': True,
+        'is_custom': True,
+    }
+
+
+def _resolve(key, row):
+    """Effective template for ``key`` given the row already fetched for it.
+
+    Separate from get_template so listing every message reads the table once
+    instead of once per key.
+    """
+    if key not in TEMPLATE_DEFAULTS and row is not None and row.is_custom:
+        return _custom_template(row)
 
     default = TEMPLATE_DEFAULTS.get(key, {})
     data = {
@@ -791,8 +849,8 @@ def get_template(key):
         'default_body': default.get('body', ''),
         'is_enabled': True,
         'is_customised': False,
+        'is_custom': False,
     }
-    row = MessageTemplate.objects.filter(key=key).first()
     if row:
         data['is_enabled'] = row.is_enabled
         data['is_customised'] = bool((row.body or '').strip()) and row.body.strip() != data['default_body'].strip()
@@ -825,8 +883,65 @@ def validate_body(key, body):
 
 
 def list_templates():
-    """All registered templates with their current staff overrides applied."""
-    return [get_template(key) for key in TEMPLATE_DEFAULTS]
+    """Every message the Messages page shows, overrides applied.
+
+    Shipped registry first, in code order, then the staff-written ones by their
+    C-number. One query for the whole table rather than one per key.
+    """
+    from core.models import MessageTemplate
+
+    rows = {r.key: r for r in MessageTemplate.objects.all()}
+    items = [_resolve(key, rows.get(key)) for key in TEMPLATE_DEFAULTS]
+    custom = [r for r in rows.values() if r.is_custom and r.key not in TEMPLATE_DEFAULTS]
+    custom.sort(key=lambda r: (r.msg_id, r.id))
+    items += [_custom_template(r) for r in custom]
+    return items
+
+
+def custom_row(key):
+    """The staff-written row for ``key``, or None.
+
+    The one gate on editing and deleting a custom message: it must never match
+    an override row, or a delete would silently reset shipped wording instead.
+    """
+    from core.models import MessageTemplate
+
+    if key in TEMPLATE_DEFAULTS:
+        return None
+    return MessageTemplate.objects.filter(key=key, is_custom=True).first()
+
+
+def next_custom_msg_id():
+    """``'C01'``, ``'C02'``… — the ID for the next staff-written message.
+
+    Its own series, so it can never collide with a code M-number, and taken from
+    the highest one in use rather than from a count, so adding or deleting a
+    message never renumbers the ones that are still there. A deleted number does
+    come back into use, which is safe here in a way it would not be for the code
+    M-series: nothing refers to a C-number except the card and the picker, and
+    both read the live row.
+    """
+    from core.models import MessageTemplate
+
+    highest = 0
+    for row in MessageTemplate.objects.filter(is_custom=True):
+        match = re.fullmatch(r'C(\d+)', (row.msg_id or '').strip().upper())
+        if match:
+            highest = max(highest, int(match.group(1)))
+    return f'C{highest + 1:02d}'
+
+
+def make_custom_key(label):
+    """A stable, unique key for a staff-written message, slugged from its name."""
+    from core.models import MessageTemplate
+
+    slug = re.sub(r'[^a-z0-9]+', '_', (label or '').lower()).strip('_')[:60]
+    base = CUSTOM_KEY_PREFIX + (slug or 'message')
+    key, n = base, 2
+    while key in TEMPLATE_DEFAULTS or MessageTemplate.objects.filter(key=key).exists():
+        key = f'{base}_{n}'
+        n += 1
+    return key
 
 
 def msg_id(key):
@@ -850,6 +965,17 @@ def get_body(key, **context):
     silently break an automatic pipeline."""
     tpl = get_template(key)
     return _format(key, tpl['body'], context)
+
+
+def format_template(tpl, **context):
+    """Format an already-resolved template dict.
+
+    Same output as render_template, without re-reading the row — for rendering
+    a whole section's worth of bodies in one request.
+    """
+    if not tpl['is_enabled']:
+        return None
+    return _format(tpl['key'], tpl['body'], context)
 
 
 def render_template(key, **context):

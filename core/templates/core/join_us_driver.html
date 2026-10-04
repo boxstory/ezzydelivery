@@ -10,7 +10,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
 {% block title %}Join as Driver - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/driver-apply.css' %}?v=20260903a" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20260926b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -392,19 +392,51 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                                     <label class="form-label mb-0 fw-bold" for="core_join_driver_file_{{ item.key }}">
                                         <i class="fas {{ item.icon }} cja__pick-ico me-1" aria-hidden="true"></i>{{ item.type }}{% if item.type == 'Selfie' %} *{% endif %}
                                     </label>
-                                    {% if item.has_file %}<span class="cja__doc-status">Uploaded &#10003;</span>{% endif %}
+                                    <span class="cja__doc-status {% if not item.has_file %}d-none{% endif %}" data-doc-badge>Uploaded &#10003;</span>
                                 </div>
-                                <input type="file" class="form-control form-control-sm mb-2 cja__doc-input"
-                                       id="core_join_driver_file_{{ item.key }}"
-                                       name="doc_{{ item.key }}" accept="image/*"
-                                       {% if item.type == 'Selfie' %}capture="user"{% endif %}
-                                       data-doc-type="{{ item.type }}"
-                                       data-existing="{% if item.has_file %}1{% else %}0{% endif %}">
+
+                                {% comment %}Thumbnail card — a saved photo, or the one just
+                                picked, so the applicant can see what they actually sent.{% endcomment %}
+                                <div class="cja__doc-preview d-flex align-items-center gap-2 mb-2 {% if not item.has_file %}d-none{% endif %}"
+                                     data-doc-preview>
+                                    <img class="cja__doc-thumb" alt="{{ item.type }} photo" data-doc-thumb
+                                         {% if item.preview_url %}src="{{ item.preview_url }}"{% endif %}>
+                                    <div class="cja__doc-preview-meta flex-grow-1">
+                                        <div class="cja__doc-thumb-name text-truncate" data-doc-name>{% if item.has_file %}Photo on file{% endif %}</div>
+                                        <button type="button" class="btn btn-sm btn-outline-dark mt-1 cja__doc-replace" data-doc-replace>
+                                            <i class="fas fa-arrows-rotate me-1" aria-hidden="true"></i>Replace
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="cja__doc-pick {% if item.has_file %}d-none{% endif %}" data-doc-pick>
+                                    <input type="file" class="form-control form-control-sm mb-2 cja__doc-input"
+                                           id="core_join_driver_file_{{ item.key }}"
+                                           name="doc_{{ item.key }}" accept="image/*"
+                                           data-doc-type="{{ item.type }}"
+                                           data-existing="{% if item.has_file %}1{% else %}0{% endif %}">
+                                    {# Opens the camera straight away; the field above still offers the gallery. #}
+                                    <button type="button" class="btn btn-sm btn-outline-dark w-100 mb-2 cja__doc-cam"
+                                            data-doc-camera="{% if item.type == 'Selfie' %}user{% else %}environment{% endif %}">
+                                        <i class="fas fa-camera me-1" aria-hidden="true"></i>{% if item.type == 'Selfie' %}Take selfie{% else %}Take photo{% endif %}
+                                    </button>
+                                </div>
                                 <div class="cja__doc-note small mb-2 d-none" data-doc-note="{{ item.key }}" aria-live="polite"></div>
                                 {% if item.type != 'Selfie' %}
-                                <input type="text" class="form-control form-control-sm" name="doc_no_{{ item.key }}"
+                                <input type="text" class="form-control form-control-sm mb-2" name="doc_no_{{ item.key }}"
                                        placeholder="{{ item.type }} number (optional)"
                                        value="{{ item.doc.document_no|default:'' }}">
+                                {% comment %}A date input shows no placeholder, so it needs
+                                a visible label of its own.{% endcomment %}
+                                <label class="cja__doc-sub-label d-block mb-1" for="core_join_driver_exp_{{ item.key }}">
+                                    Expiry date <span class="text-muted">(optional)</span>
+                                </label>
+                                <input type="date" class="form-control form-control-sm cja__doc-exp"
+                                       id="core_join_driver_exp_{{ item.key }}"
+                                       name="doc_exp_{{ item.key }}"
+                                       data-doc-type="{{ item.type }}"
+                                       value="{{ item.doc.document_expiry_date|date:'Y-m-d'|default:'' }}">
+                                <div class="cja__doc-note small mt-1 d-none" data-doc-exp-note aria-live="polite"></div>
                                 {% endif %}
                             </div>
                         </div>
@@ -705,24 +737,91 @@ document.addEventListener('DOMContentLoaded', function() {
         el.classList.toggle('cja__doc-note--ok', kind === 'ok');
     }
 
+    // ---------------------------------------------------------------------
+    // Tile thumbnail. Seeing the actual photo is the only way an applicant can
+    // tell a readable ID from a blurred thumb of the ceiling, so every pick —
+    // and every photo already on file — is shown back with a Replace button.
+    // ---------------------------------------------------------------------
+    var thumbUrls = {};                        // input name -> object URL to revoke
+
+    function tileOf(inp) { return inp.closest('.cja__doc-tile'); }
+
+    // shown=false puts the tile back to the "pick a photo" state.
+    function showPreview(inp, shown, src, label) {
+        var tile = tileOf(inp);
+        if (!tile) { return; }
+        var preview = tile.querySelector('[data-doc-preview]');
+        var pick = tile.querySelector('[data-doc-pick]');
+        var badge = tile.querySelector('[data-doc-badge]');
+        var img = tile.querySelector('[data-doc-thumb]');
+        var nameEl = tile.querySelector('[data-doc-name]');
+        if (src && img) { img.src = src; }
+        if (label && nameEl) { nameEl.textContent = label; }
+        if (preview) { preview.classList.toggle('d-none', !shown); }
+        if (pick) { pick.classList.toggle('d-none', shown); }
+        if (badge) { badge.classList.toggle('d-none', !shown); }
+        tile.classList.toggle('cja__doc-tile--done', shown);
+    }
+
+    function previewFile(inp, file) {
+        if (!window.URL || !URL.createObjectURL) { return; }
+        if (thumbUrls[inp.name]) { URL.revokeObjectURL(thumbUrls[inp.name]); }
+        thumbUrls[inp.name] = URL.createObjectURL(file);
+        showPreview(inp, true, thumbUrls[inp.name], file.name || 'Selected photo');
+    }
+
+    // The camera button borrows the same input — setting `capture` just before
+    // the click opens the camera, and clearing it on a direct click keeps the
+    // plain field offering the gallery.
+    form.querySelectorAll('[data-doc-camera]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var inp = btn.closest('.cja__doc-tile').querySelector('.cja__doc-input');
+            if (!inp) { return; }
+            inp.dataset.camPending = '1';
+            inp.setAttribute('capture', btn.dataset.docCamera);
+            inp.click();
+        });
+    });
+
+    form.querySelectorAll('[data-doc-replace]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var inp = btn.closest('.cja__doc-tile').querySelector('.cja__doc-input');
+            if (!inp) { return; }
+            // Reveal the picker first, so a cancelled chooser still leaves the
+            // applicant with both the file field and the camera button.
+            showPreview(inp, false);
+            inp.click();
+        });
+    });
+
     function handlePick(inp) {
         var name = inp.name;
         delete prepared[name];
         var file = inp.files && inp.files[0];
-        if (!file) { setNote(inp, ''); updateDocMeter(); return; }
+        if (!file) {
+            setNote(inp, '');
+            // Nothing picked: fall back to the photo already on file, if any.
+            if (inp.dataset.existing === '1') { showPreview(inp, true); }
+            updateDocMeter();
+            return;
+        }
 
         if (file.type && file.type.indexOf('image/') !== 0) {
             inp.value = '';
+            showPreview(inp, false);
             setNote(inp, 'That is not an image — please pick a JPG or PNG photo.', 'error');
             updateDocMeter();
             return;
         }
+
+        previewFile(inp, file);
 
         if (!shrinkSupported) {
             // Nothing we can do but enforce the server's limit up front, so the
             // applicant is not told "too large" after a long upload.
             if (file.size > HARD_MAX_BYTES) {
                 inp.value = '';
+                showPreview(inp, false);
                 setNote(inp, 'This photo is ' + humanSize(file.size) +
                     ' — too large. Please retake it at a lower resolution.', 'error');
             } else {
@@ -743,6 +842,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     setNote(inp, humanSize(file.size) + ' → ' + humanSize(blob.size) + ' ready.', 'ok');
                 } else if (file.size > HARD_MAX_BYTES) {
                     inp.value = '';
+                    showPreview(inp, false);
                     setNote(inp, 'This photo is ' + humanSize(file.size) +
                         ' and could not be compressed. Please retake it at a lower resolution.', 'error');
                 } else {
@@ -755,8 +855,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
     form.querySelectorAll('.cja__doc-input').forEach(function(inp) {
         inp.addEventListener('change', function() { handlePick(inp); });
+        inp.addEventListener('click', function() {
+            if (inp.dataset.camPending === '1') { delete inp.dataset.camPending; return; }
+            inp.removeAttribute('capture');
+        });
     });
     updateDocMeter();
+
+    // An expired ID is still worth recording — the review team needs to see it —
+    // so a past date is flagged where it is typed, never refused.
+    function checkExpiry(inp) {
+        var note = inp.parentNode.querySelector('[data-doc-exp-note]');
+        if (!note) { return; }
+        var val = inp.value;
+        var expired = false;
+        if (val) {
+            var today = new Date();
+            today.setHours(0, 0, 0, 0);
+            var d = new Date(val + 'T00:00:00');
+            expired = !isNaN(d.getTime()) && d < today;
+        }
+        note.textContent = expired
+            ? 'This ' + inp.dataset.docType + ' has expired — you can still apply, but please renew it.'
+            : '';
+        note.classList.toggle('d-none', !expired);
+        note.classList.toggle('cja__doc-note--error', expired);
+    }
+
+    form.querySelectorAll('.cja__doc-exp').forEach(function(inp) {
+        inp.addEventListener('change', function() { checkExpiry(inp); });
+        checkExpiry(inp);
+    });
 
     var needsLocation = form.dataset.needsLocation === '1';
 

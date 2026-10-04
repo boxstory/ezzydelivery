@@ -121,6 +121,7 @@ These cannot be locked to one department: they are the landing page or AJAX help
 |---|---|
 | `drivers_list` / `drivers_active` / `drivers_inactive` | `drivers/...` |
 | `driver_detail` | `drivers/<id>/` |
+| `driver_connect_crm_lead` | `drivers/<id>/connect-lead/` |
 | `driver_toggle_status` / `driver_set_status` / `driver_set_work_pref` | `drivers/<id>/...` |
 | `driver_vehicle_add` / `driver_vehicle_edit` / `driver_vehicle_delete` | `drivers/<id>/vehicle/...` |
 | `driver_document_add` / `driver_document_edit` / `driver_document_delete` | `drivers/<id>/document/...` |
@@ -240,7 +241,7 @@ These cannot be locked to one department: they are the landing page or AJAX help
 | `crm_lead_add_activity` / `crm_lead_delete_activity` | `crm/leads/<id>/...activity/` | Pipeline |
 | `crm_lead_link_business` | `crm/leads/link-business/` | Conversion |
 | `crm_lead_ai_summary` | `crm/leads/<id>/ai-summary/` | Pipeline |
-| `crm_lead_link_chat` / `crm_lead_wa_media` | `crm/leads/<id>/...` | WhatsApp |
+| `crm_lead_link_chat` / `crm_lead_unlink_chat` / `crm_lead_wa_media` | `crm/leads/<id>/...` | WhatsApp |
 | `crm_wa_contact_search` | `crm/wa-contacts/search/` | WhatsApp |
 | `crm_whatsapp_inbox` / `crm_wa_chat_preview` / `crm_wa_media` | `crm/whatsapp-inbox/...` | WhatsApp |
 | `crm_wa_promote` / `crm_wa_dismiss` / `crm_wa_resync` | `crm/whatsapp-inbox/...` | WhatsApp |
@@ -263,6 +264,9 @@ Platform configuration. Wrong values here break every department, so keep this l
 | URL name | Path | Group |
 |---|---|---|
 | `staff_roles_list` / `staff_role_update` | `staff-roles/...` | Staff roles |
+| `whatsapp_label_access` | `whatsapp/label-access/` | Marketing-only WhatsApp labels (which labels hide chats from other desks) |
+| `auto_triggers_list` / `auto_trigger_toggle` / `auto_trigger_update` / `auto_trigger_message_save` | `auto-triggers/...` | Automation (was multi-desk until 2026-10-04) |
+| `whatsapp_sender_routes_save` / `whatsapp_sender_route_toggle` | `auto-triggers/sender-routes/...` | Automation (was multi-desk until 2026-10-04) |
 | `auto_flows_list` / `auto_flow_add` / `auto_flow_edit` | `auto-triggers/flows/...` | Automation |
 | `auto_flow_toggle` / `auto_flow_delete` / `auto_flow_test` / `auto_flow_logs` | `auto-triggers/flows/...` | Automation |
 | `wf_ai_config` / `wf_ai_models_api` / `wf_ai_config_test` | `auto-triggers/ai-config/...` | AI gateway |
@@ -338,25 +342,27 @@ Known gap: the `warehouse:` app tree (`/warehouse/...`) is not gated by default 
 are hidden for non-Operations staff, but the URLs remain reachable by typing them. Closing it is now
 a UI action rather than a code change: classify those routes on `/workforce/staff-pages/`.
 
-## 6. MULTI-DESK (`ops` + `fin` + `mkt` + `admin`)
+## 6. Auto Triggers is super-admin only (since 2026-10-04)
 
-Routes every desk opens, where the *view* — not the URL map — decides which rows the
-viewer may see. Never widen this list without a per-row filter behind it.
+Auto Triggers used to be multi-desk: every desk opened `auto-triggers/` and the view
+filtered rows by `AutoTriggerConfig.department` / `WhatsAppSenderRoute.SECTION_DEPARTMENTS`.
+It now sits in §5 — the catalogue, its toggle/update/message endpoints and the sender
+routes are all super-admin only, and the sidebar section is hidden from every desk.
 
-| URL name | Path | How the split is enforced |
+The per-row department filter in the view is still there (harmless for super admins, who
+hold every desk). If a desk is ever given the page back, move the routes into `_MULTI` in
+`core/departments.py` and that filter takes over again.
+
+## 7. WAHA pages outside /workforce/
+
+| Path | Who | Enforced by |
 |---|---|---|
-| `auto_triggers_list` | `auto-triggers/` | Rows filtered by `AutoTriggerConfig.department`; department tabs on the page |
-| `auto_trigger_toggle` / `auto_trigger_update` | `auto-triggers/toggle/`, `auto-triggers/update/` | 403 unless `trigger.department` is one the caller holds |
-| `whatsapp_sender_routes_save` / `whatsapp_sender_route_toggle` | `auto-triggers/sender-routes/...` | 403 unless `WhatsAppSenderRoute.SECTION_DEPARTMENTS[section]` is one the caller holds |
+| `/waha/wa-chats/` | Any staff (marketing-only labels hide chats from other desks) | `_staff_only` in `whatsapp/wa_chats_view.py` |
+| `/waha/wa-dashboard/` | Super admin only | `@department_required(ADMIN)` in `whatsapp/wa_dashboard_view.py` |
 
-A trigger with no explicit department stays `admin`, so a newly added trigger is
-never exposed to a desk by accident. Classify it in `core/models.py`
-(`AutoTriggerConfig.DEPARTMENT_CHOICES`) plus a data migration, the same way
-`core/migrations/0021_autotriggerconfig_department_data.py` did.
-
-The rest of the Auto Triggers submenu (Flows, WA Instances, AI Config, API
-Configs, Webhook Imports) remains super-admin only — only the catalogue page is
-shared.
+Both also sit behind the nginx htpasswd. Session Status links a device to a company number
+by QR, which is why it is not open to marketing; the inbox's "Session health & QR" link and
+the sidebar / MSG Queue links to it are rendered for super admins only.
 
 ## Judgement calls worth confirming
 

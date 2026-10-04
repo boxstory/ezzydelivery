@@ -1,11 +1,13 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 {% comment %}
-Purpose: Staff list of driver proposals — the recruitment offers marketing publishes to the driver app and the public careers page.
+Purpose: Staff list of driver proposals — the recruitment offers marketing publishes to the driver app and the public driver jobs page, plus the public link the desk shares on WhatsApp.
 Used by: workforce.marketing_views.wf_driver_proposals at /workforce/marketing/driver-proposals/
 Notes: Uses the shared staff shell (.wfpage / *__hero / .wfcard) — the navy band and card headers come from
        staff-hero.css by class suffix, so this page declares no band colours. The "Showing on" column is the
        whole point of the table: a proposal can be live and still be invisible on one of the two surfaces.
+       The share strip carries the public driver jobs link (/careers/drivers/) — the one the desk sends on
+       WhatsApp. Its text comes from the view (DRIVER_JOBS_SHARE_TEXT) so copy and WhatsApp cannot drift.
 {% endcomment %}
 {% block title %}Driver Proposals - Ezzy Delivery{% endblock title %}
 {% block content %}
@@ -22,13 +24,16 @@ Notes: Uses the shared staff shell (.wfpage / *__hero / .wfcard) — the navy ba
             <h1 class="wfhero__heading">Driver Proposals</h1>
             <p class="wfhero__record">
                 <span class="wfhero__tag">LIVE {{ live_count }}</span>
-                <span class="wfhero__dot">·</span> shown in the driver app and on /careers/
+                <span class="wfhero__dot">·</span> shown in the driver app and on /careers/drivers/
             </p>
         </div>
         <div class="wfhero__bank">
             <div class="d-flex flex-wrap justify-content-end gap-2">
-                <a class="wfhero__btn" href="{% url 'webpages:careers' %}#webpages_careers_list_offers" target="_blank" rel="noopener">
-                    <i class="fa-solid fa-arrow-up-right-from-square"></i> View careers page
+                <a class="wfhero__btn" href="{{ public_url }}#webpages_cdrv_list_offers" target="_blank" rel="noopener">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> View driver jobs page
+                </a>
+                <a class="wfhero__btn" href="{% url 'workforce:wf_driver_proposal_interests' %}">
+                    <i class="fa-solid fa-hand"></i> Interested drivers
                 </a>
                 <a class="wfhero__btn" href="{% url 'workforce:wf_driver_proposal_new' %}">
                     <i class="fa-solid fa-plus"></i> New proposal
@@ -38,6 +43,40 @@ Notes: Uses the shared staff shell (.wfpage / *__hero / .wfcard) — the navy ba
     </div>
 
     <div class="wfpage__body">
+
+        {% comment %}
+        The link the desk actually sends. It is the public driver jobs page, so it
+        shows driver work only — an applicant never lands on the office roles form.
+        Everything ticked "Careers" below appears on it.
+        {% endcomment %}
+        <div class="wfcard mb-3">
+            <div class="wfcard__header"><i class="fa-brands fa-whatsapp"></i> Driver jobs link</div>
+            <div class="wfcard__body">
+                <div class="wfprop__share">
+                    <div class="wfprop__share-text">
+                        <div class="wfprop__share-label">Public page — safe to send to any applicant</div>
+                        <code class="wfprop__share-url" id="workforce_proposals_share_text_url">{{ public_url }}</code>
+                    </div>
+                    <div class="wfprop__share-actions">
+                        <button type="button" class="wfprop__rowbtn" id="workforce_proposals_btn_copylink"
+                                data-url="{{ public_url }}">
+                            <i class="fa-regular fa-copy"></i> Copy link
+                        </button>
+                        <a class="wfprop__rowbtn" href="{{ public_share_url }}" target="_blank" rel="noopener">
+                            <i class="fa-brands fa-whatsapp"></i> Send on WhatsApp
+                        </a>
+                        <a class="wfprop__rowbtn" href="{{ public_url }}" target="_blank" rel="noopener">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open
+                        </a>
+                    </div>
+                </div>
+                <div class="wfprop__share-hint">
+                    Office roles stay on /careers/ — this link carries driver positions
+                    and the offers below, nothing else.
+                </div>
+            </div>
+        </div>
+
         <div class="wfcard">
             <div class="wfcard__header"><i class="fa-solid fa-file-signature"></i> Proposals</div>
             <div class="wfcard__body">
@@ -55,22 +94,29 @@ Notes: Uses the shared staff shell (.wfpage / *__hero / .wfcard) — the navy ba
 
                 {% if rows %}
                 <div class="table-responsive">
-                    <table id="workforce_proposals_list_table_view" class="wfprop__table table mb-0">
+                    <table id="workforce_proposals_list_table_view" class="wfprop__table wfprop__table--offers table mb-0">
                         <thead>
                             <tr>
                                 <th>Proposal</th>
                                 <th>Status</th>
                                 <th>Showing on</th>
+                                <th>Interested</th>
                                 <th>Pay package</th>
-                                <th>Zones</th>
                                 <th>Order</th>
                                 <th>Closes</th>
                                 <th></th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {% for row in rows %}
-                            <tr>
+                        {% comment %}
+                        One <tbody> per proposal, not one <tr>: an offer's state is
+                        narrow ledger data, its zone coverage is wide-form, and forcing
+                        both into the same grid gave Zones 39% of the table while the
+                        title wrapped to four lines in 133px. Grouping keeps hover and
+                        keyboard focus over the whole record.
+                        {% endcomment %}
+                        {% for row in rows %}
+                        <tbody class="wfprop__group">
+                            <tr class="wfprop__row">
                                 <td>
                                     <a href="{% url 'workforce:wf_driver_proposal_edit' row.proposal.pk %}">{{ row.proposal.title }}</a>
                                     {% if row.proposal.ref_code %}
@@ -96,7 +142,7 @@ Notes: Uses the shared staff shell (.wfpage / *__hero / .wfcard) — the navy ba
                                         <span class="wfprop__surface"><i class="fa-solid fa-mobile-screen"></i> Driver app</span>
                                         {% endif %}
                                         {% if row.proposal.show_on_careers %}
-                                        <span class="wfprop__surface"><i class="fa-solid fa-globe"></i> Careers</span>
+                                        <span class="wfprop__surface"><i class="fa-solid fa-globe"></i> Driver jobs page</span>
                                         {% endif %}
                                         {% if not row.proposal.show_in_driver_app and not row.proposal.show_on_careers %}
                                         <span class="wfprop__surface wfprop__surface--off">Nowhere</span>
@@ -105,16 +151,21 @@ Notes: Uses the shared staff shell (.wfpage / *__hero / .wfcard) — the navy ba
                                         <span class="wfprop__surface wfprop__surface--off">Nowhere</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ row.proposal.pay_package|default:"—" }}</td>
                                 <td>
-                                    {% for zone in row.proposal.zone_groups.all %}{{ zone }}{% if not forloop.last %}, {% endif %}{% empty %}Anywhere{% endfor %}
+                                    {% if row.proposal.interest_count %}
+                                    <a class="wfprop__count" href="{% url 'workforce:wf_driver_proposal_interests' %}?proposal={{ row.proposal.pk }}&amp;status=all">{{ row.proposal.interest_count }}</a>
+                                    {% if row.proposal.new_interest_count %}<div class="wfprop__sub">{{ row.proposal.new_interest_count }} new</div>{% endif %}
+                                    {% else %}
+                                    <span class="wfprop__count--none">0</span>
+                                    {% endif %}
                                 </td>
+                                <td>{{ row.proposal.pay_package|default:"—" }}</td>
                                 <td class="wfmono">{{ row.proposal.display_order }}</td>
                                 <td class="wfmono">
                                     {% if row.proposal.closes_at %}{{ row.proposal.closes_at|date:"d M Y, H:i" }}{% else %}—{% endif %}
                                 </td>
                                 <td>
-                                    <div class="d-flex flex-wrap gap-1 justify-content-end">
+                                    <div class="wfprop__actions">
                                         <a class="wfprop__rowbtn" href="{% url 'workforce:wf_driver_proposal_edit' row.proposal.pk %}">Edit</a>
                                         {% if row.proposal.status == 'published' %}
                                         <form method="post" action="{% url 'workforce:wf_driver_proposal_status' row.proposal.pk %}">
@@ -137,8 +188,18 @@ Notes: Uses the shared staff shell (.wfpage / *__hero / .wfcard) — the navy ba
                                     </div>
                                 </td>
                             </tr>
-                            {% endfor %}
+                            <tr class="wfprop__zonerow">
+                                <td colspan="8">
+                                    <span class="wfprop__zonelabel">Zones</span>
+                                    {% for zone in row.proposal.zone_groups.all %}
+                                    <span class="wfprop__zone">{{ zone }}</span>
+                                    {% empty %}
+                                    <span class="wfprop__zone wfprop__zone--any">Anywhere in Qatar</span>
+                                    {% endfor %}
+                                </td>
+                            </tr>
                         </tbody>
+                        {% endfor %}
                     </table>
                 </div>
                 {% else %}
@@ -156,5 +217,39 @@ Notes: Uses the shared staff shell (.wfpage / *__hero / .wfcard) — the navy ba
 {% endblock content %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/driver-proposals.css' %}?v=20260924a">
+<link rel="stylesheet" href="{% static 'workforce/css/driver-proposals.css' %}?v=20261002a">
 {% endblock %}
+
+{% block extra_js %}
+<script>
+// Copy the public driver jobs link. navigator.clipboard is unavailable on plain
+// HTTP and in older browsers, so the fallback selects the code element and lets
+// the staff member copy by hand rather than leaving a dead button.
+document.addEventListener('DOMContentLoaded', function () {
+    var btn = document.getElementById('workforce_proposals_btn_copylink');
+    if (!btn) { return; }
+    btn.addEventListener('click', function () {
+        var url = btn.dataset.url || '';
+        var done = function () {
+            var original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+            setTimeout(function () { btn.innerHTML = original; }, 1600);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(url).then(done, selectInstead);
+        } else {
+            selectInstead();
+        }
+        function selectInstead() {
+            var code = document.getElementById('workforce_proposals_share_text_url');
+            if (!code) { return; }
+            var range = document.createRange();
+            range.selectNodeContents(code);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+    });
+});
+</script>
+{% endblock extra_js %}

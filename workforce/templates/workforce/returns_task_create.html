@@ -1,0 +1,117 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: The staff form that raises a return and, in the same submit, the driver's trip to collect it.
+Used by: workforce_views.returns_task_create at /workforce/returns/new/ and, pinned to standalone, at /workforce/returns/requests/new/
+Notes: Two modes, two shapes of return. Order mode reads everything off the order we carried, so only the lines are
+       editable; standalone mode carries the whole address because no order exists to copy. Both post the same field
+       names into orders.return_intake, which the seller console posts into as well. The order lookup is its own GET
+       form and must stay ABOVE the POST form — a nested form is dropped by the browser without a word.
+{% endcomment %}
+
+{% block title %}New Return Pickup - Staff Dashboard{% endblock title %}
+
+{% block content %}
+<div class="col-12">
+  <div class="wfpage">
+
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Reverse logistics &middot; Intake</span>
+        <h1 class="wfhero__title">New return pickup</h1>
+        <span class="wfhero__sub">
+          Raise the return and send a driver for it in one go
+          <span class="wfhero__sep">&middot;</span> with an order behind it, or without
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <nav class="wfhero__actions">
+          <a href="{% url 'workforce:returns_requests_list' %}" class="wfhero__ghost">
+            <i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Return requests
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    {% if not locked_mode %}
+    <div class="btn-group mb-3" role="group" aria-label="Return type">
+      <a href="?mode=order"
+         class="btn {% if mode == 'order' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+         id="workforce_returns_link_mode_order">
+        <i class="fa-solid fa-link me-1" aria-hidden="true"></i>Against an order we carried
+      </a>
+      <a href="?mode=standalone"
+         class="btn {% if mode == 'standalone' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+         id="workforce_returns_link_mode_standalone">
+        <i class="fa-solid fa-link-slash me-1" aria-hidden="true"></i>No order &mdash; not delivered by us
+      </a>
+    </div>
+    {% endif %}
+
+    {% if mode == 'order' %}
+      {% include "orders/parts/_return_order_lookup.html" with lookup_url=request.path lookup_businesses=businesses scope_note="Their order number, the code they gave it, or their customer's mobile." %}
+
+      {% if order %}
+      <form method="post" id="workforce_returns_form_intake" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="mode" value="order">
+        <input type="hidden" name="order_ref" value="{{ order.order_number }}">
+        {% comment %}The submit re-resolves the order inside this client, exactly as the
+        search did — the scope has to survive the round trip.{% endcomment %}
+        <input type="hidden" name="business" value="{{ lookup_business.business_id }}">
+
+        {% include "orders/parts/_return_order_summary.html" %}
+
+        {% if not order_blocker %}
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong><i class="fa-solid fa-rotate-left me-2" aria-hidden="true"></i>Why, and what it costs</strong>
+          </div>
+          <div class="card-body">
+            {% include "orders/parts/_return_intake_fields.html" with show_charge=1 charge_placeholder=order.dl_amount charge_note="Leave blank to charge what the outbound trip did." schedule_note="Raises the collection straight into the driver pool. Leave it off to park the claim on the returns desk instead." %}
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
+          <a href="{% url 'workforce:returns_requests_list' %}" class="btn btn-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary" id="workforce_returns_btn_create">
+            <i class="fa-solid fa-rotate-left me-1" aria-hidden="true"></i>Raise return
+          </button>
+        </div>
+        {% endif %}
+      </form>
+      {% endif %}
+
+    {% else %}
+      <form method="post" id="workforce_returns_form_intake" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="mode" value="standalone">
+
+        {% include "orders/parts/_return_standalone_fields.html" with show_plate=1 %}
+
+        <div class="card mt-3 mb-3">
+          <div class="card-header">
+            <strong><i class="fa-solid fa-rotate-left me-2" aria-hidden="true"></i>Why, and what it costs</strong>
+          </div>
+          <div class="card-body">
+            {% include "orders/parts/_return_intake_fields.html" with show_charge=1 charge_note="What the client pays for this trip. Can still be changed when the pickup is scheduled." schedule_note="Raises the collection straight into the driver pool. Leave it off to park the claim on the returns desk instead." %}
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
+          <a href="{% url 'workforce:returns_requests_list' %}" class="btn btn-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary" id="workforce_returns_btn_create">
+            <i class="fa-solid fa-rotate-left me-1" aria-hidden="true"></i>Raise return
+          </button>
+        </div>
+      </form>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+{% include "orders/parts/_return_standalone_js.html" %}
+{% include "orders/parts/_return_item_rows_js.html" %}
+{% endblock extra_js %}

@@ -1,11 +1,11 @@
 {% extends "fleet/pwa_base.html" %}
 {% load static %}
 
-{% block title %}COD Collection{% endblock %}
-{% block page_title %}COD Collection{% endblock %}
+{% block title %}Cash Collection{% endblock %}
+{% block page_title %}Cash Collection{% endblock %}
 
 {% block header_actions %}
-<button type="button" class="fleet-btn-icon" id="cod_share_btn" onclick="shareCodReport(this)" title="Share COD report (PDF)">
+<button type="button" class="fleet-btn-icon" id="cod_share_btn" onclick="shareCodReport(this)" title="Share collection report (PDF)">
     <i class="fa-solid fa-share-nodes"></i>
 </button>
 <button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
@@ -20,12 +20,12 @@
 {% endblock %}
 
 {% block content %}
-<!-- COD Summary Card -->
+<!-- Collection Summary Card -->
 <div class="fleet-card--gradient fleet-fade-in">
     <div class="fleet-cod-hero fleet-cod-hero--split">
-        <!-- Left 70%: COD Total + Orders -->
+        <!-- Left 70%: Collected Total + Orders -->
         <div class="fleet-cod-hero__left">
-            <div class="fleet-cod-hero__label">Total COD In Hand</div>
+            <div class="fleet-cod-hero__label">Total Collected</div>
             <div class="fleet-cod-hero__balance">
                 {{ total_cod_in_hand|floatformat:2|default:"0.00" }} <small>QR</small>
             </div>
@@ -66,7 +66,7 @@
                     <td class="text-end fw-semibold" style="background: transparent; color: inherit;">{{ pos_cod_amount|floatformat:2|default:"0.00" }}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.35);">
-                    <td style="background: transparent; color: inherit;"><i class="fa-solid fa-box-open me-2"></i>Zero COD (Prepaid)</td>
+                    <td style="background: transparent; color: inherit;"><i class="fa-solid fa-box-open me-2"></i>Prepaid</td>
                     <td class="text-center" style="background: transparent; color: inherit;">{{ zero_cod_count|default:0 }}</td>
                     <td class="text-end fw-semibold" style="background: transparent; color: inherit;">0.00</td>
                 </tr>
@@ -107,25 +107,25 @@
     </button>
 </div>
 
-<!-- Submit COD Button — visible whenever anything is pending settlement,
-     independent of the date filter and past-submission history -->
-{% if total_cod_count %}
+<!-- Submit Cash Button — visible whenever anything is
+     pending settlement, independent of the date filter and past-submission history -->
+{% if has_cash_to_submit %}
 <div class="fleet-slide-up" style="animation-delay: 0.15s; padding: var(--spacing-md) 0;">
     <a href="{% url 'fleet:cod_submission' %}" class="fleet-btn fleet-btn--dark fleet-btn--block fleet-btn--lg">
         <i class="fa-solid fa-building-columns me-2"></i>
-        Submit COD to Office
+        Submit Cash to Office
     </a>
 </div>
 {% endif %}
 
-<!-- COD Orders List -->
+<!-- Collected Orders List -->
 <div class="fleet-slide-up" style="animation-delay: 0.2s;">
     {% if cod_in_hand_list %}
     <div class="fleet-card" style="padding: 0; overflow: hidden;">
         <div class="fleet-card__header" style="padding: var(--spacing-md) var(--spacing-lg); margin-bottom: 0; border-bottom: 1px solid var(--fleet-grey-100); display: flex; align-items: center; justify-content: space-between;">
             <h3 class="fleet-card__title">
                 <i class="fa-solid fa-list me-2"></i>
-                COD In Hand ({{ cod_in_hand_count }})
+                Orders ({{ cod_in_hand_count }})
             </h3>
             <!-- Filtered Payment Method Split Icons -->
             {% if payment_method_breakdown %}
@@ -156,7 +156,7 @@
                         <span class="ftd__cod-card__order">#{{ task.order.order_number|default:task.dl_task_number }}</span>
                         <span class="ftd__cod-card__name">{{ task.order.customer_name|default:"-" }}</span>
                     </div>
-                    <div class="ftd__cod-card__amount {% if not task.cod_collected %}ftd__cod-card__amount--zero{% endif %}">{{ task.cod_collected_amount|floatformat:0 }} <small>QR</small></div>
+                    <div class="ftd__cod-card__amount {% if not task.collected_total %}ftd__cod-card__amount--zero{% endif %}">{{ task.collected_total|floatformat:0 }} <small>QR</small></div>
                 </div>
                 <div class="ftd__cod-card__mid">
                     {% if task.order.customer_phone %}<a href="tel:{{ task.order.customer_phone }}" class="ftd__cod-card__phone"><i class="fa-solid fa-phone"></i> {{ task.order.customer_phone }}</a>{% endif %}
@@ -166,11 +166,13 @@
                 </div>
                 <div class="ftd__cod-card__tags">
                     <span class="ftd__tag ftd__tag--{{ task.dl_task_status }}">{{ task.get_dl_task_status_display }}</span>
-                    {% if task.cod_collected %}
-                    <span class="ftd__tag ftd__tag--cod-collected"><i class="fa-solid fa-coins"></i> COD Collected</span>
+                    {% if task.cod_collected or task.fee_collected_amount %}
+                    <span class="ftd__tag ftd__tag--cod-collected"><i class="fa-solid fa-coins"></i> Collected</span>
                     {% if task.cod_settled %}<span class="ftd__tag ftd__tag--cod-settled"><i class="fa-solid fa-check-double"></i> Settled</span>{% else %}<span class="ftd__tag ftd__tag--cod-pending"><i class="fa-solid fa-hourglass-half"></i> Unsettled</span>{% endif %}
+                    {% elif task.dl_task_status == 'returned_to_shipper' or task.task_leg == 'return_to_client' %}
+                    <span class="ftd__tag ftd__tag--cod-zero"><i class="fa-solid fa-rotate-left"></i> Return · No cash</span>
                     {% else %}
-                    <span class="ftd__tag ftd__tag--cod-zero"><i class="fa-solid fa-circle-check"></i> No COD (Prepaid)</span>
+                    <span class="ftd__tag ftd__tag--cod-zero"><i class="fa-solid fa-circle-check"></i> Prepaid</span>
                     {% endif %}
                 </div>
             </div>
@@ -185,8 +187,8 @@
         <div class="fleet-empty__icon">
             <i class="fa-solid fa-money-bill-wave"></i>
         </div>
-        <div class="fleet-empty__title">No COD Orders</div>
-        <div class="fleet-empty__text">You haven't collected any COD in the selected period</div>
+        <div class="fleet-empty__title">No Collections</div>
+        <div class="fleet-empty__text">You haven't collected any cash in the selected period</div>
         <a href="{% url 'fleet:fleet_dashboard' %}" class="fleet-btn fleet-btn--primary" style="margin-top: var(--spacing-lg);">
             <i class="fa-solid fa-arrow-left me-2"></i>
             Back to Dashboard
@@ -195,18 +197,18 @@
     {% endif %}
 </div>
 
-<!-- COD Transactions (Deposits/Settlements) -->
+<!-- Cash Submissions (Deposits/Settlements) -->
 {% if cod_transactions %}
 <div class="fleet-card fleet-slide-up" style="animation-delay: 0.3s;">
     <div class="fleet-card__header">
-        <h3 class="fleet-card__title">COD Submissions ({{ cod_transactions_total }})</h3>
+        <h3 class="fleet-card__title">Cash Submissions ({{ cod_transactions_total }})</h3>
     </div>
     <div class="fleet-card__body" style="padding: 0;">
         {% for txn in cod_transactions %}
         {% with ttype=txn.transaction_type %}
         <a href="{% url 'fleet:transaction_detail_page' txn.transaction_code %}" class="fth__row fth__row--link {% if not forloop.last %}fth__row--border{% endif %}">
             <div class="fth__row-body">
-                <span class="fth__row-title">{{ txn.get_transaction_type_display }}</span>
+                <span class="fth__row-title">Cash Submission</span>
                 <span class="fth__row-meta">
                     {% if txn.transaction_code %}<span class="fth__row-code">{{ txn.transaction_code }}</span> · {% endif %}
                     {{ txn.created_at|date:"d M, Y" }}
@@ -225,7 +227,7 @@
 {% endif %}
 
 <script>
-    // Generate the COD report PDF server-side and open the native share sheet.
+    // Generate the collection report PDF server-side and open the native share sheet.
     // Works inside the standalone PWA where a plain <a download> silently fails.
     async function shareCodReport(btn) {
         haptic([10]);
@@ -248,8 +250,8 @@
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     files: [file],
-                    title: 'COD Settlement Report',
-                    text: 'COD settlement report',
+                    title: 'Cash Settlement Report',
+                    text: 'Cash settlement report',
                 });
             } else {
                 // Fallback: trigger a normal download / open in a new tab

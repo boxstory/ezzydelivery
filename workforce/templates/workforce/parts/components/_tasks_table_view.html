@@ -128,13 +128,17 @@ Each task should have select_related: order, driver, business, pickup_location, 
             </thead>
             <tbody>
                 {% for dl in tasks %}
-                <tr class="dl-table__row" data-task-id="{{ dl.id }}" data-order-number="{{ dl.order.order_number|default:'' }}" data-client-order-code="{{ dl.order.client_order_code|default:'' }}" data-customer-phone="{{ dl.order.customer_phone|default:'' }}" data-customer-address="{{ dl.order.customer_address|default:'' }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
+                {% comment %}Only the Seller/Task/Order cell below opens the task - the rest of the
+                   row stays inert so a mis-click while ticking, editing status or reading
+                   an address does not navigate away.{% endcomment %}
+                <tr class="dl-table__row" data-task-id="{{ dl.id }}" data-order-number="{{ dl.order.order_number|default:'' }}" data-client-order-code="{{ dl.order.client_order_code|default:'' }}" data-customer-phone="{{ dl.order.customer_phone|default:'' }}" data-customer-address="{{ dl.order.customer_address|default:'' }}">
                     <td class="dl-table__td-check" onclick="event.stopPropagation();">
                         {# data-export-row also feeds the sheet CSV/print export (export-columns.js) — same ticks, no second column #}
                         <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" data-export-row onchange="updateBulkSelection()">
                     </td>
-                    <!-- Seller + Task # + Order # stacked -->
+                    <!-- Seller + Task # + Order # stacked (the row's only link) -->
                     <td class="dl-table__td-id">
+                        <a href="{% url 'workforce:delivery_task_detail' dl.id %}" class="dl-table__id-link">
                         <div class="dl-table__id-stack">
                             <span class="dl-table__seller-name" title="{{ dl.order.business.business_name }}">{{ dl.order.business.business_name|default:"—"|truncatechars:18 }}</span>
                             <span class="dl-table__task-num">{{ dl.dl_task_number|default:"—" }}{% if dl.unread_seller_comments %}
@@ -142,20 +146,21 @@ Each task should have select_related: order, driver, business, pickup_location, 
                                 <span class="dl-table__comment-flag" title="{{ dl.unread_seller_comments }} unread seller comment{{ dl.unread_seller_comments|pluralize }}">
                                     <i class="fa-solid fa-comment-dots"></i>{{ dl.unread_seller_comments }}
                                 </span>{% endif %}{% if dl.task_leg == 'exchange' %}
-                                {# Two handovers in one visit - the driver has to come back with the
+                                {% comment %}Two handovers in one visit - the driver has to come back with the
                                    original. Dispatch needs to see that before assigning, not just
-                                   the driver once he is already at the door. #}
+                                   the driver once he is already at the door.{% endcomment %}
                                 <span class="dl-table__leg-flag" title="Exchange - the driver hands over the replacement and brings the original back">
                                     <i class="fa-solid fa-right-left"></i>Exchange
                                 </span>{% endif %}{% if dl.task_leg == 'collect_from_customer' %}
-                                {# Runs backwards: collects at the customer, drops at the client or a
+                                {% comment %}Runs backwards: collects at the customer, drops at the client or a
                                    hub. Dispatch has to see that before assigning, or it reads as an
-                                   ordinary drop and gets routed like one. #}
+                                   ordinary drop and gets routed like one.{% endcomment %}
                                 <span class="dl-table__leg-flag" title="Collection - the driver picks the goods up from the customer and takes them back">
                                     <i class="fa-solid fa-rotate-left"></i>Collection
                                 </span>{% endif %}</span>
                             <span class="dl-table__order-num" title="{{ dl.order.client_order_code }}">{{ dl.order.client_order_code|default:"—"|truncatechars:14 }}</span>
                         </div>
+                        </a>
                     </td>
                     <!-- Date / Updated -->
                     <td class="dl-table__td-date">

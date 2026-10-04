@@ -7,9 +7,11 @@
 {# Used by: workforce.crm_views.crm_lead_detail #}
 {# Notes: crmd__ namespace; writes go through fetch-POST JSON endpoints via crm_lead_detail.js. #}
 {#        Carries the shared wfnote__ page-notes card under the hero, hidden until the help button is pressed. #}
+{#        Driver leads also carry the crmdoc__ Documents panel + its viewer/edit dialogs (parts/_lead_documents*.html). #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260923c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20261003e" rel="stylesheet" type="text/css" />
+{% if driver %}<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">{% endif %}
 {% endblock extra_css %}
 
 {% block content %}
@@ -42,9 +44,15 @@
         <span class="crm__stage crm__stage--overdue crmd__hero-plate crmd__hero-plate--alert"><i class="fa-solid fa-triangle-exclamation"></i>Follow-up overdue</span>
         {% endif %}
         {% if lead.converted_business %}
+        {% if wf_dept_ops %}
         <a class="crm__stage crm__stage--won crmd__hero-plate" href="{% url 'workforce:seller_detail' lead.converted_business_id %}">
           <i class="fa-solid fa-store"></i>Business #{{ lead.converted_business_id }}
         </a>
+        {% else %}
+        <span class="crm__stage crm__stage--won crmd__hero-plate">
+          <i class="fa-solid fa-store"></i>Business #{{ lead.converted_business_id }}
+        </span>
+        {% endif %}
         {% endif %}
         {% if lead.company_name and lead.contact_name %}
         <span class="crmd__hero-fact" title="Contact person">
@@ -176,11 +184,21 @@
               </div>
               <div class="crmd__crow">
                 <dt class="crmd__crow-lbl">Phone</dt>
-                <dd class="crmd__crow-val" data-contact-read-phone>
+                <dd class="crmd__crow-val" data-contact-read-phone="phone">
                   {% if lead.phone %}
                   <a class="crmd__crow-tel" href="tel:{{ lead.phone }}" data-contact-read="phone">{{ lead.phone }}</a>
                   {% else %}
                   <span class="crmd__crow-val--empty" data-contact-read="phone">Not set</span>
+                  {% endif %}
+                </dd>
+              </div>
+              <div class="crmd__crow">
+                <dt class="crmd__crow-lbl">2nd mobile</dt>
+                <dd class="crmd__crow-val" data-contact-read-phone="phone_2">
+                  {% if lead.phone_2 %}
+                  <a class="crmd__crow-tel" href="tel:{{ lead.phone_2 }}" data-contact-read="phone_2">{{ lead.phone_2 }}</a>
+                  {% else %}
+                  <span class="crmd__crow-val--empty" data-contact-read="phone_2">Not set</span>
                   {% endif %}
                 </dd>
               </div>
@@ -207,6 +225,11 @@
                 <label class="crmd__field-lbl" for="workforce_crm_detail_input_phone">Phone</label>
                 <input class="form-control form-control-sm" id="workforce_crm_detail_input_phone"
                        name="phone" value="{{ lead.phone }}">
+              </div>
+              <div class="crmd__editrow">
+                <label class="crmd__field-lbl" for="workforce_crm_detail_input_phone_2">2nd mobile</label>
+                <input class="form-control form-control-sm" id="workforce_crm_detail_input_phone_2"
+                       name="phone_2" value="{{ lead.phone_2 }}" inputmode="tel">
               </div>
               <div class="crmd__editrow">
                 <label class="crmd__field-lbl" for="workforce_crm_detail_input_category">Category</label>
@@ -459,6 +482,12 @@
       </div>
       {% endif %}
 
+      {% comment %} The scans behind the Driver Application panel's "Documents" line.
+         Kept as its own panel because staff read an ID here to decide the stage, and
+         opening the driver record in a second tab lost the lead they were working.
+         Sits in the wide column, after the AI summary. {% endcomment %}
+      {% if lead.category == 'driver' and driver %}{% include "workforce/crm/parts/_lead_documents.html" %}{% endif %}
+
       <!-- FULL WHATSAPP CONVERSATION (carries the manual chat linker) -->
       <div class="crm__panel">
         <div class="crm__panel-hd">
@@ -478,7 +507,7 @@
                   aria-controls="workforce_crm_detail_div_chat_link"
                   aria-expanded="{% if wa_messages %}false{% else %}true{% endif %}">
             <i class="fa-solid fa-link" aria-hidden="true"></i>
-            {% if lead.wa_chat_override or wa_messages %}Link a different chat{% else %}Link chat{% endif %}
+            {% if wa_numbers|length > 1 or wa_messages %}Link another number{% else %}Link chat{% endif %}
           </button>
         </div>
         {# Which of our numbers this thread runs on. Also decides which line the #}
@@ -500,6 +529,31 @@
           {% endfor %}
         </div>
         {% endif %}
+        {% comment %}
+          Every WhatsApp number this lead talks from: its own phone (primary) plus
+          each linked extra (owner, office, accounts…), with the platform account
+          registered on it. A lead never blocks anyone signing up; it only reports
+          who did — and a number with an account keeps its chat out of the CRM.
+        {% endcomment %}
+        {% if wa_numbers %}
+        <ul class="crmd__numbers" id="workforce_crm_detail_list_wa_numbers">
+          {% for n in wa_numbers %}
+          <li class="crmd__number">
+            <span class="crmd__number-label">{{ n.label }}</span>
+            <span class="crmd__number-id">{% if n.is_lid %}Private WhatsApp id {{ n.identifier }}{% else %}{{ n.display }}{% endif %}</span>
+            {% if n.session %}<span class="crmd__number-sess">on {{ n.session }}</span>{% endif %}
+            {% for a in n.accounts %}
+            <span class="crmd__number-acct" title="@{{ a.username }}"><i class="fa-solid fa-user" aria-hidden="true"></i> {{ a.name }} · {{ a.role }}</span>
+            {% endfor %}
+            {% if n.blocked %}<span class="crmd__number-note">chat hidden — this number has an account</span>{% endif %}
+            {% if not n.primary %}
+            <button type="button" class="crm__btn crmd__number-remove" data-unlink-number="{{ n.identifier }}"
+                    title="Unlink this number from the lead">Unlink</button>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
         {% if not wa_messages %}
         {# Kept addressable: a successful Refresh that finally pulls the thread in #}
         {# has to retire this "nothing here" note, not leave it above the messages. #}
@@ -511,11 +565,16 @@
         {% endif %}
         <div class="crm__panel-body crmd__linker{% if wa_messages %} d-none{% endif %}"
              id="workforce_crm_detail_div_chat_link">
-          {% if lead.wa_chat_override %}
-          <div class="crmd__field-lbl mb-2">Manually linked to <strong>{{ lead.wa_chat_override }}</strong>{% if not wa_messages %} — no messages found there yet{% endif %}. Search to re-point it.</div>
-          {% else %}
-          <div class="crmd__field-lbl mb-2">Auto-matching uses the lead's phone. If the chat lives under a different number or a LID, connect it by hand.</div>
-          {% endif %}
+          <div class="crmd__field-lbl mb-2">The lead's own phone is matched automatically. Add every other number they write from — owner, office, accounts — and each chat joins this lead.</div>
+          <div class="crmd__link-label-wrap mb-2">
+            <label class="crmd__field-lbl" for="workforce_crm_detail_input_wa_label">Who is this number?</label>
+            <input type="text" class="form-control form-control-sm" id="workforce_crm_detail_input_wa_label"
+                   list="workforce_crm_detail_datalist_wa_labels" maxlength="40" placeholder="e.g. Owner, Office, Accounts">
+            <datalist id="workforce_crm_detail_datalist_wa_labels">
+              <option value="Owner"></option><option value="Office"></option><option value="Manager"></option>
+              <option value="Accounts"></option><option value="Driver"></option><option value="Other"></option>
+            </datalist>
+          </div>
           <div class="crmd__link-search-wrap">
             <input type="text" class="form-control form-control-sm" id="workforce_crm_detail_input_wa_search"
                    placeholder="Search WhatsApp contacts by phone or name…" autocomplete="off">
@@ -572,8 +631,12 @@
               <div class="crmd__tl-card">
                 <div class="crmd__tl-head">
                   <span class="crmd__tl-type">{{ activity.get_activity_type_display }}</span>
+                  {% if activity.lead_id != lead.pk %}
+                  <a class="crmd__tl-from" href="{% url 'workforce:crm_lead_detail' activity.lead_id %}"
+                     title="Entry from a card merged into this one">from #{{ activity.lead_id }}</a>
+                  {% endif %}
                   <span class="crmd__tl-time">{{ activity.created_at|date:"d M, H:i" }}</span>
-                  {% if activity.created_by == request.user or request.user.profile.is_superadmin %}
+                  {% if activity.lead_id == lead.pk and activity.created_by == request.user or activity.lead_id == lead.pk and request.user.profile.is_superadmin %}
                   <button class="crmd__tl-del" data-delete-activity="{{ activity.pk }}">
                     <i class="fa-solid fa-trash-can"></i>
                   </button>
@@ -636,9 +699,11 @@
             {% endfor %}
           </div>
           {% endif %}
+          {% if wf_dept_ops %}
           <a class="crm__btn w-100 mt-3" href="{% url 'workforce:driver_detail' driver.driver_id %}">
             <i class="fa-solid fa-arrow-up-right-from-square"></i> Open driver profile
           </a>
+          {% endif %}
           {% else %}
           <p class="crmd__appnote">No matching driver application for this number yet. The card stays in <strong>New Application</strong> and will start moving automatically once they apply with this phone.</p>
           {% endif %}
@@ -762,6 +827,10 @@
 
   </div><!-- /.crmd__body -->
 
+  {% comment %} Inside the .crm root so the dialogs inherit the console's --crm-*
+     tokens; nothing above them creates a stacking context. {% endcomment %}
+  {% if driver %}{% include "workforce/crm/parts/_lead_document_modals.html" %}{% endif %}
+
 </div>
 
 {# wa_send_session pins the composer to the number a staff member actually PICKED #}
@@ -792,11 +861,19 @@
     urlAiSummary: "{% url 'workforce:crm_lead_ai_summary' lead.pk %}",
     urlDeleteBase: "/workforce/crm/leads/{{ lead.pk }}/delete-activity/",
     urlLinkChat: "{% url 'workforce:crm_lead_link_chat' lead.pk %}",
+    urlUnlinkChat: "{% url 'workforce:crm_lead_unlink_chat' lead.pk %}",
     urlChatRefresh: "{% url 'workforce:crm_lead_chat_refresh' lead.pk %}",
+    {% if driver %}
+    urlDocAdd: "{% url 'workforce:driver_document_add' driver.driver_id %}",
+    {# The document id is appended at click time — one base, every row. #}
+    urlDocEditBase: "/workforce/drivers/{{ driver.driver_id }}/document/",
+    {% endif %}
     urlWaSearch: "{% url 'workforce:crm_wa_contact_search' %}",
     leadName: "{{ lead.contact_name|default:lead.company_name|default:lead.phone|default:'this lead'|escapejs }}",
     csrfToken: "{{ csrf_token }}"
   };
 </script>
-<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20260922f"></script>
+{% if driver %}<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>{% endif %}
+<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20261003h"></script>
+{% if driver %}<script src="{% static 'workforce/js/doc_viewer.js' %}?v=20261003a"></script>{% endif %}
 {% endblock %}

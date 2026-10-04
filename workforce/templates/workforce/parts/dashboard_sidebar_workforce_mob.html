@@ -171,6 +171,9 @@
                 <a id="workforce_sidebar_mob_link_return_requests" href="{% url 'workforce:returns_requests_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-file-invoice"></i><span>Return Requests</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_return_new" href="{% url 'workforce:returns_task_create' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-plus"></i><span>New Return Pickup</span>
+                </a>
             </div>
         </div>
         {% endif %}
@@ -426,8 +429,8 @@
         </div>
         {% endif %}
 
-        <!-- Auto Triggers (catalogue open to every desk; plumbing is admin-only) -->
-        {% if wf_departments %}
+        <!-- Auto Triggers (super-admin only) -->
+        {% if wf_dept_admin %}
         <div id="workforce_sidebar_mob_section_triggers" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('triggers')">
                 <div class="wsm__nav-header-title">
@@ -440,7 +443,6 @@
                 <a id="workforce_sidebar_mob_link_auto_triggers" href="{% url 'workforce:auto_triggers_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-list"></i><span>All Triggers</span>
                 </a>
-                {% if wf_dept_admin %}
                 <a id="workforce_sidebar_mob_link_auto_flows" href="{% url 'workforce:auto_flows_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-diagram-project"></i><span>Flows</span>
                 </a>
@@ -462,7 +464,6 @@
                 <a id="workforce_sidebar_mob_link_webhook_imports" href="{% url 'workforce:wf_webhook_imports' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-satellite-dish"></i><span>Webhook Imports</span>
                 </a>
-                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -642,11 +643,20 @@
         </div>
         {% endif %}
 
-        <!-- Driver Proposals — the recruitment offer shown in the driver app and on /careers/ -->
+        <!-- Driver Proposals — the recruitment offer shown in the driver app and on /careers/drivers/ -->
         {% if wf_dept_mkt %}
         <div id="workforce_sidebar_mob_section_driver_proposals" class="wsm__nav-section">
             <a id="workforce_sidebar_mob_link_driver_proposals" href="{% url 'workforce:wf_driver_proposals' %}" class="wsm__nav-link wsm__nav-link--top">
                 <i class="fa-solid fa-file-signature"></i><span>Driver Proposals</span>
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Interested drivers — answers to a driver proposal; marketing and operations both work it -->
+        {% if wf_dept_mkt or wf_dept_ops %}
+        <div id="workforce_sidebar_mob_section_proposal_interests" class="wsm__nav-section">
+            <a id="workforce_sidebar_mob_link_proposal_interests" href="{% url 'workforce:wf_driver_proposal_interests' %}" class="wsm__nav-link wsm__nav-link--top">
+                <i class="fa-solid fa-hand"></i><span>Interested Drivers</span>
             </a>
         </div>
         {% endif %}
@@ -665,9 +675,14 @@
                 <a id="workforce_sidebar_mob_link_wa_chats" href="/waha/wa-chats/" class="wsm__nav-link">
                     <i class="fa-solid fa-comments"></i><span>Live Chats</span>
                 </a>
+                {% if wf_dept_admin %}
                 <a id="workforce_sidebar_mob_link_wa_dashboard" href="/waha/wa-dashboard/" class="wsm__nav-link">
                     <i class="fa-solid fa-qrcode"></i><span>Session Status</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_wa_label_access" href="{% url 'workforce:whatsapp_label_access' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-user-lock"></i><span>Marketing-only Labels</span>
+                </a>
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -756,8 +771,8 @@
 
         <div class="wsm__nav-divider"></div>
 
-        <!-- Verifications -->
-        {% if wf_dept_ops or wf_dept_mkt %}
+        <!-- Verifications (Operations only — matches parts/sidebar/onboarding.html) -->
+        {% if wf_dept_ops %}
         <div id="workforce_sidebar_mob_section_verifications" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('verifications')">
                 <div class="wsm__nav-header-title">
@@ -868,9 +883,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check if current page is a fleet-related page
     const isFleetPage = /^\/workforce\/(fleet|drivers)\//.test(currentPath);
 
+    // A lead page serves both pipelines on one URL, so the path cannot say which
+    // menu owns it — the view names the board (blank on every other page).
+    const crmLeadBoard = '{{ crm_sidebar_board|default:"" }}';
+
     // Map path prefixes to {section, highlight link} for sub-pages (longer prefixes first)
     var subpageMap = [
+        // WhatsApp
+        {re: /^\/workforce\/whatsapp\/label-access/,               section: 'wa',            link: 'workforce_sidebar_mob_link_wa_label_access'},
         // Returns
+        {re: /^\/workforce\/returns\/new/,                     section: 'returns',       link: 'workforce_sidebar_mob_link_return_new'},
+        {re: /^\/workforce\/returns\/requests\/new/,            section: 'returns',       link: 'workforce_sidebar_mob_link_return_new'},
         {re: /^\/workforce\/returns\/requests/,                section: 'returns',       link: 'workforce_sidebar_mob_link_return_requests'},
         {re: /^\/workforce\/returns\//,                        section: 'returns',       link: 'workforce_sidebar_mob_link_returns_open'},
         // Import
@@ -939,6 +962,8 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/inventory\//,                       section: 'inventory',     link: null},
         // Warehouse
         {re: /^\/workforce\/product-requests\//,                section: 'warehouse',     link: 'workforce_sidebar_mob_link_product_requests'},
+        // Interested drivers lives under driver-proposals/, so it must come first.
+        {re: /^\/workforce\/marketing\/driver-proposals\/interests\//, section: null,        link: 'workforce_sidebar_mob_link_proposal_interests'},
         // Driver proposals — a top-level link, so it carries no section to open.
         {re: /^\/workforce\/marketing\/driver-proposals\//,      section: null,            link: 'workforce_sidebar_mob_link_driver_proposals'},
         // CRM — driver rules first, then the business catch-all (see the note on
@@ -948,7 +973,12 @@ document.addEventListener('DOMContentLoaded', function() {
         {re: /^\/workforce\/crm\/driver\/map\//,               section: 'crm_driver',    link: 'workforce_sidebar_mob_link_crm_driver_map'},
         {re: /^\/workforce\/crm\/driver\/reports\//,            section: 'crm_driver',    link: 'workforce_sidebar_mob_link_crm_drv_reports'},
         {re: /^\/workforce\/crm\/driver\/stages\//,             section: 'crm_driver',    link: 'workforce_sidebar_mob_link_crm_drv_stages'},
-        // A lead detail page is shared by both boards, so it defaults to Business.
+        // A lead page is shared by both boards — the server says which one, and
+        // Business is the fallback when it says nothing.
+        {re: /^\/workforce\/crm\/leads\/(\d+|new)/,
+         section: crmLeadBoard === 'driver' ? 'crm_driver' : 'crm_business',
+         link: crmLeadBoard === 'driver' ? 'workforce_sidebar_mob_link_crm_driver_board'
+                                         : 'workforce_sidebar_mob_link_crm_board'},
         {re: /^\/workforce\/crm\//,                             section: 'crm_business',  link: null},
         // Pricing inquiries feed the business pipeline and now sit in that menu.
         {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     section: 'crm_business',  link: 'workforce_sidebar_mob_link_pricing_inquiries'},

@@ -19,7 +19,7 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
 
 {% block extra_css %}
 {% comment %}crm.css carries the shared staff filter bar (crm__facets / crm__facet-select).{% endcomment %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260923c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20261003e" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -49,10 +49,10 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
           </div>
         </div>
         <nav class="wfhero__actions">
-          {% comment %}Goods we never carried have no order to raise a claim from,
-          so this is the only way one gets opened.{% endcomment %}
-          <a href="{% url 'workforce:returns_request_create' %}" class="wfhero__ghost">
-            <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>New return &mdash; not delivered by us
+          {% comment %}Raises the claim and, if asked, the driver's trip in one submit —
+          against an order we carried or against nothing at all.{% endcomment %}
+          <a href="{% url 'workforce:returns_task_create' %}" class="wfhero__ghost">
+            <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>New return pickup
           </a>
           <a href="?status=cod_owed" class="wfhero__ghost{% if cod_owed_count %} wfhero__ghost--alert{% endif %}">
             QAR {{ cod_owed_total }} unrefunded &#9656;
@@ -154,7 +154,7 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
               </td>
               <td>
                 {% for ri in r.return_items.all %}
-                <span class="badge bg-secondary">{{ ri.order_item.display_name|truncatechars:22 }} &times;{{ ri.quantity_returned }}</span>
+                <span class="badge bg-secondary">{{ ri.display_name|truncatechars:22 }} &times;{{ ri.quantity_returned }}</span>
                 {% empty %}
                 {% if r.order %}
                 <span class="text-muted">whole order</span>
@@ -221,7 +221,7 @@ Notes: Sibling of the custody console at /workforce/returns/, and deliberately a
                 <div class="empty-state">
                   <i class="fa-solid fa-file-circle-check empty-state__icon" aria-hidden="true"></i>
                   <p class="empty-state__title">No return requests here</p>
-                  <p class="empty-state__text">Returns are raised by a seller, by a driver marking a partial delivery, or when a task closes as Returned to Shipper. For goods we never delivered, <a href="{% url 'workforce:returns_request_create' %}">raise one here</a>.</p>
+                  <p class="empty-state__text">Returns are raised by a seller, by a driver marking a partial delivery, or when a task closes as Returned to Shipper. Staff can raise one directly &mdash; with an order behind it or without &mdash; from <a href="{% url 'workforce:returns_task_create' %}">New return pickup</a>.</p>
                 </div>
               </td>
             </tr>

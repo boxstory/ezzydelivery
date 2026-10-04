@@ -15,6 +15,8 @@ class StaticViewSitemap(Sitemap):
     _priority_map = {
         'core:join_driver_start': 0.9,
         'core:join_driver_start_ar': 0.9,
+        # Driver jobs: the live-vacancy page, shared on WhatsApp and indexed
+        'webpages:careers_drivers': 0.9,
         'webpages:affiliate_marketing': 0.7,
         'webpages:delivery_request': 0.7,
         'webpages:delivery_inquiry': 0.7,
@@ -36,6 +38,7 @@ class StaticViewSitemap(Sitemap):
             'webpages:services',
             'webpages:llm_knowledge_panel',
             'webpages:careers',
+            'webpages:careers_drivers',
             'webpages:fulfillment',
             'webpages:qcommerce',
             'webpages:testimonials',

@@ -1,7 +1,7 @@
 {% load workforce_tags %}
 {# Purpose: Workforce sidebar section — CRM Business (client sales pipeline). #}
 {# Used by: workforce/parts/dashboard_sidebar_workforce.html, under the Marketing heading. #}
-{# Notes: Driver recruitment has its own menu (sidebar/crm_driver.html). Shared CRM tools — WhatsApp Inbox, Contacts, Reports — carry their active_names HERE only, so a shared page highlights one menu instead of both. #}
+{# Notes: Driver recruitment has its own menu (sidebar/crm_driver.html). Shared CRM tools — WhatsApp Inbox, Contacts, Reports — carry their active_names HERE only, so a shared page highlights one menu instead of both. The lead pages (detail/new) serve BOTH pipelines on one url_name, so they are not in `active`: the view sends `crm_sidebar_board` and whichever menu it names lights up. #}
 {% url 'workforce:crm_leads_board' as u_crm_board %}
 {% url 'workforce:crm_leads_list' as u_crm_list %}
 {% url 'workforce:crm_whatsapp_inbox' as u_crm_inbox %}
@@ -12,16 +12,17 @@
 {% url 'workforce:pricing_inquiries_list' as u_pricing_inquiries_list %}
 {% url 'workforce:business_verification_list' as u_business_verification_list %}
 {% url 'workforce:crm_stages_manage' as u_crm_stages %}
-{% with active="crm_leads_board,crm_leads_list,crm_lead_detail,crm_lead_create,crm_lead_update,crm_whatsapp_inbox,crm_reports,crm_contacts,crm_stages_manage,pricing_inquiries_list,pricing_inquiry_detail" %}
-<li id="workforce_sidebar_menu_crm_business" class="nav-item {% if request.resolver_match.url_name|in_csv:active %}active{% endif %}">
+{% with active="crm_leads_board,crm_leads_list,crm_whatsapp_inbox,crm_reports,crm_contacts,crm_stages_manage,pricing_inquiries_list,pricing_inquiry_detail" %}
+{% with owns_lead_page=crm_sidebar_board|in_csv:"business" %}
+<li id="workforce_sidebar_menu_crm_business" class="nav-item {% if owns_lead_page or request.resolver_match.url_name|in_csv:active %}active{% endif %}">
   <div id="workforce_sidebar_link_crm_business" class="nav-link btn" data-bs-toggle="collapse" data-bs-target="#submenu-crm-business" data-title="CRM Business">
     <i class="fa-solid fa-briefcase me-2"></i>
     <span>CRM Business</span>
     <i class="fa-solid fa-chevron-down ms-auto"></i>
   </div>
-  <div id="submenu-crm-business" class="multi-level collapse submenu {% if request.resolver_match.url_name|in_csv:active %}show{% endif %}">
+  <div id="submenu-crm-business" class="multi-level collapse submenu {% if owns_lead_page or request.resolver_match.url_name|in_csv:active %}show{% endif %}">
     <ul class="nav flex-column">
-      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_board" url=u_crm_board icon="fa-solid fa-table-columns" label="Leads Board" active_names="crm_leads_board,crm_lead_detail,crm_lead_create,crm_lead_update" badge_var=crm_business_overdue_count badge_key="crm_business_overdue" %}
+      {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_board" url=u_crm_board icon="fa-solid fa-table-columns" label="Leads Board" active_names="crm_leads_board" is_active=owns_lead_page badge_var=crm_business_overdue_count badge_key="crm_business_overdue" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_list" url=u_crm_list icon="fa-solid fa-table-list" label="Leads List" active_names="crm_leads_list" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_pricing_inquiries" url=u_pricing_inquiries_list icon="fa-solid fa-file-invoice" label="Pricing Inquiries" active_names="pricing_inquiries_list,pricing_inquiry_detail" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_inbox" url=u_crm_inbox icon="fa-brands fa-whatsapp" label="WhatsApp Inbox" active_names="crm_whatsapp_inbox" %}
@@ -37,4 +38,5 @@
     </ul>
   </div>
 </li>
+{% endwith %}
 {% endwith %}

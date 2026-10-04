@@ -1,0 +1,21 @@
+{% comment %}
+Purpose: The data-doc-* attributes that hand one document to the shared popup (doc_viewer.js) — no second request needed.
+Used by: workforce/crm/parts/_lead_documents.html rows and workforce/driver_detail.html document cards (inside an opening tag).
+Notes: context: doc (a driver_document_cards() dict), driver (for the selfie's name).
+{% endcomment %}
+data-doc-id="{{ doc.id }}"
+data-doc-type="{{ doc.document_type|default_if_none:'' }}"
+data-doc-no="{{ doc.document_no|default_if_none:'' }}"
+{% if doc.document_type == 'Selfie' %}data-doc-name="{{ driver.driver_name }}"{% endif %}
+data-doc-issued="{{ doc.document_issued_from|default_if_none:'' }}"
+data-doc-expiry="{{ doc.document_expiry_date|date:'Y-m-d'|default_if_none:'' }}"
+data-doc-expiry-label="{% if doc.document_expiry_date %}{{ doc.document_expiry_date|date:'d M Y' }}{% endif %}"
+{% if doc.document_file %}data-doc-front="{{ doc.document_file.url }}"{% endif %}
+{% if doc.document_file_back %}data-doc-back="{{ doc.document_file_back.url }}"{% endif %}
+data-doc-front-image="{% if doc.file_is_image %}1{% else %}0{% endif %}"
+data-doc-back-image="{% if doc.back_is_image %}1{% else %}0{% endif %}"
+data-doc-check="{{ doc.ai_status_label }}{% if doc.verified_at %} · {% if doc.verified_by_name %}by {{ doc.verified_by_name }}{% else %}matched the image{% endif %}, {{ doc.verified_at|date:'d M Y' }}{% endif %}"
+data-doc-verified="{% if doc.verified_at %}1{% else %}0{% endif %}"
+data-doc-check-note="{{ doc.ai_note }}"
+data-doc-ai-no="{{ doc.ai_document_no }}"
+data-doc-ai-expiry="{% if doc.ai_expiry_date %}{{ doc.ai_expiry_date|date:'d M Y' }}{% endif %}"

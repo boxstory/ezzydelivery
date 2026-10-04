@@ -1,0 +1,217 @@
+{% comment %}
+Purpose: The whole of a return for goods EzzyDelivery never delivered — there is no order to copy, so the address typed here IS the claim.
+Used by: workforce/returns_task_create.html and orders/order_return_add.html, standalone mode only.
+Notes: Pair it with parts/_return_standalone_js.html, which filters the drop-off list by client and paints the QNAS plate.
+       On the seller console `businesses` is empty and fixed_business carries the one client, so nobody can pick another's.
+       Address helpers (qnasValidateAndFill / whatsappLocationFill / locDropHandle) and .qnas-plate ship with both bases.
+{% endcomment %}
+<div class="row g-3">
+
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <strong><i class="fa-solid fa-store me-2" aria-hidden="true"></i>Client &amp; goods</strong>
+      </div>
+      <div class="card-body">
+        {% if businesses %}
+        <div class="mb-3">
+          <label class="form-label" for="returns_intake_select_business">
+            Client <span class="text-danger">*</span>
+          </label>
+          <select class="form-select" id="returns_intake_select_business" name="business" required>
+            <option value="">Select a client…</option>
+            {% for b in businesses %}
+            <option value="{{ b.business_id }}"
+                    {% if form.business == b.business_id|stringformat:"s" %}selected{% endif %}>
+              {{ b.business_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% else %}
+        <input type="hidden" name="business" id="returns_intake_select_business"
+               value="{{ fixed_business.business_id }}">
+        {% endif %}
+
+        <div class="mb-3">
+          <label class="form-label" for="returns_intake_select_dropoff">
+            Deliver the goods to <span class="text-danger">*</span>
+          </label>
+          <select class="form-select" id="returns_intake_select_dropoff"
+                  name="pickup_location" data-no-select2 required>
+            <option value="">{% if businesses %}Pick a client first…{% else %}Select an address…{% endif %}</option>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}" data-business="{{ loc.business_id }}"
+                    {% if form.pickup_location == loc.id|stringformat:"s" %}selected{% endif %}>
+              {{ loc.pickup_location_title }}{% if loc.locality %} — {{ loc.locality }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Where the driver drops what he collects — the client's counter.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="returns_intake_input_reference">Client's own reference</label>
+          <input type="text" class="form-control" id="returns_intake_input_reference"
+                 name="external_reference" maxlength="64" value="{{ form.external_reference|default:'' }}"
+                 placeholder="Their order or invoice number">
+          <div class="form-text">Shown wherever an order number would be. We have no order of our own here.</div>
+        </div>
+
+        <div class="row g-2">
+          <div class="col-8">
+            <label class="form-label" for="returns_intake_input_package">What is coming back</label>
+            <input type="text" class="form-control" id="returns_intake_input_package"
+                   name="package_description" maxlength="255"
+                   value="{{ form.package_description|default:'' }}" placeholder="e.g. 2 dresses, boxed">
+          </div>
+          <div class="col-4">
+            <label class="form-label" for="returns_intake_input_qty">Pieces</label>
+            <input type="number" class="form-control" id="returns_intake_input_qty"
+                   name="package_qty" min="0" max="10000" value="{{ form.package_qty|default:'1' }}">
+          </div>
+        </div>
+
+        <hr>
+        {% comment %}The description above is what the parcel looks like to a driver; these
+        are the goods themselves. On a claim with no order behind it they are the only lines
+        there are, so the collection has something to carry.{% endcomment %}
+        {% include "orders/parts/_return_item_rows.html" with items_label="Items coming back" items_hint="Pick them off the client's catalogue. Optional — a description and a piece count is enough for the driver." item_business_id=fixed_business.business_id %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <strong><i class="fa-solid fa-location-dot me-2" aria-hidden="true"></i>Collect from</strong>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">
+          The customer holding the goods. This is where the driver goes — the trip runs
+          backwards, so this address is the origin, not the destination.
+        </p>
+
+        {% comment %}Staff only: .qnas-plate is styled in workforce.css, which the
+        client console does not load — rendered there it is bare text.{% endcomment %}
+        {% if show_plate %}
+        <div class="qnas-plate mb-3">
+          <div class="qnas-plate__cell">
+            <span class="qnas-plate__tag">Zone</span>
+            <span class="qnas-plate__num qnas-plate__num--empty" id="returns_intake_plate_zone">—</span>
+          </div>
+          <span class="qnas-plate__div">/</span>
+          <div class="qnas-plate__cell">
+            <span class="qnas-plate__tag">Street</span>
+            <span class="qnas-plate__num qnas-plate__num--empty" id="returns_intake_plate_street">—</span>
+          </div>
+          <span class="qnas-plate__div">/</span>
+          <div class="qnas-plate__cell">
+            <span class="qnas-plate__tag">Building</span>
+            <span class="qnas-plate__num qnas-plate__num--empty" id="returns_intake_plate_building">—</span>
+          </div>
+          <div class="qnas-plate__name qnas-plate__name--empty" id="returns_intake_plate_zonewrap">
+            <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+            <span id="returns_intake_plate_zonename">Zone name not resolved</span>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="row g-2 mb-3">
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="returns_intake_input_customer">Customer name</label>
+            <input type="text" class="form-control" id="returns_intake_input_customer"
+                   name="customer_name" maxlength="100" value="{{ form.customer_name|default:'' }}">
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label" for="returns_intake_input_phone">Phone</label>
+            <input type="text" class="form-control" id="returns_intake_input_phone"
+                   name="customer_phone" maxlength="100" value="{{ form.customer_phone|default:'' }}">
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label" for="returns_intake_input_whatsapp">WhatsApp</label>
+            <input type="text" class="form-control" id="returns_intake_input_whatsapp"
+                   name="customer_whatsapp" maxlength="100" value="{{ form.customer_whatsapp|default:'' }}"
+                   placeholder="Same as phone">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="returns_intake_input_address">Address</label>
+          <textarea class="form-control" rows="2" id="returns_intake_input_address"
+                    name="customer_address" maxlength="255"
+                    placeholder="Flat, building, area">{{ form.customer_address|default:'' }}</textarea>
+          <div class="form-text">A phone, an address or a zone — at least one, or the driver cannot find them.</div>
+        </div>
+
+        <div class="row g-2 align-items-end mb-3">
+          <div class="col-4 col-md-3">
+            <label class="form-label" for="returns_intake_input_zone">Zone</label>
+            <input type="number" class="form-control" id="returns_intake_input_zone"
+                   name="dl_zone" min="0" value="{{ form.dl_zone|default:'' }}">
+          </div>
+          <div class="col-4 col-md-3">
+            <label class="form-label" for="returns_intake_input_street">Street</label>
+            <input type="number" class="form-control" id="returns_intake_input_street"
+                   name="dl_street" min="0" value="{{ form.dl_street|default:'' }}">
+          </div>
+          <div class="col-4 col-md-3">
+            <label class="form-label" for="returns_intake_input_building">Building</label>
+            <input type="number" class="form-control" id="returns_intake_input_building"
+                   name="dl_building" min="0" value="{{ form.dl_building|default:'' }}">
+          </div>
+          <div class="col-12 col-md-3">
+            <button type="button" class="btn btn-sm btn-outline-warning w-100"
+                    id="returns_intake_btn_qnas"
+                    onclick="qnasValidateAndFill({zoneId:'returns_intake_input_zone', streetId:'returns_intake_input_street', buildingId:'returns_intake_input_building', latId:'returns_intake_input_lat', lngId:'returns_intake_input_lng', zoneNameId:'returns_intake_input_zonename', resultId:'returns_intake_txt_qnas', btnId:'returns_intake_btn_qnas', mapId:'returns_intake_link_map', accuracyId:'returns_intake_input_accuracy', accuracyBadgeId:'returns_intake_txt_accuracy'})">
+              <i class="fa-solid fa-satellite-dish me-1" aria-hidden="true"></i>Validate
+            </button>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="returns_intake_input_locpaste">Paste / drop shared location</label>
+          <div class="oap__loc-drop" id="returns_intake_box_locdrop"
+               ondragover="locDropOver(event)" ondragleave="locDropLeave(event)"
+               ondrop="locDropHandle(event, {latId:'returns_intake_input_lat', lngId:'returns_intake_input_lng', mapId:'returns_intake_link_map', accuracyId:'returns_intake_input_accuracy', accuracyBadgeId:'returns_intake_txt_accuracy', resultId:'returns_intake_txt_loc', inputId:'returns_intake_input_locpaste'})">
+            <i class="fa-solid fa-location-dot oap__loc-drop__icon" aria-hidden="true"></i>
+            <input type="text" id="returns_intake_input_locpaste"
+                   class="form-control form-control-sm oap__loc-drop__input"
+                   placeholder="Paste a WhatsApp / Google Maps link, or drop the shared location here"
+                   oninput="whatsappLocationFill(this.value, {latId:'returns_intake_input_lat', lngId:'returns_intake_input_lng', mapId:'returns_intake_link_map', accuracyId:'returns_intake_input_accuracy', accuracyBadgeId:'returns_intake_txt_accuracy', resultId:'returns_intake_txt_loc'})">
+          </div>
+          <div id="returns_intake_txt_loc" class="mt-1"></div>
+        </div>
+
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-4">
+            <label class="form-label" for="returns_intake_input_lat">Latitude</label>
+            <input type="text" class="form-control" id="returns_intake_input_lat"
+                   name="latitude" value="{{ form.latitude|default:'' }}" placeholder="--" readonly>
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label" for="returns_intake_input_lng">Longitude</label>
+            <input type="text" class="form-control" id="returns_intake_input_lng"
+                   name="longitude" value="{{ form.longitude|default:'' }}" placeholder="--" readonly>
+          </div>
+          <div class="col-8 col-md-3">
+            <label class="form-label" for="returns_intake_input_zonename">Zone name</label>
+            <input type="text" class="form-control" id="returns_intake_input_zonename"
+                   placeholder="Auto-filled" readonly>
+          </div>
+          <div class="col-4 col-md-1">
+            <a id="returns_intake_link_map" href="#" target="_blank" rel="noopener"
+               class="btn btn-sm btn-outline-secondary disabled" title="View on Google Maps">
+              <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i>
+            </a>
+          </div>
+        </div>
+        <input type="hidden" id="returns_intake_input_accuracy" name="coords_accuracy" value="">
+        <div class="d-flex gap-2 mt-2">
+          <span id="returns_intake_txt_accuracy"></span>
+          <div id="returns_intake_txt_qnas"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

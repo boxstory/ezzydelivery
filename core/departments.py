@@ -96,7 +96,7 @@ _OPS = [
     'returns_custody_set_destination', 'returns_custody_bulk_receive',
     'returns_custody_open', 'returns_custody_forward',
     'returns_requests_list', 'returns_request_set_status',
-    'returns_request_create',
+    'returns_request_create', 'returns_task_create',
     # Sending a driver to collect goods back is a dispatch decision, same desk.
     'returns_request_schedule_pickup',
 
@@ -112,13 +112,14 @@ _OPS = [
     'driver_timeline',
     'driver_request_location',
     'driver_toggle_status', 'driver_set_status', 'driver_set_work_pref',
-    'driver_set_dashboard_access', 'driver_wa_thread',
+    'driver_set_dashboard_access', 'driver_wa_thread', 'driver_connect_crm_lead',
     # Driver opportunities board (postings, slots, interest decisions)
     'wf_opportunities', 'wf_opportunity_new', 'wf_opportunity_detail',
     'wf_opportunity_edit', 'wf_opportunity_slot_save', 'wf_opportunity_slot_delete',
     'wf_opportunity_interest_decide',
     'driver_vehicle_add', 'driver_vehicle_edit', 'driver_vehicle_delete',
-    'driver_document_add', 'driver_document_edit', 'driver_document_delete',
+    'driver_document_add', 'driver_document_edit', 'driver_document_delete', 'driver_document_verify',
+    'driver_document_crop', 'driver_document_crop_restore',
     'driver_remind_completion', 'export_drivers_csv', 'wf_driver_tasks',
     # One-device-per-driver console
     'driver_devices', 'driver_device_release', 'driver_device_revoke',
@@ -135,6 +136,8 @@ _OPS = [
     'business_verification_list', 'driver_verification_list', 'user_verification_list',
     'export_driver_verification_csv',
     'team_verification_list', 'update_verification_status', 'update_team_status',
+    # Fixing a sign-up filed under the wrong role — same desk that approves it
+    'change_user_role',
     'view_user_driver_profile', 'view_user_business_profile', 'check_business_code_unique',
     'driver_documents_list', 'driver_document_detail',
     # Same scans, reached from the recruitment table instead of the documents
@@ -239,11 +242,12 @@ _MKT = [
     'crm_leads_board', 'crm_driver_leads_board', 'crm_leads_list',
     'crm_driver_leads_list', 'crm_lead_create',
     'crm_lead_detail', 'crm_lead_update', 'crm_lead_update_stage', 'crm_lead_unpin_stage',
+    'crm_leads_bulk_stage',
     'crm_lead_move_board',
     'crm_lead_add_activity', 'crm_lead_delete_activity', 'crm_lead_link_business',
     'crm_lead_ai_summary',
     # CRM WhatsApp
-    'crm_lead_link_chat', 'crm_lead_wa_media', 'crm_lead_chat_refresh',
+    'crm_lead_link_chat', 'crm_lead_unlink_chat', 'crm_lead_wa_media', 'crm_lead_chat_refresh',
     'crm_wa_contact_search',
     'crm_whatsapp_inbox', 'crm_wa_chat_preview', 'crm_wa_media',
     'crm_wa_promote', 'crm_wa_send_link', 'crm_wa_dismiss', 'crm_wa_resync',
@@ -258,7 +262,7 @@ _MKT = [
     'pricing_inquiry_edit', 'pricing_inquiry_add_activity', 'pricing_inquiry_delete_activity',
     'pricing_inquiry_quote_price',
     # Driver proposals — the recruitment offer shown in the driver app and on
-    # /careers/. Marketing writes the advert; the pay it quotes is free text and
+    # /careers/drivers/. Marketing writes the advert; the pay it quotes is free text and
     # never feeds the payout code, so ops/finance have nothing to approve here.
     'wf_driver_proposals', 'wf_driver_proposal_new', 'wf_driver_proposal_edit',
     'wf_driver_proposal_status', 'wf_driver_proposal_delete',
@@ -270,14 +274,20 @@ _ADMIN = [
     # Staff role management — who holds which department, and which pages sit where
     'staff_roles_list', 'staff_role_update',
     'staff_pages_list', 'staff_page_update',
-    # Automation (the Auto Triggers catalogue itself is multi-desk — see _MULTI)
+    # Which WhatsApp labels are marketing-only (whatsapp/label_access.py)
+    'whatsapp_label_access',
+    # Automation. Auto Triggers was multi-desk (each desk saw its own rows) until
+    # 2026-10-04; it is now super-admin only, catalogue and sender routes included.
+    'auto_triggers_list', 'auto_trigger_toggle', 'auto_trigger_update',
+    'auto_trigger_message_save',
+    'whatsapp_sender_routes_save', 'whatsapp_sender_route_toggle',
     'auto_flows_list', 'auto_flow_add', 'auto_flow_edit', 'auto_flow_toggle',
     'auto_flow_delete', 'auto_flow_test', 'auto_flow_logs',
     # AI gateway
     'wf_ai_config', 'wf_ai_models_api', 'wf_ai_config_test',
     # Outbound WhatsApp wording (bodies every desk's composer opens with)
     'wf_message_templates',
-    # WhatsApp infrastructure (the sender routes are per-desk — see _MULTI)
+    # WhatsApp infrastructure
     'whatsapp_instances_list', 'whatsapp_get_instances',
     # Seller integrations & secrets
     # Ownership transfer: changes who controls a seller account
@@ -305,20 +315,6 @@ _ADMIN = [
 
 # Routes belonging to more than one desk.
 _MULTI = {
-    # Auto Triggers is a shared catalogue: every desk owns some of the rows
-    # (AutoTriggerConfig.department / WhatsAppSenderRoute.SECTION_DEPARTMENTS).
-    # The page and its write endpoints filter per-desk themselves, so opening
-    # the URL to ops/fin/mkt does NOT expose another desk's triggers.
-    'auto_triggers_list': [OPS, FIN, MKT, ADMIN],
-    'auto_trigger_toggle': [OPS, FIN, MKT, ADMIN],
-    'auto_trigger_update': [OPS, FIN, MKT, ADMIN],
-    # The message body behind a row on that page. The Messages console itself
-    # stays admin-only (it lists every body on the platform); this write is
-    # narrowed to the bodies the desk's own rows send.
-    'auto_trigger_message_save': [OPS, FIN, MKT, ADMIN],
-    'whatsapp_sender_routes_save': [OPS, FIN, MKT, ADMIN],
-    'whatsapp_sender_route_toggle': [OPS, FIN, MKT, ADMIN],
-
     # Shared composer behind the "Send from EZZY" button. Ops send it from
     # driver pages, marketing from lead and quote pages, so it belongs to both;
     # the number and channel come from the section route either way.
@@ -333,6 +329,10 @@ _MULTI = {
     # stage endpoint that approves/rejects a real driver — the wrong way round.
     # crm_lead_update_stage re-checks for OPS before running any column write_back,
     # so opening the route does not hand marketing the verification decision.
+    # Drivers answering a proposal: marketing wrote the offer, operations places
+    # the driver on it — both desks work the same list.
+    'wf_driver_proposal_interests': [OPS, MKT, ADMIN],
+    'wf_driver_proposal_interest_update': [OPS, MKT, ADMIN],
     'crm_driver_leads_board': [OPS, MKT, ADMIN],
     'crm_leads_board': [OPS, MKT, ADMIN],
     'crm_leads_list': [OPS, MKT, ADMIN],
@@ -343,11 +343,14 @@ _MULTI = {
     'crm_lead_detail': [OPS, MKT, ADMIN],
     'crm_lead_update': [OPS, MKT, ADMIN],
     'crm_lead_update_stage': [OPS, MKT, ADMIN],
+    # The list page's bulk bar runs the same helper per lead, write-back gate included.
+    'crm_leads_bulk_stage': [OPS, MKT, ADMIN],
     'crm_lead_unpin_stage': [OPS, MKT, ADMIN],
     # Re-files a card on the other board; same desks as a stage change.
     'crm_lead_move_board': [OPS, MKT, ADMIN],
     'crm_lead_merge': [OPS, MKT, ADMIN],
     'crm_lead_unmerge': [OPS, MKT, ADMIN],
+    'crm_lead_merge_adopt': [OPS, MKT, ADMIN],
     'crm_lead_add_activity': [OPS, MKT, ADMIN],
     # Ops works the driver funnel on the same detail page, so the chat panel's
     # Refresh has to open for them too — it only re-reads what that page shows.

@@ -198,6 +198,10 @@
           // picking three stages three trips through the bar. Single pickers keep
           // Select2's default, where closing IS the answer.
           closeOnSelect: !el.multiple,
+          // Opt-in only. Select2 needs a placeholder to have something to fall
+          // back to, and on a picker without one the x clears to a blank row
+          // that reads as a real, chosen value.
+          allowClear: $el.is('[data-allow-clear]') && !!$el.data('placeholder'),
           dropdownParent: $modal.length ? $modal : undefined
         });
 
@@ -281,9 +285,20 @@
           });
         };
 
+        // The clear-all x acts with no dropdown open, so the settle guard above
+        // never sees it: without this the picker empties and the list carries on
+        // showing the filter that was just cleared. The timeout lets Select2
+        // finish writing the emptied value back to the real <select> first —
+        // submitting inside the event posts the old selection.
+        var onCleared = function (run) {
+          $el.on('select2:clear', function () { setTimeout(run, 0); });
+        };
+
         // A plain GET form bar: submit the form.
         if (el.multiple && $el.is('[data-submit-on-close]')) {
-          onPickSettled(function () { if (el.form) el.form.submit(); });
+          var submitForm = function () { if (el.form) el.form.submit(); };
+          onPickSettled(submitForm);
+          onCleared(submitForm);
           return;
         }
 
@@ -292,9 +307,11 @@
         // mid-pick, taking the open dropdown with it. One native change once
         // the list is dismissed is what that trigger is waiting for.
         if (el.multiple && $el.is('[data-change-on-close]')) {
-          onPickSettled(function () {
+          var fireChange = function () {
             el.dispatchEvent(new Event('change', { bubbles: true }));
-          });
+          };
+          onPickSettled(fireChange);
+          onCleared(fireChange);
           return;
         }
 

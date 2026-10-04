@@ -2574,6 +2574,72 @@ input.ftr__filter-input:focus {
     color: var(--brand-grey-800, #1f1f1f);
 }
 
+/* Balance-after breakdown — a three-column grid: money type, seller COD, our
+   DL fee. One row per type (cash always, Fawran/POS only when they carry a
+   value) and a total rule at the foot. Numbers are right-aligned tabular
+   figures so the columns read straight down the table; nothing wraps, which
+   the old single-column stack did with "Total: 6138" at this width. */
+.ftr__bal {
+    display: grid;
+    /* Column 1 holds an icon on the money rows and the word "Total" on the
+       foot row, so it is sized for the word, not the glyph. */
+    grid-template-columns: 2rem 1fr 1fr;
+    column-gap: 0.25rem;
+    font-size: 0.7rem;
+    line-height: 1.6;
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    color: var(--brand-grey-700, #333);
+}
+
+/* Each row hands its three cells straight to the parent grid, so every column
+   lines up across rows while the row keeps its own rule and styling. */
+.ftr__bal-row {
+    display: contents;
+}
+
+.ftr__bal-row > span {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ftr__bal-row > i {
+    color: var(--brand-grey-400, #b0b0b0);
+    font-size: 0.7rem;
+    text-align: left;
+    align-self: center;
+}
+
+.ftr__bal .fa-money-bill { color: var(--brand-success, #15803d); }
+.ftr__bal .fa-mobile-screen { color: #7c3aed; }
+.ftr__bal .fa-credit-card { color: var(--brand-info, #2563eb); }
+
+.ftr__bal-row--head > span {
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--brand-grey-400, #b0b0b0);
+    font-family: var(--font-body, inherit);
+}
+
+.ftr__bal-row--total > * {
+    border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+    padding-top: 3px;
+    margin-top: 2px;
+    font-weight: 700;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+.ftr__bal-lbl {
+    font-size: 0.6rem;
+    letter-spacing: 0.02em;
+    text-align: left;
+}
+
+.ftr__bal-nil {
+    color: var(--brand-grey-300, #d4d4d4);
+}
+
 /* Single payment-method note under an amount */
 .ftr__pm-note {
     font-size: 0.7rem;
@@ -2775,9 +2841,12 @@ input.ftr__filter-input:focus {
    0.375rem baseline instead. */
 .ftr__th--date,
 .ftr__th--amount,
-.ftr__th--after,
 .ftr__th--status,
 .ftr__th--recon { width: 100px; }
+
+/* Balance After carries a label and a five-digit number on one line, so it
+   takes a little more than the other four. */
+.ftr__th--after { width: 124px; }
 
 .ftr__table th.ftr__th--date,
 .ftr__table th.ftr__th--amount,

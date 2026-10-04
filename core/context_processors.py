@@ -265,7 +265,8 @@ def driver_pending_tasks(request):
     is a no-op, so no other page pays for the query, and no non-driver is ever
     asked for their location.
     """
-    empty = {'pending_tasks_count': 0, 'driver_on_duty': False, 'is_fleet_driver': False}
+    empty = {'pending_tasks_count': 0, 'driver_on_duty': False, 'is_fleet_driver': False,
+             'driver_gps_required': False}
     if not hasattr(request, 'user') or not request.user.is_authenticated:
         return empty
 
@@ -280,8 +281,9 @@ def driver_pending_tasks(request):
 
     try:
         from fleet.models import Driver
+        from fleet.views_device import OPS_WHATSAPP
         from delivery.models import DeliveryTask
-        driver = Driver.objects.only('driver_id').get(user_id=request.user.id)
+        driver = Driver.objects.only('driver_id', 'driver_status').get(user_id=request.user.id)
         # One query answers both questions — the badge count and whether any of
         # those tasks is actually in flight.
         statuses = list(DeliveryTask.objects.filter(
@@ -295,6 +297,14 @@ def driver_pending_tasks(request):
             # screens, so the GPS module is loaded on the strength of this
             # rather than the URL: only someone with a driver row is tracked.
             'is_fleet_driver': True,
+            # The full-screen location lock (fleet/parts/gps_gate.html). Approved
+            # drivers only: an applicant checking their application is not on
+            # the road, and must never be locked out of it.
+            'driver_gps_required': (
+                driver.driver_status == 'approved'
+                and getattr(settings, 'DRIVER_GPS_REQUIRED', True)
+            ),
+            'driver_support_whatsapp': OPS_WHATSAPP,
             # Handed to the page so it can subscribe to Web Push. Public half
             # of the VAPID pair only — it is meant to be given away, and it is
             # supplied here rather than fetched so the PWA does not spend a

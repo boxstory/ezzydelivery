@@ -454,6 +454,20 @@ def upload_path_handler_back(instance, filename):
     return os.path.join(upload_dir, filename)
 
 
+def upload_path_handler_original(instance, filename):
+    upload_dir = os.path.join('core/driver', str(instance.driver_id), 'documents', instance.document_type)
+    extension = os.path.splitext(filename)[1]
+    filename = f'{instance.document_type}_{instance.driver_id}_original{extension}'
+    return os.path.join(upload_dir, filename)
+
+
+def upload_path_handler_back_original(instance, filename):
+    upload_dir = os.path.join('core/driver', str(instance.driver_id), 'documents', instance.document_type)
+    extension = os.path.splitext(filename)[1]
+    filename = f'{instance.document_type}_{instance.driver_id}_back_original{extension}'
+    return os.path.join(upload_dir, filename)
+
+
 
 # document_file ships with a placeholder default, and a row may exist carrying
 # only a typed document number — so "a DriverDocument row exists" never means
@@ -490,8 +504,100 @@ class DriverDocument(models.Model):
     document_file_back = models.ImageField(
         upload_to=upload_path_handler_back, blank=True, null=True,
         validators=image_validators(max_mb=8))
+    # Pre-crop originals. Staff cropping rewrites the document file in place, and
+    # an ID scan usually cannot be collected a second time — so the untouched
+    # upload is kept here on the first crop and a bad crop stays undoable.
+    # Set by pointing at the existing file's path, never by copying bytes.
+    document_file_original = models.ImageField(
+        upload_to=upload_path_handler_original, blank=True, null=True,
+        validators=image_validators(max_mb=8))
+    document_file_back_original = models.ImageField(
+        upload_to=upload_path_handler_back_original, blank=True, null=True,
+        validators=image_validators(max_mb=8))
+
+    # Image check: the number and expiry read off the scan by AI, compared with
+    # what was typed. Written only by fleet/document_verify.py — a new or replaced
+    # photo puts the row back to 'pending' and the per-minute cron reads it.
+    # `verified_at` is the "Verification done" label: set only when both match.
+    AI_PENDING = 'pending'
+    AI_VERIFIED = 'verified'
+    AI_MISMATCH = 'mismatch'
+    AI_UNREADABLE = 'unreadable'
+    AI_ERROR = 'error'
+    AI_NO_IMAGE = 'no_image'
+    AI_NOT_NEEDED = 'not_needed'
+    AI_STATUS_CHOICES = [
+        (AI_PENDING, 'Waiting for image check'),
+        (AI_VERIFIED, 'Verification done'),
+        (AI_MISMATCH, 'Does not match the image'),
+        (AI_UNREADABLE, 'Image could not be read'),
+        (AI_ERROR, 'Image check failed'),
+        (AI_NO_IMAGE, 'No image to check'),
+        (AI_NOT_NEEDED, 'No check needed'),
+    ]
+    ai_status = models.CharField(max_length=16, choices=AI_STATUS_CHOICES, blank=True, default='')
+    ai_document_no = models.CharField(max_length=100, blank=True, default='')
+    ai_expiry_date = models.DateField(blank=True, null=True)
+    ai_note = models.CharField(max_length=255, blank=True, default='')
+    ai_checked_at = models.DateTimeField(blank=True, null=True)
+    verified_at = models.DateTimeField(blank=True, null=True)
+    # Set when a staff member verified by eye; null with verified_at set = the AI match.
+    verified_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, blank=True, null=True,
+                                    related_name='verified_driver_documents')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._loaded_files = instance._file_names()
+        return instance
+
+    def _file_names(self):
+        return (
+            self.document_file.name if self.document_file else '',
+            self.document_file_back.name if self.document_file_back else '',
+        )
+
+    def save(self, *args, **kwargs):
+        # A new or replaced scan (upload, crop, restore) has not been read yet, so
+        # any earlier result no longer describes it. A typed-value edit with the
+        # scan unchanged is re-compared against the stored reading — no AI call.
+        from fleet.document_verify import apply_comparison, needs_image_check
+
+        touched = ['ai_status', 'ai_note', 'verified_at']
+        uploaded = any(f and not getattr(f, '_committed', True)
+                       for f in (self.document_file, self.document_file_back))
+        files_changed = uploaded or self._file_names() != getattr(self, '_loaded_files', None)
+        if files_changed:
+            if needs_image_check(self):
+                self.ai_status = self.AI_PENDING
+            else:
+                self.ai_status = self.AI_NOT_NEEDED if self.document_type == 'Selfie' else self.AI_NO_IMAGE
+            self.ai_document_no, self.ai_expiry_date, self.ai_checked_at = '', None, None
+            self.ai_note, self.verified_at, self.verified_by = '', None, None
+            touched += ['ai_document_no', 'ai_expiry_date', 'ai_checked_at', 'verified_by']
+        elif self.verified_by_id:
+            pass  # a staff verification stands until the scan itself changes
+        elif self.ai_checked_at and self.ai_status in (self.AI_VERIFIED, self.AI_MISMATCH):
+            apply_comparison(self)
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            kwargs['update_fields'] = list(set(update_fields) | set(touched))
+        super().save(*args, **kwargs)
+        self._loaded_files = self._file_names()
+
+    @property
+    def ai_status_label(self):
+        return self.get_ai_status_display() if self.ai_status else ''
+
+    @property
+    def verified_by_name(self):
+        """Staff member who verified by eye; '' when unverified or verified by the AI match."""
+        if not self.verified_by_id:
+            return ''
+        return self.verified_by.get_full_name() or self.verified_by.get_username()
 
     @property
     def has_real_file(self):
@@ -655,6 +761,14 @@ class DriverTransaction(models.Model):
     cod_atm_after = models.DecimalField(
         max_digits=10, decimal_places=2, default=0.00
     )
+    # How much of cod_cash_after is our own delivery fee taken at the door,
+    # not the seller's COD. It rides in the same pocket and goes back on the
+    # same hand-in, so it stays inside cod_cash_after; this field only records
+    # which slice of that cash is ours, so the ledger can show it on its own
+    # line instead of hiding it inside the COD figure.
+    cod_fee_after = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00
+    )
 
     # COD Submission Verification (for cod_driver_settle / cod_deposit transactions)
     is_received = models.BooleanField(
@@ -680,6 +794,22 @@ class DriverTransaction(models.Model):
 
     def __str__(self):
         return f"{self.transaction_code or self.pk} - {self.get_transaction_type_display()} - {self.amount} QR"
+
+    @property
+    def cod_cash_excl_fee(self):
+        """Seller COD cash in hand — cod_cash_after with our door fee removed.
+
+        cod_cash_after is the whole pocket (COD + fee) because that is what the
+        driver hands in; this is the COD half of it, for the ledger's cash line.
+        """
+        cash = self.cod_cash_after or 0
+        fee = self.cod_fee_after or 0
+        return cash - fee if cash > fee else 0
+
+    @property
+    def cod_after_total_excl_fee(self):
+        """Everything the driver is holding for the seller, our fee excluded."""
+        return self.cod_after_total - (self.cod_fee_after or 0)
 
     @property
     def cod_after_total(self):
@@ -2475,9 +2605,12 @@ class DriverOpportunityInterest(models.Model):
 # two places: the driver app (existing drivers, referrals, drivers looking to
 # switch job type) and the public careers page.
 #
-# It carries no slots, no capacity and no interest rows on purpose: it is an
-# advert, not a booking. A driver who wants the work applies through the normal
-# funnel (/join_us/driver/start/) or tells operations.
+# It carries no slots and no capacity: it is an advert, not a booking. A driver
+# already on the app can tap "I'm interested" (DriverProposalInterest below) and
+# staff work those at /workforce/marketing/driver-proposals/interests/; a job
+# seeker on the public driver jobs page (/careers/drivers/ — the link the fleet
+# desk sends on WhatsApp) applies through the normal funnel
+# (/join_us/driver/start/).
 # =============================================================================
 
 PROPOSAL_STATUS_CHOICES = [
@@ -2499,7 +2632,7 @@ class DriverProposal(models.Model):
     title = models.CharField(max_length=150)
     ref_code = models.CharField(
         max_length=20, blank=True, default='',
-        help_text="Optional public reference shown on the careers page, e.g. EZY-DRV-01"
+        help_text="Optional public reference shown on the driver jobs page, e.g. EZY-DRV-01"
     )
     headline = models.CharField(
         max_length=200, blank=True, default='',
@@ -2537,7 +2670,8 @@ class DriverProposal(models.Model):
     show_in_driver_app = models.BooleanField(
         default=True, help_text="Show on the driver app opportunities screen")
     show_on_careers = models.BooleanField(
-        default=True, help_text="Show in the driver offers section of /careers/")
+        default=True,
+        help_text="Show on the public driver jobs page, /careers/drivers/")
 
     status = models.CharField(
         max_length=20, choices=PROPOSAL_STATUS_CHOICES, default='draft', db_index=True)
@@ -2583,3 +2717,64 @@ class DriverProposal(models.Model):
     @property
     def requirement_list(self):
         return [line.strip() for line in (self.requirements or '').splitlines() if line.strip()]
+
+
+# What happens to a driver's "I'm interested" on a proposal. Unlike a shift slot
+# there is no capacity to consume: staff simply work the list — reach the driver,
+# shortlist, then accept (the driver moves onto the offer) or decline.
+PROPOSAL_INTEREST_STATUS_CHOICES = [
+    ('interested', 'New'),
+    ('contacted', 'Contacted'),
+    ('shortlisted', 'Shortlisted'),
+    ('accepted', 'Accepted'),
+    ('declined', 'Declined'),
+    ('withdrawn', 'Withdrawn'),
+]
+#: Statuses the driver can still take back themselves. Once staff have acted on
+#: it, a change goes through operations.
+PROPOSAL_INTEREST_WITHDRAWABLE = ('interested',)
+
+
+class DriverProposalInterest(models.Model):
+    """A driver in the app saying they want the work a proposal advertises.
+
+    unique_together keeps it idempotent — tapping twice is one row, and a
+    withdrawn interest is revived rather than duplicated. Accepting records the
+    decision only; it changes nothing about the driver's pay or job type (pay
+    still resolves through delivery/earnings.py).
+    """
+
+    proposal = models.ForeignKey(
+        DriverProposal, on_delete=models.CASCADE, related_name='interests')
+    driver = models.ForeignKey(
+        Driver, on_delete=models.CASCADE, related_name='proposal_interests')
+
+    status = models.CharField(
+        max_length=20, choices=PROPOSAL_INTEREST_STATUS_CHOICES,
+        default='interested', db_index=True)
+    note = models.CharField(
+        max_length=300, blank=True, default='',
+        help_text="Anything the driver wanted to add")
+    staff_note = models.CharField(
+        max_length=500, blank=True, default='',
+        help_text="Internal — what staff agreed or why it was declined")
+
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='decided_proposal_interests')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Proposal Interest'
+        verbose_name_plural = 'Proposal Interests'
+        ordering = ['-created_at']
+        unique_together = [('proposal', 'driver')]
+        indexes = [
+            models.Index(fields=['proposal', 'status'], name='propint_prop_status_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.driver} → {self.proposal} ({self.status})"

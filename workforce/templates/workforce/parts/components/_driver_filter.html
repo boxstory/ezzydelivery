@@ -3,10 +3,16 @@ Purpose: The searchable multi-select driver picker shared by every staff task an
 Used by: dl_list_all / dl_list_followup / dl_list_upcoming, orders_list_view, orders_p2p_list_view.
 Notes: A plain <select multiple> — the Select2 enhancer in includes/main_dashboard_scripts.html turns
        any select inside a GET filter bar into a searchable tag box, so no per-page JS is needed.
-       130+ approved drivers means the search field always shows (it appears from 8 options up).
+       The list is the working fleet (views.driver_filter_choices): approved drivers plus anyone who
+       already carries a task, plus whoever is picked on the querystring. Drivers signed in on the
+       driver app right now are marked "· app"; app access is shown, never used to hide a name, or a
+       driver mid device re-verification disappears from the filter while his jobs stay on the page.
+       Select2's search field only appears from 8 options up.
+       data-allow-clear puts Select2's clear-all x in the control: unticking a long selection one tag
+       at a time was the slowest thing on these bars.
 
 PARAMS
-    driver_choices   REQUIRED. Approved drivers, from views.driver_filter_choices().
+    driver_choices   REQUIRED. Drivers from views.driver_filter_choices() (carries has_app).
     driver_selected  REQUIRED. List of picked values as strings, from views.driver_filter_values().
     driver_class     Extra classes for the control (the host bar's own sizing hook).
     driver_id        Element id. Defaults to pgf_driver; give it a page-local one where
@@ -23,12 +29,17 @@ PARAMS
         data-placeholder="{{ driver_all_text|default:'All Drivers' }}"
         {% if driver_form %}form="{{ driver_form }}"{% endif %}
         {% if driver_submit_on_close %}data-submit-on-close{% endif %}
+        {% comment %} Needs a real value: Select2 turns every data-* into an option, and a
+           valueless data-allow-clear arrives as "" and overrides the enhancer's own true. {% endcomment %}
+        data-allow-clear="true"
         aria-label="Filter by driver (choose one or more)">
-    {% comment %} Tasks with nobody on them are what ops chases first, so the pool is part of the same picker. {% endcomment %}
+    {% comment %} Tasks with nobody on them are what ops chases first, so the pool is part of the same picker.
+       allowClear needs a first option it can fall back to, and an empty one would read as a blank driver —
+       Unassigned already sits first and is a real choice, so nothing extra is added for it. {% endcomment %}
     <option value="none" {% if 'none' in driver_selected %}selected{% endif %}>Unassigned</option>
     {% for d in driver_choices %}
     <option value="{{ d.driver_id }}" {% if d.driver_id|stringformat:"s" in driver_selected %}selected{% endif %}>
-        {{ d.user.first_name }} {{ d.user.last_name }}{% if d.driver_code %} ({{ d.driver_code }}){% endif %}
+        {{ d.user.first_name }} {{ d.user.last_name }}{% if d.driver_code %} ({{ d.driver_code }}){% endif %}{% if d.has_app %} · app{% endif %}
     </option>
     {% endfor %}
 </select>

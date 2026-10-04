@@ -11,7 +11,7 @@ Notes: Search and the view toggle both reload with query params (no client-side 
 {% block title %}Driver ID Documents - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/driver-documents.css' %}?v=20260826a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/driver-documents.css' %}?v=20261003a" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -63,10 +63,14 @@ Notes: Search and the view toggle both reload with query params (no client-side 
           <span class="ddc__tally__num">{{ doc_totals.soon }}</span>
           <span class="ddc__tally__lbl">Due {{ expiry_soon_days }}d</span>
         </span>
-        <span class="ddc__tally">
+        {% comment %} The staff to-do list: click to show only documents missing an expiry. {% endcomment %}
+        <a class="ddc__tally ddc__tally--link{% if missing %} ddc__tally--on{% endif %}"
+           id="workforce_driver_documents_list_link_missing_expiry"
+           href="{% url 'workforce:driver_documents_list' %}?{% if not missing %}missing=expiry&amp;{% endif %}{% if filter_driver %}driver={{ filter_driver.driver_id }}&amp;{% endif %}view={{ view_type }}{% if search_query %}&amp;search={{ search_query|urlencode }}{% endif %}"
+           title="{% if missing %}Show all documents{% else %}Show documents missing an expiry{% endif %}">
           <span class="ddc__tally__num">{{ doc_totals.no_expiry }}</span>
           <span class="ddc__tally__lbl">No expiry</span>
-        </span>
+        </a>
       </div>
     </div>
   </div>
@@ -85,6 +89,18 @@ Notes: Search and the view toggle both reload with query params (no client-side 
         {{ filter_driver.user.get_full_name|default:filter_driver.user.username }}{% if filter_driver.driver_code %} · {{ filter_driver.driver_code }}{% endif %}
       </a>
       <a href="{% url 'workforce:driver_documents_list' %}{% if search_query %}?search={{ search_query|urlencode }}{% endif %}"
+         class="ddc__scope__clear">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i> Clear
+      </a>
+    </div>
+    {% endif %}
+
+    {% if missing %}
+    <!-- Scope banner: the missing-expiry to-do list -->
+    <div class="ddc__scope d-flex flex-wrap align-items-center gap-2">
+      <i class="fa-solid fa-filter" aria-hidden="true"></i>
+      <span class="ddc__scope__label">Showing documents missing an expiry ({{ documents.paginator.count }}) — where the image check read a date, it is shown under the document; open it to type the expiry in.</span>
+      <a href="{% url 'workforce:driver_documents_list' %}?view={{ view_type }}{% if filter_driver %}&amp;driver={{ filter_driver.driver_id }}{% endif %}{% if search_query %}&amp;search={{ search_query|urlencode }}{% endif %}"
          class="ddc__scope__clear">
         <i class="fa-solid fa-xmark" aria-hidden="true"></i> Clear
       </a>
@@ -136,6 +152,9 @@ Notes: Search and the view toggle both reload with query params (no client-side 
           <span class="ddc__doc__body">
             <span class="ddc__doc__type">{{ doc.document_type|default:"Untyped" }}</span>
             <span class="ddc__doc__no">{{ doc.document_no|default:"no number" }}</span>
+            {% if not doc.document_expiry_date and doc.ai_expiry_date %}
+            <span class="ddc__doc__hint">Image shows {{ doc.ai_expiry_date|date:"d M Y" }}</span>
+            {% endif %}
             <span class="ddc__doc__driver">
               {{ doc.driver.user.first_name|default:"Unknown" }} {{ doc.driver.user.last_name|default:"" }}
               <span class="ddc__doc__code">{{ doc.driver.driver_code|default:"—" }}</span>
@@ -204,6 +223,9 @@ Notes: Search and the view toggle both reload with query params (no client-side 
                     <span class="ddc__state__mark" aria-hidden="true"></span>
                     {% if doc.document_expiry_date %}{{ doc.document_expiry_date|date:"d M Y" }}{% else %}No expiry{% endif %}
                   </span>
+                  {% if not doc.document_expiry_date and doc.ai_expiry_date %}
+                  <span class="ddc__doc__hint d-block">Image shows {{ doc.ai_expiry_date|date:"d M Y" }}</span>
+                  {% endif %}
                 </td>
                 <td class="wfmono">{{ doc.created_at|date:"d M Y" }}</td>
                 <td>

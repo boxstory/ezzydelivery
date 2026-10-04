@@ -1,0 +1,19 @@
+{% comment %}
+Purpose: The image-check / verification pill for one driver document card.
+Used by: workforce/driver_detail.html, workforce/driver_document_detail.html (context: doc — a driver_document_cards() dict)
+Notes: verified_by_name empty with verified_at set means the AI matched the scan; the reason for a failed check rides in the title.
+{% endcomment %}
+{% if doc.ai_status == 'verified' %}
+<span class="wdd__doc__tag wdd__doc__tag--verified"
+      title="{% if doc.verified_by_name %}Verified by {{ doc.verified_by_name }}{% else %}matched the image{% endif %}, {{ doc.verified_at|date:'d M Y H:i' }}">
+    <i class="fa-solid fa-circle-check"></i> Verification done{% if doc.verified_by_name %} · {{ doc.verified_by_name }}{% endif %}
+</span>
+{% elif doc.ai_status == 'mismatch' or doc.ai_status == 'unreadable' or doc.ai_status == 'error' %}
+<span class="wdd__doc__tag wdd__doc__tag--unverified" title="{{ doc.ai_note }}">
+    <i class="fa-solid fa-circle-exclamation"></i> {{ doc.ai_status_label }}{% if doc.ai_note %}: {{ doc.ai_note }}{% endif %}
+</span>
+{% elif doc.ai_status == 'pending' %}
+<span class="wdd__doc__tag wdd__doc__tag--issued">
+    <i class="fa-solid fa-hourglass-half"></i> Checking image…
+</span>
+{% endif %}

@@ -126,6 +126,20 @@ class CareersForm(SanitizedModelForm):
         ]
         # Exclude auto-generated fields
         exclude = ['date']
+        # The model carries no verbose names, so crispy title-cases the attribute
+        # names ("Qid", "Self Intro"). Name each field the way an applicant would.
+        labels = {
+            'full_name': 'Full name',
+            'email': 'Email',
+            'mobile': 'Mobile',
+            'qid': 'QID',
+            'job': 'Role you are applying for',
+            'self_intro': 'Tell us about yourself',
+        }
+        help_texts = {
+            'qid': '11 digits, starting with 2 or 3',
+            'self_intro': 'Your experience and why this role. A few lines is enough.',
+        }
 
     def clean_qid(self):
         qid = self.cleaned_data.get('qid')

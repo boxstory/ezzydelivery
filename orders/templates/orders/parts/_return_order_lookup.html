@@ -1,0 +1,102 @@
+{% comment %}
+Purpose: The "which order" search on a return form — resolves an order number server-side before anything is written.
+Used by: workforce/returns_task_create.html and orders/order_return_add.html, order mode only.
+Notes: Its own GET form, so it must sit ABOVE the POST form and never inside it — nested forms are illegal and the
+       browser silently drops the inner one. Not a live search: the page shows the real address, lines and blocker.
+       A search takes a mobile as well as either order number, so it can match several orders; when it does, this
+       renders the shortlist and each row links back here with the exact number. A submit never resolves a mobile.
+{% endcomment %}
+<div class="card mb-3">
+  <div class="card-header">
+    <strong><i class="fa-solid fa-magnifying-glass me-2" aria-hidden="true"></i>Which order came back</strong>
+  </div>
+  <div class="card-body">
+    <form method="get" action="{{ lookup_url }}" class="row g-2 align-items-end">
+      <input type="hidden" name="mode" value="order">
+      {% if lookup_businesses %}
+      {% comment %}Staff only. A mobile number is not unique across clients, so a search
+      that ignored the client would put another seller's customer on screen. The seller
+      console needs no picker — it has exactly one client and scopes to it server-side.{% endcomment %}
+      <div class="col-12 col-md-5">
+        <label class="form-label" for="returns_intake_select_lookupbiz">
+          Client <span class="text-danger">*</span>
+        </label>
+        <select class="form-select" id="returns_intake_select_lookupbiz" name="business" required>
+          <option value="">Select a client…</option>
+          {% for b in lookup_businesses %}
+          <option value="{{ b.business_id }}"
+                  {% if lookup_business.business_id == b.business_id %}selected{% endif %}>
+            {{ b.business_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="col-12 {% if lookup_businesses %}col-md-4{% else %}col-md-7{% endif %}">
+        <label class="form-label" for="returns_intake_input_orderref">
+          Order number or mobile <span class="text-danger">*</span>
+        </label>
+        <input type="text" class="form-control" id="returns_intake_input_orderref"
+               name="order_ref" value="{{ order_ref|default:'' }}"
+               placeholder="e.g. 10432, or 5555 1234">
+        <div class="form-text">{{ scope_note }}</div>
+      </div>
+      <div class="col-12 col-md-3">
+        <button type="submit" class="btn btn-outline-primary w-100" id="returns_intake_btn_find">
+          <i class="fa-solid fa-magnifying-glass me-1" aria-hidden="true"></i>Find order
+        </button>
+      </div>
+    </form>
+
+    {% if lookup_businesses and not lookup_business %}
+    <div class="alert alert-secondary mt-3 mb-0" role="alert">
+      Pick the client first &mdash; the search only looks inside their orders.
+    </div>
+    {% elif order_ref and not order and not candidates %}
+    <div class="alert alert-warning mt-3 mb-0" role="alert">
+      No order matches <strong>{{ order_ref }}</strong>. Check the number or the mobile,
+      or raise the return without an order.
+    </div>
+    {% endif %}
+
+    {% if not order and candidates %}
+    {% comment %}A mobile usually belongs to somebody who has ordered before, so the
+    date is what tells the two apart — it is the first column for that reason.{% endcomment %}
+    <div class="mt-3">
+      <p class="mb-2">
+        <strong>{{ candidates|length }} orders</strong> match {{ order_ref }}. Pick the one
+        coming back.
+      </p>
+      {% comment %}A list, not a table: on a phone a table-responsive puts the status and
+      the Select button off the right edge, behind a sideways scroll nobody finds. Each row
+      is one link, so the whole thing is the tap target at any width.{% endcomment %}
+      <div class="list-group" id="returns_intake_table_matches">
+        {% for cand in candidates %}
+        <a class="list-group-item list-group-item-action"
+           href="{{ lookup_url }}?mode=order&amp;order_ref={{ cand.order_number|urlencode }}{% if lookup_business %}&amp;business={{ lookup_business.business_id }}{% endif %}">
+          <div class="d-flex flex-wrap justify-content-between align-items-start">
+            <div class="me-3">
+              <div class="fw-semibold">{{ cand.order_number }}</div>
+              <div class="text-muted small">
+                {{ cand.customer_name|default:"—" }}
+                {% if cand.customer_phone %}<span class="mx-1">&middot;</span>{{ cand.customer_phone }}{% endif %}
+              </div>
+              <div class="text-muted small">{{ cand.client_order_code }}</div>
+            </div>
+            <div class="text-end">
+              <div class="fw-semibold text-nowrap">{{ cand.order_date|date:"d M Y" }}</div>
+              {% comment %}Not a .badge: a global repaints it to near-white while the
+              utility keeps the text white, and the chip reads blank.{% endcomment %}
+              <div class="small text-muted text-nowrap">{{ cand.get_order_status_display }}</div>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% if candidates|length >= 25 %}
+      <p class="form-text mb-0">Only the 25 most recent are shown — search the order number for an older one.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>

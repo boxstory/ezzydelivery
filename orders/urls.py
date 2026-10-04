@@ -17,6 +17,9 @@ urlpatterns = [
     # ORDERS
     path('add_order/', orders_views.add_order, name='add_order'),
     path('partials/mobile_product_row/', orders_views.mobile_product_row_partial, name='mobile_product_row_partial'),
+    # The reverse of add_order: a collection FROM the customer, with one of this
+    # client's orders behind it or without one at all.
+    path('add_return/', orders_views.add_return, name='add_return'),
     path('add_order_bulk/', orders_views.add_order_bulk, name='add_order_bulk'),
     path('add_order_with_product/', orders_views.add_order_with_product, name='add_order_with_product'),
     path('add_order/<int:pickup_id>/', orders_views.deliver_to_here, name='deliver_to_here'),

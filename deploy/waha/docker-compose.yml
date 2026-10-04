@@ -5,11 +5,13 @@
 
 services:
   waha:
-    # Pinned by digest, not by version tag: devlikeapro publishes no
-    # `2026.7.1` tag (only rolling ones like `latest`), so a version pin here
-    # fails to resolve and blocks every recreate. This digest IS 2026.7.1 —
-    # confirm with `curl -H "X-Api-Key: …" http://127.0.0.1:3000/api/version`.
-    image: devlikeapro/waha@sha256:dc134637dfa0bd65202010a65e4ff8176101791699176c75bb37d5aa9daf487c
+    # Pinned by digest. This digest IS 2026.9.2 (tag `latest-2026.9.2`),
+    # upgraded 2026-10-03 from 2026.7.1, whose WEBJS could not send any media
+    # ("Data passed to getter must include an id property", fixed in 2026.9.1)
+    # or forward (fixed in 2026.9.2). Confirm with
+    # `curl -H "X-Api-Key: …" http://127.0.0.1:3000/api/version`.
+    # Previous: sha256:dc134637dfa0bd65202010a65e4ff8176101791699176c75bb37d5aa9daf487c (2026.7.1)
+    image: devlikeapro/waha@sha256:280bdc8f860267a2488a45d00ec88529646f7468c0bf0283c595d6efdd1b5e3b
     container_name: ezzy-waha
     restart: unless-stopped
     # Bind to loopback only — public exposure goes through nginx with auth.
@@ -29,7 +31,8 @@ services:
       # Webhook target — HMAC-signed by WAHA, verified in whatsapp/auth.py.
       # Applies to sessions that don't set their own config.webhooks.
       WHATSAPP_HOOK_URL: "https://ezzydelivery.qa/api/integrations/waha/webhook/"
-      WHATSAPP_HOOK_EVENTS: "message,message.any,session.status"
+      # message.reaction feeds WhatsAppReaction (inbox reaction chips) — added 2026-10-03.
+      WHATSAPP_HOOK_EVENTS: "message,message.any,message.reaction,session.status"
       # HMAC-SHA512 over raw webhook body, sent in X-Webhook-Hmac header.
       # The var name is WHATSAPP_HOOK_HMAC_KEY — WAHA reads only that one
       # (dist/core/config/GlobalWebhookConfig.js). Under the old name

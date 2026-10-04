@@ -3,8 +3,9 @@
  * Used by: fleet/templates/fleet/pwa_base.html and templates/fleet_dashboard_base.html, both of
  *          which set window.EZZY_GPS_CONFIG before loading this and pull in ezzy-gps-queue.js first.
  * Notes:   There must be exactly one GPS consumer on a device — other code listens for the
- *          `ezzy:gps` event instead of starting a second watch. Editing this file means bumping
- *          its ?v= in both bases. onDuty comes from core.context_processors.driver_pending_tasks.
+ *          `ezzy:gps` / `ezzy:gps-error` events instead of starting a second watch (the location
+ *          lock in ezzy-gps-gate.js does exactly that). Editing this file means bumping its ?v=
+ *          in both bases. onDuty comes from core.context_processors.driver_pending_tasks.
  */
 (function() {
     /* Power profiles.
@@ -224,6 +225,10 @@
         } else if (err.code === 3) { // TIMEOUT
             setGpsState('yellow', 'GPS timeout — retrying');
         }
+        // Every failure, not just a change of state: the location lock has to
+        // see the second "unavailable" in a row too, and setGpsState stays
+        // silent when the state has not moved.
+        document.dispatchEvent(new CustomEvent('ezzy:gps-error', { detail: Object.assign({}, lastError) }));
     }
 
     function geoOptions() {
@@ -534,6 +539,22 @@
                 }, { enableHighAccuracy: true, maximumAge: 5000, timeout: WAIT_MS });
             });
         },
+        /* Try for a fix now — the location lock's button, and its check when
+         * the driver comes back from their phone's settings. Restarts tracking
+         * if a refusal stopped it; if it is already running, takes one fix
+         * off-cycle instead of waiting out the duty cycle.
+         *
+         * Battery: one fix per call, and it is only ever called from a tap
+         * or a return to the app — never from a timer. */
+        recheck: function() {
+            if (!('geolocation' in navigator)) return;
+            if (!running) { window.EzzyGPS.start(); return; }
+            navigator.geolocation.getCurrentPosition(function(pos) {
+                onPosition(pos);
+                sendLocation();
+            }, onError, geoOptions());
+        },
+        isRunning: function() { return running; },
         getPosition: function() {
             return currentPos ? Object.assign({}, currentPos) : null;
         },

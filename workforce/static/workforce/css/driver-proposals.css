@@ -2,7 +2,9 @@
    Used by: workforce/templates/workforce/marketing/driver_proposals_list.html, driver_proposal_form.html
    Notes: The navy hero band and the white card headers come from staff-hero.css by class suffix (*__hero,
           *__card-header) and it loads last — never re-declare them here. The status filter is styled locally
-          rather than borrowing .crm__facet-select, whose tokens only exist inside a .crm ancestor. */
+          rather than borrowing .crm__facet-select, whose tokens only exist inside a .crm ancestor —
+          note that on a GET filter bar Select2 swallows that select and renders its own container, so
+          .wfprop__facet-select only reaches the screen on the native per-row pickers of the interests page. */
 
 /* ---------------------------------------------------------------------------
    Filter row. One control, but it still states its own height so it matches the
@@ -54,6 +56,17 @@
   box-shadow: none;
 }
 
+/* The filter select is a GET control on a staff dashboard, so the shared initialiser
+   in main_dashboard_scripts.html turns it into a Select2 and the rules above stop
+   reaching the screen — what renders is a .select2-container the shared stylesheet
+   pins to `width: 100% !important`. It claimed all 1194px of the card and pushed the
+   label (and the interests page's search field) onto their own lines. Overriding an
+   !important needs an !important; the width is explicit, so there is no intrinsic
+   sizing problem to design around. */
+.wfpage .wfprop__facets .select2-container.ez-filter-select {
+  width: 11rem !important;
+}
+
 /* ---------------------------------------------------------------------------
    Table. orders.css pins every staff tbody td to 12px site-wide with !important,
    so the body size is restated here at the console floor rather than inherited.
@@ -69,6 +82,28 @@
   white-space: nowrap;
 }
 
+/* Widths are stated because auto layout was sizing by content volume: the title —
+   the thing a reader identifies a record by — had been squeezed to 133px. Everything
+   narrow is pinned, and the slack falls to the first column.
+
+   Scoped to --offers on purpose: the interests page reuses .wfprop__table with a
+   different set of columns, and an unscoped nth-child list squeezed ITS proposal
+   column to 96px. A positional selector may only be aimed at one known column order. */
+.wfprop__table--offers thead th:nth-child(2) { width: 7rem; }    /* Status      */
+.wfprop__table--offers thead th:nth-child(3) { width: 8.5rem; }  /* Showing on  */
+.wfprop__table--offers thead th:nth-child(4) { width: 6rem; }    /* Interested  */
+.wfprop__table--offers thead th:nth-child(5) { width: 8rem; }    /* Pay package */
+.wfprop__table--offers thead th:nth-child(6) { width: 4.5rem; }  /* Order       */
+.wfprop__table--offers thead th:nth-child(7) { width: 8.5rem; }  /* Closes      */
+.wfprop__table--offers thead th:nth-child(8) { width: 13rem; }   /* Actions     */
+
+.wfprop__table--offers tbody td:first-child a {
+  font-weight: 600;
+  color: var(--brand-navy);
+  text-decoration: none;
+}
+.wfprop__table--offers tbody td:first-child a:hover { text-decoration: underline; }
+
 .wfprop__table tbody td {
   font-size: 0.8rem !important;
   color: var(--brand-grey-800);
@@ -76,7 +111,57 @@
   vertical-align: middle;
 }
 
-.wfprop__table tbody tr:hover { background: var(--brand-grey-50); }
+/* ---------------------------------------------------------------------------
+   Two-tier record. The ledger line carries the offer's state; the strip under it
+   carries its zone coverage, which is wide-form and was taking 39% of the table
+   as a column. Each proposal is its own <tbody> so hover still reads as one row.
+   --------------------------------------------------------------------------- */
+.wfprop__group:hover .wfprop__row,
+.wfprop__group:hover .wfprop__zonerow { background: var(--brand-grey-50); }
+
+/* The record is closed by the zone strip, so the ledger line carries no rule. */
+.wfprop__row > td { border-bottom: 0 !important; }
+
+.wfprop__zonerow > td {
+  padding-top: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.wfprop__zonelabel {
+  display: inline-block;
+  margin-right: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-grey-500);
+  vertical-align: middle;
+}
+
+/* Tags, not a comma string: the question staff ask this strip is "is Lusail in
+   this offer?", and that is a scan, not a read. */
+.wfprop__zone {
+  display: inline-block;
+  margin: 0 0.25rem 0.25rem 0;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--brand-grey-700);
+  background: var(--brand-white);
+  border: 1px solid var(--brand-grey-300);
+  border-radius: var(--brand-radius-sm);
+}
+
+.wfprop__zone--any { color: var(--brand-grey-500); font-style: italic; }
+
+/* Three controls, one line — stacked they set the row height at 126px. */
+.wfprop__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
 
 .wfprop__sub {
   font-size: 0.72rem;
@@ -88,6 +173,8 @@
   margin-left: 0.375rem;
   font-size: 0.72rem;
   color: var(--brand-grey-500);
+  /* Breaks inside the code otherwise — a long title split "EZY-" from "JB-B038". */
+  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------------------
@@ -134,7 +221,15 @@
 
 .wfprop__surface i { color: var(--brand-grey-500); }
 
-.wfprop__surface--off { color: var(--brand-grey-500); font-weight: 500; }
+/* A live proposal that reaches neither surface is the one thing this column exists
+   to catch, so it is the single place on the page that spends contrast. */
+.wfprop__surface--off {
+  color: var(--brand-warning-text, #92400e);
+  background: var(--brand-warning-bg);
+  border-radius: var(--brand-radius-sm);
+  padding: 0.125rem 0.375rem;
+  font-weight: 600;
+}
 
 /* ---------------------------------------------------------------------------
    Form furniture
@@ -221,4 +316,154 @@
   background: var(--brand-secondary);
   border-color: var(--brand-primary);
   color: var(--brand-grey-800);
+}
+
+/* ---------------------------------------------------------------------------
+   Interested drivers page (driver_proposal_interests.html)
+   --------------------------------------------------------------------------- */
+/* Scoped under .wfpage: mobile-app.css sets input[type=text]{width:100%} at a
+   higher specificity than one class. */
+.wfpage .wfprop__search {
+  width: 14rem;
+  height: 2.25rem;
+  font-size: 0.82rem;
+}
+
+.wfprop__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.wfprop__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.wfprop__tab:hover { color: var(--brand-grey-800); }
+
+.wfprop__tab--active {
+  color: var(--brand-navy);
+  border-bottom-color: var(--brand-navy);
+}
+
+.wfprop__rowform {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.wfpage .wfprop__note {
+  width: 12rem;
+  height: 2.25rem;
+  font-size: 0.8rem;
+}
+
+.wfprop__wa {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-success);
+  text-decoration: none;
+}
+
+.wfprop__count {
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--brand-grey-800);
+}
+
+.wfprop__count--none { color: var(--brand-grey-500); font-weight: 500; }
+
+/* The unworked interests are what brings someone to this page today, so the
+   count's sub-line reads as a signal rather than as a footnote. */
+.wfprop__row td .wfprop__count + .wfprop__sub {
+  color: var(--brand-navy);
+  font-weight: 600;
+}
+
+/* Interest states, same swatch + text language as the proposal states. */
+.wfprop__state--interested { color: var(--brand-navy); }
+.wfprop__state--interested::before { background: var(--brand-primary); }
+
+.wfprop__state--contacted,
+.wfprop__state--shortlisted { color: var(--brand-grey-700); }
+.wfprop__state--contacted::before { background: var(--brand-grey-500); }
+.wfprop__state--shortlisted::before { background: var(--brand-navy); }
+
+.wfprop__state--accepted { color: var(--brand-success); }
+.wfprop__state--accepted::before { background: var(--brand-success); }
+
+.wfprop__state--declined,
+.wfprop__state--withdrawn { color: var(--brand-grey-500); }
+.wfprop__state--declined::before,
+.wfprop__state--withdrawn::before { background: var(--brand-grey-300); }
+
+/* ---------------------------------------------------------------------------
+   Share strip — the public driver jobs link (/careers/drivers/) the desk sends
+   on WhatsApp. The URL is the payload, so it is mono and selectable; the three
+   actions reuse .wfprop__rowbtn so this adds no new button.
+   --------------------------------------------------------------------------- */
+.wfprop__share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.wfprop__share-text {
+  min-width: 0;
+}
+
+.wfprop__share-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brand-grey-500);
+}
+
+/* A link long enough to wrap on a laptop, so it breaks rather than scrolls */
+.wfprop__share-url {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--brand-navy);
+  background: none;
+  padding: 0;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.wfprop__share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.wfprop__share-hint {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--brand-grey-200);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--brand-grey-500);
+}
+
+@media (max-width: 575.98px) {
+  .wfprop__share-actions .wfprop__rowbtn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
 }

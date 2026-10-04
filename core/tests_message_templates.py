@@ -17,10 +17,11 @@ from django.urls import reverse
 from core import models as core_models
 from core import whatsapp_utils
 from core.message_templates import (
-    CRM_LEAD_MANUAL, KIND_COMPOSER, MANUAL_COMPOSERS, ORDER_VERIFY_MANUAL,
-    P2P_BOOKING_CONFIRM, PRICING_INQUIRY_THANKS, QUOTE_AGREED_ALERT,
-    TEMPLATE_DEFAULTS, TRIGGER_TEMPLATES, get_body, get_template, id_index,
-    msg_id, render_template, validate_body,
+    CRM_LEAD_MANUAL, CUSTOM_KEY_PREFIX, KIND_COMPOSER, MANUAL_COMPOSERS,
+    ORDER_VERIFY_MANUAL, P2P_BOOKING_CONFIRM, PRICING_INQUIRY_THANKS,
+    QUOTE_AGREED_ALERT, TEMPLATE_DEFAULTS, TRIGGER_TEMPLATES, custom_row,
+    get_body, get_template, id_index, list_templates, make_custom_key, msg_id,
+    next_custom_msg_id, render_template, validate_body,
 )
 
 User = get_user_model()
@@ -391,3 +392,257 @@ class AutoTriggersComposerGroupTests(TestCase):
         for key in keys:
             with self.subTest(key=key):
                 self.assertIn(f'#msg-{key}', html)
+
+
+class CustomMessageRegistryTests(TestCase):
+    """Messages staff write on the page, stored as rows with no code default."""
+
+    def _add(self, label='Late delivery apology', section='orders_tasks',
+             body='Hi {customer_name}, sorry about the delay.', **kw):
+        return core_models.MessageTemplate.objects.create(
+            key=make_custom_key(label), label=label, section=section, body=body,
+            msg_id=next_custom_msg_id(), is_custom=True, **kw)
+
+    def test_key_is_prefixed_and_never_shadows_a_shipped_one(self):
+        key = make_custom_key('Order verify manual')
+        self.assertTrue(key.startswith(CUSTOM_KEY_PREFIX))
+        self.assertNotIn(key, TEMPLATE_DEFAULTS)
+
+    def test_a_second_message_with_the_same_name_gets_its_own_key(self):
+        first = self._add(label='Same name')
+        second = make_custom_key('Same name')
+        self.assertNotEqual(first.key, second)
+
+    def test_ids_run_in_their_own_c_series(self):
+        self.assertEqual(next_custom_msg_id(), 'C01')
+        self._add(label='One')
+        self.assertEqual(next_custom_msg_id(), 'C02')
+
+    def test_deleting_the_last_one_frees_its_number_and_renumbers_nothing(self):
+        first = self._add(label='One')
+        second = self._add(label='Two')
+        self.assertEqual(second.msg_id, 'C02')
+        second.delete()
+        # The number is reused (nothing in code refers to a C-number) but the
+        # message still on the page keeps the ID staff already know it by.
+        self.assertEqual(next_custom_msg_id(), 'C02')
+        first.refresh_from_db()
+        self.assertEqual(first.msg_id, 'C01')
+
+    def test_deleting_an_earlier_one_does_not_renumber_the_rest(self):
+        first = self._add(label='One')
+        second = self._add(label='Two')
+        first.delete()
+        second.refresh_from_db()
+        self.assertEqual(second.msg_id, 'C02')
+        self.assertEqual(next_custom_msg_id(), 'C03')
+
+    def test_a_custom_id_can_never_collide_with_a_shipped_one(self):
+        shipped = {v['msg_id'] for v in TEMPLATE_DEFAULTS.values() if v.get('msg_id')}
+        self.assertNotIn(next_custom_msg_id(), shipped)
+
+    def test_it_resolves_like_a_registered_template(self):
+        row = self._add()
+        tpl = get_template(row.key)
+        self.assertTrue(tpl['is_custom'])
+        self.assertEqual(tpl['kind'], KIND_COMPOSER)
+        self.assertEqual(tpl['section'], 'orders_tasks')
+        self.assertEqual(tpl['msg_id'], 'C01')
+        # Nothing shipped behind it, so there is no default to restore.
+        self.assertEqual(tpl['default_body'], '')
+        self.assertEqual(
+            render_template(row.key, customer_name='Sara'),
+            'Hi Sara, sorry about the delay.')
+
+    def test_a_shipped_template_still_reports_itself_as_not_custom(self):
+        self.assertFalse(get_template(CRM_LEAD_MANUAL)['is_custom'])
+
+    def test_switched_off_custom_message_renders_nothing(self):
+        row = self._add(is_enabled=False)
+        self.assertIsNone(render_template(row.key, customer_name='Sara'))
+
+    def test_it_is_listed_after_the_shipped_registry(self):
+        row = self._add()
+        keys = [t['key'] for t in list_templates()]
+        self.assertEqual(keys[:len(TEMPLATE_DEFAULTS)], list(TEMPLATE_DEFAULTS))
+        self.assertEqual(keys[-1], row.key)
+
+    def test_an_override_row_is_not_mistaken_for_a_custom_message(self):
+        """A row against a shipped key is reworded text, not a new message —
+        listing it twice would put an untitled duplicate card on the page."""
+        core_models.MessageTemplate.objects.create(key=CRM_LEAD_MANUAL, body='reworded')
+        keys = [t['key'] for t in list_templates()]
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertEqual(len(keys), len(TEMPLATE_DEFAULTS))
+
+    def test_custom_row_refuses_a_shipped_key(self):
+        """The gate on delete: a shipped key must never resolve to a deletable row."""
+        core_models.MessageTemplate.objects.create(
+            key=CRM_LEAD_MANUAL, body='reworded', is_custom=True)
+        self.assertIsNone(custom_row(CRM_LEAD_MANUAL))
+
+
+class CustomMessagePageTests(TestCase):
+    """Adding, editing and deleting a message from the Messages page."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='msgtpl_admin3', email='e@f.co', password='x')
+        self.client.force_login(self.user)
+        self.url = reverse('workforce:wf_message_templates')
+
+    def _add(self, **over):
+        data = {
+            'action': 'add',
+            'label': 'Late delivery apology',
+            'section': 'orders_tasks',
+            'description': 'When a driver is running behind.',
+            'body': 'Hi {customer_name}, sorry about the delay. — {staff_name}',
+        }
+        data.update(over)
+        return self.client.post(self.url, data, follow=True)
+
+    def test_add_creates_a_message_and_lands_on_its_card(self):
+        resp = self._add()
+        self.assertEqual(resp.status_code, 200)
+        row = core_models.MessageTemplate.objects.get(is_custom=True)
+        self.assertEqual(row.msg_id, 'C01')
+        self.assertEqual(row.section, 'orders_tasks')
+        self.assertTrue(row.is_enabled)
+        self.assertEqual(row.updated_by, self.user)
+        self.assertIn(f'id="msg-{row.key}"', resp.content.decode())
+
+    def test_add_without_a_group_is_refused(self):
+        self._add(section='')
+        self.assertFalse(core_models.MessageTemplate.objects.exists())
+
+    def test_add_without_a_body_is_refused(self):
+        self._add(body='   ')
+        self.assertFalse(core_models.MessageTemplate.objects.exists())
+
+    def test_add_with_an_invented_group_is_refused(self):
+        self._add(section='not_a_route')
+        self.assertFalse(core_models.MessageTemplate.objects.exists())
+
+    def test_saving_one_updates_its_name_note_and_body(self):
+        self._add()
+        row = core_models.MessageTemplate.objects.get(is_custom=True)
+        resp = self.client.post(self.url, {
+            'template_key': row.key,
+            'label': 'Running late — apology',
+            'description': 'Reworded note.',
+            'is_enabled': '1',
+            'body': 'Hi {customer_name}, we are running late.',
+        }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(resp.status_code, 200)
+        row.refresh_from_db()
+        self.assertEqual(row.label, 'Running late — apology')
+        self.assertEqual(row.description, 'Reworded note.')
+        self.assertEqual(row.body, 'Hi {customer_name}, we are running late.')
+        # The section and the ID are not on the edit form and must survive it.
+        self.assertEqual(row.section, 'orders_tasks')
+        self.assertEqual(row.msg_id, 'C01')
+
+    def test_emptying_the_body_is_refused(self):
+        """There is no shipped text to fall back on, so a blank box would be a
+        message that sends nothing at all."""
+        self._add()
+        row = core_models.MessageTemplate.objects.get(is_custom=True)
+        resp = self.client.post(self.url, {
+            'template_key': row.key, 'is_enabled': '1', 'body': '   ',
+        }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(resp.status_code, 400)
+        row.refresh_from_db()
+        self.assertTrue(row.body.strip())
+
+    def test_a_blank_name_keeps_the_old_one(self):
+        self._add()
+        row = core_models.MessageTemplate.objects.get(is_custom=True)
+        self.client.post(self.url, {
+            'template_key': row.key, 'is_enabled': '1', 'label': '',
+            'body': 'Hi {customer_name}.',
+        }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        row.refresh_from_db()
+        self.assertEqual(row.label, 'Late delivery apology')
+
+    def test_it_can_be_switched_off_without_being_deleted(self):
+        self._add()
+        row = core_models.MessageTemplate.objects.get(is_custom=True)
+        self.client.post(self.url, {
+            'template_key': row.key, 'body': 'Hi {customer_name}.',
+        }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        row.refresh_from_db()
+        self.assertFalse(row.is_enabled)
+        self.assertTrue(core_models.MessageTemplate.objects.filter(pk=row.pk).exists())
+
+    def test_delete_removes_it(self):
+        self._add()
+        row = core_models.MessageTemplate.objects.get(is_custom=True)
+        resp = self.client.post(
+            self.url, {'action': 'delete', 'template_key': row.key}, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(core_models.MessageTemplate.objects.filter(pk=row.pk).exists())
+
+    def test_delete_cannot_touch_a_shipped_message(self):
+        """That POST against a shipped key would throw away reworded customer
+        text and silently restore the default."""
+        core_models.MessageTemplate.objects.create(
+            key=CRM_LEAD_MANUAL, body='Our own wording.')
+        self.client.post(
+            self.url, {'action': 'delete', 'template_key': CRM_LEAD_MANUAL}, follow=True)
+        self.assertEqual(
+            core_models.MessageTemplate.objects.get(key=CRM_LEAD_MANUAL).body,
+            'Our own wording.')
+
+    def test_the_card_offers_delete_and_not_restore_default(self):
+        self._add()
+        row = core_models.MessageTemplate.objects.get(is_custom=True)
+        html = self.client.get(self.url).content.decode()
+        card = html.split(f'id="msg-{row.key}"', 1)[1].split('</form>', 1)[0]
+        self.assertIn('data-wmt-delete', card)
+        self.assertNotIn('data-tpl-reset', card)
+
+    def test_the_page_offers_the_add_panel(self):
+        html = self.client.get(self.url).content.decode()
+        self.assertIn('id="wmt_add_panel"', html)
+        self.assertIn('name="section"', html)
+
+
+class CustomMessageComposerPickerTests(TestCase):
+    """The one surface a staff-written message reaches: the send window."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='msgtpl_admin4', email='g@h.co', password='x')
+        self.client.force_login(self.user)
+        self.url = reverse('workforce:whatsapp_composer_templates')
+        self.row = core_models.MessageTemplate.objects.create(
+            key=make_custom_key('Late apology'), label='Late apology',
+            section='orders_tasks', msg_id='C01', is_custom=True,
+            body='Hi {customer_name}, sorry — {staff_name}')
+
+    def _picker(self, section='orders_tasks'):
+        resp = self.client.get(self.url, {'section': section, 'name': 'Sara'})
+        self.assertEqual(resp.status_code, 200)
+        return resp.json()['templates']
+
+    def test_it_appears_with_its_names_filled_in(self):
+        entry = next(t for t in self._picker() if t['key'] == self.row.key)
+        self.assertEqual(entry['msg_id'], 'C01')
+        self.assertEqual(entry['label'], 'Late apology')
+        self.assertIn('Hi Sara', entry['body'])
+        self.assertNotIn('{customer_name}', entry['body'])
+        self.assertNotIn('{staff_name}', entry['body'])
+
+    def test_it_stays_in_its_own_group(self):
+        keys = [t['key'] for t in self._picker('crm_leads')]
+        self.assertNotIn(self.row.key, keys)
+
+    def test_switched_off_it_is_not_offered(self):
+        self.row.is_enabled = False
+        self.row.save(update_fields=['is_enabled'])
+        self.assertNotIn(self.row.key, [t['key'] for t in self._picker()])
+
+    def test_the_shipped_bodies_are_still_offered_alongside_it(self):
+        keys = [t['key'] for t in self._picker()]
+        self.assertIn(ORDER_VERIFY_MANUAL, keys)

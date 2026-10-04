@@ -1,0 +1,101 @@
+{# Purpose: Super-admin settings — tick which WhatsApp labels, per number, only marketing staff may see. #}
+{# Used by: workforce.wa_label_access_views.whatsapp_label_access (URL workforce:whatsapp_label_access) #}
+{# Notes: Enforced in whatsapp/label_access.py across the Live Chats inbox and the CRM; labels themselves are set in WhatsApp or the inbox. #}
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Marketing-only Labels - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/staff-roles.css' %}?v=20260801b" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="srol">
+  <div class="srol__wrap">
+
+    <header class="wfhero">
+      <div class="wfhero__ident">
+        <span class="wfhero__eyebrow">Access Control</span>
+        <h1 class="wfhero__title">Marketing-only WhatsApp Labels</h1>
+        <span class="wfhero__sub">
+          Chats under a ticked label are hidden from staff outside marketing
+          <span class="wfhero__sep">·</span> in Live Chats and in the CRM
+        </span>
+      </div>
+      <div class="wfhero__side">
+        <div class="wfhero__tallies">
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ restricted_total }}</span>
+            <span class="wfhero__tally-lbl">Restricted</span>
+          </div>
+        </div>
+        <nav class="wfhero__actions">
+          <a href="/waha/wa-chats/" class="wfhero__ghost">Live Chats ▸</a>
+        </nav>
+      </div>
+    </header>
+
+    <p class="text-muted small mb-3">
+      Marketing staff and super admins always see every chat. A label added or removed on the phone
+      takes effect within about two minutes. A chat is only protected while it carries the label.
+    </p>
+
+    {% for num in numbers %}
+    <form method="post" id="number-{{ num.session }}" class="mb-4">
+      {% csrf_token %}
+      <input type="hidden" name="session" value="{{ num.session }}">
+      <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
+        <h2 class="h6 mb-0">{{ num.title }}</h2>
+        {% if num.phone %}<span class="srol__meta">+{{ num.phone }}</span>{% endif %}
+        <span class="srol__meta">· {{ num.session }} · {{ num.restricted_count }} restricted</span>
+      </div>
+
+      {% if num.unreachable %}
+      <p class="srol__warn">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        Could not read this number's labels from WhatsApp. Its current restrictions still apply.
+      </p>
+      {% elif not num.labels %}
+      <p class="text-muted small">This number has no labels.</p>
+      {% else %}
+      <div class="srol__tablewrap">
+        <table id="workforce_wa_labels_table_{{ num.session }}" class="table srol__table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Label</th>
+              <th scope="col" class="srol__col-dept">Marketing only</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for lb in num.labels %}
+            <tr class="srol__row{% if lb.gone %} srol__row--off{% endif %}">
+              <th scope="row" class="srol__who">
+                <span class="srol__name">{{ lb.name }}</span>
+                <span class="srol__meta">id {{ lb.id }}{% if lb.gone %}<span class="srol__dot">·</span><span class="srol__tag">deleted in WhatsApp</span>{% endif %}</span>
+              </th>
+              <td class="srol__cell">
+                <label class="srol__toggle">
+                  <input type="checkbox" class="srol__check" name="label" value="{{ lb.id }}"
+                         {% if lb.restricted %}checked{% endif %}
+                         aria-label="Marketing only: {{ lb.name }}">
+                  <span class="srol__switch" aria-hidden="true"></span>
+                </label>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <button type="submit" id="workforce_wa_labels_btn_save_{{ num.session }}" class="btn btn-dark btn-sm mt-2">
+        Save {{ num.title }}
+      </button>
+      {% endif %}
+    </form>
+    {% empty %}
+    <p class="text-muted">No WhatsApp numbers are connected.</p>
+    {% endfor %}
+
+  </div>
+</div>
+{% endblock %}

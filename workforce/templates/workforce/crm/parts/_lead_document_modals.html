@@ -1,0 +1,79 @@
+{# Purpose: The two dialogs behind the driver-lead Documents list — the shared scan viewer popup, and the add form. #}
+{# Used by: workforce/templates/workforce/crm/lead_detail.html (context: driver, document_type_choices) #}
+{# Notes: Bootstrap modals, driven by crm_lead_detail.js; viewer Submit posts to driver_document_edit (fields) and driver_document_crop (image); the add form posts to _add. #}
+
+{% include "workforce/parts/_doc_viewer_modal.html" %}
+
+<!-- EDIT / ADD — same fields and same endpoint as the driver record's own form -->
+<div class="modal fade" id="workforce_crm_detail_modal_docedit" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content crmdoc__modal">
+      <form id="workforce_crm_detail_form_docedit" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="workforce_crm_detail_h_docedit_title">Edit document</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="workforce_crm_detail_input_docedit_id" value="">
+          <div class="mb-3">
+            <label class="form-label" for="workforce_crm_detail_select_docedit_type">Document type</label>
+            {% comment %} data-no-select2: six options need no search box, and a
+               Select2 here would break this field twice over — the enhanced
+               widget ignores a value set from script (it would keep reading
+               "— Select —" over a prefilled QID), and a `required` select that
+               Select2 has hidden fails HTML5 validation as "not focusable".
+               See the opt-out in includes/main_dashboard_scripts.html. {% endcomment %}
+            <select class="form-select form-select-sm" name="document_type" required
+                    data-no-select2 id="workforce_crm_detail_select_docedit_type">
+              <option value="">— Select —</option>
+              {% for val, label in document_type_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="workforce_crm_detail_input_docedit_no">Document number</label>
+            <input type="text" class="form-control form-control-sm" name="document_no" required
+                   id="workforce_crm_detail_input_docedit_no" placeholder="e.g. 28412345678">
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label" for="workforce_crm_detail_input_docedit_issued">Issued from</label>
+              <input type="text" class="form-control form-control-sm" name="document_issued_from"
+                     id="workforce_crm_detail_input_docedit_issued" placeholder="e.g. Qatar">
+            </div>
+            <div class="col-6">
+              <label class="form-label" for="workforce_crm_detail_input_docedit_expiry">Expiry date</label>
+              <input type="date" class="form-control form-control-sm" name="document_expiry_date"
+                     id="workforce_crm_detail_input_docedit_expiry">
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-12 col-sm-6">
+              <label class="form-label" for="workforce_crm_detail_input_docedit_front">Replace front scan</label>
+              <input type="file" class="form-control form-control-sm" name="document_file" accept="image/*"
+                     id="workforce_crm_detail_input_docedit_front">
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label" for="workforce_crm_detail_input_docedit_back">Replace back scan</label>
+              <input type="file" class="form-control form-control-sm" name="document_file_back" accept="image/*"
+                     id="workforce_crm_detail_input_docedit_back">
+            </div>
+          </div>
+          {% comment %} Leaving both file boxes empty keeps the scans already on
+             file — spelt out because "Replace" alongside an empty box reads as
+             though saving would wipe them. {% endcomment %}
+          <p class="crmdoc__hint">Leave the file boxes empty to keep the scans already uploaded.</p>
+          <p class="crmdoc__err" id="workforce_crm_detail_p_docedit_err" hidden></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="crm__btn crm__btn--sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="crm__btn crm__btn--sm crm__btn--primary" id="workforce_crm_detail_btn_docsave">
+            <i class="fa-solid fa-floppy-disk"></i> Save document
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

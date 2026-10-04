@@ -145,6 +145,13 @@ class WhatsAppContact(models.Model):
     is_business = models.BooleanField(default=False)
     is_my_contact = models.BooleanField(default=False)
     notes = models.TextField(blank=True, default='')
+    # The WhatsApp Business labels on this contact's chat for this number, as
+    # [{'id', 'name', 'colorHex'}]. WhatsApp stays the source of truth; this
+    # mirror is what answers "who carries label X" without walking every chat
+    # through WAHA. Written on every save and read in the inbox, refreshed
+    # nightly by sync_wa_chat_labels. See whatsapp/chat_labels.py.
+    labels = models.JSONField(default=list, blank=True)
+    labels_synced_at = models.DateTimeField(null=True, blank=True)
     synced_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -283,3 +290,84 @@ class AddressVerificationJob(models.Model):
 
     def __str__(self):
         return f'AVJ#{self.pk} order={self.order_id} phone={self.phone} {self.status}'
+
+
+class WhatsAppProfilePhoto(models.Model):
+    """Saved copy of a chat's WhatsApp profile photo, per session.
+
+    WhatsApp hands out profile-photo URLs on its CDN that expire within days, so
+    the inbox keeps its own copy in private storage and refreshes it weekly.
+    A row with has_photo=False records "this chat has no photo" so we do not
+    ask WAHA again on every page load.
+    """
+    session = models.CharField(max_length=64)
+    chat_id = models.CharField(max_length=100)
+    photo = models.ImageField(
+        upload_to='whatsapp/avatars/', storage=_private_media_storage,
+        blank=True, validators=media_validators(2),
+    )
+    has_photo = models.BooleanField(default=False)
+    fetched_at = models.DateTimeField()
+
+    class Meta:
+        unique_together = [('session', 'chat_id')]
+
+    def __str__(self):
+        return f'{self.session}:{self.chat_id}'
+
+
+class RestrictedChatLabel(models.Model):
+    """A WhatsApp label whose chats only marketing staff may open.
+
+    Label ids are per number (session), so the same name on two numbers is two
+    rows. `label_name` is a snapshot for the settings page, which can then still
+    show a restricted label after it is renamed or deleted on the phone. Which
+    chats carry the label is read live from WAHA (whatsapp/label_access.py).
+    """
+    session = models.CharField(max_length=64)
+    label_id = models.CharField(max_length=64)
+    label_name = models.CharField(max_length=120, blank=True, default='')
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('session', 'label_id')]
+        ordering = ['session', 'label_name']
+
+    def __str__(self):
+        return f'{self.session}:{self.label_name or self.label_id}'
+
+
+class WhatsAppReaction(models.Model):
+    """One emoji reaction on a WhatsApp message, by one sender.
+
+    WAHA's message list only says a message `hasReaction`, never which emoji,
+    so reactions are kept here: ours when staff react from the inbox, and other
+    people's from the `message.reaction` webhook event (once WAHA sends it).
+    `message_id` is the reacted message's full serialized id, as the inbox keys
+    its rows; `sender` is 'me' for our own number, else the bare phone/lid.
+    An empty `emoji` is a removed reaction.
+    """
+    session = models.CharField(max_length=64, default='default', db_index=True)
+    message_id = models.CharField(max_length=255, db_index=True)
+    sender = models.CharField(max_length=64)
+    emoji = models.CharField(max_length=32, blank=True, default='')
+    staff = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='+',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['session', 'message_id', 'sender'],
+                name='wa_reaction_one_per_sender',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.sender} {self.emoji or "(removed)"} {self.message_id}'

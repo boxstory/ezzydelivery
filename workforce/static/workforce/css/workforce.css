@@ -1187,6 +1187,13 @@ input.uvl__date:focus {
 .uvl__scopes { display: flex; flex-wrap: wrap; gap: 0.375rem; padding: 0.625rem 1rem; }
 .uvl__scope { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.675rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 0.25rem; }
 .uvl__scope i { font-size: 0.6rem; }
+/* Own font-size, not <small>: a bare element inherits whatever the page's
+   globals happen to say, and this sits inside a 0.675rem badge. */
+.uvl__scope__note {
+    font-size: 0.6rem; font-weight: 700; letter-spacing: 0.03em;
+    text-transform: uppercase; opacity: 0.7;
+    padding-left: 0.25rem; border-left: 1px solid currentColor; margin-left: 0.125rem;
+}
 .uvl__scope--ok      { background: #dcfce7; color: #166534; }
 .uvl__scope--warn    { background: #fef3c7; color: #92400e; }
 .uvl__scope--neutral { background: var(--brand-grey-100, #fafafa); color: var(--brand-grey-600, #555); }
@@ -1231,6 +1238,18 @@ input.uvl__date:focus {
 /* Section Heads */
 .uvl__section-head { display: flex; align-items: center; gap: 0.375rem; font-size: 0.675rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--brand-grey-500, #6c757d); padding-bottom: 0.375rem; border-bottom: 1px solid var(--brand-grey-200, #f0f0f0); margin-bottom: 0; }
 .uvl__section-head i { color: var(--brand-primary, #f7c000); font-size: 0.625rem; }
+/* A record left on file by a role the user no longer holds — visible to staff,
+   but plainly not the role they are being reviewed for. */
+.uvl__past-tag {
+    margin-left: auto; flex-shrink: 0;
+    font-size: 0.6rem; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--brand-grey-500, #6c757d);
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: 0.25rem; padding: 0.0625rem 0.375rem;
+}
+/* Replaces an inline style on the User Type bubble's role pill */
+.uvl__role--inline { display: inline-block; margin-top: 0.25rem; }
 
 /* Field List */
 .uvl__fields { padding: 0; }
@@ -1304,6 +1323,8 @@ input.uvl__date:focus {
 .uvl__btn--reject:hover { background: #fef2f2; border-color: #ef4444; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(239, 68, 68, 0.15); }
 .uvl__btn--detail { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
 .uvl__btn--detail:hover { background: #2563eb; color: #fff; border-color: #2563eb; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(37, 99, 235, 0.3); }
+.uvl__btn--role { background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; }
+.uvl__btn--role:hover { background: #6d28d9; color: #fff; border-color: #6d28d9; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(109, 40, 217, 0.3); }
 .uvl__btn:active { transform: scale(0.97); }
 
 /* Verified Bar */
@@ -1344,6 +1365,7 @@ input.uvl__date:focus {
 }
 .uvl__modal__header--approve { background: linear-gradient(135deg, var(--brand-navy, #001f3f), var(--brand-navy-light, #003366)); color: #fff; }
 .uvl__modal__header--reject  { background: linear-gradient(135deg, #991b1b, #dc2626); color: #fff; }
+.uvl__modal__header--role    { background: linear-gradient(135deg, #4c1d95, #6d28d9); color: #fff; }
 .uvl__modal__header-icon {
     width: 2.25rem; height: 2.25rem; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -1351,6 +1373,7 @@ input.uvl__date:focus {
 }
 .uvl__modal__header--approve .uvl__modal__header-icon { background: rgba(247,192,0,0.15); color: var(--brand-primary, #f7c000); }
 .uvl__modal__header--reject  .uvl__modal__header-icon { background: rgba(255,255,255,0.15); color: #fecaca; }
+.uvl__modal__header--role    .uvl__modal__header-icon { background: rgba(255,255,255,0.15); color: #ddd6fe; }
 .uvl__modal__title { font-size: 1rem; font-weight: 700; margin: 0; }
 .uvl__modal__subtitle { font-size: 0.75rem; margin: 0.125rem 0 0; opacity: 0.75; }
 .uvl__modal__close {
@@ -1392,7 +1415,8 @@ input.uvl__date:focus {
     position: relative;
 }
 .uvl__modal__check:hover { border-color: var(--brand-grey-300, #dcdcdc); background: var(--brand-grey-100, #fafafa); }
-.uvl__modal__check input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; }
+.uvl__modal__check input[type="checkbox"],
+.uvl__modal__check input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
 
 /* Custom Checkmark */
 .uvl__modal__checkmark {
@@ -1411,6 +1435,30 @@ input.uvl__date:focus {
     background: var(--brand-navy, #001f3f); border-color: var(--brand-navy, #001f3f);
 }
 .uvl__modal__check input:checked ~ .uvl__modal__checkmark::after { opacity: 1; }
+
+/* Role picker: the same rows, but one choice at a time — round mark, filled dot */
+.uvl__modal__check input[type="radio"] ~ .uvl__modal__checkmark { border-radius: 50%; }
+.uvl__modal__check input[type="radio"] ~ .uvl__modal__checkmark::after {
+    content: ''; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #fff;
+}
+/* `hidden` alone loses to the `display: flex` on these two blocks, so the
+   attribute has to win on specificity or a hidden row still renders. */
+.uvl__modal__check[hidden],
+.uvl__modal__info[hidden] { display: none; }
+.uvl__modal__check--current {
+    /* The role the user already holds: shown so staff can see what they are
+       leaving, but it is not a change, so it cannot be submitted. */
+    opacity: 0.55; cursor: not-allowed;
+}
+.uvl__modal__check--current:hover { border-color: var(--brand-grey-200, #f0f0f0); background: transparent; }
+.uvl__modal__check__tag {
+    margin-left: auto; align-self: center; flex-shrink: 0;
+    font-size: 0.625rem; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--brand-grey-500, #6c757d);
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: 0.25rem; padding: 0.125rem 0.375rem;
+}
 
 /* Checkbox Body Text */
 .uvl__modal__check-body { display: flex; flex-direction: column; }
@@ -6229,7 +6277,9 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 .wdd__doc__thumb {
     position: relative;
     flex: 1; min-width: 0;
-    height: 128px;
+    /* Double height: an ID card cropped to a 128px strip is unreadable, and
+       reading it without opening the lightbox is the whole point of the tile. */
+    height: 256px;
     padding: 0; border: 1px solid var(--brand-grey-200);
     border-radius: var(--brand-radius-sm);
     background: var(--brand-grey-100);
@@ -6239,8 +6289,12 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 }
 .wdd__doc__thumb img {
     width: 100%; height: 100%;
-    object-fit: cover;
+    /* contain, not cover — the whole document must be visible, centred in the
+       tile, rather than cropped to its middle. */
+    object-fit: contain;
+    object-position: center;
     display: block;
+    margin: 0 auto;
 }
 .wdd__doc__thumb:hover { border-color: var(--brand-grey-400); }
 .wdd__doc__thumb:focus-visible { outline: 2px solid var(--brand-navy); outline-offset: 2px; }
@@ -6328,6 +6382,22 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 .wdd__doc__tag--expired {
     background: #fef2f2; color: #dc2626;
 }
+/* Inside the renewal window — amber, matching the fleet expiry report */
+.wdd__doc__tag--expiry-soon {
+    background: #fef3c7; color: #92400e;
+}
+/* Nothing recorded: a visible gap staff can act on, not a blank card */
+.wdd__doc__tag--no-expiry {
+    background: var(--brand-grey-100); color: var(--brand-grey-600);
+    border: 1px dashed var(--brand-grey-300);
+}
+/* Image check: number + expiry confirmed against the scan (AI match or staff) */
+.wdd__doc__tag--verified {
+    background: var(--brand-success-bg); color: var(--brand-success);
+}
+.wdd__doc__tag--unverified {
+    background: #fef2f2; color: #dc2626;
+}
 .wdd__doc__tag i { font-size: 0.6rem; }
 
 .wdd__doc__foot {
@@ -6374,6 +6444,24 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
 .wdd__doc__btn--edit:hover {
     background: var(--brand-navy); color: #fff;
     box-shadow: 0 4px 12px rgba(0,31,63,0.2);
+}
+.wdd__doc__btn--crop {
+    background: rgba(0,31,63,0.04); color: var(--brand-grey-700);
+    border-color: var(--brand-grey-300);
+}
+.wdd__doc__btn--crop:hover {
+    background: var(--brand-navy); color: #fff;
+    border-color: var(--brand-navy);
+}
+/* Undo sits next to Crop, so it reads as the way back rather than a second action */
+.wdd__doc__btn--restore {
+    background: transparent; color: var(--brand-grey-600);
+    border-color: var(--brand-grey-300);
+    border-style: dashed;
+}
+.wdd__doc__btn--restore:hover {
+    background: var(--brand-grey-100); color: var(--brand-navy);
+    border-color: var(--brand-grey-400);
 }
 .wdd__doc__btn--delete {
     background: rgba(220,38,38,0.06); color: #dc2626;
@@ -6529,6 +6617,63 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     overflow: hidden;
     box-shadow: 0 25px 50px rgba(0,0,0,0.3);
 }
+
+/* Crop modal: a working surface, so it takes the room the viewer does not need */
+.wdd__modal--crop {
+    width: min(960px, 92vw);
+    display: flex;
+    flex-direction: column;
+}
+.wdd__crop__body {
+    padding: 0.875rem 1rem;
+    overflow: auto;
+}
+/* Cropper.js needs a block-level box with a real height to measure against */
+.wdd__crop__stage {
+    height: min(60vh, 520px);
+    background: var(--brand-grey-100);
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-sm);
+    overflow: hidden;
+}
+.wdd__crop__stage > img {
+    display: block;
+    max-width: 100%;
+}
+.wdd__crop__hint {
+    margin: 0.5rem 0 0;
+    font-size: 0.7rem;
+    color: var(--brand-grey-600);
+}
+.wdd__crop__err {
+    display: none;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.7rem;
+    background: #fef2f2;
+    color: #dc2626;
+    border-radius: var(--brand-radius-sm);
+}
+.wdd__crop__err.show { display: block; }
+.wdd__crop__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.wdd__crop__tools,
+.wdd__crop__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+.wdd__action-btn--primary {
+    background: var(--brand-navy);
+    color: #fff;
+    border-color: var(--brand-navy);
+}
+.wdd__action-btn--primary:hover { background: #00152b; color: #fff; }
 
 .wdd__modal__header {
     display: flex;
@@ -8976,6 +9121,25 @@ input.pgf__input--date::-webkit-datetime-edit-fields-wrapper { padding: 0; min-w
     cursor: pointer;
     width: 13px;
     height: 13px;
+}
+
+/* The row itself no longer navigates - this first-column link is the only way
+   into the task from the list, so it carries the pointer and the hover cue. */
+.dl-table__id-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+.dl-table__id-link:hover .dl-table__task-num,
+.dl-table__id-link:focus-visible .dl-table__task-num {
+    text-decoration: underline;
+    color: var(--brand-navy, #001f3f);
+}
+.dl-table__id-link:focus-visible {
+    outline: 2px solid var(--brand-navy, #001f3f);
+    outline-offset: 1px;
+    border-radius: 3px;
 }
 
 /* Task # + Order # stacked */
@@ -21119,9 +21283,13 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
 
 /* Application-form section progress strip (expanded case) */
 .dvm__secs { margin-bottom: 0.9rem; }
+/* Flex, not a track grid: the full-width Zones chip used to break the row, so
+   the three sections after it were pushed onto a third line while half of the
+   first sat empty. As flex items the six one-line sections share a single row
+   and Zones is ordered last, onto a line of its own. */
 .dvm__secs-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     margin-top: 0.4rem;
 }
@@ -21136,11 +21304,207 @@ textarea.wsmw__textarea { resize: vertical; min-height: 7rem; line-height: 1.45;
     font-size: 0.72rem; font-weight: 600;
     line-height: 1.35;
 }
+.dvm__sec { flex: 1 1 8.5rem; min-width: 0; }
 .dvm__sec i { grid-column: 1; grid-row: 1 / span 2; align-self: center; font-size: 0.85rem; }
 .dvm__sec--done i { color: #15803d; }
 .dvm__sec--todo i { color: #b91c1c; }
 .dvm__sec-label { grid-column: 2; color: #374151; }
-.dvm__sec-detail { grid-column: 2; color: #6b7280; font-weight: 400; }
+.dvm__sec-detail { grid-column: 2; color: #6b7280; font-weight: 400; overflow-wrap: anywhere; }
+
+/* Zones takes the whole row: a driver can pick every zone group, so the detail
+   is a long comma list that would otherwise clip inside a 180px cell. Label and
+   list sit on one line and the list wraps under itself. */
+.dvm__sec--wide { flex: 1 0 100%; order: 1; grid-template-columns: auto auto 1fr; }
+.dvm__sec--wide i { grid-row: 1; }
+.dvm__sec--wide .dvm__sec-label { grid-column: 2; grid-row: 1; }
+.dvm__sec--wide .dvm__sec-detail { grid-column: 3; grid-row: 1; padding-left: 0.4rem; }
+@media (max-width: 575px) {
+    /* Back to the stacked reading on a phone — one line is too narrow for both. */
+    .dvm__sec--wide { grid-template-columns: auto 1fr; }
+    .dvm__sec--wide i { grid-row: 1 / span 2; }
+    .dvm__sec--wide .dvm__sec-detail { grid-column: 2; grid-row: 2; padding-left: 0; }
+}
+
+/* --- Documents strip (expanded case) — scan thumbnails beside the ID details.
+   The thumbnail opens the shared lens overlay (.dvm__lens) rather than
+   navigating, so a reviewer can read a scan without leaving the queue. --- */
+.dvm__papers { margin-bottom: 0.9rem; }
+.dvm__papers-count {
+    display: inline-block;
+    margin-left: 0.3rem;
+    padding: 0 0.3rem;
+    border-radius: 3px;
+    background: #eef1f5;
+    color: #374151;
+    font-size: 0.6rem;
+    letter-spacing: 0;
+}
+.dvm__papers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+    gap: 0.6rem;
+    margin-top: 0.4rem;
+}
+.dvm__paper {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.5rem;
+    background: #fff;
+    border: 1px solid #eef1f5;
+    border-left: 3px solid #d1d5db;
+    border-radius: 6px;
+}
+.dvm__paper--valid { border-left-color: #15803d; }
+.dvm__paper--soon { border-left-color: #f7c000; }
+.dvm__paper--expired { border-left-color: #b91c1c; }
+
+.dvm__paper-shots { display: flex; flex-direction: column; gap: 0.35rem; flex-shrink: 0; }
+.dvm__paper-shot {
+    position: relative;
+    display: block;
+    width: 88px;
+    height: 62px;
+    padding: 0;
+    overflow: hidden;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    cursor: zoom-in;
+}
+.dvm__paper-shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.dvm__paper-shot:hover, .dvm__paper-shot:focus-visible { border-color: #f7c000; outline: none; }
+.dvm__paper-side {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 0.05rem 0.25rem;
+    background: rgba(0, 31, 63, 0.72);
+    color: #fff;
+    font-size: 0.56rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+.dvm__paper-shot--none {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    cursor: default;
+    color: #9ca3af;
+    font-size: 0.56rem;
+}
+.dvm__paper-shot--none i { font-size: 0.95rem; }
+
+.dvm__paper-body { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; min-width: 0; }
+.dvm__paper-type { font-size: 0.72rem; font-weight: 700; color: #001f3f; }
+.dvm__paper-no {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+    color: #374151;
+    word-break: break-all;
+    margin-bottom: 0.15rem;
+}
+.dvm__paper-field {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.4rem;
+    font-size: 0.67rem;
+    line-height: 1.5;
+}
+.dvm__paper-field > span { color: #6b7280; flex-shrink: 0; }
+.dvm__paper-field strong { font-weight: 600; color: #111827; text-align: right; min-width: 0; }
+.dvm__paper-exp--valid { color: #15803d; }
+.dvm__paper-exp--soon { color: #b45309; }
+.dvm__paper-exp--expired { color: #b91c1c; }
+.dvm__paper-exp--none { color: #6b7280; font-weight: 400; }
+.dvm__paper-open {
+    margin-top: 0.25rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #1d4ed8;
+    text-decoration: none;
+}
+.dvm__paper-open:hover { text-decoration: underline; }
+.dvm__papers-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.4rem 0 0;
+    padding: 0.5rem 0.65rem;
+    border: 1px dashed #e5e7eb;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    color: #6b7280;
+}
+
+/* Scan lens — one overlay serves every thumbnail on the page */
+.dvm__lens {
+    position: fixed;
+    inset: 0;
+    z-index: 1080;
+    display: none;
+    flex-direction: column;
+    background: rgba(0, 10, 20, 0.9);
+}
+.dvm__lens--open { display: flex; }
+.dvm__lens-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.55rem 0.85rem;
+    background: #001f3f;
+    color: #fff;
+}
+.dvm__lens-title { font-size: 0.84rem; font-weight: 700; }
+.dvm__lens-who { font-size: 0.72rem; color: rgba(255, 255, 255, 0.65); margin-right: auto; }
+.dvm__lens-act {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 4px;
+    background: transparent;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+.dvm__lens-act:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.dvm__lens-close {
+    padding: 0.2rem 0.45rem;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.dvm__lens-stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow: auto;
+}
+.dvm__lens-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 4px;
+    transition: transform 0.15s ease;
+}
+/* Rotating does not change the layout box, so the quarter turns swap the caps
+   to keep a turned scan inside the viewport. */
+.dvm__lens-img--r90 { transform: rotate(90deg); max-width: 82vh; max-height: 88vw; }
+.dvm__lens-img--r180 { transform: rotate(180deg); }
+.dvm__lens-img--r270 { transform: rotate(270deg); max-width: 82vh; max-height: 88vw; }
+@media (prefers-reduced-motion: reduce) { .dvm__lens-img { transition: none; } }
 
 .dvm__meter { display: flex; align-items: center; gap: 0.4rem; }
 .dvm__meter-track {

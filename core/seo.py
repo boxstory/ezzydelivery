@@ -201,13 +201,31 @@ class SEOMetadata:
 
     @staticmethod
     def get_careers_meta():
-        """Careers page"""
+        """Careers page — office roles. Driver keywords live on the driver page below."""
         return SEOMetadata.get_page_meta(
-            title="Delivery Driver Jobs Qatar | Join EzzyDelivery Doha",  # 52 chars
+            title="Jobs at EzzyDelivery Qatar | Careers in Doha",  # 44 chars
             description=(
-                "Join EzzyDelivery Qatar. We're hiring delivery drivers, operations staff & customer "
-                "support in Doha. Competitive pay, flexible hours. Apply now."
-            ),  # 152 chars
+                "Office and field jobs at EzzyDelivery Qatar. Business development, leads and "
+                "operations roles in Doha, plus driver jobs on their own page. Apply online."
+            ),  # 154 chars
+            url=f"{SEOMetadata.SITE_URL}/careers/",
+        )
+
+    @staticmethod
+    def get_careers_drivers_meta():
+        """Driver jobs page — the open-vacancies page shared on WhatsApp.
+
+        Kept distinct from /join_us/driver/start/ on purpose: that page answers
+        "how do I become a driver", this one answers "what is open right now and
+        what does it pay". Same funnel, different search intent.
+        """
+        return SEOMetadata.get_page_meta(
+            title="Driver Jobs in Qatar | Open Positions & Pay",  # 43 chars
+            description=(
+                "Driver jobs open right now at EzzyDelivery Qatar. See the pay, vehicle and "
+                "zones for every open position in Doha, Al Wakrah and Lusail, then apply online."
+            ),  # 153 chars
+            url=f"{SEOMetadata.SITE_URL}/careers/drivers/",
         )
 
     @staticmethod

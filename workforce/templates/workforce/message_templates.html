@@ -2,13 +2,15 @@
 {# Used by: workforce.views.wf_message_templates (URL workforce:wf_message_templates) #}
 {# Notes: wmt__ namespace. Each card is its own form POSTed back to this URL via fetch — nothing here touches .env, so no server reload. #}
 {#        Card ids stay `msg-<key>`: the Auto Triggers composer rows deep-link straight to a body. #}
+{#        Add / Delete are plain posts (action=add|delete), not the card's fetch: a new card has to be rendered and a deleted one has to go. #}
+{#        A staff-written card (tpl.is_custom) owns its name, note and Delete; a shipped one owns Restore default instead — never both. #}
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
 {% block title %}Message Templates - Staff Dashboard{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/message-templates.css' %}?v=20260921a" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/message-templates.css' %}?v=20260926a" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -40,8 +42,16 @@
             <span class="wfhero__tally-num">{{ stats.off }}</span>
             <span class="wfhero__tally-lbl">Switched off</span>
           </div>
+          <div class="wfhero__tally">
+            <span class="wfhero__tally-num">{{ stats.custom }}</span>
+            <span class="wfhero__tally-lbl">Yours</span>
+          </div>
         </div>
         <nav class="wfhero__actions">
+          <button type="button" class="wfhero__ghost btn btn-sm" data-wmt-add-toggle
+                  aria-expanded="false" aria-controls="wmt_add_panel">
+            <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add message
+          </button>
           <a class="wfhero__ghost btn btn-sm" href="{% url 'workforce:auto_triggers_list' %}">
             <i class="fa-solid fa-bolt me-1" aria-hidden="true"></i>All Triggers
           </a>
@@ -82,6 +92,91 @@
     </nav>
     {% endif %}
 
+    <!-- Add a message: staff wording, stored as its own row -->
+    <form class="wmt__add" id="wmt_add_panel" method="post"
+          action="{% url 'workforce:wf_message_templates' %}" hidden>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add">
+      <div class="wmt__add-head">
+        <h2 class="wmt__add-title">Add a message</h2>
+        <button type="button" class="wmt__add-close" data-wmt-add-toggle aria-label="Close">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <p class="wmt__help mb-3">
+        A message you write here becomes a ready body in the <strong>Send WhatsApp</strong> window on
+        every page of the group you pick — orders, tasks, leads, drivers — under its own
+        <span class="wmt__id wmt__id--sm">C</span> number, and it goes out from that group's number.
+        It is never sent on its own: for something the platform sends by itself, add an
+        <a href="{% url 'workforce:auto_flows_list' %}">automation flow</a> instead.
+      </p>
+
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="wmt_add_label">Name</label>
+          <input type="text" class="form-control form-control-sm" id="wmt_add_label"
+                 name="label" maxlength="120" required
+                 placeholder="e.g. Delivery running late — apology">
+          <div class="wmt__help mt-1">What staff will see in the send window list.</div>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="wmt_add_section">Group / sending number</label>
+          <select class="form-select form-select-sm" id="wmt_add_section" name="section"
+                  data-no-select2 required>
+            <option value="">Choose a group…</option>
+            {% for sec in add_sections %}
+            <option value="{{ sec.value }}">{{ sec.label }} — sends from {{ sec.sender }}</option>
+            {% endfor %}
+          </select>
+          <div class="wmt__help mt-1">Decides which pages offer it, and which number it leaves from.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="wmt_add_desc">When to use it <span class="wmt__opt">optional</span></label>
+          <input type="text" class="form-control form-control-sm" id="wmt_add_desc"
+                 name="description" maxlength="300"
+                 placeholder="A note to the next person who reads this card">
+        </div>
+      </div>
+
+      <div class="wmt__editor mt-3">
+        <div class="wmt__editor-main">
+          <label class="form-label" for="wmt_add_body">Message body</label>
+          <textarea class="form-control form-control-sm wmt__textarea" id="wmt_add_body"
+                    name="body" rows="10" required
+                    placeholder="Hi {customer_name}, …"></textarea>
+          <div class="wmt__help mt-1">
+            WhatsApp formatting: <code>*bold*</code>, <code>_italic_</code>, <code>```mono```</code>.
+          </div>
+        </div>
+        <aside class="wmt__editor-side">
+          <p class="wmt__side-title">Placeholders</p>
+          <div class="wmt__chips">
+            {% for ph in custom_placeholders %}
+            <button type="button" class="wmt__chip" data-insert="&#123;{{ ph.name }}&#125;"
+                    data-target="#wmt_add_body" title="{{ ph.hint }}">&#123;{{ ph.name }}&#125;</button>
+            {% endfor %}
+          </div>
+          <div class="wmt__help">
+            Only these two are filled in for you. Anything else you type in braces stays
+            unfilled and the send window will refuse to send it until someone edits it by
+            hand — so write the order number, the amount or the address into the message
+            when you send it, not here.
+          </div>
+        </aside>
+      </div>
+
+      <div class="wmt__add-foot">
+        <button type="button" class="btn btn-sm wmt__btn-ghost" data-tpl-preview="#wmt_add_body">
+          <i class="fa-solid fa-eye me-1"></i>Preview
+        </button>
+        <button type="button" class="btn btn-sm wmt__btn-ghost" data-wmt-add-toggle>Cancel</button>
+        <button type="submit" class="btn btn-sm wmt__btn-save ms-auto">
+          <i class="fa-solid fa-plus me-1"></i>Add message
+        </button>
+      </div>
+      <div class="wmt__preview" data-preview hidden></div>
+    </form>
+
     {% for group in template_groups %}
     <section class="wmt__group" id="{{ group.anchor }}">
       <div class="wmt__group-head">
@@ -102,12 +197,14 @@
           {# send the body — it is printed on every one of them. #}
           <span class="wmt__id" title="Message ID — shown on every button that sends this message">{{ tpl.msg_id }}</span>
           <i class="fa-brands fa-whatsapp"></i><strong>{{ tpl.label }}</strong>
-          {% if tpl.kind == 'composer' %}
+          {% if tpl.is_custom %}
+            <span class="wmt__state wmt__state--own">Yours</span>
+          {% elif tpl.kind == 'composer' %}
             <span class="wmt__state wmt__state--kind">Composer starter</span>
           {% else %}
             <span class="wmt__state wmt__state--auto">Sent automatically</span>
           {% endif %}
-          {% if tpl.is_customised %}<span class="wmt__state wmt__state--set">Edited</span>{% endif %}
+          {% if tpl.is_customised and not tpl.is_custom %}<span class="wmt__state wmt__state--set">Edited</span>{% endif %}
           {% if tpl.toggle_owner %}
           {# On/off belongs to a trigger row — showing a second switch here would let #}
           {# one page silently contradict the other. Point at the real one instead. #}
@@ -129,7 +226,22 @@
           {% csrf_token %}
           <input type="hidden" name="template_key" value="{{ tpl.key }}">
 
+          {% if tpl.is_custom %}
+          <div class="row g-2 mb-3">
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="wmt_label_{{ tpl.key }}">Name</label>
+              <input type="text" class="form-control form-control-sm" id="wmt_label_{{ tpl.key }}"
+                     name="label" value="{{ tpl.label }}" maxlength="120">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="wmt_desc_{{ tpl.key }}">When to use it <span class="wmt__opt">optional</span></label>
+              <input type="text" class="form-control form-control-sm" id="wmt_desc_{{ tpl.key }}"
+                     name="description" value="{{ tpl.description }}" maxlength="300">
+            </div>
+          </div>
+          {% else %}
           <div class="wmt__help mb-2">{{ tpl.description }}</div>
+          {% endif %}
 
           <div class="wmt__meta mb-3">
             <span class="wmt__plate wmt__plate--quiet">
@@ -154,12 +266,14 @@
               <div class="wmt__help mt-1">
                 WhatsApp formatting: <code>*bold*</code>, <code>_italic_</code>, <code>```mono```</code>.
               </div>
+              {% if not tpl.is_custom %}
               <div class="wmt__help mt-1">
                 Optional lines: <code>&#123;if cod_amount&#125;</code> … <code>&#123;endif&#125;</code> keeps the part between
                 them only when the order has a value — a zero COD counts as no value, so that
                 condition reads as “COD is more than 0”. <code>&#123;else&#125;</code> is optional, a tag on its
                 own line takes that line with it, and conditions cannot be nested.
               </div>
+              {% endif %}
             </div>
 
             <aside class="wmt__editor-side">
@@ -172,7 +286,27 @@
                         title="{{ ph.hint }}">&#123;{{ ph.name }}&#125;</button>
                 {% endfor %}
               </div>
+              {% if tpl.is_custom %}
+              <div class="wmt__help mb-3">
+                Only these two are filled in for you. Anything else in braces stays unfilled and
+                the send window refuses to send it until someone edits it by hand — so the order
+                number, the amount or the address goes in when you send, not here.
+              </div>
+              {% else %}
               <div class="wmt__help mb-3">Filled in at send time. Click one to drop it at the cursor — hover for what it puts in the message. A <code>…_line</code> placeholder is a whole line and disappears when the order has no value for it.</div>
+              {% endif %}
+              {% endif %}
+
+              {% if tpl.is_custom %}
+              <p class="wmt__side-title">Where {{ tpl.msg_id }} shows up</p>
+              <ul class="wmt__uses">
+                <li class="wmt__use">
+                  <span class="wmt__id wmt__id--sm">{{ tpl.msg_id }}</span>
+                  <span class="wmt__use-label">The <strong>Send WhatsApp</strong> window on every
+                  {{ group.label }} page — pick it from the template list.</span>
+                </li>
+              </ul>
+              <div class="wmt__help">Nothing sends it on its own.</div>
               {% endif %}
 
               {% if tpl.used_by %}
@@ -194,9 +328,18 @@
         </div>
 
         <div class="wmt__card-foot">
+          {% if tpl.is_custom %}
+          {# Posts this same form with action=delete — see the JS; the card's fetch stands aside. #}
+          <button type="submit" name="action" value="delete" formnovalidate
+                  class="btn btn-sm wmt__btn-danger" data-wmt-delete
+                  data-wmt-name="{{ tpl.msg_id }} {{ tpl.label }}">
+            <i class="fa-solid fa-trash-can me-1"></i>Delete
+          </button>
+          {% else %}
           <button type="button" class="btn btn-sm wmt__btn-ghost" data-tpl-reset="#wmt_tpl_{{ tpl.key }}">
             <i class="fa-solid fa-rotate-left me-1"></i>Restore default text
           </button>
+          {% endif %}
           <button type="button" class="btn btn-sm wmt__btn-ghost" data-tpl-preview="#wmt_tpl_{{ tpl.key }}">
             <i class="fa-solid fa-eye me-1"></i>Preview
           </button>
@@ -232,9 +375,44 @@
     toastTimer = setTimeout(function () { toastEl.className = 'wmt__toast'; }, 2600);
   }
 
+  // --- add panel ---
+  const addPanel = document.getElementById('wmt_add_panel');
+  document.querySelectorAll('[data-wmt-add-toggle]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (!addPanel) return;
+      const opening = addPanel.hidden;
+      addPanel.hidden = !opening;
+      document.querySelectorAll('[data-wmt-add-toggle][aria-expanded]').forEach(function (t) {
+        t.setAttribute('aria-expanded', opening ? 'true' : 'false');
+      });
+      if (opening) {
+        addPanel.scrollIntoView({ block: 'nearest' });
+        const first = addPanel.querySelector('#wmt_add_label');
+        if (first) first.focus();
+      }
+    });
+  });
+
+  // --- delete a message staff wrote ---
+  // It submits the card's own form (no nested forms allowed), so the flag tells
+  // the save handler below to stand aside and let the browser post it: the page
+  // has to re-render for the card to disappear.
+  document.querySelectorAll('[data-wmt-delete]').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      const form = btn.closest('form');
+      const name = btn.dataset.wmtName || 'this message';
+      if (!window.confirm('Delete ' + name + '? It will no longer be offered in the send window.')) {
+        e.preventDefault();
+        return;
+      }
+      if (form) form.dataset.wmtDeleting = '1';
+    });
+  });
+
   // --- save one message ---
   document.querySelectorAll('form[data-msg-form]').forEach(function (form) {
     form.addEventListener('submit', function (e) {
+      if (form.dataset.wmtDeleting === '1') return;  // a delete — post it normally
       e.preventDefault();
       const btn = form.querySelector('button[type=submit]');
       const fb = form.querySelector('[data-feedback]');

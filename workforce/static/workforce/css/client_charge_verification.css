@@ -27,8 +27,6 @@
   padding: 0 0 7rem;
 }
 
-.ccv__wrap { max-width: 1320px; margin: 0 auto; }
-
 /* Everything below the hero — one padded section */
 .ccv__body { padding: 0.325rem; }
 
@@ -105,6 +103,28 @@
 .ccv__filter--wide { width: 22rem; }
 .ccv__filter--search { width: 22rem; }
 .ccv__filter--amt { width: 7rem; }
+/* A min/max pair reads as ONE filter, so it is sized and bordered as one control
+   with a hairline divider instead of two boxes that happen to sit side by side. */
+.ccv__filter--range { width: 13rem; }
+/* Bootstrap sizes input-group children with flex off a 1% basis. The page-wide
+   `width: 100%` for bounded fields breaks that — each input claims the whole
+   group and the pair wraps onto two lines — so the group restores Bootstrap's
+   own sizing rather than overriding it. */
+.ccv__filter--range .input-group { flex-wrap: nowrap; }
+.ccv__filter--range .input-group .form-control {
+  width: 1%;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+}
+.ccv__range-sep {
+  padding: 0 0.3rem;
+  background: var(--tlr-paper);
+  border-left: 0;
+  border-right: 0;
+  color: var(--tlr-muted);
+  font-family: var(--tlr-mono);
+}
 .ccv__filter--zone { width: 7rem; }
 .ccv__filter--date { width: 10rem; }
 .ccv__filter--per { width: 5.5rem; }
@@ -170,6 +190,22 @@
   font-size: 0.72rem;
   color: var(--tlr-muted);
 }
+/* Reach past the page: a link, not a button, because it only changes what the
+   selection means — the committing buttons live on the tape. */
+.ccv__bar-all {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: var(--tlr-mono);
+  font-size: 0.72rem;
+  color: var(--tlr-brass-deep);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+.ccv__bar-all:hover { color: var(--tlr-ink); }
+.ccv__bar-all--off { color: var(--tlr-muted); }
+
 .ccv__bulk-set { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
 .ccv__bulk-group { width: 13rem; }
 .ccv__field-label {
@@ -243,9 +279,50 @@
   font-variant-numeric: tabular-nums;
 }
 .ccv__muted { color: var(--tlr-muted); }
+/* The second sort in a shared header — quieter than the column's own name, so
+   the header still reads as one column rather than two. */
+.ccv__sort--sub {
+  margin-left: 0.4rem;
+  font-size: 0.9em;
+  opacity: 0.65;
+  text-transform: lowercase;
+}
+.ccv__sort--sub:hover { opacity: 1; }
+
+/* Names a leg that is not a plain merchant → customer drop. Ink on a hairline,
+   not a coloured pill: it is a fact about the job, not a status to react to. */
+.ccv__leg {
+  display: inline-block;
+  margin-top: 0.2rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--tlr-rule);
+  border-radius: 2px;
+  font-family: var(--tlr-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tlr-muted);
+  white-space: nowrap;
+}
+
+/* The task code is the way into the job. Underlined only on hover so a column of
+   them does not read as a wall of links, and the icon stays quiet until then. */
+.ccv__task-link {
+  color: var(--tlr-ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ccv__task-link:hover { color: var(--tlr-brass-deep); text-decoration: underline; }
+.ccv__task-link-icon {
+  font-size: 0.6em;
+  margin-left: 0.25rem;
+  color: var(--tlr-muted);
+  vertical-align: baseline;
+}
+.ccv__task-link:hover .ccv__task-link-icon { color: var(--tlr-brass-deep); }
 .ccv__col-check { width: 2.4rem; }
 .ccv__truncate {
-  max-width: 12rem;
+  max-width: 18rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -377,8 +454,9 @@
   box-shadow: 0 -2px 12px rgba(22, 34, 29, 0.25);
 }
 .ccv__tape-inner {
-  max-width: 1320px;
-  margin: 0 auto;
+  /* Tracks the full-bleed wrap above it. */
+  max-width: none;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 1.25rem;
@@ -432,6 +510,7 @@
   .ccv__filter--wide,
   .ccv__filter--search { flex: 1 1 100%; width: 100%; }
   .ccv__filter--amt,
+  .ccv__filter--range,
   .ccv__filter--zone,
   .ccv__filter--date,
   .ccv__filter--per { width: auto; }

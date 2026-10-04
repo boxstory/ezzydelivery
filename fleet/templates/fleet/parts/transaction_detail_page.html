@@ -1,5 +1,5 @@
 {% extends "fleet/pwa_base.html" %}
-{% load static %}
+{% load static fleet_extras %}
 
 {% block title %}Transaction Detail{% endblock %}
 {% block page_title %}Transaction{% endblock %}
@@ -19,7 +19,7 @@
         <div class="ftd__header">
             <div class="ftd__header-left">
                 <div class="ftd__header-title">
-                    {{ txn.get_transaction_type_display }}
+                    {{ txn.get_transaction_type_display|cash_wording }}
                 </div>
                 <div class="ftd__header-date">
                     {{ txn.created_at|date:"d M Y, H:i" }}
@@ -44,7 +44,7 @@
             {% if txn.description %}
             <div class="ftd__detail-row">
                 <span class="ftd__detail-label">Description</span>
-                <span class="ftd__detail-value">{{ txn.description }}</span>
+                <span class="ftd__detail-value">{{ txn.description|cash_wording }}</span>
             </div>
             {% endif %}
             {% if txn.reference_number %}
@@ -99,7 +99,7 @@
             </div>
             <div class="fth__hero-divider"></div>
             <div class="fth__hero-item">
-                <span class="fth__hero-label">COD In-Hand</span>
+                <span class="fth__hero-label">Cash In-Hand</span>
                 <span class="fth__hero-val fth__hero-val--orange">QR {{ txn.cod_in_hand_after|floatformat:0 }}</span>
             </div>
             <div class="fth__hero-divider"></div>
@@ -159,11 +159,11 @@
             </div>
             <div class="ftd__order-status">
                 <span class="ftd__badge ftd__badge--{{ task.dl_task_status }}">{{ task.get_dl_task_status_display }}</span>
-                {% if task.cod_collected %}
-                <span class="ftd__badge ftd__badge--cod">COD Collected</span>
+                {% if task.cod_collected or task.fee_collected_amount %}
+                <span class="ftd__badge ftd__badge--cod">Collected</span>
                 {% endif %}
                 {% if task.cod_settled %}
-                <span class="ftd__badge ftd__badge--settled">COD Settled</span>
+                <span class="ftd__badge ftd__badge--settled">Settled</span>
                 {% endif %}
             </div>
         </div>
@@ -217,7 +217,7 @@
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     title: 'Transaction {{ txn.transaction_code }}',
-                    text: '{{ txn.get_transaction_type_display }} — {{ txn.amount|floatformat:0 }} QR',
+                    text: '{{ txn.get_transaction_type_display|cash_wording }} — {{ txn.amount|floatformat:0 }} QR',
                     files: [file]
                 });
             } else {

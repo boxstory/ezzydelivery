@@ -7,6 +7,7 @@ from workforce import dispatch_views
 from workforce import crm_views
 from workforce import marketing_views
 from workforce import device_views
+from workforce import wa_label_access_views
 from delivery import views as delivery_views
 from orders import views as orders_views
 from core import views as core_views
@@ -75,12 +76,16 @@ urlpatterns = [
     path('drivers/<int:driver_id>/set-status/', workforce_views.driver_set_status, name='driver_set_status'),
     path('drivers/<int:driver_id>/dashboard-access/', workforce_views.driver_set_dashboard_access, name='driver_set_dashboard_access'),
     path('drivers/<int:driver_id>/wa-thread/', workforce_views.driver_wa_thread, name='driver_wa_thread'),
+    path('drivers/<int:driver_id>/connect-lead/', workforce_views.driver_connect_crm_lead, name='driver_connect_crm_lead'),
     path('drivers/<int:driver_id>/vehicle/add/', workforce_views.driver_vehicle_save, name='driver_vehicle_add'),
     path('drivers/<int:driver_id>/vehicle/<int:vehicle_id>/edit/', workforce_views.driver_vehicle_save, name='driver_vehicle_edit'),
     path('drivers/<int:driver_id>/vehicle/<int:vehicle_id>/delete/', workforce_views.driver_vehicle_delete, name='driver_vehicle_delete'),
     path('drivers/<int:driver_id>/document/add/', workforce_views.driver_document_save, name='driver_document_add'),
     path('drivers/<int:driver_id>/document/<int:document_id>/edit/', workforce_views.driver_document_save, name='driver_document_edit'),
     path('drivers/<int:driver_id>/document/<int:document_id>/delete/', workforce_views.driver_document_delete, name='driver_document_delete'),
+    path('drivers/<int:driver_id>/document/<int:document_id>/verify/', workforce_views.driver_document_verify, name='driver_document_verify'),
+    path('drivers/<int:driver_id>/document/<int:document_id>/crop/', workforce_views.driver_document_crop, name='driver_document_crop'),
+    path('drivers/<int:driver_id>/document/<int:document_id>/crop/restore/', workforce_views.driver_document_crop_restore, name='driver_document_crop_restore'),
     path('drivers/export/', workforce_views.export_drivers_csv, name='export_drivers_csv'),
 
     #Orders sections urls -------------------------------------------------------------------
@@ -220,6 +225,7 @@ urlpatterns = [
     path('returns/<int:custody_id>/destination/', workforce_views.returns_custody_set_destination, name='returns_custody_set_destination'),
     path('returns/<int:custody_id>/forward/', workforce_views.returns_custody_forward, name='returns_custody_forward'),
     path('returns/requests/', workforce_views.returns_requests_list, name='returns_requests_list'),
+    path('returns/new/', workforce_views.returns_task_create, name='returns_task_create'),
     path('returns/requests/new/', workforce_views.returns_request_create, name='returns_request_create'),
     path('returns/requests/<int:return_id>/status/', workforce_views.returns_request_set_status, name='returns_request_set_status'),
     path('returns/requests/<int:return_id>/schedule-pickup/', workforce_views.returns_request_schedule_pickup, name='returns_request_schedule_pickup'),
@@ -242,6 +248,7 @@ urlpatterns = [
     path('verification/teams/', workforce_views.team_verification_list, name='team_verification_list'),
     path('verification/check-business-code/', workforce_views.check_business_code_unique, name='check_business_code_unique'),
     path('verification/<int:profile_id>/update-status/', workforce_views.update_verification_status, name='update_verification_status'),
+    path('verification/<int:profile_id>/change-role/', workforce_views.change_user_role, name='change_user_role'),
     path('verification/team/<int:team_id>/update-status/', workforce_views.update_team_status, name='update_team_status'),
     path('verification/<int:profile_id>/driver-profile/', workforce_views.view_user_driver_profile, name='view_user_driver_profile'),
     path('verification/<int:profile_id>/business-profile/', workforce_views.view_user_business_profile, name='view_user_business_profile'),
@@ -470,6 +477,10 @@ urlpatterns = [
          marketing_views.wf_driver_proposal_status, name='wf_driver_proposal_status'),
     path('marketing/driver-proposals/<int:proposal_id>/delete/',
          marketing_views.wf_driver_proposal_delete, name='wf_driver_proposal_delete'),
+    path('marketing/driver-proposals/interests/',
+         marketing_views.wf_driver_proposal_interests, name='wf_driver_proposal_interests'),
+    path('marketing/driver-proposals/interests/<int:interest_id>/update/',
+         marketing_views.wf_driver_proposal_interest_update, name='wf_driver_proposal_interest_update'),
 
     # CRM Leads
     path('crm/leads/board/', crm_views.crm_leads_board, name='crm_leads_board'),
@@ -483,10 +494,12 @@ urlpatterns = [
     path('crm/leads/new/', crm_views.crm_lead_create, name='crm_lead_create'),
     path('crm/leads/<int:lead_id>/', crm_views.crm_lead_detail, name='crm_lead_detail'),
     path('crm/leads/<int:lead_id>/update-stage/', crm_views.crm_lead_update_stage, name='crm_lead_update_stage'),
+    path('crm/leads/bulk-stage/', crm_views.crm_leads_bulk_stage, name='crm_leads_bulk_stage'),
     path('crm/leads/<int:lead_id>/unpin-stage/', crm_views.crm_lead_unpin_stage, name='crm_lead_unpin_stage'),
     path('crm/leads/<int:lead_id>/move-board/', crm_views.crm_lead_move_board, name='crm_lead_move_board'),
     path('crm/leads/<int:lead_id>/merge/', crm_views.crm_lead_merge, name='crm_lead_merge'),
     path('crm/leads/<int:lead_id>/unmerge/', crm_views.crm_lead_unmerge, name='crm_lead_unmerge'),
+    path('crm/leads/<int:lead_id>/merge/adopt/', crm_views.crm_lead_merge_adopt, name='crm_lead_merge_adopt'),
     path('crm/leads/<int:lead_id>/update/', crm_views.crm_lead_update, name='crm_lead_update'),
     path('crm/leads/<int:lead_id>/add-activity/', crm_views.crm_lead_add_activity, name='crm_lead_add_activity'),
     path('crm/leads/<int:lead_id>/delete-activity/<int:activity_id>/', crm_views.crm_lead_delete_activity, name='crm_lead_delete_activity'),
@@ -495,6 +508,7 @@ urlpatterns = [
     path('crm/leads/<int:lead_id>/chat-refresh/', crm_views.crm_lead_chat_refresh, name='crm_lead_chat_refresh'),
     path('crm/leads/<int:lead_id>/wa-media/<int:msg_id>/', crm_views.crm_lead_wa_media, name='crm_lead_wa_media'),
     path('crm/leads/<int:lead_id>/link-chat/', crm_views.crm_lead_link_chat, name='crm_lead_link_chat'),
+    path('crm/leads/<int:lead_id>/unlink-chat/', crm_views.crm_lead_unlink_chat, name='crm_lead_unlink_chat'),
     path('crm/wa-contacts/search/', crm_views.crm_wa_contact_search, name='crm_wa_contact_search'),
     path('crm/whatsapp-inbox/', crm_views.crm_whatsapp_inbox, name='crm_whatsapp_inbox'),
     path('crm/whatsapp-inbox/chat/', crm_views.crm_wa_chat_preview, name='crm_wa_chat_preview'),
@@ -590,6 +604,7 @@ urlpatterns = [
     path('whatsapp/last-message/', workforce_views.whatsapp_last_message, name='whatsapp_last_message'),
     path('whatsapp/send-message/', workforce_views.whatsapp_send_message, name='whatsapp_send_message'),
     path('whatsapp/send-routed/', workforce_views.whatsapp_send_routed, name='whatsapp_send_routed'),
+    path('whatsapp/label-access/', wa_label_access_views.whatsapp_label_access, name='whatsapp_label_access'),
     path('whatsapp/composer-templates/', workforce_views.whatsapp_composer_templates, name='whatsapp_composer_templates'),
 
 ]

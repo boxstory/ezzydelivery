@@ -1,3 +1,8 @@
+{% comment %}
+Purpose: List the configured social providers as POST buttons (allauth 65 requires POST to start a provider flow).
+Used by: templates/socialaccount/connections.html (process="connect").
+Notes: A GET link here lands on allauth's "Continue" interstitial instead of the provider, so each entry posts.
+{% endcomment %}
 {% load socialaccount %}
 
 {% get_providers as socialaccount_providers %}
@@ -6,21 +11,27 @@
 {% if provider.id == "openid" %}
 {% for brand in provider.get_brands %}
 <li class="btn-primary" id="social_provider_item_openid_{{ brand.id }}">
-  <a
-    id="social_provider_link_{{ brand.id }}"
-    title="{{brand.name}}"
-    class=" {{provider.id}} {{brand.id}}"
-    href="{% provider_login_url provider.id openid=brand.openid_url process=process %}"
-  >{{brand.name}}</a>
+  <form method="post" action="{% provider_login_url provider.id openid=brand.openid_url process=process %}">
+    {% csrf_token %}
+    <button
+      id="social_provider_link_{{ brand.id }}"
+      type="submit"
+      title="{{brand.name}}"
+      class="btn btn-link p-0 {{provider.id}} {{brand.id}}"
+    >{{brand.name}}</button>
+  </form>
 </li>
 {% endfor %}
 {% endif %}
 <li class=" btn btn-primary-fill  w-75 text-uppercase" id="social_provider_item_{{ provider.id }}">
-  <a
-    id="social_provider_link_{{ provider.id }}"
-    title="{{provider.name}}"
-    class="socialaccount_provider {{provider.id}} link-light text-decoration-none"
-    href="{% provider_login_url provider.id process=process scope=scope auth_params=auth_params %}"
-  >{{provider.name}}</a>
+  <form method="post" action="{% provider_login_url provider.id process=process scope=scope auth_params=auth_params %}">
+    {% csrf_token %}
+    <button
+      id="social_provider_link_{{ provider.id }}"
+      type="submit"
+      title="{{provider.name}}"
+      class="btn btn-link p-0 socialaccount_provider {{provider.id}} link-light text-decoration-none"
+    >{{provider.name}}</button>
+  </form>
 </li>
 {% endfor %}

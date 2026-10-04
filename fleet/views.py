@@ -51,6 +51,7 @@ Related:
 import json
 import logging
 from datetime import time
+from decimal import Decimal
 from django.db import connection, transaction
 from django.db.models import Case, Q, TimeField, Value, When
 from django.db.models.functions import Coalesce, TruncDate, TruncTime
@@ -551,12 +552,14 @@ def cod_collection(request):
         cod_in_hand_qs = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
             cod_settled=False,
-            dl_task_status__in=['delivered', 'partial_delivery']
+            dl_task_status__in=['delivered', 'partial_delivery', 'returned_to_shipper']
         ).filter(
-            Q(cod_collected=True) | Q(order__cod_amount=0)
+            Q(cod_collected=True)
             # A cash delivery fee is the driver's to hand back even on a job that
             # carried no COD, so the row has to be on the manifest to be settled.
             | Q(fee_collected_amount__gt=0)
+            # Prepaid drops and returns: no cash, closed on the same hand-in.
+            | Q(id__in=WalletService.no_cash_settle_tasks(driver).values('id'))
         ).select_related('order', 'order__business', 'dl_to_address')
         if date_cutoff:
             cod_in_hand_qs = cod_in_hand_qs.filter(completed_at__gte=date_cutoff)
@@ -595,14 +598,15 @@ def cod_collection(request):
             {'payment_method': 'fawran', 'total': ledger['fawran'], 'count': ledger['fawran_orders']},
             {'payment_method': 'pos', 'total': ledger['pos'], 'count': ledger['pos_orders']},
         ]
-        zero_cod_qs = delivery_models.DeliveryTask.objects.filter(
-            driver=driver, cod_settled=False, cod_collected=False,
-            dl_task_status__in=['delivered', 'partial_delivery'],
-            order__cod_amount=0,
-        )
+        # Prepaid drops and returns: no cash, closed on the same hand-in. A job
+        # that took a cash delivery fee is counted on the Cash row instead.
+        zero_cod_qs = WalletService.no_cash_settle_tasks(driver)
         if ledger['since']:
             zero_cod_qs = zero_cod_qs.filter(completed_at__gt=ledger['since'])
         zero_cod_count = zero_cod_qs.count()
+        # The driver is shown ONE cash figure (COD + delivery fee, never split):
+        # the ledger's cash balance already carries both.
+        cash_task_count = _cash_handin_task_count(driver)
 
         # Get recent settled COD deliveries
         cod_in_hand_ids = list(cod_in_hand_list.values_list('id', flat=True))
@@ -645,13 +649,15 @@ def cod_collection(request):
             'payment_method_breakdown': payment_method_breakdown,
             'all_time_payment_breakdown': all_time_payment_breakdown,
             'cash_cod_amount': ledger['cash'],
+            'has_cash_to_submit': bool(ledger['orders'] + zero_cod_count + cash_task_count),
             'fawran_cod_amount': ledger['fawran'],
             'pos_cod_amount': ledger['pos'],
-            'cash_cod_count': ledger['cash_orders'],
+            'cash_cod_count': cash_task_count,
             'fawran_cod_count': ledger['fawran_orders'],
             'pos_cod_count': ledger['pos_orders'],
             'zero_cod_count': zero_cod_count,
-            'total_cod_count': ledger['orders'] + zero_cod_count,
+            'total_cod_count': (cash_task_count + ledger['fawran_orders']
+                                + ledger['pos_orders'] + zero_cod_count),
             'total_cod_amount': ledger['total'],
             'settle_period_from': ledger['since'],
             'settle_period_to': tz.now(),
@@ -667,6 +673,119 @@ def cod_collection(request):
         return redirect('core:main_dashboard')
 
 
+# Cash hand-in ------------------------------------------------------------------------------------------------------------------------------
+def _cash_handin_tasks(driver):
+    """Unsettled tasks the driver holds cash for, each tagged with .cash_leg.
+
+    The cash leg is WalletService.task_cash_leg() — COD cash plus any delivery
+    fee taken at the door, as ONE figure (the driver is never shown the split).
+    It is the same figure submit_cod_to_admin() settles, so a job that carried
+    only a cash fee, or a Fawran COD with a cash fee, is on the list too.
+    """
+    tasks = annotate_task_sequence(
+        delivery_models.DeliveryTask.objects
+    ).filter(
+        Q(cod_collected=True) | Q(fee_collected_amount__gt=0),
+        driver=driver, cod_settled=False,
+        dl_task_status__in=['delivered', 'partial_delivery', 'returned_to_shipper'],
+    ).select_related('order', 'order__business', 'dl_to_address').order_by(*TASK_SEQ_DESC)
+    handin = []
+    for t in tasks:
+        t.cash_leg = WalletService.task_cash_leg(t)
+        if t.cash_leg > 0:
+            handin.append(t)
+    return handin
+
+
+def _cash_handin_task_count(driver):
+    return len(_cash_handin_tasks(driver))
+
+
+def _cash_handin_context(driver):
+    """Tasks and totals for the driver's cash hand-in (one Cash figure)."""
+    from django.utils import timezone as _tz
+    handin = _cash_handin_tasks(driver)
+    cash_total = sum((t.cash_leg for t in handin), Decimal('0'))
+
+    ledger = WalletService.ledger_cod_balances(driver)
+    zero_cod_qs = WalletService.no_cash_settle_tasks(driver)
+    if ledger['since']:
+        zero_cod_qs = zero_cod_qs.filter(completed_at__gt=ledger['since'])
+    # Prepaid deliveries and returns carry no cash but are listed with the cash
+    # ones, so the driver hands in against one complete manifest of the period.
+    prepaid = list(annotate_task_sequence(zero_cod_qs).select_related(
+        'order', 'order__business', 'dl_to_address').order_by(*TASK_SEQ_DESC))
+    for t in prepaid:
+        t.cash_leg = Decimal('0')
+        t.row_kind = 'return' if WalletService.is_return_task(t) else 'prepaid'
+        t.row_amount = Decimal('0')
+    for t in handin:
+        t.row_kind = 'cash'
+        t.row_amount = t.cash_leg
+    for t in handin + prepaid:
+        t.is_return = WalletService.is_return_task(t)
+
+    # Fawran / card collections since the last settlement — the same ledger rows
+    # the Fawran and Card totals come from. That money is already with Ezzy, so
+    # the rows are listed for the record and carry no cash.
+    handin_ids = {t.id for t in handin}
+    electronic, seen = [], set()
+    coll = fleet_models.DriverTransaction.objects.filter(
+        driver=driver, transaction_type='cod_collection', delivery_task__isnull=False,
+    ).exclude(amount=0).select_related(
+        'delivery_task', 'delivery_task__order', 'delivery_task__order__business',
+        'delivery_task__dl_to_address')
+    if ledger['since']:
+        coll = coll.filter(created_at__gt=ledger['since'])
+    for c in coll:
+        t = c.delivery_task
+        if t.id in handin_ids or t.id in seen:
+            continue
+        method = t.payment_method or c.payment_method or 'cash'
+        if method == 'fawran':
+            t.row_kind = 'fawran'
+        elif method in ('pos', 'card'):
+            t.row_kind = 'card'
+        else:
+            continue
+        seen.add(t.id)
+        t.row_amount = Decimal(str(t.cod_collected_amount or 0))
+        t.cash_leg = Decimal('0')
+        electronic.append(t)
+
+    return_count = sum(1 for t in prepaid if t.row_kind == 'return')
+    zero_cod_count = len(prepaid) - return_count
+    cash_count = len(handin)
+    fawran_count = sum(1 for t in electronic if t.row_kind == 'fawran')
+    card_count = len(electronic) - fawran_count
+    manifest = sorted(
+        handin + prepaid + electronic,
+        key=lambda t: t.completed_at or _tz.now(), reverse=True)
+
+    from core.models import Profile
+    return {
+        'driver': driver,
+        'handin_tasks': handin,
+        'manifest_tasks': manifest,
+        'cod_in_hand_list': handin,
+        'cod_in_hand_total': cash_total,
+        'total_cod_amount': cash_total + ledger['fawran'] + ledger['pos'],
+        'cash_cod_amount': cash_total,
+        'fawran_cod_amount': ledger['fawran'],
+        'pos_cod_amount': ledger['pos'],
+        'cash_cod_count': cash_count,
+        'fawran_cod_count': fawran_count,
+        'pos_cod_count': card_count,
+        'zero_cod_count': zero_cod_count,
+        'return_count': return_count,
+        'total_cod_count': len(manifest),
+        'settle_period_from': ledger['since'],
+        'settle_period_to': _tz.now(),
+        'delivery_ids_str': ','.join(str(t.id) for t in manifest),
+        'staff_users': Profile.objects.filter(is_staff=True).select_related('user').order_by('first_name', 'last_name'),
+    }
+
+
 # COD Submission ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
@@ -680,75 +799,10 @@ def cod_submission(request):
         # Cash only — electronic collections (Fawran/POS/bank/ATM) land in
         # Ezzy's account at collection and are never part of a driver hand-in.
         if request.method == 'GET':
-            cod_in_hand_list = annotate_task_sequence(
-                delivery_models.DeliveryTask.objects
-            ).filter(
-                driver=driver,
-                cod_collected=True,
-                cod_settled=False,
-                dl_task_status__in=['delivered', 'partial_delivery']
-            ).exclude(
-                payment_method__in=WalletService.ELECTRONIC_METHODS
-            ).select_related('order', 'order__business', 'dl_to_address').order_by(*TASK_SEQ_DESC)
-
-            from django.db.models import Sum
-            cod_in_hand_total = cod_in_hand_list.aggregate(
-                total=Sum('cod_collected_amount')
-            )['total'] or 0
-
-            if not cod_in_hand_list.exists():
-                messages.info(request, 'No COD to submit.')
+            context = _cash_handin_context(driver)
+            if not context['handin_tasks']:
+                messages.info(request, 'No cash to submit.')
                 return redirect('fleet:cod_collection')
-
-            from orders.models import Order
-            selected_orders = Order.objects.filter(
-                id__in=cod_in_hand_list.values_list('order_id', flat=True)
-            ).prefetch_related('delivery_task').order_by('-created_at')
-
-            # Build delivery_ids string and order→delivery_id mapping
-            delivery_ids_str = ','.join(str(t.id) for t in cod_in_hand_list)
-            order_to_delivery = {t.order_id: t.id for t in cod_in_hand_list}
-
-            from core.models import Profile
-            staff_users = Profile.objects.filter(is_staff=True).select_related('user').order_by('first_name', 'last_name')
-
-            order_to_date = {
-                t.order_id: t.completed_at.strftime('%Y-%m-%d') if t.completed_at else ''
-                for t in cod_in_hand_list
-            }
-
-            # Full settle total = cash hand-in + electronic already with Ezzy
-            # (ledger balances, same as the workforce transactions page)
-            ledger = WalletService.ledger_cod_balances(driver)
-            cash_count = cod_in_hand_list.count()
-            zero_cod_qs = delivery_models.DeliveryTask.objects.filter(
-                driver=driver, cod_settled=False, cod_collected=False,
-                dl_task_status__in=['delivered', 'partial_delivery'],
-                order__cod_amount=0,
-            )
-            if ledger['since']:
-                zero_cod_qs = zero_cod_qs.filter(completed_at__gt=ledger['since'])
-            zero_cod_count = zero_cod_qs.count()
-            from django.utils import timezone as _tz
-            context = {
-                'driver': driver,
-                'total_cod_amount': cod_in_hand_total + ledger['fawran'] + ledger['pos'],
-                'cash_cod_amount': cod_in_hand_total,
-                'fawran_cod_amount': ledger['fawran'],
-                'pos_cod_amount': ledger['pos'],
-                'cash_cod_count': cash_count,
-                'fawran_cod_count': ledger['fawran_orders'],
-                'pos_cod_count': ledger['pos_orders'],
-                'zero_cod_count': zero_cod_count,
-                'total_cod_count': cash_count + ledger['fawran_orders'] + ledger['pos_orders'] + zero_cod_count,
-                'settle_period_from': ledger['since'],
-                'settle_period_to': _tz.now(),
-                'selected_orders': selected_orders,
-                'delivery_ids_str': delivery_ids_str,
-                'order_to_delivery': order_to_delivery,
-                'order_to_date': order_to_date,
-                'staff_users': staff_users,
-            }
             return render(request, 'fleet/cod_submission_pwa.html', context)
 
         if request.method == 'POST':
@@ -768,28 +822,20 @@ def cod_submission(request):
             try:
                 # Compute amount server-side from the actual delivery tasks being settled
                 # (never trust the client-submitted amount to avoid sync issues)
-                from django.db.models import Sum as _Sum
+                # Cash leg per task = COD cash + DL (delivery fee) collected,
+                # the same figure submit_cod_to_admin() settles.
+                from django.db.models import Q as _Q
+                cash_qs = delivery_models.DeliveryTask.objects.filter(
+                    _Q(cod_collected=True) | _Q(fee_collected_amount__gt=0),
+                    driver=driver, cod_settled=False,
+                )
                 if delivery_ids:
-                    amount = delivery_models.DeliveryTask.objects.filter(
-                        id__in=delivery_ids,
-                        driver=driver,
-                        cod_collected=True,
-                        cod_settled=False
-                    ).exclude(
-                        payment_method__in=WalletService.ELECTRONIC_METHODS
-                    ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
-                else:
-                    amount = delivery_models.DeliveryTask.objects.filter(
-                        driver=driver,
-                        cod_collected=True,
-                        cod_settled=False,
-                        dl_task_status__in=['delivered', 'partial_delivery']
-                    ).exclude(
-                        payment_method__in=WalletService.ELECTRONIC_METHODS
-                    ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
+                    cash_qs = cash_qs.filter(id__in=delivery_ids)
+                amount = sum(
+                    (WalletService.task_cash_leg(t) for t in cash_qs), Decimal('0'))
 
                 if amount <= 0:
-                    messages.error(request, 'No valid COD amount to submit.')
+                    messages.error(request, 'No valid cash amount to submit.')
                 else:
                     # Snapshot ledger balances BEFORE the deposit resets them —
                     # the settlement record carries the full method breakdown
@@ -817,18 +863,15 @@ def cod_submission(request):
                             payment_method=payment_method,
                             delivery_ids=delivery_ids
                         )
-                        # Sweep zero-COD (prepaid) deliveries into this settlement
-                        # so the pending manifest resets — nothing to hand in for
-                        # them, they are reconciliation line items only.
+                        # Sweep the prepaid deliveries and returns into this
+                        # settlement so the pending manifest resets — nothing to
+                        # hand in for them, they are reconciliation lines only.
                         from django.utils import timezone as _tz
-                        delivery_models.DeliveryTask.objects.filter(
-                            driver=driver, cod_settled=False, cod_collected=False,
-                            dl_task_status__in=['delivered', 'partial_delivery'],
-                            order__cod_amount=0,
-                        ).update(cod_settled=True, cod_settled_at=_tz.now())
+                        WalletService.no_cash_settle_tasks(driver).update(
+                            cod_settled=True, cod_settled_at=_tz.now())
                         messages.success(
                             request,
-                            f'COD settled: {settle_total} QR total '
+                            f'Cash settled: {settle_total} QR total '
                             f'(Cash {amount} QR handed in, Fawran {ledger["fawran"]} QR '
                             f'+ Card {ledger["pos"]} QR already with Ezzy).'
                         )
@@ -838,97 +881,8 @@ def cod_submission(request):
             except Exception as e:
                 messages.error(request, f'Error processing submission: {str(e)}')
 
-        # Get wallet status
-        wallet_status = WalletService.get_wallet_status(driver)
-
-        # Get pending COD deliveries (unsettled, cash only — electronic never
-        # forms part of a driver hand-in)
-        cod_in_hand_list = annotate_task_sequence(
-            delivery_models.DeliveryTask.objects
-        ).filter(
-            driver=driver,
-            cod_collected=True,
-            cod_settled=False,
-            dl_task_status__in=['delivered', 'partial_delivery']
-        ).exclude(
-            payment_method__in=WalletService.ELECTRONIC_METHODS
-        ).select_related(
-            'order',
-            'order__business',
-            'dl_to_address'
-        ).order_by('-completed_at')
-
-        # Calculate total from actual list so it matches displayed items
-        from django.db.models import Sum
-        cod_in_hand_total = cod_in_hand_list.aggregate(
-            total=Sum('cod_collected_amount')
-        )['total'] or 0
-
-        # Reference number is optional - driver can enter their own (e.g. bank transfer ref)
-        # Transaction code (CODS-YYYYMMDD-NNNN) serves as the unique identifier
-        auto_reference = ''
-
-        # Recent COD submissions (cod_deposit / cod_driver_settle)
-        recent_submissions = fleet_models.DriverTransaction.objects.filter(
-            driver=driver,
-            transaction_type__in=['cod_deposit', 'cod_driver_settle']
-        ).order_by('-created_at')[:10]
-
-        # Convert COD in hand tasks to orders format for PWA template
-        from orders.models import Order
-        selected_orders = Order.objects.filter(
-            id__in=cod_in_hand_list.values_list('order_id', flat=True)
-        ).prefetch_related('delivery_task').order_by('-created_at')
-
-        delivery_ids_str = ','.join(str(t.id) for t in cod_in_hand_list)
-        order_to_delivery = {t.order_id: t.id for t in cod_in_hand_list}
-
-        from core.models import Profile
-        staff_users = Profile.objects.filter(is_staff=True).select_related('user').order_by('first_name', 'last_name')
-
-        order_to_date = {
-            t.order_id: t.completed_at.strftime('%Y-%m-%d') if t.completed_at else ''
-            for t in cod_in_hand_list
-        }
-
-        # Full settle total = cash hand-in + electronic already with Ezzy
-        ledger = WalletService.ledger_cod_balances(driver)
-        cash_count = cod_in_hand_list.count()
-        zero_cod_qs = delivery_models.DeliveryTask.objects.filter(
-            driver=driver, cod_settled=False, cod_collected=False,
-            dl_task_status__in=['delivered', 'partial_delivery'],
-            order__cod_amount=0,
-        )
-        if ledger['since']:
-            zero_cod_qs = zero_cod_qs.filter(completed_at__gt=ledger['since'])
-        zero_cod_count = zero_cod_qs.count()
-        from django.utils import timezone as _tz2
-
-        context = {
-            'driver': driver,
-            'wallet_status': wallet_status,
-            'cod_in_hand_list': cod_in_hand_list,
-            'cod_in_hand_total': cod_in_hand_total,
-            'total_cod_amount': cod_in_hand_total + ledger['fawran'] + ledger['pos'],
-            'cash_cod_amount': cod_in_hand_total,
-            'fawran_cod_amount': ledger['fawran'],
-            'pos_cod_amount': ledger['pos'],
-            'cash_cod_count': cash_count,
-            'fawran_cod_count': ledger['fawran_orders'],
-            'pos_cod_count': ledger['pos_orders'],
-            'zero_cod_count': zero_cod_count,
-            'total_cod_count': cash_count + ledger['fawran_orders'] + ledger['pos_orders'] + zero_cod_count,
-            'settle_period_from': ledger['since'],
-            'settle_period_to': _tz2.now(),
-            'auto_reference': auto_reference,
-            'recent_submissions': recent_submissions,
-            'selected_orders': selected_orders,
-            'delivery_ids_str': delivery_ids_str,
-            'order_to_delivery': order_to_delivery,
-            'order_to_date': order_to_date,
-            'staff_users': staff_users,
-        }
-
+        context = _cash_handin_context(driver)
+        context['wallet_status'] = WalletService.get_wallet_status(driver)
         return render(request, 'fleet/cod_submission_pwa.html', context)
 
     except fleet_models.Driver.DoesNotExist:
@@ -958,49 +912,43 @@ def cod_export(request):
         else:
             delivery_ids = []
 
-        # Get deliveries with related transactions for transaction codes.
-        # Include zero-COD delivered orders (order.cod_amount == 0) as line items so the
-        # report is a full delivery manifest; their 0 QR never affects the cash total.
-        from django.db.models import Q
-        deliveries = delivery_models.DeliveryTask.objects.filter(
-            driver=driver,
-            cod_settled=False,  # Only unsettled COD
-            dl_task_status__in=['delivered', 'partial_delivery']
-        ).filter(
-            Q(cod_collected=True) | Q(order__cod_amount=0)
-        )
+        # The report is the same manifest the Submit Cash page lists: cash orders,
+        # prepaid orders and the Fawran/card collections since the last settlement.
+        deliveries = _cash_handin_context(driver)['manifest_tasks']
         if delivery_ids:
-            deliveries = deliveries.filter(id__in=delivery_ids)
+            wanted = set(delivery_ids)
+            deliveries = [d for d in deliveries if d.id in wanted]
         else:
-            # Respect the same date window the COD list uses so the report matches.
+            # Respect the same date window the Cash Collection list uses.
             filter_days = request.GET.get('days', '')
             if filter_days and filter_days != 'all':
                 try:
                     from datetime import timedelta
-                    deliveries = deliveries.filter(
-                        completed_at__gte=timezone.now() - timedelta(days=int(filter_days))
-                    )
+                    cutoff = timezone.now() - timedelta(days=int(filter_days))
+                    deliveries = [d for d in deliveries
+                                  if d.completed_at and d.completed_at >= cutoff]
                 except (ValueError, TypeError):
                     pass
-        deliveries = annotate_task_sequence(deliveries).select_related(
-            'order', 'order__business', 'dl_to_address'
-        ).prefetch_related('transactions').order_by(*TASK_SEQ_DESC)
 
-        # Calculate total COD amount — real cash only (zero rows contribute nothing)
-        total_cod = sum(
-            Decimal(str(d.cod_collected_amount or 0)) for d in deliveries if d.cod_collected
-        )
+        total_cod = sum((d.row_amount for d in deliveries), Decimal('0'))
+        # Cash the driver actually holds (Fawran/card went straight to Ezzy).
+        total_cash = sum((d.cash_leg for d in deliveries), Decimal('0'))
+
+        def _pay_label(d):
+            if d.row_kind == 'cash':
+                return 'Mixed' if d.cash_leg < d.collected_total else 'Cash'
+            return {'prepaid': 'Prepaid', 'return': 'Return',
+                    'fawran': 'Fawran', 'card': 'Card'}[d.row_kind]
 
         # Process COD settlement if submit=1
-        if submit_settlement and total_cod > 0:
+        if submit_settlement and total_cash > 0:
             try:
                 # Submit COD to admin using wallet service
-                from fleet.wallet_service import WalletService
                 from django.db import transaction as db_transaction
                 from django.db.models import Sum as _Sum
 
                 # Only settle real-COD deliveries — never settle zero-COD/prepaid rows
-                settle_ids = [d.id for d in deliveries if d.cod_collected]
+                settle_ids = [d.id for d in deliveries if d.cash_leg > 0]
 
                 # Guard the submission the same way the PWA caller does:
                 # lock the driver row, derive the amount server-side from the
@@ -1012,28 +960,17 @@ def cod_export(request):
 
                     # Re-derive the settlement amount under the lock from the
                     # still-unsettled tasks (never trust the pre-lock total)
-                    amount = delivery_models.DeliveryTask.objects.filter(
-                        id__in=settle_ids,
-                        driver=driver,
-                        cod_collected=True,
-                        cod_settled=False,
-                        dl_task_status__in=['delivered', 'partial_delivery']
-                    ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
+                    amount = sum(
+                        (WalletService.task_cash_leg(t) for t in
+                         delivery_models.DeliveryTask.objects.filter(
+                             id__in=settle_ids, driver=driver, cod_settled=False)),
+                        Decimal('0'))
 
                     if amount <= 0:
-                        messages.error(request, 'No valid COD amount to submit (already settled?).')
+                        messages.error(request, 'No cash to submit (already settled?).')
                         return redirect('fleet:cod_collection')
 
-                    # Sync cod_in_hand if it's out of date
-                    actual_cod = delivery_models.DeliveryTask.objects.filter(
-                        driver=driver,
-                        cod_collected=True,
-                        cod_settled=False,
-                        dl_task_status__in=['delivered', 'partial_delivery']
-                    ).aggregate(total=_Sum('cod_collected_amount'))['total'] or Decimal('0')
-                    if driver.cod_in_hand != actual_cod:
-                        driver.cod_in_hand = actual_cod
-                        driver.save(update_fields=['cod_in_hand'])
+                    WalletService.sync_cod_in_hand(driver)
 
                     # Create COD deposit transaction
                     txn = WalletService.submit_cod_to_admin(
@@ -1041,12 +978,12 @@ def cod_export(request):
                         amount=amount,
                         created_by=request.user,
                         reference_number=f"COD-SUBMIT-{timezone.now().strftime('%Y%m%d%H%M%S')}",
-                        notes=f"COD submission for {len(settle_ids)} deliveries",
+                        notes=f"Cash submission for {len(settle_ids)} deliveries",
                         payment_method='cash',
                         delivery_ids=settle_ids
                     )
 
-                messages.success(request, f'COD settlement of {amount} QR submitted successfully! Transaction: {txn.transaction_code}')
+                messages.success(request, f'Cash submission of {amount} QR done! Transaction: {txn.transaction_code}')
                 logger.info(f"Driver {driver.driver_id} submitted COD: {amount} QR for {len(settle_ids)} deliveries")
 
                 # Redirect to show success message instead of returning PDF
@@ -1057,7 +994,7 @@ def cod_export(request):
                 return redirect('fleet:cod_collection')
             except Exception as e:
                 logger.error(f"COD settlement error for driver {driver.driver_id}: {str(e)}")
-                messages.error(request, 'Error processing COD settlement. Please try again.')
+                messages.error(request, 'Error processing the cash submission. Please try again.')
                 return redirect('fleet:cod_collection')
 
         if export_format == 'pdf':
@@ -1076,7 +1013,7 @@ def cod_export(request):
 
             # Title
             title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=18, alignment=TA_CENTER, spaceAfter=20)
-            elements.append(Paragraph('COD In Hand Report', title_style))
+            elements.append(Paragraph('Cash In Hand Report', title_style))
 
             # Driver info
             info_style = ParagraphStyle('Info', parent=styles['Normal'], fontSize=10, spaceAfter=10)
@@ -1085,10 +1022,10 @@ def cod_export(request):
             elements.append(Spacer(1, 20))
 
             # Table data
-            table_data = [['#', 'TXN Code', 'Task Number', 'Business', 'Customer', 'Amount (QR)']]
+            table_data = [['#', 'TXN Code', 'Task Number', 'Business', 'Customer', 'Payment', 'Amount (QR)']]
             total = 0
             for idx, d in enumerate(deliveries, 1):
-                amount = float(d.cod_collected_amount or 0)
+                amount = float(d.row_amount)
                 total += amount
                 # Get transaction code if available
                 txn = d.transactions.filter(transaction_type='cod_collection').first()
@@ -1099,14 +1036,17 @@ def cod_export(request):
                     d.dl_task_number or '-',
                     (d.order.business.business_name if d.order and d.order.business else '-')[:20],
                     (d.order.customer_name if d.order else '-')[:15],
+                    _pay_label(d),
                     f'{amount:.0f}'
                 ])
 
-            # Add total row
-            table_data.append(['', '', '', '', 'Total:', f'{total:.0f}'])
+            # Totals: everything collected, then the cash to hand in (last row, bold)
+            if total != float(total_cash):
+                table_data.append(['', '', '', '', '', 'Total Collected:', f'{total:.0f}'])
+            table_data.append(['', '', '', '', '', 'Total Cash:', f'{float(total_cash):.0f}'])
 
             # Create table
-            table = Table(table_data, colWidths=[0.3*inch, 1.1*inch, 1*inch, 1.4*inch, 1.1*inch, 0.8*inch])
+            table = Table(table_data, colWidths=[0.3*inch, 1.1*inch, 1*inch, 1.3*inch, 1*inch, 1.1*inch, 0.8*inch])
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -1128,20 +1068,20 @@ def cod_export(request):
             buffer.seek(0)
 
             response = HttpResponse(buffer, content_type='application/pdf')
-            set_export_filename(response, 'cod_report', code=driver, ext='pdf')
+            set_export_filename(response, 'cash_report', code=driver, ext='pdf')
             return response
 
         else:
             # Generate CSV
             response = HttpResponse(content_type='text/csv')
-            set_export_filename(response, 'cod_report', code=driver, ext='csv')
+            set_export_filename(response, 'cash_report', code=driver, ext='csv')
 
             writer = safe_csv_writer(response)
-            writer.writerow(['#', 'TXN Code', 'Task Number', 'Order Number', 'Business', 'Customer', 'Location', 'Delivered Date', 'Delivered Time', 'COD Amount (QR)'])
+            writer.writerow(['#', 'TXN Code', 'Task Number', 'Order Number', 'Business', 'Customer', 'Location', 'Delivered Date', 'Delivered Time', 'Payment', 'Amount (QR)'])
 
             total = 0
             for idx, d in enumerate(deliveries, 1):
-                amount = float(d.cod_collected_amount or 0)
+                amount = float(d.row_amount)
                 total += amount
                 # Get transaction code if available
                 txn = d.transactions.filter(transaction_type='cod_collection').first()
@@ -1156,11 +1096,14 @@ def cod_export(request):
                     d.dl_to_address.area_name if d.dl_to_address else '-',
                     d.completed_at.strftime('%d %b %Y') if d.completed_at else '-',
                     d.completed_at.strftime('%H:%M') if d.completed_at else '-',
+                    _pay_label(d),
                     f'{amount:.0f}'
                 ])
 
             writer.writerow([])
-            writer.writerow(['', '', '', '', '', '', '', '', 'Total:', f'{total:.0f}'])
+            if total != float(total_cash):
+                writer.writerow(['', '', '', '', '', '', '', '', '', 'Total Collected:', f'{total:.0f}'])
+            writer.writerow(['', '', '', '', '', '', '', '', '', 'Total Cash:', f'{float(total_cash):.0f}'])
 
             return response
 
@@ -2802,12 +2745,12 @@ def driver_help(request):
 
         faqs = [
             {
-                'question': 'How do I collect COD from a customer?',
-                'answer': 'When you complete a delivery, collect the exact COD amount from the customer. Mark the order as delivered in the Tasks screen. The COD amount will appear in your COD Collection page automatically.',
+                'question': 'How do I collect cash from a customer?',
+                'answer': 'When you complete a delivery, collect the exact amount shown on the task from the customer. Mark the order as delivered in the Tasks screen. The amount will appear on your Cash Collection page automatically.',
             },
             {
-                'question': 'How do I submit COD to the office?',
-                'answer': 'Go to COD → Submit COD. Select the orders you are submitting cash for, enter the total amount, and tap Submit. Keep the receipt you receive for your records.',
+                'question': 'How do I submit cash to the office?',
+                'answer': 'Go to Cash → Submit Cash to Office. Check the orders you are handing in cash for, choose who received it, and tap Confirm Submission. Keep the receipt you receive for your records.',
             },
             {
                 'question': 'How do I scan a pickup barcode?',
@@ -2826,8 +2769,8 @@ def driver_help(request):
                 'answer': 'Earnings are settled weekly every Thursday. You will receive a notification when your settlement is processed. You can track pending earnings in the Earnings section.',
             },
             {
-                'question': 'What is the COD credit limit?',
-                'answer': 'Your COD credit limit is the maximum COD you can hold at one time. When you approach your limit, you must submit COD to the office before accepting new deliveries. Your current limit is shown on the dashboard.',
+                'question': 'What is the cash credit limit?',
+                'answer': 'Your cash credit limit is the maximum cash you can hold at one time. When you approach your limit, you must submit cash to the office before accepting new deliveries. Your current limit is shown on the dashboard.',
             },
             {
                 'question': 'How do I change my availability status?',
@@ -4168,7 +4111,7 @@ def fleet_tasks_map(request):
     base_qs = annotate_task_sequence(
         delivery_models.DeliveryTask.objects
     ).select_related(
-        'order', 'order__business', 'dl_to_address',
+        'order', 'order__business', 'order__p2p_booking', 'dl_to_address',
         'order__pickup_location',
         # Same route resolution the task list does — see driver_tasks.
         'dl_address_update', 'hub_warehouse', 'hub_warehouse__warehouse',
@@ -4237,7 +4180,8 @@ def fleet_tasks_map(request):
             'status_display': t.get_dl_task_status_display(),
             'is_new': t.dl_task_status in new_statuses,
             'business': t.order.business.business_name if t.order.business else '',
-            'cod': str(t.order.cod_amount) if t.order.cod_amount else '',
+            # One figure the driver collects (COD + any cash fee), never split.
+            'cod': str(t.collect_amount.total) if t.collect_amount.total else '',
             'customer_name': t.order.customer_name or '',
             'customer_phone': t.order.customer_phone or '',
             'zone': zone_val,
@@ -5085,7 +5029,7 @@ def p2p_mark_fee_collected_at_delivery(request):
 def opportunities(request):
     """Open shifts a driver can put their hand up for, plus the standing offers."""
     from fleet.opportunities import open_slots_for, interest_for
-    from fleet.proposals import driver_app_proposals
+    from fleet.proposals import driver_app_proposals, interests_by_proposal
 
     try:
         driver = fleet_models.Driver.objects.select_related('user', 'profile').get(
@@ -5098,9 +5042,14 @@ def opportunities(request):
     slots = open_slots_for(driver)
     rows = [{'slot': s, 'interest': interest_for(s, driver)} for s in slots]
 
-    # Standing offers marketing publishes (fleet.DriverProposal) — adverts, not
-    # bookings, so they carry no interest row and nothing to accept here.
+    # Standing offers marketing publishes (fleet.DriverProposal). No capacity to
+    # book, but a driver can say they want the work; staff pick it up on
+    # /workforce/marketing/driver-proposals/interests/.
     proposals = list(driver_app_proposals())
+    mine = interests_by_proposal(driver)
+    for proposal in proposals:
+        interest = mine.get(proposal.pk)
+        proposal.my_interest = interest if interest and interest.status != 'withdrawn' else None
 
     # What the driver has already raised a hand for, including slots that have
     # since filled or closed — they should still be able to see where they stand.
@@ -5119,6 +5068,36 @@ def opportunities(request):
         'my_interests': my_interests,
         'has_dashboard_access': has_dashboard_access(driver),
     })
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def proposal_interest(request):
+    """Say "I'm interested" in a standing offer, or take it back (POST, JSON)."""
+    from fleet.proposals import (
+        express_interest, withdraw_interest, REFUSAL_MESSAGES as PROPOSAL_MESSAGES,
+    )
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'}, status=404)
+
+    proposal = fleet_models.DriverProposal.objects.filter(
+        pk=safe_int(request.POST.get('proposal_id'), default=0, minimum=0)).first()
+    if not proposal:
+        return JsonResponse({'success': False, 'error': 'Offer not found'}, status=404)
+
+    if (request.POST.get('action') or '').strip() == 'withdraw':
+        interest, reason = withdraw_interest(driver, proposal)
+    else:
+        interest, reason = express_interest(driver, proposal, note=request.POST.get('note') or '')
+    if reason:
+        return JsonResponse(
+            {'success': False, 'error': PROPOSAL_MESSAGES[reason], 'code': reason}, status=400)
+    return JsonResponse({'success': True, 'status': interest.status if interest else 'withdrawn'})
 
 
 @login_required(login_url='/accounts/login/')

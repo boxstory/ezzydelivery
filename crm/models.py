@@ -12,6 +12,15 @@ STAGE_CACHE_KEY = 'crm_lead_stages_v1'
 STAGE_CACHE_TTL = 300
 
 
+def canonical_lead_phone(raw):
+    """Stored form of a lead phone: a bare 8-digit Qatar number gains its 974 code.
+    Anything else (already international, foreign, junk) is left as entered."""
+    value = (raw or '').strip()
+    if len(value) == 8 and value.isdigit():
+        return '974' + value
+    return raw or ''
+
+
 class Lead(models.Model):
     SOURCE_PRICING = 'pricing_inquiry'
     SOURCE_WA_FORM = 'whatsapp_form'
@@ -89,9 +98,14 @@ class Lead(models.Model):
     company_name = models.CharField(max_length=200, blank=True, default='')
     contact_name = models.CharField(max_length=100, blank=True, default='')
     phone = models.CharField(max_length=50, blank=True, default='', db_index=True)
+    # A second mobile for the same person (e.g. a personal phone next to the one they
+    # applied with). Contact detail only — WhatsApp chats are joined via LeadWaLink.
+    phone_2 = models.CharField('2nd mobile', max_length=50, blank=True, default='')
     product_category = models.CharField(max_length=200, blank=True, default='')
-    # Staff-set WhatsApp identifier (phone or lid) used when auto-matching by `phone`
-    # misses or picks the wrong chat — see crm_lead_link_chat in workforce/crm_views.py.
+    # LEGACY single manual chat link (phone or lid). Superseded by LeadWaLink,
+    # which holds any number of labelled numbers per lead; migration 0013 moved
+    # every value into it and cleared this field. Still honoured by
+    # `wa_link_values` in case something writes it, but nothing should.
     wa_chat_override = models.CharField(max_length=50, blank=True, default='')
     # Which of our WhatsApp numbers this lead's conversation runs on — a WAHA
     # session name, `WA_SESSION_ALL` for the merged all-numbers view, or blank
@@ -133,6 +147,11 @@ class Lead(models.Model):
         'auth.User', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='merged_crm_leads',
     )
+    # Kept on the ABSORBED card: what its merge wrote onto the parent — blank fields it
+    # filled ({"fields": {name: value}}) and WhatsApp numbers it added ({"wa_links": [...]}).
+    # Un-merge reads it to take those back, but only where the parent still holds the
+    # merged value — anything staff changed since stays.
+    merge_filled = models.JSONField(default=dict, blank=True)
 
     # The applicant this driver card is about. Authoritative — phone matching is only
     # used to FIND the driver once, then this binding is what the board, the detail
@@ -168,6 +187,15 @@ class Lead(models.Model):
         # the four creation sites; strip-then-append makes it idempotent and survives a
         # category change. Customer-facing text uses contact_tags.strip_tags, never this.
         from crm.contact_tags import apply_tag
+        # A bare 8-digit Qatar number is stored with its 974 country code, so every
+        # screen shows a dialable +974 number without client-side guessing.
+        for field in ('phone', 'phone_2'):
+            phone = canonical_lead_phone(getattr(self, field))
+            if phone != (getattr(self, field) or ''):
+                setattr(self, field, phone)
+                update_fields = kwargs.get('update_fields')
+                if update_fields is not None and field not in update_fields:
+                    kwargs['update_fields'] = list(update_fields) + [field]
         tagged = apply_tag(self.contact_name, self.category)
         if tagged != (self.contact_name or ''):
             self.contact_name = tagged
@@ -178,6 +206,17 @@ class Lead(models.Model):
 
     def __str__(self):
         return f"{self.company_name or self.contact_name or self.phone} ({self.stage_label})"
+
+    @property
+    def wa_link_values(self):
+        """Every manually linked WhatsApp identifier (phone digits or lid), in
+        the order they were linked. Reads the prefetch cache when the caller
+        used prefetch_related('wa_links')."""
+        values = [l.identifier for l in self.wa_links.all() if l.identifier]
+        legacy = (self.wa_chat_override or '').strip()
+        if legacy and legacy not in values:
+            values.append(legacy)
+        return values
 
     @property
     def stage_label(self):
@@ -403,6 +442,43 @@ class LeadStage(models.Model):
     def board_columns(cls, category):
         """Active columns for one board, left→right. One query."""
         return list(cls.objects.filter(category=category, is_active=True).order_by('position', 'pk'))
+
+
+class LeadWaLink(models.Model):
+    """One extra WhatsApp number (or lid) that belongs to a lead.
+
+    A company talks to us from several phones — the owner, the office, an
+    accountant — each its own WhatsApp chat. Every row here joins one of those
+    chats to the lead, so all of them show the same lead card and the lead's
+    conversation covers them all. The lead's own `phone` stays the primary
+    number and is matched automatically; rows here are the manual extras.
+
+    `identifier` is bare digits: a phone, or a WhatsApp lid. A lid only means
+    something on the number (WAHA session) that issued it, hence `session`.
+    """
+    LABEL_SUGGESTIONS = ['Owner', 'Office', 'Manager', 'Accounts', 'Driver', 'Other']
+
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='wa_links')
+    identifier = models.CharField(max_length=50)
+    session = models.CharField(max_length=64, blank=True, default='',
+                               help_text='WAHA session the chat was linked on (matters for lids).')
+    label = models.CharField(max_length=40, blank=True, default='',
+                             help_text='Who this number is, e.g. Owner, Office, Accounts.')
+    created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='crm_wa_links')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+        constraints = [
+            models.UniqueConstraint(fields=['lead', 'identifier'], name='crm_leadwalink_unique_per_lead'),
+        ]
+        indexes = [models.Index(fields=['identifier'])]
+        verbose_name = 'Lead WhatsApp number'
+        verbose_name_plural = 'Lead WhatsApp numbers'
+
+    def __str__(self):
+        return f'{self.label or "Linked"}: {self.identifier} (lead #{self.lead_id})'
 
 
 class LeadActivity(models.Model):

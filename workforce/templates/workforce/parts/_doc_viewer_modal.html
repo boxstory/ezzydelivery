@@ -1,0 +1,73 @@
+{% comment %}
+Purpose: The driver-document popup — scan viewer with crop/rotate, number + expiry fields, Submit on change, staff Verify / Undo.
+Used by: workforce/crm/parts/_lead_document_modals.html (CRM driver lead) and workforce/driver_detail.html (driver record).
+Notes: Driven by workforce/js/doc_viewer.js; openers carry workforce/parts/_doc_viewer_attrs.html. Styles are crm.css crmdoc__ rules,
+       whose tokens only exist inside a .crm wrapper — a page that is not a CRM page must include this inside <div class="crm">.
+{% endcomment %}
+<!-- VIEWER — the scan itself, front/back, with the facts it was filed under -->
+<div class="modal fade" id="workforce_crm_detail_modal_docview" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content crmdoc__modal">
+      <div class="modal-header">
+        <h5 class="modal-title" id="workforce_crm_detail_h_docview_title">Document</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        {% comment %} Two sides, one viewer: the toggle is hidden unless a back
+           scan exists, so a single-sided document shows no dead control. {% endcomment %}
+        <div class="crmdoc__sides" id="workforce_crm_detail_div_docview_sides" hidden>
+          <button type="button" class="crmdoc__side is-active" data-doc-side="front">Front</button>
+          <button type="button" class="crmdoc__side" data-doc-side="back">Back</button>
+        </div>
+        <div class="crmdoc__stage">
+          <img id="workforce_crm_detail_img_docview" src="" alt="Uploaded document scan">
+          <p class="crmdoc__stage-empty" id="workforce_crm_detail_p_docview_empty" hidden>
+            This side is not an image and cannot be shown here.
+          </p>
+        </div>
+        {% comment %} Image tools act on the side on show. Crop draws a box on the scan;
+           rotate turns it. Nothing is written until Submit — and Submit only appears
+           once the scan or a field below has actually changed. {% endcomment %}
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-2" id="workforce_crm_detail_div_docview_tools" hidden>
+          <button type="button" class="crm__btn crm__btn--sm" data-doc-tool="crop">
+            <i class="fa-solid fa-crop-simple"></i> Crop
+          </button>
+          <button type="button" class="crm__btn crm__btn--sm" data-doc-tool="rotate-left" aria-label="Rotate left">
+            <i class="fa-solid fa-rotate-left"></i>
+          </button>
+          <button type="button" class="crm__btn crm__btn--sm" data-doc-tool="rotate-right" aria-label="Rotate right">
+            <i class="fa-solid fa-rotate-right"></i>
+          </button>
+          <button type="button" class="crm__btn crm__btn--sm" data-doc-tool="reset" hidden>
+            <i class="fa-solid fa-xmark"></i> Discard image changes
+          </button>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col-12 col-sm-7">
+            <label class="form-label mb-1" for="workforce_crm_detail_input_docview_no" id="workforce_crm_detail_label_docview_no">Number</label>
+            <input type="text" class="form-control form-control-sm" id="workforce_crm_detail_input_docview_no" maxlength="100">
+          </div>
+          <div class="col-12 col-sm-5" id="workforce_crm_detail_div_docview_expiry">
+            <label class="form-label mb-1" for="workforce_crm_detail_input_docview_expiry">Expiry</label>
+            <input type="date" class="form-control form-control-sm" id="workforce_crm_detail_input_docview_expiry">
+          </div>
+        </div>
+        <dl class="crmdoc__facts" id="workforce_crm_detail_dl_docview_facts"></dl>
+        <p class="crmdoc__err" id="workforce_crm_detail_p_docview_err" hidden></p>
+      </div>
+      <div class="modal-footer">
+        {% comment %} Staff verification: the fallback when the AI image check cannot read the
+           scan. JS shows one of the two, from the row's data-doc-verified. {% endcomment %}
+        <button type="button" class="crm__btn crm__btn--sm" id="workforce_crm_detail_btn_docverify" hidden>
+          <i class="fa-solid fa-circle-check"></i> Mark verified
+        </button>
+        <button type="button" class="crm__btn crm__btn--sm" id="workforce_crm_detail_btn_docunverify" hidden>
+          <i class="fa-solid fa-rotate-left"></i> Undo verification
+        </button>
+        <button type="button" class="crm__btn crm__btn--sm crm__btn--primary" id="workforce_crm_detail_btn_docsubmit" hidden>
+          <i class="fa-solid fa-check"></i> Submit
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -7,7 +7,7 @@ from django.test import SimpleTestCase
 
 from delivery.models import DeliveryTask
 from delivery.state_machine import (
-    DRIVER_TRANSITIONS, STAFF_TRANSITIONS, STATUS_STAGE,
+    DRIVER_TRANSITIONS, STAFF_TRANSITIONS, STATUS_STAGE, TERMINAL_STATUSES,
     can_transition, get_allowed_transitions,
 )
 
@@ -78,3 +78,28 @@ class ReturnedToShipperTransitionTests(SimpleTestCase):
 
     def test_admin_override_still_reaches_it(self):
         self.assertTrue(can_transition('for_review', RETURNED, actor='admin')[0])
+
+
+class UnassignResetTest(SimpleTestCase):
+    """Taking the driver off a task is a deliberate move backward."""
+
+    def test_unassign_sends_an_open_task_back_to_the_pool(self):
+        for origin in ('assigned', 'accepted', 'picked_up', 'out_for_delivery'):
+            with self.subTest(origin=origin):
+                ok, reason = can_transition(origin, 'pending', actor='unassign')
+                self.assertTrue(ok, reason)
+                # The same move as plain staff is still forward-only.
+                self.assertFalse(can_transition(origin, 'pending', actor='staff')[0])
+
+    def test_unassign_cannot_reopen_a_closed_task(self):
+        for terminal in TERMINAL_STATUSES:
+            with self.subTest(terminal=terminal):
+                self.assertFalse(can_transition(terminal, 'pending', actor='unassign')[0])
+                self.assertEqual(get_allowed_transitions(terminal, actor='unassign'), set())
+
+    def test_unassign_opens_nothing_but_the_reset(self):
+        # A no-op (old == new) is allowed for every actor, so it is not listed.
+        for target in ('picked_up', 'delivered', 'cancelled', 'failed', 'for_review'):
+            with self.subTest(target=target):
+                self.assertFalse(can_transition('accepted', target, actor='unassign')[0])
+        self.assertEqual(get_allowed_transitions('accepted', actor='unassign'), {'pending'})

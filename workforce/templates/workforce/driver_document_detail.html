@@ -219,6 +219,41 @@ Notes: The scan is the page's subject, so it sits on a dark light-box with regis
           </div>
         </div>
 
+        <!-- Verification: AI image check result, and the staff fallback -->
+        <div class="wfcard" id="workforce_driver_document_detail_card_verify">
+          <div class="wfcard__header">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>Verification</span>
+          </div>
+          <div class="wfcard__body">
+            <div class="mb-2">
+              {% with doc=document %}{% include "workforce/parts/_doc_check_tag.html" %}{% endwith %}
+              {% if not document.ai_status_label %}<span class="ddd__record__empty">Not checked</span>{% endif %}
+            </div>
+            {% if document.ai_document_no or document.ai_expiry_date %}
+            <dl class="ddd__record">
+              <div class="ddd__record__row">
+                <dt>Number on image</dt>
+                <dd class="wfmono">{{ document.ai_document_no|default:"—" }}</dd>
+              </div>
+              <div class="ddd__record__row">
+                <dt>Expiry on image</dt>
+                <dd class="wfmono">{{ document.ai_expiry_date|date:"d M Y"|default:"—" }}</dd>
+              </div>
+            </dl>
+            {% endif %}
+            {% if document.verified_at %}
+            <button type="button" class="ddd__btn ddd__btn--quiet mt-2" data-ddd-verify="unverify">
+              <i class="fa-solid fa-rotate-left"></i> Undo verification
+            </button>
+            {% else %}
+            <button type="button" class="ddd__btn ddd__btn--primary mt-2" data-ddd-verify="verify">
+              <i class="fa-solid fa-circle-check"></i> Mark verified
+            </button>
+            {% endif %}
+          </div>
+        </div>
+
         <!-- Correct the record -->
         <div class="wfcard">
           <div class="wfcard__header">
@@ -310,6 +345,32 @@ Notes: The scan is the page's subject, so it sits on a dark light-box with regis
             document.querySelectorAll('[data-ddd-pane]').forEach(function (pane) {
                 pane.classList.toggle('d-none', pane.dataset.dddPane !== side);
             });
+        });
+    });
+
+    // ── Staff verification (fallback when the AI image check cannot read it) ──
+    document.querySelectorAll('[data-ddd-verify]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var action = this.dataset.dddVerify;
+            if (action === 'verify' && !confirm('Confirm you checked the number and expiry against the image?')) return;
+            btn.disabled = true;
+            var fd = new FormData();
+            fd.append('action', action);
+            fetch('{% url "workforce:driver_document_verify" document.driver.driver_id document.id %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content
+                        || document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: fd
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) { location.reload(); return; }
+                btn.disabled = false;
+                alert(data.error || 'Could not update verification');
+            })
+            .catch(function () { btn.disabled = false; alert('Error updating verification'); });
         });
     });
 

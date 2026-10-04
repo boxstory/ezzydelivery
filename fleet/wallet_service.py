@@ -335,7 +335,7 @@ class WalletService:
 
                 # Idempotency: the specific tasks were already settled -> no money moves.
                 if not settled_task_ids:
-                    raise ValueError("No unsettled COD found for this submission (already submitted?)")
+                    raise ValueError("No unsettled cash found for this submission (already submitted?)")
                 deposit_amount = settled_amount
             else:
                 # Amount-based submission: settle oldest unsettled tasks up to the
@@ -449,10 +449,13 @@ class WalletService:
             for txn_id, method, split, total, fee in rows:
                 bucket = settled_by_txn.setdefault(
                     txn_id,
-                    {'cash': Decimal('0'), 'fawran': Decimal('0'), 'pos': Decimal('0')})
+                    {'cash': Decimal('0'), 'fawran': Decimal('0'),
+                     'pos': Decimal('0'), 'fee': Decimal('0')})
                 cash_leg = WalletService.split_cash_leg(split)
                 if cash_leg is not None:
-                    # Mixed collection — credit each leg to its own bucket.
+                    # Mixed collection — credit each leg to its own bucket. The
+                    # fee is inside that split, so it is not tracked separately
+                    # here for the same reason the replay below skips it.
                     bucket['cash'] += cash_leg
                     bucket['fawran'] += Decimal(str(split.get('fawran') or 0))
                     bucket['pos'] += Decimal(str(split.get('pos') or 0))
@@ -462,8 +465,11 @@ class WalletService:
                 bucket[key] += total or Decimal('0')
                 # The cash fee went in on the same hand-in, whatever the COD method.
                 bucket['cash'] += fee or Decimal('0')
+                bucket['fee'] += fee or Decimal('0')
 
         running_cash = Decimal('0')
+        # The slice of running_cash that is our door fee rather than seller COD.
+        running_fee = Decimal('0')
         running_fawran = Decimal('0')
         running_pos = Decimal('0')
         running_bank = Decimal('0')
@@ -476,6 +482,13 @@ class WalletService:
                 settled = settled_by_txn.get(t.id)
                 cash_paid = settled['cash'] if settled else abs(t.amount)
                 running_cash = max(running_cash - cash_paid, zero)
+                # The fee went in with the cash. Older deposits carry no linked
+                # tasks, so nothing says how much of the hand-in was fee; the
+                # clamp keeps the slice from outliving the cash it sits in.
+                fee_paid = settled['fee'] if settled else running_fee
+                running_fee = max(running_fee - fee_paid, zero)
+                if running_fee > running_cash:
+                    running_fee = running_cash
                 # Electronic collections were never in the driver's hands —
                 # a deposit closes them out on the ledger.
                 running_fawran = zero
@@ -486,12 +499,14 @@ class WalletService:
                         or t.cod_fawran_after != running_fawran
                         or t.cod_pos_after != running_pos
                         or t.cod_bank_after != running_bank
-                        or t.cod_atm_after != running_atm):
+                        or t.cod_atm_after != running_atm
+                        or t.cod_fee_after != running_fee):
                     t.cod_cash_after = running_cash
                     t.cod_fawran_after = running_fawran
                     t.cod_pos_after = running_pos
                     t.cod_bank_after = running_bank
                     t.cod_atm_after = running_atm
+                    t.cod_fee_after = running_fee
                     to_update.append(t)
                 continue
 
@@ -499,12 +514,18 @@ class WalletService:
                 split = t.delivery_task.payment_split if t.delivery_task else None
                 if WalletService.split_cash_leg(split) is None:
                     running_cash += abs(t.amount)
-                if t.cod_cash_after != running_cash:
+                    # Same condition, so the fee slice can never claim cash the
+                    # line above did not add: a mixed split already carries the
+                    # fee inside its own legs.
+                    running_fee += abs(t.amount)
+                if (t.cod_cash_after != running_cash
+                        or t.cod_fee_after != running_fee):
                     t.cod_cash_after = running_cash
                     t.cod_fawran_after = running_fawran
                     t.cod_pos_after = running_pos
                     t.cod_bank_after = running_bank
                     t.cod_atm_after = running_atm
+                    t.cod_fee_after = running_fee
                     to_update.append(t)
                 continue
 
@@ -540,19 +561,21 @@ class WalletService:
                     or t.cod_fawran_after != running_fawran
                     or t.cod_pos_after != running_pos
                     or t.cod_bank_after != running_bank
-                    or t.cod_atm_after != running_atm):
+                    or t.cod_atm_after != running_atm
+                    or t.cod_fee_after != running_fee):
                 t.cod_cash_after = running_cash
                 t.cod_fawran_after = running_fawran
                 t.cod_pos_after = running_pos
                 t.cod_bank_after = running_bank
                 t.cod_atm_after = running_atm
+                t.cod_fee_after = running_fee
                 to_update.append(t)
 
         if to_update:
             DriverTransaction.objects.bulk_update(
                 to_update,
                 ['cod_cash_after', 'cod_fawran_after', 'cod_pos_after',
-                 'cod_bank_after', 'cod_atm_after']
+                 'cod_bank_after', 'cod_atm_after', 'cod_fee_after']
             )
 
         return len(to_update)
@@ -1123,7 +1146,7 @@ class WalletService:
         available_credit = max(credit_limit - live_cod, Decimal('0'))
 
         if credit_limit and live_cod >= credit_limit:
-            return False, "Wallet balance exhausted. Please submit COD to admin."
+            return False, "Wallet balance exhausted. Please submit cash to the office."
 
         if cod_amount > available_credit:
             return False, f"Insufficient credit. Available: {available_credit} QR, Required: {cod_amount} QR"
@@ -1150,6 +1173,32 @@ class WalletService:
             return Decimal(str(payment_split.get('cash') or 0))
         except (InvalidOperation, TypeError, ValueError):
             return None
+
+    @staticmethod
+    def no_cash_settle_tasks(driver):
+        """Finished, unsettled jobs that carry no cash, for the driver's hand-in.
+
+        A hand-in settles EVERY job the driver finished in the period, not just
+        the cash ones. The cash jobs come from task_cash_leg(); these are the
+        rest, closed on the same settlement so the manifest matches the driver's:
+          - prepaid drops: delivered with nothing owed (order.cod_amount == 0)
+          - returns: brought back to the shipper, or a hub-to-client return leg.
+            Their COD was never due from the customer, so cod_amount is not a
+            failed collection here.
+        A job that took a cash fee is a cash row, never one of these; closing
+        it here would settle cash the driver has not handed in.
+        """
+        return delivery_models.DeliveryTask.objects.filter(
+            Q(dl_task_status__in=['delivered', 'partial_delivery'], order__cod_amount=0)
+            | Q(dl_task_status='returned_to_shipper')
+            | Q(dl_task_status='delivered', task_leg='return_to_client'),
+            driver=driver, cod_settled=False, cod_collected=False,
+        ).exclude(fee_collected_amount__gt=0)
+
+    @staticmethod
+    def is_return_task(task):
+        return (task.dl_task_status == 'returned_to_shipper'
+                or task.task_leg == 'return_to_client')
 
     @staticmethod
     def task_cash_leg(task):
@@ -1311,7 +1360,7 @@ class WalletService:
             'is_warning': is_warning,
             'is_blocked': is_blocked,
             'warning_message': "Warning: Wallet usage at 80% or above" if is_warning else None,
-            'block_message': "Wallet exhausted. Submit COD to continue accepting orders." if is_blocked else None
+            'block_message': "Wallet exhausted. Submit cash to continue accepting orders." if is_blocked else None
         }
 
     @staticmethod
@@ -1554,8 +1603,8 @@ class WalletAlertService:
                 'level': 'danger',
                 'icon': 'fa-ban',
                 'title': 'Wallet Blocked',
-                'message': f'Your wallet balance is exhausted. You have {driver.cod_in_hand} QR COD in hand. Please submit COD to admin to continue accepting orders.',
-                'action': 'Submit COD Now',
+                'message': f'Your wallet balance is exhausted. You have {driver.cod_in_hand} QR cash in hand. Please submit cash to the office to continue accepting orders.',
+                'action': 'Submit Cash Now',
                 'action_url': '/fleet/cod-submission/'
             })
 
@@ -1565,8 +1614,8 @@ class WalletAlertService:
                 'level': 'warning',
                 'icon': 'fa-exclamation-triangle',
                 'title': 'Wallet Warning',
-                'message': f'Your wallet is at {driver.wallet_usage_percentage:.1f}% usage. Available credit: {driver.available_credit} QR. Consider submitting COD soon.',
-                'action': 'View COD Status',
+                'message': f'Your wallet is at {driver.wallet_usage_percentage:.1f}% usage. Available credit: {driver.available_credit} QR. Consider submitting cash soon.',
+                'action': 'View Cash Status',
                 'action_url': '/fleet/cod-collection/'
             })
 
@@ -1575,9 +1624,9 @@ class WalletAlertService:
             alerts.append({
                 'level': 'info',
                 'icon': 'fa-money-bill',
-                'title': 'High COD Amount',
-                'message': f'You have {driver.cod_in_hand} QR COD in hand. Consider submitting to admin.',
-                'action': 'Submit COD',
+                'title': 'High Cash Amount',
+                'message': f'You have {driver.cod_in_hand} QR cash in hand. Consider submitting it to the office.',
+                'action': 'Submit Cash',
                 'action_url': '/fleet/cod-submission/'
             })
 

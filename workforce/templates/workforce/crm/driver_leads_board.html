@@ -8,7 +8,7 @@
 {# Notes: crmb__ namespace; the columns/cards/toolbar come from crm/parts/_board_canvas.html, shared with the business board. This board rebuilds itself from the real applicant pool on every load (crm.services.reconcile_driver_leads) and some columns write back to the driver's verification status. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20260923c" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20261003e" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -48,10 +48,12 @@
            hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
           <i class="fa-solid fa-table-columns"></i> Columns
         </a>
+        {% if wf_dept_ops %}
         <a href="{% url 'workforce:driver_verification_list' %}" class="crm__btn"
            title="Document review queue for driver applications">
           <i class="fa-solid fa-id-card"></i> Verification
         </a>
+        {% endif %}
         {# Cross-link to the other pipeline. The two boards are separate pages with #}
         {# separate sidebar menus; this is a shortcut, not a tab. #}
         <a href="{% url 'workforce:crm_leads_board' %}" class="crm__btn"

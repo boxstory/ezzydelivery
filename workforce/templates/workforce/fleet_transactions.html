@@ -389,6 +389,9 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
                                     <div><i class="fa-solid fa-money-bill"></i> -{{ txn.settlement_split.cash|floatformat:0 }}</div>
                                     <div><i class="fa-solid fa-mobile-screen"></i> -{{ txn.settlement_split.fawran|floatformat:0 }}</div>
                                     <div><i class="fa-solid fa-credit-card"></i> -{{ txn.settlement_split.pos|floatformat:0 }}</div>
+                                    {% if txn.settlement_split.dl %}
+                                    <div title="Delivery fee collected in cash"><i class="fa-solid fa-truck"></i> DL -{{ txn.settlement_split.dl|floatformat:0 }}</div>
+                                    {% endif %}
                                     <div class="ftr__split-total">-{{ txn.settlement_split.total|floatformat:0 }}</div>
                                     {% else %}
                                     <div><i class="fa-solid fa-money-bill"></i> {% if txn.payment_method == 'cash' %}-{{ txn.amount|floatformat:0 }}{% else %}0{% endif %}</div>
@@ -441,20 +444,42 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
                         </td>
                         <td class="ftr__td--after">
                             {% if txn.transaction_type == 'cod_collection' or txn.transaction_type == 'fee_collection' or txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}
-                                {% comment %}Only cash is ever "in hand" — electronic COD reaches Ezzy
-                                at collection, so its rows are structurally zero and were reading as
-                                broken. Each electronic row appears only if it ever carries a value.{% endcomment %}
-                                <div class="ftr__split">
-                                    <div><i class="fa-solid fa-money-bill"></i> {{ txn.cod_cash_after|floatformat:0 }}</div>
+                                {% comment %}A small COD | DL grid, one row per money type.
+                                Only cash is ever "in hand" — electronic COD reaches Ezzy at
+                                collection, so an electronic row appears only if it carries a value.
+                                DL is our own delivery fee: it rides in the driver's pocket with the
+                                COD and hands in on the same submission, but it is our revenue, so it
+                                gets its own column instead of inflating the COD figure. The fee is
+                                only ever taken in cash (DeliveryTask.fee_collected_amount), so the
+                                electronic rows have no DL cell to fill.{% endcomment %}
+                                <div class="ftr__bal">
+                                    <div class="ftr__bal-row ftr__bal-row--head">
+                                        <span></span><span>COD</span><span>DL</span>
+                                    </div>
+                                    <div class="ftr__bal-row">
+                                        <i class="fa-solid fa-money-bill" title="Cash"></i>
+                                        <span>{{ txn.cod_cash_excl_fee|floatformat:0 }}</span>
+                                        <span>{{ txn.cod_fee_after|floatformat:0 }}</span>
+                                    </div>
                                     {% if txn.cod_fawran_after %}
-                                    <div><i class="fa-solid fa-mobile-screen"></i> {{ txn.cod_fawran_after|floatformat:0 }}</div>
+                                    <div class="ftr__bal-row">
+                                        <i class="fa-solid fa-mobile-screen" title="Fawran"></i>
+                                        <span>{{ txn.cod_fawran_after|floatformat:0 }}</span>
+                                        <span class="ftr__bal-nil">&mdash;</span>
+                                    </div>
                                     {% endif %}
                                     {% if txn.cod_pos_after %}
-                                    <div><i class="fa-solid fa-credit-card"></i> {{ txn.cod_pos_after|floatformat:0 }}</div>
+                                    <div class="ftr__bal-row">
+                                        <i class="fa-solid fa-credit-card" title="POS"></i>
+                                        <span>{{ txn.cod_pos_after|floatformat:0 }}</span>
+                                        <span class="ftr__bal-nil">&mdash;</span>
+                                    </div>
                                     {% endif %}
-                                    {% if txn.cod_after_total != txn.cod_cash_after %}
-                                    <div class="ftr__split-total">Total: {{ txn.cod_after_total|floatformat:0 }}</div>
-                                    {% endif %}
+                                    <div class="ftr__bal-row ftr__bal-row--total">
+                                        <span class="ftr__bal-lbl">Total</span>
+                                        <span>{{ txn.cod_after_total_excl_fee|floatformat:0 }}</span>
+                                        <span>{{ txn.cod_fee_after|floatformat:0 }}</span>
+                                    </div>
                                 </div>
                             {% elif txn.transaction_type == 'earning' or txn.transaction_type == 'settlement' %}
                             <div class="ftr__after"><i class="fa-solid fa-wallet"></i>&nbsp;{{ txn.pending_earnings_after }}</div>
@@ -682,7 +707,7 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
     <div class="ftr__card">
         <div class="ftr__card-header">
             <i class="fa-solid fa-box-open ftr__card-icon"></i>
-            <span class="ftr__card-title">PREPAID / ZERO-COD DELIVERIES</span>
+            <span class="ftr__card-title">PREPAID &amp; RETURNS &middot; NO COD</span>
             <span class="ftr__toolbar-count ms-2">{{ zero_cod_tasks|length }} shown</span>
             {% if zero_cod_pending_count %}
             <span class="ftr__toolbar-count ftr__toolbar-count--warn ms-1">{{ zero_cod_pending_count }} pending</span>
@@ -691,7 +716,7 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
         <div class="ftr__card-body">
             <p class="text-muted small mb-2">
                 <i class="fa-solid fa-circle-info me-1"></i>
-                Delivered orders with no COD to collect (prepaid). They carry no cash so they do not affect COD totals.
+                Prepaid deliveries and returns &mdash; no COD to collect. They close on the driver's hand-in with the cash orders; only a cash delivery fee (shown here) moves money.
                 {% if zero_cod_truncated %}Showing the first 100 &mdash; narrow the date filter to see the rest.{% endif %}
             </p>
 
@@ -736,7 +761,7 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
                         <tr>
                             {% if zero_cod_pending_count %}
                             <td class="ftr__th-check">
-                                {% if not t.cod_settled %}
+                                {% if not t.cod_settled and not t.fee_collected_amount %}
                                 <input type="checkbox" class="ftr__prepaid-check" value="{{ t.id }}"
                                        onchange="updatePrepaidSelection()">
                                 {% endif %}
@@ -748,7 +773,10 @@ Notes: One driver at a time; three tabs filter the same ledger by transaction ty
                             <td>
                                 <span class="ftr__txn-type">{{ t.get_dl_task_status_display|default:t.dl_task_status }}</span>
                             </td>
-                            <td><span class="text-muted">No COD (Prepaid)</span></td>
+                            <td>
+                                <span class="text-muted">{% if t.dl_task_status == 'returned_to_shipper' or t.task_leg == 'return_to_client' %}No COD (Return){% else %}No COD (Prepaid){% endif %}</span>
+                                {% if t.fee_collected_amount %}<div class="small">Fee cash QAR {{ t.fee_collected_amount|floatformat:2 }}</div>{% endif %}
+                            </td>
                             <td>
                                 {% if t.cod_settled %}
                                 <span class="ftr__cod-badge ftr__cod-badge--settled">
@@ -1492,7 +1520,7 @@ function openCodDrawer(txnId, txnCode, isReceived, isVerified) {
         // The QAR figure is the CASH total — prepaid rows are 0 QAR and never move it.
         // Caption carries the split so staff can reconcile against the driver's manifest.
         document.getElementById('drawerTotal').textContent =
-            'QAR ' + data.tasks_total.toFixed(2) + ' · ' + codManifestCaption(data);
+            'QAR ' + data.tasks_total.toFixed(2) + codCodDlSplit(data) + ' · ' + codManifestCaption(data);
 
         if (!data.tasks || data.tasks.length === 0) {
             document.getElementById('codDrawerContent').innerHTML =
@@ -1524,8 +1552,8 @@ function openCodDrawer(txnId, txnCode, isReceived, isVerified) {
                         '<div class="ftr__cod-item-meta">' + t.delivered_at + '</div>' +
                     '</div>' +
                     (t.is_prepaid
-                        ? '<div class="ftr__cod-item-amount ftr__cod-item-amount--prepaid">No COD</div>'
-                        : '<div class="ftr__cod-item-amount">QAR ' + t.amount.toFixed(2) + '</div>') +
+                        ? '<div class="ftr__cod-item-amount ftr__cod-item-amount--prepaid">' + codKindLabel(t) + '</div>'
+                        : '<div class="ftr__cod-item-amount">QAR ' + t.amount.toFixed(2) + codCashSplit(t) + '</div>') +
                     // Two facts, two badges. A prepaid row still needs to say it
                     // was closed by this hand-in — showing only "Prepaid" read as
                     // if it had never been settled, which is what it is NOT.
@@ -1536,7 +1564,12 @@ function openCodDrawer(txnId, txnCode, isReceived, isVerified) {
                         '</span>' +
                         (t.is_prepaid
                             ? '<span class="ftr__cod-badge ftr__cod-badge--prepaid">' +
-                                  '<i class="fa-solid fa-box-open"></i> Prepaid' +
+                                  '<i class="fa-solid ' + codKindIcon(t) + '"></i> ' + codKindLabel(t) +
+                              '</span>'
+                            : '') +
+                        (t.is_return && !t.is_prepaid
+                            ? '<span class="ftr__cod-badge ftr__cod-badge--prepaid">' +
+                                  '<i class="fa-solid fa-rotate-left"></i> Return' +
                               '</span>'
                             : '') +
                     '</div>' +
@@ -1548,12 +1581,12 @@ function openCodDrawer(txnId, txnCode, isReceived, isVerified) {
         }
 
         var html =
-            codSection('Part 1 · COD Cash', 'fa-money-bill-wave', cash,
+            codSection('Part 1 · Cash (COD + delivery fee)', 'fa-money-bill-wave', cash,
                 cash.length + ' order' + (cash.length !== 1 ? 's' : ''),
-                '<span>Cash subtotal</span><span class="ftr__cod-section-amt">' + codMoney(data.tasks_total) + '</span>') +
-            codSection('Part 2 · Prepaid Deliveries', 'fa-box-open', prepaid,
-                prepaid.length + ' order' + (prepaid.length !== 1 ? 's' : '') + ' · no cash',
-                '<span>Prepaid subtotal</span><span class="ftr__cod-section-amt">' + codMoney(0) + '</span>');
+                '<span>Cash subtotal' + codCodDlSplit(data) + '</span><span class="ftr__cod-section-amt">' + codMoney(data.tasks_total) + '</span>') +
+            codSection('Part 2 · Prepaid, Returns &amp; Fawran/Card', 'fa-box-open', prepaid,
+                prepaid.length + ' order' + (prepaid.length !== 1 ? 's' : '') + ' · no cash handed in',
+                '<span>Cash subtotal</span><span class="ftr__cod-section-amt">' + codMoney(0) + '</span>');
         document.getElementById('codDrawerContent').innerHTML = html;
     })
     .catch(function(err) {
@@ -1580,15 +1613,46 @@ function codMoney(v) {
     return 'QAR ' + (Number(v) || 0).toFixed(2);
 }
 
-// "25 cash + 30 prepaid (55 orders)" — or plain "3 orders" when the submission
-// has no prepaid leg, so single-leg submissions read exactly as they always did.
+// "25 cash + 30 prepaid + 2 returns (57 orders)" — or plain "3 orders" when the
+// submission is cash only, so single-leg submissions read as they always did.
 function codManifestCaption(d) {
     var total = Number(d.tasks_count) || 0;
-    var prepaid = Number(d.prepaid_count) || 0;
     var cash = Number(d.cash_count) || 0;
     var orders = total + ' order' + (total !== 1 ? 's' : '');
-    if (!prepaid) { return orders; }
-    return cash + ' cash + ' + prepaid + ' prepaid (' + orders + ')';
+    var parts = [];
+    [[Number(d.prepaid_count) || 0, 'prepaid'],
+     [Number(d.return_count) || 0, 'return'],
+     [Number(d.electronic_count) || 0, 'Fawran/card']].forEach(function(p) {
+        if (p[0]) { parts.push(p[0] + ' ' + p[1] + (p[1] === 'return' && p[0] !== 1 ? 's' : '')); }
+    });
+    if (!parts.length) { return orders; }
+    return [cash + ' cash'].concat(parts).join(' + ') + ' (' + orders + ')';
+}
+
+// " (COD 0.00 + DL 35.00)" — the cash total's two parts; empty with no DL, so a
+// COD-only hand-in reads exactly as it always did.
+function codCodDlSplit(d) {
+    var dl = Number(d.dl_total) || 0;
+    if (!dl) { return ''; }
+    var total = Number(d.tasks_total) || 0;
+    return ' (COD ' + (total - dl).toFixed(2) + ' + DL ' + dl.toFixed(2) + ')';
+}
+
+// What a no-cash row is. Older payloads have no `kind`, and those were prepaid.
+function codKindLabel(t) {
+    return {prepaid: 'Prepaid', 'return': 'Return · No COD', fawran: 'Fawran', card: 'Card'}[t.kind || 'prepaid'] || 'No COD';
+}
+
+function codKindIcon(t) {
+    return {'return': 'fa-rotate-left', fawran: 'fa-mobile-screen', card: 'fa-credit-card'}[t.kind] || 'fa-box-open';
+}
+
+// "COD 100.00 + fee 25.00" under a cash row that carried a delivery fee.
+function codCashSplit(t) {
+    if (!t.fee_amount) { return ''; }
+    return '<div class="ftr__cod-item-meta">' +
+        (t.amount > t.fee_amount ? 'COD ' + (t.amount - t.fee_amount).toFixed(2) + ' + ' : '') +
+        'fee ' + Number(t.fee_amount).toFixed(2) + '</div>';
 }
 
 function printCodSubmission() {
@@ -1613,7 +1677,7 @@ function printCodSubmission() {
                     '<td>' + codEsc(t.location) + '</td>' +
                     '<td>' + codEsc(t.delivered_at) + '</td>' +
                     '<td class="codv__amt">' +
-                        (t.is_prepaid ? '&mdash;' : (Number(t.amount) || 0).toFixed(2)) +
+                        (t.is_prepaid ? codEsc(codKindLabel(t)) : (Number(t.amount) || 0).toFixed(2)) +
                     '</td>' +
                 '</tr>';
         });
@@ -1636,16 +1700,16 @@ function printCodSubmission() {
     var tableHtml = '';
     if (cash.length) {
         tableHtml +=
-            '<div class="codv__section-title">Part 1 &middot; COD Cash Collected</div>' +
+            '<div class="codv__section-title">Part 1 &middot; Cash Collected (COD + delivery fee)</div>' +
             codvTable(cash,
                 'Cash total &middot; ' + cash.length + ' order' + (cash.length !== 1 ? 's' : ''),
                 (Number(d.tasks_total) || 0).toFixed(2));
     }
     if (prepaid.length) {
         tableHtml +=
-            '<div class="codv__section-title">Part 2 &middot; Prepaid Deliveries (no cash)</div>' +
+            '<div class="codv__section-title">Part 2 &middot; Prepaid, Returns &amp; Fawran/Card (no cash)</div>' +
             codvTable(prepaid,
-                'Prepaid &middot; ' + prepaid.length + ' order' + (prepaid.length !== 1 ? 's' : '') +
+                'No cash &middot; ' + prepaid.length + ' order' + (prepaid.length !== 1 ? 's' : '') +
                 ' &mdash; carries no cash, listed for reconciliation only',
                 '0.00');
     }
@@ -1692,7 +1756,7 @@ function printCodSubmission() {
             // Signature line certifies CASH only. Prepaid rows are on the manifest
             // for reconciliation and contribute nothing to this figure.
             '<div class="codv__total">' +
-                '<span>Total COD Collected &middot; ' + codManifestCaption(d) + '</span>' +
+                '<span>Total Cash Collected' + codCodDlSplit(d) + ' &middot; ' + codManifestCaption(d) + '</span>' +
                 '<span>' + codMoney(d.tasks_total) + '</span>' +
             '</div>' +
 

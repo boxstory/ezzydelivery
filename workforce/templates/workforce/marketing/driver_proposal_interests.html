@@ -1,0 +1,138 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff list of drivers who tapped "I'm interested" on a driver proposal, worked through New → Contacted → Shortlisted → Accepted / Declined.
+Used by: workforce.marketing_views.wf_driver_proposal_interests at /workforce/marketing/driver-proposals/interests/
+Notes: Same staff shell and wfprop__ furniture as the proposals list. Each row saves through its own small form
+       (wf_driver_proposal_interest_update) and comes back to this exact filter via `next`.
+{% endcomment %}
+{% block title %}Proposal Interests - Ezzy Delivery{% endblock title %}
+{% block content %}
+<div class="wfpage">
+
+    <div class="wfprop__hero">
+        <div class="wfhero__content">
+            <nav aria-label="breadcrumb">
+                <ol class="wfhero__crumbs">
+                    <li class="wfhero__crumb"><a class="wfhero__crumb-link" href="{% url 'workforce:wf_driver_proposals' %}">Driver Proposals</a></li>
+                    <li class="wfhero__crumb wfhero__crumb--active">Interested drivers</li>
+                </ol>
+            </nav>
+            <h1 class="wfhero__heading">Interested drivers</h1>
+            <p class="wfhero__record">
+                <span class="wfhero__tag">NEW {{ new_count }}</span>
+                <span class="wfhero__dot">·</span> drivers who tapped “I'm interested” on an offer in the app
+            </p>
+        </div>
+        <div class="wfhero__bank">
+            <a class="wfhero__btn" href="{% url 'workforce:wf_driver_proposals' %}">
+                <i class="fa-solid fa-file-signature"></i> All proposals
+            </a>
+        </div>
+    </div>
+
+    <div class="wfpage__body">
+        <div class="wfcard">
+            <div class="wfcard__header"><i class="fa-solid fa-hand"></i> Interests</div>
+            <div class="wfcard__body">
+
+                <form method="get" class="wfprop__facets mb-2">
+                    <label class="wfprop__facet-label" for="workforce_propint_filter_select_proposal">Proposal</label>
+                    <select id="workforce_propint_filter_select_proposal" name="proposal"
+                            class="wfprop__facet-select" onchange="this.form.submit()">
+                        <option value="">All proposals</option>
+                        {% for p in proposals %}
+                        <option value="{{ p.pk }}" {% if proposal_id == p.pk %}selected{% endif %}>{{ p.title }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="status" value="{{ status }}">
+                    <input id="workforce_propint_filter_input_search" type="search" name="q" value="{{ q }}"
+                           class="form-control wfprop__search" placeholder="Name, phone or driver #">
+                    <button type="submit" class="wfprop__rowbtn">Search</button>
+                </form>
+
+                <nav class="wfprop__tabs mb-3" aria-label="Status">
+                    {% for key, label, n in status_tabs %}
+                    <a class="wfprop__tab{% if status == key %} wfprop__tab--active{% endif %}"
+                       href="?status={{ key }}{% if proposal_id %}&amp;proposal={{ proposal_id }}{% endif %}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">
+                        {{ label }} <span class="wfmono">{{ n }}</span>
+                    </a>
+                    {% endfor %}
+                </nav>
+
+                {% if rows %}
+                <div class="table-responsive">
+                    <table id="workforce_propint_list_table_view" class="wfprop__table table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Driver</th>
+                                <th>Contact</th>
+                                <th>Vehicle</th>
+                                <th>Proposal</th>
+                                <th>Driver's note</th>
+                                <th>Sent</th>
+                                <th>Status &amp; internal note</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in rows %}
+                            <tr>
+                                <td>
+                                    {% if wf_dept_ops %}<a href="{% url 'workforce:driver_detail' row.driver.driver_id %}" target="_blank" rel="noopener">{{ row.driver.driver_name }}</a>{% else %}{{ row.driver.driver_name }}{% endif %}
+                                    <div class="wfprop__sub">#{{ row.driver.driver_id }} · {{ row.driver.get_driver_status_display }}{% if row.driver.job_type %} · {{ row.driver.get_job_type_display }}{% endif %}</div>
+                                </td>
+                                <td class="wfmono">
+                                    {{ row.driver.driver_phone|default:"—" }}
+                                    {% if row.wa_digits %}
+                                    <div><a class="wfprop__wa" href="https://wa.me/{{ row.wa_digits }}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a></div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if row.vehicle and row.vehicle.vehicle_type != 'none' %}{{ row.vehicle.get_vehicle_type_display }}{% if row.vehicle.vehicle_no %}<div class="wfprop__sub wfmono">{{ row.vehicle.vehicle_no }}</div>{% endif %}{% else %}—{% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'workforce:wf_driver_proposal_edit' row.proposal.pk %}">{{ row.proposal.title }}</a>
+                                    {% if row.proposal.pay_package %}<div class="wfprop__sub">{{ row.proposal.pay_package }}</div>{% endif %}
+                                </td>
+                                <td>{{ row.note|default:"—" }}</td>
+                                <td class="wfmono">{{ row.created_at|date:"d M Y, H:i" }}</td>
+                                <td>
+                                    <span class="wfprop__state wfprop__state--{{ row.status }}">{{ row.get_status_display }}</span>
+                                    {% if row.decided_by %}
+                                    <div class="wfprop__sub">by {{ row.decided_by.get_full_name|default:row.decided_by.username }} · {{ row.decided_at|date:"d M, H:i" }}</div>
+                                    {% endif %}
+                                    <form method="post" action="{% url 'workforce:wf_driver_proposal_interest_update' row.pk %}"
+                                          class="wfprop__rowform mt-2">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <select name="status" class="wfprop__facet-select" aria-label="Status for {{ row.driver.driver_name }}">
+                                            {% for key, label in status_choices %}
+                                            <option value="{{ key }}" {% if row.status == key %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <input type="text" name="staff_note" value="{{ row.staff_note }}" maxlength="500"
+                                               class="form-control wfprop__note" placeholder="Internal note">
+                                        <button type="submit" class="wfprop__rowbtn">Save</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-hand"></i>
+                    <p>No drivers here yet. When a driver taps “I'm interested” on an offer in the app, they appear in this list.</p>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/driver-proposals.css' %}?v=20260929c">
+{% endblock %}

@@ -1,188 +1,400 @@
-/* Purpose: Careers page — hiring-manifest design (navy hero + route, waybill role rows, dispatch-note form)
-   Used by: webpages/templates/webpages/careers.html (block prefix wpk__)
-   Notes: yellow accent budget = hero kicker + submit button only; Bootstrap handles layout, this file is visual only */
+/* Purpose: Careers pages — "two lanes" design (navy hero, navy driver lane, quiet white office lane + form)
+   Used by: webpages/templates/webpages/careers.html (office roles) and careers_drivers.html (driver jobs); prefix wpk__
+   Notes: yellow budget = the driver CTA only; the form submit is navy on purpose so the
+          higher-volume lane owns the accent. Mono is reserved for codes and money. */
 
-/* ---------- Hero: navy manifest header ---------- */
+/* ============================================================
+   1. Hero — the fork, stated
+   ============================================================ */
 .wpk__hero {
     background: var(--brand-gradient-navy);
     color: var(--brand-white);
-    padding: 3.5rem 0 3rem;
-}
-.wpk__hero-kicker {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    color: var(--brand-primary);
+    padding: 3rem 0 2.75rem;
 }
 .wpk__hero-title {
     font-family: "Poppins", var(--brand-font-primary);
-    font-size: clamp(2.1rem, 5vw, 3.25rem);
+    font-size: clamp(2rem, 4.6vw, 3rem);
     font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
+    letter-spacing: -0.025em;
+    line-height: 1.06;
     color: var(--brand-white);
+    max-width: 14ch;
 }
 .wpk__hero-sub {
-    font-size: 0.95rem;
-    color: rgba(255, 255, 255, 0.72);
-    max-width: 34rem;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.74);
+    max-width: 46ch;
 }
 
-/* Hiring route: true sequence, drawn on load */
-.wpk__route {
-    position: relative;
-    max-width: 40rem;
+/* Facts list — fills the hero's right half with something useful rather than air */
+.wpk__facts {
+    margin: 0;
+    max-width: 22rem;
 }
-.wpk__route-line {
-    position: absolute;
-    top: 5px;
-    left: 4px;
-    right: 4px;
-    height: 0;
-    border-top: 1px dashed rgba(255, 255, 255, 0.35);
+.wpk__fact {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
 }
-.wpk__route-stop {
-    position: relative;
+.wpk__fact:first-child {
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
 }
-.wpk__route-dot {
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    background: var(--brand-navy);
-    border: 2px solid rgba(255, 255, 255, 0.85);
+.wpk__fact-key {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.55);
 }
-.wpk__route-stop--last .wpk__route-dot {
-    background: var(--brand-white);
+.wpk__fact-val {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-white);
+    text-align: right;
 }
-.wpk__route-label {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.62rem;
-    letter-spacing: 0.08em;
-    color: rgba(255, 255, 255, 0.85);
+
+/* ============================================================
+   2. Section headings — real headings, not tracked-out labels
+   ============================================================ */
+/* The count belongs beside the title, not banked a thousand pixels away from it */
+.wpk__head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--brand-grey-300);
+    padding-bottom: 0.6rem;
+}
+.wpk__head-title {
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--brand-grey-800);
+    margin: 0;
+}
+.wpk__head-note {
+    font-size: 0.82rem;
+    color: var(--brand-grey-500);
     white-space: nowrap;
 }
-.wpk__route-hint {
-    font-size: 0.6rem;
+
+/* ============================================================
+   3. Driver lane — the one loud surface on the page
+   ============================================================ */
+.wpk__lane {
+    background: var(--brand-gradient-navy);
+    color: var(--brand-white);
+    border-radius: var(--brand-radius-lg);
+    padding: 1.875rem 1.5rem;
+}
+.wpk__lane-title {
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: clamp(1.5rem, 3vw, 1.95rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--brand-white);
+    margin: 0;
+}
+.wpk__lane-ref {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
     color: rgba(255, 255, 255, 0.45);
 }
-/* ---------- Section heads: ledger style ---------- */
-.wpk__section-head {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    color: var(--brand-grey-500);
-    border-bottom: 1px solid var(--brand-grey-800);
-    padding-bottom: 0.4rem;
+.wpk__lane-lead {
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: rgba(255, 255, 255, 0.78);
+    max-width: 52ch;
 }
-.wpk__section-head-count {
-    color: var(--brand-grey-800);
+.wpk__lane-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+}
+.wpk__lane-open::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--brand-primary);
 }
 
-/* ---------- Role rows: waybill entries ---------- */
+/* Three steps — a genuine sequence, so it is genuinely numbered */
+.wpk__step {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+.wpk__step-num {
+    flex: 0 0 auto;
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--brand-white);
+}
+.wpk__step-text {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+/* The one yellow thing on the page */
+.wpk__lane-cta {
+    display: inline-block;
+    background: var(--brand-primary);
+    color: var(--brand-grey-800);
+    font-size: 0.925rem;
+    font-weight: 700;
+    text-decoration: none;
+    border: 0;
+    border-radius: var(--brand-radius-sm);
+    padding: 0.75rem 1.5rem;
+    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.wpk__lane-cta:hover,
+.wpk__lane-cta:focus-visible {
+    background: var(--brand-primary-dark);
+    color: var(--brand-grey-800);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+.wpk__lane-hint {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* ---- Offers, as translucent panels inside the lane ---- */
+.wpk__offers-head {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    padding-top: 1.125rem;
+}
+.wpk__offer {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--brand-radius-md);
+    padding: 1.125rem;
+}
+.wpk__offer-ref {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.42);
+}
+.wpk__offer-title {
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--brand-white);
+    margin: 0;
+}
+.wpk__offer-terms {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+.wpk__offer-headline {
+    font-size: 0.925rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.92);
+    max-width: 52ch;
+}
+.wpk__offer-desc {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.7);
+    max-width: 56ch;
+}
+
+/* The pay figure is why the reader stopped on this offer. Tabular so two
+   offers line up under each other. White, not yellow — the CTA keeps that. */
+.wpk__offer-pay {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.wpk__offer-pay-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+.wpk__offer-pay-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--brand-white);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Zones read as places, not as a mono string. This is the page's only claim
+   no competitor can copy, so it is set to be read. */
+.wpk__zones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+.wpk__zone {
+    font-size: 0.78rem;
+    line-height: 1.3;
+    color: rgba(255, 255, 255, 0.82);
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: var(--brand-radius-sm);
+    padding: 0.25rem 0.5rem;
+}
+.wpk__offer-block-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.55);
+}
+.wpk__offer-points {
+    padding-left: 1.125rem;
+    margin: 0;
+}
+.wpk__offer-points li {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.82);
+}
+.wpk__offer-closes {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.5);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    padding-top: 0.75rem;
+}
+
+/* ============================================================
+   4. Office lane — quiet by design
+   ============================================================ */
 .wpk__role {
     border-bottom: 1px solid var(--brand-grey-200);
-    padding: 1.1rem 0.25rem;
-    transition: background 0.2s ease;
-}
-.wpk__role:hover {
-    background: var(--brand-grey-50);
+    padding: 1.25rem 0;
 }
 .wpk__role-ref {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: var(--brand-grey-400);
-    letter-spacing: 0.06em;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--brand-grey-450);
 }
 .wpk__role-title {
     font-family: "Poppins", var(--brand-font-primary);
-    font-size: 1.05rem;
+    font-size: 1.15rem;
     font-weight: 600;
+    letter-spacing: -0.015em;
     color: var(--brand-grey-800);
-    letter-spacing: -0.01em;
+    margin: 0;
 }
 .wpk__role-meta {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.64rem;
-    letter-spacing: 0.08em;
+    font-size: 0.82rem;
     color: var(--brand-grey-500);
 }
 .wpk__role-desc {
-    font-size: 0.83rem;
+    font-size: 0.9rem;
+    line-height: 1.6;
     color: var(--brand-grey-600);
-    max-width: 30rem;
-}
-.wpk__role-apply {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--brand-navy);
-    text-decoration: none;
-    white-space: nowrap;
-    border-bottom: 1px solid var(--brand-grey-300);
-    padding-bottom: 1px;
-    transition: color 0.2s ease, border-color 0.2s ease;
-}
-.wpk__role-apply:hover {
-    color: var(--brand-navy-light);
-    border-color: var(--brand-navy);
+    max-width: 58ch;
 }
 
-/* ---------- Terms grid: quiet, no icons ---------- */
+/* A row action is a control, not an underlined word */
+.wpk__role-apply {
+    display: inline-block;
+    flex: 0 0 auto;
+    background: var(--brand-grey-100);
+    border: 1px solid var(--brand-grey-400);
+    border-radius: var(--brand-radius-sm);
+    color: var(--brand-grey-800);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    padding: 0.4375rem 0.875rem;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.wpk__role-apply:hover,
+.wpk__role-apply:focus-visible {
+    background: var(--brand-secondary);
+    border-color: var(--brand-primary);
+    color: var(--brand-grey-800);
+}
+
+/* Terms — hairline-led, no icons, no cards */
 .wpk__term {
-    border-left: 2px solid var(--brand-grey-200);
+    border-left: 2px solid var(--brand-grey-300);
     padding-left: 0.75rem;
 }
 .wpk__term-label {
-    font-size: 0.66rem;
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: 0.95rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--brand-grey-500);
+    color: var(--brand-grey-800);
 }
 .wpk__term-text {
-    font-size: 0.8rem;
-    color: var(--brand-grey-700);
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--brand-grey-600);
 }
 
-/* ---------- Dispatch-note form ---------- */
+/* ============================================================
+   5. Application band — the page's closing surface
+   ============================================================ */
+.wpk__apply {
+    background: var(--brand-grey-100);
+    border-top: 1px solid var(--brand-grey-200);
+    padding: 3rem 0 3.5rem;
+}
 .wpk__note {
     background: var(--brand-white);
     border: 1px solid var(--brand-grey-300);
-    border-radius: var(--brand-radius-sm);
+    border-radius: var(--brand-radius-md);
     overflow: hidden;
 }
 .wpk__note-head {
     background: var(--brand-navy);
     color: var(--brand-white);
-    padding: 0.9rem 1.25rem;
-}
-.wpk__note-ref {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.62rem;
-    letter-spacing: 0.12em;
-    color: rgba(255, 255, 255, 0.55);
+    padding: 1.125rem 1.25rem;
 }
 .wpk__note-title {
     font-family: "Poppins", var(--brand-font-primary);
-    font-size: 1.05rem;
+    font-size: 1.15rem;
     font-weight: 600;
+    letter-spacing: -0.015em;
     color: var(--brand-white);
+    margin: 0;
+}
+.wpk__note-blurb {
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.65);
+    margin: 0;
 }
 .wpk__note-body {
     padding: 1.25rem;
 }
 .wpk__note-body label {
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    color: var(--brand-grey-600);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    color: var(--brand-grey-700);
 }
 .wpk__note-body .form-control,
 .wpk__note-body textarea {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     border-color: var(--brand-grey-300);
     border-radius: var(--brand-radius-sm);
 }
@@ -191,98 +403,243 @@
     border-color: var(--brand-primary);
     box-shadow: none;
 }
-.wpk__note-body .asteriskField {
-    color: var(--brand-grey-400);
+.wpk__note-body textarea {
+    min-height: 7rem;
 }
+.wpk__note-body .asteriskField {
+    color: var(--brand-grey-450);
+}
+.wpk__note-body .form-text,
+.wpk__note-body .helptext {
+    font-size: 0.78rem;
+    color: var(--brand-grey-500);
+}
+
+/* Navy, not yellow — the driver lane owns the accent */
 .wpk__submit-btn {
-    background: var(--brand-primary);
-    color: var(--brand-grey-800);
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    background: var(--brand-navy);
+    color: var(--brand-white);
+    font-size: 0.925rem;
+    font-weight: 600;
     border: 0;
     border-radius: var(--brand-radius-sm);
-    padding: 0.7rem 1rem;
+    padding: 0.75rem 1rem;
     transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
-.wpk__submit-btn:hover {
-    background: var(--brand-primary-dark);
-    color: var(--brand-grey-800);
+.wpk__submit-btn:hover,
+.wpk__submit-btn:focus-visible {
+    background: var(--brand-navy-light);
+    color: var(--brand-white);
     transform: translateY(-1px);
     box-shadow: var(--brand-shadow-sm);
 }
-.wpk__note-foot {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.62rem;
-    letter-spacing: 0.08em;
-    color: var(--brand-grey-400);
+
+/* ---- What happens next: the hiring route, where the question is actually asked ---- */
+.wpk__route {
+    padding-left: 0.25rem;
+}
+.wpk__route-title {
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+}
+.wpk__route-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.wpk__route-stop {
+    position: relative;
+    padding: 0 0 0.875rem 1.375rem;
+    border-left: 1px solid var(--brand-grey-300);
+}
+.wpk__route-stop:last-child {
+    border-left-color: transparent;
+    padding-bottom: 0;
+}
+.wpk__route-stop::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: 4px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--brand-white);
+    border: 2px solid var(--brand-grey-400);
+}
+.wpk__route-stop--last::before {
+    background: var(--brand-primary);
+    border-color: var(--brand-primary);
+}
+.wpk__route-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+    line-height: 1.3;
+}
+.wpk__route-hint {
+    font-size: 0.82rem;
+    color: var(--brand-grey-500);
 }
 
-/* Sticky form on desktop */
+/* Aside beside the route — the band's right column carries its own weight */
+.wpk__aside {
+    border-top: 1px solid var(--brand-grey-300);
+    padding-top: 1rem;
+}
+.wpk__aside-title {
+    font-family: "Poppins", var(--brand-font-primary);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+}
+.wpk__aside-text {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--brand-grey-600);
+    max-width: 44ch;
+}
+.wpk__aside-text a {
+    color: var(--brand-navy);
+    font-weight: 600;
+}
+
+/* ============================================================
+   5b. Driver jobs page only (/careers/drivers/)
+   The split moved the offers onto their own page; these are the few
+   surfaces that page needs and the office page does not.
+   ============================================================ */
+/* Kicker above the hero title — the page's one dated claim, so it reads as data */
+.wpk__hero-kicker {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--brand-primary);
+}
+
+/* "Nothing named this week" — still inside the navy lane, so it is translucent
+   like an offer card rather than a grey alert box */
+.wpk__offers-empty {
+    font-size: 0.925rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.74);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--brand-radius-md);
+    padding: 1.125rem;
+    max-width: 62ch;
+}
+
+/* An offer's own apply button. Outlined, not yellow: the lane CTA above is the
+   page's single accent and three filled buttons under it would flatten it. */
+.wpk__offer-apply {
+    display: inline-block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-white);
+    text-decoration: none;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: var(--brand-radius-sm);
+    padding: 0.5rem 1.125rem;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+.wpk__offer-apply:hover,
+.wpk__offer-apply:focus-visible {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: var(--brand-primary);
+    color: var(--brand-white);
+}
+.wpk__offer-apply:focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 3px;
+}
+
+/* The closing date sits beside this offer's own apply button, not under a rule */
+.wpk__offer-closes-inline {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Secondary route out of the closing band — the Arabic driver page */
+.wpk__route-alt {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-navy);
+    text-decoration: none;
+    border-bottom: 1px solid var(--brand-grey-400);
+    padding-bottom: 1px;
+}
+.wpk__route-alt:hover,
+.wpk__route-alt:focus-visible {
+    color: var(--brand-navy-light);
+    border-bottom-color: var(--brand-navy-light);
+}
+.wpk__route-alt:focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 3px;
+}
+
+/* The office form's blurb now links to the driver page, on a navy head */
+.wpk__note-blurb a {
+    color: var(--brand-primary);
+    font-weight: 600;
+}
+
+/* ============================================================
+   6. Responsive + motion
+   ============================================================ */
 @media (min-width: 992px) {
-    .wpk__note-wrap {
-        position: sticky;
-        top: 5.5rem;
+    .wpk__lane {
+        padding: 2.25rem;
+    }
+    /* Two roles side by side: the rule under each stops at the text, not in the gutter */
+    .wpk__role {
+        padding-bottom: 1.5rem;
+    }
+    /* The route sits beside the form, so it is banked to the top of the band */
+    .wpk__route {
+        padding-left: 1rem;
     }
 }
 
-/* ---------- Driver offers: manifest entries with the offer's own terms ----------
-   The same fleet.DriverProposal rows the driver app shows. They reuse .wpk__role
-   so an offer reads as another line on the same manifest; wpk__offer only adds
-   the parts a job row does not have — the pay line and the two point lists. */
-.wpk__offer {
-    border-left: 2px solid var(--brand-navy);
-    padding-left: 0.75rem;
+@media (max-width: 575.98px) {
+    .wpk__hero {
+        padding: 2.25rem 0 2rem;
+    }
+    .wpk__hero-title {
+        max-width: none;
+    }
+    .wpk__lane {
+        border-radius: var(--brand-radius-md);
+        padding: 1.5rem 1.125rem;
+    }
+    .wpk__role-apply {
+        width: 100%;
+        text-align: center;
+    }
 }
-.wpk__offer-headline {
-    font-size: 0.86rem;
-    font-weight: 600;
-    color: var(--brand-grey-700);
-    max-width: 30rem;
+
+@media (prefers-reduced-motion: reduce) {
+    .wpk__lane-cta,
+    .wpk__submit-btn,
+    .wpk__role-apply,
+    .wpk__offer-apply {
+        transition: none;
+    }
+    .wpk__lane-cta:hover,
+    .wpk__submit-btn:hover {
+        transform: none;
+    }
 }
-/* The pay figure is why the reader stopped on this row, so it is the one value
-   set apart. Tabular numerals so two offers line up under each other. */
-.wpk__offer-pay {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    border-top: 1px solid var(--brand-grey-200);
-    padding-top: 0.5rem;
-}
-.wpk__offer-pay-label {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.64rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--brand-grey-500);
-}
-.wpk__offer-pay-value {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--brand-grey-800);
-    font-variant-numeric: tabular-nums;
-}
-.wpk__offer-block-label {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.64rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--brand-grey-500);
-}
-.wpk__offer-points {
-    padding-left: 1.125rem;
-}
-.wpk__offer-points li {
-    font-size: 0.83rem;
-    line-height: 1.55;
-    color: var(--brand-grey-600);
-}
-.wpk__offer-closes {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.64rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--brand-grey-500);
+
+/* Keyboard focus stays visible on every surface, dark and light */
+.wpk__lane-cta:focus-visible,
+.wpk__role-apply:focus-visible,
+.wpk__submit-btn:focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 3px;
 }

@@ -126,9 +126,11 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
         <!-- Card Header: Avatar + Name + Status -->
         <div class="uvl__card__head">
             <div class="d-flex align-items-center gap-3">
-                <div class="uvl__avatar {% if data.profile.is_business %}uvl__avatar--biz{% endif %}">
-                    {% if data.profile.is_business %}
+                <div class="uvl__avatar {% if data.role_kind == 'business' %}uvl__avatar--biz{% endif %}">
+                    {% if data.role_kind == 'business' %}
                         <i class="fa-solid fa-building"></i>
+                    {% elif data.role_kind == 'driver' %}
+                        <i class="fa-solid fa-car"></i>
                     {% else %}
                         <i class="fa-solid fa-user"></i>
                     {% endif %}
@@ -160,13 +162,13 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
         <!-- Scope Badges -->
         <div class="uvl__scopes">
             {% if data.business %}
-            <span class="uvl__scope {% if data.business.business_status == 'active' %}uvl__scope--ok{% else %}uvl__scope--warn{% endif %}">
-                <i class="fa-solid fa-building"></i> Biz: {{ data.business.business_status|title }}
+            <span class="uvl__scope {% if data.stale_business %}uvl__scope--neutral{% elif data.business.business_status == 'active' %}uvl__scope--ok{% else %}uvl__scope--warn{% endif %}">
+                <i class="fa-solid fa-building"></i> Biz: {{ data.business.business_status|title }}{% if data.stale_business %}<span class="uvl__scope__note">past role</span>{% endif %}
             </span>
             {% endif %}
             {% if data.driver %}
-            <span class="uvl__scope {% if data.driver.driver_status == 'approved' %}uvl__scope--ok{% else %}uvl__scope--warn{% endif %}">
-                <i class="fa-solid fa-car"></i> Driver: {{ data.driver.get_driver_status_display }}
+            <span class="uvl__scope {% if data.stale_driver %}uvl__scope--neutral{% elif data.driver.driver_status == 'approved' %}uvl__scope--ok{% else %}uvl__scope--warn{% endif %}">
+                <i class="fa-solid fa-car"></i> Driver: {{ data.driver.get_driver_status_display }}{% if data.stale_driver %}<span class="uvl__scope__note">past role</span>{% endif %}
             </span>
             {% endif %}
             {% for tm in data.team_memberships %}
@@ -240,12 +242,16 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
             </div>
             <!-- Business/Driver Profile Completion -->
             <div class="col-sm-6">
-                {# Heading and bar follow the actual business/driver record, not the role flags, which lag behind an in-progress application #}
+                {% comment %}
+                Heading and bar follow data.role_kind (core.models.resolve_role_kind): the role
+                flags when one is set, the records otherwise. Reading the records first showed a
+                seller who was moved off a driver application their old 80% "Driver Profile".
+                {% endcomment %}
                 {% with role_completion=data.profile.get_role_profile_completion_percentage %}
                 <div class="uvl__progress-wrap">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="uvl__section-head">
-                            {% if data.business %}<i class="fa-solid fa-building"></i> Business Profile{% elif data.driver %}<i class="fa-solid fa-car"></i> Driver Profile{% else %}<i class="fa-solid fa-user"></i> Role Profile{% endif %}
+                            {% if data.role_kind == 'business' %}<i class="fa-solid fa-building"></i> Business Profile{% elif data.role_kind == 'driver' %}<i class="fa-solid fa-car"></i> Driver Profile{% else %}<i class="fa-solid fa-user"></i> Role Profile{% endif %}
                             <span class="uvl__origin-note"
                                   title="How this user arrived{% if data.profile.signup_landing_path %} — landed on {{ data.profile.signup_landing_path }}{% endif %}{% if data.profile.signup_referrer %} — referred by {{ data.profile.signup_referrer }}{% endif %}{% if data.profile.signup_source_inferred %} (guessed from the account, not tracked at signup){% endif %}">
                                 (via {{ data.profile.get_signup_source_display }}{% if data.profile.signup_source_inferred %} · inferred{% endif %})
@@ -260,7 +266,7 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
                              style="width: {{ role_completion }}%"></div>
                     </div>
                     <div class="small text-muted mt-1">
-                        {% if role_completion == 100 %}<i class="fa-solid fa-check text-success"></i> Complete{% elif not data.business and not data.driver %}<i class="fa-solid fa-minus text-muted"></i> No role yet{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
+                        {% if role_completion == 100 %}<i class="fa-solid fa-check text-success"></i> Complete{% elif not data.role_kind %}<i class="fa-solid fa-minus text-muted"></i> No role yet{% elif role_completion == 0 %}<i class="fa-solid fa-hourglass-start text-muted"></i> Not started — the user still has to fill this in{% else %}<i class="fa-solid fa-xmark text-danger"></i> Incomplete{% endif %}
                     </div>
                 </div>
                 {% endwith %}
@@ -309,7 +315,7 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
             {% if data.business %}
             <!-- Business Details -->
             <div class="{% if data.driver %}col-sm-6 uvl__col-left{% else %}col-12{% endif %}">
-                <div class="uvl__section-head"><i class="fa-solid fa-building"></i> Business Details</div>
+                <div class="uvl__section-head"><i class="fa-solid fa-building"></i> Business Details{% if data.stale_business %}<span class="uvl__past-tag" title="Kept on file from before the role was changed">Past application</span>{% endif %}</div>
                 <div class="uvl__fields">
                     <div class="uvl__field">
                         <span class="uvl__field__label">Name</span>
@@ -338,7 +344,7 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
             {% if data.driver %}
             <!-- Driver Details -->
             <div class="{% if data.business %}col-sm-6 uvl__col-right{% else %}col-12{% endif %}">
-                <div class="uvl__section-head"><i class="fa-solid fa-id-card"></i> Driver Details</div>
+                <div class="uvl__section-head"><i class="fa-solid fa-id-card"></i> Driver Details{% if data.stale_driver %}<span class="uvl__past-tag" title="Kept on file from before the role was changed">Past application</span>{% endif %}</div>
                 <div class="uvl__fields">
                     <div class="uvl__field">
                         <span class="uvl__field__label">Code</span>
@@ -398,12 +404,12 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
                 <!-- User Type/Role -->
                 <div class="uvl__tl-bubble uvl__tl-bubble--neutral">
                     <div class="uvl__tl-bubble__icon">
-                        {% if data.profile.is_business %}<i class="fa-solid fa-building"></i>{% elif data.profile.is_driver %}<i class="fa-solid fa-car"></i>{% else %}<i class="fa-solid fa-user"></i>{% endif %}
+                        {% if data.role_kind == 'business' %}<i class="fa-solid fa-building"></i>{% elif data.role_kind == 'driver' %}<i class="fa-solid fa-car"></i>{% else %}<i class="fa-solid fa-user"></i>{% endif %}
                     </div>
                     <div class="uvl__tl-bubble__body">
                         <span class="uvl__tl-bubble__label">User Type</span>
-                        <span class="uvl__role {% if data.profile.is_business %}uvl__role--biz{% else %}uvl__role--drv{% endif %}" style="display: inline-block; margin-top: 0.25rem;">
-                            {% if data.profile.is_business %}Business{% elif data.profile.is_driver %}Driver{% else %}User{% endif %}
+                        <span class="uvl__role {% if data.role_kind == 'business' %}uvl__role--biz{% else %}uvl__role--drv{% endif %} uvl__role--inline">
+                            {% if data.role_kind == 'business' %}Business{% elif data.role_kind == 'driver' %}Driver{% else %}User{% endif %}
                         </span>
                     </div>
                 </div>
@@ -460,6 +466,18 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Profile
             </a>
             {% endif %}
+            <button type="button" class="uvl__btn uvl__btn--role" data-action="change_role"
+                data-profile-id="{{ data.profile.id }}"
+                data-user-name="{{ data.user.first_name }} {{ data.user.last_name }}"
+                data-current-role="{% if data.profile.is_business %}business{% elif data.profile.is_driver %}driver{% else %}user{% endif %}"
+                data-verification-status="{{ data.profile.verification_status }}"
+                data-biz-label="{% if data.business %}{{ data.business.business_code|default:data.business.business_name }}{% endif %}"
+                data-biz-status="{% if data.business %}{{ data.business.get_business_status_display }}{% endif %}"
+                data-driver-label="{% if data.driver %}{{ data.driver.driver_code|default:data.driver.driver_id }}{% endif %}"
+                data-driver-status="{% if data.driver %}{{ data.driver.get_driver_status_display }}{% endif %}"
+                title="Change this user's role">
+                <i class="fa-solid fa-right-left"></i> Change Role
+            </button>
             <button type="button" class="uvl__btn uvl__btn--verify" data-action="verify"
                 data-profile-id="{{ data.profile.id }}"
                 data-user-name="{{ data.user.first_name }} {{ data.user.last_name }}"
@@ -501,6 +519,18 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Profile
             </a>
             {% endif %}
+            <button type="button" class="uvl__btn uvl__btn--role" data-action="change_role"
+                data-profile-id="{{ data.profile.id }}"
+                data-user-name="{{ data.user.first_name }} {{ data.user.last_name }}"
+                data-current-role="{% if data.profile.is_business %}business{% elif data.profile.is_driver %}driver{% else %}user{% endif %}"
+                data-verification-status="{{ data.profile.verification_status }}"
+                data-biz-label="{% if data.business %}{{ data.business.business_code|default:data.business.business_name }}{% endif %}"
+                data-biz-status="{% if data.business %}{{ data.business.get_business_status_display }}{% endif %}"
+                data-driver-label="{% if data.driver %}{{ data.driver.driver_code|default:data.driver.driver_id }}{% endif %}"
+                data-driver-status="{% if data.driver %}{{ data.driver.get_driver_status_display }}{% endif %}"
+                title="Change this user's role">
+                <i class="fa-solid fa-right-left"></i> Change Role
+            </button>
             <div class="uvl__verified-bar">
                 <i class="fa-solid fa-circle-check"></i> This user has been verified
             </div>
@@ -578,6 +608,88 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
     </div>
 </div>
 
+<!-- ============ CHANGE ROLE MODAL ============ -->
+<div class="uvl__modal__overlay" id="uvlRoleOverlay">
+    <div class="uvl__modal">
+        <div class="uvl__modal__header uvl__modal__header--role">
+            <div class="uvl__modal__header-icon"><i class="fa-solid fa-right-left"></i></div>
+            <div>
+                <h3 class="uvl__modal__title">Change Role</h3>
+                <p class="uvl__modal__subtitle" id="uvlRoleUser"></p>
+            </div>
+            <button type="button" class="uvl__modal__close" id="uvlRoleClose"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="uvl__modal__body">
+            <div class="uvl__modal__info">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>Use this when a sign-up was filed under the wrong role — the user cannot switch it themselves.</span>
+            </div>
+            <div class="uvl__modal__info uvl__modal__info--warn" id="uvlRoleVerifiedWarn" hidden>
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>This user is already <strong>verified</strong>. Changing the role withdraws that approval for the old role.</span>
+            </div>
+
+            <div class="uvl__modal__field">
+                <label class="uvl__modal__field-label">New role</label>
+                <div class="uvl__modal__checks" id="uvlRoleChoices">
+                    <label class="uvl__modal__check" data-role-option="business">
+                        <input type="radio" name="uvlRole" value="business">
+                        <span class="uvl__modal__checkmark"></span>
+                        <span class="uvl__modal__check-body">
+                            <span class="uvl__modal__check-title"><i class="fa-solid fa-building"></i> Business</span>
+                            <span class="uvl__modal__check-desc">A seller who books deliveries</span>
+                        </span>
+                    </label>
+                    <label class="uvl__modal__check" data-role-option="driver">
+                        <input type="radio" name="uvlRole" value="driver">
+                        <span class="uvl__modal__checkmark"></span>
+                        <span class="uvl__modal__check-body">
+                            <span class="uvl__modal__check-title"><i class="fa-solid fa-car"></i> Driver</span>
+                            <span class="uvl__modal__check-desc">A rider who delivers orders</span>
+                        </span>
+                    </label>
+                    <label class="uvl__modal__check" data-role-option="user">
+                        <input type="radio" name="uvlRole" value="user">
+                        <span class="uvl__modal__checkmark"></span>
+                        <span class="uvl__modal__check-body">
+                            <span class="uvl__modal__check-title"><i class="fa-solid fa-user"></i> User (no role)</span>
+                            <span class="uvl__modal__check-desc">Clear both roles — a plain account</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="uvl__modal__field">
+                <label class="uvl__modal__field-label">Also do this</label>
+                <div class="uvl__modal__checks">
+                    <label class="uvl__modal__check" id="uvlRoleCloseWrap" hidden>
+                        <input type="checkbox" id="uvlRoleCloseExisting" checked>
+                        <span class="uvl__modal__checkmark"></span>
+                        <span class="uvl__modal__check-body">
+                            <span class="uvl__modal__check-title"><i class="fa-solid fa-box-archive"></i> Close the old application</span>
+                            <span class="uvl__modal__check-desc" id="uvlRoleCloseDesc"></span>
+                        </span>
+                    </label>
+                    <label class="uvl__modal__check">
+                        <input type="checkbox" id="uvlRoleReset" checked>
+                        <span class="uvl__modal__checkmark"></span>
+                        <span class="uvl__modal__check-body">
+                            <span class="uvl__modal__check-title"><i class="fa-solid fa-rotate-left"></i> Reset verification to Incomplete</span>
+                            <span class="uvl__modal__check-desc">The user completes the new role's application, then re-applies</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="uvl__modal__footer">
+            <button type="button" class="uvl__btn uvl__btn--review" id="uvlRoleCancelBtn">Cancel</button>
+            <button type="button" class="uvl__btn uvl__btn--verify" id="uvlRoleConfirmBtn" disabled>
+                <i class="fa-solid fa-right-left"></i> Confirm Change
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- ============ REJECT MODAL ============ -->
 <div class="uvl__modal__overlay" id="uvlRejectOverlay">
     <div class="uvl__modal">
@@ -646,6 +758,7 @@ document.addEventListener('DOMContentLoaded', function() {
     /* ---------- MODAL HELPERS ---------- */
     var approveOverlay  = document.getElementById('uvlApproveOverlay');
     var rejectOverlay   = document.getElementById('uvlRejectOverlay');
+    var roleOverlay     = document.getElementById('uvlRoleOverlay');
     var currentProfileId = null;
 
     function openModal(overlay) {
@@ -658,7 +771,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /* Close on overlay click */
-    [approveOverlay, rejectOverlay].forEach(function(ov) {
+    [approveOverlay, rejectOverlay, roleOverlay].forEach(function(ov) {
         ov.addEventListener('click', function(e) {
             if (e.target === ov) closeModal(ov);
         });
@@ -669,12 +782,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('uvlApproveCancelBtn').addEventListener('click', function() { closeModal(approveOverlay); });
     document.getElementById('uvlRejectClose').addEventListener('click', function() { closeModal(rejectOverlay); });
     document.getElementById('uvlRejectCancelBtn').addEventListener('click', function() { closeModal(rejectOverlay); });
+    document.getElementById('uvlRoleClose').addEventListener('click', function() { closeModal(roleOverlay); });
+    document.getElementById('uvlRoleCancelBtn').addEventListener('click', function() { closeModal(roleOverlay); });
 
     /* Escape key closes modals */
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             closeModal(approveOverlay);
             closeModal(rejectOverlay);
+            closeModal(roleOverlay);
         }
     });
 
@@ -825,6 +941,127 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    /* ---------- CHANGE ROLE MODAL ---------- */
+    var roleChoices    = document.getElementById('uvlRoleChoices');
+    var roleCloseWrap  = document.getElementById('uvlRoleCloseWrap');
+    var roleCloseChk   = document.getElementById('uvlRoleCloseExisting');
+    var roleCloseDesc  = document.getElementById('uvlRoleCloseDesc');
+    var roleResetChk   = document.getElementById('uvlRoleReset');
+    var roleConfirm    = document.getElementById('uvlRoleConfirmBtn');
+    var roleVerifWarn  = document.getElementById('uvlRoleVerifiedWarn');
+    var roleCurrent    = 'user';
+    var roleRecords    = { business: null, driver: null };
+
+    function selectedRole() {
+        var picked = roleChoices.querySelector('input[name="uvlRole"]:checked');
+        return picked ? picked.value : '';
+    }
+
+    /* The "close the old application" row only makes sense when a record for the
+       role being left actually exists — so its label names that record. */
+    function refreshRoleCloseRow() {
+        var target = selectedRole();
+        var leaving = null;
+        if (target !== 'driver' && roleRecords.driver) leaving = { kind: 'driver', rec: roleRecords.driver };
+        else if (target !== 'business' && roleRecords.business) leaving = { kind: 'business', rec: roleRecords.business };
+
+        if (!target || !leaving) {
+            roleCloseWrap.hidden = true;
+            return;
+        }
+        roleCloseWrap.hidden = false;
+        if (leaving.kind === 'driver') {
+            roleCloseDesc.textContent = 'Reject driver ' + leaving.rec.label +
+                ' (now ' + leaving.rec.status + '), take it offline and revoke app access';
+        } else {
+            roleCloseDesc.textContent = 'Set business ' + leaving.rec.label +
+                ' (now ' + leaving.rec.status + ') to Inactive';
+        }
+    }
+
+    function updateRoleBtn() {
+        roleConfirm.disabled = !selectedRole();
+    }
+
+    roleChoices.addEventListener('change', function() {
+        refreshRoleCloseRow();
+        updateRoleBtn();
+    });
+
+    function openRoleModal(btn) {
+        currentProfileId = btn.dataset.profileId;
+        roleCurrent = btn.dataset.currentRole || 'user';
+        roleRecords.business = btn.dataset.bizLabel
+            ? { label: btn.dataset.bizLabel, status: btn.dataset.bizStatus || 'unknown' } : null;
+        roleRecords.driver = btn.dataset.driverLabel
+            ? { label: btn.dataset.driverLabel, status: btn.dataset.driverStatus || 'unknown' } : null;
+
+        document.getElementById('uvlRoleUser').textContent = btn.dataset.userName;
+        roleVerifWarn.hidden = btn.dataset.verificationStatus !== 'verified';
+
+        /* Reset the picker and lock the role the user already holds */
+        roleChoices.querySelectorAll('[data-role-option]').forEach(function(row) {
+            var input = row.querySelector('input[name="uvlRole"]');
+            var isCurrent = row.dataset.roleOption === roleCurrent;
+            input.checked = false;
+            input.disabled = isCurrent;
+            row.classList.toggle('uvl__modal__check--current', isCurrent);
+            var tag = row.querySelector('.uvl__modal__check__tag');
+            if (isCurrent && !tag) {
+                tag = document.createElement('span');
+                tag.className = 'uvl__modal__check__tag';
+                tag.textContent = 'Current';
+                row.appendChild(tag);
+            } else if (!isCurrent && tag) {
+                tag.remove();
+            }
+        });
+
+        roleCloseChk.checked = true;
+        roleResetChk.checked = true;
+        roleCloseWrap.hidden = true;
+        updateRoleBtn();
+        openModal(roleOverlay);
+    }
+
+    roleConfirm.addEventListener('click', function() {
+        var target = selectedRole();
+        if (!currentProfileId || !target || roleConfirm.disabled) return;
+        roleConfirm.disabled = true;
+        roleConfirm.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Changing...';
+
+        fetch('/workforce/verification/' + currentProfileId + '/change-role/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                role: target,
+                close_existing: !roleCloseWrap.hidden && roleCloseChk.checked,
+                reset_verification: roleResetChk.checked
+            })
+        })
+        .then(function(r) {
+            if (!r.ok && (r.headers.get('content-type') || '').indexOf('json') === -1)
+                throw new Error('Server returned ' + r.status + '. Please refresh and try again.');
+            return r.json();
+        })
+        .then(function(data) {
+            if (data.success) {
+                closeModal(roleOverlay);
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to change role'));
+                roleConfirm.disabled = false;
+                roleConfirm.innerHTML = '<i class="fa-solid fa-right-left"></i> Confirm Change';
+            }
+        })
+        .catch(function(err) {
+            alert(err.message || 'An error occurred');
+            roleConfirm.disabled = false;
+            roleConfirm.innerHTML = '<i class="fa-solid fa-right-left"></i> Confirm Change';
+        });
+    });
+
     /* ---------- UNDER REVIEW (simple confirm) ---------- */
     function markUnderReview(profileId) {
         if (confirm('Mark this user as Under Review?')) {
@@ -885,6 +1122,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 markUnderReview(this.dataset.profileId);
             } else if (action === 'reject') {
                 openRejectModal(this);
+            } else if (action === 'change_role') {
+                openRoleModal(this);
             }
         });
     });

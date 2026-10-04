@@ -69,8 +69,10 @@
             <tbody>
               {% for ri in ret.return_items.all %}
               <tr>
-                <td data-label="Item">{{ ri.order_item.display_name }}</td>
-                <td data-label="Ordered" class="bcon__td--right bcon__num">{{ ri.order_item.quantity }}</td>
+                {% comment %}display_name / ordered_quantity, never ri.order_item: a line added
+                by hand has no outbound line and would print blank.{% endcomment %}
+                <td data-label="Item">{{ ri.display_name }}</td>
+                <td data-label="Ordered" class="bcon__td--right bcon__num">{{ ri.ordered_quantity|default_if_none:"—" }}</td>
                 <td data-label="Return Qty" class="bcon__td--right bcon__num">{{ ri.quantity_returned }}</td>
               </tr>
               {% endfor %}

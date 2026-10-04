@@ -54,6 +54,7 @@ import hmac
 import json
 import logging
 from decimal import Decimal, InvalidOperation
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
@@ -112,6 +113,7 @@ from core.utils import (
 )
 from core.json_utils import safe_json
 from core.validators import safe_int
+from core.destination import filter_deliverable, is_foreign, order_country
 
 
 # Grouped delivery-task statuses. The orders manifest renders these as a single
@@ -1093,6 +1095,123 @@ def add_order(request):
     })
 
 
+@login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_CREATE)
+@business_active_required
+def add_return(request):
+    """Book a collection from a customer — the seller's own side of a return.
+
+    The sibling of add_order, and the reverse of it: the customer is where the
+    driver GOES and this client's counter is where he drops off. Until this page
+    a seller could only press "Request Return" on a delivered order and then
+    wait for somebody here to decide a driver was worth sending; goods their own
+    courier had delivered they could not raise at all.
+
+    Two modes, the same two the staff desk has (workforce.views.returns_task_create)
+    and the same intake behind both, so the two forms cannot drift:
+
+    * ``order``      — one of THIS client's orders. return_intake.find_order is
+                       given the business, so another client's order number
+                       resolves to nothing rather than to their customer.
+    * ``standalone`` — goods we never carried, where the typed address is the
+                       claim.
+
+    The collection is raised UNPUBLISHED (publish=False): it lands at
+    'to_review' exactly where this client's ordinary new orders land, and staff
+    release it. A seller asking for a driver is a request, not the approval —
+    that distinction is the whole reason create_return_pickup_order is staff-
+    gated, and nothing here may quietly undo it.
+    """
+    from orders import return_intake
+    from orders.models import ReturnRequest
+    from orders.services import can_schedule_return_pickup, open_return_for_order
+
+    business = request.current_business
+
+    form = request.POST if request.method == 'POST' else request.GET
+    mode = return_intake.resolve_mode(form.get('mode'))
+
+    order_ref = (form.get('order_ref') or form.get('order') or '').strip()
+    # Their own order number, the code they gave it, or their customer's mobile
+    # — which can name several orders, so a search may come back as a shortlist.
+    # A submit resolves exactly or not at all. Both are scoped to this client.
+    candidates = []
+    if mode != 'order':
+        order = None
+    elif request.method == 'POST':
+        order = return_intake.find_order(order_ref, business=business)
+    else:
+        order, candidates = return_intake.search_orders(order_ref, business=business)
+
+    order_claim = open_return_for_order(order) if order is not None else None
+    order_blocker = ''
+    if order is not None:
+        # The desk's own gate, run before anything is written, so the seller is
+        # told why no driver can be sent instead of finding out later.
+        probe = ReturnRequest(business=order.business, order=order)
+        ok, why = can_schedule_return_pickup(order_claim or probe)
+        if not ok:
+            order_blocker = why
+
+    # This client's own counters only — where the driver brings the goods back
+    # to. Same .selectable() floor the staff desk applies.
+    locations = (business_models.PickupLocation.objects.selectable()
+                 .filter(business=business, pickup_status='active')
+                 .order_by('-is_default', 'pickup_location_title'))
+
+    if request.method == 'POST':
+        try:
+            if mode == 'order' and order is None:
+                raise ValidationError(
+                    "No order of yours matches that number. Check it, or raise "
+                    "the return without an order.")
+            if order_blocker:
+                raise ValidationError(order_blocker)
+
+            ret, collection, reused = return_intake.raise_return(
+                post=form,
+                user=request.user,
+                business=business,
+                order=order,
+                publish=False,
+            )
+        except ValidationError as exc:
+            messages.error(request, '; '.join(exc.messages))
+        except Exception:
+            logger.exception("Seller return intake failed for business %s",
+                             business.business_id)
+            messages.error(request, "Could not raise this return. Please try again.")
+        else:
+            opened = ("Added to the return already open for this order"
+                      if reused else f"Return {ret.return_number} raised")
+            if collection is not None:
+                messages.success(
+                    request,
+                    f"{opened}. Collection {collection.order_number} is with our "
+                    f"team for review — we will assign a driver.")
+                return redirect('orders:order_details', collection.id)
+
+            messages.success(
+                request,
+                f"{opened}. Our team will arrange the collection.")
+            return redirect('business:returns_list')
+
+    return render(request, 'orders/order_return_add.html', {
+        'mode': mode,
+        'order': order,
+        'order_ref': order_ref,
+        'order_claim': order_claim,
+        'order_blocker': order_blocker,
+        'candidates': candidates,
+        'return_lines': return_intake.order_lines(order),
+        'fixed_business': business,
+        'user_business': business,
+        'locations': locations,
+        'reason_choices': ReturnRequest.RETURN_REASON_CHOICES,
+        'form': form if request.method == 'POST' else {},
+    })
+
+
 def _parse_coord(value, limit):
     """Return a Decimal coordinate within ±limit, or None when unusable."""
     if value in (None, ''):
@@ -1570,7 +1689,7 @@ def order_update(request, order_id):
                 # Fire auto flow for order edit
                 try:
                     from core.auto_flow_executor import execute_flows_for_trigger
-                    execute_flows_for_trigger('staff_order_edit', extra_context={
+                    execute_flows_for_trigger('staff_order_edit', order=order, extra_context={
                         'order_number': order.order_number or '',
                         'customer_name': order.customer_name or '',
                         'customer_phone': order.customer_phone or '',
@@ -2450,7 +2569,7 @@ def get_order_by_api(request):
     logger.debug(f"Using API settings for business {business.business_id}")
 
     # Build Shopify API URL from business API settings
-    shop_url = api_data.site_api_url.replace('https://', '').replace('http://', '')
+    shop_url = api_data.shop_domain()
     order_endpoint = api_data.order_api_endpoint or '/admin/api/2024-10/orders.json'
     api_url = f'https://{shop_url}{order_endpoint}'
 
@@ -2491,6 +2610,11 @@ def get_order_by_api(request):
         ]
         filtered_orders.sort(key=lambda x: x['created_at'], reverse=True)
 
+        # Withhold orders shipping outside Qatar when the seller asked us to.
+        # These are raw REST dicts, so core.destination reads
+        # shipping_address.country_code directly.
+        filtered_orders, hidden_foreign = filter_deliverable(filtered_orders, api_data)
+
         # Annotate each order with its TempOrder import status
         visible_pids = [str(o['id']) for o in filtered_orders]
         temp_status_map = {}
@@ -2514,6 +2638,9 @@ def get_order_by_api(request):
             'orders': filtered_orders,
             'business': business,
             'ready_count': ready_count,
+            # Without this the page is simply empty for a GCC-wide store and
+            # reads as a broken connection rather than a filter doing its job.
+            'hidden_foreign_count': len(hidden_foreign),
         }
         return render(request, 'orders/order_api_get.html', data)
     else:
@@ -2692,6 +2819,7 @@ def orders_api_pending_list(request):
     api_orders = []
     api_orders_error = ''
     resolved_handle = ''
+    hidden_foreign = 0
 
     class ApiTimeout(Exception):
         pass
@@ -2718,6 +2846,12 @@ def orders_api_pending_list(request):
             try:
                 fetched = shopify.Order.find(limit=10, status='any', order='created_at desc')
                 for o in fetched:
+                    # These are shopify-lib objects, not dicts; core.destination
+                    # reads both. The panel only shows the latest 10, so for a
+                    # GCC-wide store it can legitimately come back empty.
+                    if is_foreign(o, api):
+                        hidden_foreign += 1
+                        continue
                     customer_name = ''
                     customer_phone = ''
                     customer = getattr(o, 'customer', None)
@@ -2836,6 +2970,7 @@ def orders_api_pending_list(request):
         'api_orders_platform': api.api_type,
         'imported_codes': imported_codes,
         'resolved_handle': resolved_handle,
+        'hidden_foreign_count': hidden_foreign,
     }))
 
 
@@ -3009,7 +3144,10 @@ def get_orders_by_base_api(request):
     BASE_API_ORDER_ENDPINT = business_api.order_api_endpoint
     BASE_API_PRODUCT_ENDPINT = business_api.product_api_endpoint
 
-    BASE_API_STORE_NAME = BASE_API_STORE_NAME.replace('https://', '')
+    # Strip both schemes and any trailing slash: a stored "https://host/" was
+    # rebuilt as "https://host//admin/api/..." and Shopify 404s the double slash.
+    BASE_API_STORE_NAME = (BASE_API_STORE_NAME or '').strip().replace(
+        'https://', '').replace('http://', '').strip('/')
 
 
     if business_api.api_type == 'shopify':
@@ -3096,6 +3234,17 @@ def get_orders_by_base_api(request):
                                     'address': customer_data.get('default_address', {}).get('address1', '')
                                 }
                             else:
+                                # Silence here is why a missing read_customers scope
+                                # looked like "Shopify has no customer details" for
+                                # months: 403 fell through to blank strings.
+                                logger.warning(
+                                    'Shopify customer fetch failed for business %s '
+                                    '(order %s, customer %s): HTTP %s. A 403 here means '
+                                    'the token lacks read_customers — reconnect the '
+                                    'store to re-grant scopes.',
+                                    business_id, order.get('id'), customer_id,
+                                    customer_response.status_code,
+                                )
                                 customer_info = {
                                     'first_name': '',
                                     'last_name': '',

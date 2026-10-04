@@ -1,0 +1,80 @@
+{% comment %}
+Purpose: Behaviour for parts/_return_standalone_fields.html — filters the drop-off list by client and keeps the QNAS plate honest.
+Used by: workforce/returns_task_create.html and orders/order_return_add.html, from their {% templatetag openblock %} block extra_js {% templatetag closeblock %}.
+Notes: Lifted unchanged from the old staff-only form so the two consoles cannot drift. It exits quietly when the
+       standalone fields are not on the page, which is the case whenever the form is in order mode.
+{% endcomment %}
+<script>
+(function () {
+    // The drop-off list holds every client's addresses at once, so it is filtered
+    // here rather than by reloading the page each time a client is picked.
+    const bizSel = document.getElementById('returns_intake_select_business');
+    const dropSel = document.getElementById('returns_intake_select_dropoff');
+    if (!bizSel || !dropSel) return;
+
+    const all = Array.from(dropSel.querySelectorAll('option[data-business]'));
+    const placeholder = dropSel.querySelector('option:not([data-business])');
+    // On the seller console the client is a hidden input, not a picker: one
+    // client, already chosen, and nothing to re-filter on.
+    const fixed = bizSel.tagName !== 'SELECT';
+
+    function filterDropoffs() {
+        const biz = bizSel.value;
+        let shown = 0;
+        all.forEach(opt => {
+            const mine = biz && opt.dataset.business === biz;
+            opt.hidden = !mine;
+            opt.disabled = !mine;
+            if (mine) shown += 1;
+        });
+        // A choice left over from another client would submit an address that
+        // client does not own; the service refuses it, so clear it here instead.
+        const current = dropSel.selectedOptions[0];
+        if (current && current.dataset.business && current.hidden) dropSel.value = '';
+        if (placeholder) {
+            placeholder.textContent = !biz
+                ? 'Pick a client first…'
+                : (shown ? 'Select an address…' : 'This client has no usable address');
+        }
+    }
+
+    if (!fixed) bizSel.addEventListener('change', filterDropoffs);
+    filterDropoffs();
+
+    // Mirror the typed numbers onto the plate, the same signature the order
+    // screens use. qnasValidateAndFill fills the inputs; this keeps the plate
+    // honest whether they were typed or resolved.
+    const plate = {
+        returns_intake_input_zone: 'returns_intake_plate_zone',
+        returns_intake_input_street: 'returns_intake_plate_street',
+        returns_intake_input_building: 'returns_intake_plate_building',
+    };
+    function paintPlate() {
+        Object.entries(plate).forEach(([inputId, cellId]) => {
+            const input = document.getElementById(inputId);
+            const cell = document.getElementById(cellId);
+            if (!input || !cell) return;
+            const value = (input.value || '').trim();
+            cell.textContent = value || '—';
+            cell.classList.toggle('qnas-plate__num--empty', !value);
+        });
+        const name = document.getElementById('returns_intake_input_zonename');
+        const label = document.getElementById('returns_intake_plate_zonename');
+        const wrap = document.getElementById('returns_intake_plate_zonewrap');
+        if (name && label && wrap) {
+            const value = (name.value || '').trim();
+            label.textContent = value || 'Zone name not resolved';
+            wrap.classList.toggle('qnas-plate__name--empty', !value);
+        }
+    }
+    Object.keys(plate).forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.addEventListener('input', paintPlate);
+    });
+    // QNAS validate and the location paste set these fields programmatically and
+    // fire no input event — reconcile the plate from the live values every
+    // second, the same way the staff order form keeps its plate honest.
+    setInterval(paintPlate, 1000);
+    paintPlate();
+})();
+</script>

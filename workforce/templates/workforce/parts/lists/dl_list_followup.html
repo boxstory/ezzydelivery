@@ -11,7 +11,7 @@ Notes: Rows are tiered fresh / aging / stale off updated_at; the pickup column s
 {% endcomment %}
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}?v=20260718b" rel="stylesheet" type="text/css" />
-<link href="{% static 'workforce/css/followup-list.css' %}?v=20260921a" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/followup-list.css' %}?v=20260929a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
 <div class="wfl">
@@ -194,16 +194,18 @@ Notes: Rows are tiered fresh / aging / stale off updated_at; the pickup column s
                 </thead>
                 <tbody>
                     {% for dl in dl_tasks %}
-                    <tr class="dl-table__row dl-table__row--{{ dl.staleness_tier }}" data-task-id="{{ dl.id }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
+                    <tr class="dl-table__row dl-table__row--{{ dl.staleness_tier }}" data-task-id="{{ dl.id }}">
                         <td class="dl-table__td-check" onclick="event.stopPropagation();">
                             <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" onchange="updateBulkSelection()">
                         </td>
-                        <!-- Task # + Order # -->
+                        <!-- Task # + Order # (the row's only link) -->
                         <td class="dl-table__td-id">
+                            <a href="{% url 'workforce:delivery_task_detail' dl.id %}" class="dl-table__id-link">
                             <div class="dl-table__id-stack">
                                 <span class="dl-table__task-num">{{ dl.dl_task_number|default:"--" }}</span>
                                 <span class="dl-table__order-num" title="{{ dl.order.client_order_code }}">{{ dl.order.client_order_code|default:"--"|truncatechars:14 }}</span>
                             </div>
+                            </a>
                         </td>
                         <!-- Last Updated -->
                         <td>

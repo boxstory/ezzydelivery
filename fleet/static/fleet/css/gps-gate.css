@@ -1,0 +1,128 @@
+/* Purpose: The full-screen "turn on location" lock over the driver app.
+ * Used by: fleet/templates/fleet/parts/gps_gate.html, linked from fleet/pwa_base.html and templates/fleet_dashboard_base.html.
+ * Notes:   Brand tokens carry their hex as fallback — pwa_base does not load brandkit.css. Sits above the AI-tools toast (9999).
+ */
+.fleet-gpsgate {
+    --fleet-gpsgate-navy: var(--brand-navy, #001f3f);
+    --fleet-gpsgate-navy-light: var(--brand-navy-light, #003366);
+    --fleet-gpsgate-yellow: var(--brand-primary, #f7c000);
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    overflow-y: auto;
+    padding: max(1.125rem, env(safe-area-inset-top)) 1.125rem max(1.125rem, env(safe-area-inset-bottom));
+    background: linear-gradient(135deg, var(--fleet-gpsgate-navy), var(--fleet-gpsgate-navy-light));
+    color: #fff;
+    font-family: inherit;
+    -webkit-overflow-scrolling: touch;
+}
+.fleet-gpsgate[hidden] { display: none; }
+
+html.fleet-gpsgate-locked,
+html.fleet-gpsgate-locked body { overflow: hidden; }
+
+.fleet-gpsgate__panel {
+    width: 100%;
+    max-width: 26rem;
+    margin: auto;
+    text-align: center;
+}
+
+.fleet-gpsgate__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 4.5rem;
+    height: 4.5rem;
+    margin: 0 auto 1.125rem;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    font-size: 2rem;
+    color: #fff;
+}
+
+.fleet-gpsgate__kicker {
+    margin: 0 0 0.375rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.fleet-gpsgate__title {
+    margin: 0 0 0.375rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #fff;
+}
+
+.fleet-gpsgate__reason {
+    margin: 0 0 1.125rem;
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.fleet-gpsgate__steps {
+    margin: 0 0 1.125rem;
+    padding: 0.75rem 0.75rem 0.75rem 2.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.06);
+    text-align: left;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.92);
+}
+.fleet-gpsgate__steps[hidden] { display: none; }
+.fleet-gpsgate__steps li + li { margin-top: 0.375rem; }
+.fleet-gpsgate__steps strong { color: #fff; font-weight: 700; }
+
+.fleet-gpsgate__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 3.25rem;
+    padding: 0.75rem 1.125rem;
+    border: 0;
+    border-radius: 0.75rem;
+    background: var(--fleet-gpsgate-yellow);
+    color: var(--fleet-gpsgate-navy);
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.fleet-gpsgate__btn:active { transform: scale(0.97); }
+.fleet-gpsgate__btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+.fleet-gpsgate__status {
+    min-height: 1.25rem;
+    margin: 0.75rem 0 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.fleet-gpsgate__help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 2.75rem;
+    margin-top: 0.375rem;
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+}
+.fleet-gpsgate__help:active { transform: scale(0.97); }

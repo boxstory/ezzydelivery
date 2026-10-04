@@ -592,6 +592,31 @@ def sync_return_pickup_claim(task):
     return target
 
 
+def _line_spec(source, qty):
+    """One collection line, from either kind of source.
+
+    `source` is an OrderItem (what every caller passed before hand-added lines
+    existed) or a ReturnItem. Reading through the ReturnItem's own properties
+    keeps the "which kind of line is this" question in one place — the model —
+    rather than at every site that builds a collection.
+    """
+    from orders.models import ReturnItem
+
+    if isinstance(source, ReturnItem):
+        return {
+            'product': source.line_product,
+            'unit_price': source.line_unit_price,
+            'notes': source.line_notes,
+            'quantity': int(qty),
+        }
+    return {
+        'product': source.product,
+        'unit_price': source.unit_price,
+        'notes': source.notes,
+        'quantity': int(qty),
+    }
+
+
 @transaction.atomic
 def create_return_pickup_order(ret, *, items=None, charge=None, user=None,
                                notes='', publish=True):
@@ -636,10 +661,15 @@ def create_return_pickup_order(ret, *, items=None, charge=None, user=None,
     if charge < ZERO:
         raise ValidationError("A collection charge cannot be negative.")
 
+    # Normalised to plain specs before anything reads them: a claim line may be
+    # a line off the order we delivered OR one added by hand with only a product
+    # behind it (ReturnItem), and callers still pass raw [(OrderItem, qty)].
     if items is None:
-        items = [(ri.order_item, ri.quantity_returned)
-                 for ri in ret.return_items.select_related('order_item')]
-    items = [(item, int(qty)) for item, qty in items if int(qty) > 0]
+        specs = [_line_spec(ri, ri.quantity_returned)
+                 for ri in ret.return_items.select_related('order_item', 'product')]
+    else:
+        specs = [_line_spec(item, qty) for item, qty in items]
+    specs = [sp for sp in specs if sp['quantity'] > 0]
 
     customer_name = ret.claim_customer_name or 'Customer'
     fields = dict(
@@ -664,7 +694,7 @@ def create_return_pickup_order(ret, *, items=None, charge=None, user=None,
         delivery_speed=src.delivery_speed if src is not None else 'standard',
         package_description=(ret.claim_package_description
                              or f"Return from {customer_name}")[:100],
-        package_qty=sum(qty for _, qty in items) or ret.claim_package_qty,
+        package_qty=sum(sp['quantity'] for sp in specs) or ret.claim_package_qty,
         package_weight_kg=src.package_weight_kg if src is not None else None,
         order_notes=(f"Return pickup for {src.order_number}" if src is not None
                      else f"Return pickup for {ret.return_number}")[:100],
@@ -695,10 +725,10 @@ def create_return_pickup_order(ret, *, items=None, charge=None, user=None,
         new = Order.objects.create(
             client_order_code=f"RP-{uuid.uuid4().hex[:8].upper()}", **fields)
 
-    for item, qty in items:
+    for sp in specs:
         OrderItem.objects.create(
-            order=new, product=item.product, quantity=qty,
-            unit_price=item.unit_price, notes=item.notes)
+            order=new, product=sp['product'], quantity=sp['quantity'],
+            unit_price=sp['unit_price'], notes=sp['notes'])
 
     # Both threads carry the link, so either order tells the story on its own.
     # A standalone claim has only one thread — there is no outbound order to

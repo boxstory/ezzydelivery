@@ -28,6 +28,7 @@ _TYPE_MAP = {
     'location': 'location',
     'sticker': 'sticker',
     'vcard': 'contact',
+    'multi_vcard': 'contact',
     'contact_card': 'contact',
 }
 
@@ -211,10 +212,13 @@ class Command(BaseCommand):
                 total_skipped_chats += 1
                 continue
 
+            # Group media is downloaded only when someone clicks it in the inbox,
+            # so WAHA is not asked to pull a group's files here.
+            download = 'false' if str(chat_id).endswith('@g.us') else 'true'
             try:
                 msgs = waha_get(
                     f'/api/{session}/chats/{chat_id}/messages',
-                    params={'limit': opts['limit_per_chat'], 'downloadMedia': 'true'},
+                    params={'limit': opts['limit_per_chat'], 'downloadMedia': download},
                     timeout=180,
                 )
             except requests.exceptions.RequestException as e:

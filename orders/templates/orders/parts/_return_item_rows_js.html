@@ -1,0 +1,107 @@
+{% comment %}
+Purpose: Behaviour for parts/_return_item_rows.html — adds and removes product rows and wires each select to the product search.
+Used by: workforce/returns_task_create.html and orders/order_return_add.html, from their extra_js block.
+Notes: Runs on window load because select2.min.js is deferred; on DOMContentLoaded it is not defined yet. Exits quietly when
+       the rows are not on the page. Each select is marked data-no-select2 so the site-wide initialiser does not replace the
+       remote search with a plain dropdown.
+{% endcomment %}
+<script>
+window.addEventListener('load', function () {
+    const box = document.getElementById('returns_intake_box_items');
+    if (!box) return;
+    const rows = document.getElementById('returns_intake_rows_items');
+    const addBtn = document.getElementById('returns_intake_btn_additem');
+    const note = document.getElementById('returns_intake_txt_additem');
+    const searchUrl = box.dataset.searchUrl;
+    const clientSel = document.getElementById('returns_intake_select_business');
+
+    // Known from the order or from the one client this console has; otherwise
+    // whatever the client picker currently holds.
+    function businessId() {
+        if (box.dataset.business) return box.dataset.business;
+        return clientSel ? (clientSel.value || '') : '';
+    }
+
+    function refreshGate() {
+        const ready = !!businessId();
+        addBtn.disabled = !ready;
+        note.textContent = ready ? '' : 'Pick a client first — items come from their catalogue.';
+    }
+
+    function buildRow() {
+        const row = document.createElement('div');
+        row.className = 'row g-2 align-items-end mb-2 returns-intake__itemrow';
+        row.innerHTML = `
+          <div class="col-7 col-md-9">
+            <select name="inline_product_id[]" class="form-select form-select-sm returns-intake__product" data-no-select2>
+              <option value="">Search…</option>
+            </select>
+          </div>
+          <div class="col-3 col-md-2">
+            <input type="number" name="inline_quantity[]" class="form-control form-control-sm"
+                   value="1" min="1" max="10000" aria-label="Quantity coming back">
+          </div>
+          <div class="col-2 col-md-1">
+            <button type="button" class="btn btn-sm btn-outline-danger w-100 returns-intake__remove"
+                    aria-label="Remove this item"><i class="fa-solid fa-times" aria-hidden="true"></i></button>
+          </div>`;
+        return row;
+    }
+
+    function initSelect(sel) {
+        if (typeof jQuery === 'undefined' || typeof jQuery.fn.select2 === 'undefined') return;
+        jQuery(sel).select2({
+            placeholder: 'Search products…',
+            minimumInputLength: 0,
+            allowClear: true,
+            width: '100%',
+            dropdownParent: jQuery(sel).closest('.returns-intake__itemrow'),
+            ajax: {
+                url: searchUrl,
+                dataType: 'json',
+                delay: 200,
+                data: p => ({ q: p.term || '', business: businessId() }),
+                processResults: d => ({ results: d.results }),
+                cache: true
+            },
+            templateResult: function (p) {
+                if (!p.id) return p.text;
+                return jQuery(`<div><span></span> <small class="text-muted"></small></div>`)
+                    .find('span').text(p.text).end()
+                    .find('small').text(`${p.sku} — ${p.price} QAR`).end();
+            },
+            // item_name, not text: text is "brand + item" and the brand eats the
+            // whole control on a phone, leaving every row reading "MarkFair…".
+            templateSelection: s => s.item_name || s.text || 'Search products…'
+        });
+    }
+
+    addBtn.addEventListener('click', function () {
+        const row = buildRow();
+        rows.appendChild(row);
+        initSelect(row.querySelector('.returns-intake__product'));
+    });
+
+    rows.addEventListener('click', function (e) {
+        const btn = e.target.closest('.returns-intake__remove');
+        if (!btn) return;
+        const row = btn.closest('.returns-intake__itemrow');
+        const sel = row.querySelector('.returns-intake__product');
+        // Select2 leaves its own markup behind if the select is simply removed.
+        if (typeof jQuery !== 'undefined' && jQuery.fn.select2 && jQuery(sel).data('select2')) {
+            jQuery(sel).select2('destroy');
+        }
+        row.remove();
+    });
+
+    // Changing the client invalidates every row already picked: those products
+    // belong to the client who was selected when they were chosen.
+    if (clientSel && clientSel.tagName === 'SELECT') {
+        clientSel.addEventListener('change', function () {
+            rows.querySelectorAll('.returns-intake__itemrow').forEach(r => r.remove());
+            refreshGate();
+        });
+    }
+    refreshGate();
+});
+</script>

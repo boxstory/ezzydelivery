@@ -182,9 +182,10 @@ def _resolve_recipient_phones(flow, task=None, order=None, context=None):
     Either ``task`` (DeliveryTask) or ``order`` (Order) may be supplied —
     triggers fired at the order level (e.g. ``staff_order_publish``) pass only
     ``order``; task-level triggers pass ``task`` and we derive the order from
-    it. ``context`` is the flow's template context and carries a ``phone`` for
-    events that are about a person rather than an order — a lead, a driver
-    applicant — which is what the ``context_phone`` recipient sends to. All
+    it. ``context`` is the flow's template context and carries a ``phone`` (and,
+    where the subject has one, a ``*_whatsapp``) for events that are about a
+    person rather than an order — a lead, a driver applicant, a seller — which
+    is what the ``context_phone`` / ``context_whatsapp`` recipients send to. All
     phones are normalized to Qatar 974-prefixed form before return so the
     WhatsApp existence check succeeds for local-format numbers.
     """
@@ -255,11 +256,21 @@ def _resolve_recipient_phones(flow, task=None, order=None, context=None):
             if n and is_valid_phone(n):
                 phones.append(n)
 
-    elif recipient == 'context_phone':
-        # Whoever the event is about: the lead, the driver applicant. Order-less
-        # triggers put that number in the context under 'phone'.
-        raw = (context.get('phone') or context.get('lead_phone')
-               or context.get('driver_phone') or '')
+    elif recipient in ('context_phone', 'context_whatsapp'):
+        # Whoever the event is about: the driver applicant, the lead, the seller.
+        # Order-less triggers put their numbers in the context.
+        #
+        # The WhatsApp variant prefers the number they are actually reachable on
+        # and falls back to the phone, exactly as _pick_phone does for a Driver
+        # row — a driver whose WhatsApp differs from their line would otherwise
+        # be messaged on a number with no WhatsApp on it at all. A subject with
+        # no separate WhatsApp field (a CRM lead) simply falls through to the
+        # phone, which is the number staff message them on anyway.
+        keys = ()
+        if recipient == 'context_whatsapp':
+            keys += ('whatsapp', 'driver_whatsapp', 'lead_whatsapp', 'business_whatsapp')
+        keys += ('phone', 'lead_phone', 'driver_phone', 'business_phone')
+        raw = next((context.get(k) for k in keys if (context.get(k) or '').strip()), '')
         n = _normalize_qatar_phone(raw)
         if n and is_valid_phone(n):
             phones.append(n)

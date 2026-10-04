@@ -152,6 +152,48 @@
     color: var(--brand-danger, #dc3545);
     background: none;
 }
+/* ── Clear-all ────────────────────────────────────────────────
+   Opted into per picker with data-allow-clear. Select2 4.1 renders it as a
+   <button> holding a bare "x" and gives it no styling of its own, so left
+   alone it inherits the UA button box and lands mid-control looking like a
+   stray glyph. Pinned to the right end, sized like the per-tag remove, and —
+   as with that button — held off mobile-app.css's 44px touch floor, which
+   would otherwise blow the 34px control open. */
+.select2-container.ez-filter-select .select2-selection--multiple .select2-selection__clear {
+    /* The three flex children of the control are ordered by hand: tags, clear,
+       caret. Select2 puts the clear button first in the DOM and the caret is an
+       ::after, so without explicit orders the button and the caret both claim
+       the right edge and paint on top of each other — the x rendered as a
+       blob with a triangle through it. */
+    order: 1;
+    margin: 0 0.15rem 0 auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
+    width: 1.15rem;
+    height: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Matched to the per-tag remove. Larger than this and the "x" Select2 puts
+       in the button renders as a squat blob in Poppins rather than a cross. */
+    font-size: 0.85rem;
+    line-height: 1;
+    color: var(--brand-grey-500, #6c757d);
+    cursor: pointer;
+}
+.select2-container.ez-filter-select .select2-selection--multiple .select2-selection__clear:hover {
+    color: var(--brand-danger, #dc3545);
+    background: none;
+}
+/* The rendered tag list is the flex item that grows, so without this the clear
+   button is pushed past the right edge and clipped by the control's overflow. */
+.select2-container.ez-filter-select .select2-selection--multiple .select2-selection__rendered {
+    flex: 1 1 auto;
+}
 /* Select2 4.1 builds the inline search as an auto-sizing <textarea> that
    computes ~88px tall. Inside a 34px control that pushes the placeholder below
    the visible strip, so the picker renders as a blank box with no hint of what
@@ -186,6 +228,7 @@
    you open — every single-value picker beside it carries one. */
 .select2-container.ez-filter-select .select2-selection--multiple::after {
     content: "";
+    order: 2;
     flex: 0 0 auto;
     width: 0;
     height: 0;
@@ -194,6 +237,14 @@
     border-left: 4px solid transparent;
     border-right: 4px solid transparent;
     border-top: 5px solid var(--brand-grey-500, #6c757d);
+}
+/* ...but not while the clear-all is showing. Select2 marks the control
+   --clearable only when there is something to clear, and a 34px control has no
+   room for a caret and an x side by side — crammed together they read as one
+   smudged glyph. The x is the better affordance of the two, the tags already
+   say the control is live, and the caret comes straight back on clear. */
+.select2-container.ez-filter-select .select2-selection--multiple.select2-selection--clearable::after {
+    display: none;
 }
 
 /* ── Dropdown ─────────────────────────────────────────────────

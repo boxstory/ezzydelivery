@@ -3,15 +3,15 @@
 {% comment %}
 Purpose: Driver opportunities board — the standing offers marketing publishes, then the open shifts a verified driver can put their hand up for.
 Used by: fleet.views.opportunities (fleet:opportunities)
-Notes: The gate in fleet/access.py redirects here, so this page must never require dashboard access. Proposals are
-       adverts (fleet.DriverProposal) — read-only on purpose, with no interest button; shifts below are the bookable part.
+Notes: The gate in fleet/access.py redirects here, so this page must never require dashboard access. Proposals
+       (fleet.DriverProposal) take an "I'm interested" with no capacity (fleet:proposal_interest); shifts below are the bookable part.
 {% endcomment %}
 
 {% block title %}Opportunities{% endblock %}
 {% block page_title %}Opportunities{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'fleet/css/fleet-opportunities.css' %}?v=20260924a">
+<link rel="stylesheet" href="{% static 'fleet/css/fleet-opportunities.css' %}?v=20260929a">
 {% endblock %}
 
 {% block header_actions %}
@@ -100,9 +100,33 @@ Notes: The gate in fleet/access.py redirects here, so this page must never requi
         {% endif %}
 
         <div class="fopp__prop-foot">
-            Interested? Message operations on WhatsApp and we will set it up.
+            {% if proposal.my_interest %}
+            <span>Operations will contact you about this offer.</span>
+            {% else %}
+            <span>Want this work? Tap below and operations will contact you.</span>
+            {% endif %}
             {% if proposal.closes_at %}
             <span class="fopp__prop-closes">Offer ends {{ proposal.closes_at|date:"d M Y" }}</span>
+            {% endif %}
+        </div>
+        <div class="fopp__actions">
+            {% if proposal.my_interest %}
+                <span class="fopp__state fopp__state--{{ proposal.my_interest.status }}">
+                    {% if proposal.my_interest.status == 'interested' %}Interest sent{% else %}{{ proposal.my_interest.get_status_display }}{% endif %}
+                </span>
+                {% if proposal.my_interest.status == 'interested' %}
+                <button type="button"
+                        class="fleet-btn fleet-btn--ghost fleet-btn--sm fopp__btn fopp__btn--withdraw"
+                        data-action="withdraw" data-proposal="{{ proposal.pk }}">
+                    Withdraw
+                </button>
+                {% endif %}
+            {% else %}
+                <button type="button"
+                        class="fleet-btn fleet-btn--dark fopp__btn"
+                        data-action="interested" data-proposal="{{ proposal.pk }}">
+                    <i class="fa-solid fa-hand"></i> I'm interested
+                </button>
             {% endif %}
         </div>
     </li>
@@ -222,24 +246,27 @@ Notes: The gate in fleet/access.py redirects here, so this page must never requi
 // csrf-token meta tag in pwa_base.html — not a cookie read.
 (function () {
     const endpoint = "{% url 'fleet:opportunity_interest' %}";
+    const proposalEndpoint = "{% url 'fleet:proposal_interest' %}";
     const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
     document.addEventListener('click', function (event) {
-        const btn = event.target.closest('[data-action][data-slot]');
+        const btn = event.target.closest('[data-action][data-slot], [data-action][data-proposal]');
         if (!btn) return;
 
         const action = btn.dataset.action;
         const slot = btn.dataset.slot;
+        const proposal = btn.dataset.proposal;
 
         btn.disabled = true;
         const original = btn.innerHTML;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
         const body = new FormData();
-        body.append('slot_code', slot);
+        if (proposal) body.append('proposal_id', proposal);
+        else body.append('slot_code', slot);
         body.append('action', action);
 
-        fetch(endpoint, {
+        fetch(proposal ? proposalEndpoint : endpoint, {
             method: 'POST',
             headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
             body: body,

@@ -13,20 +13,31 @@
       {# multi-select makes visible as ?source=manual&source=manual in the URL. #}
       {# hx-get names the board rather than being left empty, so the request never #}
       {# inherits the query string already on the page. #}
+      {# hx-sync keys every request on this form, so the two that a press of Enter #}
+      {# raises — the box's own `change`, then the form's `submit` — collapse into one #}
+      {# swap instead of rebuilding the board twice. #}
       <form method="get"
             hx-get="{{ board_url }}" hx-target="#main-content" hx-select="#main-content"
             hx-swap="outerHTML" hx-push-url="true"
             hx-trigger="submit, change from:.crm__facets"
-            id="workforce_crm_board_form_filter" class="crm__filters crmb__filters">
+            hx-sync="#workforce_crm_board_form_filter:abort"
+            id="workforce_crm_board_form_filter"
+            class="crm__filters crmb__filters {% if is_driver_board %}crmb__filters--rich{% endif %}">
 
+        {# The board reloads when the box is DONE with — focus leaves it, or Enter is #}
+        {# pressed — never per keystroke: a mid-word swap replaces the field the typing #}
+        {# is going into, so the caret jumps and half a phone number is searched for. #}
+        {# `blur`, not `change`: leaving the box always searches, whether or not the #}
+        {# term was edited, so a second look at the same term still reloads the board. #}
         <div class="crm__search {% if search %}is-filled{% endif %}">
           <i class="fa-solid fa-magnifying-glass crm__search-icon"></i>
           <input type="text" name="search" value="{{ search }}" id="workforce_crm_board_input_search"
                  class="crm__search-input" autocomplete="off"
-                 placeholder="Search company, contact, phone…"
+                 placeholder="{% if is_driver_board %}Name, phone or WhatsApp…{% else %}Search company, contact, phone…{% endif %}"
+                 title="A number matches the lead's phone, any WhatsApp number linked to it and — for an applicant — the number on their application. Press Enter or click away to search."
                  hx-get="{{ board_url }}" hx-target="#main-content" hx-select="#main-content"
                  hx-swap="outerHTML" hx-push-url="true"
-                 hx-trigger="keyup changed delay:350ms, search" data-search-min="3"
+                 hx-trigger="blur, search" data-search-min="3"
                  hx-include="#workforce_crm_board_form_filter">
         </div>
 
@@ -71,6 +82,68 @@
             {% endfor %}
             <option value="none" {% if 'none' in vehicle_filter %}selected{% endif %}>No vehicle</option>
           </select>
+
+          {% comment %}The rest of the application. Same param names, options and
+          meanings as the driver verification queue's bar, so a recruiter reading
+          "Part Time" gets the same pool on both pages and a URL carries between
+          them. "Not stated" / "No zone" / "Any time" are the not-recorded case —
+          the applicants still to be chased — never something an applicant chose.
+          {% endcomment %}
+          <select name="job" multiple data-placeholder="Any job type"
+                  data-facet-label="job type" data-facet-plural="job types" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if driver_picks.job %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_board_select_job" aria-label="Filter by job type"
+                  title="Full time / part time, as the applicant answered on the form">
+            {% for value, label in job_choices %}
+            <option value="{{ value }}" {% if value in driver_picks.job %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            <option value="none" {% if 'none' in driver_picks.job %}selected{% endif %}>Not stated</option>
+          </select>
+
+          <select name="docs" multiple data-placeholder="Any documents"
+                  data-facet-label="document state" data-facet-plural="document states" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if driver_picks.docs %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_board_select_docs" aria-label="Filter by uploaded documents"
+                  title="Complete = a selfie plus two ID documents actually uploaded; partial = something uploaded but short of that">
+            {% for value, label in doc_state_choices %}
+            <option value="{{ value }}" {% if value in driver_picks.docs %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="slab" multiple data-placeholder="Any hours"
+                  data-facet-label="slot" data-facet-plural="slots" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if driver_picks.slab %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_board_select_slab" aria-label="Filter by preferred working hours"
+                  title="Working hours the applicant offered — several ticked reads as any of them">
+            {% for value, label in slab_choices %}
+            <option value="{{ value }}" {% if value in driver_picks.slab %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            <option value="none" {% if 'none' in driver_picks.slab %}selected{% endif %}>Any time</option>
+          </select>
+
+          <select name="language" multiple data-placeholder="Any language"
+                  data-facet-label="language" data-facet-plural="languages" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if driver_picks.language %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_board_select_language" aria-label="Filter by language">
+            {% for value, label in language_choices %}
+            <option value="{{ value }}" {% if value in driver_picks.language %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            <option value="none" {% if 'none' in driver_picks.language %}selected{% endif %}>Not stated</option>
+          </select>
+
+          {# Only when there are zone groups to pick from — an empty facet reads as broken. #}
+          {% if zone_choices %}
+          <select name="zone" multiple data-placeholder="Any zone"
+                  data-facet-label="zone" data-facet-plural="zones" data-change-on-close
+                  class="crm__facet-select crm__facet--multi {% if driver_picks.zone %}crm__facet-select--on{% endif %}"
+                  id="workforce_crm_board_select_zone" aria-label="Filter by preferred zone"
+                  title="Zones the applicant said they want to work in">
+            {% for value, label in zone_choices %}
+            <option value="{{ value }}" {% if value in driver_picks.zone %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            <option value="none" {% if 'none' in driver_picks.zone %}selected{% endif %}>No zone</option>
+          </select>
+          {% endif %}
           {% endif %}
 
           {% include "workforce/crm/parts/_date_facet.html" %}

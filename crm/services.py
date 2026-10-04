@@ -243,12 +243,15 @@ def is_platform_account_number(*candidates):
     return False
 
 
-def wa_read_blocked(identifiers):
+def wa_read_blocked(identifiers, user=None):
     """'' when this conversation may be opened in the CRM, else the refusal reason.
 
     Takes the resolved identifier set for a chat (phones and/or @lid values) and
     resolves each back to a phone through the contact directory, because inbound rows
     are keyed by LID and a LID lookup is the only way to spot a platform account.
+
+    With `user`, also refuses a chat under a marketing-only WhatsApp label to staff
+    outside marketing (whatsapp/label_access.py).
     """
     from whatsapp.models import WhatsAppContact
 
@@ -275,6 +278,10 @@ def wa_read_blocked(identifiers):
             'cannot be opened here — it carries account and verification messages. '
             'Use the account\'s own profile page instead.'
         )
+    if user is not None:
+        from whatsapp import label_access
+        if label_access.identifiers_hidden(user, phones | lids):
+            return label_access.REFUSAL
     return ''
 
 
@@ -712,6 +719,162 @@ def is_lid_value(value):
     return n.isdigit() and len(n) > 13
 
 
+def add_wa_link(lead, identifier, session='', label='', user=None):
+    """Join another WhatsApp number (or lid) to this lead. Returns (link, created).
+
+    An existing link for the same identifier keeps its row; a label or session
+    given now fills in whatever it was missing.
+    """
+    from .models import LeadWaLink
+
+    ident = normalize_phone(identifier)[:50]
+    if not ident:
+        return None, False
+    link, created = LeadWaLink.objects.get_or_create(
+        lead=lead, identifier=ident,
+        defaults={'session': (session or '')[:64], 'label': (label or '').strip()[:40], 'created_by': user},
+    )
+    if not created:
+        fields = []
+        if label and not link.label:
+            link.label = label.strip()[:40]
+            fields.append('label')
+        if session and not link.session:
+            link.session = session[:64]
+            fields.append('session')
+        if fields:
+            link.save(update_fields=fields)
+    return link, created
+
+
+def remove_wa_link(lead, identifier):
+    """Detach one linked number. True when something was removed."""
+    from .models import LeadWaLink
+
+    ident = normalize_phone(identifier)
+    removed, _ = LeadWaLink.objects.filter(lead=lead, identifier=ident).delete()
+    if lead.wa_chat_override and normalize_phone(lead.wa_chat_override) == ident:
+        lead.wa_chat_override = ''
+        lead.save(update_fields=['wa_chat_override', 'updated_at'])
+        removed += 1
+    return bool(removed)
+
+
+def repoint_wa_link(lead, old_identifier, new_identifier):
+    """A linked phone turned out to be stored under a lid — point the link at it."""
+    from .models import LeadWaLink
+
+    old, new = normalize_phone(old_identifier), normalize_phone(new_identifier)[:50]
+    if not new or old == new:
+        return
+    link = LeadWaLink.objects.filter(lead=lead, identifier=old).first()
+    if link is None:
+        add_wa_link(lead, new)
+    elif LeadWaLink.objects.filter(lead=lead, identifier=new).exists():
+        link.delete()
+    else:
+        link.identifier = new
+        link.save(update_fields=['identifier'])
+
+
+def accounts_for_numbers(identifiers):
+    """{identifier: [account, ...]} — the platform user(s) registered on each number.
+
+    A lead's numbers often turn into logins: the owner signs up to manage the
+    dashboard, the office signs up as a team member. This only *reports* who
+    they are; a lead never blocks anyone from creating an account (signup
+    checks other accounts only). Lids are resolved to a phone through the
+    contact directory first; a lid with no known phone matches nobody.
+    """
+    import re
+    from django.db.models import Q
+    from core.models import Profile
+    from whatsapp.models import WhatsAppContact
+
+    phone_of = {}
+    lids = [normalize_phone(i) for i in identifiers if is_lid_value(i)]
+    lid_phone = dict(
+        WhatsAppContact.objects.filter(lid__in=lids).exclude(phone='').values_list('lid', 'phone')
+    ) if lids else {}
+    for ident in identifiers:
+        n = normalize_phone(ident)
+        phone = lid_phone.get(n, '') if is_lid_value(n) else n
+        if 8 <= len(phone) <= 13:
+            phone_of[ident] = phone[-8:]
+    out = {i: [] for i in identifiers}
+    if not phone_of:
+        return out
+
+    q = Q()
+    for last8 in set(phone_of.values()):
+        rx = r'\D*'.join(last8) + r'\D*$'
+        q |= Q(phone__regex=rx) | Q(whatsapp__regex=rx)
+    profiles = list(Profile.objects.filter(q).select_related('user'))
+    if not profiles:
+        return out
+
+    from business.models import Business
+    from fleet.models import Driver
+    user_ids = [p.user_id for p in profiles if p.user_id]
+    biz = {}
+    for uid, name in Business.objects.filter(user_id__in=user_ids).values_list('user_id', 'business_name'):
+        biz.setdefault(uid, name)
+    driver_status = dict(Driver.objects.filter(profile__in=profiles).values_list('profile_id', 'driver_status'))
+
+    for p in profiles:
+        user = p.user
+        if user is None:
+            continue
+        if user.is_staff or p.is_staff:
+            role = 'Staff'
+        elif p.user_id in biz:
+            role = f'Client · {biz[p.user_id]}'
+        elif p.pk in driver_status:
+            role = 'Driver' if driver_status[p.pk] == 'approved' else 'Driver applicant'
+        elif p.is_business:
+            role = 'Client team'
+        else:
+            role = 'Customer'
+        acct = {
+            'user_id': user.pk,
+            'username': user.username,
+            'name': ' '.join(x for x in (p.first_name, p.last_name) if x) or user.get_full_name() or user.username,
+            'role': role,
+        }
+        own = {re.sub(r'\D', '', v or '')[-8:] for v in (p.phone, p.whatsapp)}
+        for ident, last8 in phone_of.items():
+            if last8 in own and all(a['user_id'] != user.pk for a in out[ident]):
+                out[ident].append(acct)
+    return out
+
+
+def lead_wa_numbers(lead):
+    """Every WhatsApp number on a lead for the "Numbers" list: the lead's own phone
+    (primary) plus each linked number with its label, and the platform account(s)
+    registered on it. `blocked` marks numbers whose chat the CRM will not show
+    because they belong to an account (see wa_read_blocked)."""
+    rows = []
+    phone = normalize_phone(lead.phone)
+    if phone:
+        rows.append({'identifier': phone, 'label': 'Primary', 'session': '', 'primary': True, 'is_lid': False})
+    legacy = normalize_phone(lead.wa_chat_override or '')
+    for link in lead.wa_links.all():
+        rows.append({'identifier': link.identifier, 'label': link.label or 'Linked', 'session': link.session,
+                     'primary': False, 'is_lid': is_lid_value(link.identifier)})
+    if legacy and all(r['identifier'] != legacy for r in rows):
+        rows.append({'identifier': legacy, 'label': 'Linked', 'session': '', 'primary': False,
+                     'is_lid': is_lid_value(legacy)})
+    accounts = accounts_for_numbers([r['identifier'] for r in rows])
+    for r in rows:
+        r['accounts'] = accounts.get(r['identifier'], [])
+        r['blocked'] = bool(r['accounts'])
+        # A bare 8-digit number is a Qatar local one (the driver form stores it
+        # that way); show it dialable. Display only — never feed this to a lid.
+        ident = r['identifier']
+        r['display'] = ident if r['is_lid'] else '+' + ('974' + ident if len(ident) == 8 else ident)
+    return rows
+
+
 def driver_lead_target_stage(driver, stages=None):
     """Stage key a driver-category lead should sit in for this driver's status.
 
@@ -754,7 +917,7 @@ def reconcile_driver_leads():
     for lead in existing:
         if lead.driver_id:
             continue
-        for k in _driver_match_keys(lead.phone, lead.wa_chat_override):
+        for k in _driver_match_keys(lead.phone, *lead.wa_link_values):
             unbound_by_key.setdefault(k, []).append(lead)
 
     now = timezone.now()
@@ -845,13 +1008,66 @@ def driver_candidates_for_lead(lead):
     from django.db.models import Q
     from fleet.models import Driver
 
-    keys = _driver_match_keys(lead.phone, lead.wa_chat_override)
+    keys = _driver_match_keys(lead.phone, *lead.wa_link_values)
     if not keys:
         return []
     q = Q()
     for k in keys:
         q |= Q(driver_phone__endswith=k) | Q(driver_whatsapp__endswith=k)
     return list(Driver.objects.select_related('profile').filter(q).order_by('driver_id'))
+
+
+def lead_candidates_for_driver(driver):
+    """Unbound driver cards whose numbers match this driver — the reverse of
+    driver_candidates_for_lead, offered on the driver page's Leads tab so staff can
+    connect a WhatsApp / manual card the reconcile pass never claimed.
+
+    The SQL regex only narrows the search; each hit is re-checked with
+    _driver_match_keys so a lid in wa_chat_override / wa_links can't match on its
+    last 8 digits."""
+    from django.db.models import Q
+
+    prof = getattr(driver, 'profile', None)
+    keys = _driver_match_keys(driver.driver_phone, driver.driver_whatsapp,
+                              getattr(prof, 'whatsapp', '') or '')
+    if not keys:
+        return []
+    q = Q()
+    for k in keys:
+        rx = r'\D*'.join(k) + r'\D*$'
+        q |= Q(phone__regex=rx) | Q(wa_chat_override__regex=rx) | Q(wa_links__identifier__regex=rx)
+    leads = (
+        Lead.objects.filter(q, category=Lead.CATEGORY_DRIVER, driver__isnull=True,
+                            merged_into__isnull=True)
+        .distinct().prefetch_related('wa_links', 'merged_children')
+    )
+    return [l for l in leads if _driver_match_keys(l.phone, *l.wa_link_values) & keys]
+
+
+def connect_lead_to_driver(lead, driver, user=None):
+    """Bind an unclaimed driver card to this driver (sets the authoritative
+    Lead.driver FK). Raises ValueError with a staff-readable reason when it can't.
+
+    Only a number-matched candidate is accepted, and only while the driver has no
+    card of its own — two live cards on one driver would make reconcile pick one
+    at random. The stage catches up on the next driver-board reconcile."""
+    if driver.crm_leads.filter(merged_into__isnull=True).exclude(pk=lead.pk).exists():
+        raise ValueError('This driver already has a CRM card. Merge the cards on the CRM instead.')
+    if lead.driver_id == driver.pk:
+        return False
+    if lead.driver_id:
+        raise ValueError('That card is already connected to another driver.')
+    if all(c.pk != lead.pk for c in lead_candidates_for_driver(driver)):
+        raise ValueError("That card's numbers don't match this driver.")
+    lead.driver = driver
+    lead.save(update_fields=['driver', 'updated_at'])
+    _log_activity(
+        lead, LeadActivity.TYPE_NOTE,
+        f'Connected to driver {driver.driver_code or driver.pk} from the driver page — '
+        'this card now covers both the conversation and the application.',
+        user=user,
+    )
+    return True
 
 
 def _driver_for_lead(lead):
@@ -886,7 +1102,9 @@ def _driver_for_lead(lead):
 
 def duplicate_candidates(lead, limit=10):
     """Other open leads on the same board whose number matches this one."""
-    if not lead.phone:
+    # An absorbed card is already folded into its parent — offering the parent (or a
+    # sibling) as a "separate card" to merge would just loop back to where it lives.
+    if not lead.phone or lead.merged_into_id:
         return []
     variants = _phone_variants(normalize_phone(lead.phone))
     if not variants:
@@ -931,37 +1149,59 @@ def merge_leads(primary, duplicate, user=None):
             grandchild.save(update_fields=['merged_into', 'updated_at'])
 
         # Fill blanks on the survivor rather than overwrite — the primary is the card
-        # staff already know, so its own values win.
+        # staff already know, so its own values win. Where both have a value and they
+        # disagree, the detail page lists it (merge_differences) for staff to pick.
         filled = []
-        for field in ('company_name', 'contact_name', 'phone', 'product_category',
-                      'wa_chat_override', 'wa_session'):
+        for field in MERGE_TEXT_FIELDS + ('wa_session',):
             if not getattr(primary, field, '') and getattr(duplicate, field, ''):
                 setattr(primary, field, getattr(duplicate, field))
                 filled.append(field)
-        if primary.assigned_to_id is None and duplicate.assigned_to_id:
-            primary.assigned_to_id = duplicate.assigned_to_id
-            filled.append('assigned_to')
-        if primary.next_followup_at is None and duplicate.next_followup_at:
-            primary.next_followup_at = duplicate.next_followup_at
-            filled.append('next_followup_at')
-        if primary.driver_id is None and duplicate.driver_id:
-            primary.driver_id = duplicate.driver_id
-            filled.append('driver')
-        if primary.converted_business_id is None and duplicate.converted_business_id:
-            primary.converted_business_id = duplicate.converted_business_id
-            filled.append('converted_business')
+        for field in MERGE_FK_FIELDS + ('next_followup_at',):
+            if getattr(primary, field) is None and getattr(duplicate, field) is not None:
+                setattr(primary, field, getattr(duplicate, field))
+                filled.append(field)
         if filled:
             primary.save(update_fields=filled + ['updated_at'])
+
+        # Every extra WhatsApp number on the absorbed card joins the survivor, plus the
+        # absorbed card's own phone when it is a different number, so no chat is lost.
+        primary_numbers = set(_phone_variants(normalize_phone(primary.phone))) if primary.phone else set()
+        primary_numbers |= {normalize_phone(v) for v in primary.wa_link_values}
+        added_links = []
+        extra = [(l.identifier, l.session, l.label) for l in duplicate.wa_links.all()]
+        if duplicate.phone and normalize_phone(duplicate.phone) not in primary_numbers:
+            extra.insert(0, (duplicate.phone, '', f'From #{duplicate.pk}'))
+        for identifier, session, label in extra:
+            ident = normalize_phone(identifier)
+            if not ident or ident in primary_numbers:
+                continue
+            link, created = add_wa_link(primary, ident, session=session, label=label, user=user)
+            if created:
+                added_links.append(link.identifier)
+                primary_numbers.add(link.identifier)
 
         duplicate.merged_into = primary
         duplicate.merged_at = timezone.now()
         duplicate.merged_by = user
-        duplicate.save(update_fields=['merged_into', 'merged_at', 'merged_by', 'updated_at'])
+        # Read back after save — Lead.save() re-tags contact_name, and un-merge compares
+        # against what actually landed on the parent.
+        duplicate.merge_filled = {
+            'fields': {f: _merge_value(primary, f) for f in filled},
+            'wa_links': added_links,
+        }
+        duplicate.save(update_fields=['merged_into', 'merged_at', 'merged_by',
+                                      'merge_filled', 'updated_at'])
 
+    summary = []
+    if filled:
+        summary.append(f'Filled: {", ".join(MERGE_FIELD_LABELS.get(f, f) for f in filled)}.')
+    if added_links:
+        summary.append(f'Added WhatsApp number{"s" if len(added_links) > 1 else ""}: '
+                       f'{", ".join(added_links)}.')
     _log_activity(
         primary, LeadActivity.TYPE_NOTE,
-        f'Merged lead #{duplicate.pk} ({duplicate.get_source_display()}) into this card.'
-        + (f' Filled: {", ".join(filled)}.' if filled else ''),
+        ' '.join([f'Merged lead #{duplicate.pk} ({duplicate.get_source_display()}) into this card.']
+                 + summary),
         user,
     )
     _log_activity(
@@ -971,17 +1211,142 @@ def merge_leads(primary, duplicate, user=None):
     return True, ''
 
 
+# Fields a merge compares and fills. Text blanks are '', FK/date blanks are None.
+MERGE_TEXT_FIELDS = ('company_name', 'contact_name', 'phone', 'phone_2', 'product_category', 'notes')
+MERGE_FK_FIELDS = ('assigned_to_id', 'driver_id', 'converted_business_id')
+MERGE_FIELD_LABELS = {
+    'company_name': 'Company', 'contact_name': 'Contact', 'phone': 'Phone', 'phone_2': '2nd mobile',
+    'product_category': 'Product category', 'notes': 'Notes', 'wa_session': 'WhatsApp number used',
+    'assigned_to_id': 'Assigned to', 'driver_id': 'Driver record',
+    'converted_business_id': 'Converted business', 'next_followup_at': 'Next follow-up',
+}
+# What "Use this value" may copy from an absorbed card. The driver binding and the
+# converted business are left out: repointing those moves real records, not a label.
+MERGE_ADOPTABLE_FIELDS = ('company_name', 'contact_name', 'phone', 'phone_2', 'product_category',
+                          'notes', 'assigned_to_id', 'next_followup_at')
+
+
+def _merge_value(lead, field):
+    """A field's value in JSON-safe form, for merge_filled and comparisons."""
+    value = getattr(lead, field)
+    if field == 'next_followup_at':
+        return value.isoformat() if value else None
+    return value
+
+
+def _merge_display(lead, field):
+    value = getattr(lead, field)
+    if field == 'assigned_to_id':
+        user = lead.assigned_to
+        return (user.get_full_name() or user.username) if user else ''
+    if field == 'next_followup_at':
+        return value.strftime('%d %b %Y') if value else ''
+    return value or ''
+
+
+def _merge_same(field, a, b):
+    if field == 'phone':
+        # Same number in another format (55000123 vs 97455000123) is not a conflict.
+        na, nb = normalize_phone(a), normalize_phone(b)
+        return na == nb or bool(set(_phone_variants(na)) & set(_phone_variants(nb)))
+    if isinstance(a, str) and isinstance(b, str):
+        return a.strip() == b.strip()
+    return a == b
+
+
+def merge_differences(parent, child):
+    """Fields where the parent and an absorbed card both hold a value and they disagree.
+
+    The merge kept the parent's value silently; this is what the detail page shows so
+    staff can see what the other card said and take it with "Use this value".
+    """
+    rows = []
+    for field in MERGE_ADOPTABLE_FIELDS:
+        mine, theirs = getattr(parent, field), getattr(child, field)
+        if mine in (None, '') or theirs in (None, '') or _merge_same(field, mine, theirs):
+            continue
+        rows.append({
+            'field': field,
+            'label': MERGE_FIELD_LABELS[field],
+            'parent_value': _merge_display(parent, field),
+            'child_value': _merge_display(child, field),
+        })
+    return rows
+
+
+def adopt_merged_value(parent, child, field, user=None):
+    """Copy one field from an absorbed card onto its parent. Returns (ok, error)."""
+    if child.merged_into_id != parent.pk:
+        return False, 'That card is not merged into this one.'
+    if field not in MERGE_ADOPTABLE_FIELDS:
+        return False, 'That field cannot be copied.'
+    old = _merge_display(parent, field)
+    setattr(parent, field, getattr(child, field))
+    parent.save(update_fields=[field, 'updated_at'])
+    # A deliberate choice — un-merge must not take it back.
+    recorded = (child.merge_filled or {}).get('fields', {})
+    if field in recorded:
+        recorded.pop(field)
+        child.save(update_fields=['merge_filled', 'updated_at'])
+    _log_activity(
+        parent, LeadActivity.TYPE_NOTE,
+        f'{MERGE_FIELD_LABELS[field]} taken from merged lead #{child.pk}: '
+        f'"{old}" → "{_merge_display(parent, field)}".',
+        user,
+    )
+    return True, ''
+
+
 def unmerge_lead(child, user=None):
-    """Put an absorbed lead back on the board as its own card."""
+    """Put an absorbed lead back on the board as its own card.
+
+    Takes back what the merge wrote onto the parent — the blanks it filled and the
+    WhatsApp numbers it added — wherever the parent still holds the merged value.
+    Anything staff changed since the merge is theirs and stays.
+    """
+    from .models import LeadWaLink
+
     if not child.merged_into_id:
         return False, 'That lead is not merged into anything.'
-    parent_id = child.merged_into_id
-    child.merged_into = None
-    child.merged_at = None
-    child.merged_by = None
-    child.save(update_fields=['merged_into', 'merged_at', 'merged_by', 'updated_at'])
+    parent = child.merged_into
+    record = child.merge_filled or {}
+    reverted, kept = [], []
+    with transaction.atomic():
+        clear = []
+        for field, value in (record.get('fields') or {}).items():
+            if not hasattr(parent, field):
+                continue
+            if _merge_value(parent, field) == value:
+                blank = None if field in MERGE_FK_FIELDS or field == 'next_followup_at' else ''
+                setattr(parent, field, blank)
+                clear.append(field)
+                reverted.append(MERGE_FIELD_LABELS.get(field, field))
+            else:
+                kept.append(MERGE_FIELD_LABELS.get(field, field))
+        if clear:
+            parent.save(update_fields=clear + ['updated_at'])
+        links = record.get('wa_links') or []
+        removed = 0
+        if links:
+            removed, _ = LeadWaLink.objects.filter(lead=parent, identifier__in=links).delete()
+
+        child.merged_into = None
+        child.merged_at = None
+        child.merged_by = None
+        child.merge_filled = {}
+        child.save(update_fields=['merged_into', 'merged_at', 'merged_by',
+                                  'merge_filled', 'updated_at'])
+
     _log_activity(child, LeadActivity.TYPE_NOTE,
-                  f'Un-merged from lead #{parent_id} — back on the board on its own.', user)
+                  f'Un-merged from lead #{parent.pk} — back on the board on its own.', user)
+    detail = [f'Un-merged lead #{child.pk} — it is back on the board on its own.']
+    if reverted:
+        detail.append(f'Cleared what the merge had filled: {", ".join(reverted)}.')
+    if removed:
+        detail.append(f'Removed {removed} WhatsApp number{"s" if removed > 1 else ""} it had added.')
+    if kept:
+        detail.append(f'Kept (changed since the merge): {", ".join(kept)}.')
+    _log_activity(parent, LeadActivity.TYPE_NOTE, ' '.join(detail), user)
     return True, ''
 
 

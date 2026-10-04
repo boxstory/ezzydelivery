@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db.models.functions import Lower
 from business import models as business_models
 
 from core import models as core_models
@@ -8,9 +9,16 @@ from core import models as core_models
 
 @admin.register(core_models.Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'first_name', 'last_name', 'email',
-                    'whatsapp', 'is_business', 'is_driver', 'created_at', 'updated_at')
-    list_filter = ('is_business', 'is_driver', 'created_at', 'updated_at')
+    list_display = ('user_number', 'user_col', 'first_name_col', 'last_name_col', 'email_col',
+                    'phone', 'whatsapp', 'whatsapp_verified', 'zone_name_col', 'is_business', 'is_driver',
+                    'is_customer', 'is_staff', 'is_superadmin', 'dept_operations',
+                    'dept_finance', 'dept_marketing', 'verification_status',
+                    'is_profile_completed', 'signup_source', 'created_at', 'updated_at')
+    list_display_links = ('user_number', 'user_col')
+    list_filter = ('is_business', 'is_driver', 'is_customer', 'is_staff', 'is_superadmin',
+                   'dept_operations', 'dept_finance', 'dept_marketing', 'verification_status',
+                   'whatsapp_verified', 'is_profile_completed', 'signup_source',
+                   'created_at', 'updated_at')
     search_fields = ('user_number', 'username', 'first_name', 'last_name', 'zone_name', 'email',
                      'phone', 'whatsapp', 'address', 'verification_status', 'instagram',
                      'nationlity', 'rejection_reason', 'signup_source', 'signup_landing_path',
@@ -19,6 +27,29 @@ class ProfileAdmin(admin.ModelAdmin):
                         'address, zone, verification status and signup source')
     list_select_related = ('user',)
     list_per_page = 10
+
+    # The database collation is C.UTF-8, which sorts every capitalised value
+    # before every lowercase one. Sort the text columns on Lower() so a
+    # column header click gives true A-Z order.
+    @admin.display(description='User', ordering=Lower('user__username'))
+    def user_col(self, obj):
+        return obj.user
+
+    @admin.display(description='First name', ordering=Lower('first_name'))
+    def first_name_col(self, obj):
+        return obj.first_name
+
+    @admin.display(description='Last name', ordering=Lower('last_name'))
+    def last_name_col(self, obj):
+        return obj.last_name
+
+    @admin.display(description='Email', ordering=Lower('email'))
+    def email_col(self, obj):
+        return obj.email
+
+    @admin.display(description='Zone', ordering=Lower('zone_name'))
+    def zone_name_col(self, obj):
+        return obj.zone_name
 
 @admin.register(core_models.ProfilePicture)
 class ProfilePictureAdmin(admin.ModelAdmin):

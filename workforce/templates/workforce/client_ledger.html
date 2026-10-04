@@ -144,9 +144,9 @@
         <span class="clg__balance-sub">{{ entries_total|intcomma }} entr{{ entries_total|pluralize:"y,ies" }}{% if segment or status or direction or date_from or date_to or q %} matching the filter{% endif %}</span>
       </div>
 
-      {# Deliberately not the balance. A refund at a customer's door spends the
+      {% comment %}Deliberately not the balance. A refund at a customer's door spends the
          client's money, so it is allowed only against float this account can
-         evidence — a narrower set of segments than the balance sums. #}
+         evidence — a narrower set of segments than the balance sums.{% endcomment %}
       <div class="clg__float {% if refund_credit <= 0 %}clg__float--empty{% endif %}">
         <span class="clg__float-label">Refundable float</span>
         <span class="clg__float-value">QAR {{ refund_credit|floatformat:2|intcomma }}</span>
@@ -168,9 +168,9 @@
       {% endif %}
     </section>
 
-    {# Record a money event by hand. This is the only route that posts a client
+    {% comment %}Record a money event by hand. This is the only route that posts a client
        payment: the COD, charge and payout legs do not write to this ledger, so
-       without it an account is seeded once and then frozen. #}
+       without it an account is seeded once and then frozen.{% endcomment %}
     <section class="clg__postbox" aria-label="Record an entry">
       <div class="clg__postbox-head">
         <h2 class="clg__postbox-title">Record an entry</h2>

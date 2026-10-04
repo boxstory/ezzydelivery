@@ -6,6 +6,7 @@ import json
 import re
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 from django.test import TestCase, RequestFactory
 
@@ -18,6 +19,14 @@ TWO_SESSIONS = [
     {'name': 'fleet', 'status': 'WORKING', 'phone': '97466124545', 'push_name': 'Ezzy Fleet'},
 ]
 
+
+
+def _admin_get(path):
+    """GET for the dashboard view as a super admin — the page refuses anyone else."""
+    req = RequestFactory().get(path)
+    req.user, _ = User.objects.get_or_create(
+        username='dash-admin', defaults={'is_superuser': True, 'is_staff': True})
+    return req
 
 class SessionNormalizeTests(TestCase):
     def test_blank_and_malformed_fall_back_to_default(self):
@@ -122,6 +131,14 @@ class WebhookSessionTests(TestCase):
         self.assertEqual(WhatsAppMessage.objects.count(), 1)
 
     @patch('whatsapp.waha_views._verify_waha_hmac', return_value=(True, ''))
+    def test_a_code_sent_to_us_is_redacted_in_body_and_payload(self, _hmac):
+        self._post(self.client, 'default', 'Your verification code is 482913. Do not share it.')
+        row = WhatsAppMessage.objects.get()
+        self.assertNotIn('482913', row.body)
+        self.assertNotIn('482913', json.dumps(row.raw_payload))
+        self.assertIn('verification code', row.body)
+
+    @patch('whatsapp.waha_views._verify_waha_hmac', return_value=(True, ''))
     def test_unknown_session_name_is_normalized_not_stored_raw(self, _hmac):
         payload = {
             'event': 'message',
@@ -153,6 +170,7 @@ class ChatThreadIsolationTests(TestCase):
         from whatsapp.wa_chats_view import _messages_response
         rf = RequestFactory()
         req = rf.get(f'/waha/wa-chats/?messages=1&chatId=97455512345@c.us&session={session}')
+        req.user = User.objects.get_or_create(username='isolation', defaults={'is_superuser': True, 'is_staff': True})[0]
         # Stub the live WAHA leg — this asserts on the DB half only.
         import requests as _rq
         offline = _rq.exceptions.RequestException('offline')
@@ -286,7 +304,7 @@ class SectionRoutesTests(TestCase):
 class DashboardRenderTests(TestCase):
     def test_no_placeholder_survives_and_panel_is_present(self):
         from whatsapp.wa_dashboard_view import wa_dashboard
-        body = wa_dashboard(RequestFactory().get('/waha/wa-dashboard/')).content.decode()
+        body = wa_dashboard(_admin_get('/waha/wa-dashboard/')).content.decode()
         for placeholder in ('%SESSION%', '%SESSION_TABS%', '%SESSION_ROUTES%'):
             self.assertNotIn(placeholder, body)
         self.assertIn('wa-routes__hd', body)
@@ -297,7 +315,7 @@ class DashboardRenderTests(TestCase):
         session), so its links out must not navigate the ops page away."""
         import re
         from whatsapp.wa_dashboard_view import wa_dashboard
-        body = wa_dashboard(RequestFactory().get('/waha/wa-dashboard/')).content.decode()
+        body = wa_dashboard(_admin_get('/waha/wa-dashboard/')).content.decode()
         panel = body[body.index('<div class="wa-routes">'):]
         panel = panel[:panel.index('</div></div>') + 12]
 
@@ -310,17 +328,71 @@ class DashboardRenderTests(TestCase):
 
     def test_edit_link_is_a_visible_header_action(self):
         from whatsapp.wa_dashboard_view import wa_dashboard
-        body = wa_dashboard(RequestFactory().get('/waha/wa-dashboard/')).content.decode()
+        body = wa_dashboard(_admin_get('/waha/wa-dashboard/')).content.decode()
         self.assertIn('wa-routes__edit', body)
         self.assertIn('Edit settings', body)
 
     def test_requested_session_reaches_the_page_js(self):
         from whatsapp.wa_dashboard_view import wa_dashboard
         body = wa_dashboard(
-            RequestFactory().get('/waha/wa-dashboard/?session=fleet')
+            _admin_get('/waha/wa-dashboard/?session=fleet')
         ).content.decode()
         self.assertIn("const SESSION = 'fleet'", body)
 
+
+class DashboardAccessTests(TestCase):
+    """Session Status links a device to a company number by QR, so it is
+    super-admin only; marketing staff get the inbox and nothing else."""
+
+    def _staff(self, username, **dept):
+        from core.models import Profile
+        user = User.objects.create_user(username=username, password='x', is_staff=True)
+        Profile.objects.create(user=user, first_name=username, is_staff=True, **dept)
+        return user
+
+    def test_anonymous_is_sent_to_login(self):
+        resp = self.client.get('/waha/wa-dashboard/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp['Location'])
+
+    def test_marketing_staff_are_refused(self):
+        self.client.force_login(self._staff('dash-mkt', dept_marketing=True))
+        resp = self.client.get('/waha/wa-dashboard/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertNotIn('wa-routes', resp.content.decode())
+
+    def test_every_desk_is_refused(self):
+        self.client.force_login(self._staff(
+            'dash-all', dept_marketing=True, dept_operations=True, dept_finance=True))
+        self.assertEqual(self.client.get('/waha/wa-dashboard/').status_code, 302)
+
+    @patch.object(wa_sessions, 'list_sessions', return_value=TWO_SESSIONS)
+    def test_superadmin_opens_it(self, _s):
+        from core.models import Profile
+        user = self._staff('dash-boss')
+        Profile.objects.filter(user=user).update(is_superadmin=True)
+        self.client.force_login(user)
+        resp = self.client.get('/waha/wa-dashboard/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('wa-routes__hd', resp.content.decode())
+
+    @patch.object(wa_sessions, 'list_sessions', return_value=TWO_SESSIONS)
+    def test_inbox_hides_the_dashboard_link_from_marketing(self, _s):
+        self.client.force_login(self._staff('dash-mkt2', dept_marketing=True))
+        resp = self.client.get('/waha/wa-chats/', HTTP_ACCEPT='text/html')
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertNotIn('/waha/wa-dashboard/', body)
+        self.assertNotIn('%SESSION_HEALTH_LINK%', body)
+
+    @patch.object(wa_sessions, 'list_sessions', return_value=TWO_SESSIONS)
+    def test_inbox_keeps_the_dashboard_link_for_superadmin(self, _s):
+        from core.models import Profile
+        user = self._staff('dash-boss2')
+        Profile.objects.filter(user=user).update(is_superadmin=True)
+        self.client.force_login(user)
+        body = self.client.get('/waha/wa-chats/', HTTP_ACCEPT='text/html').content.decode()
+        self.assertIn('/waha/wa-dashboard/?session=default', body)
 
 class SenderNumberTests(TestCase):
     def test_prefers_the_configured_instance_mapping(self):
@@ -703,6 +775,6 @@ class RoutePanelLivenessTests(TestCase):
         from django.test import RequestFactory
         from whatsapp.wa_dashboard_view import wa_dashboard
         self._route_to('fleet')
-        html = wa_dashboard(RequestFactory().get('/waha/wa-dashboard/')).content.decode()
+        html = wa_dashboard(_admin_get('/waha/wa-dashboard/')).content.decode()
         self.assertIn('session scan_qr_code', html)
         self.assertIn('wa-routes__num--warn', html)

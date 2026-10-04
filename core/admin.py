@@ -70,9 +70,10 @@ class AutoTriggerConfigAdmin(admin.ModelAdmin):
 
 @admin.register(core_models.MessageTemplate)
 class MessageTemplateAdmin(admin.ModelAdmin):
-    list_display = ('is_enabled', 'updated_at', 'updated_by')
-    search_fields = ('body', 'updated_by__username')
-    list_filter = ('is_enabled',)
+    list_display = ('key', 'msg_id', 'label', 'is_custom', 'section', 'is_enabled',
+                    'updated_at', 'updated_by')
+    search_fields = ('key', 'label', 'body', 'updated_by__username')
+    list_filter = ('is_custom', 'is_enabled', 'section')
     list_select_related = ('updated_by',)
     raw_id_fields = ('updated_by',)
 

@@ -48,6 +48,7 @@
             {% include "workforce/parts/sidebar/whatsapp.html" %}
             {% include "workforce/parts/sidebar/driver_proposals.html" %}
           {% endif %}
+          {% include "workforce/parts/sidebar/proposal_interests.html" %}
           {% include "workforce/parts/sidebar/onboarding.html" %}
         {% endif %}
 
@@ -56,18 +57,13 @@
           {% if wf_dept_ops %}
             {% include "workforce/parts/sidebar/dispatch.html" %}
           {% endif %}
-          {% comment %}
-          Auto Triggers is multi-desk: the catalogue link is open to every
-          department (it shows only that desk's rows); the automation plumbing
-          inside the submenu stays admin-only.
-          {% endcomment %}
-          {% include "workforce/parts/sidebar/triggers.html" %}
+          {# Auto Triggers is super-admin only (core/departments.py _ADMIN). #}
+          {% if wf_dept_admin %}
+            {% include "workforce/parts/sidebar/triggers.html" %}
+          {% endif %}
           {% if wf_dept_ops %}
             {% include "workforce/parts/sidebar/zones.html" %}
           {% endif %}
-        {% elif wf_dept_fin or wf_dept_mkt %}
-          <p class="dsb-section">Automation</p>
-          {% include "workforce/parts/sidebar/triggers.html" %}
         {% endif %}
 
         {% include "workforce/parts/sidebar/import.html" %}
@@ -146,8 +142,11 @@ document.addEventListener('DOMContentLoaded', function () {
     {re: /^\/workforce\/product-requests\//,                menu: 'submenu-warehouse',     link: 'workforce_sidebar_link_product_requests'},
     {re: /^\/workforce\/forms\/pricing-inquiries\/\d+/,     menu: 'submenu-verifications', link: 'workforce_sidebar_link_pricing_inquiries'},
     {re: /^\/workforce\/forms\//,                           menu: 'submenu-verifications', link: null},
-    {re: /^\/workforce\/crm\/leads\/\d+/,                   menu: 'submenu-crm',           link: 'workforce_sidebar_link_crm_board'},
-    {re: /^\/workforce\/crm\//,                             menu: 'submenu-crm',           link: null},
+    // Both CRM menus resolve server-side (a lead page says which board owns it
+    // via crm_sidebar_board), so these only catch a CRM page with no entry at all.
+    {re: /^\/workforce\/crm\/leads\/drivers/,                menu: 'submenu-crm-driver',    link: 'workforce_sidebar_link_crm_driver_list'},
+    {re: /^\/workforce\/crm\/driver\//,                     menu: 'submenu-crm-driver',    link: null},
+    {re: /^\/workforce\/crm\//,                             menu: 'submenu-crm-business',  link: null},
     // Finance > Driver also lives under /workforce/fleet/, so each of its pages
     // has to claim itself before the Fleet A/Cs catch-all below sweeps it up.
     {re: /^\/workforce\/fleet\/drivers-earnings\//,         menu: 'submenu-finance-driver', link: 'workforce_sidebar_link_finance_driver_earnings'},

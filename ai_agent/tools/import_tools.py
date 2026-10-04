@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from ai_agent.tools.base import BaseTool, ToolError, register_tool
 from business.suspension import is_business_suspended, SUSPENSION_MESSAGE
+from core.destination import is_foreign, order_country
 
 logger = logging.getLogger(__name__)
 
@@ -612,6 +613,17 @@ class ImportFromApiTool(BaseTool):
                     original_order_data__source='shopify'
                 ).exists():
                     skipped += 1
+                    continue
+
+                # This path runs unattended and writes straight to Order with no
+                # TempOrder in between, so nobody reviews what it creates. A
+                # GCC-wide store would book undeliverable jobs here first.
+                if is_foreign(o, api):
+                    skipped += 1
+                    errors.append(
+                        f'{pid}: ships to {order_country(o) or "an unknown country"} '
+                        f'— outside Qatar, not imported'
+                    )
                     continue
 
                 try:

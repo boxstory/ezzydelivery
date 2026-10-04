@@ -49,6 +49,11 @@
         {% if orders %}
         <div class="oag__result-count d-flex align-items-center gap-3">
             <span class="oag__count-num">{{ orders|length }}</span> orders found
+            {% if hidden_foreign_count %}
+            <span class="text-muted small ms-2">
+                <i class="fa-solid fa-filter me-1"></i>{{ hidden_foreign_count }} outside Qatar not shown
+            </span>
+            {% endif %}
             {% if ready_count %}
             <label class="d-flex align-items-center gap-2 mb-0 ms-2" style="cursor:pointer;font-size:.875rem;">
                 <input type="checkbox" id="oag_select_all" onchange="oagToggleSelectAll(this)" style="width:16px;height:16px;cursor:pointer;">
@@ -252,8 +257,17 @@
     {% else %}
     <div class="oag__empty">
         <div class="oag__empty-icon"><i class="fas fa-plug"></i></div>
+        {% if hidden_foreign_count %}
+        <p class="oag__empty-text">No Qatar orders in this date range.</p>
+        <p class="oag__empty-hint">
+            {{ hidden_foreign_count }} order{{ hidden_foreign_count|pluralize }} ship
+            outside Qatar and {{ hidden_foreign_count|pluralize:"is,are" }} not listed,
+            because this store is set to import Qatar orders only.
+        </p>
+        {% else %}
         <p class="oag__empty-text">No orders found for this date range.</p>
         <p class="oag__empty-hint">Try adjusting the dates above.</p>
+        {% endif %}
     </div>
     {% endif %}
 

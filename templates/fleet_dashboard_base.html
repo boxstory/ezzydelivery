@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="{% static 'mobile-app.css' %}?v=20260803a">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
   <!-- Brand sizing for the searchable filter selects (see main_dashboard_scripts.html) -->
-  <link rel="stylesheet" href="{% static 'webpages/css/select2-filters.css' %}?v=20260922b" type="text/css" />
+  <link rel="stylesheet" href="{% static 'webpages/css/select2-filters.css' %}?v=20260929d" type="text/css" />
 
   <!-- Dashboard CSS - Always loaded for HTMX compatibility -->
   <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}?v=20260514a" type="text/css" />
@@ -35,6 +35,9 @@
 
   <!-- AI Chat Widget CSS -->
   <link rel="stylesheet" href="{% static 'ai_agent/css/chat-widget.css' %}?v=20260614c" type="text/css" />
+  {% if driver_gps_required %}
+  <link rel="stylesheet" href="{% static 'fleet/css/gps-gate.css' %}?v=20261004a" type="text/css" />
+  {% endif %}
 
   {% block extra_css %}
   {% endblock extra_css %}
@@ -56,11 +59,11 @@
         <i class="fa-solid fa-hand"></i>
       </div>
       <div class="cod-warning-banner__text">
-        <strong>COD Limit Reached!</strong>
-        <span>You have {{ driver_cod_in_hand }} QR COD in hand. Please submit COD to admin to continue accepting orders.</span>
+        <strong>Cash Limit Reached!</strong>
+        <span>You have {{ driver_cod_in_hand }} QR cash in hand. Please submit cash to the office to continue accepting orders.</span>
       </div>
       <a href="{% url 'fleet:cod_submission' %}" class="cod-warning-banner__btn">
-        <i class="fa-solid fa-upload me-1"></i>Submit COD
+        <i class="fa-solid fa-upload me-1"></i>Submit Cash
       </a>
     </div>
   </div>
@@ -71,11 +74,11 @@
         <i class="fa-solid fa-exclamation-triangle"></i>
       </div>
       <div class="cod-warning-banner__text">
-        <strong>COD Warning!</strong>
+        <strong>Cash Warning!</strong>
         <span>Wallet usage at {{ driver_usage_percentage|floatformat:0 }}%. Available credit: {{ driver_available_credit }} QR</span>
       </div>
       <a href="{% url 'fleet:cod_submission' %}" class="cod-warning-banner__btn">
-        <i class="fa-solid fa-upload me-1"></i>Submit COD
+        <i class="fa-solid fa-upload me-1"></i>Submit Cash
       </a>
       <button type="button" class="cod-warning-banner__close" onclick="this.parentElement.parentElement.style.display='none'">
         <i class="fa-solid fa-times"></i>
@@ -138,9 +141,14 @@
        pages report their position and record their handoffs to other apps too.
        Gated on is_fleet_driver: this base is shared with a few staff screens,
        and nobody without a driver row should be asked for their location. -->
+  {% if driver_gps_required %}{% include "fleet/parts/gps_gate.html" %}{% endif %}
   <script>window.EZZY_GPS_CONFIG = { onDuty: {{ driver_on_duty|yesno:"true,false" }} };</script>
   <script src="{% static 'fleet/js/ezzy-gps-queue.js' %}?v=20260802a"></script>
-  <script src="{% static 'fleet/js/ezzy-gps.js' %}?v=20260903c"></script>
+  <script src="{% static 'fleet/js/ezzy-gps.js' %}?v=20261004a"></script>
+  {% if driver_gps_required %}
+  <!-- Location lock — approved drivers cannot use the app with location off -->
+  <script src="{% static 'fleet/js/ezzy-gps-gate.js' %}?v=20261004a"></script>
+  {% endif %}
   {% endif %}
 
   <!-- PWA Service Worker Registration -->
