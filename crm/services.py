@@ -777,7 +777,32 @@ def repoint_wa_link(lead, old_identifier, new_identifier):
         link.save(update_fields=['identifier'])
 
 
-def accounts_for_numbers(identifiers):
+def lid_phones(identifiers, sessions=()):
+    """{lid: phone digits} for the lids among `identifiers` whose real number we know.
+
+    The contact directory first (the daily contact sync fills it), then WAHA's
+    cached lids map for `sessions`. Never calls WAHA; an unknown lid is simply
+    absent from the result.
+    """
+    from django.core.cache import cache
+    from whatsapp.models import WhatsAppContact
+    from whatsapp.wa_chats_view import _lid_cache_key
+
+    lids = {normalize_phone(i) for i in identifiers if is_lid_value(i)}
+    if not lids:
+        return {}
+    out = dict(WhatsAppContact.objects.filter(lid__in=lids).exclude(phone='').values_list('lid', 'phone'))
+    for session in dict.fromkeys(s for s in sessions if s):
+        missing = lids - out.keys()
+        if not missing:
+            break
+        mp = cache.get(_lid_cache_key(session))
+        if isinstance(mp, dict):
+            out.update({lid: mp[lid] for lid in missing if mp.get(lid)})
+    return out
+
+
+def accounts_for_numbers(identifiers, lid_phone=None):
     """{identifier: [account, ...]} — the platform user(s) registered on each number.
 
     A lead's numbers often turn into logins: the owner signs up to manage the
@@ -789,13 +814,10 @@ def accounts_for_numbers(identifiers):
     import re
     from django.db.models import Q
     from core.models import Profile
-    from whatsapp.models import WhatsAppContact
 
     phone_of = {}
-    lids = [normalize_phone(i) for i in identifiers if is_lid_value(i)]
-    lid_phone = dict(
-        WhatsAppContact.objects.filter(lid__in=lids).exclude(phone='').values_list('lid', 'phone')
-    ) if lids else {}
+    if lid_phone is None:
+        lid_phone = lid_phones(identifiers)
     for ident in identifiers:
         n = normalize_phone(ident)
         phone = lid_phone.get(n, '') if is_lid_value(n) else n
@@ -864,14 +886,20 @@ def lead_wa_numbers(lead):
     if legacy and all(r['identifier'] != legacy for r in rows):
         rows.append({'identifier': legacy, 'label': 'Linked', 'session': '', 'primary': False,
                      'is_lid': is_lid_value(legacy)})
-    accounts = accounts_for_numbers([r['identifier'] for r in rows])
+    idents = [r['identifier'] for r in rows]
+    lid_phone = lid_phones(idents, [r['session'] for r in rows])
+    accounts = accounts_for_numbers(idents, lid_phone=lid_phone)
     for r in rows:
         r['accounts'] = accounts.get(r['identifier'], [])
         r['blocked'] = bool(r['accounts'])
-        # A bare 8-digit number is a Qatar local one (the driver form stores it
-        # that way); show it dialable. Display only — never feed this to a lid.
+        # `phone` is the real number behind the row — a lid's comes from the
+        # contact directory and is '' when unknown. A bare 8-digit number is a
+        # Qatar local one (the driver form stores it that way); show it
+        # dialable. Display only — never feed `display` back in as a lid.
         ident = r['identifier']
-        r['display'] = ident if r['is_lid'] else '+' + ('974' + ident if len(ident) == 8 else ident)
+        phone = lid_phone.get(ident, '') if r['is_lid'] else ident
+        r['phone'] = phone
+        r['display'] = '+' + ('974' + phone if len(phone) == 8 else phone) if phone else ident
     return rows
 
 

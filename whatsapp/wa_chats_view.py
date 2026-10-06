@@ -2427,10 +2427,10 @@ body {
 .wa-lead__block { margin-top: 0.625rem; font-size: 0.75rem; }
 .wa-lead__block > summary { cursor: pointer; color: var(--wa-muted); font-weight: 600; }
 .wa-lead__block p { margin: 0.25rem 0 0; white-space: pre-wrap; color: #3b4a54; line-height: 1.45; }
-.wa-acts { list-style: none; margin: 0.375rem 0 0; padding: 0; }
-.wa-acts li { padding: 0.3125rem 0; border-top: 0.0625rem solid var(--wa-border); }
-.wa-acts__meta { font-size: 0.6875rem; color: var(--wa-muted); }
-.wa-acts__body { color: #3b4a54; overflow-wrap: anywhere; }
+.wa-actlog { list-style: none; margin: 0.375rem 0 0; padding: 0; }
+.wa-actlog li { padding: 0.3125rem 0; border-top: 0.0625rem solid var(--wa-border); }
+.wa-actlog__meta { font-size: 0.6875rem; color: var(--wa-muted); }
+.wa-actlog__body { color: #3b4a54; overflow-wrap: anywhere; }
 .wa-lead__note { display: flex; gap: 0.375rem; margin-top: 0.5rem; }
 .wa-lead__note .wa-inp { flex: 1; }
 .wa-lead__msg { font-size: 0.6875rem; margin-top: 0.375rem; min-height: 0; }
@@ -2445,6 +2445,7 @@ body {
 .wa-nums__label { font-weight: 600; min-width: 4.5rem; }
 .wa-nums__id { font-variant-numeric: tabular-nums; color: #3b4a54; }
 .wa-nums__acct { color: var(--wa-muted); border: 0.0625rem solid var(--wa-border); border-radius: 0.25rem; padding: 0 0.3125rem; }
+.wa-nums__open { flex: none; padding: 0.0625rem 0.5rem; font-size: 0.6875rem; line-height: 1.4; }
 .wa-lead-search { margin-top: 0.5rem; }
 .wa-lead-search .wa-search { margin-bottom: 0.375rem; }
 
@@ -4431,6 +4432,43 @@ body {
     for (var i = 0; i < state.chats.length; i++) { if (state.chats[i].id === id) return state.chats[i]; }
     return null;
   }
+
+  // A lead card's number → its chat. A lid only exists on the WhatsApp number
+  // that issued it, so one from another session reloads the inbox there
+  // (?open=). A phone with no chat in the loaded list asks WhatsApp which chat
+  // it is — the thread may be stored under a lid.
+  function openNumberChat(n, btn) {
+    var lid = n.is_lid ? n.identifier : '';
+    if (lid && n.session && n.session !== SESSION) {
+      window.location.href = '/waha/wa-chats/?session=' + encodeURIComponent(n.session) +
+        '&open=' + encodeURIComponent(lid + '@lid');
+      return;
+    }
+    var hit = (lid && findChat(lid + '@lid')) || (n.phone && findChat(n.phone + '@c.us'));
+    if (hit) { openChat(hit.id, hit.name, hit.hasName); return; }
+    if (lid) { openChat(lid + '@lid', n.phone ? n.display : '', false); return; }
+    btn.disabled = true;
+    fetch(wq('/waha/wa-chats/check-number/?phone=' + encodeURIComponent(n.phone)), { credentials: 'same-origin' })
+      .then(function (r) { return r.json().catch(function () { return null; }); })
+      .then(function (j) {
+        btn.disabled = false;
+        if (!j || !j.ok) { showError((j && j.error) || 'Could not check ' + n.display + ' on WhatsApp.'); return; }
+        if (!j.exists) { showError(n.display + ' is not on WhatsApp.'); return; }
+        var c = j.chatId && findChat(j.chatId);
+        if (c) openChat(c.id, c.name, c.hasName);
+        else openChat(j.chatId || n.phone + '@c.us', n.display, false);
+      })
+      .catch(function () { btn.disabled = false; showError('Could not check ' + n.display + ' on WhatsApp.'); });
+  }
+  // ?open=<chatId>: arrive with that chat open (openNumberChat on another session).
+  function openFromUrl() {
+    var id = '';
+    try { id = new URLSearchParams(window.location.search).get('open') || ''; } catch (e) { return; }
+    if (!/^[\w.-]+@(?:c\.us|lid)$/.test(id)) return;
+    var c = findChat(id);
+    if (c) openChat(c.id, c.name, c.hasName);
+    else openChat(id, /@c\.us$/.test(id) ? '+' + id.split('@')[0] : '', false);
+  }
   function openChatMenu(anchor) {
     var id = state.activeChatId;
     if (!id) return;
@@ -5056,9 +5094,19 @@ body {
       l.numbers.forEach(function (n) {
         var li = el('li', 'wa-nums__row');
         li.appendChild(el('span', 'wa-nums__label', n.label));
-        li.appendChild(el('span', 'wa-nums__id', n.is_lid ? 'Private id ' + n.identifier : '+' + n.identifier));
-        var here = n.identifier === chatDigits || (chatPhone && n.identifier.slice(-8) === chatPhone.slice(-8));
+        // A lid shows its real number when the directory knows it; the lid stays on hover.
+        var idEl = el('span', 'wa-nums__id', n.phone ? n.display : 'Private id ' + n.identifier);
+        if (n.is_lid && n.phone) idEl.title = 'WhatsApp private id ' + n.identifier;
+        li.appendChild(idEl);
+        var here = n.identifier === chatDigits || (chatPhone && n.phone && n.phone.slice(-8) === chatPhone.slice(-8));
+        // "this chat" or Open chat sits right beside the number; accounts follow.
         if (here) li.appendChild(el('span', 'wa-flag wa-flag--ok', 'this chat'));
+        else {
+          var go = el('button', 'wa-btn wa-btn--sm wa-btn--ghost wa-nums__open', 'Open chat');
+          go.type = 'button';
+          go.addEventListener('click', function () { openNumberChat(n, go); });
+          li.appendChild(go);
+        }
         (n.accounts || []).forEach(function (a) {
           var acc = el('span', 'wa-nums__acct', '\u{1F464} ' + a.name + ' · ' + a.role);
           acc.title = '@' + a.username;
@@ -5157,11 +5205,12 @@ body {
     // Recent activity + add note
     var actD = el('details', 'wa-lead__block'); actD.open = true;
     actD.appendChild(el('summary', null, 'Recent activity'));
-    var list = el('ul', 'wa-acts');
+    // Not `wa-acts` — that is the message hover toolbar (opacity 0 until hover).
+    var list = el('ul', 'wa-actlog');
     function actItem(a) {
       var li = el('li');
-      li.appendChild(el('div', 'wa-acts__meta', a.type + ' · ' + a.by + ' · ' + fmtDate(a.at, true)));
-      li.appendChild(el('div', 'wa-acts__body', a.body));
+      li.appendChild(el('div', 'wa-actlog__meta', a.type + ' · ' + a.by + ' · ' + fmtDate(a.at, true)));
+      li.appendChild(el('div', 'wa-actlog__body', a.body));
       return li;
     }
     (l.activities || []).forEach(function (a) { list.appendChild(actItem(a)); });
@@ -5768,7 +5817,7 @@ body {
     }
   });
 
-  loadChats();
+  loadChats().then(openFromUrl);
   loadLabels();
   setInterval(poll, 30000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });

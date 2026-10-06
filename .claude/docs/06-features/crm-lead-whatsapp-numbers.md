@@ -40,7 +40,7 @@ Unique on `(lead, identifier)`, and ordered by `created_at`.
 | Add a number | `crm.services.add_wa_link(lead, identifier, session='', label='', user=None)`. Returns `(link, created)`. **Adds, never replaces**; on a repeat it only fills a missing label or session. |
 | Remove a number | `crm.services.remove_wa_link(lead, identifier)`. Also clears the legacy field if it held that value. |
 | A linked phone turned out to be a lid | `crm.services.repoint_wa_link(lead, old, new)` |
-| Numbers plus accounts for display | `crm.services.lead_wa_numbers(lead)`: primary phone (label "Primary") plus each link, with `accounts` and `blocked` |
+| Numbers plus accounts for display | `crm.services.lead_wa_numbers(lead)`: primary phone (label "Primary") plus each link, with `accounts`, `blocked`, and `phone`: a lid's real number from `lid_phones()` (contact directory, then the cached WAHA lids map; never a live call), or '' when unknown |
 | Who registered on these numbers | `crm.services.accounts_for_numbers(identifiers)` |
 
 Readers already switched to `wa_link_values`:
@@ -74,7 +74,7 @@ A lid is not a phone. Running it through `_phone_variants()` invents `974` + its
 ## UI
 
 **CRM lead page** (`/workforce/crm/leads/<id>/`, conversation panel):
-- A **Numbers** list (`#workforce_crm_detail_list_wa_numbers`) is always visible. Each row shows the label, the number (or "Private WhatsApp id …"), the session, the account(s) on it and the blocked note. Every non-primary row has **Unlink**.
+- A **Numbers** list (`#workforce_crm_detail_list_wa_numbers`) is always visible. Each row shows the label, the number (a lid shows its known phone with the id on hover; "Private WhatsApp id …" only when no phone is known), the session, the account(s) on it and the blocked note. Every non-primary row has **Unlink**.
 - The "Link chat / Link another number" linker has a **"Who is this number?"** field (datalist of suggestions) posted as `label` with the pick. The page reloads after any successful link, even when no messages exist yet.
 - Styles are the `.crmd__numbers` / `.crmd__number*` rules in `workforce/css/crm.css`, whose `?v=` was bumped in all 15 templates that link it. JS is in `crm_lead_detail.js` (`[data-unlink-number]` handler, label read on link).
 

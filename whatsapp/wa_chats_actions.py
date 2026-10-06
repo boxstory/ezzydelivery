@@ -354,7 +354,8 @@ def wa_chats_delete(request):
 @require_http_methods(["GET"])
 def wa_chats_check_number(request):
     """?phone=<digits>&session= → {exists, chatId}. Only called for a typed number
-    that has no chat yet, so it never runs per message or per list row."""
+    with no chat yet, or a lead card's "Open chat" on a number whose chat is not
+    in the loaded list — never per message or per list row."""
     session = _session_or_none(request.GET.get('session'))
     phone = re.sub(r'\D', '', request.GET.get('phone') or '')
     if not session or not 8 <= len(phone) <= 15:

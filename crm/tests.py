@@ -1815,6 +1815,17 @@ class LeadWaLinkTests(TestCase):
         self.assertTrue(rows['97455667788']['blocked'])
         self.assertEqual(rows['97433112233']['accounts'], [])
 
+    def test_lid_number_shows_its_real_phone_when_known(self):
+        from whatsapp.models import WhatsAppContact
+        services.add_wa_link(self.lead, self.LID, session='default', label='Office')
+        rows = {r['identifier']: r for r in services.lead_wa_numbers(self.lead)}
+        # Unknown lid: no phone, the lid itself is all we can show.
+        self.assertEqual((rows[self.LID]['phone'], rows[self.LID]['display']), ('', self.LID))
+        WhatsAppContact.objects.create(session='default', phone='971558212796', lid=self.LID)
+        rows = {r['identifier']: r for r in services.lead_wa_numbers(self.lead)}
+        self.assertEqual((rows[self.LID]['phone'], rows[self.LID]['display']), ('971558212796', '+971558212796'))
+        self.assertTrue(rows[self.LID]['is_lid'])
+
 
 class DriverBoardApplicationFacetTests(TestCase):
     """The driver board's application facets — job type, uploaded documents,

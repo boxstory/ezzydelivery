@@ -540,7 +540,7 @@
           {% for n in wa_numbers %}
           <li class="crmd__number">
             <span class="crmd__number-label">{{ n.label }}</span>
-            <span class="crmd__number-id">{% if n.is_lid %}Private WhatsApp id {{ n.identifier }}{% else %}{{ n.display }}{% endif %}</span>
+            <span class="crmd__number-id"{% if n.is_lid and n.phone %} title="WhatsApp private id {{ n.identifier }}"{% endif %}>{% if n.phone %}{{ n.display }}{% else %}Private WhatsApp id {{ n.identifier }}{% endif %}</span>
             {% if n.session %}<span class="crmd__number-sess">on {{ n.session }}</span>{% endif %}
             {% for a in n.accounts %}
             <span class="crmd__number-acct" title="@{{ a.username }}"><i class="fa-solid fa-user" aria-hidden="true"></i> {{ a.name }} · {{ a.role }}</span>
