@@ -466,7 +466,7 @@ ab -n 100 -c 10 http://localhost:8000/orders/all/
 
 1. **🔴 URGENT: Exposed Shopify API Token**
    - **Location:** [`orders/views.py:531`](../../orders/views.py:531)
-   - **Token:** `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`
+   - **Token:** `shpat_<REDACTED>`
    - **Action:** MUST revoke from Shopify admin panel TODAY
    - **Fix:** Move to environment variables (see [SECURE_CODE_FIXES.md](SECURE_CODE_FIXES.md))
 

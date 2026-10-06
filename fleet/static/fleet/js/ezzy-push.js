@@ -64,15 +64,41 @@
             });
     }
 
+    /* True when the subscription was made with another server key, i.e. the
+     * VAPID pair was rotated. The push service refuses pushes signed with the
+     * new key for it, so it has to be replaced, not reused. A browser that does
+     * not expose the key keeps its subscription as before. */
+    function madeWithOtherKey(sub) {
+        var key = sub.options && sub.options.applicationServerKey;
+        if (!key) return false;
+        var have = new Uint8Array(key);
+        var want = urlBase64ToUint8Array(PUBLIC_KEY);
+        if (have.length !== want.length) return true;
+        for (var i = 0; i < want.length; ++i) {
+            if (have[i] !== want[i]) return true;
+        }
+        return false;
+    }
+
     function subscribe(registration, force) {
         if (!PUBLIC_KEY) return Promise.resolve(false);
         return registration.pushManager.getSubscription().then(function (existing) {
-            if (existing) return syncSubscription(existing, force);
-            return registration.pushManager.subscribe({
-                // Chrome refuses a subscription that may deliver silently, and
-                // a push we cannot show is one the driver never acts on anyway.
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY)
+            if (existing && !madeWithOtherKey(existing)) return syncSubscription(existing, force);
+            var retired = Promise.resolve();
+            if (existing) {
+                var oldEndpoint = existing.endpoint;
+                retired = existing.unsubscribe().then(function () {
+                    try { localStorage.removeItem(SYNCED_KEY); } catch (e) {}
+                    return post('/api/driver/push/unsubscribe/', { endpoint: oldEndpoint });
+                }).catch(function () { /* the new subscription matters more */ });
+            }
+            return retired.then(function () {
+                return registration.pushManager.subscribe({
+                    // Chrome refuses a subscription that may deliver silently, and
+                    // a push we cannot show is one the driver never acts on anyway.
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY)
+                });
             }).then(function (sub) {
                 return syncSubscription(sub, true);
             });

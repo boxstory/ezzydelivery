@@ -254,7 +254,7 @@ tail -f logs/error.log
 **Revoke Exposed Shopify API Token**
 
 - **Location:** `orders/views.py:531`
-- **Token:** `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`
+- **Token:** `shpat_<REDACTED>`
 - **Instructions:** [IMMEDIATE_ACTIONS_REQUIRED.md](docs/critical-fixes/IMMEDIATE_ACTIONS_REQUIRED.md)
 
 **Steps:**

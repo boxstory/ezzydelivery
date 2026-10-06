@@ -31,7 +31,7 @@ def get_order_by_api(request):
 
     headers = {
         'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': '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'  # ❌ HARDCODED!
+        'X-Shopify-Access-Token': 'shpat_<REDACTED>'  # ❌ HARDCODED!
     }
     get_orders = requests.get('https://hn0d1z-qe.myshopify.com/admin/api/2024-10/orders.json?status=any', headers=headers)
 ```

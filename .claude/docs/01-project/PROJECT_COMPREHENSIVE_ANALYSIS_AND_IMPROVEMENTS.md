@@ -95,7 +95,7 @@ docs/
 
 2. **Hardcoded API Credentials - CVSS 9.1** 🚨
    - Location: `orders/views.py:531`
-   - Exposed: Shopify token `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`
+   - Exposed: Shopify token `shpat_<REDACTED>`
    - **ACTION REQUIRED: REVOKE THIS TOKEN IMMEDIATELY**
    - Fix: Move to environment variables, rotate token
 
@@ -322,7 +322,7 @@ coverage report
 
 1. **REVOKE EXPOSED API TOKEN** (Immediate)
    - Shopify token in `orders/views.py:531` is exposed
-   - Revoke: `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`
+   - Revoke: `shpat_<REDACTED>`
    - Generate new token and store in environment variables
 
 2. **Fix IDOR Vulnerabilities** (1-2 weeks)

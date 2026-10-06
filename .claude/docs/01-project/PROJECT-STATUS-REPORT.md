@@ -34,7 +34,7 @@ This report combines two major analyses:
 ```bash
 # ISSUE: Production secrets committed to git
 SECRET_KEY=django-insecure-pzaaj1wd(...)
-DB_PASSWORD=mskp1111
+DB_PASSWORD=<REDACTED>
 SHIPDAY_API_KEY=actual_key_here
 ```
 

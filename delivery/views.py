@@ -1076,7 +1076,7 @@ def get_street_polygon(request, zone_number, street_number):
 
     # QNAS API configuration
     base_url = "https://qnas.qa"
-    token = config("QNAS_TOKEN", default="75f6618da1204809900d904de6e61b40")
+    token = config("QNAS_TOKEN", default="")
     domain = config("QNAS_DOMAIN", default="ezzydelivery.qa")
 
     headers = {

@@ -670,7 +670,7 @@ def delete_order(request: HttpRequest, order_id: int) -> HttpResponse:
 ```python
 headers = {
     'Content-Type': 'application/json',
-    'X-Shopify-Access-Token': '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'  # EXPOSED!
+    'X-Shopify-Access-Token': 'shpat_<REDACTED>'  # EXPOSED!
 }
 get_orders = requests.get('https://hn0d1z-qe.myshopify.com/admin/api/2024-10/orders.json?status=any', headers=headers)
 ```

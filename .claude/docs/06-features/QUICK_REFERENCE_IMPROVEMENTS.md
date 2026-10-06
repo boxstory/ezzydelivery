@@ -74,7 +74,7 @@ http://localhost:8000/delivery/tasks/
 
 **What:** Hardcoded Shopify API token in [`orders/views.py:531`](../orders/views.py)
 
-**Token:** `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`
+**Token:** `shpat_<REDACTED>`
 
 **Action:**
 1. Log into Shopify admin panel

@@ -17,7 +17,7 @@
 ### 🚨 EXPOSED CREDENTIAL DETAILS
 
 **Location:** `orders/views.py:531`
-**Exposed Token:** `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`
+**Exposed Token:** `shpat_<REDACTED>`
 **Shopify Store:** `hn0d1z-qe.myshopify.com`
 **Severity:** CRITICAL (CVSS 9.1)
 
@@ -35,7 +35,7 @@
    Settings → Apps and sales channels → Develop apps
    ```
 
-3. **Find the app with token:** `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`
+3. **Find the app with token:** `shpat_<REDACTED>`
 
 4. **REVOKE IT IMMEDIATELY**
    - Click on the app
@@ -55,7 +55,7 @@
 **Current Code (LINE 531):**
 ```python
 headers = {
-    'X-Shopify-Access-Token': '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'  # ❌ EXPOSED!
+    'X-Shopify-Access-Token': 'shpat_<REDACTED>'  # ❌ EXPOSED!
 }
 ```
 
@@ -190,7 +190,7 @@ header_value = {
 git log --all --grep="shopify" --oneline
 
 # Search history for token
-git log -S "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" --all
+git log -S "shpat_<REDACTED>" --all
 ```
 
 ### If token found in history:
@@ -201,7 +201,7 @@ git log -S "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" --all
 # https://reco-bfg.github.io/
 
 # Remove token from history
-bfg --replace-text <(echo "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==>REMOVED") .
+bfg --replace-text <(echo "shpat_<REDACTED>==>REMOVED") .
 
 # Force push
 git reflog expire --expire=now --all
@@ -367,7 +367,7 @@ grep -n "@csrf_exempt" --include="*.py" -r .
 ## 📊 PROGRESS CHECKLIST
 
 ### Phase 1: IMMEDIATE (Do in next 2 hours)
-- [ ] Revoke Shopify token `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`
+- [ ] Revoke Shopify token `shpat_<REDACTED>`
 - [ ] Generate new Shopify token
 - [ ] Create .env file with new credentials
 - [ ] Remove hardcoded token from `orders/views.py:531`
