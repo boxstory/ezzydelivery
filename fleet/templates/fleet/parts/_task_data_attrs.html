@@ -42,8 +42,8 @@ Notes: Include inside the opening <div> tag. Expects `card` (DeliveryTask) and `
     is not going to the customer, so the grade describes the wrong place.{% endcomment %}
     data-coords-accuracy="{% if card.route_destination.is_customer %}{{ card.order.coords_accuracy|default:'' }}{% endif %}"
     data-order-id="{{ card.order.id }}"
-    {% comment %}Still in the pool and claimable — the sheet turns this into a Take button. The server re-checks the same rule in fleet_task_take_scan.{% endcomment %}
-    data-takeable="{% if not card.driver_id and card.dl_task_publish %}1{% else %}0{% endif %}"
+    {% comment %}Still in the pool and claimable — the sheet turns this into a Take button. The server re-checks the same rule in delivery_pool_block.{% endcomment %}
+    data-takeable="{% if not card.driver_id and card.dl_task_publish and card.public_pool %}1{% else %}0{% endif %}"
     data-payment-method="{{ card.payment_method|default:'' }}"
     data-cod-collected-amount="{{ card.cod_collected_amount|default:'' }}"
     data-payment-split-cash="{{ card.payment_split_cash|default:'' }}"

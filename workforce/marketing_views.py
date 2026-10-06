@@ -1,5 +1,5 @@
-# Purpose: Marketing-desk staff views — the driver proposals console (the recruitment offers shown in the driver app and on the public careers page) and the drivers interested in them.
-# Used by: workforce/urls.py (marketing/driver-proposals/... routes); templates in workforce/templates/workforce/marketing/.
+# Purpose: Marketing-desk staff views — the desk's own overview page, the driver proposals console (the recruitment offers shown in the driver app and on the public careers page) and the drivers interested in them.
+# Used by: workforce/urls.py (marketing/... routes); templates in workforce/templates/workforce/marketing/.
 # Notes: Which surface shows a proposal is decided by fleet/proposals.py, never by a query written in a view. Route names
 #        must be classified in core/departments.py (_MKT) or the gating middleware redirects staff away from them.
 
@@ -21,6 +21,24 @@ from fleet import models as fleet_models
 from fleet.models import DriverProposal, DriverProposalInterest
 
 logger = logging.getLogger(__name__)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_marketing_overview(request):
+    """The marketing desk's landing page — what needs working today.
+
+    Deliberately a page of its own rather than a department block on the staff
+    dashboard: that page is the Operations/Finance console, and a marketing-only
+    account is redirected here by workforce.views.wf_dashboard. Every figure comes
+    from workforce/dashboard_marketing.py, which reads stage keys through
+    crm.services so each board keeps its own column names.
+    """
+    from workforce.dashboard_marketing import marketing_dashboard_context
+
+    context = {'page_title': 'Marketing Overview'}
+    context.update(marketing_dashboard_context(request))
+    return render(request, 'workforce/marketing/overview.html', context)
 
 
 def _proposal_dt(raw):

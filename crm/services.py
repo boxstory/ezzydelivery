@@ -315,13 +315,21 @@ def create_lead_from_wa_number(phone, user=None, category=Lead.CATEGORY_BUSINESS
     if category not in {c for c, _ in Lead.CATEGORY_CHOICES}:
         category = Lead.CATEGORY_BUSINESS
 
+    # Any card already carrying this number — as its phone, 2nd mobile or a linked
+    # chat — is this sender's card.
     existing = (
-        Lead.objects.filter(phone__in=_phone_variants(phone), merged_into__isnull=True)
+        _cards_with_numbers([phone])
+        .filter(merged_into__isnull=True)
         .exclude(stage__in=closed_stage_keys())
         .order_by('-created_at')
         .first()
     )
     if existing:
+        from .chat_links import _already_on
+        if not _already_on(existing, phone):
+            # Matched on the card's 2nd mobile: the lead page reads chats from the
+            # phone and linked numbers only, so join this one.
+            add_wa_link(existing, phone, user=user)
         return existing, False
 
     contact = _wa_contact_for_phone(phone)
@@ -455,7 +463,10 @@ def sync_lead_from_pricing_status(inquiry):
         updates += ['stage', 'stage_changed_at', 'closed_at']
         _log_activity(lead, LeadActivity.TYPE_STAGE_CHANGE,
                       f'Stage set to {lead.stage_label} (via pricing inquiry page)')
-    if inquiry.assigned_to_id != lead.assigned_to_id:
+    # The lead owns its owner now (crm/ownership.py): the legacy page may fill an
+    # empty slot, but never clears a taken lead or hands it to someone else —
+    # its assignee is often stale, and a status save re-posts it every time.
+    if inquiry.assigned_to_id and lead.assigned_to_id is None:
         lead.assigned_to_id = inquiry.assigned_to_id
         updates.append('assigned_to')
     if updates:
@@ -913,12 +924,34 @@ def driver_lead_target_stage(driver, stages=None):
     return stage_rules.target_stage_key(driver, stages)
 
 
-def reconcile_driver_leads():
+# Any fixed number works; it only has to be the same for every caller.
+_DRIVER_RECONCILE_LOCK = 4_752_118
+
+
+def reconcile_driver_leads(driver_ids=None):
     """Make the driver board mirror the real applicant pool: ensure every driver
     application has a driver-category lead, and set each lead's stage to match
     its driver's current form status. Creates missing leads, advances existing
-    ones. Safe (and cheap) to call on every driver-board render."""
-    from django.db.models import Count
+    ones. Safe (and cheap) to call on every driver-board render.
+
+    `driver_ids` limits the pass to those applicants. The driver form passes the
+    one it just saved, so the card exists before anyone opens the board — the
+    WhatsApp inbox showed a fresh applicant as "No lead" until then.
+
+    The board, the roster and the form can run this at the same moment, and two
+    passes that both see no card for a new driver would each create one. A
+    transaction-scoped lock makes them take turns."""
+    from django.db import connection
+
+    with transaction.atomic():
+        if connection.vendor == 'postgresql':
+            with connection.cursor() as cur:
+                cur.execute('SELECT pg_advisory_xact_lock(%s)', [_DRIVER_RECONCILE_LOCK])
+        return _reconcile_driver_leads(driver_ids)
+
+
+def _reconcile_driver_leads(driver_ids):
+    from django.db.models import Count, Q
     from fleet.models import Driver
 
     stages = board_stages(Lead.CATEGORY_DRIVER)
@@ -933,8 +966,13 @@ def reconcile_driver_leads():
         # Annotated so a `has_deliveries` rule costs no extra query per driver.
         .annotate(dl_task_count=Count('deliverytask', distinct=True))
     )
-    existing = list(Lead.objects.filter(
-        category=Lead.CATEGORY_DRIVER, merged_into__isnull=True))
+    existing = Lead.objects.filter(category=Lead.CATEGORY_DRIVER, merged_into__isnull=True)
+    if driver_ids is not None:
+        drivers = drivers.filter(pk__in=driver_ids)
+        # Their own cards, plus every unclaimed card one of them might claim.
+        existing = existing.filter(Q(driver_id__in=driver_ids) | Q(driver__isnull=True))
+    # wa_links feeds the phone keys of unbound cards below.
+    existing = list(existing.prefetch_related('wa_links'))
 
     # Already-bound leads are looked up by their FK. Unbound ones are offered by phone
     # key and CLAIMED (popped) by the first driver that matches, so two drivers sharing
@@ -1128,18 +1166,62 @@ def _driver_for_lead(lead):
 # survive, the child renders as a sub-card inside the parent, and the parent's card
 # shows both source badges. Undoable, because nothing is destroyed.
 
-def duplicate_candidates(lead, limit=10):
-    """Other open leads on the same board whose number matches this one."""
+def _lead_numbers(lead, include_ops=False):
+    """Every phone-shaped number on a lead: phone, 2nd mobile and phone-shaped linked
+    chats (never a lid); with `include_ops`, also the pricing form's operation-team
+    number."""
+    raw = [lead.phone, lead.phone_2] + [v for v in lead.wa_link_values if not is_lid_value(v)]
+    if include_ops and lead.pricing_enquiry_id:
+        raw.append(getattr(lead.pricing_enquiry, 'operation_team_contact_number', ''))
+    return {n for n in (normalize_phone(r) for r in raw if r) if n}
+
+
+def _cards_with_numbers(numbers, include_ops=False):
+    """Leads carrying any of `numbers` as their phone, 2nd mobile or a linked chat —
+    and with `include_ops`, as (the last 8 digits of) their pricing form's
+    operation-team number.
+
+    The operation-team number is only ever a suggestion: one owner can run two
+    shops and type the same number into both forms, so nothing merges on it.
+    """
+    from django.db.models import F, Func, Q, Value
+    from django.db.models.functions import Right
+
+    variants, tails = set(), set()
+    for number in numbers:
+        variants |= set(_phone_variants(normalize_phone(number)))
+        if len(number) >= 8:
+            tails.add(number[-8:])
+    if not variants:
+        return Lead.objects.none()
+    q = Q(phone__in=variants) | Q(phone_2__in=variants) | Q(wa_links__identifier__in=variants)
+    qs = Lead.objects.all()
+    if include_ops and tails:
+        qs = qs.annotate(op_tail=Right(
+            Func(F('pricing_enquiry__operation_team_contact_number'), Value(r'\D'), Value(''),
+                 Value('g'), function='regexp_replace'), 8))
+        q |= Q(op_tail__in=tails)
+    return qs.filter(q).distinct()
+
+
+def duplicate_candidates(lead, limit=10, include_ops=True):
+    """Other open leads on the same board that share a number with this one.
+
+    A business usually registers with the office line while the owner chats from
+    their own phone, so every number on either card counts, not just `phone`.
+    The detail page's suggestions include the pricing form's operation-team number;
+    auto_merge_duplicate passes include_ops=False and merges on identity only.
+    """
     # An absorbed card is already folded into its parent — offering the parent (or a
     # sibling) as a "separate card" to merge would just loop back to where it lives.
-    if not lead.phone or lead.merged_into_id:
+    if lead.merged_into_id:
         return []
-    variants = _phone_variants(normalize_phone(lead.phone))
-    if not variants:
+    numbers = _lead_numbers(lead, include_ops)
+    if not numbers:
         return []
     return list(
-        Lead.objects
-        .filter(category=lead.category, phone__in=variants, merged_into__isnull=True)
+        _cards_with_numbers(numbers, include_ops)
+        .filter(category=lead.category, merged_into__isnull=True)
         .exclude(pk=lead.pk)
         .exclude(stage__in=closed_stage_keys(lead.category))
         .select_related('assigned_to')
@@ -1384,7 +1466,7 @@ def auto_merge_duplicate(lead, user=None):
     The OLDER card stays primary: staff already know it, it carries the history, and
     its id is the one in links and messages. Returns the surviving lead.
     """
-    candidates = duplicate_candidates(lead, limit=1)
+    candidates = duplicate_candidates(lead, limit=1, include_ops=False)
     if not candidates:
         return lead
     other = candidates[0]

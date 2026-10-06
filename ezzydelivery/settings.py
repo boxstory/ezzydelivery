@@ -1024,6 +1024,12 @@ WAHA_WEBHOOK_HMAC_SECRET = config('WAHA_WEBHOOK_HMAC_SECRET', default='')
 WAHA_DEFAULT_SESSION = config('WAHA_DEFAULT_SESSION', default='default')
 WAHA_DEFAULT_FROM = config('WAHA_DEFAULT_FROM', default='EzzyDelivery')
 
+# Per-staff browser logins for /waha/wa-chats/ only (whatsapp/inbox_access.py),
+# managed from Staff Roles. nginx reads this file for the inbox location; the raw
+# /waha/ API proxy keeps the root-owned /etc/nginx/.htpasswd (admin only).
+WAHA_INBOX_HTPASSWD = config('WAHA_INBOX_HTPASSWD', default='/home/ezzyadmin/ezzy-private/waha-inbox.htpasswd')
+NGINX_SITE_CONF = config('NGINX_SITE_CONF', default='/etc/nginx/sites-enabled/ezzydelivery')
+
 # Bearer token used by internal callers of /api/integrations/waha/messages/
 # and /api/integrations/waha/send/ (agent API + send proxy).
 WAHA_AGENT_TOKEN = config('WAHA_AGENT_TOKEN', default='')

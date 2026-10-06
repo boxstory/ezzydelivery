@@ -172,28 +172,8 @@
             }
         );
 
-        // Copy-to-clipboard for the redirect URL merchants must whitelist in
-        // Shopify. It has to match byte-for-byte, so typing it is the failure mode.
-        // Each copy button reads the <code> block it is paired with.
-        [
-            ['client_api_shopify_copy_redirect', 'client_api_shopify_redirect_uri'],
-            ['client_api_shopify_copy_app_url', 'client_api_shopify_app_url'],
-        ].forEach(function (pair) {
-            var copyBtn = document.getElementById(pair[0]);
-            if (!copyBtn) return;
-            copyBtn.addEventListener('click', function () {
-                var target = document.getElementById(pair[1]);
-                if (!target) return;
-                var text = target.textContent.trim();
-                var done = function () {
-                    var original = copyBtn.textContent;
-                    copyBtn.textContent = 'Copied';
-                    setTimeout(function () { copyBtn.textContent = original; }, 1500);
-                };
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(text).then(done, function () {});
-                }
-            });
-        });
+        // The guide's Copy buttons are wired by shopify_guide_copy.js, which the
+        // guide partial loads itself — they must work on the API list page too,
+        // where this file early-returns because there is no add/update form.
     });
 })();

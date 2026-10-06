@@ -1,0 +1,597 @@
+/* Purpose: Visual system for the Marketing Overview at /workforce/marketing/ — queue ledger, KPI tiles, the action rail and the activity list.
+   Used by: workforce/templates/workforce/marketing/overview.html only. Nothing here is shared, so the staff dashboard's own look is unaffected.
+   Notes: Brand Kit console — white surfaces, hairline edges, numbers as the only loud element. Semantic state is a 2px left rule plus a tinted glyph, never a filled row; yellow is reserved for the hero band and chip hover. */
+
+/* ========================================== */
+/* PAGE SHELL                                 */
+/* ========================================== */
+
+.mko {
+    /* One place to retune the page's rhythm. grey-300 for edges — grey-200
+       disappears against the grey-50 page and cards stop reading as cards. */
+    --mko-rule: var(--brand-grey-300);
+    --mko-rule-soft: var(--brand-grey-200);
+    --mko-gap: 0.5rem;
+
+    padding: 0.375rem;
+    background: var(--brand-grey-50);
+    min-height: 100vh;
+    font-family: var(--brand-font-primary);
+    display: flex;
+    flex-direction: column;
+    gap: var(--mko-gap);
+}
+
+/* ========================================== */
+/* GRID                                       */
+/* ========================================== */
+
+.mko__grid {
+    display: grid;
+    grid-template-columns: 23rem 1fr;
+    gap: var(--mko-gap);
+}
+
+.mko__col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mko-gap);
+    min-width: 0;
+}
+
+/* ========================================== */
+/* CARD                                       */
+/* ========================================== */
+
+.mko__card {
+    background: #fff;
+    border: 1px solid var(--mko-rule);
+    border-radius: var(--brand-radius-sm);
+    overflow: hidden;
+}
+
+.mko__card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    min-height: 2.25rem;
+    border-bottom: 1px solid var(--mko-rule-soft);
+}
+
+.mko__card-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-navy);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Grey, not yellow: a yellow icon on every card head spends the accent six times
+   over. The hero band is where this page's yellow lives. */
+.mko__card-title i {
+    color: var(--brand-grey-400);
+    font-size: 0.8rem;
+}
+
+.mko__card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--brand-grey-600);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.mko__card-link i {
+    font-size: 0.6rem;
+    color: var(--brand-grey-400);
+}
+
+.mko__card-link:hover,
+.mko__card-link:hover i {
+    color: var(--brand-navy);
+}
+
+.mko__card-body {
+    padding: 0.375rem 0.75rem;
+}
+
+.mko__card-body--flush {
+    padding: 0;
+}
+
+/* ========================================== */
+/* KPI TILES                                  */
+/* ========================================== */
+
+.mko__tiles {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--mko-gap);
+}
+
+.mko__tile {
+    background: #fff;
+    border: 1px solid var(--mko-rule);
+    border-radius: var(--brand-radius-sm);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    transition: border-color 0.2s ease;
+}
+
+.mko__tile:hover {
+    border-color: var(--brand-grey-400);
+}
+
+.mko__tile-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500);
+}
+
+/* The figure leads and its qualifier trails — on a KPI tile the number is the
+   content, so it is the one thing allowed to be large. */
+.mko__tile-figure {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-height: 1.75rem;
+}
+
+.mko__tile-value {
+    font-size: 1.5rem;
+    line-height: 1.1;
+    font-weight: 700;
+    color: var(--brand-grey-800);
+    font-variant-numeric: tabular-nums;
+}
+
+.mko__tile-value--sm {
+    font-size: 1.25rem;
+}
+
+.mko__tile-of {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--brand-grey-500);
+}
+
+/* A quiet qualifier with a semantic dot, not a filled pill. */
+.mko__tile-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--brand-grey-500);
+    white-space: nowrap;
+}
+
+.mko__tile-note i {
+    font-size: 0.5rem;
+}
+
+.mko__tile-note--up { color: var(--brand-success); }
+.mko__tile-note--alert { color: var(--brand-danger); }
+
+.mko__tile-foot {
+    margin-top: auto;
+    padding-top: 0.375rem;
+    border-top: 1px solid var(--mko-rule-soft);
+}
+
+.mko__tile-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--brand-grey-600);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.mko__tile-link i {
+    font-size: 0.6rem;
+    color: var(--brand-grey-400);
+}
+
+.mko__tile-link:hover,
+.mko__tile-link:hover i {
+    color: var(--brand-navy);
+}
+
+/* ========================================== */
+/* QUEUE LEDGER                               */
+/* ========================================== */
+
+.mko__list {
+    display: flex;
+    flex-direction: column;
+}
+
+/* One line per queue: swatch, what it is, how many, where it goes. */
+.mko__row {
+    display: grid;
+    grid-template-columns: 1.5rem 1fr 0.75rem;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem 0.375rem 0.625rem;
+    border-bottom: 1px solid var(--mko-rule-soft);
+    border-left: 2px solid transparent;
+    background: #fff;
+    text-decoration: none;
+    min-height: 2.25rem;
+    transition: background-color 0.15s ease;
+}
+
+.mko__row:last-child {
+    border-bottom: 0;
+}
+
+/* A grey wash, never a yellow one, and the row stays put — a console that slides
+   sideways under the cursor is hard to read down. */
+.mko__row:hover {
+    background: var(--brand-grey-50);
+}
+
+.mko__row-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    color: var(--brand-grey-400);
+    flex-shrink: 0;
+}
+
+/* Label and figure share a baseline; the note sits under the label rather than
+   pushing the row onto a second full line. */
+.mko__row-main {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    column-gap: 0.75rem;
+    row-gap: 0.1rem;
+    min-width: 0;
+}
+
+.mko__row-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+    min-width: 0;
+}
+
+.mko__row-note {
+    grid-column: 1 / -1;
+    font-size: 0.72rem;
+    color: var(--brand-grey-500);
+}
+
+.mko__row-value {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--brand-grey-800);
+    font-variant-numeric: tabular-nums;
+    justify-self: end;
+}
+
+/* Where the slot holds a stage name rather than a count, the subject of the row is
+   the lead — so the word steps back instead of out-shouting the name. */
+.mko__row-value--text {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--brand-grey-500);
+    font-variant-numeric: normal;
+    white-space: nowrap;
+}
+
+.mko__row-go {
+    font-size: 0.65rem;
+    color: var(--brand-grey-300);
+    justify-self: end;
+    transition: color 0.15s ease;
+}
+
+.mko__row:hover .mko__row-go {
+    color: var(--brand-grey-600);
+}
+
+/* --- State: a left rule and a tinted glyph, never a filled row --- */
+.mko__row--ok { border-left-color: var(--brand-success); }
+.mko__row--ok .mko__row-icon { color: var(--brand-success); }
+
+.mko__row--due { border-left-color: var(--brand-warning); }
+.mko__row--due .mko__row-icon { color: var(--brand-warning); }
+
+/* Danger is the one state allowed to colour the figure too: a genuinely blocking
+   queue should be findable without reading every row. */
+.mko__row--late { border-left-color: var(--brand-danger); }
+.mko__row--late .mko__row-icon { color: var(--brand-danger); }
+.mko__row--late .mko__row-value { color: var(--brand-danger); }
+.mko__row--late:hover { background: var(--brand-danger-bg); }
+
+.mko__row--open { border-left-color: var(--brand-info); }
+.mko__row--open .mko__row-icon { color: var(--brand-info); }
+
+.mko__row--house { border-left-color: var(--brand-navy); }
+.mko__row--house .mko__row-icon { color: var(--brand-navy); }
+
+/* --- My Leads: "Take next" bar under the two rows --- */
+.mko__take {
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--mko-rule-soft);
+    background: var(--brand-grey-50);
+}
+
+/* Ink outline, filled on hover — the hero band keeps this page's only yellow. */
+.mko__take-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--brand-navy);
+    background-color: #fff;
+    border: 1px solid var(--mko-rule);
+}
+
+.mko__take-btn:hover,
+.mko__take-btn:focus-visible {
+    color: #fff;
+    background-color: var(--brand-navy);
+    border-color: var(--brand-navy);
+}
+
+.mko__take-count {
+    font-variant-numeric: tabular-nums;
+    color: var(--brand-grey-500);
+}
+
+.mko__take-btn:hover .mko__take-count,
+.mko__take-btn:focus-visible .mko__take-count {
+    color: inherit;
+}
+
+.mko__flag {
+    color: var(--brand-danger);
+    font-weight: 600;
+}
+
+/* ========================================== */
+/* ACTION RAIL                                */
+/* ========================================== */
+
+.mko__actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+    gap: 0.375rem;
+}
+
+/* A bordered chip read left to right, like a menu line. */
+.mko__action {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    min-height: 2.25rem;
+    border: 1px solid var(--mko-rule);
+    border-radius: var(--brand-radius-sm);
+    background: #fff;
+    text-decoration: none;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.mko__action:hover {
+    background: var(--brand-secondary);
+    border-color: var(--brand-primary);
+}
+
+.mko__action-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    color: var(--brand-grey-500);
+    flex-shrink: 0;
+}
+
+.mko__action-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+    line-height: 1.2;
+}
+
+/* The glyph alone carries the colour. */
+.mko__action--house .mko__action-icon { color: var(--brand-navy); }
+.mko__action--chat .mko__action-icon { color: var(--brand-success); }
+.mko__action--watch .mko__action-icon { color: var(--brand-warning); }
+.mko__action--read .mko__action-icon { color: var(--brand-info); }
+
+/* ========================================== */
+/* CHARTS                                     */
+/* ========================================== */
+
+/* The two boards sit side by side so the week reads as one picture, but each
+   keeps its own y-axis — driver intake runs several times business intake, and a
+   shared axis flattened the business bars to nothing. */
+.mko__chart-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mko-gap);
+}
+
+/* Matches chart.height so the cards below do not jump while Apex measures. */
+.mko__chart {
+    min-height: 260px;
+    width: 100%;
+}
+
+/* ========================================== */
+/* EMPTY STATE                                */
+/* ========================================== */
+
+.mko__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1rem;
+    text-align: center;
+}
+
+.mko__empty i {
+    font-size: 2rem;
+    color: var(--brand-grey-300);
+    margin-bottom: 0.75rem;
+}
+
+.mko__empty-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-grey-700);
+    margin: 0 0 0.375rem;
+}
+
+.mko__empty-text {
+    font-size: 0.78rem;
+    color: var(--brand-grey-500);
+    margin: 0;
+}
+
+/* ========================================== */
+/* RESPONSIVE                                 */
+/* ========================================== */
+
+@media (max-width: 1200px) {
+    .mko__grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Two 10-bar charts stop being readable much under half of a 1440 column. */
+@media (max-width: 1100px) {
+    .mko__chart-pair {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1024px) {
+    .mko__tiles {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .mko {
+        padding: 0;
+    }
+
+    .mko__tiles {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .mko__tile {
+        padding: 0.5rem;
+    }
+
+    .mko__tile-value {
+        font-size: 1.375rem;
+    }
+
+    .mko__tile-value--sm {
+        font-size: 1.125rem;
+    }
+
+    .mko__actions {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .mko__action {
+        min-height: 2.75rem;
+    }
+
+    .mko__row {
+        padding: 0.375rem 0.5rem;
+        min-height: 2.5rem;
+    }
+}
+
+@media (max-width: 575px) {
+    .mko__card-head,
+    .mko__card-body {
+        padding: 0.375rem 0.5rem;
+    }
+
+    .mko__card-body--flush {
+        padding: 0;
+    }
+
+    .mko__chart {
+        min-height: 230px;
+        margin: 0 -0.375rem;
+        width: auto;
+    }
+
+    .mko__row-label {
+        font-size: 0.8rem;
+    }
+
+    .mko__row-value {
+        font-size: 1rem;
+    }
+
+    /* A stage name and a lead name cannot share 390px: holding the stage on one
+       line wrapped names like "Zainul Abid Valiya purakkal" to three. On a phone
+       the stage takes its own line above the meta, so both stay readable. */
+    .mko__row-value--text {
+        grid-column: 1 / -1;
+        justify-self: start;
+    }
+}
+
+/* ========================================== */
+/* MOTION + FOCUS                             */
+/* ========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .mko *,
+    .mko *::before,
+    .mko *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+}
+
+.mko__row:focus-visible,
+.mko__action:focus-visible,
+.mko__tile-link:focus-visible,
+.mko__card-link:focus-visible {
+    outline: 2px solid var(--brand-navy);
+    outline-offset: -2px;
+    border-radius: var(--brand-radius-sm);
+}

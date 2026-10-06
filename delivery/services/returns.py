@@ -706,8 +706,9 @@ def forward_to_client(custody, *, actor=None, pickup_location=None, notes=''):
             pickup_location=None,
             task_leg=RETURN_LEG,
             hub_warehouse=custody.warehouse_location,
-            # Published on creation: the whole point is that any driver can take
-            # it. Staff can still unpublish it from the task page.
+            # Published on creation into the Unassigned list — usually a different
+            # driver from the one who brought it in, picked by staff or a Task
+            # Automation rule (the publish hook in delivery.signals runs them).
             dl_task_publish=True,
             # No COD on the way back — that was reversed by open_return_for_task.
             # The DELIVERY CHARGE is a different question: a run raised on a later

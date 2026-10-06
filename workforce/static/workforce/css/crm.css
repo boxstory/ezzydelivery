@@ -539,6 +539,24 @@
 .crml__row--overdue td { background: #fdf6f4; }
 .crm__overdue-text { color: var(--crm-alert); font-weight: 600; }
 
+/* ── OWNERSHIP — idle flag + Take (board card, list row) ─────────────────── */
+/* Text in the alert ink, no fill: the flag sits on cards that may already carry
+   an overdue tint, and two filled warnings on one card read as noise. */
+.crm__idle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--crm-alert);
+  white-space: nowrap;
+}
+/* Same right-hand slot the owner's avatar takes once the card is taken. */
+.crm__take { display: inline-flex; margin: 0; }
+.crmb__card-meta .crm__take { margin-left: auto; }
+.crm__take-btn { gap: 0.3rem; padding: 0.15rem 0.5rem; font-size: 0.68rem; }
+.crmd__owner-note { margin: 0.4rem 0; font-size: 0.75rem; color: var(--crm-ink-2); }
+
 /* ── STAGE (swatch + text) & SOURCE ───────────────────────────────────────── */
 .crm__stage {
   display: inline-flex;
@@ -1858,6 +1876,13 @@
 .crmd__boardmove-note { flex: 1 1 11rem; font-size: 0.72rem; color: var(--crm-muted); }
 .crmd__boardmove-note strong { color: var(--crm-ink-2); font-weight: 600; }
 
+/* ── DELETE LEAD: super admins only, at the foot of Manage Lead ──────────── */
+/* Outline, not filled: a permanent action should be findable, not inviting. */
+.crm__btn--danger { border-color: var(--brand-danger); color: var(--brand-danger); }
+.crm__btn--danger:hover { background: var(--brand-danger-bg); border-color: var(--brand-danger); color: var(--brand-danger-dark); }
+.crmd__danger { border-top: 1px solid var(--crm-line); }
+.crmd__danger-note { flex: 1 1 11rem; font-size: 0.72rem; color: var(--crm-muted); }
+
 /* ── MERGED DUPLICATES: two cards in one (crmb__submerge / crmd__merge) ────── */
 /* One prospect that arrived twice is one board card, with the absorbed card shown
    nested inside it so the second origin is visible rather than flattened away. */
@@ -2302,18 +2327,49 @@
 }
 .crmdoc__side.is-active { background: var(--crm-ink); border-color: var(--crm-ink); color: var(--brand-white); }
 
-/* The scan gets the room; the dialog scrolls rather than shrinking it to a stamp. */
+/* Fit to view: the viewer is exactly the window's height and the scan takes
+   whatever the fields and footer leave, so nothing sits below the fold. The
+   body scrolls only when a very short window cannot give the stage its floor. */
+.crmdoc__viewer { height: calc(100% - var(--bs-modal-margin, 1.75rem) * 2); }
+.crmdoc__viewer .modal-content { height: 100%; }
+.crmdoc__viewer .modal-body { min-height: 0; overflow-y: auto; }
+
 .crmdoc__stage {
   display: flex;
+  flex: 1 1 0;
   align-items: center;
   justify-content: center;
   background: var(--crm-well);
   border: 1px solid var(--crm-line);
   border-radius: 8px;
   padding: 0.5rem;
-  min-height: 12rem;
+  min-height: 10rem;
+  position: relative;   /* anchors the zoom chip */
+  overflow: hidden;     /* a zoomed scan is clipped to the frame */
 }
-.crmdoc__stage img { max-width: 100%; max-height: 62vh; object-fit: contain; }
+.crmdoc__stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* Wheel zoom: the scan scales from a top-left origin, which doc_viewer.js
+   offsets so the point under the pointer stays put. */
+.crmdoc__stage img { transform-origin: 0 0; cursor: zoom-in; user-select: none; }
+.crmdoc__stage.is-zoomed img { cursor: grab; }
+.crmdoc__stage.is-panning img { cursor: grabbing; }
+.crmdoc__zoom {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-white);
+  background: var(--crm-ink);
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.85;
+}
+.crmdoc__zoom:hover { opacity: 1; }
+.crmdoc__zoom[hidden] { display: none; }
 /* Cropper sizes itself to the stage's outer box, so padding would push the photo past the edge. */
 .crmdoc__stage.is-editing { padding: 0; }
 .crmdoc__stage-empty { margin: 0; font-size: 0.78rem; color: var(--crm-ink-2); text-align: center; }
@@ -2326,6 +2382,12 @@
 }
 .crmdoc__facts dt { font-size: 0.68rem; font-weight: 700; color: var(--crm-muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .crmdoc__facts dd { margin: 0; font-size: 0.78rem; color: var(--crm-ink); overflow-wrap: anywhere; }
+
+/* Previous / Next through the page's documents. Own display rule, not .d-flex:
+   Bootstrap's !important utility would beat the [hidden] attribute. */
+.crmdoc__nav { display: flex; align-items: center; gap: 0.4rem; }
+.crmdoc__nav[hidden] { display: none; }
+.crmdoc__pos { font-size: 0.72rem; font-weight: 600; color: var(--crm-muted); white-space: nowrap; }
 
 .crmdoc__hint { margin: 0.6rem 0 0; font-size: 0.7rem; color: var(--crm-muted); }
 .crmdoc__err { margin: 0.5rem 0 0; font-size: 0.75rem; font-weight: 600; color: var(--crm-alert); }

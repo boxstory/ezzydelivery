@@ -23,11 +23,14 @@ The page uses a WhatsApp-Web palette on purpose, not the Brand Kit (see the comm
 
 | Layer | Gate |
 |---|---|
-| Every endpoint (page, list, labels, messages, media, photos, send) | nginx htpasswd on `/waha/` **and** a Django staff login (`_staff_only`, since 2026-10-01). Page → login redirect; JSON → 401 |
+| Every endpoint (page, list, labels, messages, media, photos, send) | nginx basic auth **and** a Django staff login (`_staff_only`, since 2026-10-01). Page → login redirect; JSON → 401 |
+| nginx basic auth for `/waha/wa-chats/` (since 2026-10-06) | Per-staff logins in `settings.WAHA_INBOX_HTPASSWD` (`/home/ezzyadmin/ezzy-private/waha-inbox.htpasswd`), managed by super admins in the **WAHA Inbox** group (Login column) on `/workforce/staff-roles/` (`whatsapp/inbox_access.py`). Login name = Django username; password generated, shown once. The raw `/waha/` API proxy (injects `X-Api-Key`) and `/waha/wa-dashboard/` keep the root-owned `/etc/nginx/.htpasswd` — never hand that one to staff |
+| Which WhatsApp numbers (since 2026-10-06) | `whatsapp/session_access.py`: super admins open every number; everyone else only the numbers switched on in the **Numbers** dropdown (WAHA Inbox group) on Staff Roles (`InboxSessionAccess` rows — no row = closed). Enforced in `_staff_only` on every endpoint from `?session=`, else the POST form/JSON `session`, else the default number; `media/<id>/` is marked `_session_from_row` and checks the message's own number. A page on a closed number redirects to the first open one (403 if none); JSON → 403 `This WhatsApp number is not open to you.` The tab strip lists only open numbers (`render_tabs(only=…)`). Label mirroring to other numbers still runs; its note names only open numbers |
 | Chats under a marketing-only label | Hidden from staff without the Marketing department (super admins see all). See below |
 | CRM lead details in the panel | Also needs `can_access(user, 'crm_lead_detail')` |
 | Linking or unlinking a lead, lead search | Needs `can_access(user, 'crm_lead_link_chat')` |
 | Filing a chat photo onto a driver's documents (`save-doc/`) | Needs `crm_lead_link_chat` **and** `can_access(user, 'driver_document_edit')` (`chat_panel.can_save_driver_docs`) |
+| Editing / verifying a driver document from the media viewer | Same edit right for Submit (`can_save_docs`); Mark verified needs `driver_document_verify` (`chat_panel.can_verify_driver_docs` → `can_verify_docs`). Both are Ops + Marketing since 2026-10-06 |
 | Editing a lead (stage, assignee, follow-up, note) | Posts to the CRM's own `/workforce/crm/...` endpoints, so their department rules apply (driver write-back stages need Operations) |
 
 Every POST is CSRF-protected (`send/` and `resync/` lost `csrf_exempt` on 2026-10-01). The token is rendered as `%CSRF%`.
@@ -39,7 +42,18 @@ Every POST is CSRF-protected (`send/` and `resync/` lost `csrf_exempt` on 2026-1
 - **Fails closed:** if a restricted label's chats cannot be read and nothing is cached, non-marketing staff get 503 on the list and 403 on chat calls.
 - Inbox: list (`chats=1`), labels (`labels=1`, `chat_labels=1`), `chat_latest`, `names` filter the chats out; every chat-scoped call (messages, info, who, media, send, resync, read, set-labels, link-lead, save-doc, avatar, `media/<id>/`) refuses them. Restricted labels themselves are not shown or settable outside marketing.
 - CRM: `crm_services.wa_read_blocked(identifiers, user)` adds the same rule; lead detail (conversation, number picker, AI summary), chat refresh, chat preview, media, and `driver_wa_thread` pass `request.user`.
-- **The browser never calls WAHA for chat data any more.** It still calls `/waha/api/sessions/<s>` for the header pill. Until nginx stops proxying `/waha/api/<s>/chats|labels|…`, anyone with the htpasswd can still read chats there directly.
+- **The browser never calls WAHA directly.** Every fetch is `/waha/wa-chats/…` or `/workforce/…`; stored media is `/waha/wa-chats/media/<id>/`, live media `media-live/` (listed with `downloadMedia=false`, so WAHA hands back no `/api/files/` URL). That is what lets the inbox run on its own password file. Anyone holding the *admin* htpasswd can still read chats straight through the raw `/waha/api/…` proxy.
+
+### nginx wiring for the per-staff file (one-time, needs sudo)
+
+In `/etc/nginx/sites-enabled/ezzydelivery`, inside `location ^~ /waha/wa-chats/` only:
+
+```nginx
+auth_basic           "EzzyDelivery inbox";
+auth_basic_user_file /home/ezzyadmin/ezzy-private/waha-inbox.htpasswd;
+```
+
+then `sudo nginx -t && sudo systemctl reload nginx`. The separate realm name stops browsers re-sending inbox credentials to the admin-only locations. Until this is done, Staff Roles shows a "not live yet" warning (`inbox_access.nginx_wired()` looks for the path in the site config). The file was seeded from `/etc/nginx/.htpasswd` (`ezzyadmin`, `test`) so nobody loses access at the switch; `test` has no Django user, so it never shows in the column — remove it by hand if unwanted. nginx re-reads the file per request: adding/removing a login needs no reload.
 
 ## Endpoints
 
@@ -54,7 +68,7 @@ All are `GET /waha/wa-chats/?…` unless stated. Every call carries `session=` (
 | `POST read/` | `{session, chatId}` → marks the chat read in WhatsApp | |
 | `messages=1&chatId=&limit=&before_ts=` | Messages, DB and live WAHA merged | Existing behaviour |
 | `chat_latest=1` | Latest timestamp per number | Existing behaviour |
-| `info=1&chatId=&name=` | Contact identity, media counts, leads, suggestions, staff list | Leads are only included when the user may see them |
+| `info=1&chatId=&name=` | Contact identity, media counts, leads, suggestions, staff list, `accounts` | Leads and accounts are only included when the user may see leads |
 | `media=1&chatId=&kind=&offset=` | 60 items a page | `kind` is one of photos / videos / files / links / voice / audio |
 | `lead_search=1&q=` | Leads by name, company, phone or #id | Needs CRM link rights |
 | `who=1&chatId=` | `{phone, lid, saved_name, push_name}` | Used for the conversation header title |
@@ -93,9 +107,16 @@ All writes need a strict session name (`sessions.is_valid`), not `normalize()`.
 ### Contact panel (right column)
 - Full height beside the chat. Below 75rem (about 1200px) it slides over the chat instead. Open/closed is remembered per browser in `localStorage` key `waInfoOpen`.
 - **Top summary**: one compact `<details>` row with avatar, name, phone and the connected lead's stage label. Expanding it shows On number, Phone, WhatsApp name, Saved as, LID, Messages, First and Last message. Rows are always listed and left blank when a value is unknown.
+- **EzzyDelivery account** (2026-10-05, `chat_panel.chat_accounts()`): the platform login(s) behind the chat, one card per person, up to 8. Shown to the same CRM login that may see leads. Each card is a `<details>` closed to one line (name, roles, the driver's or first business's status, "Login disabled") since 2026-10-06; the facts and seller/driver records open underneath. Since 2026-10-06 the section has no heading and the card is no longer a `<details>`. **Line 1** is the person: user icon, name (a toggle button that opens the facts), roles, then a green **Verified** flag when `verification_key == 'verified'`, otherwise a **Verify** button (`verify_url`: one profile status, so one queue: business `?search=<business_id>` for a client, else driver `?search=<driver_code or username>`, else user `?q=<username>`; staff-only and verified get none). **Line 2+** is one indented row per business / team / driver record with its status and **Open business** / **Open driver**. Each link only appears when the viewer `can_access` that route.
+  - Matched by the chat's **real phone** (last 8 digits, `\D*` regex) against `Profile.phone/whatsapp`, `Business.business_phone/business_whatsapp`, `Driver.driver_phone/driver_whatsapp` and `BusinessTeamProfile.team_phone`, **or through a connected lead**: its `converted_business` (owner) and its `driver`. "Matched by" lists every route (Phone · Business number · Lead #239…).
+  - A lid chat with no known phone matches through its leads only; a lid is never phone-matched (it would invent a 974 number).
+  - Card: name, @username, roles (Staff / Client / Team member / Driver or Driver applicant / Customer), login disabled, user no., email, phone, WhatsApp, verification, joined, last login, P2P bookings. Below it each owned business (status, code, order count + last order, business number), team memberships, and the driver row (status, availability, code).
+  - A business found by its number with no owner login gets its own card ("Business · no login").
+  - "Open seller" / "Open driver" links only appear when the viewer may open `seller_detail` / `driver_detail` (Operations), so a marketing login sees the facts without dead links.
 - **CRM leads**:
   - A **connected** lead shows a working card: stage select, assignee, follow-up date, add note, recent activity, notes and AI summary, flags (overdue, no follow-up, unassigned, days in stage, pinned, closed), facts, Open in CRM, and Unlink for manual links.
   - A connected **driver lead** with a `Lead.driver` also shows **Required documents**: the driver profile's Selfie, QID, Passport, Driving License and Istimara (`chat_panel.driver_documents`), with front/back thumbnails, number, expiry, and a "Complete"/"Incomplete" flag against the application rule (Selfie + any 2 IDs, same as `core.views.join_driver`). A row holding only the placeholder image counts as missing. Each tile has **+ Add from chat** (or **Replace from chat**) which opens a picker `<dialog id="wa-pick">` of this chat's photos (`?media=1&kind=photos`), with a Front/Back choice for IDs; tapping a photo confirms and posts to `save-doc/`.
+  - **Send reminder · N missing** (2026-10-06) sits in that card's footer whenever the applicant still owes something: the lead dict's `reminder` comes from `chat_panel.driver_reminder()` → the CRM composer's `_lead_reminder()` (the driver page's `_build_driver_reminder` body: every unfinished application section + the form link). Closed/converted cards and complete applications get none, so no button. The button opens `<dialog id="wa-remind">` with the text editable; Send posts it to this chat through `postText()`, the composer's own send path (`send/`, this chat's session), never the driver-onboarding route.
   - With **nothing connected**, the panel shows name-based suggestions and a lead search, each result with "Link this chat".
   - It **never creates a lead** (the 2026-09-22 rule: leads come only from the driver or pricing form).
 - **Media** tabs: Photos, Videos, Files, Links, Voice, Audio, each with a count and "Load more".
@@ -105,6 +126,7 @@ All writes need a strict session name (`sessions.is_valid`), not `normalize()`.
 - It shows the date and Sent/Received, an `n / total` counter, previous/next (buttons or ←/→) through the other media in the **same container** (that grid, or `#wa-msgs`), a Download link, and closes on ×, backdrop or Esc.
 - **Save to driver file**: for a photo from this chat, when the chat has a connected driver lead and the account may edit driver documents, the viewer bar offers a document + side picker. Saving (`chat_panel.save_chat_photo_to_driver`) replaces only that side's image: number, expiry and the other side are kept, a crop's parked original is dropped, and a note goes on the lead. The image is Pillow-verified, JPEG/PNG/WebP only, 8 MB max. Replacing asks for confirmation.
 - To make something open in it, give the element `data-lb-url` (plus optional `data-lb-kind="video"`, `data-lb-meta`, `data-lb-caption`). One delegated document click handler does the rest, including items added later. Documents are not wired to it; they still open as files.
+- **Document panel (2026-10-06)**: a thumbnail from the Required documents card (`data-lb-doc`) opens with the same panel as the CRM document popup beside the photo (stacked under it at phone width): Number / Expiry fields, **Use values from image** (copies `ai_no` / `ai_expiry_iso` into the fields, saves nothing), the image-check facts (Image check, Why, Number / Expiry on image), and **Mark verified** / **Undo verification**, **Submit**, **Submit & verify**. It posts to the workforce endpoints (`docs.doc_edit_base` + `<id>/edit/` and `/verify/`, with `X-CSRFToken` + `X-Requested-With`), never a second write path, then reloads the panel (`loadPanel()` returns its fetch) and repaints. The facts come from `chat_panel._doc_check()`. Arrow keys inside a field no longer flip the photo.
 
 ### Message actions (2026-10-03)
 - Hovering a bubble shows ↩ Reply, ☺ React and ⋮ More (Reply · Forward, plus Edit within 15 min and Delete for everyone within ~2 days on our own messages). Touch screens show them faintly all the time.

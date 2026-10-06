@@ -189,6 +189,7 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
                         <span class="text-muted">— {{ tm.get_team_role_display }}</span>
                     </span>
                     <span class="d-flex gap-1">
+                        {% if wf_dept_ops %}
                         {% if tm.team_status != 'active' %}
                         <button type="button" class="uvl__team-btn uvl__team-btn--activate" data-team-id="{{ tm.id }}" data-action="active" title="Activate">
                             <i class="fa-solid fa-check"></i> Activate
@@ -203,6 +204,7 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
                         <button type="button" class="uvl__team-btn uvl__team-btn--reject" data-team-id="{{ tm.id }}" data-action="rejected" title="Reject">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
+                        {% endif %}
                         {% endif %}
                     </span>
                 </div>
@@ -451,21 +453,26 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
             <a href="{% url 'workforce:view_user_business_profile' data.profile.id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-chart-line"></i> View Progress
             </a>
+            {% if wf_dept_ops %}
             <a href="{% url 'workforce:seller_detail' data.business.business_id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
             </a>
+            {% endif %}
             {% elif data.profile.is_driver and data.driver %}
             <a href="{% url 'workforce:view_user_driver_profile' data.profile.id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-chart-line"></i> View Progress
             </a>
+            {% if wf_dept_ops %}
             <a href="{% url 'workforce:driver_detail' data.driver.driver_id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
             </a>
+            {% endif %}
             {% else %}
             <a href="{% url 'core:profile' data.profile.user_number %}" class="uvl__btn uvl__btn--detail" target="_blank">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Profile
             </a>
             {% endif %}
+            {% if wf_dept_ops %}
             <button type="button" class="uvl__btn uvl__btn--role" data-action="change_role"
                 data-profile-id="{{ data.profile.id }}"
                 data-user-name="{{ data.user.first_name }} {{ data.user.last_name }}"
@@ -497,6 +504,7 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
                 data-user-name="{{ data.user.first_name }} {{ data.user.last_name }}">
                 <i class="fa-solid fa-xmark"></i> Reject
             </button>
+            {% endif %}
         </div>
         {% else %}
         <div class="uvl__actions">
@@ -504,21 +512,26 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
             <a href="{% url 'workforce:view_user_business_profile' data.profile.id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-chart-line"></i> View Progress
             </a>
+            {% if wf_dept_ops %}
             <a href="{% url 'workforce:seller_detail' data.business.business_id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
             </a>
+            {% endif %}
             {% elif data.profile.is_driver and data.driver %}
             <a href="{% url 'workforce:view_user_driver_profile' data.profile.id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-chart-line"></i> View Progress
             </a>
+            {% if wf_dept_ops %}
             <a href="{% url 'workforce:driver_detail' data.driver.driver_id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
             </a>
+            {% endif %}
             {% else %}
             <a href="{% url 'core:profile' data.profile.user_number %}" class="uvl__btn uvl__btn--detail" target="_blank">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> View Profile
             </a>
             {% endif %}
+            {% if wf_dept_ops %}
             <button type="button" class="uvl__btn uvl__btn--role" data-action="change_role"
                 data-profile-id="{{ data.profile.id }}"
                 data-user-name="{{ data.user.first_name }} {{ data.user.last_name }}"
@@ -531,6 +544,7 @@ Notes: Approve/reject/review POST to update_verification_status; team rows POST 
                 title="Change this user's role">
                 <i class="fa-solid fa-right-left"></i> Change Role
             </button>
+            {% endif %}
             <div class="uvl__verified-bar">
                 <i class="fa-solid fa-circle-check"></i> This user has been verified
             </div>

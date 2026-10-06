@@ -555,3 +555,80 @@
     font-size: 0.7rem;
     color: var(--text-secondary);
 }
+
+/* Location banner on the Documents step — a final submit waits for a location */
+.cja__geo {
+    background: var(--brand-warning-bg);
+    border: 1px solid var(--brand-grey-200);
+    border-left: 3px solid var(--brand-warning-alt);
+    border-radius: var(--brand-radius-sm);
+    color: var(--brand-grey-800);
+}
+
+.cja__geo-ico {
+    font-size: 1.125rem;
+    line-height: 1.5;
+    color: var(--brand-warning-text);
+    flex-shrink: 0;
+}
+
+.cja__geo-title {
+    font-size: 0.9375rem;
+    font-weight: var(--brand-font-weight-bold);
+    color: var(--brand-warning-text);
+}
+
+.cja__geo-text,
+.cja__geo-steps {
+    color: var(--brand-grey-800);
+}
+
+.cja__geo-steps {
+    padding-left: 1.25rem;
+}
+
+.cja__geo-steps li + li {
+    margin-top: 0.25rem;
+}
+
+/* A thumb-sized target: this is the one tap that unblocks the submit */
+.cja__geo-btn {
+    min-height: 2.75rem;
+}
+
+.cja__geo--on {
+    background: var(--brand-success-bg);
+    border-left-color: var(--brand-success);
+}
+
+.cja__geo--on .cja__geo-ico,
+.cja__geo--on .cja__geo-title {
+    color: var(--brand-success-dark);
+}
+
+.cja__geo--blocked {
+    background: var(--brand-danger-bg);
+    border-left-color: var(--brand-danger);
+}
+
+.cja__geo--blocked .cja__geo-ico,
+.cja__geo--blocked .cja__geo-title {
+    color: var(--brand-danger-dark);
+}
+
+/* Submit was tapped with no location yet: draw the eye back to the banner */
+.cja__geo--nudge {
+    animation: cja-geo-nudge 0.9s ease-out 2;
+}
+
+@keyframes cja-geo-nudge {
+    0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.45); }
+    100% { box-shadow: 0 0 0 10px rgba(217, 119, 6, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cja__geo--nudge {
+        animation: none;
+        box-shadow: 0 0 0 3px var(--brand-warning-alt);
+    }
+}

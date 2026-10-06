@@ -8,7 +8,7 @@
 {#        Carries the shared wfnote__ page-notes card under the header, hidden until the help button is pressed. #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20261003e" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20261006p" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -174,9 +174,13 @@
 
           <select name="overdue" class="crm__facet-select {% if overdue_filter %}crm__facet-select--on{% endif %}" aria-label="Filter overdue">
             <option value="">Any follow-up</option>
+            <option value="due" {% if overdue_filter == 'due' %}selected{% endif %}>Due today or earlier</option>
             <option value="1" {% if overdue_filter == '1' %}selected{% endif %}>Overdue only</option>
           </select>
         </div>
+        {# Carried, not shown: the idle flag arrives from the overview's link and its #}
+        {# chip below removes it; without this any other facet change would drop it. #}
+        {% if idle_filter %}<input type="hidden" name="idle" value="1">{% endif %}
 
         {# ROW DOWNLOADS — one instrument row with the filters, since both read #}
         {# the same view. The readout and the all-matching offer stay left, next #}
@@ -202,7 +206,16 @@
         {# The category is fixed by the URL now, so it is not one of the filters a #}
         {# Reset can clear — Reset returns to this same page, unfiltered. #}
         {% if is_driver_list %}{% url 'workforce:crm_driver_leads_list' as list_reset_url %}{% else %}{% url 'workforce:crm_leads_list' as list_reset_url %}{% endif %}
-        {% if search or stage_filter or source_filter or assigned_filter or overdue_filter or vehicle_filter or date_preset %}
+        {% if idle_filter %}
+        <a class="crmb__chip" href="{{ idle_remove_url }}" title="Remove the idle filter"
+           hx-get="{{ idle_remove_url }}" hx-target="#main-content"
+           hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+          <span class="crmb__chip-key">Flag</span>
+          <span class="crmb__chip-val">Idle {{ idle_days }}+ days</span>
+          <i class="fa-solid fa-xmark crmb__chip-x" aria-hidden="true"></i>
+        </a>
+        {% endif %}
+        {% if search or stage_filter or source_filter or assigned_filter or overdue_filter or vehicle_filter or date_preset or idle_filter %}
         <a href="{{ list_reset_url }}" class="crm__clear-all"
            hx-get="{{ list_reset_url }}"
            hx-target="#main-content" hx-select="#main-content"
@@ -305,7 +318,25 @@
               {% endif %}
             </td>
             <td><span class="crm__stage crm__stage--sw-{{ lead.stage_swatch }}"><i class="fa-solid fa-circle"></i>{{ lead.stage_label }}</span></td>
-            <td>{% if lead.assigned_to %}{{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }}{% else %}—{% endif %}</td>
+            <td>
+              {% if lead.assigned_to %}
+              {{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }}
+              {% if lead.is_idle %}
+              <span class="crm__idle" title="Owned for {{ idle_days }}+ days with nothing logged by the owner since">
+                <i class="fa-solid fa-hourglass-end" aria-hidden="true"></i>Idle {{ idle_days }}d+
+              </span>
+              {% endif %}
+              {% elif can_claim_leads %}
+              <form method="post" action="{% url 'workforce:crm_lead_claim' lead.pk %}" class="crm__take">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ list_path }}">
+                <button type="submit" class="crm__btn crm__btn--sm crm__take-btn"
+                        id="workforce_crm_leads_btn_take_{{ lead.pk }}" title="Assign this lead to me">
+                  <i class="fa-solid fa-hand-holding" aria-hidden="true"></i> Take
+                </button>
+              </form>
+              {% else %}—{% endif %}
+            </td>
             <td class="crm__num {% if lead.is_overdue %}crm__overdue-text{% endif %}">
               {{ lead.next_followup_at|date:"d M"|default:"—" }}
               {% if lead.is_overdue %}<i class="fa-solid fa-triangle-exclamation"></i>{% endif %}

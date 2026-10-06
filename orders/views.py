@@ -3692,7 +3692,8 @@ def update_location(request):
                             if delivery_task is None:
                                 delivery_task = _create_delivery_task_from_order(order)
                                 if delivery_task:
-                                    # Auto-publish so drivers can see it
+                                    # Auto-publish into the Unassigned list — the
+                                    # publish hook runs the Task Automation rules
                                     delivery_task.dl_task_publish = True
                                     delivery_task.save(update_fields=['dl_task_publish'])
 

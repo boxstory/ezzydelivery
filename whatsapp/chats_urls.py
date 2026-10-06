@@ -11,6 +11,7 @@ urlpatterns = [
     path('avatar/', wa_chats_view.wa_chats_avatar, name='wa_chats_avatar'),
     path('link-lead/', wa_chats_view.wa_chats_link_lead, name='wa_chats_link_lead'),
     path('set-labels/', wa_chats_view.wa_chats_set_labels, name='wa_chats_set_labels'),
+    path('create-label/', wa_chats_view.wa_chats_create_label, name='wa_chats_create_label'),
     path('save-doc/', wa_chats_view.wa_chats_save_doc, name='wa_chats_save_doc'),
     path('media/<int:msg_id>/', wa_chats_view.wa_chats_media, name='wa_chats_media'),
     path('media-live/', wa_chats_view.wa_chats_media_live, name='wa_chats_media_live'),

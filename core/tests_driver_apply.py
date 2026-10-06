@@ -3,10 +3,12 @@
 # Notes: Everything goes through the real multipart POST, since the bugs these cover live in the view's document loop.
 
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from allauth.socialaccount.models import SocialApp
 from django.contrib.auth import get_user_model
 from django.contrib.sites.models import Site
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -14,6 +16,7 @@ from django.utils import timezone
 
 from core import models as core_models
 from core.views import MAX_UPLOAD_SIZE
+from crm.models import STAGE_CACHE_KEY
 from fleet.models import docs_with_image
 from delivery.models import ZoneGroup
 from fleet import models as fleet_models
@@ -64,6 +67,8 @@ class DriverApplyPostTest(TestCase):
             'job_type_opts': ['part_time'],
             'work_time_slabs': ['evening'],
             'zone_groups': [str(self.zone.id)],
+            # The Documents step will not let a browser submit without one
+            'geo_lat': '25.2854', 'geo_lng': '51.5310', 'geo_accuracy': '12',
         })
         data.update(extra)
         return data
@@ -238,6 +243,79 @@ class DriverApplyPostTest(TestCase):
         resp = self.client.post(self.url, data, follow=True)
         self.assertFalse(core_models.Profile.objects.get(user=self.user).is_driver)
         self.assertIn('selfie photo is required', resp.content.decode())
+
+    # --- a final submit needs a location; a draft never does --------------
+
+    def complete_docs(self):
+        return {'doc_Selfie': photo('selfie.jpg'), 'doc_QID': photo('qid.jpg'),
+                'doc_Driving_License': photo('dl.jpg')}
+
+    def test_a_final_submit_without_a_location_is_refused(self):
+        data = self.full_payload(geo_lat='', geo_lng='', geo_accuracy='', **self.complete_docs())
+        resp = self.client.post(self.url, data, follow=True)
+        self.assertFalse(core_models.Profile.objects.get(user=self.user).is_driver)
+        self.assertIn('Turn on location to submit', resp.content.decode())
+        # ...and the wizard reopens on the Documents step, where the banner is
+        self.assertEqual(resp.context['initial_step'], 4)
+
+    def test_a_nonsense_location_counts_as_none(self):
+        data = self.full_payload(geo_lat='nan', geo_lng='51.53', **self.complete_docs())
+        self.client.post(self.url, data)
+        self.assertFalse(core_models.Profile.objects.get(user=self.user).is_driver)
+
+    def test_a_location_already_on_file_needs_no_new_fix(self):
+        """Applicants coming back to edit must not be asked again — the first is kept."""
+        self.client.post(self.url, dict(self.profile_fields(), action='save',
+                                        geo_lat='25.1659', geo_lng='51.6038',
+                                        **{'veh-vehicle_type': 'car'}))
+        data = self.full_payload(geo_lat='', geo_lng='', geo_accuracy='', **self.complete_docs())
+        self.client.post(self.url, data)
+        self.assertTrue(core_models.Profile.objects.get(user=self.user).is_driver)
+        self.assertEqual(self.driver().driver_meta['registration_location']['lat'], 25.1659)
+
+    def test_a_draft_save_never_needs_a_location(self):
+        data = dict(self.profile_fields(), action='save', **{'veh-vehicle_type': 'car'})
+        resp = self.client.post(self.url, data, follow=True)
+        self.assertNotIn('Turn on location to submit your application', resp.content.decode())
+        self.assertEqual(core_models.Profile.objects.get(user=self.user).first_name, 'Testname')
+
+    def test_the_documents_step_carries_the_banner_until_a_location_is_on_file(self):
+        resp = self.client.get(self.url + '?step=4')
+        self.assertContains(resp, 'id="core_join_driver_box_geo"')
+
+        self.client.post(self.url, dict(self.profile_fields(), action='save',
+                                        geo_lat='25.2854', geo_lng='51.5310',
+                                        **{'veh-vehicle_type': 'car'}))
+        resp = self.client.get(self.url + '?step=4&edit=1')
+        self.assertNotContains(resp, 'id="core_join_driver_box_geo"')
+        self.assertContains(resp, 'Your location is already on file.')
+
+    # --- the CRM card comes from the form, not from opening the board -----
+
+    def crm_cards(self):
+        from crm.models import Lead
+        return Lead.objects.filter(driver=self.driver(), category=Lead.CATEGORY_DRIVER)
+
+    def test_a_submit_files_the_applicant_on_the_crm_driver_board(self):
+        """The WhatsApp inbox read "No lead" for a fresh applicant: the card was
+        only built when someone opened the CRM driver board."""
+        cache.delete(STAGE_CACHE_KEY)
+        self.client.post(self.url, self.full_payload(**self.complete_docs()))
+        self.assertEqual(self.crm_cards().count(), 1)
+        self.assertTrue(self.crm_cards().get().phone.endswith('30000000'))
+
+    def test_a_draft_save_files_the_card_and_a_submit_reuses_it(self):
+        cache.delete(STAGE_CACHE_KEY)
+        self.client.post(self.url, dict(self.profile_fields(), action='save',
+                                        **{'veh-vehicle_type': 'car'}))
+        self.assertEqual(self.crm_cards().count(), 1)
+        self.client.post(self.url, self.full_payload(**self.complete_docs()))
+        self.assertEqual(self.crm_cards().count(), 1)
+
+    def test_a_failing_crm_sync_never_breaks_the_submit(self):
+        with patch('crm.services.reconcile_driver_leads', side_effect=RuntimeError('boom')):
+            self.client.post(self.url, self.full_payload(**self.complete_docs()))
+        self.assertTrue(core_models.Profile.objects.get(user=self.user).is_driver)
 
     # --- a stray is_business flag must not lock an applicant out ----------
 

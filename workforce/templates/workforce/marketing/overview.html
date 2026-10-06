@@ -1,0 +1,568 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: The marketing desk's landing page at /workforce/marketing/ — lead queues, pipeline tiles, a 10-day intake chart, the desk's actions and the latest open cards.
+Used by: workforce.marketing_views.wf_marketing_overview; context from workforce/dashboard_marketing.py (every mkt_ key below).
+Notes: Every link must point at a URL listed under _MKT in core/departments.py, or a marketing-only account lands on "You don't have access" — workforce/tests_dashboard_marketing.py crawls them and asserts 200. The navy band comes free from staff-hero.css because the class ends in __hero.
+{% endcomment %}
+{% block title %}Marketing Overview | Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'workforce/css/marketing-overview.css' %}?v=20261006m" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<header class="mko__hero">
+  <div class="wfhero__ident">
+    <span class="wfhero__eyebrow">Marketing desk</span>
+    <h1 class="wfhero__title">Marketing Overview</h1>
+    <span class="wfhero__sub">Lead pipeline, inbound forms and driver recruitment</span>
+  </div>
+  <div class="wfhero__side">
+    <nav class="wfhero__actions">
+      <a href="{% url 'workforce:crm_lead_create' %}" class="wfhero__btn" id="mko_hero_link_add_lead">
+        <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
+        <span>Add lead</span>
+      </a>
+      <button type="button" class="wfhero__ghost" id="mko_btn_refresh">
+        <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+        <span>Refresh</span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<div class="mko">
+
+  {% include "workforce/parts/_marketing_desk_rail.html" %}
+
+  <div class="mko__grid">
+
+    {% comment %}Left: the worklist. Every link carries the same filter the tally
+    counted, so the page it opens shows exactly these cards and nothing wider.{% endcomment %}
+    <div class="mko__col">
+
+      {% comment %}Your own cards first: once a lead is taken it leaves everyone else's
+      board, so this is the worklist. Idle = owned, open and nothing logged by the
+      owner for mkt_idle_days (crm/ownership.py).{% endcomment %}
+      <section class="mko__card" id="mko_card_my_leads">
+        <div class="mko__card-head">
+          <h2 class="mko__card-title">
+            <i class="fa-solid fa-user-check" aria-hidden="true"></i>
+            My Leads
+          </h2>
+        </div>
+        <div class="mko__card-body mko__card-body--flush">
+          <div class="mko__list">
+
+            <a href="{% url 'workforce:crm_leads_list' %}?assigned=me{% if mkt_my_idle_business %}&amp;idle=1{% endif %}"
+               class="mko__row {% if mkt_my_idle_business %}mko__row--late{% elif mkt_my_due_business %}mko__row--due{% else %}mko__row--house{% endif %}"
+               id="mko_row_my_business">
+              <span class="mko__row-icon"><i class="fa-solid fa-store" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">My Business Leads</span>
+                <span class="mko__row-value">{{ mkt_my_business|default:0 }}</span>
+                <span class="mko__row-note">Due: {{ mkt_my_due_business|default:0 }} &middot; Idle {{ mkt_idle_days }}+ days: {{ mkt_my_idle_business|default:0 }}</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+            <a href="{% url 'workforce:crm_driver_leads_list' %}?assigned=me{% if mkt_my_idle_driver %}&amp;idle=1{% endif %}"
+               class="mko__row {% if mkt_my_idle_driver %}mko__row--late{% elif mkt_my_due_driver %}mko__row--due{% else %}mko__row--house{% endif %}"
+               id="mko_row_my_driver">
+              <span class="mko__row-icon"><i class="fa-solid fa-motorcycle" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">My Driver Applicants</span>
+                <span class="mko__row-value">{{ mkt_my_driver|default:0 }}</span>
+                <span class="mko__row-note">Due: {{ mkt_my_due_driver|default:0 }} &middot; Idle {{ mkt_idle_days }}+ days: {{ mkt_my_idle_driver|default:0 }}</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+          </div>
+          {% if mkt_can_claim %}
+          <div class="mko__take d-flex flex-wrap gap-2">
+            <form method="post" action="{% url 'workforce:crm_lead_claim_next' %}" class="flex-fill">
+              {% csrf_token %}
+              <input type="hidden" name="category" value="business">
+              <button type="submit" class="btn btn-sm w-100 mko__take-btn" id="mko_btn_take_business"
+                      {% if not mkt_unassigned_business %}disabled{% endif %}>
+                <i class="fa-solid fa-hand-holding" aria-hidden="true"></i>
+                Take next business lead
+                <span class="mko__take-count">{{ mkt_unassigned_business|default:0 }}</span>
+              </button>
+            </form>
+            <form method="post" action="{% url 'workforce:crm_lead_claim_next' %}" class="flex-fill">
+              {% csrf_token %}
+              <input type="hidden" name="category" value="driver">
+              <button type="submit" class="btn btn-sm w-100 mko__take-btn" id="mko_btn_take_driver"
+                      {% if not mkt_unassigned_driver %}disabled{% endif %}>
+                <i class="fa-solid fa-hand-holding" aria-hidden="true"></i>
+                Take next driver applicant
+                <span class="mko__take-count">{{ mkt_unassigned_driver|default:0 }}</span>
+              </button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="mko__card">
+        <div class="mko__card-head">
+          <h2 class="mko__card-title">
+            <i class="fa-solid fa-filter-circle-dollar" aria-hidden="true"></i>
+            Lead Queues
+          </h2>
+          <a href="{% url 'workforce:crm_leads_board' %}" class="mko__card-link" id="mko_link_board">
+            Open board <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          </a>
+        </div>
+        <div class="mko__card-body mko__card-body--flush">
+          <div class="mko__list">
+
+            <a href="{% url 'workforce:crm_leads_list' %}?stage={{ mkt_new_business_stage }}"
+               class="mko__row {% if mkt_new_business %}mko__row--due{% else %}mko__row--ok{% endif %}"
+               id="mko_row_new_business">
+              <span class="mko__row-icon"><i class="fa-solid fa-store" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">New Business Leads</span>
+                <span class="mko__row-value">{{ mkt_new_business|default:0 }}</span>
+                <span class="mko__row-note">Unworked cards in the entry column</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+            <a href="{% url 'workforce:crm_driver_leads_list' %}?stage={{ mkt_new_driver_stage }}"
+               class="mko__row {% if mkt_new_driver %}mko__row--due{% else %}mko__row--ok{% endif %}"
+               id="mko_row_new_driver">
+              <span class="mko__row-icon"><i class="fa-solid fa-motorcycle" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">New Driver Applicants</span>
+                <span class="mko__row-value">{{ mkt_new_driver|default:0 }}</span>
+                <span class="mko__row-note">Unworked cards in the entry column</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+            <a href="{% url 'workforce:crm_leads_list' %}?overdue=due"
+               class="mko__row {% if mkt_overdue_business %}mko__row--late{% elif mkt_due_business %}mko__row--due{% else %}mko__row--ok{% endif %}"
+               id="mko_row_due_business">
+              <span class="mko__row-icon"><i class="fa-solid fa-phone-volume" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">Business Follow-ups Due</span>
+                <span class="mko__row-value">{{ mkt_due_business|default:0 }}</span>
+                <span class="mko__row-note">Overdue: {{ mkt_overdue_business|default:0 }}</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+            <a href="{% url 'workforce:crm_driver_leads_list' %}?overdue=due"
+               class="mko__row {% if mkt_overdue_driver %}mko__row--late{% elif mkt_due_driver %}mko__row--due{% else %}mko__row--ok{% endif %}"
+               id="mko_row_due_driver">
+              <span class="mko__row-icon"><i class="fa-solid fa-phone-volume" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">Driver Follow-ups Due</span>
+                <span class="mko__row-value">{{ mkt_due_driver|default:0 }}</span>
+                <span class="mko__row-note">Overdue: {{ mkt_overdue_driver|default:0 }}</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+            <a href="{% url 'workforce:crm_leads_list' %}?assigned=none"
+               class="mko__row {% if mkt_unassigned_business %}mko__row--due{% else %}mko__row--ok{% endif %}"
+               id="mko_row_unassigned_business">
+              <span class="mko__row-icon"><i class="fa-solid fa-user-slash" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">Unassigned Business Leads</span>
+                <span class="mko__row-value">{{ mkt_unassigned_business|default:0 }}</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+            <a href="{% url 'workforce:crm_driver_leads_list' %}?assigned=none"
+               class="mko__row {% if mkt_unassigned_driver %}mko__row--due{% else %}mko__row--ok{% endif %}"
+               id="mko_row_unassigned_driver">
+              <span class="mko__row-icon"><i class="fa-solid fa-user-slash" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">Unassigned Driver Applicants</span>
+                <span class="mko__row-value">{{ mkt_unassigned_driver|default:0 }}</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+            {% comment %}Team-wide, so managers only — anyone else's figure would be their
+            own idle count again, which the My Leads card already shows.{% endcomment %}
+            {% if mkt_is_lead_manager %}
+            <a href="{% url 'workforce:crm_leads_list' %}?idle=1"
+               class="mko__row {% if mkt_idle_business %}mko__row--late{% else %}mko__row--ok{% endif %}"
+               id="mko_row_idle_business">
+              <span class="mko__row-icon"><i class="fa-solid fa-hourglass-end" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">Idle Business Leads</span>
+                <span class="mko__row-value">{{ mkt_idle_business|default:0 }}</span>
+                <span class="mko__row-note">Taken, untouched by the owner for {{ mkt_idle_days }}+ days</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+            <a href="{% url 'workforce:crm_driver_leads_list' %}?idle=1"
+               class="mko__row {% if mkt_idle_driver %}mko__row--late{% else %}mko__row--ok{% endif %}"
+               id="mko_row_idle_driver">
+              <span class="mko__row-icon"><i class="fa-solid fa-hourglass-end" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">Idle Driver Applicants</span>
+                <span class="mko__row-value">{{ mkt_idle_driver|default:0 }}</span>
+                <span class="mko__row-note">Taken, untouched by the owner for {{ mkt_idle_days }}+ days</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+            {% endif %}
+
+          </div>
+        </div>
+      </section>
+
+      <section class="mko__card">
+        <div class="mko__card-head">
+          <h2 class="mko__card-title">
+            <i class="fa-solid fa-inbox" aria-hidden="true"></i>
+            Inbound &amp; Recruitment
+          </h2>
+        </div>
+        <div class="mko__card-body mko__card-body--flush">
+          <div class="mko__list">
+
+            <a href="{% url 'workforce:pricing_inquiries_list' %}?status=new"
+               class="mko__row {% if mkt_pricing_new %}mko__row--due{% else %}mko__row--ok{% endif %}"
+               id="mko_row_pricing_new">
+              <span class="mko__row-icon"><i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">Pricing Inquiries (New)</span>
+                <span class="mko__row-value">{{ mkt_pricing_new|default:0 }}</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+            <a href="{% url 'workforce:wf_driver_proposal_interests' %}?status=interested"
+               class="mko__row {% if mkt_interest_new %}mko__row--due{% else %}mko__row--ok{% endif %}"
+               id="mko_row_interests">
+              <span class="mko__row-icon"><i class="fa-solid fa-hand" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">Interested Drivers (New)</span>
+                <span class="mko__row-value">{{ mkt_interest_new|default:0 }}</span>
+                <span class="mko__row-note">Answered a published offer</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+            <a href="{% url 'workforce:wf_driver_proposals' %}"
+               class="mko__row {% if mkt_proposals_live %}mko__row--open{% else %}mko__row--due{% endif %}"
+               id="mko_row_proposals">
+              <span class="mko__row-icon"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i></span>
+              <span class="mko__row-main">
+                <span class="mko__row-label">Live Driver Offers</span>
+                <span class="mko__row-value">{{ mkt_proposals_live|default:0 }}</span>
+                <span class="mko__row-note">Published and not past closing</span>
+              </span>
+              <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            </a>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    {# Right: the measures, then the chart, then where to go next. #}
+    <div class="mko__col">
+
+      <div class="mko__tiles">
+
+        <div class="mko__tile">
+          <span class="mko__tile-label">Leads Today</span>
+          <div class="mko__tile-figure">
+            <span class="mko__tile-value">{{ mkt_leads_today|default:0 }}</span>
+            <span class="mko__tile-note {% if mkt_leads_today %}mko__tile-note--up{% endif %}">
+              <i class="fa-solid fa-circle" aria-hidden="true"></i> Live
+            </span>
+          </div>
+          <div class="mko__tile-foot">
+            <a href="{% url 'workforce:crm_leads_list' %}?datePreset=today" class="mko__tile-link">
+              <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              {{ mkt_leads_week|default:0 }} in the last 7 days
+            </a>
+          </div>
+        </div>
+
+        <div class="mko__tile">
+          <span class="mko__tile-label">Business Pipeline</span>
+          <div class="mko__tile-figure">
+            <span class="mko__tile-value">{{ mkt_open_business|default:0 }}</span>
+            <span class="mko__tile-of">of {{ mkt_total_business|default:0 }}</span>
+            <span class="mko__tile-note">Open</span>
+          </div>
+          <div class="mko__tile-foot">
+            <a href="{% url 'workforce:crm_leads_board' %}" class="mko__tile-link">
+              <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              Open business board
+            </a>
+          </div>
+        </div>
+
+        <div class="mko__tile">
+          <span class="mko__tile-label">Driver Pipeline</span>
+          <div class="mko__tile-figure">
+            <span class="mko__tile-value">{{ mkt_open_driver|default:0 }}</span>
+            <span class="mko__tile-of">of {{ mkt_total_driver|default:0 }}</span>
+            <span class="mko__tile-note">Open</span>
+          </div>
+          <div class="mko__tile-foot">
+            <a href="{% url 'workforce:crm_driver_leads_board' %}" class="mko__tile-link">
+              <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              Open driver board
+            </a>
+          </div>
+        </div>
+
+        {% comment %}Win rate over cards DECIDED in the last 30 days, not over the whole
+        board — a pipeline running for years would otherwise never move.{% endcomment %}
+        <div class="mko__tile">
+          <span class="mko__tile-label">Win Rate (30d)</span>
+          <div class="mko__tile-figure">
+            <span class="mko__tile-value mko__tile-value--sm">
+              {% if mkt_win_rate_30d is not None %}{{ mkt_win_rate_30d }}%{% else %}&mdash;{% endif %}
+            </span>
+            <span class="mko__tile-note">Decided</span>
+          </div>
+          <div class="mko__tile-foot">
+            <a href="{% url 'workforce:crm_reports' %}" class="mko__tile-link">
+              <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              {{ mkt_won_30d|default:0 }} won &middot; {{ mkt_lost_30d|default:0 }} lost
+            </a>
+          </div>
+        </div>
+
+      </div>
+
+      {% comment %}One chart per board, not two series in one. Driver intake runs
+      several times business intake, so a shared y-axis flattened the business line
+      to nothing — separate charts let each board be read on its own scale.{% endcomment %}
+      {{ mkt_trend|json_script:"workforce_mko_data_trend" }}
+      <div class="mko__chart-pair">
+
+        <section class="mko__card">
+          <div class="mko__card-head">
+            <h2 class="mko__card-title">
+              <i class="fa-solid fa-store" aria-hidden="true"></i>
+              Client Leads (Last 10 Days)
+            </h2>
+            <a href="{% url 'workforce:crm_reports' %}" class="mko__card-link" id="mko_link_reports">
+              Reports <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+            </a>
+          </div>
+          <div class="mko__card-body">
+            <div class="mko__chart" id="mko_chart_business"></div>
+          </div>
+        </section>
+
+        <section class="mko__card">
+          <div class="mko__card-head">
+            <h2 class="mko__card-title">
+              <i class="fa-solid fa-motorcycle" aria-hidden="true"></i>
+              Driver Leads (Last 10 Days)
+            </h2>
+            <a href="{% url 'workforce:crm_driver_reports' %}" class="mko__card-link" id="mko_link_driver_reports">
+              Reports <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+            </a>
+          </div>
+          <div class="mko__card-body">
+            <div class="mko__chart" id="mko_chart_driver"></div>
+          </div>
+        </section>
+
+      </div>
+
+      <section class="mko__card">
+        <div class="mko__card-head">
+          <h2 class="mko__card-title">
+            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+            Quick Actions
+          </h2>
+        </div>
+        <div class="mko__card-body">
+          <div class="mko__actions">
+
+            <a href="{% url 'workforce:crm_lead_create' %}" class="mko__action mko__action--house" id="mko_action_add_lead">
+              <span class="mko__action-icon"><i class="fa-solid fa-user-plus" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Add Lead</span>
+            </a>
+
+            <a href="{% url 'workforce:crm_leads_board' %}" class="mko__action mko__action--house" id="mko_action_board">
+              <span class="mko__action-icon"><i class="fa-solid fa-table-columns" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Business Board</span>
+            </a>
+
+            <a href="{% url 'workforce:crm_driver_leads_board' %}" class="mko__action mko__action--house" id="mko_action_driver_board">
+              <span class="mko__action-icon"><i class="fa-solid fa-id-card" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Driver Board</span>
+            </a>
+
+            <a href="{% url 'workforce:crm_whatsapp_inbox' %}" class="mko__action mko__action--chat" id="mko_action_inbox">
+              <span class="mko__action-icon"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></span>
+              <span class="mko__action-label">WhatsApp Inbox</span>
+            </a>
+
+            <a href="{% url 'workforce:crm_contacts' %}" class="mko__action mko__action--chat" id="mko_action_contacts">
+              <span class="mko__action-icon"><i class="fa-solid fa-address-book" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Contacts</span>
+            </a>
+
+            <a href="{% url 'workforce:pricing_inquiries_list' %}" class="mko__action mko__action--watch" id="mko_action_pricing">
+              <span class="mko__action-icon"><i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Pricing Inquiries</span>
+            </a>
+
+            <a href="{% url 'workforce:wf_driver_proposals' %}" class="mko__action mko__action--watch" id="mko_action_offers">
+              <span class="mko__action-icon"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Driver Offers</span>
+            </a>
+
+            <a href="{% url 'workforce:wf_driver_proposal_interests' %}" class="mko__action mko__action--watch" id="mko_action_interests">
+              <span class="mko__action-icon"><i class="fa-solid fa-hand" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Interested Drivers{% if mkt_interest_new %} ({{ mkt_interest_new }}){% endif %}</span>
+            </a>
+
+            <a href="{% url 'workforce:crm_driver_map' %}" class="mko__action mko__action--read" id="mko_action_driver_map">
+              <span class="mko__action-icon"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Driver Map</span>
+            </a>
+
+            <a href="{% url 'workforce:crm_reports' %}" class="mko__action mko__action--read" id="mko_action_reports">
+              <span class="mko__action-icon"><i class="fa-solid fa-chart-pie" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Business Reports</span>
+            </a>
+
+            <a href="{% url 'workforce:crm_driver_reports' %}" class="mko__action mko__action--read" id="mko_action_driver_reports">
+              <span class="mko__action-icon"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Driver Reports</span>
+            </a>
+
+            <a href="{% url 'workforce:crm_stages_manage' %}" class="mko__action mko__action--read" id="mko_action_stages">
+              <span class="mko__action-icon"><i class="fa-solid fa-sliders" aria-hidden="true"></i></span>
+              <span class="mko__action-label">Board Columns</span>
+            </a>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+  </div>
+
+  <section class="mko__card">
+    <div class="mko__card-head">
+      <h2 class="mko__card-title">
+        <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+        Latest Lead Activity
+      </h2>
+      <a href="{% url 'workforce:crm_leads_list' %}" class="mko__card-link" id="mko_link_all_leads">
+        View all <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+      </a>
+    </div>
+    <div class="mko__card-body mko__card-body--flush">
+      {% if mkt_recent_leads %}
+      <div class="mko__list">
+        {% for lead in mkt_recent_leads %}
+        <a href="{% url 'workforce:crm_lead_detail' lead.id %}"
+           class="mko__row {% if lead.is_overdue %}mko__row--late{% else %}mko__row--open{% endif %}">
+          <span class="mko__row-icon">
+            <i class="fa-solid {% if lead.category == 'driver' %}fa-motorcycle{% else %}fa-store{% endif %}" aria-hidden="true"></i>
+          </span>
+          <span class="mko__row-main">
+            <span class="mko__row-label">{{ lead.company_name|default:lead.contact_name|default:lead.phone|default:"Unnamed lead" }}</span>
+            <span class="mko__row-value mko__row-value--text">{{ lead.stage_label }}</span>
+            <span class="mko__row-note">
+              {{ lead.get_source_display }}
+              &middot; {% if lead.assigned_to %}{{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }}{% else %}Unassigned{% endif %}
+              {% if lead.is_idle %}&middot; <span class="mko__flag">Idle {{ mkt_idle_days }}+ days</span>{% endif %}
+              &middot; updated {{ lead.updated_at|date:"d M H:i" }}
+              {% if lead.next_followup_at %}&middot; follow up {{ lead.next_followup_at|date:"d M" }}{% endif %}
+            </span>
+          </span>
+          <span class="mko__row-go"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="mko__empty">
+        <i class="fa-solid fa-inbox" aria-hidden="true"></i>
+        <p class="mko__empty-title">No open leads</p>
+        <p class="mko__empty-text">Cards appear here as inquiries and applications arrive</p>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var raw = document.getElementById('workforce_mko_data_trend');
+    var trend = raw ? JSON.parse(raw.textContent) : null;
+
+    // One chart per board. Each is a single series, so neither carries a legend —
+    // the card title already names what is being counted.
+    function drawIntake(elementId, series, ink) {
+      var el = document.getElementById(elementId);
+      // HTMX re-runs this on every #main-content swap, so the dataset flag stops a
+      // second chart being drawn over a live one.
+      if (!el || !series || typeof ApexCharts === 'undefined' || el.dataset.rendered) return;
+      el.dataset.rendered = '1';
+      new ApexCharts(el, {
+        chart: { type: 'bar', height: 260, toolbar: { show: false }, fontFamily: 'inherit' },
+        series: [series],
+        colors: [ink],
+        xaxis: {
+          categories: trend.categories,
+          labels: { style: { colors: '#8a94a6', fontSize: '11px' } },
+          axisBorder: { color: '#e7eaef' },
+          axisTicks: { show: false }
+        },
+        // Each board keeps its own scale — that is the whole point of two charts.
+        yaxis: { min: 0, forceNiceScale: true,
+                 labels: { style: { colors: '#8a94a6', fontSize: '12px' } } },
+        plotOptions: { bar: { columnWidth: '55%', borderRadius: 3, borderRadiusApplication: 'end' } },
+        dataLabels: { enabled: false },
+        legend: { show: false },
+        grid: { borderColor: '#e7eaef', strokeDashArray: 4, padding: { left: 4, right: 8 } },
+        tooltip: { intersect: false, shared: false },
+        responsive: [{
+          breakpoint: 576,
+          options: {
+            chart: { height: 230 },
+            grid: { padding: { left: 0, right: 2, top: 0, bottom: 0 } },
+            xaxis: { labels: { style: { fontSize: '10px' } } },
+            yaxis: { labels: { style: { fontSize: '10px' } } }
+          }
+        }]
+      }).render();
+    }
+
+    if (trend) {
+      // Colour follows the board, not the rank — the same two inks the CRM
+      // scorecard gives these entities.
+      drawIntake('mko_chart_business', trend.series[0], '#2563eb');
+      drawIntake('mko_chart_driver', trend.series[1], '#6f42c1');
+    }
+
+    var refresh = document.getElementById('mko_btn_refresh');
+    if (refresh && !refresh.dataset.bound) {
+      refresh.dataset.bound = '1';
+      refresh.addEventListener('click', function () { location.reload(); });
+    }
+  })();
+</script>
+{% endblock extra_js %}

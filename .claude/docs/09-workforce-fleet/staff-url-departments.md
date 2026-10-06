@@ -88,6 +88,9 @@ These cannot be locked to one department: they are the landing page or AJAX help
 | `publish_task_to_fleets` / `unpublish_task_from_fleets` | `delivery-task/<id>/...-fleets/` |
 | `assign_driver_to_task` / `unassign_driver_from_task` | `delivery-task/<id>/...-driver/` |
 | `update_task_status` | `delivery-task/<id>/update-status/` |
+| `dl_list_unassigned` | `tasks/unassigned/` (`?pool=public` for the Public pool) |
+| `task_automation_list` / `task_automation_apply` | `task-automation/`, `task-automation/apply/` |
+| `task_automation_toggle` / `task_automation_delete` | `task-automation/<id>/toggle/`, `.../delete/` |
 | `bulk_print_tasks` / `bulk_print_waybills` | `tasks/bulk-print/`, `tasks/print-waybills/` |
 | `bulk_publish_fleets` / `bulk_publish_app` | `tasks/bulk-publish-.../` |
 | `bulk_update_status` / `bulk_export_tasks` / `bulk_assign_driver` | `tasks/bulk-.../` |
@@ -124,7 +127,9 @@ These cannot be locked to one department: they are the landing page or AJAX help
 | `driver_connect_crm_lead` | `drivers/<id>/connect-lead/` |
 | `driver_toggle_status` / `driver_set_status` / `driver_set_work_pref` | `drivers/<id>/...` |
 | `driver_vehicle_add` / `driver_vehicle_edit` / `driver_vehicle_delete` | `drivers/<id>/vehicle/...` |
-| `driver_document_add` / `driver_document_edit` / `driver_document_delete` | `drivers/<id>/document/...` |
+| `driver_document_delete` | `drivers/<id>/document/<id>/delete/` |
+
+> `driver_document_add` / `_edit` / `_crop` / `_crop_restore` / `_verify` → **Ops + Marketing** (see §9).
 | `driver_remind_completion` | `drivers/<id>/remind-completion/` |
 | `export_drivers_csv` | `drivers/export/` |
 | `wf_driver_tasks` | `fleet/driver-tasks/` |
@@ -146,10 +151,10 @@ These cannot be locked to one department: they are the landing page or AJAX help
 ### 2.7 Verification & Documents
 | URL name | Path |
 |---|---|
-| `business_verification_list` / `driver_verification_list` / `user_verification_list` / `team_verification_list` | `verification/...` |
+| `business_verification_list` / `driver_verification_list` / `user_verification_list` / `team_verification_list` | `verification/...` — also open to marketing, view-only (see §8) |
 | `export_driver_verification_csv` | `verification/drivers/export/` |
 | `update_verification_status` / `update_team_status` | `verification/.../update-status/` |
-| `view_user_driver_profile` / `view_user_business_profile` | `verification/<id>/...-profile/` |
+| `view_user_driver_profile` / `view_user_business_profile` | `verification/<id>/...-profile/` — also open to marketing (see §8) |
 | `check_business_code_unique` | `verification/check-business-code/` |
 | `driver_documents_list` / `driver_document_detail` | `documents/driver-ids/...` |
 | `vehicle_documents_list` / `vehicle_document_detail` | `documents/vehicles/...` |
@@ -263,7 +268,7 @@ Platform configuration. Wrong values here break every department, so keep this l
 
 | URL name | Path | Group |
 |---|---|---|
-| `staff_roles_list` / `staff_role_update` | `staff-roles/...` | Staff roles |
+| `staff_roles_list` / `staff_role_update` / `staff_role_grant` / `staff_waha_access` / `staff_waha_session` | `staff-roles/...` | Staff roles (grant = make a signed-up account staff; waha = WhatsApp inbox browser login; waha-session = which WhatsApp numbers they open in the inbox) |
 | `whatsapp_label_access` | `whatsapp/label-access/` | Marketing-only WhatsApp labels (which labels hide chats from other desks) |
 | `auto_triggers_list` / `auto_trigger_toggle` / `auto_trigger_update` / `auto_trigger_message_save` | `auto-triggers/...` | Automation (was multi-desk until 2026-10-04) |
 | `whatsapp_sender_routes_save` / `whatsapp_sender_route_toggle` | `auto-triggers/sender-routes/...` | Automation (was multi-desk until 2026-10-04) |
@@ -287,6 +292,7 @@ Platform configuration. Wrong values here break every department, so keep this l
 | `temp_order_config` | `orders/temp/config/` | Import config |
 | `temp_auto_stages` / `temp_auto_stages_save` | `orders/temp/auto-stages/`, `orders/temp/auto-stages/save/` | Import config (read helper `temp_auto_stages_get` is OPS — the Auto-Import modal needs it) |
 | `dispatch_config_list` / `dispatch_config_edit` | `dispatch/config/...` | Dispatch config |
+| `crm_lead_delete` | `crm/leads/<id>/delete/` | CRM — permanent lead delete (since 2026-10-04); timeline, WhatsApp links and merged cards go with it. The view also refuses non-super-admins, whatever the page override says |
 
 ---
 
@@ -363,6 +369,42 @@ hold every desk). If a desk is ever given the page back, move the routes into `_
 Both also sit behind the nginx htpasswd. Session Status links a device to a company number
 by QR, which is why it is not open to marketing; the inbox's "Session health & QR" link and
 the sidebar / MSG Queue links to it are rendered for super admins only.
+
+## 8. Onboarding is view-only for marketing (since 2026-10-04)
+
+Marketing chases the same applicants from the CRM, so the four queues (Business,
+Driver, All Users, Team) and the two applicant profile pages are in `_MULTI` as
+`[OPS, MKT, ADMIN]`. Every decision stays Operations-only, twice over:
+
+- **Endpoint:** `update_verification_status`, `update_team_status`, `change_user_role`,
+  `check_business_code_unique` and `export_driver_verification_csv` stay in `_OPS`, so the
+  middleware refuses marketing even if a request is hand-made.
+- **Template:** Approve / Review / Reject, Change Role, team Activate / Suspend / Reject,
+  Remind to complete, CSV export (and its row ticks), and the links out to the driver,
+  seller and document records render only under `wf_dept_ops`.
+
+WH-Business Links (`warehouses_list`) sits in the same Onboarding menu but is fulfilment
+setup, so it stays Operations-only. Tests: `workforce.tests_departments.OnboardingMarketingViewOnlyTests`.
+
+## 9. Driver documents are shared with marketing (since 2026-10-06)
+
+Marketing works driver documents from the driver-lead page (`/workforce/crm/leads/<id>/`):
+type the number / expiry off the scan, crop it, add a missing document and mark it verified.
+`driver_document_add`, `_edit`, `_crop`, `_crop_restore` and `_verify` sit in `_MULTI` as
+`[OPS, MKT, ADMIN]`; **`driver_document_delete` stays `_OPS`**. Before this, ezzycmo1's Submit
+was refused and the popup showed `Unexpected token '<'` — the fetch sent no
+`X-Requested-With`, so the middleware's refusal was a redirect to dashboard HTML. Both
+document fetches now send that header. Tests: `workforce.tests_departments.MarketingDriverDocumentTests`.
+
+## 10. Lead ownership — take, release, take next (since 2026-10-06)
+
+`crm_lead_claim` (`crm/leads/<id>/claim/`), `crm_lead_release` (`crm/leads/<id>/release/`) and
+`crm_lead_claim_next` (`crm/leads/claim-next/`) sit in `_MULTI` as `[OPS, MKT, ADMIN]` — both desks
+work the pool. The map only opens the routes; **whose lead is whose is decided per row in
+`crm/ownership.py`**: a lead manager (`Profile.lead_manager`, or any super admin) sees and assigns
+everything, everyone else sees their own leads plus the unassigned pool. Every per-lead CRM
+endpoint refuses someone else's lead with a JSON 403. See
+`.claude/docs/06-features/crm-lead-ownership.md`.
 
 ## Judgement calls worth confirming
 

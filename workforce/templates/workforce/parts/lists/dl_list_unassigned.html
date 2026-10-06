@@ -1,0 +1,88 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff queue of published delivery tasks nobody is on — Unassigned (no driver sees it) or Public (every app driver's New tab)
+Used by: workforce.views.dl_list_unassigned at /workforce/tasks/unassigned/
+Notes:   Assign from the bulk bar (pick a driver or "Public") or the task page; Task Automation rules empty this list on their own.
+{% endcomment %}
+{% block title %}Unassigned Tasks - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/task-automation.css' %}?v=20261005d">
+{% endblock extra_css %}
+
+{% block content %}
+{% csrf_token %}
+<div class="wfpage">
+
+  {% include "workforce/parts/components/_page_header.html" with title="Unassigned Tasks" icon="fa-user-clock" subtitle="Published tasks with no driver — assign one, send it to Public, or let a Task Automation rule do it" notes_id="workforce_parts_lists_dl_list_unassigned_card_notes" %}
+
+  <div class="wfnote" id="workforce_parts_lists_dl_list_unassigned_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'workforce_parts_lists_dl_list_unassigned_card_notes' %}" hidden></div>
+
+  <div class="wfpage__body">
+    <div class="wfcard">
+      <div class="tau__toolbar d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="d-flex flex-wrap align-items-center gap-1">
+          <a href="{% url 'workforce:dl_list_unassigned' %}" id="workforce_tasks_unassigned_tab_unassigned"
+             class="tau__tab{% if pool == 'unassigned' %} tau__tab--on{% endif %}">
+            Unassigned <span class="wfmono">{{ unassigned_count }}</span>
+          </a>
+          <a href="{% url 'workforce:dl_list_unassigned' %}?pool=public" id="workforce_tasks_unassigned_tab_public"
+             class="tau__tab{% if pool == 'public' %} tau__tab--on{% endif %}">
+            Public <span class="wfmono">{{ public_count }}</span>
+          </a>
+          <span class="tau__tally ms-2">
+            {% if pool == 'public' %}In every app driver's New tab, not taken yet.{% else %}No driver can see these yet.{% endif %}
+          </span>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <a href="{% url 'workforce:task_automation_list' %}" class="tau__btn" id="workforce_tasks_unassigned_btn_rules">
+            <i class="fa-solid fa-shuffle" aria-hidden="true"></i> Task Automation
+            <span class="tau__meta">· {{ active_rule_count }} rule{{ active_rule_count|pluralize }} on</span>
+          </a>
+          {% if pool == 'unassigned' %}
+          <form method="post" action="{% url 'workforce:task_automation_apply' %}" class="m-0"
+                id="workforce_tasks_unassigned_form_apply">
+            {% csrf_token %}
+            <input type="hidden" name="back" value="unassigned">
+            <button type="submit" class="tau__btn" id="workforce_tasks_unassigned_btn_apply"
+                    {% if not active_rule_count or not unassigned_count %}disabled{% endif %}>
+              <i class="fa-solid fa-play" aria-hidden="true"></i> Run rules now
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="wfcard__body">
+        {% if dl_tasks %}
+        {% include "workforce/parts/components/_tasks_table_view.html" with tasks=dl_tasks %}
+        {% if pool == 'public' %}
+        {% include "includes/components/_pagination.html" with page_obj=dl_tasks filter_params="pool=public" %}
+        {% else %}
+        {% include "includes/components/_pagination.html" with page_obj=dl_tasks %}
+        {% endif %}
+        {% else %}
+        <div class="tau__empty">
+          {% if pool == 'public' %}
+            Nothing is waiting in Public — every task sent there has been taken.
+          {% else %}
+            Nothing is waiting for a driver. Published tasks land here until staff or a rule assigns them.
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Status Update Modal -->
+{% include "workforce/parts/components/_tasks_status_modal.html" %}
+
+<!-- Scripts -->
+<script src="{% static 'orders/js/orders_main.js' %}"></script>
+{% include "workforce/parts/components/_tasks_view_scripts.html" %}
+{% include "workforce/parts/components/_tasks_ai_scripts.html" %}
+{% endblock content %}

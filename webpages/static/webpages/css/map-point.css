@@ -12,28 +12,49 @@
     font-variant-numeric: tabular-nums;
     color: var(--brand-grey-600, #555);
 }
+/* Brand Kit secondary-button surface, kept row-sized: 26px tall fits a table row
+   without pushing it, and is no longer the 16px hairline that read as broken.
+   Icon-only buttons square up so the glyph sits centred. */
 .mpt__btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.1rem 0.35rem;
-    font-size: 0.7rem;
-    line-height: 1.4;
-    background: transparent;
-    border: 1px solid var(--brand-grey-400, #bbb);
-    border-radius: 0.2rem;
-    color: var(--brand-grey-600, #555);
+    justify-content: center;
+    gap: 0.3rem;
+    min-width: 1.625rem;
+    min-height: 1.625rem;
+    padding: 0 0.375rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-400, #b0b0b0);
+    border-radius: 0.25rem;   /* same corner as the modal and its Google Maps chip */
+    color: var(--brand-grey-800, #1f1f1f);
     cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
-.mpt__btn:hover {
-    border-color: var(--brand-navy, #001f3f);
+.mpt__btn i {
+    font-size: 0.78rem;
     color: var(--brand-navy, #001f3f);
 }
-.mpt__btn--on {
+.mpt__btn:hover {
+    background: var(--brand-secondary, #fff7d6);
+    border-color: var(--brand-primary, #f7c000);
+}
+/* Navy, not yellow: a yellow ring on white is 1.7:1 and disappears. */
+.mpt__btn:focus-visible {
+    outline: 2px solid var(--brand-navy, #001f3f);
+    outline-offset: 1px;
+}
+/* While its map is open. */
+.mpt__btn--on,
+.mpt__btn--on:hover {
     background: var(--brand-navy, #001f3f);
     border-color: var(--brand-navy, #001f3f);
     color: #fff;
 }
+.mpt__btn--on i { color: #fff; }
 
 .mpt__panel { margin: 0.4rem 0; }
 .mpt__map {

@@ -308,7 +308,7 @@ window.wfConfirmDoorCollection = function(data) {
                 submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Updating...';
             }
 
-            // Special action: Publish to Fleets (sets dl_task_publish=True + status=pending)
+            // Special action: Publish to Fleets — a driverless task lands in Unassigned Tasks
             if (status === 'publish_to_fleets') {
                 fetch('/workforce/delivery-task/' + taskId + '/publish-fleets/', {
                     method: 'POST',
@@ -326,7 +326,7 @@ window.wfConfirmDoorCollection = function(data) {
                     if (data.success) {
                         var modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
                         if (modal) modal.hide();
-                        showToast('Task published to Fleet drivers!', 'success');
+                        showToast(data.message || 'Task published', 'success');
                         if (typeof htmx !== 'undefined') {
                             htmx.ajax('GET', window.location.href, { target: '#main-content', select: '#main-content', swap: 'outerHTML' });
                         } else {

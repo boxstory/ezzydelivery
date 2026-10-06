@@ -1432,6 +1432,56 @@ class WfUserVerificationTest(WorkforceTestMixin, TestCase):
             {'status': 'verified'})
         self.assertEqual(resp.status_code, 200)
 
+    def test_verify_from_seller_page_targets_its_business(self):
+        """Seller page sends business_id: an owner with two businesses activates the named one"""
+        first = self.create_business(bid=8101, code=None, status='pending')
+        second = business_models.Business.objects.create(
+            business_id=8102, user=first.user, profile=first.profile,
+            business_name='Second Shop', business_status='pending')
+        owner = first.profile
+        owner.verification_status = 'pending'
+        owner.save()
+        resp = self.client.post(
+            reverse('workforce:update_verification_status',
+                    kwargs={'profile_id': owner.id}),
+            json.dumps({'status': 'verified', 'business_id': '8102',
+                        'business_code': 'secondshop'}),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual((second.business_status, second.business_code), ('active', 'SECONDSHOP'))
+        self.assertEqual((first.business_status, first.business_code), ('pending', None))
+
+    def test_verify_refuses_business_of_another_owner(self):
+        """A business_id the profile has no claim on is refused before anything is saved"""
+        mine = self.create_business(bid=8103, code='MINE', status='pending')
+        theirs = self.create_business(bid=8104, code='THEIRS', status='pending')
+        owner = mine.profile
+        owner.verification_status = 'pending'
+        owner.save()
+        resp = self.client.post(
+            reverse('workforce:update_verification_status',
+                    kwargs={'profile_id': owner.id}),
+            json.dumps({'status': 'verified', 'business_id': theirs.business_id}),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+        owner.refresh_from_db()
+        theirs.refresh_from_db()
+        self.assertEqual(owner.verification_status, 'pending')
+        self.assertEqual(theirs.business_status, 'pending')
+
+    def test_seller_detail_shows_verification_section(self):
+        """Details tab carries the verify strip for an unverified owner"""
+        biz = self.create_business(bid=8105, code='VSEC', status='pending')
+        biz.profile.verification_status = 'pending'
+        biz.profile.save()
+        resp = self.client.get(reverse('workforce:seller_detail', args=[biz.business_id]))
+        self.assertContains(resp, 'id="workforce_seller_section_verify"')
+        self.assertContains(resp, 'id="workforce_seller_verify_desk"')
+        self.assertContains(resp, reverse('workforce:update_verification_status',
+                                          kwargs={'profile_id': biz.profile.id}))
+
 
 # =============================================================================
 # 11. FINANCE & FLEET TESTS (8 tests)

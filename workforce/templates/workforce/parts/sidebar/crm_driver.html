@@ -22,9 +22,9 @@
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_driver_board" url=u_crm_driver_board icon="fa-solid fa-table-columns" label="Driver Board" active_names="crm_driver_leads_board" is_active=owns_lead_page badge_var=crm_driver_overdue_count badge_key="crm_driver_overdue" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_driver_list" url=u_crm_driver_list icon="fa-solid fa-table-list" label="Driver Leads" active_names="crm_driver_leads_list" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_driver_map" url=u_crm_driver_map icon="fa-solid fa-map-location-dot" label="Driver Map" active_names="crm_driver_map" %}
-      {# Where the recruitment funnel is actually decided. Operations owns this #}
-      {# page, so it only appears for staff who can open it. #}
-      {% if wf_dept_ops %}
+      {# Where the recruitment funnel is actually decided. Operations decides; #}
+      {# marketing opens it view-only. #}
+      {% if wf_dept_ops or wf_dept_mkt %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_drv_verify" url=u_driver_verification_list icon="fa-solid fa-id-card" label="Driver Verification" %}
       {% endif %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_drv_inbox" url=u_crm_inbox icon="fa-brands fa-whatsapp" label="WhatsApp Inbox" %}

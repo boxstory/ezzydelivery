@@ -1065,6 +1065,48 @@ class DriverBindingTests(TestCase):
         self.assertEqual(services._driver_match_keys('97466430977'), {'66430977'})
 
 
+class DriverCardForOneApplicantTests(TestCase):
+    """reconcile_driver_leads(driver_ids=...) is the driver form's call: it files
+    only the named applicant, and still claims an unbound card on their number."""
+
+    def setUp(self):
+        cache.delete(STAGE_CACHE_KEY)
+        from core.models import Profile
+        from fleet.models import Driver
+
+        self.drivers = []
+        for i, phone in enumerate(['55414189', '66778899']):
+            user = User.objects.create_user(f'solo_{i}', password='x')
+            profile, _ = Profile.objects.get_or_create(
+                user=user, defaults={'whatsapp': '974' + phone})
+            self.drivers.append(Driver.objects.create(
+                driver_id=9200 + i, user=user, profile=profile,
+                driver_phone=phone, driver_whatsapp='974' + phone,
+                driver_languages='en', driver_status='pending',
+            ))
+
+    def reconcile_first(self):
+        with patch('workforce.views._driver_application_sections', return_value=[{'done': False}]):
+            services.reconcile_driver_leads(driver_ids=[self.drivers[0].pk])
+
+    def test_only_the_named_driver_gets_a_card(self):
+        self.reconcile_first()
+        self.assertEqual(Lead.objects.filter(driver=self.drivers[0]).count(), 1)
+        self.assertFalse(Lead.objects.filter(driver=self.drivers[1]).exists())
+
+    def test_an_unbound_card_on_the_number_is_claimed_not_duplicated(self):
+        lead = Lead.objects.create(category=Lead.CATEGORY_DRIVER, phone='97455414189')
+        self.reconcile_first()
+        lead.refresh_from_db()
+        self.assertEqual(lead.driver_id, self.drivers[0].pk)
+        self.assertEqual(Lead.objects.filter(driver=self.drivers[0]).count(), 1)
+
+    def test_running_it_again_makes_no_second_card(self):
+        self.reconcile_first()
+        self.reconcile_first()
+        self.assertEqual(Lead.objects.filter(driver=self.drivers[0]).count(), 1)
+
+
 class StageConfigGuardTests(TestCase):
     def setUp(self):
         cache.delete(STAGE_CACHE_KEY)
@@ -2070,9 +2112,10 @@ class MarketingDeadLinkTests(TestCase):
         self.assertNotIn('workforce_crm_detail_btn_docadd', pages['driver_lead'])
         self.assertNotIn(f'href="/workforce/sellers/{self.business.business_id}/"', pages['biz_lead'])
         self.assertIn(f'Business #{self.business.business_id}', pages['biz_lead'])
-        self.assertNotIn('/workforce/verification/', pages['driver_board'])
-        self.assertNotIn('workforce_sidebar_mob_section_verifications', pages['dashboard'])
-        self.assertNotIn('/workforce/verification/', pages['dashboard'])
+        # The onboarding queues are view-only for marketing since 2026-10-04, so
+        # those links are real now — see OnboardingMarketingViewOnlyTests.
+        self.assertIn('/workforce/verification/drivers/', pages['driver_board'])
+        self.assertIn('workforce_sidebar_mob_section_verifications', pages['dashboard'])
 
     def test_operations_keeps_every_link(self):
         self._staff('dlops', dept_operations=True, dept_marketing=True)
@@ -2082,3 +2125,103 @@ class MarketingDeadLinkTests(TestCase):
         self.assertIn(f'href="/workforce/sellers/{self.business.business_id}/"', pages['biz_lead'])
         self.assertIn('/workforce/verification/drivers/', pages['driver_board'])
         self.assertIn('workforce_sidebar_mob_section_verifications', pages['dashboard'])
+
+
+class LeadDeleteTests(TestCase):
+    """Super admins can delete a lead outright; nobody else can, and the records
+    the lead points at (driver, business, WhatsApp messages) survive it."""
+
+    def setUp(self):
+        cache.delete(STAGE_CACHE_KEY)
+        from core.models import Profile
+        from fleet.models import Driver
+        from whatsapp.models import WhatsAppMessage
+
+        applicant = User.objects.create_user('delapplicant', password='x')
+        profile, _ = Profile.objects.get_or_create(user=applicant, defaults={'whatsapp': '97455771122'})
+        self.driver = Driver.objects.create(
+            driver_id=9401, user=applicant, profile=profile,
+            driver_phone='55771122', driver_whatsapp='55771122',
+            driver_languages='en', driver_status='pending',
+        )
+        self.business = Business.objects.create(
+            business_id=654399, business_name='Delete Me Trading', business_status='pending')
+        self.lead = Lead.objects.create(
+            category=Lead.CATEGORY_DRIVER, phone='97455771122', contact_name='Del Applicant',
+            stage=Lead.DRIVER_STAGE_APPLIED, driver=self.driver)
+        LeadActivity.objects.create(lead=self.lead, body='called')
+        self.lead.wa_links.create(identifier='97455771199', label='Office')
+        self.child = Lead.objects.create(
+            category=Lead.CATEGORY_DRIVER, phone='97455771123', contact_name='Del Duplicate',
+            merged_into=self.lead)
+        LeadActivity.objects.create(lead=self.child, body='duplicate note')
+        self.bystander = Lead.objects.create(category=Lead.CATEGORY_BUSINESS, phone='97455770000',
+                                             company_name='Stays', converted_business=self.business)
+        self.message = WhatsAppMessage.objects.create(
+            waha_message_id='del-msg-1', session='default', direction='inbound',
+            from_number='97455771122', body='hello')
+
+    def _staff(self, username, **fields):
+        from core.models import Profile
+        user = User.objects.create_user(username, password='x', is_staff=True)
+        profile, _ = Profile.objects.get_or_create(user=user)
+        profile.is_staff = True
+        for field, value in fields.items():
+            setattr(profile, field, value)
+        profile.save()
+        self.client.force_login(user)
+        return user
+
+    def _delete(self, lead):
+        return self.client.post(f'/workforce/crm/leads/{lead.pk}/delete/',
+                                HTTP_HOST='ezzydelivery.qa', secure=True)
+
+    def _detail(self, lead):
+        resp = self.client.get(f'/workforce/crm/leads/{lead.pk}/', HTTP_HOST='ezzydelivery.qa', secure=True)
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode()
+
+    def test_super_admin_deletes_lead_timeline_links_and_merged_cards(self):
+        from whatsapp.models import WhatsAppMessage
+        from fleet.models import Driver
+        from crm.models import LeadWaLink
+
+        self._staff('delboss', is_superadmin=True)
+        resp = self._delete(self.lead)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {'success': True, 'redirect': '/workforce/crm/leads/board/drivers/'})
+        self.assertFalse(Lead.objects.filter(pk__in=[self.lead.pk, self.child.pk]).exists())
+        self.assertFalse(LeadActivity.objects.filter(lead_id__in=[self.lead.pk, self.child.pk]).exists())
+        self.assertFalse(LeadWaLink.objects.filter(identifier='97455771199').exists())
+        self.assertTrue(Driver.objects.filter(pk=self.driver.pk).exists())
+        self.assertTrue(WhatsAppMessage.objects.filter(pk=self.message.pk).exists())
+        self.assertTrue(Lead.objects.filter(pk=self.bystander.pk).exists())
+
+    def test_a_business_lead_goes_back_to_the_business_board_and_keeps_the_business(self):
+        self._staff('delboss2', is_superadmin=True)
+        resp = self._delete(self.bystander)
+        self.assertEqual(resp.json()['redirect'], '/workforce/crm/leads/board/')
+        self.assertTrue(Business.objects.filter(pk=self.business.pk).exists())
+
+    def test_crm_staff_cannot_delete(self):
+        self._staff('delmkt', dept_marketing=True, dept_operations=True)
+        resp = self._delete(self.lead)
+        self.assertNotEqual(resp.status_code, 200)
+        self.assertTrue(Lead.objects.filter(pk=self.lead.pk).exists())
+
+    def test_get_deletes_nothing(self):
+        self._staff('delboss3', is_superadmin=True)
+        resp = self.client.get(f'/workforce/crm/leads/{self.lead.pk}/delete/',
+                               HTTP_HOST='ezzydelivery.qa', secure=True)
+        self.assertEqual(resp.status_code, 405)
+        self.assertTrue(Lead.objects.filter(pk=self.lead.pk).exists())
+
+    def test_button_is_for_super_admins_only(self):
+        self._staff('delboss4', is_superadmin=True)
+        page = self._detail(self.lead)
+        self.assertIn('id="workforce_crm_detail_btn_delete"', page)
+        # Opening a driver card can log a stage-sync entry, so count after the render.
+        shown = LeadActivity.objects.filter(lead_id__in=[self.lead.pk, self.child.pk]).count()
+        self.assertIn(f'data-activities="{shown}" data-merged="1"', page)
+        self._staff('delmkt2', dept_marketing=True)
+        self.assertNotIn('workforce_crm_detail_btn_delete', self._detail(self.lead))

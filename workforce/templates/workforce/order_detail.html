@@ -46,6 +46,21 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                             <span>Orders</span>
                         </a>
                     </li>
+                    {% if order.business_id %}
+                    <li class="wod__breadcrumb-item">
+                        <a href="{% url 'workforce:wf_orders_all' %}?business={{ order.business_id }}" class="wod__breadcrumb-link"
+                           id="workforce_order_detail_link_business_orders"
+                           title="All orders from {{ order.business.business_name }}"
+                           hx-get="{% url 'workforce:wf_orders_all' %}?business={{ order.business_id }}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">
+                            <i class="fa-solid fa-store"></i>
+                            <span>{{ order.business.business_name }}</span>
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="wod__breadcrumb-item wod__breadcrumb-item--active">
                         <i class="fa-solid fa-hashtag"></i>
                         <span>{{ order.order_number }}</span>
@@ -343,7 +358,7 @@ Notes: Hero actions are state-gated (publish only pre-task, cancel only while st
                                 <span class="text-muted">Pin</span>
                                 <div class="d-flex align-items-center gap-2">
                                     {% if pl.pickup_lat and pl.pickup_lon %}
-                                    <a href="https://www.google.com/maps?q={{ pl.pickup_lat }},{{ pl.pickup_lon }}" target="_blank" rel="noopener" title="Open pickup in Google Maps"><i class="fa-solid fa-map-location-dot"></i> Google Maps</a>
+                                    <a href="https://www.google.com/maps?q={{ pl.pickup_lat }},{{ pl.pickup_lon }}" target="_blank" rel="noopener" title="Open pickup in Google Maps"><i class="fa-solid fa-arrow-up-right-from-square"></i> Google Maps</a>
                                     {% include "includes/components/_map_point.html" with uid=order.id|stringformat:"s"|add:"-pickup" lat=pl.pickup_lat lon=pl.pickup_lon label="Pickup location" size="sm" %}
                                     {% else %}
                                     <span class="text-muted">No pin</span>

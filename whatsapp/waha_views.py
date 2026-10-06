@@ -697,6 +697,17 @@ def waha_webhook(request):
         # Media is archived into Django storage by the per-minute
         # archive_wa_media cron — WAHA purges its own copy within minutes.
 
+        # A prospect writing with the reference from our pricing-form confirmation
+        # ("Ref P125-…") is the business on that lead, even when the form named
+        # the office number: link this chat to it (crm/chat_links.py).
+        if created and body:
+            try:
+                from crm.chat_links import link_from_message
+                link_from_message(session, from_number, body,
+                                  is_group=str(payload.get("from") or "").endswith("@g.us"))
+            except Exception:
+                logger.exception('crm chat link failed for msg %s', obj.id)
+
         # Try to apply the location pin to a queued verification job. We swallow
         # exceptions because the webhook must still return 200 to WAHA — the
         # message has been saved either way, agents can re-process manually.

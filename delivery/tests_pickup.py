@@ -1011,9 +1011,11 @@ class PickupDeliveryClaimTestCase(PickupBaseTestCase):
         pickup.save()
 
         task = _create_delivery_task_from_order(order)
+        # In the pool = published AND sent to Public; published alone is Unassigned.
         task.dl_task_publish = True
+        task.public_pool = True
         task.dl_task_status = 'pending'
-        task.save(update_fields=['dl_task_publish', 'dl_task_status'])
+        task.save(update_fields=['dl_task_publish', 'public_pool', 'dl_task_status'])
         return pickup, task
 
     def claim(self, task, driver):

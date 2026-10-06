@@ -330,12 +330,14 @@ def driver_accept_task(request, task_id):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # First-mile parcel already collected by someone else — the delivery
-            # belongs to whoever is physically holding it.
-            from delivery.selectors import parcel_claim_block
-            blocked, block_msg = parcel_claim_block(task, driver)
-            if blocked:
-                return Response({'error': block_msg}, status=status.HTTP_400_BAD_REQUEST)
+            # A task nobody is on can only be taken from the Public pool, same rule
+            # as the PWA New tab — an Unassigned one waits for staff, and a parcel
+            # already collected by someone else belongs to whoever holds it.
+            if task.driver_id is None:
+                from delivery.selectors import delivery_pool_block
+                blocked, block_msg = delivery_pool_block(task, driver)
+                if blocked:
+                    return Response({'error': block_msg}, status=status.HTTP_400_BAD_REQUEST)
 
             task.driver = driver
             task.dl_task_status = 'accepted'

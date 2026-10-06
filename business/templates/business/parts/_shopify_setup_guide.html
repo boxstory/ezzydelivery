@@ -1,6 +1,9 @@
 {# Purpose: Step-by-step Shopify Custom App + OAuth setup guide shown on API list / add / update pages. #}
 {# Used by: business/parts/business_settings_api_list.html, business_settings_api_add.html, business_settings_api_update.html #}
-{# Notes: Both mode blocks are toggled by api_form_fields.js. Needs shopify_oauth_redirect_uri + shopify_oauth_app_url in context. #}
+{# Notes: Both mode blocks are toggled by api_form_fields.js. Copy buttons are wired by shopify_guide_copy.js,
+   loaded at the foot of this partial so they also work on the list page, which has no form JS.
+   Needs shopify_oauth_redirect_uri + shopify_oauth_app_url in context. #}
+{% load static %}
 
 <section class="bapi__section" id="client_api_shopify_setup_help" style="display:none;">
     <div class="bapi__section-header">
@@ -43,6 +46,13 @@
                         <li><code>read_products</code><span>product names and SKUs on the label</span></li>
                         <li><code>read_customers</code><span>delivery name, phone and address</span></li>
                     </ul>
+                    <div class="bapi__url-display mt-1 mb-1">
+                        <code id="client_api_shopify_scopes">read_orders,read_products,read_customers</code>
+                        <button type="button" class="btn bapi__copy-btn ms-2"
+                                id="client_api_shopify_copy_scopes">Copy</button>
+                    </div>
+                    <p><small>Shopify's scope list is long. Copy this, then paste one name at a time into the
+                    <strong>search box</strong> above the checkboxes to jump straight to each scope.</small></p>
                     <p>Read-only on purpose: we never write anything back to your store.</p>
                     <p class="mb-0">Click <strong>Save</strong>.</p>
                 </li>
@@ -223,3 +233,5 @@
 
     </div>
 </section>
+
+<script src="{% static 'business/js/shopify_guide_copy.js' %}?v=20261006a"></script>

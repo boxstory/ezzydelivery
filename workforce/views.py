@@ -71,6 +71,7 @@ from core.decorators import (
 )
 from core.departments import (
     ADMIN as dept_ADMIN, FIN as dept_FIN, MKT as dept_MKT, OPS as dept_OPS,
+    user_departments,
 )
 from core.pagination import paginate as core_paginate, other_params
 from core.destination import is_foreign, order_country
@@ -559,6 +560,10 @@ def filter_display_labels(c_status, dl_task_status, date_preset):
 # Sentinel option. Real ids are integers, so this cannot collide with one.
 DRIVER_FILTER_UNASSIGNED = 'none'
 
+# The "Public — all drivers" choice in every Assign Driver picker, sent in place
+# of a driver id. Same reasoning: driver ids are integers.
+PUBLIC_ASSIGN_VALUE = 'public'
+
 
 def driver_filter_choices(include_ids=None):
     """Drivers the picker offers: the working fleet, app sign-in or not.
@@ -761,20 +766,16 @@ def apply_order_list_filters(request, orders):
     return orders, context
 
 
-@login_required(login_url='/accounts/login/')
-@staff_required
-def wf_dashboard(request):
-    from django.utils import timezone
+def _ops_dashboard_data(today):
+    """Every Operations and Finance figure on the staff home dashboard.
+
+    Pulled out of wf_dashboard so the page can skip it: the block costs ~15
+    aggregates over orders, tasks, drivers and COD, and a Marketing-only sign-in
+    can see no tile that reads any of them. Returns exactly the context keys the
+    `wf_dept_ops` / `wf_dept_fin` blocks of workforce/parts/wf_dashboard.html use.
+    """
     from django.db.models import Sum, Count, Q
     from datetime import timedelta
-
-    # Use cached profile to avoid duplicate queries
-    profile = get_cached_profile(request)
-    if not profile:
-        logger.warning(f"User {request.user.id} has no profile. Redirecting to profile creation.")
-        return redirect('core:profile_view')
-
-    today = timezone.localdate()
 
     # Order Statistics - single aggregate query instead of 5 separate counts
     from django.db.models import Case, When, IntegerField
@@ -963,8 +964,6 @@ def wf_dashboard(request):
         })
 
     data = {
-        'profile': profile,
-        'today': today,
         # Order stats
         'total_orders': total_orders,
         'orders_today': orders_today,
@@ -995,6 +994,32 @@ def wf_dashboard(request):
         'orders_trend': orders_trend,
         'max_orders': max_orders,
     }
+    return data
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def wf_dashboard(request):
+    """Staff home at /workforce/ — the Operations and Finance console.
+
+    Marketing has its own page (workforce.marketing_views.wf_marketing_overview),
+    so a marketing-only account is sent there rather than shown a page whose every
+    block is gated away from it.
+    """
+    # Use cached profile to avoid duplicate queries
+    profile = get_cached_profile(request)
+    if not profile:
+        logger.warning(f"User {request.user.id} has no profile. Redirecting to profile creation.")
+        return redirect('core:profile_view')
+
+    held = user_departments(request.user)
+    if dept_MKT in held and not (dept_OPS in held or dept_FIN in held):
+        return redirect('workforce:wf_marketing_overview')
+
+    today = timezone.localdate()
+    data = {'profile': profile, 'today': today}
+    data.update(_ops_dashboard_data(today))
+
     return render(request, 'workforce/wf_base_dashboard.html', data)
 
 
@@ -8445,14 +8470,20 @@ def assign_driver_to_order(request, order_id):
         # Check if order already has a delivery task - use select_for_update to prevent race conditions
         from django.db import transaction
 
+        from delivery.services.assignment import assign_to_driver
+
         with transaction.atomic():
-            existing_task = delivery_models.DeliveryTask.objects.select_for_update().filter(order=order).first()
+            # Latest task: an order can carry an old cancelled task plus a live retry.
+            existing_task = delivery_models.DeliveryTask.objects.select_for_update(
+                of=('self',)).select_related('order').filter(order=order).order_by('-id').first()
 
             if existing_task:
-                # Update existing task
+                # Same path as Assign Driver, so the driver actually sees the task
+                # (published, status 'assigned') and any other claim row goes.
                 old_driver = existing_task.driver
-                existing_task.driver = driver
-                existing_task.save()
+                ok, error = assign_to_driver(existing_task, driver, actor=request.user)
+                if not ok:
+                    return JsonResponse({'success': False, 'error': error}, status=400)
 
                 # Log the update
                 orders_models.OrderVerificationLog.objects.create(
@@ -8464,15 +8495,15 @@ def assign_driver_to_order(request, order_id):
                     notes=f'Driver reassigned from AI suggestion: {driver.user.get_full_name() if driver.user else driver.driver_code}'
                 )
             else:
-                # Create new delivery task
+                # Create new delivery task, then assign it the same way as above
                 task = delivery_models.DeliveryTask.objects.create(
                     order=order,
-                    driver=driver,
                     business=order.business,
                     pickup_location=order.pickup_location,
                     dl_task_status='pending',
                     dl_task_number=f'DL-{order.order_number}'
                 )
+                assign_to_driver(task, driver, actor=request.user)
 
                 # Log the assignment
                 orders_models.OrderVerificationLog.objects.create(
@@ -10149,37 +10180,43 @@ def delivery_task_detail(request, task_id):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def publish_task_to_fleets(request, task_id):
-    """AJAX endpoint to publish delivery task to Fleet drivers"""
+    """AJAX endpoint to publish a delivery task to the fleet.
+
+    Publishing does not offer the task to drivers: with nobody on it, it lands in
+    the Unassigned list, where staff or a Task Automation rule picks the driver
+    (or sends it to Public).
+    """
+    from delivery.services.assignment import publish_to_fleet
     try:
         task = get_object_or_404(
             delivery_models.DeliveryTask.objects.select_related('order'), id=task_id)
+        was_published = task.dl_task_publish
 
-        # Block if order is cancelled
-        if task.order and task.order.order_status == 'cancelled':
-            return JsonResponse({
-                'success': False,
-                'error': 'Cannot publish — order is cancelled'
-            }, status=400)
+        ok, error = publish_to_fleet(task, actor=request.user)
+        if not ok:
+            return JsonResponse({'success': False, 'error': error}, status=400)
 
-        # Mark task as published to fleet (pending = visible to all fleet drivers)
-        task.dl_task_status = 'pending'
-        task.dl_task_publish = True
-        task.save()
+        if not was_published:
+            orders_models.OrderStatusHistory.objects.create(
+                order=task.order,
+                field_name='dl_task_publish',
+                old_value='False',
+                new_value='True',
+                old_display='Not Published',
+                new_display='Published to Fleet',
+                changed_by=request.user,
+            )
 
-        # Log to timeline
-        orders_models.OrderStatusHistory.objects.create(
-            order=task.order,
-            field_name='dl_task_publish',
-            old_value='False',
-            new_value='True',
-            old_display='Not Published',
-            new_display='Published to Fleet',
-            changed_by=request.user,
-        )
-
+        task.refresh_from_db(fields=['driver', 'public_pool'])
+        if task.driver_id:
+            message = f'Task published — assigned to {task.driver}'
+        elif task.public_pool:
+            message = 'Task published — sent to Public by a Task Automation rule'
+        else:
+            message = 'Task published — waiting in Unassigned Tasks'
         return JsonResponse({
             'success': True,
-            'message': 'Task published to Fleets successfully',
+            'message': message,
             'task_id': task.id,
             'task_number': task.dl_task_number
         })
@@ -10199,7 +10236,9 @@ def unpublish_task_from_fleets(request, task_id):
     try:
         task = get_object_or_404(delivery_models.DeliveryTask, id=task_id)
         task.dl_task_publish = False
-        task.save(update_fields=['dl_task_publish'])
+        # Out of Public too, or publishing it again would skip Unassigned.
+        task.public_pool = False
+        task.save(update_fields=['dl_task_publish', 'public_pool'])
         return JsonResponse({
             'success': True,
             'message': 'Task unpublished from Fleets',
@@ -10214,8 +10253,13 @@ def unpublish_task_from_fleets(request, task_id):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def assign_driver_to_task(request, task_id):
-    """AJAX endpoint to assign driver to delivery task"""
+    """AJAX endpoint to assign a delivery task to one driver, or to Public.
+
+    driver_id='public' opens the task to every driver with app access (their New
+    tab); a driver id gives it to that driver alone (their Assigned tab).
+    """
     from django.db import transaction
+    from delivery.services.assignment import assign_to_driver, send_to_public
     try:
         # Parse JSON body first (before locking)
         data = json.loads(request.body)
@@ -10227,15 +10271,18 @@ def assign_driver_to_task(request, task_id):
                 'error': 'Driver ID is required'
             }, status=400)
 
-        # Get driver — must exist and be approved
-        try:
-            driver = fleet_models.Driver.objects.get(
-                driver_id=driver_id, driver_status='approved')
-        except fleet_models.Driver.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': f'Driver {driver_id} not found or not approved'
-            }, status=400)
+        to_public = str(driver_id) == PUBLIC_ASSIGN_VALUE
+        driver = None
+        if not to_public:
+            # Get driver — must exist and be approved
+            try:
+                driver = fleet_models.Driver.objects.get(
+                    driver_id=driver_id, driver_status='approved')
+            except (fleet_models.Driver.DoesNotExist, ValueError):
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Driver {driver_id} not found or not approved'
+                }, status=400)
 
         with transaction.atomic():
             # Lock the task row to prevent race conditions
@@ -10243,24 +10290,21 @@ def assign_driver_to_task(request, task_id):
                 delivery_models.DeliveryTask.objects.select_related('order').select_for_update(),
                 id=task_id)
 
-            # Block if order is cancelled
-            if task.order and task.order.order_status == 'cancelled':
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Cannot assign driver — order is cancelled'
-                }, status=400)
+            if to_public:
+                ok, error = send_to_public(task, actor=request.user)
+            else:
+                ok, error = assign_to_driver(task, driver, actor=request.user)
+            if not ok:
+                return JsonResponse({'success': False, 'error': error}, status=400)
 
-            task.driver = driver
-            task.dl_task_status = 'assigned'
-            task._status_actor = 'staff'
-            task._status_changed_by = request.user  # names the staffer on the timeline row
-            task.save()
-
-            # Any claim row from the previous holder has to go with them — it
-            # passes the driver-side ownership checks on its own, so a stale one
-            # leaves two drivers able to work the same task.
-            delivery_models.AssignedDriver.objects.filter(
-                dl_task=task).exclude(driver=driver).delete()
+        if to_public:
+            return JsonResponse({
+                'success': True,
+                'message': 'Task sent to Public — every driver with app access can take it',
+                'task_id': task.id,
+                'driver_id': PUBLIC_ASSIGN_VALUE,
+                'driver_name': 'Public',
+            })
 
         driver_name = driver.user.get_full_name() if driver.user else driver.driver_code
 
@@ -10290,14 +10334,16 @@ def assign_driver_to_task(request, task_id):
 def unassign_driver_from_task(request, task_id):
     """AJAX endpoint to unassign driver from delivery task.
 
-    Taking the driver off puts the task back in the open pool, so the status
-    resets with it. That is a backward move the forward-only staff rule blocks,
-    which is why the save names `unassign` as the actor — without it the guard
-    reverted the status and the task sat there reading 'accepted' with nobody
-    on it, invisible to every driver.
+    Taking the driver off (or pulling the task out of Public) puts it in the
+    Unassigned list, so the status resets with it. That is a backward move the
+    forward-only staff rule blocks, which is why the service saves with the
+    `unassign` actor — without it the guard reverted the status and the task sat
+    there reading 'accepted' with nobody on it. The rules do not re-run: staff
+    took the driver off on purpose.
     """
     from django.db import transaction
-    from delivery.state_machine import TERMINAL_STATUSES, UNASSIGN_RESET_STATUS
+    from delivery.state_machine import TERMINAL_STATUSES
+    from delivery.services.assignment import send_to_unassigned
     try:
         with transaction.atomic():
             task = get_object_or_404(
@@ -10316,22 +10362,15 @@ def unassign_driver_from_task(request, task_id):
                               'Assign the correct driver instead if it is wrong.'),
                 }, status=400)
 
-            task.driver = None
-            task.dl_task_status = UNASSIGN_RESET_STATUS
-            task.dl_task_status_client = 'for_review'
-            task._status_actor = 'unassign'
-            task._status_changed_by = request.user
-            task.save()
-
-            # The claim row outlives the FK: `AssignedDriver` alone is enough to
-            # pass every driver-side ownership check (start ride, deliver,
-            # collect COD), so leaving it behind means the removed driver still
-            # holds the task.
-            delivery_models.AssignedDriver.objects.filter(dl_task=task).delete()
+            # Drops every claim row too — `AssignedDriver` alone passes every
+            # driver-side ownership check, so one left behind keeps the task.
+            ok, error = send_to_unassigned(task, actor=request.user)
+            if not ok:
+                return JsonResponse({'success': False, 'error': error}, status=400)
 
         return JsonResponse({
             'success': True,
-            'message': 'Driver unassigned successfully',
+            'message': 'Task moved to Unassigned Tasks',
             'task_id': task.id,
             'new_status': task.dl_task_status,
         })
@@ -10567,29 +10606,18 @@ def update_task_status(request, task_id):
 
         # Handle publish_to_fleets as a special action (fallback if JS intercept missed it)
         if status == 'publish_to_fleets':
-            # A finished task must not be dragged back into the driver pool — the
-            # state machine blocks the write anyway, so returning 'pending' here
-            # would just leave the UI showing a status the DB never took.
-            from delivery.state_machine import can_transition as _can_transition
-            if task.dl_task_status != 'pending':
-                allowed, _reason = _can_transition(task.dl_task_status, 'pending', actor='staff')
-                if not allowed:
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Task is already {task.get_dl_task_status_display()} — cannot publish it to Fleet.'
-                    }, status=400)
-
-            task.dl_task_status = 'pending'
-            task.dl_task_status_client = 'for_review'
-            task.dl_task_publish = True
-            task._status_actor = 'staff'
-            task.save(update_fields=[
-                'dl_task_status', 'dl_task_status_client', 'dl_task_publish', 'updated_at',
-            ])
+            # Same service as the Publish button: a finished task is refused, a
+            # driverless one lands in Unassigned Tasks for staff or a rule.
+            from delivery.services.assignment import publish_to_fleet
+            if not task.driver_id:
+                task.dl_task_status_client = 'for_review'
+            ok, error = publish_to_fleet(task, actor=request.user)
+            if not ok:
+                return JsonResponse({'success': False, 'error': error}, status=400)
             task.refresh_from_db(fields=['dl_task_status'])
             return JsonResponse({
                 'success': True,
-                'message': 'Task published to Fleet drivers',
+                'message': 'Task published — waiting in Unassigned Tasks',
                 'task_id': task.id,
                 'new_status': task.dl_task_status
             })
@@ -10678,6 +10706,10 @@ def update_task_status(request, task_id):
                 driver = fleet_models.Driver.objects.get(pk=driver_id)
                 task.driver = driver
                 update_fields.append('driver')
+                # A task with a driver is out of Public — it shows only to them.
+                if task.public_pool:
+                    task.public_pool = False
+                    update_fields.append('public_pool')
             except fleet_models.Driver.DoesNotExist:
                 pass
         elif driver_id == '':
@@ -10783,6 +10815,14 @@ def update_task_status(request, task_id):
             door_split = (cod_part, fee_part)
 
         task.save(update_fields=update_fields)
+
+        # A previous holder's claim row would still pass every driver-side
+        # ownership check — it goes when the driver changes here, as on Assign.
+        if 'driver' in update_fields:
+            claims = delivery_models.AssignedDriver.objects.filter(dl_task=task)
+            if task.driver_id:
+                claims = claims.exclude(driver_id=task.driver_id)
+            claims.delete()
 
         # Post-save: the ledger rows + order COD status (same as driver API)
         if door_split is not None:
@@ -11913,6 +11953,20 @@ def apply_verification_status(profile, new_status, user, data=None):
     data = data or {}
     rejection_reason = data.get('rejection_reason', '')
 
+    # The seller page names the business it was opened on. The queue does not, and
+    # .get(user=...) below cannot choose between two businesses on one owner. The
+    # profile match also accepts Business.profile, which an ownership transfer
+    # leaves on the previous owner. Resolved before anything is written.
+    target_business = None
+    if data.get('business_id') and profile.is_business:
+        from business import models as business_models
+        target_business = business_models.Business.objects.filter(
+            Q(user_id=profile.user_id) | Q(profile=profile),
+            business_id=data['business_id'],
+        ).first()
+        if target_business is None:
+            raise ValueError('That business does not belong to this profile.')
+
     # If staff verifies a user who skipped self-service, back-fill the applied timestamp
     if new_status == 'verified' and not profile.verification_applied_at:
         profile.verification_applied_at = timezone.now()
@@ -11931,7 +11985,7 @@ def apply_verification_status(profile, new_status, user, data=None):
             profile.is_business_profile_completed = True
             try:
                 from business import models as business_models
-                business = business_models.Business.objects.get(user=profile.user)
+                business = target_business or business_models.Business.objects.get(user=profile.user)
                 # Verifying the owner's identity says nothing about account standing.
                 # A suspension is a deliberate staff decision and must be lifted
                 # deliberately, not as a side effect of approving a document.
@@ -25529,7 +25583,18 @@ def bulk_print_waybills(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def bulk_publish_fleets(request):
-    """Bulk publish tasks to Fleet drivers"""
+    """Bulk publish tasks to the fleet.
+
+    Driverless tasks land in Unassigned Tasks and the Task Automation rules get
+    one look at each; a task that already has a driver just becomes visible to
+    them. Finished tasks are left alone. Kept as queryset updates on purpose:
+    bulk publish has never sent the customer location-verification WhatsApp a
+    single publish sends, and a save() loop would start doing so — so the rules,
+    which that skipped signal would have run, are scheduled here instead.
+    """
+    from delivery.selectors import unassigned_tasks
+    from delivery.services.assignment import OPEN_STATUS, schedule_rules
+    from delivery.state_machine import TERMINAL_STATUSES
     try:
         data = json.loads(request.body)
         task_ids = data.get('task_ids', [])
@@ -25540,19 +25605,29 @@ def bulk_publish_fleets(request):
                 'error': 'No tasks selected'
             }, status=400)
 
-        # Update all selected tasks (non-cancelled orders)
-        updated = delivery_models.DeliveryTask.objects.filter(
-            id__in=task_ids,
+        to_publish = delivery_models.DeliveryTask.objects.filter(
+            id__in=task_ids, dl_task_publish=False,
         ).exclude(
             order__order_status='cancelled'
-        ).update(
-            dl_task_status='pending',
-            dl_task_publish=True
-        )
+        ).exclude(dl_task_status__in=TERMINAL_STATUSES)
 
+        driverless_ids = list(
+            to_publish.filter(driver__isnull=True).values_list('pk', flat=True))
+        with_driver = to_publish.filter(driver__isnull=False).update(dl_task_publish=True)
+        delivery_models.DeliveryTask.objects.filter(pk__in=driverless_ids).update(
+            dl_task_status=OPEN_STATUS, dl_task_publish=True, public_pool=False)
+        for task_pk in driverless_ids:
+            schedule_rules(task_pk)
+
+        updated = with_driver + len(driverless_ids)
+        waiting = unassigned_tasks().filter(pk__in=driverless_ids).count()
+        message = f'{updated} task(s) published'
+        if driverless_ids:
+            message += (f' — {waiting} waiting in Unassigned Tasks, '
+                        f'{len(driverless_ids) - waiting} routed by Task Automation')
         return JsonResponse({
             'success': True,
-            'message': f'{updated} task(s) published to Fleets',
+            'message': message,
             'updated_count': updated
         })
     except Exception as e:
@@ -25801,7 +25876,8 @@ def get_active_drivers(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def bulk_assign_driver(request):
-    """Bulk assign driver to selected tasks"""
+    """Bulk assign selected tasks to one driver, or to Public (driver_id='public')."""
+    from delivery.services.assignment import assign_to_driver, send_to_public
     try:
         data = json.loads(request.body)
         task_ids = data.get('task_ids', [])
@@ -25813,17 +25889,19 @@ def bulk_assign_driver(request):
                 'message': 'Missing task IDs or driver ID'
             }, status=400)
 
-        # Validate driver
-        try:
-            driver = fleet_models.Driver.objects.get(driver_id=driver_id, driver_status='approved')
-        except fleet_models.Driver.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'message': 'Driver not found or not approved'
-            }, status=400)
+        to_public = str(driver_id) == PUBLIC_ASSIGN_VALUE
+        driver = None
+        if not to_public:
+            try:
+                driver = fleet_models.Driver.objects.get(driver_id=driver_id, driver_status='approved')
+            except (fleet_models.Driver.DoesNotExist, ValueError):
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Driver not found or not approved'
+                }, status=400)
 
         # Get tasks
-        tasks = delivery_models.DeliveryTask.objects.filter(id__in=task_ids)
+        tasks = delivery_models.DeliveryTask.objects.select_related('order').filter(id__in=task_ids)
 
         if not tasks.exists():
             return JsonResponse({
@@ -25831,26 +25909,28 @@ def bulk_assign_driver(request):
                 'message': 'No tasks found with provided IDs'
             }, status=400)
 
-        # Assign driver to all tasks
         assigned_count = 0
+        skipped = []
         for task in tasks:
-            task.driver = driver
-            task._status_changed_by = request.user
-            # Update status to assigned if currently pending/for_review
-            if task.dl_task_status in ['for_review', 'pending', None]:
-                task.dl_task_status = 'assigned'
-                task._status_actor = 'staff'
-            task.save()
-            assigned_count += 1
+            if to_public:
+                ok, error = send_to_public(task, actor=request.user)
+            else:
+                ok, error = assign_to_driver(task, driver, actor=request.user)
+            if ok:
+                assigned_count += 1
+            else:
+                skipped.append(f'{task.dl_task_number or task.pk}: {error}')
 
-        # Log assignment
-        driver_name = driver.user.get_full_name() or driver.user.username
-        logger.info(f"Bulk assign by user {request.user.id}: {assigned_count} tasks to driver {driver_id} ({driver_name})")
+        target = 'Public' if to_public else (driver.user.get_full_name() or driver.user.username)
+        logger.info(f"Bulk assign by user {request.user.id}: {assigned_count} tasks to {target}")
 
+        message = f'Successfully assigned {assigned_count} task(s) to {target}'
+        if skipped:
+            message += f' — {len(skipped)} skipped ({"; ".join(skipped[:3])})'
         return JsonResponse({
-            'success': True,
+            'success': assigned_count > 0,
             'assigned': assigned_count,
-            'message': f'Successfully assigned {assigned_count} task(s) to {driver_name}'
+            'message': message,
         })
 
     except json.JSONDecodeError:
@@ -37696,14 +37776,22 @@ def staff_roles_list(request):
         is_staff=True
     ).select_related('user').order_by('-is_superadmin', 'username')
 
+    # The same search also finds signed-up accounts that are not staff yet, so a
+    # new hire can be added from here (staff_role_grant) instead of Django admin.
+    candidates = []
     if search:
-        profiles = profiles.filter(
+        search_q = (
             Q(username__icontains=search)
             | Q(first_name__icontains=search)
             | Q(last_name__icontains=search)
             | Q(email__icontains=search)
             | Q(phone__icontains=search)
             | Q(user_number__icontains=search)
+        )
+        profiles = profiles.filter(search_q)
+        candidates = list(
+            core_models.Profile.objects.filter(search_q, is_staff=False, user__is_active=True)
+            .select_related('user').order_by('-user__date_joined')[:10]
         )
 
     if dept_filter in DEPARTMENT_FIELDS:
@@ -37719,12 +37807,32 @@ def staff_roles_list(request):
 
     profiles = list(profiles)
 
+    # Who has a browser login for the WhatsApp inbox (whatsapp/inbox_access.py),
+    # and which numbers they may open in it (whatsapp/session_access.py).
+    from whatsapp import inbox_access, session_access
+    from whatsapp.models import InboxSessionAccess
+    try:
+        waha_users, waha_error = inbox_access.usernames(), ''
+    except inbox_access.InboxAccessError as e:
+        waha_users, waha_error = set(), str(e)
+    wa_numbers = session_access.known_sessions()
+    number_grants = {}
+    for uid, session in InboxSessionAccess.objects.filter(
+            user_id__in=[p.user_id for p in profiles if p.user_id]).values_list('user_id', 'session'):
+        number_grants.setdefault(uid, set()).add(session)
+
     rows = []
     for profile in profiles:
         rows.append({
             'profile': profile,
             'held': profile.staff_departments,
             'is_orphan': not profile.is_superadmin and not profile.staff_departments,
+            'waha': bool(profile.user_id) and profile.user.username in waha_users,
+            'all_numbers': bool(profile.user_id) and session_access.sees_all(profile.user),
+            'numbers': number_grants.get(profile.user_id, set()),
+            # For the Numbers dropdown's "2 of 3" summary.
+            'numbers_open': sum(1 for n in wa_numbers
+                                if n['name'] in number_grants.get(profile.user_id, set())),
         })
 
     # Counts are over all staff, not the filtered page, so the tallies stay stable.
@@ -37735,6 +37843,7 @@ def staff_roles_list(request):
         'fin': all_staff.filter(dept_finance=True).count(),
         'mkt': all_staff.filter(dept_marketing=True).count(),
         'admin': all_staff.filter(is_superadmin=True).count(),
+        'lead_manager': all_staff.filter(lead_manager=True).count(),
         'none': all_staff.filter(
             is_superadmin=False, dept_operations=False,
             dept_finance=False, dept_marketing=False,
@@ -37751,6 +37860,7 @@ def staff_roles_list(request):
 
     data = {
         'rows': rows,
+        'candidates': candidates,
         'stats': stats,
         'search': search,
         'dept_filter': dept_filter,
@@ -37758,7 +37868,13 @@ def staff_roles_list(request):
             {'code': code, 'label': label, 'pages': page_counts.get(code, 0)}
             for code, label in DEPARTMENT_CHOICES
         ],
+        # Same counts keyed by code, for the matrix column captions.
+        'dept_pages': {code: page_counts.get(code, 0) for code, _label in DEPARTMENT_CHOICES},
         'assignable': ASSIGNABLE_DEPARTMENTS,
+        'waha_error': waha_error,
+        'wa_numbers': wa_numbers,
+        'waha_wired': inbox_access.nginx_wired(),
+        'waha_path': inbox_access.path(),
         'page_title': 'Staff Roles',
     }
     return render(request, 'workforce/staff_roles.html', data)
@@ -37786,7 +37902,9 @@ def staff_role_update(request, profile_id):
         dept = data.get('department')
         enabled = bool(data.get('enabled'))
 
-        field = DEPARTMENT_FIELDS.get(dept)
+        # Lead manager is not a desk but a CRM rank (crm/ownership.py); it rides the
+        # same toggle and the same super-admin refusal below.
+        field = 'lead_manager' if dept == 'lead_manager' else DEPARTMENT_FIELDS.get(dept)
         if not field:
             return JsonResponse(
                 {'success': False, 'error': f'Unknown department: {dept}'}, status=400)
@@ -37824,6 +37942,135 @@ def staff_role_update(request, profile_id):
         logger.exception("Error updating staff role for profile %s: %s", profile_id, str(e))
         return JsonResponse(
             {'success': False, 'error': f'{type(e).__name__}: {str(e)}'}, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+@superuser_required
+def staff_role_grant(request, profile_id):
+    """
+    Make a signed-up account staff. AJAX, from the "Not staff yet" search results.
+
+    Sets both User.is_staff and Profile.is_staff — the gate accepts either, but CRM
+    lead assignment and AutoFlow recipients read User.is_staff. No department is
+    granted: the person lands as "No desk" and the super admin ticks their desks.
+    """
+    from django.db import transaction
+    from core import models as core_models
+
+    profile = get_object_or_404(core_models.Profile.objects.select_related('user'), id=profile_id)
+    user = profile.user
+
+    if profile.is_staff:
+        return JsonResponse(
+            {'success': False, 'error': 'That user is already staff.'}, status=400)
+    if user is None or not user.is_active:
+        return JsonResponse(
+            {'success': False, 'error': 'That account is deactivated.'}, status=400)
+
+    with transaction.atomic():
+        profile.is_staff = True
+        profile.save(update_fields=['is_staff', 'updated_at'])
+        if not user.is_staff:
+            user.is_staff = True
+            user.save(update_fields=['is_staff'])
+
+    logger.info("Staff access granted by %s: user %s (profile %s)",
+                request.user.id, user.id, profile.id)
+    return JsonResponse({'success': True, 'profile_id': profile.id})
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+@superuser_required
+def staff_waha_access(request, profile_id):
+    """
+    WhatsApp inbox browser login for one staff member. AJAX, {action: grant|revoke}.
+
+    grant (also "new password") writes a fresh password and returns it once — it
+    is not stored anywhere else. The login name is their Django username. Staff
+    still need their own staff login inside; this only gets them past nginx.
+    """
+    from core import models as core_models
+    from whatsapp import inbox_access
+
+    profile = get_object_or_404(core_models.Profile.objects.select_related('user'), id=profile_id)
+    user = profile.user
+    try:
+        action = (json.loads(request.body or '{}') or {}).get('action')
+    except (ValueError, AttributeError):
+        action = None
+
+    if action not in ('grant', 'revoke'):
+        return JsonResponse({'success': False, 'error': 'Unknown action.'}, status=400)
+    if user is None or not profile.is_staff:
+        return JsonResponse({'success': False, 'error': 'That user is not staff.'}, status=400)
+    if action == 'revoke' and user.pk == request.user.pk:
+        return JsonResponse({'success': False,
+                             'error': 'You cannot remove your own inbox login.'}, status=400)
+
+    try:
+        if action == 'grant':
+            password = inbox_access.set_password(user.username)
+        else:
+            inbox_access.revoke(user.username)
+            password = ''
+    except inbox_access.InboxAccessError as e:
+        logger.error("WAHA inbox login %s for user %s failed: %s", action, user.id, e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    logger.info("WAHA inbox login %s by %s for user %s", action, request.user.id, user.id)
+    # The popup lists the WhatsApp numbers this login will open, so the message the
+    # super admin sends says which numbers they will see.
+    from whatsapp import session_access
+    open_numbers = session_access.allowed(user)
+    numbers = [
+        {'name': s['name'], 'label': s['push_name'] or s['name'], 'tail': (s['phone'] or '')[-4:]}
+        for s in session_access.known_sessions()
+        if open_numbers is None or s['name'] in open_numbers
+    ] if action == 'grant' else []
+    resp = JsonResponse({'success': True, 'action': action,
+                         'username': user.username, 'password': password, 'numbers': numbers})
+    resp['Cache-Control'] = 'no-store'
+    return resp
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+@superuser_required
+def staff_waha_session(request, profile_id):
+    """
+    Open or close one WhatsApp number (WAHA session) in the inbox for one staff
+    member. AJAX, {session, enabled}. Enforced on every /waha/wa-chats/ endpoint
+    by whatsapp/session_access.py; super admins open every number already.
+    """
+    from core import models as core_models
+    from whatsapp import session_access
+
+    profile = get_object_or_404(core_models.Profile.objects.select_related('user'), id=profile_id)
+    user = profile.user
+    try:
+        data = json.loads(request.body or '{}') or {}
+        session = str(data.get('session') or '').strip()
+        enabled = bool(data.get('enabled'))
+    except (ValueError, AttributeError):
+        return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)
+
+    if session not in {s['name'] for s in session_access.known_sessions()}:
+        return JsonResponse({'success': False, 'error': 'Unknown WhatsApp number.'}, status=400)
+    if user is None or not profile.is_staff:
+        return JsonResponse({'success': False, 'error': 'That user is not staff.'}, status=400)
+    if session_access.sees_all(user):
+        return JsonResponse({'success': False,
+                             'error': 'Super admins already open every number.'}, status=400)
+
+    session_access.set_access(user, session, enabled, actor=request.user)
+    logger.info("WAHA inbox number %s -> %s for user %s by %s", session, enabled, user.id, request.user.id)
+    return JsonResponse({'success': True, 'session': session, 'enabled': enabled,
+                         'sessions': sorted(session_access.allowed(user) or [])})
 
 
 @login_required(login_url='/accounts/login/')
@@ -40338,3 +40585,141 @@ def driver_wa_thread(request, driver_id):
         'messages': out,
         'truncated': len(rows) >= DRIVER_WA_THREAD_LIMIT,
     })
+
+
+# UNASSIGNED TASKS + TASK AUTOMATION -----------------------------------------------------------------------------------------------------
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def dl_list_unassigned(request):
+    """Published tasks nobody is on yet: the Unassigned list, or the Public pool (?pool=public).
+
+    Unassigned tasks are invisible in the driver app until staff assign them — to one
+    driver or to Public — or a Task Automation rule does. Public tasks are in every
+    app driver's New tab and leave this list the moment one of them takes it.
+    """
+    from delivery.models import TaskAssignmentRule
+    from delivery.selectors import public_pool_tasks, unassigned_tasks
+
+    pool = 'public' if request.GET.get('pool') == 'public' else 'unassigned'
+    base = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'order__business', 'driver', 'business', 'pickup_location',
+    ).prefetch_related('order__order_items')
+    dl_tasks = public_pool_tasks(base) if pool == 'public' else unassigned_tasks(base)
+    dl_tasks = annotate_task_sequence(dl_tasks).order_by(*TASK_SEQ_DESC)
+    dl_tasks = paginate_queryset(request, dl_tasks)
+    attach_unread_seller_comments(dl_tasks)
+
+    return render(request, 'workforce/parts/lists/dl_list_unassigned.html', {
+        'dl_tasks': dl_tasks,
+        'pool': pool,
+        'unassigned_count': unassigned_tasks().count(),
+        'public_count': public_pool_tasks().count(),
+        'active_rule_count': TaskAssignmentRule.objects.filter(is_active=True).count(),
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def task_automation_list(request):
+    """Staff page: the Task Automation rules — list, add and edit (POST saves one rule)."""
+    from delivery.forms import TaskAssignmentRuleForm
+    from delivery.models import TaskAssignmentRule
+    from delivery.selectors import public_pool_tasks, unassigned_tasks
+    from delivery.services.assignment import driver_rule_problem
+
+    edit_id = request.POST.get('rule_id') or request.GET.get('edit') or ''
+    edit_rule = (TaskAssignmentRule.objects.filter(pk=edit_id).first()
+                 if str(edit_id).isdigit() else None)
+
+    if request.method == 'POST':
+        form = TaskAssignmentRuleForm(request.POST, instance=edit_rule)
+        if form.is_valid():
+            rule = form.save(commit=False)
+            if not rule.pk:
+                rule.created_by = request.user
+            rule.save()
+            logger.info(
+                f"[task-automation] {request.user.username} {'updated' if edit_rule else 'created'} "
+                f"rule {rule.pk} '{rule.name}': priority={rule.priority} active={rule.is_active} "
+                f"business={rule.business_id} zone_group={rule.zone_group_id} leg={rule.task_leg or '-'} "
+                f"speed={rule.dl_speed or '-'} action={rule.action} driver={rule.driver_id}"
+            )
+            messages.success(request, f'Rule "{rule.name}" saved.')
+            return redirect('workforce:task_automation_list')
+    else:
+        last = TaskAssignmentRule.objects.order_by('-priority').values_list('priority', flat=True).first()
+        form = TaskAssignmentRuleForm(
+            instance=edit_rule,
+            initial=None if edit_rule else {'priority': (last or 0) + 10, 'is_active': True},
+        )
+
+    rules = list(TaskAssignmentRule.objects.select_related(
+        'business', 'zone_group', 'driver', 'driver__user'))
+    for rule in rules:
+        rule.problem = (driver_rule_problem(rule.driver)
+                        if rule.action == TaskAssignmentRule.ACTION_DRIVER else '')
+
+    return render(request, 'workforce/task_automation.html', {
+        'rules': rules,
+        'form': form,
+        'edit_rule': edit_rule,
+        'active_rule_count': sum(1 for r in rules if r.is_active),
+        'unassigned_count': unassigned_tasks().count(),
+        'public_count': public_pool_tasks().count(),
+    })
+
+
+@require_POST
+@login_required(login_url='/accounts/login/')
+@staff_required
+def task_automation_toggle(request, rule_id):
+    """Switch one rule on or off without opening the form."""
+    from delivery.models import TaskAssignmentRule
+
+    rule = get_object_or_404(TaskAssignmentRule, pk=rule_id)
+    rule.is_active = not rule.is_active
+    rule.save(update_fields=['is_active', 'updated_at'])
+    logger.info(f"[task-automation] {request.user.username} turned rule {rule.pk} "
+                f"'{rule.name}' {'on' if rule.is_active else 'off'}")
+    messages.success(request, f'Rule "{rule.name}" turned {"on" if rule.is_active else "off"}.')
+    return redirect('workforce:task_automation_list')
+
+
+@require_POST
+@login_required(login_url='/accounts/login/')
+@staff_required
+def task_automation_delete(request, rule_id):
+    """Delete one rule. Tasks it already routed keep their driver."""
+    from delivery.models import TaskAssignmentRule
+
+    rule = get_object_or_404(TaskAssignmentRule, pk=rule_id)
+    name = rule.name
+    logger.info(f"[task-automation] {request.user.username} deleted rule {rule.pk} '{name}'")
+    rule.delete()
+    messages.success(request, f'Rule "{name}" deleted.')
+    return redirect('workforce:task_automation_list')
+
+
+@require_POST
+@login_required(login_url='/accounts/login/')
+@staff_required
+def task_automation_apply(request):
+    """Run the active rules over everything already waiting in the Unassigned list."""
+    from delivery.services.assignment import APPLY_ALL_LIMIT, apply_rules_to_unassigned
+
+    routed, looked_at = apply_rules_to_unassigned(actor=request.user)
+    logger.info(f"[task-automation] {request.user.username} applied rules: "
+                f"{routed} of {looked_at} unassigned tasks routed")
+    if not looked_at:
+        messages.info(request, 'The Unassigned list is empty — nothing to route.')
+    else:
+        scope = f'the oldest {looked_at}' if looked_at >= APPLY_ALL_LIMIT else f'{looked_at}'
+        messages.success(
+            request,
+            f'{routed} of {scope} unassigned task(s) routed by the rules; '
+            f'{looked_at - routed} matched no rule and stay Unassigned.')
+    # A named page, never a URL from the form — that would be an open redirect.
+    if request.POST.get('back') == 'unassigned':
+        return redirect('workforce:dl_list_unassigned')
+    return redirect('workforce:task_automation_list')

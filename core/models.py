@@ -131,6 +131,12 @@ class Profile(EmailNormalizedModel, models.Model):
         default=False, help_text='Staff department: Finance — COD, settlements, payouts, transactions')
     dept_marketing = models.BooleanField(
         default=False, help_text='Staff department: Marketing — CRM leads, WhatsApp inbox, pricing inquiries')
+    # Not a desk: a rank inside the CRM. Everyone else sees only their own leads plus
+    # the unassigned pool — see crm/ownership.py. db_default so a worker still on
+    # the old model can keep inserting profiles during a reload.
+    lead_manager = models.BooleanField(
+        default=False, db_default=False,
+        help_text='Lead manager — sees every CRM lead and assigns leads to anyone')
 
     # Profile completion tracking
     is_profile_completed = models.BooleanField(default=False)

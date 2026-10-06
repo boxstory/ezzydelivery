@@ -192,7 +192,7 @@ function getCsrfToken() {
 
 // Bulk publish to Fleets
 function bulkPublishFleets(taskIds) {
-    if (confirm('Publish ' + taskIds.length + ' task(s) to Fleet drivers?')) {
+    if (confirm('Publish ' + taskIds.length + ' task(s)? Those with no driver go to Unassigned Tasks, where you or a Task Automation rule picks a driver or Public.')) {
         fetch('/workforce/tasks/bulk-publish-fleets/', {
             method: 'POST',
             headers: {
@@ -204,8 +204,8 @@ function bulkPublishFleets(taskIds) {
         .then(function(response) { return response.json(); })
         .then(function(data) {
             if (data.success) {
-                showToast('Tasks published to Fleets successfully', 'success');
-                location.reload();
+                showToast(data.message || 'Tasks published', 'success');
+                setTimeout(function() { location.reload(); }, 1200);
             } else {
                 showToast(data.error || data.message || 'Error publishing tasks', 'error');
             }
@@ -334,6 +334,8 @@ function populateDriverList(drivers, taskCount) {
     }
 
     selectElement.append(new Option('Select a driver...', '', false, false));
+    // Not a driver: opens the tasks to every driver with app access (their New tab).
+    selectElement.append(new Option('Public — all drivers with app access', 'public', false, false));
 
     for (var i = 0; i < drivers.length; i++) {
         var driver = drivers[i];
@@ -380,7 +382,7 @@ function confirmBulkDriverAssign() {
     .then(function(response) { return response.json(); })
     .then(function(data) {
         if (data.success) {
-            showToast('Successfully assigned ' + (data.assigned || taskIds.length) + ' task(s) to driver', 'success');
+            showToast(data.message || ('Successfully assigned ' + (data.assigned || taskIds.length) + ' task(s)'), 'success');
             var modal = bootstrap.Modal.getInstance(document.getElementById('bulkDriverModal'));
             if (modal) modal.hide();
             setTimeout(function() { location.reload(); }, 1000);
@@ -506,7 +508,7 @@ function editTask(taskId) {
 }
 
 function publishToFleets(taskId) {
-    if (confirm('Publish this task to Fleet drivers?')) {
+    if (confirm('Publish this task? With no driver it goes to Unassigned Tasks, where you or a Task Automation rule picks a driver or Public.')) {
         fetch('/workforce/delivery-task/' + taskId + '/publish-fleets/', {
             method: 'POST',
             headers: {
@@ -517,8 +519,8 @@ function publishToFleets(taskId) {
         .then(function(response) { return response.json(); })
         .then(function(data) {
             if (data.success) {
-                showToast('Task published to Fleets successfully', 'success');
-                location.reload();
+                showToast(data.message || 'Task published', 'success');
+                setTimeout(function() { location.reload(); }, 1200);
             } else {
                 showToast(data.error || data.message || 'Error publishing task', 'error');
             }

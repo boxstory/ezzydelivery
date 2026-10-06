@@ -249,6 +249,15 @@ class DeliveryTask(models.Model):
         ('dropsownlost', 'Drops Own Lost'),
     ]
     dl_task_publish = models.BooleanField(default=False)
+    # Publishing releases a task to the fleet; it does not offer it to anyone.
+    # A published task with no driver sits in staff's Unassigned list until a
+    # person or a Task Automation rule hands it to one driver or sets this, and
+    # only this puts it in every driver's New tab — see delivery_pool_for().
+    # db_default too: workers still on the old code keep inserting tasks without
+    # this column for the seconds between migrate and reload.
+    public_pool = models.BooleanField(
+        default=False, db_default=False, db_index=True,
+        help_text="Open to every driver with app access (PWA New tab)")
     dl_task_number = models.CharField(max_length=100)
     dl_task_description = models.CharField(max_length=100)
     dl_task_status_client = models.CharField(
@@ -1264,6 +1273,75 @@ class PickupTask(models.Model):
             models.Index(fields=['status', 'pickup_mode'], name='pickup_pool_idx'),
             models.Index(fields=['driver', 'status'], name='pickup_driver_idx'),
         ]
+
+
+class TaskAssignmentRule(models.Model):
+    """
+    One Task Automation rule: which published, unassigned delivery tasks it
+    catches, and who gets them. Rules run in priority order the moment a task
+    reaches the Unassigned list; the first one that matches wins, and a task no
+    rule matches stays Unassigned for staff. Edited at /workforce/task-automation/.
+    """
+    ACTION_DRIVER = 'driver'
+    ACTION_PUBLIC = 'public'
+    ACTION_CHOICES = [
+        (ACTION_DRIVER, 'Assign to driver'),
+        (ACTION_PUBLIC, 'Send to Public'),
+    ]
+
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    priority = models.PositiveIntegerField(default=100, help_text="Lower runs first")
+
+    # Conditions. Blank means "any" — a rule with none set catches every task.
+    business = models.ForeignKey(
+        business_models.Business, on_delete=models.CASCADE,
+        null=True, blank=True, related_name='task_assignment_rules')
+    zone_group = models.ForeignKey(
+        'delivery.ZoneGroup', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='task_assignment_rules',
+        help_text="Matched on the task's drop-off zone")
+    task_leg = models.CharField(
+        max_length=24, blank=True, choices=DeliveryTask.TASK_LEG_CHOICES)
+    dl_speed = models.CharField(
+        max_length=100, blank=True, choices=DeliveryTask.DL_SPEED_CHOICES)
+
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES, default=ACTION_DRIVER)
+    driver = models.ForeignKey(
+        fleet_models.Driver, on_delete=models.CASCADE,
+        null=True, blank=True, related_name='task_assignment_rules')
+
+    match_count = models.PositiveIntegerField(default=0)
+    last_matched_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_task_assignment_rules')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = 'delivery'
+        ordering = ['priority', 'id']
+
+    def __str__(self):
+        return self.name
+
+    def matches(self, task, zone=None):
+        """True when every condition this rule sets holds for the task."""
+        if self.business_id:
+            task_business_id = task.business_id or getattr(task.order, 'business_id', None)
+            if task_business_id != self.business_id:
+                return False
+        if self.task_leg and task.task_leg != self.task_leg:
+            return False
+        if self.dl_speed and (task.dl_speed or '') != self.dl_speed:
+            return False
+        if self.zone_group_id:
+            if zone is None:
+                return False
+            if not self.zone_group.zones.filter(zone_number=zone).exists():
+                return False
+        return True
 
 
 class ParcelCustody(models.Model):

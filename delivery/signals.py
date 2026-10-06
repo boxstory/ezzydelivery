@@ -381,14 +381,19 @@ def _log_driver_change(task, old_driver_id):
         note = 'Driver assigned'
     else:
         note = 'Driver removed from the task'
+    # The assignment service names the move itself (Sent to Public, a Task
+    # Automation rule) — a bare "Driver assigned" would hide who decided it.
+    note = getattr(task, '_driver_change_note', None) or note
 
+    from delivery.services.assignment import PUBLIC_LABEL
     OrderStatusHistory.objects.create(
         order_id=task.order_id,
         field_name='driver_change',
         old_value=str(old_driver_id or ''),
         new_value=str(task.driver_id or ''),
         old_display=_driver_label(old_driver)[:100] or 'No driver',
-        new_display=_driver_label(new_driver)[:100] or 'No driver',
+        new_display=_driver_label(new_driver)[:100] or (
+            PUBLIC_LABEL if task.public_pool else 'No driver'),
         changed_by=actor,
         notes=note,
     )
@@ -778,6 +783,15 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
                 execute_flows_for_trigger('wa_location_verification', task=instance)
             except Exception as e:
                 logger.warning(f"Auto flow execution failed for task publish {instance.pk}: {e}")
+
+    # A task published with nobody on it lands in staff's Unassigned list — give
+    # the Task Automation rules one look at it. Created-published tasks (return
+    # legs) count too. After commit, so the caller finishes building the task.
+    became_published = instance.dl_task_publish and (
+        created or getattr(instance, '_old_dl_task_publish', None) is False)
+    if became_published and not instance.driver_id and not instance.public_pool:
+        from delivery.services.assignment import schedule_rules
+        schedule_rules(instance.pk)
 
     # Fire auto flow for task reschedule (date changed)
     if not created:

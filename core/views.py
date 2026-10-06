@@ -466,13 +466,26 @@ def _fire_driver_application_submitted(driver, profile, is_new):
         logger.exception("driver_application_submitted flows failed for driver %s", driver.pk)
 
 
+def _sync_driver_crm_card(driver):
+    """Create the applicant's CRM driver card now, or move it to the column the
+    application has reached, instead of waiting for someone to open the driver
+    board. Never allowed to break the save."""
+    try:
+        from crm.services import reconcile_driver_leads
+
+        reconcile_driver_leads(driver_ids=[driver.pk])
+    except Exception:
+        logger.exception("CRM card sync failed for driver %s", driver.pk)
+
+
 def join_driver(request):
     """Public driver application — Google sign-in, then 3 sections: profile, vehicle, documents.
 
     Anonymous visitors see the form with a Google login popup (One Tap +
     explicit button). After login the form is prefilled from the Google
-    account / existing profile. Browser geolocation is captured on submit
-    and stored in driver_meta['registration_location'].
+    account / existing profile. A final submit needs a browser location —
+    the Documents step asks for it with a banner — unless one is already on
+    file; the first one captured is kept in driver_meta['registration_location'].
     """
     from delivery.models import ZoneGroup
 
@@ -594,9 +607,26 @@ def join_driver(request):
         else:
             job_type_val = (request.POST.get('job_type') or '').strip()
 
+        # The browser's position, posted with every save. Only the first one is
+        # kept (see below), so an applicant with one on file needs no new fix.
+        try:
+            geo_lat = float(request.POST.get('geo_lat', ''))
+            geo_lng = float(request.POST.get('geo_lng', ''))
+        except (TypeError, ValueError):
+            geo_lat = geo_lng = None
+        if geo_lat is not None and not (-90 <= geo_lat <= 90 and -180 <= geo_lng <= 180):
+            geo_lat = geo_lng = None
+        has_stored_location = bool(
+            driver and (driver.driver_meta or {}).get('registration_location', {}).get('lat')
+        )
+
         # Minimum requirements enforced only on final submission:
-        # selfie + at least 2 ID documents + a vehicle type
+        # selfie + at least 2 ID documents + a vehicle type + a location
         if not is_partial_save:
+            # The Documents step asks for it with a banner; this is the same rule
+            # for a submit that skipped the page. A draft save never needs one.
+            if geo_lat is None and not has_stored_location:
+                upload_errors.append("Turn on location to submit your application.")
             if 'Selfie' not in uploaded and 'Selfie' not in existing_types:
                 upload_errors.append("A selfie photo is required.")
             id_docs_count = len({t for t in ID_DOC_TYPES if t in uploaded or t in existing_types})
@@ -685,16 +715,7 @@ def join_driver(request):
                     # Registration location captured by the browser on submit, and
                     # on any later save while it is still missing. Never overwritten:
                     # the first capture is the one that means "where they applied".
-                    try:
-                        geo_lat = float(request.POST.get('geo_lat', ''))
-                        geo_lng = float(request.POST.get('geo_lng', ''))
-                    except (TypeError, ValueError):
-                        geo_lat = geo_lng = None
-                    has_location = bool(
-                        (driver.driver_meta or {}).get('registration_location', {}).get('lat')
-                    )
-                    if (geo_lat is not None and not has_location
-                            and -90 <= geo_lat <= 90 and -180 <= geo_lng <= 180):
+                    if geo_lat is not None and not has_stored_location:
                         meta = driver.driver_meta or {}
                         meta['registration_location'] = {
                             'lat': geo_lat,
@@ -742,6 +763,9 @@ def join_driver(request):
                         if doc_exp:
                             doc.document_expiry_date = doc_exp
                         doc.save()
+
+            if driver:
+                _sync_driver_crm_card(driver)
 
             for warn in upload_warnings:
                 messages.warning(request, warn)

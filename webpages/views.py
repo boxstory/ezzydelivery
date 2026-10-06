@@ -111,6 +111,9 @@ def index(request):
 
 
 def delivery_pricing(request):
+    # The inbox's pricing link carries ?wa=<code> for the chat it was sent to.
+    from crm.chat_links import remember_link_code
+    remember_link_code(request)
     meta = SEOMetadata.get_pricing_meta()
     data = {
         'seo': meta,
@@ -428,6 +431,8 @@ def _render_inquiry_step(request, step, all_data, error):
 
 def delivery_inquiry(request):
     """Multi-step pricing inquiry form — saves to DB on each step."""
+    from crm.chat_links import remember_link_code
+    remember_link_code(request)
     # Initialize session data if not exists
     if 'inquiry_data' not in request.session:
         request.session['inquiry_data'] = {}
@@ -477,8 +482,10 @@ def delivery_inquiry(request):
 
             # Register as a CRM lead — never let CRM failures break the public form
             try:
+                from crm.chat_links import link_from_pricing_ref
                 from crm.services import create_lead_from_whatsapp_inquiry
-                create_lead_from_whatsapp_inquiry(wa_inquiry)
+                lead, _created = create_lead_from_whatsapp_inquiry(wa_inquiry)
+                link_from_pricing_ref(lead, request)
             except Exception:
                 logger.exception('CRM lead creation failed for WhatsAppInquiry %s', wa_inquiry.pk)
 
@@ -490,6 +497,9 @@ def delivery_inquiry(request):
             wa_message += f". Contact: {contact_number}"
             if additional_info:
                 wa_message += f". Additional info: {additional_info}"
+            # Ties the chat this opens to the lead above, whatever number they typed.
+            from crm.chat_links import ref_for
+            wa_message += f" ({ref_for('W', wa_inquiry.pk)})"
 
             # The number this chat opens with is the CRM — Business Leads sender
             # route (Auto Triggers page), not a literal: the prospect must land
@@ -595,8 +605,11 @@ def delivery_inquiry(request):
 
             # Register as a CRM lead — never let CRM failures break the public form
             try:
+                from crm.chat_links import link_from_pricing_ref
                 from crm.services import create_lead_from_pricing_inquiry
-                create_lead_from_pricing_inquiry(inquiry)
+                lead, _created = create_lead_from_pricing_inquiry(inquiry)
+                # Opened from a link the inbox sent? That chat is this business.
+                link_from_pricing_ref(lead, request)
             except Exception:
                 logger.exception('CRM lead creation failed for PricingEnquiry %s', inquiry.pk)
 
@@ -789,6 +802,9 @@ def inquiry_quote(request, token):
         # Pre-select what they picked last time when they come back to change it.
         'selected_key': (request.POST.get('plan')
                          or (inquiry.selected_plan.key if inquiry.selected_plan else '')),
+        # Rides in the WhatsApp button's prefilled text so the chat it opens is
+        # linked to this lead even when the owner writes from their own phone.
+        'wa_ref': _wa_ref(inquiry),
     })
 
 
@@ -827,7 +843,16 @@ def inquiry_success(request):
         'seo': meta,
         'inquiry': inquiry,
         'celebrate': celebrate,
+        'wa_ref': _wa_ref(inquiry),
     })
+
+
+def _wa_ref(inquiry):
+    """'Ref P125-3f9a2c' for a pricing enquiry's WhatsApp buttons, '' without one."""
+    if inquiry is None:
+        return ''
+    from crm.chat_links import ref_for
+    return ref_for('P', inquiry.pk)
 
 
 @login_required

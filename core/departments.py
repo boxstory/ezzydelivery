@@ -72,6 +72,9 @@ _OPS = [
     'delivery_task_detail', 'delivery_task_edit',
     'publish_task_to_fleets', 'unpublish_task_from_fleets',
     'assign_driver_to_task', 'unassign_driver_from_task', 'update_task_status',
+    # Unassigned list + Task Automation rules (who a published task goes to)
+    'dl_list_unassigned', 'task_automation_list', 'task_automation_apply',
+    'task_automation_toggle', 'task_automation_delete',
     'pass_note_to_driver',
     'bulk_print_tasks', 'bulk_print_waybills', 'bulk_publish_fleets', 'bulk_publish_app',
     'bulk_update_status', 'bulk_export_tasks', 'bulk_assign_driver', 'dl_tasks_export_page',
@@ -118,8 +121,9 @@ _OPS = [
     'wf_opportunity_edit', 'wf_opportunity_slot_save', 'wf_opportunity_slot_delete',
     'wf_opportunity_interest_decide',
     'driver_vehicle_add', 'driver_vehicle_edit', 'driver_vehicle_delete',
-    'driver_document_add', 'driver_document_edit', 'driver_document_delete', 'driver_document_verify',
-    'driver_document_crop', 'driver_document_crop_restore',
+    # Add / edit / crop / verify are shared with marketing (see _MULTI); deleting a
+    # document of record stays with this desk.
+    'driver_document_delete',
     'driver_remind_completion', 'export_drivers_csv', 'wf_driver_tasks',
     # One-device-per-driver console
     'driver_devices', 'driver_device_release', 'driver_device_revoke',
@@ -132,13 +136,13 @@ _OPS = [
     # day-to-day seller edit — see _ADMIN for 'seller_transfer_ownership'.
     'wf_pickup_location_add', 'wf_pickup_location_update', 'wf_pickup_location_delete',
 
-    # Verification & documents
-    'business_verification_list', 'driver_verification_list', 'user_verification_list',
+    # Verification & documents. The queues themselves are shared with marketing
+    # (see _MULTI); every decision and export below stays with this desk.
     'export_driver_verification_csv',
-    'team_verification_list', 'update_verification_status', 'update_team_status',
+    'update_verification_status', 'update_team_status',
     # Fixing a sign-up filed under the wrong role — same desk that approves it
     'change_user_role',
-    'view_user_driver_profile', 'view_user_business_profile', 'check_business_code_unique',
+    'check_business_code_unique',
     'driver_documents_list', 'driver_document_detail',
     # Same scans, reached from the recruitment table instead of the documents
     # list — so it answers to the same desk, not to marketing.
@@ -238,6 +242,9 @@ _FIN = [
 ]
 
 _MKT = [
+    # The desk's landing page. wf_dashboard redirects a marketing-only account
+    # here, so losing this entry strands them on a page they cannot open.
+    'wf_marketing_overview',
     # CRM pipeline
     'crm_leads_board', 'crm_driver_leads_board', 'crm_leads_list',
     'crm_driver_leads_list', 'crm_lead_create',
@@ -272,7 +279,8 @@ _MKT = [
 
 _ADMIN = [
     # Staff role management — who holds which department, and which pages sit where
-    'staff_roles_list', 'staff_role_update',
+    'staff_roles_list', 'staff_role_update', 'staff_role_grant', 'staff_waha_access',
+    'staff_waha_session',
     'staff_pages_list', 'staff_page_update',
     # Which WhatsApp labels are marketing-only (whatsapp/label_access.py)
     'whatsapp_label_access',
@@ -292,6 +300,8 @@ _ADMIN = [
     # Seller integrations & secrets
     # Ownership transfer: changes who controls a seller account
     'seller_transfer_ownership',
+    # Permanent CRM lead delete (activities, WhatsApp links and merged cards go too)
+    'crm_lead_delete',
     'wf_seller_api_configs', 'wf_approve_api_config', 'wf_get_api_config',
     'wf_create_api_config',
     'wf_update_api_config', 'wf_delete_api_config', 'wf_test_api_config',
@@ -342,6 +352,12 @@ _MULTI = {
     'crm_driver_leads_export_csv': [OPS, MKT, ADMIN],
     'crm_lead_detail': [OPS, MKT, ADMIN],
     'crm_lead_update': [OPS, MKT, ADMIN],
+    # Take a lead from the pool, hand it back, or take the oldest waiting one. Both
+    # desks work the pool (2026-10-06, user's call); whose lead is whose is decided
+    # per row in crm/ownership.py, not here.
+    'crm_lead_claim': [OPS, MKT, ADMIN],
+    'crm_lead_release': [OPS, MKT, ADMIN],
+    'crm_lead_claim_next': [OPS, MKT, ADMIN],
     'crm_lead_update_stage': [OPS, MKT, ADMIN],
     # The list page's bulk bar runs the same helper per lead, write-back gate included.
     'crm_leads_bulk_stage': [OPS, MKT, ADMIN],
@@ -361,6 +377,26 @@ _MULTI = {
     # so its scorecard opens for ops too. The business one stays marketing-only.
     'crm_driver_reports': [OPS, MKT, ADMIN],
     'crm_driver_map': [OPS, MKT, ADMIN],
+
+    # Driver documents, worked from the driver-lead page (2026-10-06, user's call):
+    # marketing types the number / expiry off the scan, crops it, adds a missing
+    # document and marks it verified. Delete stays OPS-only in _OPS.
+    'driver_document_add': [OPS, MKT, ADMIN],
+    'driver_document_edit': [OPS, MKT, ADMIN],
+    'driver_document_crop': [OPS, MKT, ADMIN],
+    'driver_document_crop_restore': [OPS, MKT, ADMIN],
+    'driver_document_verify': [OPS, MKT, ADMIN],
+
+    # Onboarding queues, view-only for marketing (2026-10-04): they chase the same
+    # applicants from the CRM. Approve / review / reject, team status, change role
+    # and the CSV export stay OPS-only in _OPS, and the templates hide those
+    # controls unless wf_dept_ops.
+    'business_verification_list': [OPS, MKT, ADMIN],
+    'driver_verification_list': [OPS, MKT, ADMIN],
+    'user_verification_list': [OPS, MKT, ADMIN],
+    'team_verification_list': [OPS, MKT, ADMIN],
+    'view_user_driver_profile': [OPS, MKT, ADMIN],
+    'view_user_business_profile': [OPS, MKT, ADMIN],
 }
 
 

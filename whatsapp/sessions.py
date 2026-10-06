@@ -254,7 +254,7 @@ def create_session(name, start=True, timeout=20):
     return False, f'WAHA returned HTTP {resp.status_code}{": " + detail if detail else ""}'
 
 
-def render_tabs(active, base_path, always=False, add_button=False):
+def render_tabs(active, base_path, always=False, add_button=False, only=None):
     """Tab strip HTML linking to <base_path>?session=<name>.
 
     Shared by the wa-chats and wa-dashboard ops pages — both style the same
@@ -264,8 +264,13 @@ def render_tabs(active, base_path, always=False, add_button=False):
     renders exactly as before. The dashboard passes always=True + add_button=True
     because that is where a *new* number gets linked — hiding the control until a
     second session exists would make it impossible to create the second session.
+
+    only = a set of session names to show (the inbox passes the numbers open to
+    the viewer, whatsapp/session_access.py); None shows every number.
     """
     rows = list_sessions()
+    if only is not None:
+        rows = [s for s in rows if s['name'] in only]
     if len(rows) < 2 and not always:
         return ''
     parts = ['<nav class="wa-sess">']

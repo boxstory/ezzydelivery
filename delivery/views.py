@@ -193,17 +193,10 @@ def all_delivery_tasks(request):
     )
     base_qs = annotate_task_sequence(base_qs)
 
-    # All tasks: published and available (not assigned to any driver) — only verified orders
-    all_tasks = base_qs.filter(
-        dl_task_publish=True,
-        driver__isnull=True,
-        dl_task_status__in=['pending', 'for_review'],
+    # All tasks: the Public pool, same rule as the PWA New tab — only verified orders
+    from delivery.selectors import delivery_pool_for
+    all_tasks = delivery_pool_for(driver, base_qs).filter(
         order__verification_status='verified',
-    ).exclude(
-        dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed',
-                            'returned_to_shipper']
-    ).exclude(
-        order__order_status='cancelled'
     ).order_by('-id')
 
     # Assigned tasks: Tasks assigned to driver but not yet accepted — only verified orders
@@ -402,24 +395,18 @@ def assign_driver(request):
 
                 logger.info(f"Driver {driver.driver_id} assigning themselves to task {task_id}")
 
-                # The goods may already be with the pickup driver — only they and
-                # the driver a transfer is addressed to may take this delivery.
-                from delivery.selectors import parcel_claim_block
-                blocked, block_msg = parcel_claim_block(task, driver)
+                # Only a task in the Public pool can be taken: published, sent to
+                # Public, nobody on it, and the goods not already in another car.
+                # Checked BEFORE the claim row is written — that row alone passes
+                # every ownership check, and an early return here commits it.
+                from delivery.selectors import delivery_pool_block
+                blocked, block_msg = delivery_pool_block(task, driver)
                 if blocked:
                     return JsonResponse({"success": False, "error": block_msg})
 
                 delivery_models.AssignedDriver.objects.create(
                     driver=driver, dl_task=task
                 )
-
-                # Block if task is not published to fleet
-                if not task.dl_task_publish:
-                    return JsonResponse({"success": False, "error": "Task is not published to fleet yet"})
-
-                # Block if order is cancelled
-                if task.order and task.order.order_status == 'cancelled':
-                    return JsonResponse({"success": False, "error": "Order is cancelled"})
 
                 # Update task: set driver and status to accepted
                 task.driver = driver
@@ -491,10 +478,11 @@ def accept_task(request):
 
             # Assign driver if not assigned
             if task.driver_id is None:
-                # Claiming an unassigned task: refuse when the parcel is already
-                # in another driver's car (first-mile pickup still 'collected').
-                from delivery.selectors import parcel_claim_block
-                blocked, block_msg = parcel_claim_block(task, driver)
+                # A task nobody is on can only be taken from the Public pool — an
+                # Unassigned one waits for staff, and a held parcel stays with its
+                # holder. Checked before the claim row below is written.
+                from delivery.selectors import delivery_pool_block
+                blocked, block_msg = delivery_pool_block(task, driver)
                 if blocked:
                     return JsonResponse({"success": False, "error": block_msg})
 

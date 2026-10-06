@@ -26,6 +26,11 @@ PALETTE = [
 ]
 FALLBACK_COLOR = 4  # '#99b6c1', a neutral grey, for a label with no usable colour
 
+# WhatsApp's built-in chat-list filters, which WAHA reports alongside real
+# labels. They are each person's own view of their inbox, not a tag on the
+# contact, so the backfill never copies them to another number.
+LIST_FILTERS = {'unread', 'favorite', 'favourite', 'group'}
+
 # A chat object exists for anyone WhatsApp has ever exchanged a key with, so
 # these system rows are not evidence of a conversation — see has_real_chat().
 NOTIFICATION_TYPES = {
@@ -118,8 +123,12 @@ def confirm_chat_labels(session, chat_id, ids, retry_after=1.2):
     return False
 
 
-def create_label(session, name, color=None, color_hex=''):
-    """Create a label on this number and return it, or None if WhatsApp refused.
+# WhatsApp's own ceiling per number; WAHA answers 422 past it.
+MAX_LABELS = 20
+
+
+def create_label_detail(session, name, color=None, color_hex=''):
+    """(label, error) for a create — the error is WhatsApp's own words.
 
     WAHA takes `color` (palette index) or `colorHex`, never both. We prefer the
     index because the source label already carries one; an off-palette hex is a
@@ -130,9 +139,15 @@ def create_label(session, name, color=None, color_hex=''):
     status, body = call('POST', f'/api/{session}/labels', {'name': name[:100], 'color': int(color)})
     if not 200 <= status < 300 or not isinstance(body, dict) or not body.get('id'):
         logger.warning('wa labels: could not create %r on %s (HTTP %s): %s', name, session, status, body)
-        return None
+        said = body.get('message') if isinstance(body, dict) else ''
+        return None, str(said or f'WhatsApp refused it (HTTP {status or "network"}).')
     logger.info('wa labels: created %r on %s as id %s', name, session, body.get('id'))
-    return body
+    return body, ''
+
+
+def create_label(session, name, color=None, color_hex=''):
+    """The label, or None when WhatsApp refused it."""
+    return create_label_detail(session, name, color=color, color_hex=color_hex)[0]
 
 
 # ------------------------------------------------------- names across numbers
@@ -293,13 +308,14 @@ def other_sessions(session, phone):
             if s and s != session and s in known and wa_sessions.sender_number(s) != phone]
 
 
-def propagate(session, chat_id, add_names, remove_names, actor=None):
+def propagate(session, chat_id, add_names, remove_names, actor=None, only=None):
     """Apply the same label change to our other numbers. Returns a per-number report.
 
     Best effort by design: the save on the open number has already succeeded, so
     a refusal here is reported to the user, never raised. A name missing on the
     other number is created there, and labels set on that phone by hand are kept
-    because the whole set is merged, not replaced.
+    because the whole set is merged, not replaced. `only` limits the push to
+    those numbers (the backfill command); the inbox pushes to every number.
     """
     add_names = [n for n in (add_names or []) if str(n).strip()]
     remove_names = [n for n in (remove_names or []) if str(n).strip()]
@@ -312,6 +328,8 @@ def propagate(session, chat_id, add_names, remove_names, actor=None):
     source = session_labels(session) or []
     report = []
     for target in other_sessions(session, phone):
+        if only is not None and target not in only:
+            continue
         entry = {'session': target, 'added': [], 'removed': [], 'created': [], 'error': ''}
         if not has_real_chat(target, phone):
             entry['error'] = 'no chat on this number'

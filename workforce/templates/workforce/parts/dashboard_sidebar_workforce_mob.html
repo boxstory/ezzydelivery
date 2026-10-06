@@ -105,6 +105,13 @@
                     <i class="fa-solid fa-spinner"></i><span>Unpublished Tasks</span>
                     <span class="badge ms-auto" style="background:var(--brand-primary);color:#000;font-size:0.6rem;" data-badge="unpublished_tasks">{{ unpublished_tasks_count|default:"0" }}</span>
                 </a>
+                <a id="workforce_sidebar_mob_link_tasks_unassigned" href="{% url 'workforce:dl_list_unassigned' %}" class="wsm__nav-link d-flex align-items-center">
+                    <i class="fa-solid fa-user-clock"></i><span>Unassigned Tasks</span>
+                    <span class="badge ms-auto" style="background:var(--brand-primary);color:#000;font-size:0.6rem;" data-badge="unassigned_tasks">{{ unassigned_tasks_count|default:"0" }}</span>
+                </a>
+                <a id="workforce_sidebar_mob_link_task_automation" href="{% url 'workforce:task_automation_list' %}" class="wsm__nav-link">
+                    <i class="fa-solid fa-shuffle"></i><span>Task Automation</span>
+                </a>
                 <a id="workforce_sidebar_mob_link_tasks_incompleted" href="{% url 'workforce:dl_list_incompleted_details' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-check-double"></i><span>Incompleted List</span>
                 </a>
@@ -562,6 +569,16 @@
 
         <div class="wsm__nav-divider"></div>
 
+        {% comment %}The marketing desk's landing page. /workforce/ redirects a
+        marketing-only account here, so it is their Staff Dashboard and leads the
+        section.{% endcomment %}
+        {% if wf_dept_mkt %}
+        <a id="workforce_sidebar_mob_link_marketing_overview"
+           href="{% url 'workforce:wf_marketing_overview' %}" class="wsm__nav-link">
+            <i class="fa-solid fa-gauge-high"></i><span>Marketing Overview</span>
+        </a>
+        {% endif %}
+
         <!-- CRM Business — the client sales pipeline -->
         {% if wf_dept_mkt %}
         <div id="workforce_sidebar_mob_section_crm_business" class="wsm__nav-section">
@@ -595,7 +612,7 @@
                 <a id="workforce_sidebar_mob_link_crm_stages" href="{% url 'workforce:crm_stages_manage' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-table-columns"></i><span>Board Columns</span>
                 </a>
-                {% if wf_dept_ops %}
+                {% if wf_dept_ops or wf_dept_mkt %}
                 <a id="workforce_sidebar_mob_link_crm_biz_verify" href="{% url 'workforce:business_verification_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-building-circle-check"></i><span>Business Verification</span>
                 </a>
@@ -625,7 +642,7 @@
                 <a id="workforce_sidebar_mob_link_crm_driver_map" href="{% url 'workforce:crm_driver_map' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-map-location-dot"></i><span>Driver Map</span>
                 </a>
-                {% if wf_dept_ops %}
+                {% if wf_dept_ops or wf_dept_mkt %}
                 <a id="workforce_sidebar_mob_link_crm_drv_verify" href="{% url 'workforce:driver_verification_list' %}" class="wsm__nav-link">
                     <i class="fa-solid fa-id-card"></i><span>Driver Verification</span>
                 </a>
@@ -771,8 +788,8 @@
 
         <div class="wsm__nav-divider"></div>
 
-        <!-- Verifications (Operations only — matches parts/sidebar/onboarding.html) -->
-        {% if wf_dept_ops %}
+        <!-- Verifications (Operations + Marketing view-only — matches parts/sidebar/onboarding.html) -->
+        {% if wf_dept_ops or wf_dept_mkt %}
         <div id="workforce_sidebar_mob_section_verifications" class="wsm__nav-section">
             <div class="wsm__nav-header" onclick="toggleMobileSection('verifications')">
                 <div class="wsm__nav-header-title">
@@ -889,6 +906,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Map path prefixes to {section, highlight link} for sub-pages (longer prefixes first)
     var subpageMap = [
+        // Marketing desk landing page
+        {re: /^\/workforce\/marketing\/$/,                        section: null,            link: 'workforce_sidebar_mob_link_marketing_overview'},
         // WhatsApp
         {re: /^\/workforce\/whatsapp\/label-access/,               section: 'wa',            link: 'workforce_sidebar_mob_link_wa_label_access'},
         // Returns

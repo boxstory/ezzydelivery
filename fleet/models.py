@@ -566,6 +566,11 @@ class DriverDocument(models.Model):
         # scan unchanged is re-compared against the stored reading — no AI call.
         from fleet.document_verify import apply_comparison, needs_image_check
 
+        # Writers assign the posted 'YYYY-MM-DD' string, and the comparison below
+        # runs before the database converts it — '2029-07-16' != date(2029, 7, 16)
+        # flagged a correct expiry as "Expiry on image is …".
+        self.document_expiry_date = self._meta.get_field('document_expiry_date').to_python(
+            self.document_expiry_date)
         touched = ['ai_status', 'ai_note', 'verified_at']
         uploaded = any(f and not getattr(f, '_committed', True)
                        for f in (self.document_file, self.document_file_back))

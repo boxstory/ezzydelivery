@@ -59,11 +59,16 @@ class TasksMapPinCardTests(TestCase):
             latitude=Decimal('25.2854'), longitude=Decimal('51.5310'),
             pickup_location=self.pickup, cod_amount=Decimal('150.00'))
 
-    def _task(self, code, status, publish=True, driver=None):
+    def _task(self, code, status, publish=True, driver=None, public=None):
+        # A driverless published task is in the pool only once sent to Public;
+        # default to that so "pool task" reads as before, and pass public=False
+        # for one sitting in staff's Unassigned list.
+        if public is None:
+            public = publish and driver is None
         return delivery_models.DeliveryTask.objects.create(
             order=self._order(code), business=self.business, pickup_location=self.pickup,
             driver=driver, dl_task_number=code, dl_task_status=status,
-            dl_task_publish=publish, dl_task_description='Map test task')
+            dl_task_publish=publish, public_pool=public, dl_task_description='Map test task')
 
     def _get_map(self):
         response = self.client.get('/fleet/tasks/map/')
@@ -119,6 +124,11 @@ class TasksMapPinCardTests(TestCase):
     def test_unpublished_pool_task_is_not_pinned(self):
         """It is not takeable, so a Take button on it would only ever fail."""
         self._task('MAP-UNPUB-1', 'pending', publish=False)
+        self.assertEqual(self._pins(self._get_map()), [])
+
+    def test_unassigned_task_is_not_pinned(self):
+        """Published but not sent to Public — it waits for staff, not for the drivers."""
+        self._task('MAP-UNASSIGNED-1', 'pending', public=False)
         self.assertEqual(self._pins(self._get_map()), [])
 
     def test_the_map_is_closed_to_a_driver_who_is_not_approved(self):

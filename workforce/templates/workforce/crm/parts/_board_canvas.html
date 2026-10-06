@@ -148,6 +148,9 @@
 
           {% include "workforce/crm/parts/_date_facet.html" %}
         </div>
+        {# Carried, not shown: the idle flag arrives from the overview's link and its #}
+        {# chip below removes it; without this any other facet change would drop it. #}
+        {% if request.GET.idle == '1' %}<input type="hidden" name="idle" value="1">{% endif %}
       </form>
 
       <div class="crmb__scope" role="status" aria-live="polite">
@@ -259,10 +262,27 @@
                 <i class="fa-regular fa-calendar"></i>{{ lead.next_followup_at|date:"d M" }}
               </span>
               {% endif %}
+              {% if lead.is_idle %}
+              <span class="crm__idle" title="Owned for {{ idle_days }}+ days with nothing logged by the owner since">
+                <i class="fa-solid fa-hourglass-end" aria-hidden="true"></i>Idle {{ idle_days }}d+
+              </span>
+              {% endif %}
               {% if lead.assigned_to %}
               <span class="crmb__card-avatar" title="{{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }}">
                 {{ lead.assigned_to.get_full_name|default:lead.assigned_to.username|slice:":1"|upper }}
               </span>
+              {% elif can_claim_leads %}
+              {# A plain post, so it works without the board script; the board's click #}
+              {# handler leaves forms alone rather than opening the card. #}
+              <form method="post" action="{% url 'workforce:crm_lead_claim' lead.pk %}" class="crm__take">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ board_path }}">
+                <button type="submit" class="crm__btn crm__btn--sm crm__take-btn"
+                        id="workforce_crm_board_btn_take_{{ lead.pk }}"
+                        title="Assign this lead to me">
+                  <i class="fa-solid fa-hand-holding" aria-hidden="true"></i> Take
+                </button>
+              </form>
               {% endif %}
             </div>
             {# Merged duplicates ride inside the card they were absorbed into, so one #}

@@ -1,0 +1,223 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% comment %}
+Purpose: Staff console for Task Automation rules — which published, unassigned delivery tasks go to which driver or to Public
+Used by: workforce.views.task_automation_list at /workforce/task-automation/
+Notes:   Rules run in priority order when a task lands in Unassigned Tasks; first match wins, no match stays Unassigned. Logic lives in delivery/services/assignment.py.
+{% endcomment %}
+{% block title %}Task Automation - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'workforce/css/task-automation.css' %}?v=20261005d">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="wfpage">
+
+  {% include "workforce/parts/components/_page_header.html" with title="Task Automation" icon="fa-shuffle" subtitle="Rules that hand published tasks to a driver or to Public — first match wins, no match stays in Unassigned Tasks" notes_id="workforce_task_automation_card_notes" %}
+
+  <div class="wfnote" id="workforce_task_automation_card_notes"
+       data-wfnote-src="{% url 'workforce:page_notes' 'workforce_task_automation_card_notes' %}" hidden></div>
+
+  <div class="wfpage__body">
+
+    <div class="wfcard">
+      <div class="tau__toolbar d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="tau__tally d-flex flex-wrap align-items-center gap-1">
+          <span><strong class="wfmono">{{ active_rule_count }}</strong> active rule{{ active_rule_count|pluralize }}</span>
+          <span class="tau__dot">·</span>
+          <a class="tau__tally-link" href="{% url 'workforce:dl_list_unassigned' %}" id="workforce_task_automation_link_unassigned">
+            <strong class="wfmono">{{ unassigned_count }}</strong> waiting in Unassigned
+          </a>
+          <span class="tau__dot">·</span>
+          <a class="tau__tally-link" href="{% url 'workforce:dl_list_unassigned' %}?pool=public" id="workforce_task_automation_link_public">
+            <strong class="wfmono">{{ public_count }}</strong> in Public
+          </a>
+        </div>
+        <form method="post" action="{% url 'workforce:task_automation_apply' %}" class="m-0"
+              id="workforce_task_automation_form_apply">
+          {% csrf_token %}
+          <button type="submit" class="tau__btn" id="workforce_task_automation_btn_apply"
+                  {% if not active_rule_count or not unassigned_count %}disabled{% endif %}
+                  title="Run the active rules over the tasks already waiting in Unassigned">
+            <i class="fa-solid fa-play" aria-hidden="true"></i> Run rules on Unassigned now
+          </button>
+        </form>
+      </div>
+
+      <div class="wfcard__body wfcard__body--flush table-responsive">
+        {% if rules %}
+        <table class="tau__table" id="workforce_task_automation_table_rules">
+          <thead>
+            <tr>
+              <th class="text-end">Order</th>
+              <th>Rule</th>
+              <th>When the task is</th>
+              <th>Then</th>
+              <th class="text-end">Matched</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rule in rules %}
+            <tr class="tau__row{% if not rule.is_active %} tau__row--off{% endif %}{% if edit_rule and edit_rule.pk == rule.pk %} tau__row--editing{% endif %}">
+              <td class="text-end wfmono">{{ rule.priority }}</td>
+              <td><span class="tau__name">{{ rule.name }}</span></td>
+              <td class="tau__when">
+                {% if rule.business %}<span>{{ rule.business.business_name|default:rule.business.business_code }}</span>{% endif %}
+                {% if rule.zone_group %}<span>{{ rule.zone_group.name }}</span>{% endif %}
+                {% if rule.task_leg %}<span>{{ rule.get_task_leg_display }}</span>{% endif %}
+                {% if rule.dl_speed %}<span>{{ rule.dl_speed }}</span>{% endif %}
+                {% if not rule.business and not rule.zone_group and not rule.task_leg and not rule.dl_speed %}<span class="tau__any">Any task</span>{% endif %}
+              </td>
+              <td>
+                {% if rule.action == 'public' %}
+                  <span class="tau__target"><i class="fa-solid fa-users" aria-hidden="true"></i> Public — all drivers</span>
+                {% else %}
+                  <span class="tau__target"><i class="fa-solid fa-motorcycle" aria-hidden="true"></i>
+                    <span class="wfmono">{{ rule.driver.driver_code }}</span> {{ rule.driver.user.get_full_name|default:rule.driver.user.username }}</span>
+                  {% if rule.problem %}
+                  <div class="tau__status tau__status--warn">Skipped — {{ rule.problem }}</div>
+                  {% endif %}
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <span class="wfmono">{{ rule.match_count }}</span>
+                {% if rule.last_matched_at %}<div class="tau__meta">last {{ rule.last_matched_at|date:"d M, H:i" }}</div>{% endif %}
+              </td>
+              <td>
+                {% if rule.is_active %}
+                  <span class="tau__status tau__status--on">On</span>
+                {% else %}
+                  <span class="tau__status tau__status--off">Off</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <div class="d-inline-flex flex-wrap justify-content-end gap-1">
+                  <a href="?edit={{ rule.pk }}#workforce_task_automation_card_form" class="tau__btn tau__btn--sm"
+                     id="workforce_task_automation_btn_edit_{{ rule.pk }}">Edit</a>
+                  <form method="post" action="{% url 'workforce:task_automation_toggle' rule.pk %}" class="m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="tau__btn tau__btn--sm" id="workforce_task_automation_btn_toggle_{{ rule.pk }}">
+                      {% if rule.is_active %}Turn off{% else %}Turn on{% endif %}
+                    </button>
+                  </form>
+                  <form method="post" action="{% url 'workforce:task_automation_delete' rule.pk %}" class="m-0"
+                        data-confirm="Delete the rule &quot;{{ rule.name }}&quot;? Tasks it already routed keep their driver.">
+                    {% csrf_token %}
+                    <button type="submit" class="tau__btn tau__btn--sm tau__btn--danger" id="workforce_task_automation_btn_delete_{{ rule.pk }}">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="tau__empty">
+          No rules yet. Every published task waits in <a href="{% url 'workforce:dl_list_unassigned' %}">Unassigned Tasks</a>
+          until staff assign it — add a rule below to hand some of them out automatically.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="wfcard wfcard--form" id="workforce_task_automation_card_form">
+      <div class="wfcard__header">
+        <i class="fa-solid {% if edit_rule %}fa-pen{% else %}fa-plus{% endif %}" aria-hidden="true"></i>
+        {% if edit_rule %}Edit rule — {{ edit_rule.name }}{% else %}Add a rule{% endif %}
+      </div>
+      <div class="wfcard__body">
+        <form method="post" action="{% url 'workforce:task_automation_list' %}" id="workforce_task_automation_form_rule" novalidate>
+          {% csrf_token %}
+          {% if edit_rule %}<input type="hidden" name="rule_id" value="{{ edit_rule.pk }}">{% endif %}
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger py-2 small">{{ form.non_field_errors|join:" " }}</div>
+          {% endif %}
+
+          <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+              <label class="tau__label" for="{{ form.name.id_for_label }}">Rule name</label>
+              {{ form.name }}
+              {% for e in form.name.errors %}<div class="tau__error">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="tau__label" for="{{ form.priority.id_for_label }}">Order <span class="tau__hint">(lower runs first)</span></label>
+              {{ form.priority }}
+              {% for e in form.priority.errors %}<div class="tau__error">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="d-flex align-items-center gap-2 tau__check">
+                {{ form.is_active }}
+                <label class="m-0" for="{{ form.is_active.id_for_label }}">Rule is on</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="tau__section">When the task is <span class="tau__hint">— leave a field on "Any" to ignore it</span></div>
+          <div class="row g-2">
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="tau__label" for="{{ form.business.id_for_label }}">Client</label>
+              {{ form.business }}
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="tau__label" for="{{ form.zone_group.id_for_label }}">Drop-off zone group</label>
+              {{ form.zone_group }}
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="tau__label" for="{{ form.task_leg.id_for_label }}">Task type</label>
+              {{ form.task_leg }}
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="tau__label" for="{{ form.dl_speed.id_for_label }}">Delivery speed</label>
+              {{ form.dl_speed }}
+            </div>
+          </div>
+
+          <div class="tau__section">Then</div>
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="tau__label" for="{{ form.action.id_for_label }}">Send it to</label>
+              {{ form.action }}
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="tau__label" for="{{ form.driver.id_for_label }}">Driver <span class="tau__hint">(drivers with app access)</span></label>
+              {{ form.driver }}
+              {% for e in form.driver.errors %}<div class="tau__error">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            <button type="submit" class="tau__btn tau__btn--primary" id="workforce_task_automation_btn_save">
+              {% if edit_rule %}Save rule{% else %}Add rule{% endif %}
+            </button>
+            {% if edit_rule %}
+            <a href="{% url 'workforce:task_automation_list' %}" class="tau__btn" id="workforce_task_automation_btn_cancel">Cancel</a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // The driver only matters when the rule assigns to a driver; Public ignores it.
+  var action = document.getElementById('{{ form.action.id_for_label }}');
+  var driver = document.getElementById('{{ form.driver.id_for_label }}');
+  function sync() { if (action && driver) driver.disabled = action.value === 'public'; }
+  if (action) { action.addEventListener('change', sync); sync(); }
+
+  document.querySelectorAll('form[data-confirm]').forEach(function (f) {
+    f.addEventListener('submit', function (e) {
+      if (!window.confirm(f.dataset.confirm)) e.preventDefault();
+    });
+  });
+})();
+</script>
+{% endblock content %}

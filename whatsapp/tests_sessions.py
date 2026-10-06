@@ -348,6 +348,8 @@ class DashboardAccessTests(TestCase):
         from core.models import Profile
         user = User.objects.create_user(username=username, password='x', is_staff=True)
         Profile.objects.create(user=user, first_name=username, is_staff=True, **dept)
+        from whatsapp.models import InboxSessionAccess
+        InboxSessionAccess.objects.create(user=user, session='default')  # inbox number gate
         return user
 
     def test_anonymous_is_sent_to_login(self):

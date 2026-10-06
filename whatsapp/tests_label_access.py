@@ -33,6 +33,8 @@ def make_staff(username, *, mkt=False, ops=False):
     user = User.objects.create_user(username, is_staff=True)
     Profile.objects.create(user=user, first_name='S', last_name='U', phone=11111111, is_staff=True,
                            dept_marketing=mkt, dept_operations=ops)
+    from whatsapp.models import InboxSessionAccess
+    InboxSessionAccess.objects.create(user=user, session='default')  # inbox number gate
     return user
 
 

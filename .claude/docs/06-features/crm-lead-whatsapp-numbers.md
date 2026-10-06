@@ -110,7 +110,21 @@ New workforce routes must be classified in `core/departments.py` or they fail cl
 - **Known unrelated failure**: `crm.tests.ConvertTests.test_convert_creates_pending_business_and_is_idempotent` (2 businesses instead of 1) fails identically at HEAD, before this work.
 - **Run on a fresh test DB** (`--noinput`, not `--keepdb`) when the stage-seed tests fail en masse. The shared `test_ezzy_dl_db` goes stale when other sessions' runs wipe the seeded `LeadStage` rows. Check `pgrep -af "[m]anage.py test"` first.
 
+## Automatic owner link: office number on the form, owner on WhatsApp (2026-10-04)
+
+A business usually fills the pricing form with the office line while the owner chats from their own phone, often as a lid with no phone at all. Phone matching can never join those, so a short reference does (`crm/chat_links.py`):
+
+- **Website first.** The WhatsApp buttons on the quote page and the thank-you page prefill `… (Ref P243-b7ad4a)`; the WhatsApp quick inquiry's message ends `(Ref W<id>-…)`. The six characters are an HMAC of the id keyed on `SECRET_KEY`, so an id cannot be guessed into someone else's lead. `waha_webhook` passes every new inbound 1:1 message to `link_from_message`: a valid reference links that chat to the lead as **Owner** (a lid is stored with its session).
+- **WhatsApp first.** "Send Pricing Link" in the inbox (`crm_wa_send_link`) rewrites `https://ezzydelivery.qa/3pl/pricing/` in the message to `…/3pl/pricing/?wa=<8-char code>` and records a `crm.PricingLinkRef` (chat number, session, who sent it). `/3pl/pricing/` and `/3pl/inquiry/` keep the code in the visitor's session; when the form (or the quick inquiry) creates its lead, `link_from_pricing_ref` links that chat as Owner and stamps the ref `used_at` / `lead`.
+- Either way, `attach_chat_to_lead` also folds any separate open card for that chat into one, with the **older card staying primary** like `auto_merge_duplicate`. It is reversible with Unmerge and logged on the timeline. It never creates a lead.
+
+**Wider duplicate check** (`crm/services.py`): a number counts as the card's phone, 2nd mobile or any phone-shaped linked number (`_cards_with_numbers`). "Add Business Lead" on a chat (`create_lead_from_wa_number`) opens that card instead of creating a second one, linking the chat when it matched on the 2nd mobile. The pricing form's **operation-team number** is matched by its last 8 digits, but only for the lead page's merge **suggestions** (`duplicate_candidates(include_ops=True)`), never for an automatic merge. One owner can run two shops and type the same number into both forms; on production that was #62 "rowad altaqah" vs #69/#70 "Laloshcandy".
+
+Tests: `crm.tests_chat_links` (14).
+
 ## Not built (yet)
+
+- Chats that arrived before the reference existed (16 thank-you-page hand-offs up to 2026-10-04) carried only the generic text. Matching them by time is ambiguous (2–3 enquiries in the same 3 h), so they are left to staff and the merge suggestions.
 
 - No "default send number" per lead. Sending goes to the conversation you pick, or the lead's own phone / first link.
 - No stored FK from a link to the user account. Accounts are looked up live from `Profile`, so they are always current.

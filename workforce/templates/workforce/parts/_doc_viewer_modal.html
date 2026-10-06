@@ -1,26 +1,32 @@
 {% comment %}
-Purpose: The driver-document popup — scan viewer with crop/rotate, number + expiry fields, Submit on change, staff Verify / Undo.
+Purpose: The driver-document popup — scan viewer with wheel zoom and crop/rotate, number + expiry fields ("Use values from image" fills them), Submit / Submit & verify on change, staff Verify / Undo.
 Used by: workforce/crm/parts/_lead_document_modals.html (CRM driver lead) and workforce/driver_detail.html (driver record).
 Notes: Driven by workforce/js/doc_viewer.js; openers carry workforce/parts/_doc_viewer_attrs.html. Styles are crm.css crmdoc__ rules,
        whose tokens only exist inside a .crm wrapper — a page that is not a CRM page must include this inside <div class="crm">.
 {% endcomment %}
 <!-- VIEWER — the scan itself, front/back, with the facts it was filed under -->
 <div class="modal fade" id="workforce_crm_detail_modal_docview" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+  {% comment %} crmdoc__viewer fits the dialog to the window: the scan shrinks into
+     the room the fields and footer leave, so Previous / Next never need a scroll. {% endcomment %}
+  <div class="modal-dialog modal-lg modal-dialog-centered crmdoc__viewer">
     <div class="modal-content crmdoc__modal">
       <div class="modal-header">
         <h5 class="modal-title" id="workforce_crm_detail_h_docview_title">Document</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body d-flex flex-column">
         {% comment %} Two sides, one viewer: the toggle is hidden unless a back
            scan exists, so a single-sided document shows no dead control. {% endcomment %}
         <div class="crmdoc__sides" id="workforce_crm_detail_div_docview_sides" hidden>
           <button type="button" class="crmdoc__side is-active" data-doc-side="front">Front</button>
           <button type="button" class="crmdoc__side" data-doc-side="back">Back</button>
         </div>
+        {% comment %} Mouse wheel zooms the scan at the pointer; drag pans it once zoomed,
+           double-click or the zoom chip puts it back. Crop mode has Cropper's own zoom. {% endcomment %}
         <div class="crmdoc__stage">
-          <img id="workforce_crm_detail_img_docview" src="" alt="Uploaded document scan">
+          <img id="workforce_crm_detail_img_docview" src="" alt="Uploaded document scan" draggable="false">
+          <button type="button" class="crmdoc__zoom" id="workforce_crm_detail_btn_docview_zoom" hidden
+                  title="Reset zoom" aria-label="Reset zoom"></button>
           <p class="crmdoc__stage-empty" id="workforce_crm_detail_p_docview_empty" hidden>
             This side is not an image and cannot be shown here.
           </p>
@@ -52,10 +58,27 @@ Notes: Driven by workforce/js/doc_viewer.js; openers carry workforce/parts/_doc_
             <input type="date" class="form-control form-control-sm" id="workforce_crm_detail_input_docview_expiry">
           </div>
         </div>
+        {% comment %} Copies what the image check read into the two fields above. Staff
+           click it after looking at the scan; nothing is saved until Submit. Hidden
+           when the image gave nothing or the fields already hold the same values. {% endcomment %}
+        <button type="button" class="crm__btn crm__btn--sm mt-2 align-self-start" id="workforce_crm_detail_btn_docuseai" hidden>
+          <i class="fa-solid fa-file-import"></i> Use values from image
+        </button>
         <dl class="crmdoc__facts" id="workforce_crm_detail_dl_docview_facts"></dl>
         <p class="crmdoc__err" id="workforce_crm_detail_p_docview_err" hidden></p>
       </div>
       <div class="modal-footer">
+        {% comment %} Step through the page's documents without closing the popup. JS fills
+           the position and hides the pair when the page has a single document. {% endcomment %}
+        <div class="crmdoc__nav me-auto" id="workforce_crm_detail_div_docview_nav" hidden>
+          <button type="button" class="crm__btn crm__btn--sm" id="workforce_crm_detail_btn_docprev" aria-label="Previous document">
+            <i class="fa-solid fa-chevron-left"></i> Previous
+          </button>
+          <span class="crmdoc__pos" id="workforce_crm_detail_span_docview_pos"></span>
+          <button type="button" class="crm__btn crm__btn--sm" id="workforce_crm_detail_btn_docnext" aria-label="Next document">
+            Next <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
         {% comment %} Staff verification: the fallback when the AI image check cannot read the
            scan. JS shows one of the two, from the row's data-doc-verified. {% endcomment %}
         <button type="button" class="crm__btn crm__btn--sm" id="workforce_crm_detail_btn_docverify" hidden>
@@ -64,8 +87,13 @@ Notes: Driven by workforce/js/doc_viewer.js; openers carry workforce/parts/_doc_
         <button type="button" class="crm__btn crm__btn--sm" id="workforce_crm_detail_btn_docunverify" hidden>
           <i class="fa-solid fa-rotate-left"></i> Undo verification
         </button>
-        <button type="button" class="crm__btn crm__btn--sm crm__btn--primary" id="workforce_crm_detail_btn_docsubmit" hidden>
+        <button type="button" class="crm__btn crm__btn--sm" id="workforce_crm_detail_btn_docsubmit" hidden>
           <i class="fa-solid fa-check"></i> Submit
+        </button>
+        {% comment %} Save the edits, then mark verified — one click for the usual
+           "typed it off the scan, it's right" case. Shows with Submit. {% endcomment %}
+        <button type="button" class="crm__btn crm__btn--sm crm__btn--primary" id="workforce_crm_detail_btn_docsubmitverify" hidden>
+          <i class="fa-solid fa-circle-check"></i> Submit &amp; verify
         </button>
       </div>
     </div>

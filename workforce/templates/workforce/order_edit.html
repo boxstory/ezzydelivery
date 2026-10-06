@@ -37,6 +37,18 @@ Notes: Product item rows save on their own over AJAX; every save writes a diff i
                            hx-swap="outerHTML"
                            hx-push-url="true">Orders</a>
                     </li>
+                    {% if order.business_id %}
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'workforce:wf_orders_all' %}?business={{ order.business_id }}" class="woe__breadcrumb-link"
+                           id="workforce_order_edit_link_business_orders"
+                           title="All orders from {{ order.business.business_name }}"
+                           hx-get="{% url 'workforce:wf_orders_all' %}?business={{ order.business_id }}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">{{ order.business.business_name }}</a>
+                    </li>
+                    {% endif %}
                     <li class="breadcrumb-item">
                         <a href="{% url 'workforce:order_detail' order.id %}" class="woe__breadcrumb-link"
                            hx-get="{% url 'workforce:order_detail' order.id %}"

@@ -341,6 +341,31 @@ class RestrictedChatLabel(models.Model):
         return f'{self.session}:{self.label_name or self.label_id}'
 
 
+class InboxSessionAccess(models.Model):
+    """One WhatsApp number (WAHA session) a staff member may open in the inbox.
+
+    No row = that number is closed to them; super admins open every number and
+    need no rows. Ticked on Staff Roles, enforced on every /waha/wa-chats/
+    endpoint by whatsapp/session_access.py.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='wa_inbox_sessions',
+    )
+    session = models.CharField(max_length=64)
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    granted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('user', 'session')]
+        ordering = ['user_id', 'session']
+
+    def __str__(self):
+        return f'{self.user_id}:{self.session}'
+
+
 class WhatsAppReaction(models.Model):
     """One emoji reaction on a WhatsApp message, by one sender.
 

@@ -297,3 +297,64 @@ class PropagateTests(TestCase):
         with patched(waha), sessions_live('default', 'Ezzy6000', 'FleetAdmin4545'):
             report = chat_labels.propagate('default', CHAT, ['Driver'], [])
         self.assertEqual([r['session'] for r in report], ['Ezzy6000'])
+
+
+class PushCommandTests(TestCase):
+    """manage.py push_wa_chat_labels — the backfill of labels set before the live push, or on a phone."""
+
+    def setUp(self):
+        cache.clear()
+        for session in ('default', 'Ezzy6000'):
+            WhatsAppMessage.objects.create(waha_message_id=f'm-{session}', session=session,
+                                           direction='inbound', from_number=PHONE, body='hi')
+        WhatsAppContact.objects.create(session='default', phone=PHONE, labels=[
+            {'id': '7', 'name': 'Driver', 'colorHex': '#9368cf'},
+            {'id': '3', 'name': 'Unread', 'colorHex': '#99b6c1'}])
+        WhatsAppContact.objects.create(session='Ezzy6000', phone=PHONE, labels=[])
+
+    def run_cmd(self, waha, *extra):
+        from io import StringIO
+
+        from django.core.management import call_command
+        out = StringIO()
+        with patched(waha), sessions_live('default', 'Ezzy6000'):
+            call_command('push_wa_chat_labels', '--no-refresh', *extra, stdout=out, stderr=out)
+        return out.getvalue()
+
+    def test_a_dry_run_writes_nothing(self):
+        waha = FakeWaha(chats={'default': ['7']})
+        out = self.run_cmd(waha)
+        self.assertIn('Ezzy6000 would get +Driver (from default)', out)
+        self.assertEqual(waha.puts, [])
+
+    def test_apply_copies_the_label_and_skips_list_filters(self):
+        waha = FakeWaha(chats={'default': ['7']})
+        self.run_cmd(waha, '--apply')
+        self.assertEqual(waha.puts, [('Ezzy6000', ['13'])])   # Driver only, never Unread
+        self.assertEqual([l['name'] for l in chat_labels.contact_labels('Ezzy6000', PHONE)], ['Driver'])
+
+    def test_it_copies_both_ways(self):
+        WhatsAppContact.objects.filter(session='Ezzy6000').update(labels=[
+            {'id': '13', 'name': 'Driver', 'colorHex': '#9368cf'},
+            {'id': '12', 'name': 'New order', 'colorHex': '#64c4ff'}])
+        waha = FakeWaha(chats={'default': ['7'], 'Ezzy6000': ['13', '12']})
+        waha.labels['Ezzy6000'].append({'id': '12', 'name': 'New order', 'color': 1, 'colorHex': '#64c4ff'})
+        self.run_cmd(waha, '--apply')
+        self.assertEqual(waha.created, [('default', 'New order', 1)])
+        self.assertEqual(waha.puts, [('default', ['7', '90'])])
+
+    def test_labels_limits_the_copy_to_those_names(self):
+        WhatsAppContact.objects.filter(session='Ezzy6000').update(labels=[
+            {'id': '12', 'name': 'New order', 'colorHex': '#64c4ff'}])
+        waha = FakeWaha(chats={'default': ['7'], 'Ezzy6000': ['12']})
+        waha.labels['Ezzy6000'].append({'id': '12', 'name': 'New order', 'color': 1, 'colorHex': '#64c4ff'})
+        self.run_cmd(waha, '--apply', '--labels', 'Drivers')
+        self.assertEqual(waha.created, [])                     # New order not copied to default
+        self.assertEqual(waha.puts, [('Ezzy6000', ['12', '13'])])
+
+    def test_a_number_without_a_conversation_is_left_alone(self):
+        WhatsAppMessage.objects.filter(session='Ezzy6000').delete()
+        waha = FakeWaha(chats={'default': ['7']})
+        out = self.run_cmd(waha, '--apply')
+        self.assertIn('skipped, no conversation', out)
+        self.assertEqual(waha.puts, [])

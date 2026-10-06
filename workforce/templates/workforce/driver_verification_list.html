@@ -77,6 +77,7 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                    title="Clear filters" aria-label="Clear filters">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </a>
+                {% if wf_dept_ops %}
                 <button type="button" class="pg-filter__btn" title="Export CSV" aria-label="Export CSV"
                         data-bs-toggle="modal" data-bs-target="#wfExportModal">
                     <i class="fa-solid fa-file-csv" aria-hidden="true"></i>
@@ -84,6 +85,7 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                 {# Both only appear once cases are ticked — see export-columns.js #}
                 <span class="wfsel__count" data-export-count hidden></span>
                 {% include "workforce/parts/components/_export_selectall.html" with total=page_obj.paginator.count noun="applications" limit=2000 %}
+                {% endif %}
             </div>
         </div>
     </form>
@@ -174,8 +176,10 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
     <div class="dvm__manifest">
         <div class="dvm__header">
             <span class="dvm__pick">
+                {% if wf_dept_ops %}
                 <input type="checkbox" class="form-check-input wfsel__box" data-export-row-all
                        aria-label="Select every application on this page">
+                {% endif %}
             </span>
             <span aria-hidden="true"></span>
             <span>Applicant</span>
@@ -197,9 +201,11 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                 also undo the tick.
                 {% endcomment %}
                 <span class="dvm__pick">
+                    {% if wf_dept_ops %}
                     <input type="checkbox" class="form-check-input wfsel__box" data-export-row
                            value="{{ driver.driver_id }}" onclick="event.stopPropagation()"
                            aria-label="Select {{ driver.user.get_full_name|default:driver.user.email }}">
+                    {% endif %}
                 </span>
                 <span class="dvm__stamp dvm__stamp--{{ driver.profile.verification_status }}">{{ driver.stamp_label }}</span>
                 <span class="dvm__who">
@@ -343,9 +349,11 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                                 <span class="dvm__paper-field">
                                     <span>Uploaded</span><strong>{{ doc.created_at|date:"d M Y" }}</strong>
                                 </span>
+                                {% if wf_dept_ops %}
                                 <a class="dvm__paper-open" href="{% url 'workforce:driver_document_detail' doc.id %}">
                                     <i class="fa-solid fa-arrow-up-right-from-square"></i> Open record
                                 </a>
+                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}
@@ -410,9 +418,11 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                     <a href="{% url 'workforce:view_user_driver_profile' driver.profile.id %}" class="uvl__btn uvl__btn--detail">
                         <i class="fa-solid fa-chart-line"></i> View progress
                     </a>
+                    {% if wf_dept_ops %}
                     <a href="{% url 'workforce:driver_detail' driver.driver_id %}" class="uvl__btn uvl__btn--detail">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i> Full profile
                     </a>
+                    {% endif %}
                     {% if driver.reminder_phone %}
                     <button type="button" class="uvl__btn uvl__btn--wa-chat dvm__wa-btn"
                             data-wa-phone="{{ driver.reminder_phone|whatsapp_number }}"
@@ -423,7 +433,7 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                         <i class="fa-brands fa-whatsapp"></i> WhatsApp
                     </button>
                     {% endif %}
-                    {% if driver.app_incomplete and driver.profile.verification_status != 'verified' %}
+                    {% if wf_dept_ops and driver.app_incomplete and driver.profile.verification_status != 'verified' %}
                     <button type="button" class="uvl__btn uvl__btn--wa dvm__remind-btn"
                             data-driver-id="{{ driver.driver_id }}"
                             {% if not driver.reminder_phone %}disabled title="No WhatsApp or phone number on this application"
@@ -433,6 +443,8 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                     </button>
                     {% endif %}
                     {% if driver.profile.verification_status != 'verified' %}
+                    {# Approve / review / reject are Operations decisions; marketing views the queue only. #}
+                    {% if wf_dept_ops %}
                     <button type="button" class="uvl__btn uvl__btn--verify" data-action="verify"
                         data-profile-id="{{ driver.profile.id }}"
                         data-user-name="{{ driver.user.get_full_name|default:driver.user.email }}"
@@ -452,6 +464,7 @@ Notes: Actions POST to /workforce/verification/<profile_id>/update-status/ via t
                         data-user-name="{{ driver.user.get_full_name|default:driver.user.email }}">
                         <i class="fa-solid fa-xmark"></i> Reject
                     </button>
+                    {% endif %}
                     {% else %}
                     <div class="dvm__verified-note"><i class="fa-solid fa-circle-check"></i> Driver is verified</div>
                     {% endif %}

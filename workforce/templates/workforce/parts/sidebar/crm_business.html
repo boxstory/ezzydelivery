@@ -29,10 +29,9 @@
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_contacts" url=u_crm_contacts icon="fa-solid fa-address-book" label="Contacts" active_names="crm_contacts" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_reports" url=u_crm_reports icon="fa-solid fa-chart-column" label="Reports" active_names="crm_reports" %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_stages" url=u_crm_stages icon="fa-solid fa-table-columns" label="Board Columns" active_names="crm_stages_manage" %}
-      {# The decision queue this pipeline ends in. Operations owns the page, so it #}
-      {# only appears for staff who can actually open it; the highlight stays with #}
-      {# Onboarding, where the queue lives. #}
-      {% if wf_dept_ops %}
+      {# The decision queue this pipeline ends in. Operations decides; marketing #}
+      {# opens it view-only. The highlight stays with Onboarding, where the queue lives. #}
+      {% if wf_dept_ops or wf_dept_mkt %}
       {% include "workforce/parts/sidebar/_link.html" with id="workforce_sidebar_link_crm_biz_verify" url=u_business_verification_list icon="fa-solid fa-building-circle-check" label="Business Verification" %}
       {% endif %}
     </ul>

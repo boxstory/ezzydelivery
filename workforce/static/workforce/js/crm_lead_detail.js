@@ -1,4 +1,4 @@
-/* Purpose: CRM lead detail page actions — stage change, save assignee/follow-up/notes, contact edit, add/delete activity, AI summary, driver-document Add form (the viewer popup is doc_viewer.js).
+/* Purpose: CRM lead detail page actions — stage change, save assignee/follow-up/notes, contact edit, add/delete activity, delete lead, AI summary, driver-document Add form (the viewer popup is doc_viewer.js).
    Used by: workforce/templates/workforce/crm/lead_detail.html (reads window.CRMD_CONFIG for URLs + CSRF).
    Notes: All writes are fetch POST → JSON endpoints in workforce/crm_views.py; re-runs safely after HTMX swaps because it re-reads CRMD_CONFIG per action.
           The document dialogs post instead to the fleet endpoints in workforce/views.py (driver_document_save) — the same ones the driver record uses. */
@@ -163,6 +163,35 @@
       return;
     }
 
+    // Permanently delete this lead. Only rendered for super admins; the view checks again.
+    var deleteBtn = e.target.closest && e.target.closest('#workforce_crm_detail_btn_delete');
+    if (deleteBtn) {
+      var d = deleteBtn.dataset;
+      var acts = Number(d.activities || 0), merged = Number(d.merged || 0);
+      var lines = ['Delete ' + (d.name || 'this lead') + ' permanently?', '',
+                   'Also deleted: ' + acts + ' timeline entr' + (acts === 1 ? 'y' : 'ies')
+                   + (merged ? ' and ' + merged + ' merged card' + (merged === 1 ? '' : 's') : '') + '.'];
+      if (d.driver) lines.push('The driver record stays.');
+      if (d.business) lines.push('Business #' + d.business + ' stays.');
+      lines.push('WhatsApp messages stay in the inbox.', '', 'This cannot be undone.');
+      if (!confirm(lines.join('\n'))) return;
+      deleteBtn.disabled = true;
+      post(cfg().urlDeleteLead, {})
+        .then(function (data) {
+          if (!data.success) {
+            deleteBtn.disabled = false;
+            alert(data.error || 'Could not delete this lead');
+            return;
+          }
+          window.location.href = data.redirect;
+        })
+        .catch(function () {
+          deleteBtn.disabled = false;
+          alert('Network error. Reload the page to see whether the lead was deleted.');
+        });
+      return;
+    }
+
     // Resume automatic filing for a pinned driver card
     var unpinBtn = e.target.closest && e.target.closest('#workforce_crm_detail_btn_unpin');
     if (unpinBtn) {
@@ -188,11 +217,14 @@
       var assignee = document.getElementById('workforce_crm_detail_select_assignee');
       var followup = document.getElementById('workforce_crm_detail_input_followup');
       var notes = document.getElementById('workforce_crm_detail_textarea_notes');
-      post(cfg().urlUpdate, {
-        assigned_to: assignee ? assignee.value : '',
+      var fields = {
         next_followup_at: followup ? followup.value : '',
         notes: notes ? notes.value : ''
-      }).then(function (data) {
+      };
+      // Only a lead manager gets the picker. Posting a blank owner without one would
+      // ask the server to clear the assignment on every Save.
+      if (assignee) fields.assigned_to = assignee.value;
+      post(cfg().urlUpdate, fields).then(function (data) {
         if (data.success) {
           var label = document.getElementById('workforce_crm_detail_span_assignee');
           if (label) label.textContent = data.assigned_to || 'Unassigned';
@@ -601,16 +633,24 @@
 
     var fd = new FormData(form);
     fd.append('csrfmiddlewaretoken', cfg().csrfToken || '');
-    fetch(url, { method: 'POST', body: fd })
-      .then(function (r) { return r.json(); })
+    // The header gets a department refusal back as JSON (with its reason) instead
+    // of a redirect to the dashboard HTML, which r.json() cannot parse.
+    fetch(url, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) {
+        return r.json().catch(function () {
+          throw new Error('The server did not answer properly (HTTP ' + r.status + '). Reload the page and try again.');
+        });
+      })
       .then(function (data) {
         if (data.success) { window.location.reload(); return; }
         if (save) save.disabled = false;
         if (err) { err.textContent = data.error || 'Could not save this document.'; err.hidden = false; }
       })
-      .catch(function () {
+      .catch(function (e) {
         if (save) save.disabled = false;
-        if (err) { err.textContent = 'Could not reach the server. Try again.'; err.hidden = false; }
+        // A TypeError is fetch itself failing (offline); anything else carries our own message.
+        var msg = e && e.name !== 'TypeError' && e.message ? e.message : 'Could not reach the server. Try again.';
+        if (err) { err.textContent = msg; err.hidden = false; }
       });
   });
 

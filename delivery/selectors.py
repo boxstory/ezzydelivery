@@ -1,5 +1,5 @@
-# Purpose: Single source of truth for which pickup tasks a driver may see/claim.
-# Used by: fleet/views.py (Pickup tab list + accept gating), fleet/workforce context processors.
+# Purpose: Single source of truth for which pickup and delivery tasks a driver may see/claim.
+# Used by: fleet/views.py (Pickup tab, Tasks New tab, map, scans, take/accept gating), delivery/views.py, ezzy_api, workforce lists.
 # Notes: Assigned mode = active DriverDirectory link; public pool = all approved drivers.
 #        A pickup also drops out of the pool once its order/delivery leg is finished.
 
@@ -126,6 +126,92 @@ def parcel_claim_block(task, driver):
         f"This parcel is with {holder.driver or 'another driver'} — "
         f"ask them to transfer it to you in the Pickup tab."
     )
+
+
+# =============================================================================
+# DELIVERY POOL — which delivery tasks a driver may see in New and take
+# =============================================================================
+
+#: Statuses a delivery task waits for a driver in — the pool and the Unassigned list.
+POOL_STATUSES = ('pending', 'for_review')
+
+
+def delivery_pool_for(driver, qs=None):
+    """
+    Delivery tasks this driver may see in the PWA New tab and take: published,
+    sent to Public, nobody on them, order not cancelled, and not a parcel that is
+    already in another driver's car. Every surface that lists or claims pool
+    tasks goes through this or delivery_pool_block, so they cannot disagree.
+
+    A published task that is NOT public is in staff's Unassigned list and no
+    driver sees it — it waits for staff or a Task Automation rule.
+    """
+    from delivery.models import DeliveryTask
+    from fleet.access import has_dashboard_access
+
+    if not has_dashboard_access(driver):
+        return DeliveryTask.objects.none()
+    if qs is None:
+        qs = DeliveryTask.objects.all()
+    return exclude_held_parcels(
+        qs.filter(
+            public_pool=True, dl_task_publish=True, driver__isnull=True,
+            dl_task_status__in=POOL_STATUSES,
+        ).exclude(order__order_status='cancelled'),
+        driver,
+    )
+
+
+def delivery_pool_block(task, driver):
+    """
+    Server-side twin of delivery_pool_for for one task, for the take endpoints.
+    Returns (blocked, message) — message is empty when the driver may take it.
+    """
+    from fleet.access import REFUSAL_MESSAGES, dashboard_refusal_code
+
+    reason = dashboard_refusal_code(driver)
+    if reason:
+        return True, REFUSAL_MESSAGES[reason]
+    if task.driver_id:
+        if task.driver_id == driver.pk:
+            return True, 'This task is already yours'
+        return True, 'Another driver already has this task'
+    if not task.dl_task_publish:
+        return True, 'Task is not published to fleet yet'
+    if not task.public_pool:
+        return True, 'This task is not open to all drivers — staff will assign it'
+    if task.order_id and task.order.order_status == 'cancelled':
+        return True, 'Order is cancelled'
+    if task.dl_task_status not in POOL_STATUSES:
+        return True, f'Task is {task.get_dl_task_status_display()} — cannot take it'
+    return parcel_claim_block(task, driver)
+
+
+def unassigned_tasks(qs=None):
+    """
+    Staff's Unassigned list: published, no driver, not sent to Public, still open.
+    Nobody sees these in the app — staff assign them, or a Task Automation rule does.
+    """
+    from delivery.models import DeliveryTask
+
+    if qs is None:
+        qs = DeliveryTask.objects.all()
+    return qs.filter(
+        dl_task_publish=True, driver__isnull=True, public_pool=False,
+        dl_task_status__in=POOL_STATUSES,
+    ).exclude(order__order_status='cancelled')
+
+
+def public_pool_tasks(qs=None):
+    """Tasks sitting in every driver's New tab that nobody has taken yet."""
+    from delivery.models import DeliveryTask
+
+    if qs is None:
+        qs = DeliveryTask.objects.all()
+    return qs.filter(
+        dl_task_publish=True, driver__isnull=True, public_pool=True,
+        dl_task_status__in=POOL_STATUSES,
+    ).exclude(order__order_status='cancelled')
 
 
 # =============================================================================

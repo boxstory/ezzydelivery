@@ -1,6 +1,6 @@
 {% load workforce_tags %}
 {# Purpose: Horizontal rail of the marketing-desk pages, scoped to the desk the current page belongs to. #}
-{# Used by: the CRM consoles (business board, driver board, lists, inbox, contacts, reports, columns) and Pricing Inquiries. #}
+{# Used by: the Marketing Overview, the CRM consoles (business board, driver board, lists, inbox, contacts, reports, columns) and Pricing Inquiries. #}
 {# Notes: wfdesk__ furniture lives in workforce.css. A business page shows only the business pipeline, a driver page #}
 {#        only the driver pipeline — the two desks are worked by different people and the cross-links were noise. #}
 {#        Reports is now per-pipeline and sits inside its own group; only Inbox/Contacts belong to neither desk, #}
@@ -13,6 +13,15 @@
 
 <nav class="wfdesk" aria-label="Marketing desk pages">
   <span class="wfdesk__label">Marketing desk</span>
+
+  {% url 'workforce:wf_marketing_overview' as u_overview %}
+  {% comment %}The desk's landing page belongs to neither pipeline, so it sits ahead
+  of both groups and stays visible on every page that carries this rail.{% endcomment %}
+  <div class="wfdesk__group">
+    {% include "workforce/parts/_marketing_desk_link.html" with url=u_overview label="Overview" names="wf_marketing_overview" %}
+  </div>
+
+  <span class="wfdesk__rule" aria-hidden="true"></span>
 
   {% url 'workforce:crm_leads_board' as u_board %}
   {% url 'workforce:crm_leads_list' as u_list %}

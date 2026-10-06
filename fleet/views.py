@@ -232,15 +232,8 @@ def fleet_dashboard(request):
 
         # Task counts for dashboard summary — mirrors driver_tasks view logic exactly
         from delivery import models as delivery_models
-        from delivery.selectors import exclude_held_parcels
-        new_tasks_count = exclude_held_parcels(
-            delivery_models.DeliveryTask.objects.filter(
-                dl_task_publish=True,
-                driver__isnull=True,
-                dl_task_status__in=['pending', 'for_review'],
-            ).exclude(order__order_status='cancelled'),
-            driver,
-        ).count()
+        from delivery.selectors import delivery_pool_for
+        new_tasks_count = delivery_pool_for(driver).count()
 
         assigned_tasks_count = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
@@ -2375,7 +2368,9 @@ def scan_resolve(request):
                 subtitle = order.business.business_name if order and order.business else ''
                 if order and order.customer_name:
                     details.append({'icon': 'fa-user', 'text': order.customer_name})
-            if pool_task.dl_task_publish and pool_task.dl_task_status in ('pending', 'for_review'):
+            from delivery.selectors import delivery_pool_block
+            blocked, block_msg = delivery_pool_block(pool_task, driver)
+            if not blocked:
                 actions.append({
                     'key': 'take_task',
                     'label': 'Take this task',
@@ -2383,10 +2378,8 @@ def scan_resolve(request):
                     'endpoint': reverse('fleet:fleet_task_scan_take_any'),
                     'payload': {'code': code},
                 })
-            elif not pool_task.dl_task_publish:
-                warnings.append('This task is not published to fleet yet.')
             else:
-                warnings.append(f'Task is {pool_task.get_dl_task_status_display()} — cannot take it.')
+                warnings.append(block_msg.rstrip('.') + '.')
         elif pool_task and pool_task.driver_id:
             warnings.append('Another driver already has this task.')
 
@@ -2839,16 +2832,10 @@ def driver_tasks(request):
     driver_active = (driver.driver_status == 'approved')
 
     if driver_active:
-        from delivery.selectors import exclude_held_parcels
-        # A parcel already collected by another driver is not takeable from the
-        # pool — only its holder and the transfer target still see the task.
-        all_tasks = exclude_held_parcels(base_qs.filter(
-            dl_task_publish=True, driver__isnull=True,
-            dl_task_status__in=['pending', 'for_review'],
-        ).exclude(
-            dl_task_status__in=['delivered', 'partial_delivery', 'cancelled', 'failed',
-                                'returned_to_shipper']
-        ).exclude(order__order_status='cancelled'), driver).order_by('-id')
+        from delivery.selectors import delivery_pool_for
+        # Only tasks staff (or a Task Automation rule) sent to Public. A published
+        # task nobody is on yet sits in staff's Unassigned list, not here.
+        all_tasks = delivery_pool_for(driver, base_qs).order_by('-id')
     else:
         from delivery.models import DeliveryTask as _DT
         all_tasks = _DT.objects.none()
@@ -3122,27 +3109,21 @@ def fleet_task_take_scan(request):
                 'error': f'Scanned code does not match this task. Got: {scanned_code}'
             })
 
-        # Block if task is not published to fleet
-        if not task.dl_task_publish:
-            return JsonResponse({'success': False, 'error': 'Task is not published to fleet yet'})
-
-        # Already taken?
-        if task.dl_task_status not in ('pending', 'for_review'):
-            return JsonResponse({
-                'success': False,
-                'error': f'Task is already {task.get_dl_task_status_display()}'
-            })
-
-        # The parcel may already be in another driver's car (first-mile pickup
-        # collected but not handed over) — scanning the label does not move it.
-        from delivery.selectors import parcel_claim_block
-        blocked, block_msg = parcel_claim_block(task, driver)
+        # Same rule as the New tab: published, sent to Public, nobody on it, and
+        # the parcel not already in another driver's car.
+        from delivery.selectors import POOL_STATUSES, delivery_pool_block
+        blocked, block_msg = delivery_pool_block(task, driver)
         if blocked:
             return JsonResponse({'success': False, 'error': block_msg})
 
         # Assign driver and set to accepted
         from django.db import transaction as db_transaction
         with db_transaction.atomic():
+            # Lock and re-check, so two drivers scanning the same label cannot both win.
+            if not delivery_models.DeliveryTask.objects.select_for_update().filter(
+                    pk=task.pk, driver__isnull=True, public_pool=True,
+                    dl_task_status__in=POOL_STATUSES).exists():
+                return JsonResponse({'success': False, 'error': 'Another driver just took this task'})
             task.driver = driver
             task.dl_task_status = 'accepted'
             task._status_actor = 'driver'  # state machine: pending/for_review → accepted allowed for driver
@@ -3226,21 +3207,15 @@ def fleet_task_scan_take_any(request):
         'order', 'order__business', 'order__pickup_location', 'driver', 'dl_to_address')
 
     # Claimable pool — same rule as the New tab, minus its UI filters
-    from delivery.selectors import exclude_held_parcels, parcel_claim_block
-    task = exclude_held_parcels(base.filter(
-        _code_q(), dl_task_publish=True, driver__isnull=True,
-        dl_task_status__in=['pending', 'for_review'],
-    ).exclude(order__order_status='cancelled'), driver).first()
+    from delivery.selectors import POOL_STATUSES, delivery_pool_block, delivery_pool_for
+    task = delivery_pool_for(driver, base.filter(_code_q())).first()
 
     if not task:
         # Explain why this label is not takeable instead of a blank "not found"
         other = base.filter(_code_q()).first()
         if not other:
             # Loose match — label may carry a prefix/suffix around the order number
-            for cand in exclude_held_parcels(
-                    base.filter(dl_task_publish=True, driver__isnull=True,
-                                dl_task_status__in=['pending', 'for_review']
-                                ).exclude(order__order_status='cancelled'), driver)[:500]:
+            for cand in delivery_pool_for(driver, base)[:500]:
                 order_num = (cand.order.order_number or '').lower() if cand.order else ''
                 if order_num and (order_num in code_l or code_l in order_num):
                     task = cand
@@ -3253,15 +3228,11 @@ def fleet_task_scan_take_any(request):
                 })
             if other.driver_id:
                 return JsonResponse({'success': False, 'error': 'Another driver already took this task'})
-            if not other.dl_task_publish:
-                return JsonResponse({'success': False, 'error': 'Task is not published to fleet yet'})
-            # Held parcel: the task looks free but the goods are in another car.
-            blocked, block_msg = parcel_claim_block(other, driver)
-            if blocked:
-                return JsonResponse({'success': False, 'error': block_msg})
+            # Unpublished, not sent to Public, held by another driver, or closed.
+            blocked, block_msg = delivery_pool_block(other, driver)
             return JsonResponse({
                 'success': False,
-                'error': f'Task is {other.get_dl_task_status_display()} — cannot take it',
+                'error': block_msg if blocked else 'This task cannot be taken right now',
             })
         if not task:
             return JsonResponse({'success': False, 'error': f'No available task matches this code: {code}'})
@@ -3270,7 +3241,7 @@ def fleet_task_scan_take_any(request):
     # but still save through the model so the state machine + signals run.
     with db_transaction.atomic():
         locked = delivery_models.DeliveryTask.objects.select_for_update().filter(
-            pk=task.pk, driver__isnull=True, dl_task_status__in=['pending', 'for_review'],
+            pk=task.pk, driver__isnull=True, public_pool=True, dl_task_status__in=POOL_STATUSES,
         ).first()
         if not locked:
             return JsonResponse({'success': False, 'error': 'Another driver just took this task'})
@@ -4131,12 +4102,8 @@ def fleet_tasks_map(request):
     # so it has no business showing a Take button on the map.
     driver_active = (driver.driver_status == 'approved')
     if driver_active:
-        from delivery.selectors import exclude_held_parcels
-        new_tasks = exclude_held_parcels(base_qs.filter(
-            dl_task_status__in=new_statuses,
-            dl_task_publish=True,
-            driver__isnull=True,
-        ).exclude(order__order_status='cancelled'), driver).order_by(*TASK_SEQ_DESC)
+        from delivery.selectors import delivery_pool_for
+        new_tasks = delivery_pool_for(driver, base_qs).order_by(*TASK_SEQ_DESC)
     else:
         new_tasks = delivery_models.DeliveryTask.objects.none()
 

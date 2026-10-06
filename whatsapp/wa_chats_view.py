@@ -19,11 +19,13 @@ from django.contrib.auth.views import redirect_to_login
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.middleware.csrf import get_token
+from django.shortcuts import redirect
 from django.utils.html import escape
 from django.views.decorators.http import require_http_methods
 
 from . import chat_labels as chat_labels_svc
 from . import label_access
+from . import session_access
 from . import sessions as wa_sessions
 from .models import WhatsAppMessage
 from core.validators import safe_int
@@ -143,14 +145,51 @@ def _is_staff(user):
     return bool(profile and profile.is_staff)
 
 
+def _requested_session(request):
+    """The number a request acts on, read the way the views read it: ?session=,
+    else the POST form or JSON body, else the default number."""
+    raw = request.GET.get('session')
+    if raw is None and request.method == 'POST':
+        if request.content_type in ('multipart/form-data', 'application/x-www-form-urlencoded'):
+            raw = request.POST.get('session')
+        else:
+            try:
+                body = json.loads(request.body.decode('utf-8') or '{}')
+            except (ValueError, UnicodeDecodeError):
+                body = None
+            if isinstance(body, dict):
+                raw = body.get('session')
+    return wa_sessions.normalize(raw)
+
+
+def _session_from_row(view):
+    """Mark a view whose number comes from a stored row, not the request — it
+    runs session_access itself (media/<id>/ carries no ?session=)."""
+    view._session_from_row = True
+    return view
+
+
 def _staff_only(view):
     """Staff login on top of the nginx htpasswd: without knowing who is looking,
-    marketing-only chats could not be kept from anyone."""
+    marketing-only chats could not be kept from anyone. Also the number gate —
+    a staff member opens only the WhatsApp numbers ticked for them on Staff Roles
+    (whatsapp/session_access.py)."""
     @wraps(view)
     def wrapper(request, *args, **kwargs):
-        if _is_staff(request.user):
-            return view(request, *args, **kwargs)
         wants_page = 'text/html' in request.headers.get('Accept', '')
+        if _is_staff(request.user):
+            if getattr(view, '_session_from_row', False):
+                return view(request, *args, **kwargs)
+            session = _requested_session(request)
+            if session_access.can_open(request.user, session):
+                return view(request, *args, **kwargs)
+            if wants_page and request.method == 'GET':
+                landing = session_access.first_open(request.user)
+                if landing:
+                    return redirect(f'{request.path}?session={landing}')
+                return HttpResponse('No WhatsApp number is open to you yet. Ask a super admin to '
+                                    'tick one for you on Staff Roles.', status=403)
+            return JsonResponse({"ok": False, "error": session_access.REFUSAL}, status=403)
         if not request.user.is_authenticated:
             if wants_page:
                 return redirect_to_login(request.get_full_path())
@@ -1080,23 +1119,32 @@ def _chat_info_response(request):
         "leads_visible": chat_panel.can_see_leads(request.user),
         "can_link": chat_panel.can_link_leads(request.user),
         "can_save_docs": chat_panel.can_save_driver_docs(request.user),
+        "can_verify_docs": chat_panel.can_verify_driver_docs(request.user),
         "can_label": chat_panel.can_link_leads(request.user),
     }
     if data["leads_visible"] and data["info"]["kind"] == 'person':
+        from crm import ownership
+
         connected = chat_panel.connected_leads(session, chat_id)
         can_link = data["can_link"]
         stage_cache = {}
+        # Someone else's lead still shows — name, stage and owner, so nobody starts a
+        # second card for the same person — but without the working card's controls.
         data["leads"] = [
-            chat_panel.lead_dict(l, how, detail=can_link, stage_cache=stage_cache, label=label)
+            chat_panel.lead_dict(
+                l, how, detail=can_link and ownership.can_see_lead(request.user, l),
+                stage_cache=stage_cache, label=label)
             for l, how, label in connected
         ]
         if connected and can_link:
-            data["staff"] = chat_panel.staff_options()
+            data["staff"] = chat_panel.staff_options(request.user)
         data["suggested"] = [] if connected else [
             chat_panel.lead_dict(l) for l in chat_panel.suggested_leads(
-                session, chat_id, request.GET.get('name') or '',
+                session, chat_id, request.GET.get('name') or '', user=request.user,
             )
         ]
+        # The platform login(s) on this number, or reached through a connected lead.
+        data["accounts"] = chat_panel.chat_accounts(data["info"]["phone"], connected, request.user)
     return _no_store(data)
 
 
@@ -1119,7 +1167,7 @@ def _lead_search_response(request):
 
     if not chat_panel.can_link_leads(request.user):
         return _no_store({"ok": False, "error": "Sign in with CRM access"}, status=403)
-    leads = chat_panel.search_leads(request.GET.get('q') or '')
+    leads = chat_panel.search_leads(request.GET.get('q') or '', user=request.user)
     return _no_store({"ok": True, "leads": [chat_panel.lead_dict(l) for l in leads]})
 
 
@@ -1153,6 +1201,11 @@ def wa_chats_link_lead(request):
         return _no_store({"ok": False, "error": "Lead not found"}, status=404)
     if lead.merged_into_id:
         lead = lead.merged_into
+    from crm import ownership
+    if not ownership.can_see_lead(request.user, lead):
+        return _no_store({"ok": False, "error": f"Lead #{lead.pk} belongs to "
+                          f"{ownership.user_label(lead.assigned_to)} — only they or a lead manager can link chats to it."},
+                         status=403)
     session = wa_sessions.normalize(data.get('session'))
     if label_access.chat_hidden(request.user, session, chat_id):
         return _refuse_hidden()
@@ -1244,6 +1297,11 @@ def wa_chats_set_labels(request):
         [by_name.get(i, '') for i in sorted(remove)],
         actor=str(request.user),
     )
+    # The mirror still runs on every number (a label belongs to the contact), but
+    # the note only names numbers this person may open.
+    open_numbers = session_access.allowed(request.user)
+    if open_numbers is not None and isinstance(sync, list):
+        sync = [r for r in sync if isinstance(r, dict) and r.get('session') in open_numbers]
 
     # `ids` is the set WhatsApp now holds, because we just wrote it. Reading the
     # chat back here is not safe: WAHA can still answer with the pre-PUT set for
@@ -1260,6 +1318,63 @@ def wa_chats_set_labels(request):
          "colorHex": (by_id.get(i) or {}).get('colorHex') or ''}
         for i in ids if i in shown
     ]})
+
+
+@_staff_only
+@require_http_methods(["POST"])
+def wa_chats_create_label(request):
+    """Create a new WhatsApp label on this number, from the chat panel.
+
+    A label belongs to the whole number, not to the chat it was made from, so
+    this is narrower than setting labels: marketing and super admins only. The
+    new label is not applied here — the browser ticks it and the ordinary
+    "Save to WhatsApp" puts it on the chat, so one path writes to a chat.
+    """
+    if not label_access.can_see_all(request.user):
+        return _no_store({"ok": False,
+                          "error": "Only marketing staff and super admins can create a label."}, status=403)
+    try:
+        data = json.loads(request.body.decode('utf-8') or '{}')
+    except (ValueError, UnicodeDecodeError):
+        return _no_store({"ok": False, "error": "invalid json"}, status=400)
+    if not isinstance(data, dict):
+        return _no_store({"ok": False, "error": "body must be object"}, status=400)
+    if not wa_sessions.is_valid(data.get('session')):
+        return _no_store({"ok": False, "error": "invalid session"}, status=400)
+    session = data['session'].strip()
+
+    name = ' '.join(str(data.get('name') or '').split())[:100]
+    if not name:
+        return _no_store({"ok": False, "error": "Give the label a name."}, status=400)
+    color = safe_int(data.get('color'), default=chat_labels_svc.FALLBACK_COLOR, minimum=0)
+    if color >= len(chat_labels_svc.PALETTE):
+        color = chat_labels_svc.FALLBACK_COLOR
+
+    known = chat_labels_svc.session_labels(session)
+    if known is None:
+        return _no_store({"ok": False, "error": "Could not read this number's labels from WhatsApp."}, status=502)
+    # Already there under this name (or its plural): hand it back so the panel
+    # ticks it instead of making WhatsApp hold two labels that mean one thing.
+    existing = chat_labels_svc.find_label(known, name)
+    if existing is not None:
+        return _no_store({"ok": True, "existing": True, "label": {
+            "id": str(existing.get('id')), "name": existing.get('name') or '',
+            "colorHex": existing.get('colorHex') or ''}})
+
+    # WhatsApp holds at most 20 labels per number and the built-in ones count,
+    # so say that plainly instead of passing back a bare 422.
+    if len(known) >= chat_labels_svc.MAX_LABELS:
+        return _no_store({"ok": False, "error": (
+            f"This number already has WhatsApp's maximum of {chat_labels_svc.MAX_LABELS} labels — "
+            "delete one in WhatsApp first.")}, status=400)
+
+    row, refused = chat_labels_svc.create_label_detail(session, name, color=color)
+    if row is None:
+        return _no_store({"ok": False, "error": refused}, status=502)
+    logger.info("wa labels: %s created %r on %s as id %s", request.user, name, session, row.get('id'))
+    return _no_store({"ok": True, "existing": False, "label": {
+        "id": str(row.get('id')), "name": row.get('name') or name,
+        "colorHex": row.get('colorHex') or chat_labels_svc.PALETTE[color]}})
 
 
 @_staff_only
@@ -1292,6 +1407,11 @@ def wa_chats_save_doc(request):
     lead = connected.get(lead_id)
     if not lead or lead.category != Lead.CATEGORY_DRIVER or not lead.driver_id:
         return _no_store({"ok": False, "error": "This chat has no connected driver lead with a driver profile."}, status=400)
+    from crm import ownership
+    if not ownership.can_see_lead(request.user, lead):
+        return _no_store({"ok": False, "error": f"Lead #{lead.pk} belongs to "
+                          f"{ownership.user_label(lead.assigned_to)} — only they or a lead manager can file to it."},
+                         status=403)
     msg = chat_panel._chat_rows(session, chat_id).filter(
         pk=safe_int(data.get('msg_id'), default=0, minimum=0)).first()
     if not msg:
@@ -1518,6 +1638,7 @@ def wa_chats_avatar(request):
 
 
 @_staff_only
+@_session_from_row
 @require_http_methods(["GET"])
 def wa_chats_media(request, msg_id):
     """Stream one stored message's attachment to the inbox UI.
@@ -1547,6 +1668,9 @@ def wa_chats_media(request, msg_id):
     from workforce.crm_views import _stream_wa_media
 
     msg = get_object_or_404(WhatsAppMessage, pk=msg_id)
+    # The URL carries no ?session=, so the number gate runs on the row itself.
+    if not session_access.can_open(request.user, msg.session):
+        raise Http404
     if not label_access.can_see_all(request.user):
         try:
             hidden = label_access.restricted_identifiers(msg.session)
@@ -1629,11 +1753,14 @@ def _render_page(request):
     html = (
         _CHATS_HTML
         .replace('%SESSION_LABEL%', escape(label))
-        .replace('%SESSION_TABS%', wa_sessions.render_tabs(session, request.path, always=True))
+        .replace('%SESSION_TABS%', wa_sessions.render_tabs(session, request.path, always=True,
+                                                           only=session_access.allowed(request.user)))
         .replace('%SESSION_HEALTH_LINK%', _session_health_link(request.user))
         .replace('%SESSION%', session)
         .replace('%CSRF%', get_token(request))
         .replace('%LABEL_RULES%', _label_rules_token(request.user, session))
+        .replace('%CAN_MAKE_LABEL%', 'true' if label_access.can_see_all(request.user) else 'false')
+        .replace('%LABEL_COLORS%', json.dumps(chat_labels_svc.PALETTE))
     )
     resp = HttpResponse(html, content_type='text/html; charset=utf-8')
     # Voice notes record from the microphone, which the site-wide policy
@@ -2187,6 +2314,9 @@ body {
 }
 .wa-edit__ta:focus { border-color: var(--wa-brand); }
 .wa-edit__note { font-size: 0.75rem; color: var(--wa-muted); margin-top: 0.375rem; }
+/* "Send reminder" preview: the whole multi-line reminder visible before it goes. */
+.wa-remind { width: min(30rem, calc(100vw - 2rem)); }
+.wa-remind__ta { min-height: 18rem; }
 
 /* Chat list: marked-unread dot and the Archived tag. */
 .wa-row__unread--dot { min-width: 0.75rem; width: 0.75rem; height: 0.75rem; padding: 0; }
@@ -2390,6 +2520,16 @@ body {
 .wa-wlabels--view .wa-wlabels__row { cursor: default; }
 .wa-wlabels--view input { display: none; }
 .wa-wlabels__row[hidden], .wa-wlabels[hidden], .wa-wlabels__bar[hidden], .wa-wlabels__edit[hidden], .wa-btn[hidden] { display: none; }
+.wa-mk { margin-top: 0.5rem; }
+.wa-mk__form { display: flex; align-items: center; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.375rem; }
+.wa-mk__name { flex: 1 1 9rem; min-width: 0; }
+.wa-mk__swatches { display: flex; flex-wrap: wrap; gap: 0.25rem; flex: 1 1 100%; }
+.wa-mk__sw {
+  width: 1rem; height: 1rem; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15);
+  padding: 0; cursor: pointer; flex: 0 0 auto;
+}
+.wa-mk__sw[aria-pressed="true"] { outline: 2px solid var(--wa-brand); outline-offset: 2px; }
+.wa-mk[hidden], .wa-mk__form[hidden] { display: none; }
 .wa-wlabels__edit { flex: 0 0 auto; margin-left: auto; }
 .wa-note--warn { color: #8a5a00; }
 /* Working card for a connected lead — edit stage, owner, follow-up, notes in place. */
@@ -2447,6 +2587,52 @@ body {
 .wa-nums__acct { color: var(--wa-muted); border: 0.0625rem solid var(--wa-border); border-radius: 0.25rem; padding: 0 0.3125rem; }
 .wa-nums__open { flex: none; padding: 0.0625rem 0.5rem; font-size: 0.6875rem; line-height: 1.4; }
 .wa-lead-search { margin-top: 0.5rem; }
+/* Platform account card — the user / business on this number. Reuses the lead card frame. */
+.wa-acct__user { color: var(--wa-muted-2); font-size: 0.75rem; overflow-wrap: anywhere; }
+/* Account card closed to one line; the name gives way (ellipsis) before the flags do. */
+.wa-acct__name { flex: 0 1 auto; min-width: 0; font-weight: 600; color: #111b21; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-acct--open .wa-acct__name { white-space: normal; overflow-wrap: anywhere; }
+.wa-acct__sub { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 0.0625rem dashed var(--wa-border); font-size: 0.75rem; }
+.wa-acct__subtop { display: flex; align-items: center; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
+.wa-acct__subname { font-weight: 600; color: #111b21; overflow-wrap: anywhere; }
+.wa-acct__sub .wa-lead__meta { margin-top: 0.125rem; }
+.wa-acct__sub .wa-lead__foot { margin-top: 0.375rem; }
+/* Account + labels strips: minimal height — tight padding and a hairline
+   between them instead of the grey band. */
+.wa-info__sec--tight { padding: 0.5rem 0.875rem; }
+.wa-info__sec--tight .wa-info__sec-title { margin-bottom: 0.25rem; }
+.wa-info__sec--joined { border-bottom: 0.0625rem solid var(--wa-border); }
+.wa-info__sec-title[hidden] { display: none; }
+/* Account: no heading. Line 1 = user icon, name, roles, Verified / Verification;
+   then one indented line per business / driver record with its Open button.
+   The caret opens the details underneath and frames the card. */
+.wa-acct { font-size: 0.8125rem; }
+.wa-acct + .wa-acct { margin-top: 0.5rem; }
+.wa-acct--open {
+  border: 0.0625rem solid var(--wa-border);
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.625rem 0.5rem;
+}
+.wa-acct__line, .wa-acct__row { display: flex; align-items: center; gap: 0.375rem; min-width: 0; }
+.wa-acct__row { margin-top: 0.375rem; padding-left: 0.875rem; }
+.wa-acct__toggle {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  flex: 0 1 auto; min-width: 2.75rem;
+  padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.wa-acct__toggle::before { content: '\25B8'; flex: none; color: var(--wa-muted); font-size: 0.75rem; }
+.wa-acct__toggle[aria-expanded="true"]::before { content: '\25BE'; }
+.wa-acct__toggle:hover .wa-acct__name { text-decoration: underline; }
+.wa-acct__icon { display: inline-flex; flex: none; color: var(--wa-muted); }
+.wa-acct__icon svg { width: 1rem; height: 1rem; }
+.wa-acct__rowname { flex: 0 1 auto; min-width: 0; color: #3b4a54; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-acct__line .wa-flag, .wa-acct__row .wa-flag { flex: none; }
+.wa-acct__end { flex: none; margin-left: auto; }
+a.wa-acct__end { text-decoration: none; padding: 0.125rem 0.5rem; }
+.wa-acct__body { margin-top: 0.5rem; }
+.wa-acct__body[hidden] { display: none; }
+.wa-acct__none { display: flex; align-items: center; gap: 0.375rem; }
 .wa-lead-search .wa-search { margin-bottom: 0.375rem; }
 
 .wa-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.625rem; }
@@ -2509,7 +2695,8 @@ body {
 }
 .wa-lb__btn:hover { background: rgba(255,255,255,0.1); }
 .wa-lb__close { font-size: 1.5rem; line-height: 1; }
-.wa-lb__stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; padding: 0 3.5rem 1rem; }
+.wa-lb__body { flex: 1; min-height: 0; display: flex; }
+.wa-lb__stage { flex: 1; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; position: relative; padding: 0 3.5rem 1rem; }
 .wa-lb__stage img, .wa-lb__stage video { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 0.25rem; }
 .wa-lb__caption { text-align: center; font-size: 0.8125rem; color: #d1d7db; padding: 0 1rem 1rem; white-space: pre-wrap; }
 .wa-lb__nav {
@@ -2530,6 +2717,39 @@ body {
   padding: 0.25rem 0.375rem; font: inherit; font-size: 0.75rem; max-width: 12rem;
 }
 .wa-lb__sel option { color: #111b21; }
+/* Driver-profile document in the viewer: number / expiry / image check beside the scan. */
+.wa-lb__doc {
+  flex: none; width: 20rem; overflow-y: auto; padding: 0 1rem 1rem;
+  border-left: 0.0625rem solid rgba(255,255,255,0.12);
+  display: flex; flex-direction: column; gap: 0.625rem; font-size: 0.8125rem;
+}
+.wa-lb__doc[hidden], .wa-lb__doc-fields[hidden], .wa-lb__err[hidden], .wa-lb__note[hidden], .wa-lb__btn[hidden] { display: none; }
+.wa-lb__doc-title { font-weight: 600; font-size: 0.9375rem; }
+.wa-lb__doc-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.wa-lb__lbl { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; font-size: 0.6875rem; color: #8696a0; text-transform: uppercase; letter-spacing: 0.04em; }
+.wa-lb__inp {
+  min-width: 0; background: rgba(255,255,255,0.08); color: #e9edef; color-scheme: dark;
+  border: 0.0625rem solid rgba(255,255,255,0.2); border-radius: 0.375rem;
+  padding: 0.375rem 0.5rem; font: inherit; font-size: 0.8125rem; text-transform: none; letter-spacing: normal;
+}
+.wa-lb__inp:focus { outline: none; border-color: var(--wa-brand); }
+.wa-lb__inp[readonly] { opacity: 0.7; }
+.wa-lb__btn--line { border: 0.0625rem solid rgba(255,255,255,0.25); }
+.wa-lb__btn--primary { background: var(--wa-brand); color: #fff; }
+.wa-lb__btn--primary:hover { background: var(--wa-brand-hover); }
+.wa-lb__btn:disabled { opacity: 0.5; cursor: wait; }
+#wa-lb-doc-useai { align-self: flex-start; }
+.wa-lb__facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.3125rem 0.75rem; }
+.wa-lb__facts dt { font-size: 0.6875rem; color: #8696a0; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 0.0625rem; }
+.wa-lb__facts dd { margin: 0; color: #e9edef; overflow-wrap: anywhere; }
+.wa-lb__err { margin: 0; color: #f15c6d; font-weight: 600; }
+.wa-lb__note { margin: 0; color: #aebac1; font-size: 0.75rem; }
+.wa-lb__doc-acts { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+@media (max-width: 48rem) {
+  .wa-lb__body { flex-direction: column; }
+  .wa-lb__stage { padding: 0 3.5rem 0.5rem; }
+  .wa-lb__doc { width: auto; max-height: 45vh; border-left: 0; border-top: 0.0625rem solid rgba(255,255,255,0.12); padding-top: 0.75rem; }
+}
 /* Driver lead: documents on the driver's profile, against the application rule. */
 .wa-docs__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: 0.375rem; margin-top: 0.375rem; }
 .wa-docs__tile { border: 0.0625rem solid var(--wa-border); border-radius: 0.375rem; padding: 0.3125rem; min-width: 0; }
@@ -2651,7 +2871,8 @@ body {
     </div>
     <div class="wa-info__body">
       <section class="wa-info__sec wa-info__sec--who" id="wa-info-who"></section>
-      <section class="wa-info__sec" id="wa-info-labels" hidden></section>
+      <section class="wa-info__sec wa-info__sec--tight wa-info__sec--joined" id="wa-info-accounts" hidden></section>
+      <section class="wa-info__sec wa-info__sec--tight" id="wa-info-labels" hidden></section>
       <section class="wa-info__sec" id="wa-info-leads"></section>
       <section class="wa-info__sec">
         <div class="wa-info__sec-title">Media, links &amp; docs</div>
@@ -2677,9 +2898,30 @@ body {
     <a class="wa-lb__btn" id="wa-lb-dl" href="#" download>Download</a>
     <button class="wa-lb__btn wa-lb__close" id="wa-lb-close" type="button" aria-label="Close">&times;</button>
   </div>
-  <div class="wa-lb__stage" id="wa-lb-stage">
-    <button class="wa-lb__nav wa-lb__nav--prev" id="wa-lb-prev" type="button" aria-label="Previous">&#8249;</button>
-    <button class="wa-lb__nav wa-lb__nav--next" id="wa-lb-next" type="button" aria-label="Next">&#8250;</button>
+  <div class="wa-lb__body">
+    <div class="wa-lb__stage" id="wa-lb-stage">
+      <button class="wa-lb__nav wa-lb__nav--prev" id="wa-lb-prev" type="button" aria-label="Previous">&#8249;</button>
+      <button class="wa-lb__nav wa-lb__nav--next" id="wa-lb-next" type="button" aria-label="Next">&#8250;</button>
+    </div>
+    <!-- A driver-profile document photo: the same number / expiry / image-check
+         panel as the CRM document popup, posting to the same workforce endpoints. -->
+    <aside class="wa-lb__doc" id="wa-lb-doc" aria-label="Document details" hidden>
+      <div class="wa-lb__doc-title" id="wa-lb-doc-title">Document</div>
+      <div class="wa-lb__doc-fields" id="wa-lb-doc-fields">
+        <label class="wa-lb__lbl">Number<input class="wa-lb__inp" id="wa-lb-doc-no" maxlength="100" autocomplete="off"></label>
+        <label class="wa-lb__lbl">Expiry<input class="wa-lb__inp" id="wa-lb-doc-exp" type="date"></label>
+      </div>
+      <button class="wa-lb__btn wa-lb__btn--line" id="wa-lb-doc-useai" type="button" hidden>Use values from image</button>
+      <dl class="wa-lb__facts" id="wa-lb-doc-facts"></dl>
+      <p class="wa-lb__err" id="wa-lb-doc-err" hidden></p>
+      <p class="wa-lb__note" id="wa-lb-doc-ro" hidden>Your account can view these details but not change them.</p>
+      <div class="wa-lb__doc-acts">
+        <button class="wa-lb__btn wa-lb__btn--line" id="wa-lb-doc-verify" type="button" hidden>Mark verified</button>
+        <button class="wa-lb__btn wa-lb__btn--line" id="wa-lb-doc-unverify" type="button" hidden>Undo verification</button>
+        <button class="wa-lb__btn wa-lb__btn--line" id="wa-lb-doc-submit" type="button" hidden>Submit</button>
+        <button class="wa-lb__btn wa-lb__btn--primary" id="wa-lb-doc-submitverify" type="button" hidden>Submit &amp; verify</button>
+      </div>
+    </aside>
   </div>
   <div class="wa-lb__caption" id="wa-lb-caption"></div>
 </dialog>
@@ -2698,6 +2940,14 @@ body {
     <div class="wa-edit__note">WhatsApp allows edits for 15 minutes after sending. The customer sees "Edited".</div>
   </div>
   <div class="wa-modal__foot wa-modal__foot--split"><span></span><button class="wa-btn" id="wa-edit-save" type="button">Save</button></div>
+</dialog>
+<dialog class="wa-modal wa-remind" id="wa-remind" aria-label="Send reminder">
+  <div class="wa-modal__hdr"><span id="wa-remind-title">Send reminder</span><button class="wa-modal__close" id="wa-remind-close" type="button" aria-label="Close">&times;</button></div>
+  <div class="wa-modal__body">
+    <textarea class="wa-edit__ta wa-remind__ta" id="wa-remind-ta" aria-label="Reminder message"></textarea>
+    <div class="wa-edit__note">Sends in this chat like a typed message — the same reminder the CRM lead page offers. Edit it first if needed.</div>
+  </div>
+  <div class="wa-modal__foot wa-modal__foot--split"><span></span><button class="wa-btn" id="wa-remind-send" type="button">Send</button></div>
 </dialog>
 <dialog class="wa-modal wa-pick" id="wa-pick" aria-label="Choose a photo from this chat">
   <div class="wa-modal__hdr"><span id="wa-pick-title">Choose a photo</span><button class="wa-modal__close" id="wa-pick-close" type="button" aria-label="Close">&times;</button></div>
@@ -2736,6 +2986,10 @@ body {
   // The rules token changes when marketing-only labels change, so a cached map
   // never outlives the rules it was filtered under.
   var LABEL_RULES = '%LABEL_RULES%';
+  // Making a label changes the list for everyone on this number, so it is
+  // marketing + super-admin only; the server gates it again on POST.
+  var CAN_MAKE_LABEL = %CAN_MAKE_LABEL%;
+  var LABEL_COLORS = %LABEL_COLORS%;
   var LABEL_CACHE_KEY = 'wa_label_map_v3:' + SESSION + ':' + LABEL_RULES;
   var LABEL_CACHE_TS_KEY = 'wa_label_map_v3_ts:' + SESSION + ':' + LABEL_RULES;
   var LABEL_TTL_MS = 24 * 60 * 60 * 1000;
@@ -4637,12 +4891,16 @@ body {
       return;
     }
     if (!txt) return;
-
-    // Draw the bubble now with a pending clock; the server round trip can sit
-    // behind slow inbox polls, and the writer should not wait on it to type on.
     ta.value = '';
     var reply = state.replyTo;
     cancelReply();
+    postText(txt, reply);
+  }
+
+  // Draw the bubble now with a pending clock; the server round trip can sit
+  // behind slow inbox polls, and the writer should not wait on it to type on.
+  // Shared by the composer and "Send reminder" so both send the same way.
+  function postText(txt, reply) {
     var row = appendOutgoingLocal(txt, reply);
     var tm = row.querySelector('.wa-bubble__time');
     var sendBody = { to: state.activeChatId, text: txt, session: SESSION };
@@ -4760,13 +5018,15 @@ body {
     if (!chatId) return;
     panel.loadedFor = chatId;
     $('wa-info-who').innerHTML = '<div class="wa-empty">Loading…</div>';
+    $('wa-info-accounts').hidden = true;
     $('wa-info-leads').innerHTML = '';
     $('wa-info-labels').hidden = true;  // the previous chat's ticks must not show
     $('wa-media-tabs').innerHTML = '';
     $('wa-media-body').innerHTML = '';
     var url = wq('/waha/wa-chats/?info=1&chatId=' + encodeURIComponent(chatId) +
                  '&name=' + encodeURIComponent(state.activeChatName || ''));
-    fetch(url, { credentials: 'same-origin' })
+    // Returned so the media viewer can repaint its document panel once fresh data lands.
+    return fetch(url, { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (state.activeChatId !== chatId) return;
@@ -4774,6 +5034,7 @@ body {
         panel.data = d;
         panel.counts = d.media_counts || {};
         renderWho(d);
+        renderAccounts(d);
         renderWaLabels(d);
         renderLeads(d);
         var first = MEDIA_TABS.filter(function (t) { return panel.counts[t[0]] > 0; })[0];
@@ -4820,23 +5081,25 @@ body {
     var current = new Set(chatLabels(chatId).map(function (l) { return String(l.id); }));
     var touched = false;
     var savedHere = false;  // once saved, the panel's live read must not undo it
-    visibleLabels(current).forEach(function (lb) {
+    function addRow(lb, checked) {
       var row = el('label', 'wa-wlabels__row');
       var cb = el('input');
       cb.type = 'checkbox';
       cb.value = lb.id;
-      cb.checked = current.has(lb.id);
+      cb.checked = !!checked;
       cb.disabled = !d.can_label;
       var dot = el('span', 'wa-label-chip__dot');
       dot.style.background = lb.colorHex || '#8696a0';
       row.appendChild(cb); row.appendChild(dot); row.appendChild(el('span', null, lb.name));
       list.appendChild(row);
-    });
+      return cb;
+    }
+    visibleLabels(current).forEach(function (lb) { addRow(lb, current.has(lb.id)); });
     function boxes() { return Array.prototype.slice.call(list.querySelectorAll('input')); }
     function setTicks() { boxes().forEach(function (cb) { cb.checked = current.has(cb.value); }); }
     // A labelled chat shows only its labels; "Change" opens the full list.
     var editing = !current.size;
-    var editBtn = null, bar = null, cancelBtn = null;
+    var editBtn = null, bar = null, cancelBtn = null, make = null;
     function applyMode() {
       if (!current.size) editing = true;
       var view = !editing || !d.can_label;
@@ -4849,6 +5112,7 @@ body {
       title.hidden = view && !!current.size;
       if (editBtn) editBtn.hidden = editing;
       if (bar) bar.hidden = !editing;
+      if (make) make.hidden = !editing;
       if (cancelBtn) cancelBtn.hidden = !current.size;
     }
 
@@ -4883,6 +5147,97 @@ body {
     box.appendChild(bar);
     var saved = el('div', 'wa-note');
     box.appendChild(saved);
+
+    // A label this number does not have yet. It is created on WhatsApp straight
+    // away — a label belongs to the number — and then simply ticked, so the one
+    // "Save to WhatsApp" below is still what puts it on this chat.
+    if (CAN_MAKE_LABEL) {
+      make = el('div', 'wa-mk');
+      var openBtn = el('button', 'wa-btn wa-btn--sm wa-btn--ghost', '+ New label');
+      openBtn.type = 'button';
+      var form = el('div', 'wa-mk__form');
+      form.hidden = true;
+      var name = el('input', 'wa-search wa-mk__name');
+      name.type = 'text';
+      name.placeholder = 'Label name';
+      name.maxLength = 100;
+      var swatches = el('div', 'wa-mk__swatches');
+      var color = LABEL_COLORS.length > 4 ? 4 : 0;
+      LABEL_COLORS.forEach(function (hex, i) {
+        var sw = el('button', 'wa-mk__sw');
+        sw.type = 'button';
+        sw.style.background = hex;
+        sw.title = hex;
+        sw.setAttribute('aria-pressed', i === color ? 'true' : 'false');
+        sw.addEventListener('click', function () {
+          color = i;
+          Array.prototype.forEach.call(swatches.children, function (other, j) {
+            other.setAttribute('aria-pressed', j === i ? 'true' : 'false');
+          });
+        });
+        swatches.appendChild(sw);
+      });
+      var makeBtn = el('button', 'wa-btn wa-btn--sm', 'Create');
+      makeBtn.type = 'button';
+      var dropBtn = el('button', 'wa-btn wa-btn--sm wa-btn--ghost', 'Cancel');
+      dropBtn.type = 'button';
+      var makeMsg = el('span', 'wa-note');
+      form.appendChild(name); form.appendChild(makeBtn); form.appendChild(dropBtn);
+      form.appendChild(makeMsg); form.appendChild(swatches);
+      make.appendChild(openBtn); make.appendChild(form);
+      box.appendChild(make);
+
+      function showForm(open) {
+        form.hidden = !open;
+        openBtn.hidden = open;
+        makeMsg.textContent = '';
+        if (open) name.focus();
+      }
+      openBtn.addEventListener('click', function () { showForm(true); });
+      dropBtn.addEventListener('click', function () { name.value = ''; showForm(false); });
+      name.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); makeBtn.click(); }
+      });
+      makeBtn.addEventListener('click', function () {
+        var wanted = name.value.trim();
+        if (!wanted) { makeMsg.textContent = 'Give the label a name.'; name.focus(); return; }
+        makeBtn.disabled = true; makeBtn.textContent = 'Creating…'; makeMsg.textContent = '';
+        fetch('/waha/wa-chats/create-label/', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+          body: JSON.stringify({ session: SESSION, name: wanted, color: color }),
+        })
+          .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'HTTP ' + r.status }; }); })
+          .then(function (j) {
+            makeBtn.disabled = false; makeBtn.textContent = 'Create';
+            if (!j.ok || !j.label) { makeMsg.textContent = j.error || 'Could not create it'; return; }
+            var lb = j.label;
+            if (!state.labels.some(function (x) { return String(x.id) === lb.id; })) {
+              state.labels.push(lb);
+              if (!state.labelMap) state.labelMap = {};
+              if (!state.labelMap[lb.id]) state.labelMap[lb.id] = new Set();
+              writeLabelCache(state.labelMap, state.labels);
+              populateLabelSelect();  // it can be filtered on straight away
+            }
+            var existing = boxes().filter(function (cb) { return cb.value === lb.id; })[0];
+            if (existing) existing.checked = true;
+            else addRow(lb, true);
+            touched = true;
+            btn.disabled = false;   // "Save to WhatsApp" now has something to do
+            name.value = '';
+            showForm(false);
+            saved.textContent = '';
+            msg.textContent = j.existing
+              ? '“' + lb.name + '” already exists on this number — ticked it.'
+              : '“' + lb.name + '” created. Save to put it on this chat.';
+          })
+          .catch(function () {
+            makeBtn.disabled = false; makeBtn.textContent = 'Create';
+            makeMsg.textContent = 'Network error';
+          });
+      });
+    }
     applyMode();
     editBtn.addEventListener('click', function () { editing = true; saved.textContent = ''; applyMode(); });
     cancelBtn.addEventListener('click', function () {
@@ -5273,6 +5628,7 @@ body {
         var a = el('a', 'wa-docs__thumb'); a.href = p[1];
         a.dataset.lbUrl = p[1]; a.dataset.lbKind = 'photo';
         a.dataset.lbMeta = it.type + (p[0] === 'back' ? ' (back)' : '') + ' · driver profile';
+        a.dataset.lbDoc = it.type;   // the viewer shows this document's number / expiry / check
         var im = el('img'); im.loading = 'lazy'; im.alt = it.type; im.src = p[1];
         a.appendChild(im); thumbs.appendChild(a);
       });
@@ -5300,7 +5656,16 @@ body {
         : 'Your account cannot file photos onto driver documents.')));
     var pl = el('a', 'wa-btn wa-btn--sm', 'Driver profile ↗');
     pl.href = d.driver_url; pl.target = '_blank'; pl.rel = 'noopener';
-    var f = el('div', 'wa-lead__foot'); f.appendChild(pl); box.appendChild(f);
+    var f = el('div', 'wa-lead__foot');
+    // Only when something is still owed (the server sends no reminder otherwise).
+    if (l.reminder) {
+      var rb = el('button', 'wa-btn wa-btn--sm', l.reminder.label.replace(/^Reminder/, 'Send reminder'));
+      rb.type = 'button';
+      rb.id = 'wa-docs-remind';
+      rb.addEventListener('click', function () { openRemind(l); });
+      f.appendChild(rb);
+    }
+    f.appendChild(pl); box.appendChild(f);
     return box;
   }
 
@@ -5308,6 +5673,171 @@ body {
   function refreshPanelSoon() {
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(function () { panel.loadedFor = null; if (panel.open) loadPanel(); }, 1500);
+  }
+
+  // EzzyDelivery accounts: the user / business whose number this chat is, or
+  // that a connected lead became (converted business, linked driver).
+  function renderAccounts(d) {
+    var box = $('wa-info-accounts');
+    box.innerHTML = '';
+    if (d.info.kind === 'group' || !d.leads_visible) { box.hidden = true; return; }
+    box.hidden = false;
+    var accts = d.accounts || [];
+    // No heading: a user icon at the start of each row says "EzzyDelivery account".
+    if (!accts.length) {
+      var none = el('div', 'wa-acct__none');
+      none.appendChild(userIcon());
+      none.appendChild(el('span', 'wa-note', d.info.phone
+        ? 'No user or business is registered on this number.'
+        : 'The number behind this private id is not known yet, so only connected leads were checked.'));
+      box.appendChild(none);
+      return;
+    }
+    accts.forEach(function (a) { box.appendChild(accountCard(a)); });
+  }
+
+  var ACCT_ICONS = {
+    user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    business: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+    driver: '<rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+  };
+  // A driver row shows their vehicle: the Font Awesome Free (CC BY 4.0) glyphs the
+  // CRM board chip and the roster plate use (workforce_tags.vehicle_icon), keyed
+  // by DriverVehicle.vehicle_type. No vehicle on file keeps the generic truck.
+  var VEHICLE_ICONS = {
+    bike: 'M280 32c-13.3 0-24 10.7-24 24s10.7 24 24 24l57.7 0 16.4 30.3L256 192l-45.3-45.3c-12-12-28.3-18.7-45.3-18.7L64 128c-17.7 0-32 14.3-32 32l0 32 96 0c88.4 0 160 71.6 160 160c0 11-1.1 21.7-3.2 32l70.4 0c-2.1-10.3-3.2-21-3.2-32c0-52.2 25-98.6 63.7-127.8l15.4 28.6C402.4 276.3 384 312 384 352c0 70.7 57.3 128 128 128s128-57.3 128-128s-57.3-128-128-128c-13.5 0-26.5 2.1-38.7 6L418.2 128l61.8 0c17.7 0 32-14.3 32-32l0-32c0-17.7-14.3-32-32-32l-20.4 0c-7.5 0-14.7 2.6-20.5 7.4L391.7 78.9l-14-26c-7-12.9-20.5-21-35.2-21L280 32zM462.7 311.2l28.2 52.2c6.3 11.7 20.9 16 32.5 9.7s16-20.9 9.7-32.5l-28.2-52.2c2.3-.3 4.7-.4 7.1-.4c35.3 0 64 28.7 64 64s-28.7 64-64 64s-64-28.7-64-64c0-15.5 5.5-29.7 14.7-40.8zM187.3 376c-9.5 23.5-32.5 40-59.3 40c-35.3 0-64-28.7-64-64s28.7-64 64-64c26.9 0 49.9 16.5 59.3 40l66.4 0C242.5 268.8 190.5 224 128 224C57.3 224 0 281.3 0 352s57.3 128 128 128c62.5 0 114.5-44.8 125.8-104l-66.4 0zM128 384a32 32 0 1 0 0-64 32 32 0 1 0 0 64z',
+    car: 'M171.3 96L224 96l0 96-112.7 0 30.4-75.9C146.5 104 158.2 96 171.3 96zM272 192l0-96 81.2 0c9.7 0 18.9 4.4 25 12l67.2 84L272 192zm256.2 1L428.2 68c-18.2-22.8-45.8-36-75-36L171.3 32c-39.3 0-74.6 23.9-89.1 60.3L40.6 196.4C16.8 205.8 0 228.9 0 256L0 368c0 17.7 14.3 32 32 32l33.3 0c7.6 45.4 47.1 80 94.7 80s87.1-34.6 94.7-80l130.7 0c7.6 45.4 47.1 80 94.7 80s87.1-34.6 94.7-80l33.3 0c17.7 0 32-14.3 32-32l0-48c0-65.2-48.8-119-111.8-127zM434.7 368a48 48 0 1 1 90.5 32 48 48 0 1 1 -90.5-32zM160 336a48 48 0 1 1 0 96 48 48 0 1 1 0-96z',
+    van: 'M64 104l0 88 96 0 0-96L72 96c-4.4 0-8 3.6-8 8zm482 88L465.1 96 384 96l0 96 162 0zm-226 0l0-96-96 0 0 96 96 0zM592 384l-16 0c0 53-43 96-96 96s-96-43-96-96l-128 0c0 53-43 96-96 96s-96-43-96-96l-16 0c-26.5 0-48-21.5-48-48L0 104C0 64.2 32.2 32 72 32l120 0 160 0 113.1 0c18.9 0 36.8 8.3 49 22.8L625 186.5c9.7 11.5 15 26.1 15 41.2L640 336c0 26.5-21.5 48-48 48zm-64 0a48 48 0 1 0 -96 0 48 48 0 1 0 96 0zM160 432a48 48 0 1 0 0-96 48 48 0 1 0 0 96z',
+    pickup: 'M368.6 96l76.8 96L288 192l0-96 80.6 0zM224 80l0 112L64 192c-17.7 0-32 14.3-32 32l0 64c-17.7 0-32 14.3-32 32s14.3 32 32 32l33.1 0c-.7 5.2-1.1 10.6-1.1 16c0 61.9 50.1 112 112 112s112-50.1 112-112c0-5.4-.4-10.8-1.1-16l66.3 0c-.7 5.2-1.1 10.6-1.1 16c0 61.9 50.1 112 112 112s112-50.1 112-112c0-5.4-.4-10.8-1.1-16l33.1 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l0-64c0-17.7-14.3-32-32-32l-48.6 0L418.6 56c-12.1-15.2-30.5-24-50-24L272 32c-26.5 0-48 21.5-48 48zm0 288a48 48 0 1 1 -96 0 48 48 0 1 1 96 0zm288 0a48 48 0 1 1 -96 0 48 48 0 1 1 96 0z',
+    pickup3ton: 'M48 0C21.5 0 0 21.5 0 48L0 368c0 26.5 21.5 48 48 48l16 0c0 53 43 96 96 96s96-43 96-96l128 0c0 53 43 96 96 96s96-43 96-96l32 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l0-64 0-32 0-18.7c0-17-6.7-33.3-18.7-45.3L512 114.7c-12-12-28.3-18.7-45.3-18.7L416 96l0-48c0-26.5-21.5-48-48-48L48 0zM416 160l50.7 0L544 237.3l0 18.7-128 0 0-96zM112 416a48 48 0 1 1 96 0 48 48 0 1 1 -96 0zm368-48a48 48 0 1 1 0 96 48 48 0 1 1 0-96z',
+    pickup_big: 'M64 32C28.7 32 0 60.7 0 96L0 304l0 80 0 16c0 44.2 35.8 80 80 80c26.2 0 49.4-12.6 64-32c14.6 19.4 37.8 32 64 32c44.2 0 80-35.8 80-80c0-5.5-.6-10.8-1.6-16L416 384l33.6 0c-1 5.2-1.6 10.5-1.6 16c0 44.2 35.8 80 80 80s80-35.8 80-80c0-5.5-.6-10.8-1.6-16l1.6 0c17.7 0 32-14.3 32-32l0-64 0-16 0-10.3c0-9.2-3.2-18.2-9-25.3l-58.8-71.8c-10.6-13-26.5-20.5-43.3-20.5L480 144l0-48c0-35.3-28.7-64-64-64L64 32zM585 256l-105 0 0-64 48.8 0c2.4 0 4.7 1.1 6.2 2.9L585 256zM528 368a32 32 0 1 1 0 64 32 32 0 1 1 0-64zM176 400a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zM80 368a32 32 0 1 1 0 64 32 32 0 1 1 0-64z',
+  };
+  function acctIcon(kind, label) {
+    var i = el('span', 'wa-acct__icon');
+    i.title = label;
+    i.setAttribute('role', 'img');
+    i.setAttribute('aria-label', label);
+    i.innerHTML = VEHICLE_ICONS[kind]
+      ? '<svg viewBox="0 0 640 512" fill="currentColor" aria-hidden="true"><path d="' + VEHICLE_ICONS[kind] + '"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ACCT_ICONS[kind] + '</svg>';
+    return i;
+  }
+  function userIcon() { return acctIcon('user', 'EzzyDelivery account'); }
+
+  var ACCT_OK = { active: 1, approved: 1 };
+  var ACCT_WARN = { inactive: 1, suspended: 1, rejected: 1, blocked: 1 };
+  function statusFlag(text, key) {
+    return el('span', 'wa-flag' + (ACCT_OK[key] ? ' wa-flag--ok' : ACCT_WARN[key] ? ' wa-flag--warn' : ''), text);
+  }
+  function openLink(url, text) {
+    var f = el('div', 'wa-lead__foot');
+    var a = el('a', 'wa-btn wa-btn--sm', text + ' ↗'); a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    f.appendChild(a);
+    return f;
+  }
+  function accountSub(title, flags, meta, url, linkText) {
+    var sub = el('div', 'wa-acct__sub');
+    var top = el('div', 'wa-acct__subtop');
+    top.appendChild(el('span', 'wa-acct__subname', title));
+    flags.forEach(function (f) { if (f) top.appendChild(f); });
+    sub.appendChild(top);
+    meta = meta.filter(Boolean);
+    if (meta.length) sub.appendChild(el('div', 'wa-lead__meta', meta.join(' · ')));
+    if (url) sub.appendChild(openLink(url, linkText));
+    return sub;
+  }
+
+  function acctBtn(url, text) {
+    var b = el('a', 'wa-btn wa-btn--sm wa-btn--ghost wa-acct__end', text + ' ↗');
+    b.href = url; b.target = '_blank'; b.rel = 'noopener';
+    return b;
+  }
+  // A business / team / driver record under the person: icon, name, flags, Open.
+  function recordRow(kind, label, title, flags, url, linkText) {
+    var row = el('div', 'wa-acct__row');
+    row.appendChild(acctIcon(kind, label));
+    row.appendChild(el('span', 'wa-acct__rowname', title));
+    flags.forEach(function (f) { if (f) row.appendChild(f); });
+    if (url) row.appendChild(acctBtn(url, linkText));
+    return row;
+  }
+
+  // Line 1 is the person: name, roles, then "Verified" or the Verification
+  // button. One line under it per business / team / driver record, each with
+  // its Open button. The caret opens the rest (facts, order counts) below.
+  function accountCard(a) {
+    var card = el('div', 'wa-acct');
+    var line = el('div', 'wa-acct__line');
+    var tog = el('button', 'wa-acct__toggle');
+    tog.type = 'button';
+    tog.setAttribute('aria-expanded', 'false');
+    tog.appendChild(userIcon());
+    tog.appendChild(el('span', 'wa-acct__name', a.name));
+    line.appendChild(tog);
+    (a.roles || []).forEach(function (r) { line.appendChild(el('span', 'wa-flag', r)); });
+    if (a.active === false) line.appendChild(el('span', 'wa-flag wa-flag--warn', 'Login disabled'));
+    if (a.verification_key === 'verified') line.appendChild(el('span', 'wa-flag wa-flag--ok wa-acct__end', 'Verified'));
+    else if (a.verify_url) {
+      var vb = acctBtn(a.verify_url, 'Verify');
+      vb.title = 'Open the verification page for this person';
+      line.appendChild(vb);
+    }
+    card.appendChild(line);
+
+    (a.businesses || []).forEach(function (b) {
+      card.appendChild(recordRow('business', 'Business #' + b.id, b.name,
+        [statusFlag(b.status, b.status_key)], b.url, 'Open business'));
+    });
+    (a.teams || []).forEach(function (t) {
+      card.appendChild(recordRow('business', 'Team member', t.business,
+        [el('span', 'wa-flag', t.role), statusFlag(t.status, (t.status || '').toLowerCase())], t.url, 'Open business'));
+    });
+    var dr = a.driver;
+    if (dr) {
+      card.appendChild(recordRow(VEHICLE_ICONS[dr.vehicle_type] ? dr.vehicle_type : 'driver',
+        (dr.vehicle ? dr.vehicle + ' · ' : '') + 'Driver #' + dr.id, dr.code || 'Driver #' + dr.id,
+        [statusFlag(dr.status, dr.status_key)], dr.url, 'Open driver'));
+    }
+
+    var body = el('div', 'wa-acct__body');
+    body.hidden = true;
+    if (a.username) body.appendChild(el('div', 'wa-acct__user', '@' + a.username));
+    if ((a.match || []).length) body.appendChild(el('div', 'wa-lead__meta', 'Matched by: ' + a.match.join(' · ')));
+
+    if (a.username) {
+      var facts = el('dl', 'wa-lead__facts');
+      var fact = function (k, v) { if (!v && v !== 0) return; facts.appendChild(el('dt', null, k)); facts.appendChild(el('dd', null, String(v))); };
+      fact('User no.', a.user_number);
+      fact('Email', a.email);
+      fact('Phone', a.phone);
+      fact('WhatsApp', a.whatsapp);
+      fact('Verification', a.verification);
+      fact('Joined', a.joined ? fmtDate(a.joined, false) : '');
+      fact('Last login', a.last_login ? fmtDate(a.last_login, true) : 'Never');
+      if (a.p2p_orders) fact('P2P bookings', a.p2p_orders);
+      body.appendChild(facts);
+    }
+
+    // Status and the Open buttons already sit on the record lines above.
+    (a.businesses || []).forEach(function (b) {
+      body.appendChild(accountSub(b.name + ' #' + b.id, [], [
+        b.code,
+        b.orders ? b.orders + ' order' + (b.orders === 1 ? '' : 's') + (b.last_order ? ', last ' + fmtDate(b.last_order, false) : '') : 'No orders yet',
+        b.phone ? 'Business no. ' + b.phone : '',
+        b.whatsapp && b.whatsapp !== b.phone ? 'WhatsApp ' + b.whatsapp : '',
+        (b.match || []).length ? 'Matched by: ' + b.match.join(', ') : '',
+      ]));
+    });
+    if (dr) body.appendChild(accountSub('Driver #' + dr.id, [el('span', 'wa-flag', dr.availability)], [dr.code]));
+    card.appendChild(body);
+
+    tog.addEventListener('click', function () {
+      var open = body.hidden;
+      body.hidden = !open;
+      tog.setAttribute('aria-expanded', open ? 'true' : 'false');
+      card.classList.toggle('wa-acct--open', open);
+    });
+    return card;
   }
 
   function renderLeads(d) {
@@ -5511,7 +6041,8 @@ body {
     var scope = target.closest('.wa-grid, .wa-docs__grid, #wa-msgs') || document;
     var nodes = Array.prototype.slice.call(scope.querySelectorAll('[data-lb-url]'));
     lb.items = nodes.map(function (n) {
-      return { url: n.dataset.lbUrl, kind: n.dataset.lbKind || 'photo', meta: n.dataset.lbMeta || '', caption: n.dataset.lbCaption || '' };
+      return { url: n.dataset.lbUrl, kind: n.dataset.lbKind || 'photo', meta: n.dataset.lbMeta || '',
+               caption: n.dataset.lbCaption || '', doc: n.dataset.lbDoc || '' };
     });
     lb.i = Math.max(0, nodes.indexOf(target));
     showViewer();
@@ -5541,6 +6072,7 @@ body {
     $('wa-lb-count').textContent = lb.items.length > 1 ? (lb.i + 1) + ' / ' + lb.items.length : '';
     $('wa-lb-dl').href = it.url;
     updateSaveControl(it);
+    updateDocPanel(it);
     $('wa-lb-prev').hidden = lb.i <= 0;
     $('wa-lb-next').hidden = lb.i >= lb.items.length - 1;
   }
@@ -5659,6 +6191,139 @@ body {
       .catch(function () { btn.disabled = false; btn.textContent = 'Save to driver file'; alert('Network error'); });
   });
 
+  // ---------- Document panel in the viewer ----------
+  // A driver-profile document photo shows the same number / expiry / image-check
+  // panel as the CRM popup (workforce/js/doc_viewer.js) and posts to the same
+  // workforce endpoints — no second write path. Nothing is saved until Submit.
+  var lbDoc = null;   // { base, item } for the document on show, else null
+  function docForItem(it) {
+    var d = panel.data;
+    if (!it || !it.doc || !d || !d.leads || panel.loadedFor !== state.activeChatId) return null;
+    var l = d.leads.filter(function (x) { return x.docs; })[0];
+    if (!l) return null;
+    var item = l.docs.items.filter(function (x) { return x.type === it.doc; })[0];
+    return item && item.id ? { base: l.docs.doc_edit_base + item.id, item: item } : null;
+  }
+  function docFact(dl, label, value) {
+    if (!value) return;
+    dl.appendChild(el('dt', null, label));
+    dl.appendChild(el('dd', null, value));
+  }
+  function updateDocPanel(it) {
+    lbDoc = docForItem(it);
+    $('wa-lb-doc').hidden = !lbDoc;
+    if (!lbDoc) return;
+    var item = lbDoc.item, canEdit = !!panel.data.can_save_docs;
+    $('wa-lb-doc-title').textContent = item.type;
+    $('wa-lb-doc-fields').hidden = item.type === 'Selfie';
+    $('wa-lb-doc-no').value = item.number || '';
+    $('wa-lb-doc-exp').value = item.expiry || '';
+    $('wa-lb-doc-no').readOnly = $('wa-lb-doc-exp').readOnly = !canEdit;
+    var facts = $('wa-lb-doc-facts');
+    facts.innerHTML = '';
+    docFact(facts, 'Issued from', item.issued);
+    docFact(facts, 'Image check', item.check);
+    docFact(facts, 'Why', item.check_note);
+    docFact(facts, 'Number on image', item.ai_no);
+    docFact(facts, 'Expiry on image', item.ai_expiry);
+    $('wa-lb-doc-ro').hidden = canEdit || !!panel.data.can_verify_docs;
+    docShowErr('');
+    docBusy(false);
+    docRefresh();
+  }
+  function docDirty() {
+    if (!lbDoc || lbDoc.item.type === 'Selfie' || !panel.data.can_save_docs) return false;
+    return $('wa-lb-doc-no').value.trim() !== (lbDoc.item.number || '')
+      || $('wa-lb-doc-exp').value !== (lbDoc.item.expiry || '');
+  }
+  // Submit / Submit & verify only once a field really differs; while it does,
+  // Submit & verify stands in for Mark verified, which would verify the old values.
+  function docRefresh() {
+    if (!lbDoc) return;
+    var item = lbDoc.item, dirty = docDirty(), canVerify = !!panel.data.can_verify_docs;
+    var no = $('wa-lb-doc-no').value.trim(), exp = $('wa-lb-doc-exp').value;
+    $('wa-lb-doc-submit').hidden = !dirty;
+    $('wa-lb-doc-submitverify').hidden = !dirty || !canVerify;
+    $('wa-lb-doc-verify').hidden = !canVerify || item.verified || dirty;
+    $('wa-lb-doc-unverify').hidden = !canVerify || !item.verified;
+    $('wa-lb-doc-useai').hidden = !(panel.data.can_save_docs && item.type !== 'Selfie' &&
+      ((item.ai_no && no !== item.ai_no) || (item.ai_expiry_iso && exp !== item.ai_expiry_iso)));
+  }
+  function docShowErr(msg) {
+    var e = $('wa-lb-doc-err');
+    e.textContent = msg || '';
+    e.hidden = !msg;
+  }
+  function docBusy(busy) {
+    ['wa-lb-doc-submit', 'wa-lb-doc-submitverify', 'wa-lb-doc-verify', 'wa-lb-doc-unverify']
+      .forEach(function (id) { $(id).disabled = busy; });
+  }
+  // X-Requested-With: a department refusal then comes back as JSON with its reason,
+  // not a redirect to dashboard HTML.
+  function docPost(url, fields) {
+    var fd = new FormData();
+    Object.keys(fields).forEach(function (k) { fd.append(k, fields[k]); });
+    return fetch(url, { method: 'POST', credentials: 'same-origin', body: fd,
+                        headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) {
+        return r.json().catch(function () {
+          throw new Error('The server did not answer properly (HTTP ' + r.status + '). Try again.');
+        });
+      })
+      .then(function (j) {
+        if (!j.success) throw new Error(j.error || 'Could not save this document.');
+        return j;
+      });
+  }
+  // Save the fields and/or (un)verify, then reload the panel so the tile and this
+  // viewer both show what the server now holds — including the re-run image match.
+  function docRun(save, action) {
+    if (!lbDoc) return;
+    if (action === 'verify' && !confirm('Confirm you checked the number and expiry against the image?')) return;
+    var doc = lbDoc, chat = state.activeChatId, shown = lb.items[lb.i] && lb.items[lb.i].url;
+    docShowErr('');
+    docBusy(true);
+    var chain = Promise.resolve();
+    if (save) {
+      chain = chain.then(function () {
+        return docPost(doc.base + '/edit/', {
+          document_type: doc.item.type,   // the endpoint rewrites every field it is sent
+          document_no: $('wa-lb-doc-no').value.trim(),
+          document_issued_from: doc.item.issued || '',
+          document_expiry_date: $('wa-lb-doc-exp').value,
+        });
+      });
+    }
+    if (action) chain = chain.then(function () { return docPost(doc.base + '/verify/', { action: action }); });
+    chain
+      .then(function () {
+        if (state.activeChatId !== chat) return;
+        panel.loadedFor = null;
+        return loadPanel();
+      })
+      .then(function () {
+        var it = lb.items[lb.i];
+        if ($('wa-lb').open && it && it.url === shown) updateDocPanel(it);
+      })
+      .catch(function (err) {
+        docBusy(false);
+        docShowErr(err && err.name !== 'TypeError' && err.message ? err.message : 'Could not reach the server. Try again.');
+      });
+  }
+  $('wa-lb-doc-no').addEventListener('input', docRefresh);
+  $('wa-lb-doc-exp').addEventListener('input', docRefresh);
+  $('wa-lb-doc-exp').addEventListener('change', docRefresh);
+  $('wa-lb-doc-useai').addEventListener('click', function () {
+    if (!lbDoc) return;
+    if (lbDoc.item.ai_no) $('wa-lb-doc-no').value = lbDoc.item.ai_no;
+    if (lbDoc.item.ai_expiry_iso) $('wa-lb-doc-exp').value = lbDoc.item.ai_expiry_iso;
+    docRefresh();
+  });
+  $('wa-lb-doc-submit').addEventListener('click', function () { docRun(true, ''); });
+  $('wa-lb-doc-submitverify').addEventListener('click', function () { docRun(true, 'verify'); });
+  $('wa-lb-doc-verify').addEventListener('click', function () { docRun(false, 'verify'); });
+  $('wa-lb-doc-unverify').addEventListener('click', function () { docRun(false, 'unverify'); });
+
   function stepViewer(d) {
     var n = lb.i + d;
     if (n < 0 || n >= lb.items.length) return;
@@ -5680,6 +6345,8 @@ body {
     if (e.target === $('wa-lb') || e.target === $('wa-lb-stage')) closeViewer();
   });
   $('wa-lb').addEventListener('keydown', function (e) {
+    // Arrows inside a field (document number / expiry, "Save as…") move the caret, not the photo.
+    if (e.target.closest && e.target.closest('input, select, textarea')) return;
     if (e.key === 'ArrowLeft') { e.preventDefault(); stepViewer(-1); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); stepViewer(1); }
   });
@@ -5805,6 +6472,23 @@ body {
   $('wa-fwd-close').addEventListener('click', function () { $('wa-fwd').close(); });
   $('wa-edit-save').addEventListener('click', saveEdit);
   $('wa-edit-close').addEventListener('click', function () { $('wa-edit').close(); });
+
+  // "Send reminder": preview the missing-items reminder, then send it in this chat.
+  var remindChat = null;
+  function openRemind(l) {
+    remindChat = state.activeChatId;
+    $('wa-remind-title').textContent = l.reminder.label;
+    $('wa-remind-ta').value = l.reminder.body;
+    $('wa-remind').showModal();
+  }
+  $('wa-remind-send').addEventListener('click', function () {
+    var txt = ($('wa-remind-ta').value || '').trim();
+    $('wa-remind').close();
+    // The chat changed under the dialog (a poll or a click): never send to the wrong person.
+    if (!txt || !remindChat || remindChat !== state.activeChatId) return;
+    postText(txt, null);
+  });
+  $('wa-remind-close').addEventListener('click', function () { $('wa-remind').close(); });
   $('wa-edit-ta').addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); }
   });

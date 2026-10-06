@@ -1677,7 +1677,7 @@ class AssignDriverViewTest(DriverTestMixin, TestCase):
         task = self.create_delivery_task(
             self.order, self.business, self.pickup,
             status='pending', task_number='ASSIGN-001',
-            dl_task_publish=True)
+            dl_task_publish=True, public_pool=True)
         response = self.client.post(
             '/delivery/delivery_task/assign_driver/',
             {'task_id': task.id})

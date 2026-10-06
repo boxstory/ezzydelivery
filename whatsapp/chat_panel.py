@@ -8,6 +8,7 @@ import re
 
 from django.db.models import Count, Q
 from django.urls import reverse
+from django.utils.http import urlencode
 
 from .models import WhatsAppContact, WhatsAppMessage
 
@@ -376,6 +377,12 @@ def can_save_driver_docs(user):
     return can_link_leads(user) and can_access(user, 'driver_document_edit')
 
 
+def can_verify_driver_docs(user):
+    """"Mark verified" in the viewer posts to driver_document_verify — its own route."""
+    from core.departments import can_access
+    return can_link_leads(user) and can_access(user, 'driver_document_verify')
+
+
 # ---------------------------------------------------------------- driver documents
 
 # The driver application's own rule (core.views.join_driver): a selfie plus at
@@ -394,7 +401,8 @@ _PIL_EXT = {'JPEG': '.jpg', 'PNG': '.png', 'WEBP': '.webp'}
 def _doc_rows(driver):
     """One row per document type: the one holding a real photo, else the newest."""
     rows = {}
-    for doc in driver.driver_document.filter(document_type__in=DRIVER_DOC_TYPES).order_by('-updated_at', '-pk'):
+    for doc in (driver.driver_document.filter(document_type__in=DRIVER_DOC_TYPES)
+                .select_related('verified_by').order_by('-updated_at', '-pk')):
         held = rows.get(doc.document_type)
         if held is None or (doc.has_real_file and not held.has_real_file):
             rows[doc.document_type] = doc
@@ -408,6 +416,27 @@ def _file_url(f):
         return ''
 
 
+def _doc_check(doc):
+    """The image-check facts the viewer shows — same wording as the CRM popup
+    (workforce/parts/_doc_viewer_attrs.html)."""
+    from django.utils import timezone
+
+    check = doc.ai_status_label
+    if doc.verified_at:
+        who = f'by {doc.verified_by_name}' if doc.verified_by_id else 'matched the image'
+        check += f' · {who}, {timezone.localtime(doc.verified_at):%d %b %Y}'
+    return {
+        'id': doc.pk,
+        'issued': doc.document_issued_from or '',
+        'check': check,
+        'check_note': doc.ai_note,
+        'ai_no': doc.ai_document_no,
+        'ai_expiry': f'{doc.ai_expiry_date:%d %b %Y}' if doc.ai_expiry_date else '',
+        'ai_expiry_iso': doc.ai_expiry_date.isoformat() if doc.ai_expiry_date else '',
+        'verified': bool(doc.verified_at),
+    }
+
+
 def driver_documents(driver):
     """The driver's documents as their profile holds them, against the application rule."""
     from django.utils import timezone
@@ -418,7 +447,7 @@ def driver_documents(driver):
     for doc_type in DRIVER_DOC_TYPES:
         doc = rows.get(doc_type)
         front = _file_url(doc.document_file) if doc and doc.has_real_file else ''
-        items.append({
+        item = {
             'type': doc_type,
             'required': doc_type == 'Selfie',
             'front': front,
@@ -427,7 +456,10 @@ def driver_documents(driver):
             'expiry': doc.document_expiry_date.isoformat() if doc and doc.document_expiry_date else '',
             'expired': bool(doc and doc.document_expiry_date and doc.document_expiry_date < today),
             'url': reverse('workforce:driver_document_detail', args=[doc.pk]) if doc else '',
-        })
+        }
+        if doc:
+            item.update(_doc_check(doc))
+        items.append(item)
     selfie = bool(items[0]['front'])
     ids = sum(1 for i in items[1:] if i['front'])
     return {
@@ -437,7 +469,17 @@ def driver_documents(driver):
         'ids_need': DRIVER_IDS_REQUIRED,
         'complete': selfie and ids >= DRIVER_IDS_REQUIRED,
         'driver_url': reverse('workforce:driver_detail', args=[driver.pk]),
+        # The viewer's Submit / verify post to /workforce/drivers/<this>/document/<id>/…
+        'doc_edit_base': f'/workforce/drivers/{driver.pk}/document/',
     }
+
+
+def driver_reminder(lead):
+    """{'label', 'body'} — what the applicant still owes, or None when nothing is
+    missing or the card is closed. The CRM composer's own reminder, so a chase
+    sent from the inbox reads exactly like one from the lead or driver page."""
+    from workforce.crm_views import _lead_reminder
+    return _lead_reminder(lead, lead.driver)
 
 
 def save_chat_photo_to_driver(lead, msg, doc_type, side, user):
@@ -557,8 +599,10 @@ def connected_leads(session, chat_id):
     return [(card,) + meta_by_pk[card.pk] for card in _surviving([l for l, _, _ in found.values()])]
 
 
-def suggested_leads(session, chat_id, chat_name='', exclude=()):
-    """Unconnected leads whose contact/company name resembles this chat's name."""
+def suggested_leads(session, chat_id, chat_name='', exclude=(), user=None):
+    """Unconnected leads whose contact/company name resembles this chat's name.
+    `user` limits them to leads that person may open (crm/ownership.py)."""
+    from crm import ownership
     from crm.models import Lead
 
     digits, _ = split_chat_id(chat_id)
@@ -581,10 +625,16 @@ def suggested_leads(session, chat_id, chat_name='', exclude=()):
                 tq &= Q(contact_name__icontains=t) | Q(company_name__icontains=t)
             q |= tq
     leads = Lead.objects.select_related('merged_into', 'assigned_to').filter(q).exclude(pk__in=list(exclude))
-    return _surviving(leads.order_by('-updated_at')[:10])[:6]
+    found = _surviving(leads.order_by('-updated_at')[:10])
+    if user is not None:
+        found = [lead for lead in found if ownership.can_see_lead(user, lead)]
+    return found[:6]
 
 
-def search_leads(term, limit=8):
+def search_leads(term, limit=8, user=None):
+    """Leads matching a typed name, number or id. `user` limits them to leads that
+    person may open — a search box must not be a way round the ownership rule."""
+    from crm import ownership
     from crm.models import Lead
 
     term = (term or '').strip()
@@ -597,7 +647,10 @@ def search_leads(term, limit=8):
     if term.isdigit():
         q |= Q(pk=int(term))
     leads = Lead.objects.select_related('merged_into', 'assigned_to').filter(q).order_by('-updated_at')[:limit * 2]
-    return _surviving(leads)[:limit]
+    found = _surviving(leads)
+    if user is not None:
+        found = [lead for lead in found if ownership.can_see_lead(user, lead)]
+    return found[:limit]
 
 
 def lead_dict(lead, how='', detail=False, stage_cache=None, label=''):
@@ -659,6 +712,8 @@ def _lead_detail(lead, stage_cache):
         'pinned': lead.stage_pinned,
         'docs': driver_documents(lead.driver)
                 if lead.category == Lead.CATEGORY_DRIVER and lead.driver_id else None,
+        'reminder': driver_reminder(lead)
+                    if lead.category == Lead.CATEGORY_DRIVER and lead.driver_id else None,
         'activity_count': lead.activities.count(),
         # Every number the lead talks from, labelled, with the account on it.
         'numbers': crm_services.lead_wa_numbers(lead),
@@ -676,12 +731,18 @@ def _lead_detail(lead, stage_cache):
     }
 
 
-def staff_options():
+def staff_options(user=None):
+    """The working card's assignee picker. With `user`, the same choices the lead
+    page offers: the desk for a lead manager, only themselves for anyone else
+    (take or release — crm_lead_update refuses the rest)."""
     from django.contrib.auth.models import User
-    return [
-        {'id': u.pk, 'name': u.get_full_name() or u.username}
-        for u in User.objects.filter(is_staff=True, is_active=True).order_by('first_name', 'username')
-    ]
+    from crm import ownership
+
+    if user is not None:
+        users = ownership.owner_choices(user)
+    else:
+        users = User.objects.filter(is_staff=True, is_active=True).order_by('first_name', 'username')
+    return [{'id': u.pk, 'name': u.get_full_name() or u.username} for u in users]
 
 
 def link_lead(lead, session, chat_id, user, label=''):
@@ -720,3 +781,209 @@ def unlink_lead(lead, session, chat_id, user):
         created_by=user,
     )
     return True
+
+
+# ---------------------------------------------------------------- platform accounts
+
+ACCOUNTS_MAX = 8
+
+
+def _last8(value):
+    digits = re.sub(r'\D', '', value or '')
+    return digits[-8:] if len(digits) >= 8 else ''
+
+
+def _ends_in(fields, last8):
+    """Q: any of these free-text phone fields ends in these 8 digits."""
+    rx = r'\D*'.join(last8) + r'\D*$'
+    q = Q()
+    for f in fields:
+        q |= Q(**{f'{f}__regex': rx})
+    return q
+
+
+def chat_accounts(phone, connected=(), viewer=None):
+    """EzzyDelivery accounts behind a chat — one card per person (or ownerless business).
+
+    Matched two ways: the chat's real `phone` ends in the same 8 digits as a
+    profile, business, driver or team-member number; or a connected lead
+    (`connected` = connected_leads() rows) was converted to a business or
+    belongs to a driver. `phone` must be a real number — a lid chat whose phone
+    is unknown passes '' and matches through its leads only (never run a lid
+    through phone matching, see crm.services.is_lid_value). Staff page links
+    are only included where `viewer` may open them.
+    """
+    from django.contrib.auth.models import User
+    from django.db.models import Max
+    from business.models import Business, BusinessTeamProfile
+    from core.departments import can_access
+    from core.models import Profile
+    from crm import services as crm_services
+    from fleet.models import VEHICLE_CHOICES, Driver, DriverVehicle
+    from orders.models import Order
+
+    match = {}       # user_id -> [why, ...]
+    biz_match = {}   # business_id -> [why, ...], for businesses found directly
+
+    def hit(store, key, why):
+        if key and why not in store.setdefault(key, []):
+            store[key].append(why)
+
+    last8 = '' if crm_services.is_lid_value(phone) else _last8(phone)
+    if last8:
+        for p in Profile.objects.filter(_ends_in(['phone', 'whatsapp'], last8)).exclude(user=None):
+            hit(match, p.user_id, 'Phone' if _last8(p.phone) == last8 else 'WhatsApp')
+        for bid, uid in Business.objects.filter(
+            _ends_in(['business_phone', 'business_whatsapp'], last8)
+        ).values_list('business_id', 'user_id'):
+            hit(biz_match, bid, 'Business number')
+            hit(match, uid, 'Business number')
+        for uid in Driver.objects.filter(_ends_in(['driver_phone', 'driver_whatsapp'], last8)).values_list('user_id', flat=True):
+            hit(match, uid, 'Driver number')
+        for uid in BusinessTeamProfile.objects.filter(_ends_in(['team_phone'], last8)).values_list('user_id', flat=True):
+            hit(match, uid, 'Team number')
+    for lead, _how, _label in connected:
+        why = f'Lead #{lead.pk}'
+        if lead.converted_business_id:
+            hit(biz_match, lead.converted_business_id, why)
+            hit(match, lead.converted_business.user_id, why)
+        if lead.driver_id:
+            hit(match, lead.driver.user_id, why)
+
+    users = {u.pk: u for u in User.objects.filter(pk__in=list(match)).select_related('profile')}
+    uids = list(users)
+    businesses = list(Business.objects.filter(
+        Q(business_id__in=list(biz_match)) | Q(user_id__in=uids)
+    ).order_by('business_id'))
+    stats = {
+        r['business_id']: r for r in Order.objects.filter(business__in=businesses)
+        .values('business_id').annotate(n=Count('pk'), last=Max('created_at'))
+    }
+    drivers = {d.user_id: d for d in Driver.objects.filter(user_id__in=uids)}
+    # The driver row's icon is the vehicle. Newest row wins, as on the CRM board
+    # chip: a driver who re-registered is shown on what they drive now.
+    vehicles = {}
+    for driver_id, vtype in (
+        DriverVehicle.objects.filter(driver__in=list(drivers.values()))
+        .exclude(vehicle_type__in=['', 'none'])
+        .order_by('driver_id', '-created_at').values_list('driver_id', 'vehicle_type')
+    ):
+        vehicles.setdefault(driver_id, vtype)
+    vehicle_labels = dict(VEHICLE_CHOICES)
+    teams = {}
+    for t in BusinessTeamProfile.objects.filter(user_id__in=uids).select_related('business'):
+        teams.setdefault(t.user_id, []).append(t)
+    p2p = dict(Order.objects.filter(p2p_customer_id__in=uids).values('p2p_customer_id')
+               .annotate(n=Count('pk')).values_list('p2p_customer_id', 'n'))
+    seller_url = viewer is not None and can_access(viewer, 'seller_detail')
+    driver_url = viewer is not None and can_access(viewer, 'driver_detail')
+
+    # Each role's verification queue, filtered down to this one person.
+    verify_ok = {name: viewer is not None and can_access(viewer, name) for name in (
+        'business_verification_list', 'driver_verification_list', 'user_verification_list')}
+
+    def verify_link(url_name, **query):
+        if not verify_ok[url_name]:
+            return ''
+        return reverse(f'workforce:{url_name}') + '?' + urlencode({**query, 'status': 'all'})
+
+    def biz_dict(b):
+        s = stats.get(b.business_id) or {}
+        return {
+            'id': b.business_id,
+            'name': b.business_name or f'Business #{b.business_id}',
+            'code': b.business_code or '',
+            'status': b.get_business_status_display(),
+            'status_key': b.business_status,
+            'phone': b.business_phone or '',
+            'whatsapp': b.business_whatsapp or '',
+            'orders': s.get('n', 0),
+            'last_order': int(s['last'].timestamp()) if s.get('last') else 0,
+            'url': reverse('workforce:seller_detail', args=[b.business_id]) if seller_url else '',
+            'match': biz_match.get(b.business_id, []),
+        }
+
+    owned = {}
+    for b in businesses:
+        if b.user_id in users:
+            owned.setdefault(b.user_id, []).append(b)
+
+    cards = []
+    for uid in match:
+        user = users.get(uid)
+        if user is None:
+            continue
+        p = getattr(user, 'profile', None)
+        d = drivers.get(uid)
+        roles = []
+        if user.is_staff or (p and p.is_staff):
+            roles.append('Staff')
+        if owned.get(uid):
+            roles.append('Client')
+        if teams.get(uid):
+            roles.append('Team member')
+        if d:
+            roles.append('Driver' if d.driver_status == 'approved' else 'Driver applicant')
+        if p and p.is_customer:
+            roles.append('Customer')
+        name = ''
+        if p:
+            name = ' '.join(x for x in (p.first_name, p.last_name) if x)
+        # Verification is one status on the profile, whichever desk works it: the
+        # business queue for a client, else the driver queue, else the user queue.
+        # Already verified (or staff only) — nothing to open.
+        if not p or p.verification_status == 'verified':
+            verify_url = ''
+        elif owned.get(uid):
+            # A bare number is read as a business id there (see business_verification_list).
+            verify_url = verify_link('business_verification_list', search=owned[uid][0].business_id)
+        elif d:
+            verify_url = verify_link('driver_verification_list', search=d.driver_code or user.username)
+        elif 'Staff' in roles:
+            verify_url = ''
+        else:
+            verify_url = verify_link('user_verification_list', q=user.username)
+        cards.append({
+            'key': f'u{uid}',
+            'name': name or user.get_full_name() or user.username,
+            'username': user.username,
+            'user_number': (p.user_number or '') if p else '',
+            'email': user.email or ((p.email or '') if p else ''),
+            'phone': (p.phone or '') if p else '',
+            'whatsapp': (p.whatsapp or '') if p else '',
+            'joined': int(user.date_joined.timestamp()) if user.date_joined else 0,
+            'last_login': int(user.last_login.timestamp()) if user.last_login else 0,
+            'active': user.is_active,
+            'verification': p.get_verification_status_display() if p else '',
+            'verification_key': p.verification_status if p else '',
+            'roles': roles or ['User'],
+            'match': match[uid],
+            'businesses': [biz_dict(b) for b in owned.get(uid, [])],
+            'teams': [{
+                'business': t.business.business_name or f'Business #{t.business_id}',
+                'role': t.get_team_role_display(),
+                'status': t.get_team_status_display(),
+                'url': reverse('workforce:seller_detail', args=[t.business_id]) if seller_url else '',
+            } for t in teams.get(uid, [])],
+            'driver': {
+                'id': d.driver_id,
+                'code': d.driver_code or '',
+                'status': d.get_driver_status_display(),
+                'status_key': d.driver_status,
+                'availability': d.get_driver_availability_display(),
+                'vehicle_type': vehicles.get(d.driver_id, ''),
+                'vehicle': vehicle_labels.get(vehicles.get(d.driver_id), ''),
+                'url': reverse('workforce:driver_detail', args=[d.driver_id]) if driver_url else '',
+            } if d else None,
+            'verify_url': verify_url,
+            'p2p_orders': p2p.get(uid, 0),
+        })
+    # A business found by its number or a lead, with no owner login on it.
+    for b in businesses:
+        if b.business_id in biz_match and b.user_id not in users:
+            cards.append({
+                'key': f'b{b.business_id}', 'name': b.business_name or f'Business #{b.business_id}',
+                'roles': ['Business · no login'], 'match': biz_match[b.business_id],
+                'businesses': [biz_dict(b)], 'teams': [], 'driver': None, 'active': True,
+            })
+    return cards[:ACCOUNTS_MAX]

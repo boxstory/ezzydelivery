@@ -172,9 +172,16 @@ class MiddlewareGatingTests(DepartmentTestMixin, TestCase):
                 client.get(reverse(f'workforce:{name}')).status_code, 200, name)
 
     def test_shared_routes_open_to_any_department(self):
+        """A shared route must never bounce staff with a permission denial. The
+        staff home does redirect a marketing-only account — to that desk's own
+        landing page, not away from the app — so follow it and check where it
+        lands rather than insisting on a bare 200."""
         user, _ = self.make_staff('mktshared', [MKT])
-        res = self.login_as(user).get(reverse('workforce:wf_dashboard'))
+        res = self.login_as(user).get(reverse('workforce:wf_dashboard'), follow=True)
         self.assertEqual(res.status_code, 200)
+        self.assertEqual(
+            res.redirect_chain[-1][0] if res.redirect_chain else reverse('workforce:wf_dashboard'),
+            reverse('workforce:wf_marketing_overview'))
 
     def test_staff_with_no_department_still_reach_the_dashboard(self):
         """No desk must not mean no landing page, or the deny-redirect loops."""
@@ -222,7 +229,8 @@ class SidebarRenderingTests(DepartmentTestMixin, TestCase):
 
     def test_marketing_sidebar_shows_crm(self):
         user, _ = self.make_staff('mkt2', [MKT])
-        html = self.login_as(user).get(reverse('workforce:wf_dashboard')).content.decode()
+        html = self.login_as(user).get(
+            reverse('workforce:wf_dashboard'), follow=True).content.decode()
         self.assertIn(reverse('workforce:crm_leads_board'), html)
         self.assertNotIn(reverse('workforce:cod_ledger'), html)
 
@@ -321,6 +329,210 @@ class StaffRolesConsoleTests(DepartmentTestMixin, TestCase):
         res = self.client_boss.get(reverse('workforce:staff_roles_list') + '?dept=none')
         self.assertEqual(res.status_code, 200)
         self.assertNotContains(res, self.worker_profile.user_number)
+
+    def _outsider(self, username='newhire'):
+        user = User.objects.create_user(
+            username=username, password='x', email=f'{username}@gmail.com', is_staff=False)
+        profile = core_models.Profile.objects.create(
+            user=user, email=f'{username}@gmail.com', is_staff=False)
+        return user, profile
+
+    def test_search_lists_non_staff_account_as_candidate(self):
+        _, profile = self._outsider()
+        res = self.client_boss.get(reverse('workforce:staff_roles_list') + '?search=newhire%40gmail.com')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual([p.id for p in res.context['candidates']], [profile.id])
+        self.assertContains(res, 'Add as staff')
+
+    def test_grant_makes_account_staff_with_no_desk(self):
+        user, profile = self._outsider()
+        res = self.client_boss.post(reverse('workforce:staff_role_grant', args=[profile.id]))
+        self.assertEqual(res.status_code, 200)
+        profile.refresh_from_db()
+        user.refresh_from_db()
+        self.assertTrue(profile.is_staff)
+        self.assertTrue(user.is_staff)
+        self.assertEqual(profile.staff_departments, set())
+        self.assertFalse(profile.is_superadmin)
+        # Now in the staff table, no longer a candidate.
+        res = self.client_boss.get(reverse('workforce:staff_roles_list') + '?search=newhire')
+        self.assertEqual(res.context['candidates'], [])
+        self.assertEqual([r['profile'].id for r in res.context['rows']], [profile.id])
+
+    def test_grant_refuses_ordinary_staff(self):
+        user, profile = self._outsider()
+        res = self.login_as(self.worker).post(
+            reverse('workforce:staff_role_grant', args=[profile.id]))
+        self.assertEqual(res.status_code, 302)
+        profile.refresh_from_db()
+        self.assertFalse(profile.is_staff)
+
+    def test_grant_refuses_deactivated_account(self):
+        user, profile = self._outsider()
+        user.is_active = False
+        user.save()
+        res = self.client_boss.post(reverse('workforce:staff_role_grant', args=[profile.id]))
+        self.assertEqual(res.status_code, 400)
+        profile.refresh_from_db()
+        self.assertFalse(profile.is_staff)
+
+
+class WahaInboxAccessTests(DepartmentTestMixin, TestCase):
+    """The WAHA Inbox column — per-staff nginx logins for /waha/wa-chats/ only."""
+
+    def setUp(self):
+        import tempfile
+        from django.test import override_settings
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.htpasswd = f'{self.tmp.name}/private/waha-inbox.htpasswd'
+        self.nginx_conf = f'{self.tmp.name}/site.conf'
+        with open(self.nginx_conf, 'w') as f:
+            f.write('auth_basic_user_file /etc/nginx/.htpasswd;\n')
+        self.settings_cm = override_settings(
+            WAHA_INBOX_HTPASSWD=self.htpasswd, NGINX_SITE_CONF=self.nginx_conf)
+        self.settings_cm.enable()
+
+        self.boss, _ = self.make_staff('wahaboss', [], superadmin=True)
+        self.worker, self.worker_profile = self.make_staff('wahaworker', [MKT])
+        self.client_boss = self.login_as(self.boss)
+
+    def tearDown(self):
+        self.settings_cm.disable()
+        self.tmp.cleanup()
+
+    def _post(self, profile, action, client=None):
+        return (client or self.client_boss).post(
+            reverse('workforce:staff_waha_access', args=[profile.id]),
+            data=json.dumps({'action': action}), content_type='application/json')
+
+    def _lines(self):
+        with open(self.htpasswd) as f:
+            return f.read().splitlines()
+
+    def test_grant_writes_a_verifiable_apr1_entry(self):
+        import subprocess
+        res = self._post(self.worker_profile, 'grant')
+        self.assertEqual(res.status_code, 200)
+        data = json.loads(res.content)
+        self.assertEqual(data['username'], 'wahaworker')
+        self.assertEqual(res['Cache-Control'], 'no-store')
+        [line] = self._lines()
+        user, hashed = line.split(':', 1)
+        self.assertEqual(user, 'wahaworker')
+        salt = hashed.split('$')[2]
+        again = subprocess.run(['openssl', 'passwd', '-apr1', '-salt', salt, '-stdin'],
+                               input=data['password'], capture_output=True, text=True).stdout.strip()
+        self.assertEqual(again, hashed)
+
+    def test_new_password_replaces_and_keeps_other_entries(self):
+        import os
+        os.makedirs(os.path.dirname(self.htpasswd))
+        with open(self.htpasswd, 'w') as f:
+            f.write('test:$apr1$abc$def\n')
+        first = json.loads(self._post(self.worker_profile, 'grant').content)['password']
+        second = json.loads(self._post(self.worker_profile, 'grant').content)['password']
+        self.assertNotEqual(first, second)
+        lines = self._lines()
+        self.assertEqual(lines[0], 'test:$apr1$abc$def')
+        self.assertEqual([l.split(':')[0] for l in lines], ['test', 'wahaworker'])
+
+    def test_revoke_removes_the_entry(self):
+        self._post(self.worker_profile, 'grant')
+        res = self._post(self.worker_profile, 'revoke')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(self._lines(), [])
+
+    def test_cannot_remove_own_login(self):
+        boss_profile = self.boss.profile
+        self._post(boss_profile, 'grant')
+        res = self._post(boss_profile, 'revoke')
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual([l.split(':')[0] for l in self._lines()], ['wahaboss'])
+
+    def test_non_staff_refused(self):
+        user = User.objects.create_user(username='wahaoutsider', password='x')
+        profile = core_models.Profile.objects.create(user=user, is_staff=False)
+        self.assertEqual(self._post(profile, 'grant').status_code, 400)
+
+    def test_ordinary_staff_refused(self):
+        res = self._post(self.worker_profile, 'grant', client=self.login_as(self.worker))
+        self.assertEqual(res.status_code, 302)
+
+    def test_page_shows_column_state_and_unwired_warning(self):
+        self._post(self.worker_profile, 'grant')
+        res = self.client_boss.get(reverse('workforce:staff_roles_list'))
+        rows = {r['profile'].id: r['waha'] for r in res.context['rows']}
+        self.assertTrue(rows[self.worker_profile.id])
+        self.assertFalse(rows[self.boss.profile.id])
+        self.assertContains(res, 'not live yet')
+        with open(self.nginx_conf, 'w') as f:
+            f.write(f'auth_basic_user_file {self.htpasswd};\n')
+        res = self.client_boss.get(reverse('workforce:staff_roles_list'))
+        self.assertNotContains(res, 'not live yet')
+
+
+class WahaNumberColumnTests(DepartmentTestMixin, TestCase):
+    """The WhatsApp number columns — which WAHA sessions a staff member opens in the inbox."""
+
+    def setUp(self):
+        self.boss, _ = self.make_staff('numcolboss', [], superadmin=True)
+        self.worker, self.worker_profile = self.make_staff('numcolworker', [MKT])
+        self.client_boss = self.login_as(self.boss)
+
+    def _post(self, profile, session, enabled, client=None):
+        return (client or self.client_boss).post(
+            reverse('workforce:staff_waha_session', args=[profile.id]),
+            data=json.dumps({'session': session, 'enabled': enabled}), content_type='application/json')
+
+    def _numbers(self, user):
+        from whatsapp.models import InboxSessionAccess
+        return set(InboxSessionAccess.objects.filter(user=user).values_list('session', flat=True))
+
+    def test_open_and_close_a_number(self):
+        res = self._post(self.worker_profile, 'default', True)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(json.loads(res.content)['sessions'], ['default'])
+        self.assertEqual(self._numbers(self.worker), {'default'})
+        self._post(self.worker_profile, 'default', False)
+        self.assertEqual(self._numbers(self.worker), set())
+
+    def test_unknown_number_refused(self):
+        self.assertEqual(self._post(self.worker_profile, 'NotARealSession', True).status_code, 400)
+        self.assertEqual(self._numbers(self.worker), set())
+
+    def test_super_admin_row_refused(self):
+        self.assertEqual(self._post(self.boss.profile, 'default', True).status_code, 400)
+
+    def test_ordinary_staff_refused(self):
+        res = self._post(self.worker_profile, 'default', True, client=self.login_as(self.worker))
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(self._numbers(self.worker), set())
+
+    def test_page_shows_number_columns_and_ticks(self):
+        self._post(self.worker_profile, 'default', True)
+        res = self.client_boss.get(reverse('workforce:staff_roles_list'))
+        self.assertEqual([n['name'] for n in res.context['wa_numbers']], ['default'])
+        rows = {r['profile'].id: r for r in res.context['rows']}
+        self.assertEqual(rows[self.worker_profile.id]['numbers'], {'default'})
+        self.assertTrue(rows[self.boss.profile.id]['all_numbers'])
+        self.assertEqual(rows[self.worker_profile.id]['numbers_open'], 1)
+        self.assertContains(res, 'data-session="default"')
+        self.assertContains(res, '1 of 1')
+
+    def test_login_popup_lists_the_numbers_it_opens(self):
+        from whatsapp.models import InboxSessionAccess
+        import tempfile
+        from django.test import override_settings
+        with tempfile.TemporaryDirectory() as tmp, override_settings(
+                WAHA_INBOX_HTPASSWD=f'{tmp}/h', NGINX_SITE_CONF=f'{tmp}/c'):
+            url = reverse('workforce:staff_waha_access', args=[self.worker_profile.id])
+            body = json.dumps({'action': 'grant'})
+            data = json.loads(self.client_boss.post(url, body, content_type='application/json').content)
+            self.assertEqual(data['numbers'], [])
+            InboxSessionAccess.objects.create(user=self.worker, session='default')
+            data = json.loads(self.client_boss.post(url, body, content_type='application/json').content)
+            self.assertEqual([n['name'] for n in data['numbers']], ['default'])
 
 
 class PageOverrideTests(DepartmentTestMixin, TestCase):
@@ -558,3 +770,146 @@ class AutoTriggerDepartmentTests(DepartmentTestMixin, TestCase):
         user, _ = self.make_staff('atboss3', [], superadmin=True)
         html = self.login_as(user).get(reverse('workforce:wf_dashboard')).content.decode()
         self.assertIn('workforce_sidebar_link_auto_triggers', html)
+
+
+class OnboardingMarketingViewOnlyTests(DepartmentTestMixin, TestCase):
+    """
+    Marketing opens the onboarding queues (2026-10-04) but only to look:
+    approve / review / reject, team status, change role and the CSV export
+    stay with Operations — hidden on the page AND refused by the endpoint.
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        from fleet.tests_opportunities import make_driver
+
+        self.driver = make_driver('onbdriver', 9971)
+        profile = self.driver.profile
+        profile.first_name, profile.last_name = 'Onboard', 'Applicant'
+        profile.verification_status = 'pending'
+        profile.verification_applied_at = timezone.now()
+        profile.save()
+        self.driver.user.first_name, self.driver.user.last_name = 'Onboard', 'Applicant'
+        self.driver.user.save()
+        self.profile = profile
+
+    def _queues(self):
+        return [
+            reverse('workforce:business_verification_list'),
+            reverse('workforce:driver_verification_list'),
+            reverse('workforce:user_verification_list'),
+            reverse('workforce:team_verification_list'),
+            reverse('workforce:view_user_driver_profile', args=[self.profile.id]),
+            reverse('workforce:view_user_business_profile', args=[self.profile.id]),
+        ]
+
+    def test_marketing_opens_every_queue(self):
+        user, _ = self.make_staff('onbmkt', [MKT])
+        client = self.login_as(user)
+        for url in self._queues():
+            self.assertEqual(client.get(url).status_code, 200, url)
+
+    def test_marketing_is_refused_every_decision(self):
+        user, _ = self.make_staff('onbmkt2', [MKT])
+        client = self.login_as(user)
+        json_hdr = {'HTTP_ACCEPT': 'application/json'}
+        for url in (
+            reverse('workforce:update_verification_status', args=[self.profile.id]),
+            reverse('workforce:change_user_role', args=[self.profile.id]),
+            reverse('workforce:update_team_status', args=[1]),
+        ):
+            self.assertEqual(client.post(url, {'status': 'verified'}, **json_hdr).status_code, 403, url)
+        self.assertNotEqual(
+            client.get(reverse('workforce:export_driver_verification_csv')).status_code, 200)
+        self.assertNotEqual(client.get(reverse('workforce:warehouses_list')).status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.verification_status, 'pending')
+
+    def test_marketing_sees_no_decision_controls(self):
+        user, _ = self.make_staff('onbmkt3', [MKT])
+        client = self.login_as(user)
+        driver_q = client.get(reverse('workforce:driver_verification_list')).content.decode()
+        users_q = client.get(reverse('workforce:user_verification_list')).content.decode()
+        self.assertIn('Onboard Applicant', driver_q)
+        self.assertIn('Onboard Applicant', users_q)
+        for html in (driver_q, users_q):
+            self.assertNotIn('data-action="verify"', html)
+            self.assertNotIn('data-action="under_review"', html)
+            self.assertNotIn('data-action="reject"', html)
+            self.assertNotIn(f'href="/workforce/drivers/{self.driver.driver_id}/"', html)
+        self.assertNotIn('data-action="change_role"', users_q)
+        self.assertNotIn('data-bs-target="#wfExportModal"', driver_q)
+        self.assertNotIn('data-export-row', driver_q)
+
+    def test_operations_keeps_every_control(self):
+        user, _ = self.make_staff('onbops', [OPS])
+        client = self.login_as(user)
+        driver_q = client.get(reverse('workforce:driver_verification_list')).content.decode()
+        users_q = client.get(reverse('workforce:user_verification_list')).content.decode()
+        for html in (driver_q, users_q):
+            self.assertIn('data-action="verify"', html)
+            self.assertIn('data-action="reject"', html)
+            self.assertIn(f'href="/workforce/drivers/{self.driver.driver_id}/"', html)
+        self.assertIn('data-action="change_role"', users_q)
+        self.assertIn('data-bs-target="#wfExportModal"', driver_q)
+
+    def test_onboarding_menu_for_marketing_has_no_warehouse_link(self):
+        user, _ = self.make_staff('onbmkt4', [MKT])
+        # follow=True: marketing lands on its own overview, which carries the same sidebar.
+        html = self.login_as(user).get(
+            reverse('workforce:wf_dashboard'), follow=True).content.decode()
+        self.assertIn('workforce_sidebar_menu_verifications', html)
+        self.assertIn('workforce_sidebar_link_verify_driver', html)
+        self.assertNotIn('href="/workforce/warehouses/"', html)
+        self.assertIn('workforce_sidebar_mob_section_verifications', html)
+
+
+class MarketingDriverDocumentTests(DepartmentTestMixin, TestCase):
+    """
+    Marketing works driver documents from the driver-lead page (2026-10-06): edit
+    number / expiry, crop, add and verify. Delete stays with Operations.
+    """
+
+    def setUp(self):
+        import datetime
+
+        from django.utils import timezone
+        from fleet.models import DriverDocument
+        from fleet.tests_opportunities import make_driver
+
+        self.driver = make_driver('docmktdriver', 9981)
+        # Lead 339's QID: the image check read the expiry, nobody had typed it yet.
+        self.doc = DriverDocument.objects.create(
+            driver=self.driver, document_type='QID', document_no='30701200184')
+        DriverDocument.objects.filter(pk=self.doc.pk).update(
+            ai_status=DriverDocument.AI_MISMATCH, ai_document_no='30701200184',
+            ai_expiry_date=datetime.date(2029, 7, 16), ai_checked_at=timezone.now(),
+            ai_note='Expiry not entered (image shows 16 Jul 2029)')
+        user, _ = self.make_staff('docmkt', [MKT])
+        self.client = self.login_as(user)
+        self.base = f'/workforce/drivers/{self.driver.driver_id}/document/{self.doc.pk}/'
+
+    def test_marketing_typed_expiry_matches_the_image(self):
+        resp = self.client.post(self.base + 'edit/', {
+            'document_type': 'QID', 'document_no': '30701200184',
+            'document_issued_from': '', 'document_expiry_date': '2029-07-16',
+        }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.doc.refresh_from_db()
+        self.assertEqual(str(self.doc.document_expiry_date), '2029-07-16')
+        # The posted string must compare as a date, not flag "Expiry on image is 16 Jul 2029".
+        self.assertEqual(self.doc.ai_status, self.doc.AI_VERIFIED, self.doc.ai_note)
+        self.assertIsNotNone(self.doc.verified_at)
+
+    def test_marketing_can_verify_by_eye(self):
+        resp = self.client.post(self.base + 'verify/', {'action': 'verify'},
+                                HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.doc.refresh_from_db()
+        self.assertIsNotNone(self.doc.verified_by_id)
+
+    def test_marketing_cannot_delete_and_gets_json(self):
+        resp = self.client.post(self.base + 'delete/', HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(resp.status_code, 403)
+        self.assertIn('Department access required', resp.json()['error'])
+        self.assertTrue(type(self.doc).objects.filter(pk=self.doc.pk).exists())

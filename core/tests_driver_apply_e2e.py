@@ -1,4 +1,4 @@
-# Purpose: Browser test for the driver application submit path — photo shrinking, progress upload, document swap.
+# Purpose: Browser test for the driver application submit path — photo shrinking, progress upload, document swap, and the location a final submit needs.
 # Used by: python manage.py test core.tests_driver_apply_e2e (needs playwright + chromium; skips itself when absent)
 # Notes: Runs against a live server in Chromium because the thing under test is the client-side upload pipeline, which no Django test client exercises.
 
@@ -21,6 +21,7 @@ from fleet import models as fleet_models
 User = get_user_model()
 
 MEDIA_ROOT = '/tmp/ezzy-test-media-e2e'
+DOHA = {'latitude': 25.2854, 'longitude': 51.5310, 'accuracy': 12}
 # Headless Chromium here needs the extracted system libs (see server-environment notes)
 CHROME_LIBS = '/home/ezzyadmin/chrome-libs/extract/usr/lib/x86_64-linux-gnu'
 
@@ -110,14 +111,17 @@ class DriverApplySubmitBrowserTest(StaticLiveServerTestCase):
         session.save()
         self.session_key = session.session_key
 
-    def _page(self):
+    def _page(self, init_script=None, **context_options):
         from urllib.parse import urlparse
         ctx = self.browser.new_context(
-            viewport={'width': 412, 'height': 915}, is_mobile=True, has_touch=True)
+            viewport={'width': 412, 'height': 915}, is_mobile=True, has_touch=True,
+            **context_options)
         ctx.add_cookies([{'name': settings.SESSION_COOKIE_NAME,
                           'value': self.session_key,
                           'domain': urlparse(self.live_server_url).hostname,
                           'path': '/'}])
+        if init_script:
+            ctx.add_init_script(init_script)
         page = ctx.new_page()
         page.goto(self.live_server_url + '/join_us/driver/?step=4')
         # A disabled Submit button means the session cookie did not authenticate
@@ -126,7 +130,9 @@ class DriverApplySubmitBrowserTest(StaticLiveServerTestCase):
         return ctx, page
 
     def test_submit_shrinks_photos_uploads_and_lands_the_application(self):
-        ctx, page = self._page()
+        ctx, page = self._page(permissions=['geolocation'], geolocation=DOHA)
+        # Location already allowed: the Documents banner takes it with no tap
+        page.wait_for_selector('#core_join_driver_box_geo[data-geo-state="on"]')
         errors = []
         page.on('pageerror', lambda e: errors.append(str(e)))
         posts = []
@@ -174,22 +180,90 @@ class DriverApplySubmitBrowserTest(StaticLiveServerTestCase):
                             'photo was not shrunk before upload: %d vs %d'
                             % (stored, self.photo_bytes))
 
-    def test_denied_location_does_not_block_the_submission(self):
-        """Geolocation is refused here (no permission granted to the context)."""
+    def test_a_refused_location_holds_the_submission_until_allowed(self):
+        """No permission is granted to the context, so the browser refuses —
+        Submit must wait, and go through once location is allowed."""
+        from playwright.sync_api import TimeoutError as PlaywrightTimeout
         ctx, page = self._page()
+        dialogs, posts = [], []
+        page.on('dialog', lambda d: (dialogs.append(d.message), d.accept()))
+        page.on('request', lambda r: posts.append(r.url) if r.method == 'POST' else None)
+
         for key in ('Selfie', 'QID', 'Istimara'):
             page.set_input_files('#core_join_driver_file_' + key, self.photo_path)
         page.wait_for_function(
             "() => Array.from(document.querySelectorAll('[data-doc-note]'))"
             ".filter(n => /ready/.test(n.textContent)).length === 3")
+
+        page.click('#core_join_driver_btn_geo')
+        page.wait_for_function(
+            "() => ['denied', 'ask'].includes("
+            "document.getElementById('core_join_driver_box_geo').dataset.geoState)")
+        page.click('#core_join_driver_btn_submit')
+        page.wait_for_timeout(1000)
+        self.assertEqual(posts, [], 'submitted with no location')
+        self.assertTrue(any('Turn on location' in m for m in dialogs), dialogs)
+        self.assertFalse(core_models.Profile.objects.get(pk=self.profile.pk).is_driver)
+
+        # Allowed from the browser's settings: the banner turns green on its own,
+        # or on the Try again tap where the browser says nothing.
+        ctx.set_geolocation(DOHA)
+        ctx.grant_permissions(['geolocation'])
+        try:
+            page.wait_for_selector('#core_join_driver_box_geo[data-geo-state="on"]', timeout=4000)
+        except PlaywrightTimeout:
+            page.click('#core_join_driver_btn_geo')
+            page.wait_for_selector('#core_join_driver_box_geo[data-geo-state="on"]')
         page.click('#core_join_driver_btn_submit')
         page.wait_for_selector('text=Application under review', timeout=60000)
         ctx.close()
 
         self.assertTrue(core_models.Profile.objects.get(pk=self.profile.pk).is_driver)
-        self.assertEqual(
-            fleet_models.Driver.objects.get(pk=self.driver.pk).driver_meta.get(
-                'registration_location'), None)
+        location = fleet_models.Driver.objects.get(
+            pk=self.driver.pk).driver_meta['registration_location']
+        self.assertAlmostEqual(location['lat'], DOHA['latitude'], places=3)
+
+    # Counts every position request the page makes; optionally reports the
+    # site's permission as `state` the way a previously blocked browser would.
+    GEO_SPY = """
+        window.__geoCalls = 0;
+        var real = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+        navigator.geolocation.getCurrentPosition = function(ok, fail, opts) {
+            window.__geoCalls++; return real(ok, fail, opts);
+        };
+    """
+    GEO_BLOCKED = GEO_SPY + """
+        navigator.permissions.query = function() {
+            return Promise.resolve({ state: 'denied', onchange: null });
+        };
+    """
+
+    def test_a_step_save_never_asks_for_location(self):
+        """Only the banner's own button may ask. A prompt sprung on Save &
+        Continue, with no reason on screen, got answered "Block" — and a
+        blocked site can never be asked again."""
+        ctx, page = self._page(init_script=self.GEO_SPY)
+        page.click('[data-step-btn="1"]')
+        page.wait_for_selector('[data-wiz-step="1"].cja__wiz-step--active')
+        page.click('#core_join_driver_btn_next')
+        page.wait_for_selector('[data-wiz-step="2"].cja__wiz-step--active', timeout=60000)
+        self.assertEqual(page.evaluate('window.__geoCalls'), 0)
+        ctx.close()
+
+    def test_a_blocked_site_opens_on_the_plain_ask_not_phone_settings(self):
+        """Fix-it steps (site permissions, phone settings) appear only after a
+        tap fails — never on arrival."""
+        ctx, page = self._page(init_script=self.GEO_BLOCKED)
+        page.wait_for_timeout(500)   # let the permission query settle
+        box = '#core_join_driver_box_geo'
+        self.assertEqual(page.get_attribute(box, 'data-geo-state'), 'need')
+        self.assertEqual(page.locator(box + ' [data-geo-steps]:not(.d-none)').count(), 0)
+        self.assertEqual(page.evaluate('window.__geoCalls'), 0)
+
+        page.click('#core_join_driver_btn_geo')
+        page.wait_for_selector(box + '[data-geo-state="denied"]')
+        self.assertEqual(page.locator(box + ' [data-geo-steps]:not(.d-none)').count(), 1)
+        ctx.close()
 
     def test_save_and_continue_advances_the_wizard(self):
         """The Next button goes through the same XHR sender as Submit."""

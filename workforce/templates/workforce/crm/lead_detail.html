@@ -10,7 +10,7 @@
 {#        Driver leads also carry the crmdoc__ Documents panel + its viewer/edit dialogs (parts/_lead_documents*.html). #}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/crm.css' %}?v=20261003e" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/crm.css' %}?v=20261006p" rel="stylesheet" type="text/css" />
 {% if driver %}<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">{% endif %}
 {% endblock extra_css %}
 
@@ -42,6 +42,12 @@
         </span>
         {% if lead.is_overdue %}
         <span class="crm__stage crm__stage--overdue crmd__hero-plate crmd__hero-plate--alert"><i class="fa-solid fa-triangle-exclamation"></i>Follow-up overdue</span>
+        {% endif %}
+        {% if lead.is_idle %}
+        <span class="crm__stage crm__stage--overdue crmd__hero-plate crmd__hero-plate--alert"
+              title="Owned for {{ idle_days }}+ days with nothing logged by the owner since">
+          <i class="fa-solid fa-hourglass-end"></i>Idle {{ idle_days }}+ days
+        </span>
         {% endif %}
         {% if lead.converted_business %}
         {% if wf_dept_ops %}
@@ -766,8 +772,12 @@
             {% endif %}
           </div>
 
-          <div class="crmd__section">
+          {% comment %}Only a lead manager hands a lead to someone else, so only they get the
+          picker; everyone else has the two moves open to them — take it from the pool,
+          or give their own back. crm_lead_update enforces the same rule server-side.{% endcomment %}
+          <div class="crmd__section" id="workforce_crm_detail_div_owner">
             <div class="crmd__section-lbl">Assign To</div>
+            {% if is_lead_manager %}
             <select class="form-select form-select-sm" id="workforce_crm_detail_select_assignee">
               <option value="">— Unassigned —</option>
               {% for user in staff_users %}
@@ -776,6 +786,30 @@
               </option>
               {% endfor %}
             </select>
+            {% endif %}
+            {% if lead.assigned_to %}
+              {% if is_own_lead %}
+              <p class="crmd__owner-note">Yours since {{ lead.assigned_at|date:"d M Y" }}</p>
+              <form method="post" action="{% url 'workforce:crm_lead_release' lead.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="crm__btn crm__btn--sm w-100 justify-content-center" id="workforce_crm_detail_btn_release">
+                  <i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i> Release to pool
+                </button>
+              </form>
+              {% else %}
+              <p class="crmd__owner-note">Owned by {{ lead.assigned_to.get_full_name|default:lead.assigned_to.username }} since {{ lead.assigned_at|date:"d M Y" }}</p>
+              {% endif %}
+            {% elif can_claim_leads %}
+              <p class="crmd__owner-note">In the pool — nobody owns this lead yet.</p>
+              <form method="post" action="{% url 'workforce:crm_lead_claim' lead.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="crm__btn crm__btn--sm w-100 justify-content-center" id="workforce_crm_detail_btn_claim">
+                  <i class="fa-solid fa-hand-holding" aria-hidden="true"></i> Assign to me
+                </button>
+              </form>
+            {% endif %}
           </div>
 
           <div class="crmd__section">
@@ -795,6 +829,23 @@
             <i class="fa-solid fa-floppy-disk"></i> Save Changes
           </button>
           <div class="crmd__feedback" id="workforce_crm_detail_div_feedback"></div>
+
+          {% if can_delete_lead %}
+          {% comment %} Super admins only — crm_lead_delete checks again. Permanent: the
+             timeline, linked numbers and any merged duplicate cards go with the lead. {% endcomment %}
+          <div class="crmd__danger d-flex flex-wrap align-items-center gap-2 mt-3 pt-3">
+            <span class="crmd__danger-note">
+              Permanently removes this lead and its timeline{% if merged_children %}, plus {{ merged_children|length }} merged card{{ merged_children|length|pluralize }}{% endif %}. Cannot be undone.
+            </span>
+            <button type="button" class="crm__btn crm__btn--sm crm__btn--danger" id="workforce_crm_detail_btn_delete"
+                    data-name="{{ lead_wa_name|default:lead.phone }}"
+                    data-activities="{{ activities|length }}" data-merged="{{ merged_children|length }}"
+                    {% if lead.converted_business_id %}data-business="{{ lead.converted_business_id }}"{% endif %}
+                    {% if driver %}data-driver="1"{% endif %}>
+              <i class="fa-solid fa-trash-can"></i> Delete lead
+            </button>
+          </div>
+          {% endif %}
 
         </div>
       </div>
@@ -856,6 +907,7 @@
     leadId: {{ lead.pk }},
     urlUpdateStage: "{% url 'workforce:crm_lead_update_stage' lead.pk %}",
     urlMoveBoard: "{% url 'workforce:crm_lead_move_board' lead.pk %}",
+    urlDeleteLead: "{% url 'workforce:crm_lead_delete' lead.pk %}",
     urlUpdate: "{% url 'workforce:crm_lead_update' lead.pk %}",
     urlAddActivity: "{% url 'workforce:crm_lead_add_activity' lead.pk %}",
     urlAiSummary: "{% url 'workforce:crm_lead_ai_summary' lead.pk %}",
@@ -874,6 +926,6 @@
   };
 </script>
 {% if driver %}<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>{% endif %}
-<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20261003h"></script>
-{% if driver %}<script src="{% static 'workforce/js/doc_viewer.js' %}?v=20261003a"></script>{% endif %}
+<script src="{% static 'workforce/js/crm_lead_detail.js' %}?v=20261006m"></script>
+{% if driver %}<script src="{% static 'workforce/js/doc_viewer.js' %}?v=20261006f"></script>{% endif %}
 {% endblock %}

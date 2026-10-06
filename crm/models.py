@@ -11,6 +11,9 @@ from django.utils import timezone
 STAGE_CACHE_KEY = 'crm_lead_stages_v1'
 STAGE_CACHE_TTL = 300
 
+# Lead.save(): "we never saw the owner this row was loaded with".
+_UNKNOWN = object()
+
 
 def canonical_lead_phone(raw):
     """Stored form of a lead phone: a bare 8-digit Qatar number gains its 974 code.
@@ -122,6 +125,9 @@ class Lead(models.Model):
         'auth.User', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='assigned_crm_leads',
     )
+    # When the current owner got the card. Stamped by save() whenever assigned_to
+    # changes; the "idle 7 days" flag counts from here (crm/ownership.py).
+    assigned_at = models.DateTimeField(null=True, blank=True)
     next_followup_at = models.DateField(null=True, blank=True, db_index=True)
     converted_business = models.ForeignKey(
         'business.Business', null=True, blank=True, on_delete=models.SET_NULL,
@@ -202,7 +208,27 @@ class Lead(models.Model):
             update_fields = kwargs.get('update_fields')
             if update_fields is not None and 'contact_name' not in update_fields:
                 kwargs['update_fields'] = list(update_fields) + ['contact_name']
+        # Stamp assigned_at here rather than at the dozen places that set an owner
+        # (detail page, inbox panel, manual create, pricing sync, merge adopt).
+        loaded = getattr(self, '_loaded_assigned_to_id', _UNKNOWN)
+        if self._state.adding:
+            if self.assigned_to_id and not self.assigned_at:
+                self.assigned_at = timezone.now()
+        elif loaded is not _UNKNOWN and loaded != self.assigned_to_id:
+            self.assigned_at = timezone.now() if self.assigned_to_id else None
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None and 'assigned_at' not in update_fields:
+                kwargs['update_fields'] = list(update_fields) + ['assigned_at']
         super().save(*args, **kwargs)
+        self._loaded_assigned_to_id = self.assigned_to_id
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        # A deferred assigned_to (.only()) stays _UNKNOWN, so save() never stamps
+        # a change it cannot see.
+        instance._loaded_assigned_to_id = instance.__dict__.get('assigned_to_id', _UNKNOWN)
+        return instance
 
     def __str__(self):
         return f"{self.company_name or self.contact_name or self.phone} ({self.stage_label})"
@@ -442,6 +468,29 @@ class LeadStage(models.Model):
     def board_columns(cls, category):
         """Active columns for one board, left→right. One query."""
         return list(cls.objects.filter(category=category, is_active=True).order_by('position', 'pk'))
+
+
+class PricingLinkRef(models.Model):
+    """One pricing-form link the WhatsApp inbox sent to one chat (`?wa=<code>`).
+
+    The form usually comes back naming the office number while the owner chats from
+    their own phone, so nothing would tie the enquiry to the chat. The code does:
+    crm.chat_links.link_from_pricing_ref joins that chat to the lead the form creates.
+    """
+    code = models.CharField(max_length=16, unique=True)
+    session = models.CharField(max_length=64, blank=True, default='')
+    identifier = models.CharField(max_length=50, help_text='Phone digits the link was sent to.')
+    sent_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    lead = models.ForeignKey(Lead, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.code} -> {self.identifier}'
 
 
 class LeadWaLink(models.Model):

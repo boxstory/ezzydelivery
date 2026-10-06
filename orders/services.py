@@ -771,9 +771,13 @@ def create_return_pickup_order(ret, *, items=None, charge=None, user=None,
         new.order_status = 'publish'
         new._status_changed_by = user
         new.save()
-        # Published on creation for the same reason forward_to_client does it:
-        # any driver can take it. Staff can still unpublish from the task page.
+        # Published on creation like forward_to_client does it, into the
+        # Unassigned list: staff or a Task Automation rule picks the driver.
+        # update() skips the signal that runs the rules, so they are run here.
+        from delivery.services.assignment import schedule_rules
         new.delivery_task.update(dl_task_publish=True, dl_task_status='pending')
+        for task_pk in new.delivery_task.values_list('pk', flat=True):
+            schedule_rules(task_pk)
 
     return new
 

@@ -83,16 +83,22 @@ def _safe_count_returns_on_shelf():
         return 0
 
 
-def _safe_count_crm_overdue(category=None):
+def _safe_count_crm_overdue(category=None, user=None):
     """Count open CRM leads whose follow-up date has passed. `category` scopes the
     count to one pipeline — the sidebar carries a separate badge for CRM Business
-    and CRM Driver, so a business badge must not count driver applicants. Returns 0
-    if the crm app or its migrations aren't ready (defensive)."""
+    and CRM Driver, so a business badge must not count driver applicants. `user`
+    narrows it to the leads that user can see (crm/ownership.py) — a badge must not
+    count cards the page behind it hides. Returns 0 if the crm app or its
+    migrations aren't ready (defensive)."""
     try:
         from django.utils import timezone
+        from crm import ownership
         from crm.models import Lead
         from crm.services import closed_stage_keys
-        leads = Lead.objects.filter(next_followup_at__lt=timezone.localdate())
+        leads = Lead.objects.filter(next_followup_at__lt=timezone.localdate(),
+                                    merged_into__isnull=True)
+        if user is not None:
+            leads = ownership.visible_leads(leads, user)
         if category:
             leads = leads.filter(category=category)
         return leads.exclude(stage__in=closed_stage_keys(category)).count()
@@ -218,6 +224,10 @@ def workforce_sidebar_counts(request):
             dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
         ).count(),
 
+        # Published tasks nobody is on and no driver can see — waiting on staff
+        # or a Task Automation rule.
+        'unassigned_tasks_count': _unassigned_tasks_count(),
+
         # Address verification jobs awaiting attention (queued + sent +
         # manual_review). Surfaces in the Tasks/Import sidebar badges so ops
         # notice the WhatsApp pipeline backlog.
@@ -225,9 +235,9 @@ def workforce_sidebar_counts(request):
 
         # Open CRM leads with an overdue follow-up (CRM sidebar badges — one per
         # pipeline, plus the combined figure other pages still read).
-        'crm_overdue_count': _safe_count_crm_overdue(),
-        'crm_business_overdue_count': _safe_count_crm_overdue('business'),
-        'crm_driver_overdue_count': _safe_count_crm_overdue('driver'),
+        'crm_overdue_count': _safe_count_crm_overdue(user=request.user),
+        'crm_business_overdue_count': _safe_count_crm_overdue('business', request.user),
+        'crm_driver_overdue_count': _safe_count_crm_overdue('driver', request.user),
 
         # Unclaimed first-mile pickups (Pickup sidebar badge)
         'pickup_pending_count': _safe_count_pickup_pending(),
@@ -245,6 +255,16 @@ def workforce_sidebar_counts(request):
     cache.set(cache_key, counts, 60)  # 60 second TTL
     request._cached_workforce_counts = counts
     return counts
+
+
+def _unassigned_tasks_count():
+    """Published tasks waiting for a driver or Public. Never raises, for the same
+    reason as the P2P badge below — this runs on every staff page."""
+    try:
+        from delivery.selectors import unassigned_tasks
+        return unassigned_tasks().count()
+    except Exception:
+        return 0
 
 
 def _p2p_pending_count():

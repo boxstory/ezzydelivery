@@ -29,6 +29,9 @@ urlpatterns = [
     # Staff role management (super admin) — department sub-roles per staff user
     path('staff-roles/', workforce_views.staff_roles_list, name='staff_roles_list'),
     path('staff-roles/<int:profile_id>/update/', workforce_views.staff_role_update, name='staff_role_update'),
+    path('staff-roles/<int:profile_id>/grant/', workforce_views.staff_role_grant, name='staff_role_grant'),
+    path('staff-roles/<int:profile_id>/waha/', workforce_views.staff_waha_access, name='staff_waha_access'),
+    path('staff-roles/<int:profile_id>/waha-session/', workforce_views.staff_waha_session, name='staff_waha_session'),
 
     # Page → department map editor (super admin) — move pages between desks,
     # switch them off, classify routes that have none
@@ -177,6 +180,7 @@ urlpatterns = [
     path('tasks/fulfilled-clients/', workforce_views.fulfilled_clients_tasks, name='dl_list_fulfilled_clients'),
     path('tasks/non-fulfilled-clients/', workforce_views.non_fulfilled_clients_tasks, name='dl_list_non_fulfilled_clients'),
     path('tasks/unpublished/', workforce_views.dl_list_ready_to_published_to_dms, name='dl_list_ready_to_published_to_dms'),
+    path('tasks/unassigned/', workforce_views.dl_list_unassigned, name='dl_list_unassigned'),
     path('tasks/published/', workforce_views.dl_list_published_to_dms, name='dl_list_published_to_dms'),
     path('tasks/dl_list_incompleted/', workforce_views.dl_list_incompleted_details, name='dl_list_incompleted_details'),
 
@@ -212,6 +216,10 @@ urlpatterns = [
     path('pickups/create/', workforce_views.pickup_staff_create, name='pickup_staff_create'),
     path('pickups/relocate/', workforce_views.pickup_staff_relocate, name='pickup_staff_relocate'),
     path('pickups/<int:pickup_id>/timeline/', workforce_views.pickup_timeline_card, name='pickup_timeline_card'),
+    path('task-automation/', workforce_views.task_automation_list, name='task_automation_list'),
+    path('task-automation/apply/', workforce_views.task_automation_apply, name='task_automation_apply'),
+    path('task-automation/<int:rule_id>/toggle/', workforce_views.task_automation_toggle, name='task_automation_toggle'),
+    path('task-automation/<int:rule_id>/delete/', workforce_views.task_automation_delete, name='task_automation_delete'),
     path('pickup-automation/', workforce_views.pickup_automation_list, name='pickup_automation_list'),
     path('pickup-automation/save/', workforce_views.pickup_automation_save, name='pickup_automation_save'),
     path('pickup-automation/fleet/<int:business_id>/', workforce_views.pickup_fleet_list, name='pickup_fleet_list'),
@@ -465,6 +473,11 @@ urlpatterns = [
     path('forms/pricing-inquiries/<int:inquiry_id>/add-activity/', workforce_views.pricing_inquiry_add_activity, name='pricing_inquiry_add_activity'),
     path('forms/pricing-inquiries/<int:inquiry_id>/delete-activity/<int:activity_id>/', workforce_views.pricing_inquiry_delete_activity, name='pricing_inquiry_delete_activity'),
 
+    # The marketing desk's landing page. wf_dashboard sends a marketing-only
+    # account here, so this route must stay reachable by MKT in core/departments.py.
+    path('marketing/', marketing_views.wf_marketing_overview,
+         name='wf_marketing_overview'),
+
     # Driver proposals — the recruitment offer marketing publishes to the driver
     # app and the public careers page (fleet.DriverProposal)
     path('marketing/driver-proposals/',
@@ -499,8 +512,12 @@ urlpatterns = [
     path('crm/leads/<int:lead_id>/move-board/', crm_views.crm_lead_move_board, name='crm_lead_move_board'),
     path('crm/leads/<int:lead_id>/merge/', crm_views.crm_lead_merge, name='crm_lead_merge'),
     path('crm/leads/<int:lead_id>/unmerge/', crm_views.crm_lead_unmerge, name='crm_lead_unmerge'),
+    path('crm/leads/<int:lead_id>/delete/', crm_views.crm_lead_delete, name='crm_lead_delete'),
     path('crm/leads/<int:lead_id>/merge/adopt/', crm_views.crm_lead_merge_adopt, name='crm_lead_merge_adopt'),
     path('crm/leads/<int:lead_id>/update/', crm_views.crm_lead_update, name='crm_lead_update'),
+    path('crm/leads/<int:lead_id>/claim/', crm_views.crm_lead_claim, name='crm_lead_claim'),
+    path('crm/leads/<int:lead_id>/release/', crm_views.crm_lead_release, name='crm_lead_release'),
+    path('crm/leads/claim-next/', crm_views.crm_lead_claim_next, name='crm_lead_claim_next'),
     path('crm/leads/<int:lead_id>/add-activity/', crm_views.crm_lead_add_activity, name='crm_lead_add_activity'),
     path('crm/leads/<int:lead_id>/delete-activity/<int:activity_id>/', crm_views.crm_lead_delete_activity, name='crm_lead_delete_activity'),
     path('crm/leads/link-business/', crm_views.crm_lead_link_business, name='crm_lead_link_business'),

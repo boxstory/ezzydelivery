@@ -2,7 +2,7 @@
 {% load static %}
 {% load socialaccount %}
 {% comment %}
-Purpose: Public driver application — Google sign-in gate, 3 sections (profile, vehicle, documents) with geolocation on submit
+Purpose: Public driver application — Google sign-in gate, 4 steps (profile, vehicle, zones & hours, documents); a location is required to submit
 Used by: core.views.join_driver (/join_us/driver/)
 Notes: Anonymous users see a blurred form behind a Google login modal; One Tap from base.html also fires
 {% endcomment %}
@@ -10,7 +10,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
 {% block title %}Join as Driver - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/driver-apply.css' %}?v=20260926b" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/driver-apply.css' %}?v=20261006b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -442,6 +442,40 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
                         </div>
                         {% endfor %}
                     </div>
+                    {% if needs_location %}
+                    {% comment %}A final submit needs a location (core.views.join_driver refuses one
+                    without). Asked for last, right above Submit and after the photos, so the
+                    Documents step reads as documents. Fix-it steps only show after a tap fails —
+                    never on page load. Only rendered while none is on file (the first is kept).{% endcomment %}
+                    <div class="cja__geo d-flex align-items-start gap-2 p-3 mt-4" id="core_join_driver_box_geo"
+                         data-geo-state="need" role="status" aria-live="polite">
+                        <i class="fa-solid fa-location-crosshairs cja__geo-ico" aria-hidden="true"></i>
+                        <div class="flex-grow-1">
+                            <p class="cja__geo-title mb-1" id="core_join_driver_text_geotitle">Last step: turn on location</p>
+                            <p class="cja__geo-text small mb-2" id="core_join_driver_text_geostate">
+                                Needed to submit. We use it to match you with deliveries near you, and save it once.
+                            </p>
+                            <ol class="cja__geo-steps small mb-2 d-none" data-geo-steps="android">
+                                <li>Swipe down from the top of the screen and turn on <strong>Location</strong>.</li>
+                                <li>Tap the small icon at the left of the web address, open <strong>Permissions</strong> and set <strong>Location</strong> to <strong>Allow</strong>.</li>
+                                <li>Come back here and tap <strong>Try again</strong>.</li>
+                            </ol>
+                            <ol class="cja__geo-steps small mb-2 d-none" data-geo-steps="ios">
+                                <li>Open <strong>Settings &rsaquo; Privacy &amp; Security &rsaquo; Location Services</strong> and turn it on.</li>
+                                <li>In the same list open <strong>Safari Websites</strong> (or <strong>Chrome</strong>) and choose <strong>While Using the App</strong>.</li>
+                                <li>Come back here, tap <strong>Try again</strong>, then choose <strong>Allow</strong>.</li>
+                            </ol>
+                            <ol class="cja__geo-steps small mb-2 d-none" data-geo-steps="desktop">
+                                <li>Click the icon at the left of the address bar.</li>
+                                <li>Set <strong>Location</strong> to <strong>Allow</strong>, then click <strong>Try again</strong>.</li>
+                            </ol>
+                            <button type="button" class="btn cja__btn-navy cja__geo-btn" id="core_join_driver_btn_geo"
+                                    {% if not user.is_authenticated %}disabled{% endif %}>
+                                <i class="fa-solid fa-location-arrow me-1" aria-hidden="true"></i><span data-geo-btn-label>Turn on location</span>
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Live upload state: a phone on weak mobile data needs to see that
@@ -465,7 +499,7 @@ Notes: Anonymous users see a blurred form behind a Google login modal; One Tap f
 
                 <div class="d-flex flex-column flex-md-row align-items-center justify-content-between gap-2 mb-5">
                     <p class="text-muted small mb-0" id="core_join_driver_text_geohint">
-                        Your location is captured when you submit, to help us assign nearby deliveries.
+                        {% if needs_location %}Turn on location (just above) to submit.{% else %}Your location is already on file.{% endif %}
                     </p>
                     <div class="d-flex flex-wrap justify-content-center gap-2 cja__wiz-actions">
                         <button type="button" class="btn btn-outline-dark btn-lg d-none" id="core_join_driver_btn_back">
@@ -888,28 +922,151 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     var needsLocation = form.dataset.needsLocation === '1';
+    var geoLatInput = document.getElementById('core_join_driver_input_geolat');
+    var geoLngInput = document.getElementById('core_join_driver_input_geolng');
+    var geoAccInput = document.getElementById('core_join_driver_input_geoacc');
 
-    // Ask the browser for a position, then let the form through either way —
-    // a refused or slow fix must never block the application.
+    function geoFilled() { return !!(geoLatInput.value && geoLngInput.value); }
+
+    function fillGeo(pos) {
+        geoLatInput.value = pos.coords.latitude;
+        geoLngInput.value = pos.coords.longitude;
+        geoAccInput.value = Math.round(pos.coords.accuracy);
+    }
+
+    // Opportunistic capture on a save, only where location is ALREADY allowed —
+    // so no browser prompt ever pops up on a step save with no reason on
+    // screen. An unexplained prompt on step 1 got tapped "Block", and a blocked
+    // site cannot be asked again: the Documents banner could then only offer
+    // phone-settings steps. The one place that asks is the banner's own button.
     function captureThen(done) {
         var settled = false;
         function once() { if (!settled) { settled = true; done(); } }
-        if (!navigator.geolocation) { once(); return; }
+        if (!navigator.geolocation || !needsLocation || geoFilled()
+                || geoPermission !== 'granted') { once(); return; }
         // Our own wall clock, on top of the API's `timeout`. An unanswered
         // permission prompt fires neither callback, and the API timeout does not
         // start counting until permission is decided — that is how this form
         // used to sit on "Submitting…" forever without ever sending a request.
         var guard = window.setTimeout(once, 9000);
         navigator.geolocation.getCurrentPosition(function(pos) {
-            document.getElementById('core_join_driver_input_geolat').value = pos.coords.latitude;
-            document.getElementById('core_join_driver_input_geolng').value = pos.coords.longitude;
-            document.getElementById('core_join_driver_input_geoacc').value = Math.round(pos.coords.accuracy);
+            fillGeo(pos);
             window.clearTimeout(guard);
             once();
         }, function() {
             window.clearTimeout(guard);
             once();
         }, { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true });
+    }
+
+    // ---------------------------------------------------------------------
+    // Location banner on the Documents step. A final submission needs a
+    // location — it places the applicant on the driver map and near the right
+    // zones — and a refusal used to slip through on Submit with none at all.
+    // So it is asked for here, with the reason on screen, and Submit waits.
+    // ---------------------------------------------------------------------
+    var geoBox = document.getElementById('core_join_driver_box_geo');
+    var geoBtn = document.getElementById('core_join_driver_btn_geo');
+    var geoPermission = null;   // 'granted' | 'denied' | 'prompt', or null where the browser will not say
+    var geoTimer = null;
+    var GEO_COPY = {
+        need: ['Last step: turn on location',
+               'Needed to submit. We use it to match you with deliveries near you, and save it once.',
+               'Turn on location'],
+        checking: ['Getting your location…', 'If your phone asks, choose “Allow”.', null],
+        on: ['Location on', 'Thanks — you can submit your application.', null],
+        ask: ['Location not allowed yet', 'Tap the button and choose “Allow” when your phone asks.',
+              'Turn on location'],
+        denied: ['Location is blocked for this site', 'Follow these steps, then tap Try again.', 'Try again'],
+        off: ['Your location (GPS) is turned off', 'Follow these steps, then tap Try again.', 'Try again'],
+        slow: ['Still waiting for your location',
+               'If your phone asked, choose “Allow”. Otherwise move near a window and tap Try again.',
+               'Try again'],
+        unsupported: ['This browser cannot share your location',
+                      'Open this page in Chrome or Safari on your phone to submit.', null]
+    };
+    var geoPlatform = (/iPad|iPhone|iPod/.test(navigator.userAgent)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) ? 'ios'
+        : (/Android/i.test(navigator.userAgent) ? 'android' : 'desktop');
+
+    function setGeo(state) {
+        if (!geoBox) { return; }
+        var copy = GEO_COPY[state];
+        geoBox.dataset.geoState = state;
+        geoBox.classList.toggle('cja__geo--on', state === 'on');
+        geoBox.classList.toggle('cja__geo--blocked',
+            state === 'denied' || state === 'off' || state === 'unsupported');
+        document.getElementById('core_join_driver_text_geotitle').textContent = copy[0];
+        document.getElementById('core_join_driver_text_geostate').textContent = copy[1];
+        var showSteps = state === 'denied' || state === 'off';
+        geoBox.querySelectorAll('[data-geo-steps]').forEach(function(list) {
+            list.classList.toggle('d-none', !showSteps || list.dataset.geoSteps !== geoPlatform);
+        });
+        geoBtn.classList.toggle('d-none', !copy[2]);
+        if (copy[2]) { geoBtn.querySelector('[data-geo-btn-label]').textContent = copy[2]; }
+        if (geoHint) {
+            geoHint.textContent = state === 'on'
+                ? '✓ Location on — ready to submit.'
+                : 'Turn on location (just above) to submit.';
+        }
+    }
+
+    // One fix per tap (or per return from the phone's settings) — never on a timer.
+    function locate() {
+        if (!navigator.geolocation) { setGeo('unsupported'); return; }
+        setGeo('checking');
+        window.clearTimeout(geoTimer);
+        // An unanswered permission prompt fires neither callback. Say so after a
+        // while, but keep listening: a late "Allow" still lands below.
+        geoTimer = window.setTimeout(function() {
+            if (!geoFilled()) { setGeo('slow'); }
+        }, 20000);
+        // Any accuracy will do for "where they applied", and a network fix
+        // answers indoors where a cold GPS would time out.
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            window.clearTimeout(geoTimer);
+            fillGeo(pos);
+            setGeo('on');
+        }, function(err) {
+            window.clearTimeout(geoTimer);
+            if (geoFilled()) { return; }
+            if (err.code === 1) {
+                // Refused while the site permission still reads "granted" is the
+                // phone's own Location switch saying no.
+                setGeo(geoPermission === 'granted' ? 'off' : (geoPermission === 'prompt' ? 'ask' : 'denied'));
+            } else {
+                setGeo(err.code === 2 ? 'off' : 'slow');
+            }
+        }, { timeout: 15000, maximumAge: 300000, enableHighAccuracy: false });
+    }
+
+    if (geoBox) {
+        geoBtn.addEventListener('click', locate);
+        if (!navigator.geolocation) {
+            setGeo('unsupported');
+        } else if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({ name: 'geolocation' }).then(function(status) {
+                geoPermission = status.state;
+                // Already allowed: take it now, no prompt will show. Blocked:
+                // stay on the plain ask — the fix-it steps wait for a tap that
+                // fails, rather than greeting the applicant with phone settings.
+                if (!geoFilled() && status.state === 'granted' && current === TOTAL) { locate(); }
+                status.onchange = function() {
+                    geoPermission = status.state;
+                    if (geoFilled()) { return; }
+                    if (status.state === 'granted') { locate(); }
+                    else if (status.state === 'denied') { setGeo('denied'); }
+                };
+            }).catch(function() { /* not answerable here — the button still works */ });
+        }
+        // Back from the phone's settings: try once more without waiting for a tap.
+        document.addEventListener('visibilitychange', function() {
+            var st = geoBox.dataset.geoState;
+            if (document.visibilityState === 'visible' && !geoFilled() && current === TOTAL
+                    && (st === 'denied' || st === 'off')) {
+                locate();
+            }
+        });
     }
 
     // ---------------------------------------------------------------------
@@ -982,7 +1139,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         showPanel();
-        setStage(needsLocation ? 'Getting your location…' : 'Preparing your photos…',
+        setStage(needsLocation && !geoFilled() && geoPermission === 'granted'
+                     ? 'Getting your location…' : 'Preparing your photos…',
                  'Keep this page open — closing it cancels the upload.');
 
         captureThen(function() {
@@ -1083,8 +1241,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (zoneChecks.length && !form.querySelector('input[name="zone_groups"]:checked')) {
             errs.push('Select at least one delivery zone you want to work in.');
         }
+        var needGeo = !!geoBox && !geoFilled();
+        if (needGeo) {
+            errs.push('Turn on location to submit — use the "Turn on location" button just above.');
+        }
         if (errs.length) {
             alert(errs.join('\n'));
+            if (needGeo) {
+                geoBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Restart the highlight even if it ran on an earlier tap.
+                geoBox.classList.remove('cja__geo--nudge');
+                void geoBox.offsetWidth;
+                geoBox.classList.add('cja__geo--nudge');
+            }
             return;
         }
 

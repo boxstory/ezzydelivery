@@ -8,11 +8,11 @@
 {% block title %}Staff Roles - Staff Dashboard{% endblock title %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/staff-roles.css' %}?v=20260801b" type="text/css" />
+<link rel="stylesheet" href="{% static 'workforce/css/staff-roles.css' %}?v=20261006g" type="text/css" />
 {% endblock %}
 
 {% block content %}
-<div class="srol">
+<div class="srol srol--roles">
   <div class="srol__wrap">
 
     <!-- Masthead -->
@@ -20,11 +20,7 @@
       <div class="wfhero__ident">
         <span class="wfhero__eyebrow">Access Control</span>
         <h1 class="wfhero__title">Staff Roles</h1>
-        <span class="wfhero__sub">
-          Staff access is two questions
-          <span class="wfhero__sep">·</span> <em>is_staff</em> lets them in
-          <span class="wfhero__sep">·</span> departments decide which desks
-        </span>
+        <span class="wfhero__sub">Who can open the staff dashboard, and which desks they see</span>
       </div>
       <div class="wfhero__side">
         <div class="wfhero__tallies">
@@ -55,78 +51,174 @@
     <div class="wfnote" id="workforce_staff_roles_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_staff_roles_card_notes' %}" hidden></div>
 
-    <!-- Department legend: what each desk actually unlocks -->
-    <div class="row g-2 mb-3">
-      {% for dept in departments %}
-      <div class="col-12 col-sm-6 col-lg-3">
-        <a class="srol__legend srol__legend--{{ dept.code }}"
-           href="{% url 'workforce:staff_pages_list' %}?dept={{ dept.code }}"
-           title="Edit which pages belong to {{ dept.label }}">
-          <span class="srol__legend-swatch" aria-hidden="true"></span>
-          <span class="srol__legend-name">{{ dept.label }}</span>
-          <span class="srol__legend-count">{{ dept.pages }} pages</span>
+    <!-- Toolbar: find people (staff or accounts to add) · filter the matrix by desk -->
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <form method="get" role="search" class="srol__find d-flex flex-nowrap gap-2 flex-grow-1">
+        {% if dept_filter %}<input type="hidden" name="dept" value="{{ dept_filter }}">{% endif %}
+        <input type="search" name="search" value="{{ search }}" id="workforce_staff_roles_input_search"
+               class="form-control srol__find-input"
+               placeholder="Search staff or accounts to add: name, email, phone"
+               title="Searches name, email, phone and user number, across staff and signed-up accounts"
+               aria-label="Find staff or an account to add">
+        <button type="submit" class="btn srol__btn srol__btn--icon" id="workforce_staff_roles_btn_search" title="Search">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <span class="visually-hidden">Search</span>
+        </button>
+        {% if search or dept_filter %}
+        <a href="{% url 'workforce:staff_roles_list' %}" class="btn srol__btn srol__btn--icon"
+           id="workforce_staff_roles_btn_clear" title="Clear search and filter">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          <span class="visually-hidden">Clear search and filter</span>
         </a>
+        {% endif %}
+      </form>
+
+      <nav class="srol__seg d-flex align-items-stretch" aria-label="Filter by desk" id="workforce_staff_roles_nav_desk">
+        <span class="srol__seg-label d-flex align-items-center">Desk</span>
+        {% with q=search|urlencode %}
+        <a href="?{% if search %}search={{ q }}{% endif %}"
+           class="srol__seg-item d-flex align-items-center gap-2{% if not dept_filter %} srol__seg-item--on{% endif %}"
+           {% if not dept_filter %}aria-current="page"{% endif %}>All <span class="srol__seg-num">{{ stats.total }}</span></a>
+        <a href="?dept=ops{% if search %}&search={{ q }}{% endif %}"
+           class="srol__seg-item d-flex align-items-center gap-2{% if dept_filter == 'ops' %} srol__seg-item--on{% endif %}"
+           {% if dept_filter == 'ops' %}aria-current="page"{% endif %}>Operations <span class="srol__seg-num">{{ stats.ops }}</span></a>
+        <a href="?dept=fin{% if search %}&search={{ q }}{% endif %}"
+           class="srol__seg-item d-flex align-items-center gap-2{% if dept_filter == 'fin' %} srol__seg-item--on{% endif %}"
+           {% if dept_filter == 'fin' %}aria-current="page"{% endif %}>Finance <span class="srol__seg-num">{{ stats.fin }}</span></a>
+        <a href="?dept=mkt{% if search %}&search={{ q }}{% endif %}"
+           class="srol__seg-item d-flex align-items-center gap-2{% if dept_filter == 'mkt' %} srol__seg-item--on{% endif %}"
+           {% if dept_filter == 'mkt' %}aria-current="page"{% endif %}>Marketing <span class="srol__seg-num">{{ stats.mkt }}</span></a>
+        <a href="?dept=admin{% if search %}&search={{ q }}{% endif %}"
+           class="srol__seg-item d-flex align-items-center gap-2{% if dept_filter == 'admin' %} srol__seg-item--on{% endif %}"
+           {% if dept_filter == 'admin' %}aria-current="page"{% endif %}>Super Admin <span class="srol__seg-num">{{ stats.admin }}</span></a>
+        <a href="?dept=none{% if search %}&search={{ q }}{% endif %}"
+           class="srol__seg-item d-flex align-items-center gap-2{% if dept_filter == 'none' %} srol__seg-item--on{% endif %}"
+           {% if dept_filter == 'none' %}aria-current="page"{% endif %}>No desk <span class="srol__seg-num">{{ stats.none }}</span></a>
+        {% endwith %}
+      </nav>
+    </div>
+
+    {% if waha_error %}
+    <div class="alert alert-danger srol__strip d-flex align-items-baseline gap-2" role="alert" id="workforce_staff_roles_alert_waha">
+      <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+      <span>WAHA Inbox logins cannot be read right now: {{ waha_error }}</span>
+    </div>
+    {% elif not waha_wired %}
+    <div class="alert alert-warning srol__strip d-flex align-items-baseline gap-2" role="alert" id="workforce_staff_roles_alert_waha">
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+      <span>
+        <strong>WAHA Inbox logins are saved but not live yet.</strong>
+        nginx still checks <code>/etc/nginx/.htpasswd</code> for <code>/waha/wa-chats/</code>.
+        Point that block's <code>auth_basic_user_file</code> at <code>{{ waha_path }}</code> and reload nginx.
+      </span>
+    </div>
+    {% endif %}
+
+    {% if search %}
+    <!-- Signed-up accounts matching the search that are not staff yet -->
+    <section class="srol__add mb-2" id="workforce_staff_roles_card_candidates"
+             aria-labelledby="workforce_staff_roles_title_candidates">
+      <div class="srol__add-head d-flex flex-wrap align-items-baseline column-gap-2">
+        <h2 class="srol__add-title" id="workforce_staff_roles_title_candidates">Not staff yet</h2>
+        <span class="srol__add-count srol__mono">{{ candidates|length }}</span>
+        <span class="srol__add-hint">Signed-up accounts matching “{{ search }}”. Add one, then tick their desks in the table below.</span>
       </div>
-      {% endfor %}
-    </div>
-
-    <!-- Search + department filter -->
-    <form method="get" class="d-flex flex-wrap gap-2 mb-3">
-      <input type="text" name="search" value="{{ search }}" class="form-control srol__search"
-             placeholder="Search name, email, phone, user number...">
-      <button type="submit" class="btn btn-outline-secondary">
-        <i class="fa-solid fa-magnifying-glass"></i>
-      </button>
-      {% if search or dept_filter %}
-      <a href="{% url 'workforce:staff_roles_list' %}" class="btn btn-outline-danger">
-        <i class="fa-solid fa-xmark"></i>
-      </a>
+      {% if candidates %}
+      <div class="srol__tablewrap">
+        <table id="workforce_staff_roles_table_candidates" class="table srol__table align-middle mb-0">
+          <tbody>
+            {% for p in candidates %}
+            <tr class="srol__row" data-profile-id="{{ p.id }}">
+              <th scope="row" class="srol__who">
+                <span class="srol__name">
+                  {{ p.first_name|default:"" }} {{ p.last_name|default:"" }}
+                  {% if not p.first_name and not p.last_name %}{{ p.username|default:p.user_number }}{% endif %}
+                </span>
+                <span class="srol__meta d-flex flex-wrap align-items-center column-gap-3">
+                  <span class="srol__mono">{{ p.user_number }}</span>
+                  {% if p.email %}<span>{{ p.email }}</span>{% endif %}
+                  {% if p.phone %}<span class="srol__mono">{{ p.phone }}</span>{% endif %}
+                  <span>Joined {{ p.user.date_joined|date:"j M Y" }}</span>
+                  {% if p.is_driver %}<span class="srol__tag">Driver</span>{% endif %}
+                  {% if p.is_business %}<span class="srol__tag">Business</span>{% endif %}
+                  {% if p.is_customer %}<span class="srol__tag">Customer</span>{% endif %}
+                </span>
+              </th>
+              <td class="text-end">
+                <button type="button" class="btn srol__btn srol__btn--row text-nowrap srol__grant"
+                        id="workforce_staff_roles_btn_grant_{{ p.id }}"
+                        data-name="{{ p.email|default:p.username }}">
+                  <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Add as staff
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="srol__add-empty">No other signed-up account matches “{{ search }}”. They need to create an account first.</p>
       {% endif %}
-    </form>
+    </section>
+    {% endif %}
 
-    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-      <span class="text-muted small"><i class="fa-solid fa-filter"></i> Desk:</span>
-      <a href="?{% if search %}search={{ search }}{% endif %}"
-         class="btn btn-sm {% if not dept_filter %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-        All <span class="srol__pill-num">{{ stats.total }}</span>
-      </a>
-      <a href="?dept=ops{% if search %}&search={{ search }}{% endif %}"
-         class="btn btn-sm {% if dept_filter == 'ops' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-        Operations <span class="srol__pill-num">{{ stats.ops }}</span>
-      </a>
-      <a href="?dept=fin{% if search %}&search={{ search }}{% endif %}"
-         class="btn btn-sm {% if dept_filter == 'fin' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-        Finance <span class="srol__pill-num">{{ stats.fin }}</span>
-      </a>
-      <a href="?dept=mkt{% if search %}&search={{ search }}{% endif %}"
-         class="btn btn-sm {% if dept_filter == 'mkt' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-        Marketing <span class="srol__pill-num">{{ stats.mkt }}</span>
-      </a>
-      <a href="?dept=admin{% if search %}&search={{ search }}{% endif %}"
-         class="btn btn-sm {% if dept_filter == 'admin' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-        Super Admin <span class="srol__pill-num">{{ stats.admin }}</span>
-      </a>
-      <a href="?dept=none{% if search %}&search={{ search }}{% endif %}"
-         class="btn btn-sm {% if dept_filter == 'none' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-        No desk <span class="srol__pill-num">{{ stats.none }}</span>
-      </a>
-    </div>
-
+    <!-- The access matrix: one row per person, one column per permission.
+         The header doubles as the legend — each desk links to its pages. -->
     <div class="srol__tablewrap">
-      <table id="workforce_staff_roles_table_view" class="table srol__table align-middle">
+      <table id="workforce_staff_roles_table_view" class="table srol__table srol__mx align-middle">
         <thead>
-          <tr>
-            <th scope="col">Staff member</th>
-            <th scope="col" class="srol__col-dept">Operations</th>
-            <th scope="col" class="srol__col-dept">Finance</th>
-            <th scope="col" class="srol__col-dept">Marketing</th>
-            <th scope="col" class="srol__col-dept">Super Admin</th>
+          <tr class="srol__mx-lanes">
+            <th scope="col" rowspan="2" class="srol__who srol__mx-who">
+              Staff member
+              <span class="srol__mx-cap">{{ rows|length }} shown</span>
+            </th>
+            <th scope="colgroup" colspan="3" class="srol__mx-edge"><span class="srol__mx-lane">Desks</span></th>
+            <th scope="colgroup" colspan="2" class="srol__mx-edge"><span class="srol__mx-lane">Ranks</span></th>
+            <th scope="colgroup" colspan="2" class="srol__mx-edge"><span class="srol__mx-lane">WAHA Inbox</span></th>
+          </tr>
+          <tr class="srol__mx-cols">
+            <th scope="col" class="srol__col-dept srol__mx-edge">
+              Operations
+              <a class="srol__mx-cap" href="{% url 'workforce:staff_pages_list' %}?dept=ops"
+                 title="Edit which pages belong to Operations">{{ dept_pages.ops }} pages</a>
+            </th>
+            <th scope="col" class="srol__col-dept">
+              Finance
+              <a class="srol__mx-cap" href="{% url 'workforce:staff_pages_list' %}?dept=fin"
+                 title="Edit which pages belong to Finance">{{ dept_pages.fin }} pages</a>
+            </th>
+            <th scope="col" class="srol__col-dept">
+              Marketing
+              <a class="srol__mx-cap" href="{% url 'workforce:staff_pages_list' %}?dept=mkt"
+                 title="Edit which pages belong to Marketing">{{ dept_pages.mkt }} pages</a>
+            </th>
+            <th scope="col" class="srol__col-dept srol__mx-edge"
+                title="Sees every CRM lead and assigns leads to anyone. Everyone else sees only their own leads and the unassigned pool.">
+              Lead Manager
+              <span class="srol__mx-cap">Every CRM lead</span>
+            </th>
+            <th scope="col" class="srol__col-dept">
+              Super Admin
+              <a class="srol__mx-cap" href="{% url 'workforce:staff_pages_list' %}?dept=admin"
+                 title="Edit which pages belong to Super Admin">{{ dept_pages.admin }} pages</a>
+            </th>
+            <th scope="col" class="srol__col-dept srol__mx-edge"
+                title="Browser login for the WhatsApp inbox (/waha/wa-chats/). They still sign in with their staff account inside.">
+              Login
+              <span class="srol__mx-cap">Browser password</span>
+            </th>
+            <th scope="col" class="srol__col-dept"
+                title="Which WhatsApp numbers they can open in the inbox. A closed number is hidden from their tabs and refused by the server.">
+              Numbers
+              <span class="srol__mx-cap">{{ wa_numbers|length }} on WhatsApp</span>
+            </th>
           </tr>
         </thead>
         <tbody>
           {% for row in rows %}
           <tr class="srol__row{% if row.is_orphan %} srol__row--orphan{% endif %}"
-              data-profile-id="{{ row.profile.id }}">
+              data-profile-id="{{ row.profile.id }}"
+              data-username="{{ row.profile.user.username }}">
             <th scope="row" class="srol__who">
               <span class="srol__name">
                 {{ row.profile.first_name|default:"" }} {{ row.profile.last_name|default:"" }}
@@ -134,23 +226,24 @@
                   {{ row.profile.username|default:row.profile.user_number }}
                 {% endif %}
               </span>
-              <span class="srol__meta">
-                {{ row.profile.user_number }}
-                {% if row.profile.email %}<span class="srol__dot">·</span>{{ row.profile.email }}{% endif %}
+              <span class="srol__meta d-flex flex-wrap column-gap-3">
+                <span class="srol__mono">{{ row.profile.user_number }}</span>
+                {% if row.profile.email %}<span>{{ row.profile.email }}</span>{% endif %}
               </span>
               {% if row.is_orphan %}
               <span class="srol__warn">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                No desk assigned — can sign in but every section is blocked
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                No desk assigned: can sign in, but every section is blocked
               </span>
               {% endif %}
             </th>
 
             {% for code in assignable %}
-            <td class="srol__cell">
+            <td class="srol__cell{% if forloop.first %} srol__mx-edge{% endif %}">
               {% if row.profile.is_superadmin %}
                 <span class="srol__locked" title="Super admins hold every department">
-                  <i class="fa-solid fa-check"></i>
+                  <i class="fa-solid fa-check" aria-hidden="true"></i>
+                  <span class="visually-hidden">Included</span>
                 </span>
               {% else %}
                 <label class="srol__toggle">
@@ -163,18 +256,99 @@
             </td>
             {% endfor %}
 
+            <td class="srol__cell srol__mx-edge">
+              {% if row.profile.is_superadmin %}
+                <span class="srol__locked" title="Super admins manage every lead">
+                  <i class="fa-solid fa-check" aria-hidden="true"></i>
+                  <span class="visually-hidden">Included</span>
+                </span>
+              {% else %}
+                <label class="srol__toggle">
+                  <input type="checkbox" class="srol__check" data-department="lead_manager"
+                         {% if row.profile.lead_manager %}checked{% endif %}
+                         aria-label="Lead manager for {{ row.profile.user_number }}">
+                  <span class="srol__switch" aria-hidden="true"></span>
+                </label>
+              {% endif %}
+            </td>
+
             <td class="srol__cell">
               {% if row.profile.is_superadmin %}
-                <span class="srol__badge srol__badge--admin">Super Admin</span>
+                <span class="srol__status srol__status--admin">Super Admin</span>
               {% else %}
                 <span class="srol__dash">—</span>
+              {% endif %}
+            </td>
+
+            <td class="srol__cell srol__mx-edge" id="workforce_staff_roles_cell_waha_{{ row.profile.id }}">
+              {% if row.waha %}
+                <div class="d-flex justify-content-center align-items-center gap-1">
+                  <span class="srol__status srol__status--on">On</span>
+                  <button type="button" class="btn srol__btn srol__btn--row srol__btn--icon srol__waha-btn" data-action="grant"
+                          title="New password (the old one stops working)">
+                    <i class="fa-solid fa-key" aria-hidden="true"></i>
+                    <span class="visually-hidden">New inbox password for {{ row.profile.user.username }}</span>
+                  </button>
+                  {% if row.profile.user_id != request.user.id %}
+                  <button type="button" class="btn srol__btn srol__btn--row srol__btn--icon srol__btn--danger srol__waha-btn"
+                          data-action="revoke" title="Remove inbox login">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    <span class="visually-hidden">Remove inbox login for {{ row.profile.user.username }}</span>
+                  </button>
+                  {% endif %}
+                </div>
+                <span class="srol__login srol__mono" title="Login name">{{ row.profile.user.username }}</span>
+              {% else %}
+                <button type="button" class="btn srol__btn srol__btn--row text-nowrap srol__waha-btn"
+                        data-action="grant" data-first="1">
+                  Give access
+                </button>
+              {% endif %}
+            </td>
+
+            <td class="srol__cell">
+              {% if row.all_numbers %}
+                <span class="srol__numbers-all" title="Super admins open every number">All numbers</span>
+              {% else %}
+              <!-- Dropdown section: one switch per WhatsApp number; each click saves. -->
+              <div class="dropdown srol__numbers">
+                <button type="button"
+                        class="btn srol__btn srol__btn--row text-nowrap dropdown-toggle srol__numbers-btn{% if not row.numbers_open %} srol__numbers-btn--none{% endif %}"
+                        id="workforce_staff_roles_btn_numbers_{{ row.profile.id }}"
+                        data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                        data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false"
+                        title="WhatsApp numbers {{ row.profile.user.username }} can open in the inbox">
+                  <span class="srol__numbers-sum">{% if row.numbers_open %}{{ row.numbers_open }} of {{ wa_numbers|length }}{% else %}None{% endif %}</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end srol__numbers-menu"
+                     aria-labelledby="workforce_staff_roles_btn_numbers_{{ row.profile.id }}">
+                  <p class="srol__numbers-head">Numbers {{ row.profile.user.username }} can open in the inbox</p>
+                  {% for n in wa_numbers %}
+                  <label class="srol__numbers-item d-flex align-items-center gap-3">
+                    <span class="flex-grow-1">
+                      <span class="srol__numbers-name">{{ n.push_name|default:n.name }}</span>
+                      <span class="srol__numbers-tail srol__mono">{% if n.status == 'GONE' %}not in WAHA any more{% elif n.phone %}···{{ n.phone|slice:"-4:" }}{% else %}{{ n.name }}{% endif %}</span>
+                    </span>
+                    <input type="checkbox" class="srol__check" data-session="{{ n.name }}"
+                           {% if n.name in row.numbers %}checked{% endif %}
+                           aria-label="{{ n.push_name|default:n.name }} in the inbox for {{ row.profile.user_number }}">
+                    <span class="srol__switch" aria-hidden="true"></span>
+                  </label>
+                  {% endfor %}
+                </div>
+              </div>
               {% endif %}
             </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" class="srol__empty">
-              No staff match this filter.
+            <td colspan="8" class="srol__empty">
+              {% if search %}
+                No staff match “{{ search }}”{% if dept_filter %} on this desk{% endif %}.
+                {% if candidates %}Matching accounts that aren't staff yet are listed above.{% endif %}
+              {% else %}
+                No staff on this desk.
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -183,10 +357,54 @@
     </div>
 
     <p class="srol__foot">
-      Changes save immediately and apply on that person's next page load.
-      Super Admin is not editable here — it bypasses departments entirely, so it stays a Django-admin change.
+      Changes save as you click and apply on the person's next page load.
+      Lead Manager sees every CRM lead and can assign them; everyone else sees their own leads and the unassigned pool.
+      Super Admin holds every desk and is changed in Django admin, not here.
+      WAHA Inbox is a browser login for the WhatsApp inbox only, never the WAHA API or Session Status.
+      The login name is their username, and the password is shown once.
+      Numbers picks which WhatsApp numbers they open in the inbox; a closed number is hidden from their tabs and refused by the server.
+      Super Admins open every number.
     </p>
 
+  </div>
+</div>
+
+<!-- One-time display of a new inbox password -->
+<div class="modal fade" id="workforce_staff_roles_modal_waha" tabindex="-1"
+     aria-labelledby="workforce_staff_roles_modal_waha_title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-6" id="workforce_staff_roles_modal_waha_title">WhatsApp inbox login</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">
+          Send these to the staff member. The password is shown only now — if it is lost, make a new one.
+        </p>
+        <dl class="row small mb-0">
+          <dt class="col-4">Address</dt>
+          <dd class="col-8"><code id="workforce_staff_roles_text_waha_url"></code></dd>
+          <dt class="col-4">Username</dt>
+          <dd class="col-8"><code id="workforce_staff_roles_text_waha_username"></code></dd>
+          <dt class="col-4">Password</dt>
+          <dd class="col-8"><code class="fs-6" id="workforce_staff_roles_text_waha_password"></code></dd>
+          <dt class="col-4">WhatsApp numbers</dt>
+          <dd class="col-8 mb-0">
+            <ul class="list-unstyled mb-0" id="workforce_staff_roles_list_waha_numbers"></ul>
+          </dd>
+        </dl>
+        <p class="small text-muted mt-3 mb-0">
+          After this browser prompt they sign in with their own staff account as usual.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="workforce_staff_roles_btn_waha_copy">
+          <i class="fa-regular fa-copy"></i> Copy all
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -194,11 +412,132 @@
 // Staff role toggles. One checkbox = one department on one profile; the row
 // reverts if the server refuses so the UI never shows access that isn't real.
 document.addEventListener('DOMContentLoaded', function () {
+  var csrf = document.querySelector('meta[name="csrf-token"]');
+  var token = csrf ? csrf.content : '';
+
+  // "Add as staff" — makes the account staff with no desk, then reloads so the
+  // person moves into the table below where their desks are ticked.
+  var candidates = document.getElementById('workforce_staff_roles_table_candidates');
+  if (candidates) {
+    candidates.addEventListener('click', function (event) {
+      var btn = event.target.closest('.srol__grant');
+      if (!btn) return;
+      var row = btn.closest('.srol__row');
+      var name = btn.getAttribute('data-name');
+      if (!window.confirm('Give ' + name + ' staff access?\n\nThey start with no desk — tick their departments next.')) return;
+
+      btn.disabled = true;
+      row.classList.add('srol__row--saving');
+      fetch('/workforce/staff-roles/' + row.getAttribute('data-profile-id') + '/grant/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': token, 'X-Requested-With': 'XMLHttpRequest'}
+      })
+        .then(function (res) { return res.json().then(function (d) { return {ok: res.ok, data: d}; }); })
+        .then(function (result) {
+          if (!result.ok || !result.data.success) {
+            window.alert(result.data.error || 'Could not add that user.');
+            btn.disabled = false;
+            row.classList.remove('srol__row--saving');
+            return;
+          }
+          window.location.reload();
+        })
+        .catch(function () {
+          window.alert('Network error — the user was not added.');
+          btn.disabled = false;
+          row.classList.remove('srol__row--saving');
+        });
+    });
+  }
+
   var table = document.getElementById('workforce_staff_roles_table_view');
   if (!table) return;
 
-  var csrf = document.querySelector('meta[name="csrf-token"]');
-  var token = csrf ? csrf.content : '';
+  // WAHA Inbox column. "grant" makes a new password and shows it once in the
+  // modal; the page reloads when the modal closes so the cell shows "On".
+  var wahaModalEl = document.getElementById('workforce_staff_roles_modal_waha');
+  var wahaText = '';
+  wahaModalEl.addEventListener('hidden.bs.modal', function () { window.location.reload(); });
+  document.getElementById('workforce_staff_roles_btn_waha_copy').addEventListener('click', function () {
+    var btn = this;
+    navigator.clipboard.writeText(wahaText).then(function () {
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+    });
+  });
+
+  table.addEventListener('click', function (event) {
+    var btn = event.target.closest('.srol__waha-btn');
+    if (!btn) return;
+    var row = btn.closest('.srol__row');
+    var action = btn.getAttribute('data-action');
+    var username = row.getAttribute('data-username');
+    var question = action === 'revoke'
+      ? 'Remove the WhatsApp inbox login for ' + username + '?'
+      : (btn.hasAttribute('data-first')
+        ? 'Give ' + username + ' a WhatsApp inbox login?'
+        : 'Make a new inbox password for ' + username + '? The old one stops working.');
+    if (!window.confirm(question)) return;
+
+    btn.disabled = true;
+    row.classList.add('srol__row--saving');
+    fetch('/workforce/staff-roles/' + row.getAttribute('data-profile-id') + '/waha/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': token,
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify({action: action})
+    })
+      .then(function (res) { return res.json().then(function (d) { return {ok: res.ok, data: d}; }); })
+      .then(function (result) {
+        if (!result.ok || !result.data.success) {
+          window.alert(result.data.error || 'Could not save that change.');
+          btn.disabled = false;
+          row.classList.remove('srol__row--saving');
+          return;
+        }
+        if (action === 'revoke') { window.location.reload(); return; }
+        var url = window.location.origin + '/waha/wa-chats/';
+        document.getElementById('workforce_staff_roles_text_waha_url').textContent = url;
+        document.getElementById('workforce_staff_roles_text_waha_username').textContent = result.data.username;
+        document.getElementById('workforce_staff_roles_text_waha_password').textContent = result.data.password;
+
+        // The numbers this login opens (the Numbers dropdown in the WAHA Inbox group).
+        var numbers = result.data.numbers || [];
+        var list = document.getElementById('workforce_staff_roles_list_waha_numbers');
+        list.innerHTML = '';
+        numbers.forEach(function (n) {
+          var li = document.createElement('li');
+          li.textContent = n.label;
+          if (n.tail) {
+            var tail = document.createElement('span');
+            tail.className = 'srol__mono text-muted ms-2';
+            tail.textContent = '···' + n.tail;
+            li.appendChild(tail);
+          }
+          list.appendChild(li);
+        });
+        if (!numbers.length) {
+          var none = document.createElement('li');
+          none.className = 'srol__numbers-none';
+          none.textContent = 'None yet: tick at least one number column, or the inbox stays closed to them.';
+          list.appendChild(none);
+        }
+
+        wahaText = 'WhatsApp inbox: ' + url + '\nUsername: ' + result.data.username +
+                   '\nPassword: ' + result.data.password +
+                   '\nWhatsApp numbers: ' + (numbers.length
+                     ? numbers.map(function (n) { return n.label; }).join(', ')
+                     : 'none yet');
+        bootstrap.Modal.getOrCreateInstance(wahaModalEl).show();
+      })
+      .catch(function () {
+        window.alert('Network error — reload the page to see what was saved.');
+        btn.disabled = false;
+        row.classList.remove('srol__row--saving');
+      });
+  });
 
   table.addEventListener('change', function (event) {
     var box = event.target;
@@ -207,19 +546,23 @@ document.addEventListener('DOMContentLoaded', function () {
     var row = box.closest('.srol__row');
     var profileId = row.getAttribute('data-profile-id');
     var department = box.getAttribute('data-department');
+    var session = box.getAttribute('data-session');
     var enabled = box.checked;
 
     box.disabled = true;
     row.classList.add('srol__row--saving');
 
-    fetch('/workforce/staff-roles/' + profileId + '/update/', {
+    // A WhatsApp number column opens/closes that number in the inbox; every
+    // other toggle is a desk or the Lead Manager rank.
+    fetch('/workforce/staff-roles/' + profileId + (session ? '/waha-session/' : '/update/'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': token,
         'X-Requested-With': 'XMLHttpRequest'
       },
-      body: JSON.stringify({department: department, enabled: enabled})
+      body: JSON.stringify(session ? {session: session, enabled: enabled}
+                                   : {department: department, enabled: enabled})
     })
       .then(function (res) { return res.json().then(function (d) { return {ok: res.ok, data: d}; }); })
       .then(function (result) {
@@ -228,9 +571,19 @@ document.addEventListener('DOMContentLoaded', function () {
           window.alert(result.data.error || 'Could not save that change.');
           return;
         }
-        // An empty desk list is worth flagging on the spot.
-        var held = result.data.held || [];
-        row.classList.toggle('srol__row--orphan', held.length === 0);
+        if (session) {
+          // Keep the dropdown's "2 of 3" summary in step with its switches.
+          var menu = box.closest('.srol__numbers');
+          var boxes = menu.querySelectorAll('.srol__check');
+          var on = Array.prototype.filter.call(boxes, function (b) { return b.checked; }).length;
+          var sumBtn = menu.querySelector('.srol__numbers-btn');
+          sumBtn.querySelector('.srol__numbers-sum').textContent = on ? on + ' of ' + boxes.length : 'None';
+          sumBtn.classList.toggle('srol__numbers-btn--none', on === 0);
+        } else {
+          // An empty desk list is worth flagging on the spot.
+          var held = result.data.held || [];
+          row.classList.toggle('srol__row--orphan', held.length === 0);
+        }
       })
       .catch(function () {
         box.checked = !enabled;

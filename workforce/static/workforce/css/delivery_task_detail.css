@@ -431,14 +431,9 @@
    ══════════════════════════════════════════════════════════════════ */
 /* Named -detail-split, not -split: .dtd__split is already the payment-split
    ledger below and forces flex-direction:column, which would stack these.
-   Hairline between the two halves, drawn only when they actually sit side by
-   side. Below lg the columns stack and a vertical rule would float in the
-   gap, so it becomes a horizontal separator instead. */
-@media (min-width: 992px) {
-  .dtd__detail-split__col--drop {
-    border-left: 1px solid var(--dtd-rule);
-  }
-}
+   Side by side, the dropoff's navy route bar marks where the column starts, so
+   no hairline between the halves. Below lg the columns stack, and a horizontal
+   separator divides them instead. */
 @media (max-width: 991.98px) {
   .dtd__detail-split__col--drop {
     border-top: 1px solid var(--dtd-rule);
@@ -447,15 +442,16 @@
 }
 
 /* The dropoff column opens with the route, so it has no field block above
-   it to be ruled off from — the column border already does that job. */
-.dtd__route--bare {
+   it to be ruled off from. Doubled class: .dtd__route below is declared later
+   and would otherwise put the rule and its spacing back. */
+.dtd__route.dtd__route--bare {
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   ROUTE — pickup hollow, dropoff solid, hairline between
+   ROUTE — each end of the leg marked by a coloured left bar
    ══════════════════════════════════════════════════════════════════ */
 .dtd__route {
   position: relative;
@@ -477,27 +473,19 @@
   );
 }
 
+/* The bar replaces the old dot, so the 1.5rem indent the dot needed is gone:
+   3px bar + 0.375rem gap. Colours match the map markers on this page — pickup
+   gold as on the timeline's pickup pin, dropoff navy as on the delivery pin —
+   and the PICKUP / DROPOFF label takes its bar's colour. */
 .dtd__route__point {
   position: relative;
-  padding-left: 1.5rem;
+  padding-left: 0.375rem;
   padding-bottom: 1.1rem;
+  border-left: 3px solid var(--dtd-border-strong);
 }
 .dtd__route__point:last-child { padding-bottom: 0; }
-
-/* Hairline spine linking the two legs */
-.dtd__route__point:not(:last-child)::before {
-  content: "";
-  position: absolute;
-  left: 5px;
-  top: 1.05rem;
-  bottom: 0.15rem;
-  width: 1px;
-  background: repeating-linear-gradient(
-    to bottom,
-    var(--dtd-border-strong) 0 3px,
-    transparent 3px 7px
-  );
-}
+.dtd__route__point--pickup  { border-left-color: var(--brand-primary-text, #8f6b00); }
+.dtd__route__point--dropoff { border-left-color: var(--dtd-navy); }
 
 .dtd__route__point-head {
   display: flex;
@@ -507,36 +495,25 @@
   flex-wrap: wrap;
 }
 
-.dtd__route__dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  position: absolute;
-  left: 0;
-  top: 4px;
-  flex-shrink: 0;
-  box-shadow: none;
-  border: 2px solid var(--dtd-navy);
-  background: #fff;
-}
-.dtd__route__dot--pickup  { background: #fff; }
-.dtd__route__dot--dropoff { background: var(--dtd-navy); }
-
 .dtd__route__type {
   font-size: 0.63rem;
   color: var(--dtd-label);
 }
+.dtd__route__point--pickup  .dtd__route__type { color: var(--brand-primary-text, #8f6b00); }
+.dtd__route__point--dropoff .dtd__route__type { color: var(--dtd-navy); }
 
 .dtd__route__name {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--dtd-navy);
+  padding-left: 0;   /* workforce.css still indents these for the old dot */
 }
 
 .dtd__route__addr {
   font-size: 0.76rem;
   color: var(--dtd-muted);
   margin-top: 0.1rem;
+  padding-left: 0;
 }
 
 /* ── Inline actions on the route: ghost, navy on hover ── */
@@ -1735,6 +1712,9 @@
   font-family: var(--dtd-font-mono);
   font-size: 0.7rem;
 }
+/* In the narrow 3/12 sidebar (1400px+) "from → to" no longer fits beside the
+   title; the pair drops under it whole rather than clipping a phone number. */
+.dtd__whatsapp > .dtd__card__head { flex-wrap: wrap; row-gap: 0.25rem; }
 
 .dtd__whatsapp__route-from {
   color: var(--dtd-muted);
@@ -1992,4 +1972,20 @@ input.dtd__whatsapp__input:focus {
 
   .dtd__whatsapp__send:active,
   .dtd__whatsapp__refresh-btn:active { transform: none; }
+}
+
+/* ── QNAS plate: compact when its column is squeezed ──
+   On desktop the Dropoff column is half of the left side, so the plate's
+   col-md-8 cell is only ~150-240px wide between ~1000 and ~1500px viewports and
+   the full-size plate wrapped Zone/Street/Building onto 2-3 rows. Sized off the
+   cell's own width (container query), not the viewport, and scoped to this page
+   so the shared plate on the order pages is untouched. */
+.dtd__plate-col { container-type: inline-size; }
+
+@container (max-width: 300px) {
+  .dtd__plate-col .qnas-plate { gap: 0.15rem; padding: 0.45rem 0.4rem; }
+  .dtd__plate-col .qnas-plate__div { display: none; }
+  .dtd__plate-col .qnas-plate__cell { flex: 1 1 auto; min-width: 0; padding: 0.05rem 0.25rem; }
+  .dtd__plate-col .qnas-plate__tag { font-size: 0.5rem; letter-spacing: 0.06em; }
+  .dtd__plate-col .qnas-plate__num { font-size: 1.1rem; }
 }

@@ -1,5 +1,5 @@
 /* Purpose: Styling for the super-admin Staff Roles console — department toggles per staff member. */
-/* Used by: workforce/templates/workforce/staff_roles.html */
+/* Used by: workforce/templates/workforce/staff_roles.html, staff_pages.html, whatsapp_label_access.html */
 /* Notes: Layout is Bootstrap; this file only carries visual styling. The shared wfhero__ masthead
           and wfnote__ card come from workforce.css — nothing here re-declares them. */
 
@@ -11,44 +11,6 @@
   max-width: 1180px;
   margin: 0 auto;
   padding: 0 var(--spacing-md);
-}
-
-/* --- Department legend ---------------------------------------------------- */
-/* One quiet card per desk. The swatch is the only colour; the text stays ink so
-   the row reads as data, not as a set of status chips. */
-.srol__legend {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: 0.625rem 0.75rem;
-  background-color: var(--brand-white);
-  border: 1px solid var(--brand-grey-250);
-  border-radius: 2px;
-}
-
-.srol__legend-swatch {
-  width: 3px;
-  height: 1.75rem;
-  flex: 0 0 auto;
-  background-color: var(--brand-grey-400);
-}
-
-.srol__legend--ops .srol__legend-swatch { background-color: var(--brand-navy); }
-.srol__legend--fin .srol__legend-swatch { background-color: var(--brand-success); }
-.srol__legend--mkt .srol__legend-swatch { background-color: var(--brand-info); }
-.srol__legend--admin .srol__legend-swatch { background-color: var(--brand-primary); }
-
-.srol__legend-name {
-  font-weight: 600;
-  color: var(--brand-grey-800);
-  letter-spacing: 0.01em;
-}
-
-.srol__legend-count {
-  margin-left: auto;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--brand-grey-500);
 }
 
 /* --- Filters -------------------------------------------------------------- */
@@ -64,6 +26,10 @@
 
 /* --- Table ---------------------------------------------------------------- */
 .srol__tablewrap {
+  /* Positioned so absolute descendants (hidden checkboxes, visually-hidden labels)
+     use this scroll box as their containing block and get clipped by it — otherwise
+     they escape and widen the whole page on phones. */
+  position: relative;
   overflow-x: auto;
   background-color: var(--brand-white);
   border: 1px solid var(--brand-grey-250);
@@ -216,18 +182,6 @@
   color: var(--brand-grey-400);
 }
 
-.srol__badge--admin {
-  display: inline-block;
-  padding: 0.125rem 0.5rem;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--brand-navy);
-  background-color: var(--brand-primary);
-  border-radius: 2px;
-}
-
 .srol__foot {
   margin-top: var(--spacing-md);
   font-size: 0.75rem;
@@ -285,16 +239,428 @@
   background-color: var(--brand-success);
 }
 
-/* The legend cards on Staff Roles are links into this console. */
-a.srol__legend {
+/* ==========================================================================
+   Staff Roles — access matrix (scoped to .srol--roles; Staff Pages and Label
+   Access share the base rules above and are not touched by anything below).
+   One bold thing on the page: the two-tier navy header that groups columns by
+   kind of permission and doubles as the legend. Everything else stays quiet.
+   ========================================================================== */
+
+.srol__mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Buttons: real surfaces (brandkit Redesign Rule 3) --------------------- */
+.srol--roles .srol__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--brand-grey-800);
+  background-color: var(--brand-grey-100);
+  border: 1px solid var(--brand-grey-400);
+  border-radius: var(--brand-radius-sm);
+  box-shadow: none;
+}
+
+.srol--roles .srol__btn:hover {
+  color: var(--brand-grey-800);
+  background-color: var(--brand-secondary);
+  border-color: var(--brand-primary);
+}
+
+.srol--roles .srol__btn:focus-visible {
+  outline: 2px solid var(--brand-navy);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.srol--roles .srol__btn--row { height: 2.1rem; }
+.srol--roles .srol__btn--icon { flex: 0 0 auto; width: 2.25rem; padding: 0; }
+.srol--roles .srol__btn--row.srol__btn--icon { width: 2.1rem; }
+
+.srol--roles .srol__btn--danger { color: var(--brand-danger-dark); }
+.srol--roles .srol__btn--danger:hover {
+  color: var(--brand-danger-dark);
+  background-color: var(--brand-danger-bg);
+  border-color: var(--brand-danger);
+}
+
+/* --- Toolbar --------------------------------------------------------------- */
+.srol--roles .srol__find { min-width: 16rem; }
+
+.srol--roles .srol__find-input {
+  max-width: 34rem;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--brand-grey-800);
+  border: 1px solid var(--brand-grey-400);
+  border-radius: var(--brand-radius-sm);
+}
+
+.srol--roles .srol__find-input:focus {
+  border-color: var(--brand-primary);
+  box-shadow: none;
+}
+
+/* Desk filter: one joined control, not six loose pills. Scrolls sideways on a
+   phone instead of wrapping into two rows. */
+.srol__seg {
+  max-width: 100%;
+  height: 2.25rem;
+  overflow-x: auto;
+  background-color: var(--brand-white);
+  border: 1px solid var(--brand-grey-400);
+  border-radius: var(--brand-radius-sm);
+  scrollbar-width: none;
+}
+
+.srol__seg::-webkit-scrollbar { display: none; }
+
+.srol__seg-label {
+  padding: 0 0.75rem;
+  font-size: 0.75rem;
+  color: var(--brand-grey-500);
+  background-color: var(--brand-grey-50);
+  border-right: 1px solid var(--brand-grey-250);
+  white-space: nowrap;
+}
+
+.srol__seg-item {
+  padding: 0 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--brand-grey-700);
   text-decoration: none;
-  transition: border-color 0.15s ease;
+  white-space: nowrap;
+  border-right: 1px solid var(--brand-grey-200);
 }
 
-a.srol__legend:hover {
-  border-color: var(--brand-grey-400);
+.srol__seg-item:last-child { border-right: 0; }
+
+/* Inside the scrolling strip an item must never shrink, or its count wraps under it. */
+.srol__seg-label,
+.srol__seg-item { flex: 0 0 auto; }
+
+.srol__seg-item:hover {
+  color: var(--brand-grey-800);
+  background-color: var(--brand-secondary);
 }
 
-a.srol__legend .srol__legend-name {
+.srol__seg-item:focus-visible {
+  outline: 2px solid var(--brand-navy);
+  outline-offset: -2px;
+}
+
+.srol__seg-item--on,
+.srol__seg-item--on:hover {
+  color: var(--brand-white);
+  background-color: var(--brand-navy);
+}
+
+.srol__seg-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+/* --- State strip (WAHA file not wired / unreadable) ------------------------ */
+.srol--roles .srol__strip {
+  margin-bottom: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: var(--brand-radius-sm);
+}
+
+.srol--roles .srol__strip code { font-size: 0.75rem; }
+
+/* --- "Not staff yet" panel -------------------------------------------------- */
+.srol__add {
+  background-color: var(--brand-white);
+  border: 1px solid var(--brand-grey-250);
+  border-left: 3px solid var(--brand-navy);
+  border-radius: 2px;
+}
+
+.srol__add-head {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.srol__add-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
   color: var(--brand-grey-800);
 }
+
+.srol__add-count {
+  font-size: 0.75rem;
+  color: var(--brand-grey-500);
+}
+
+.srol__add-hint {
+  font-size: 0.75rem;
+  color: var(--brand-grey-500);
+}
+
+.srol__add-empty {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--brand-grey-500);
+}
+
+.srol__add .srol__tablewrap {
+  border: 0;
+  border-radius: 0;
+}
+
+/* --- Body cells (both tables on this page) --------------------------------- */
+/* orders.css forces `tbody td/th { font-size: .75rem !important }` on every staff
+   page; restored to the 0.8rem console floor here, as workforce.css does. */
+/* A global table rule adds a 1rem top margin, which showed as a white strip
+   above the navy header and a gap above the first "Not staff yet" row. */
+.srol--roles .srol__table { margin-top: 0; }
+
+.srol--roles .srol__table > tbody > tr > td,
+.srol--roles .srol__table > tbody > tr > th {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem !important;
+  border-top: 0;
+}
+
+.srol--roles .srol__table > tbody > tr:last-child > td,
+.srol--roles .srol__table > tbody > tr:last-child > th {
+  border-bottom: 0;
+}
+
+.srol--roles .srol__table > tbody > tr:hover > td,
+.srol--roles .srol__table > tbody > tr:hover > th {
+  background-color: var(--brand-grey-50);
+}
+
+.srol--roles .srol__name { font-size: 0.875rem; }
+
+.srol--roles .srol__meta {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+}
+
+.srol--roles .srol__tag { font-size: 0.72rem; }  /* chip floor */
+
+/* --- The matrix header ----------------------------------------------------- */
+/* !important: brandkit-overrides.css ships `.table thead th` grey with
+   !important; same restore pattern as .wai__table in workforce.css. */
+.srol__mx > thead > tr > th {
+  background-color: var(--brand-navy) !important;
+  color: var(--brand-white) !important;
+  border-bottom: 0;
+  text-align: center;
+  vertical-align: bottom;
+}
+
+.srol__mx > thead > tr.srol__mx-lanes > th {
+  padding: 0.5rem 0.75rem 0.25rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Lane name: a hairline under the word, not a coloured chip. */
+.srol__mx-lane {
+  display: inline-block;
+  padding-bottom: 0.125rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.35);
+}
+
+.srol__mx > thead > tr.srol__mx-cols > th {
+  padding: 0.375rem 0.5rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background-color: var(--brand-navy-light) !important;
+}
+
+.srol__mx > thead > tr > th.srol__mx-who {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+/* Column caption: what the column unlocks. Desk captions link to Staff Pages. */
+.srol__mx-cap {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+a.srol__mx-cap {
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+  text-underline-offset: 2px;
+}
+
+a.srol__mx-cap:hover,
+a.srol__mx-cap:focus-visible {
+  color: var(--brand-primary);
+  text-decoration-color: currentColor;
+}
+
+/* Lane rules: a hairline where one kind of permission ends and the next begins,
+   carried from the header down through every row. */
+.srol__mx > thead > tr > th.srol__mx-edge {
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.srol__mx > tbody > tr > td.srol__mx-edge {
+  border-left: 1px solid var(--brand-grey-750);
+}
+
+.srol__mx { min-width: 60rem; }
+
+/* The person stays in view while a phone scrolls the permission columns. */
+.srol__mx > thead > tr > th.srol__mx-who,
+.srol__mx > tbody > tr > th.srol__who {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.srol__mx > tbody > tr > th.srol__who { background-color: var(--brand-white); }
+
+/* --- Cell states ----------------------------------------------------------- */
+.srol__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  white-space: nowrap;
+}
+
+.srol__status::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background-color: var(--brand-grey-400);
+}
+
+.srol__status--on { color: var(--brand-success-dark); }
+.srol__status--on::before { background-color: var(--brand-success); }
+.srol__status--admin::before { background-color: var(--brand-primary); }
+
+.srol__login {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.72rem;
+  color: var(--brand-grey-500);
+}
+
+.srol--roles .srol__foot {
+  max-width: 52rem;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 575.98px) {
+  .srol--roles .srol__find { min-width: 100%; }
+
+  /* Phones get 44px touch targets site-wide; the field and the filter strip
+     match that so the row keeps one height. */
+  .srol--roles .srol__find-input {
+    flex: 1 1 auto;
+    width: 1%;
+    min-width: 0;
+    max-width: none;
+    height: 2.75rem;
+  }
+
+  .srol__seg { width: 100%; height: 2.75rem; }
+
+  /* Narrow sticky name column, so two or three permission columns stay in view. */
+  .srol__mx > thead > tr > th.srol__mx-who,
+  .srol__mx > tbody > tr > th.srol__who {
+    width: 9.5rem;
+    min-width: 9.5rem;
+    max-width: 9.5rem;
+  }
+
+  .srol__mx .srol__meta { overflow-wrap: anywhere; }
+}
+
+/* Numbers dropdown (WAHA Inbox group): which WhatsApp numbers a person opens.
+   Popper runs with strategy "fixed" so the menu escapes the table's scroll box. */
+.srol--roles .srol__numbers-btn.dropdown-toggle::after { margin-left: 0.375rem; }
+
+.srol--roles .srol__numbers-btn--none {
+  color: var(--brand-warning-text);
+  border-color: var(--brand-warning);
+}
+
+.srol__numbers-menu {
+  min-width: 17rem;
+  padding: 0 0 0.375rem;
+  border: 1px solid var(--brand-grey-250);
+  border-radius: var(--brand-radius-sm);
+  box-shadow: var(--brand-shadow-md);
+}
+
+.srol__numbers-head {
+  margin: 0 0 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--brand-grey-500);
+  border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.srol__numbers-item {
+  position: relative; /* containing block for the hidden checkbox */
+  margin: 0;
+  padding: 0.375rem 0.75rem;
+  cursor: pointer;
+}
+
+.srol__numbers-item:hover { background-color: var(--brand-grey-50); }
+
+.srol__numbers-name {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+}
+
+.srol__numbers-tail {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--brand-grey-500);
+}
+
+.srol__numbers-all {
+  font-size: 0.75rem;
+  color: var(--brand-grey-500);
+  white-space: nowrap;
+}
+
+/* Login popup: a login with no number yet is worth a warning. */
+.srol__numbers-none { color: var(--brand-warning-text); }

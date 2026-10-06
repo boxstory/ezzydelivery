@@ -323,9 +323,11 @@ Notes: Approving posts to update_verification_status, which also activates the b
             <a href="{% url 'workforce:view_user_business_profile' business.profile.id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-chart-line"></i> View Progress
             </a>
+            {% if wf_dept_ops %}
             <a href="{% url 'workforce:seller_detail' business.business_id %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> Full Profile
             </a>
+            {% endif %}
             {% if business.crm_lead %}
             <a href="{% url 'workforce:crm_lead_detail' business.crm_lead.pk %}" class="uvl__btn uvl__btn--detail">
                 <i class="fa-solid fa-address-book"></i> CRM Lead #{{ business.crm_lead.pk }}
@@ -340,6 +342,8 @@ Notes: Approving posts to update_verification_status, which also activates the b
             </button>
             {% endif %}
             {% if business.profile.verification_status != 'verified' %}
+            {# Approve / review / reject are Operations decisions; marketing views the queue only. #}
+            {% if wf_dept_ops %}
             <button type="button" class="uvl__btn uvl__btn--verify" data-action="verify"
                 data-profile-id="{{ business.profile.id }}"
                 data-user-name="{{ business.profile.user.get_full_name|default:business.profile.user.email }}"
@@ -361,6 +365,7 @@ Notes: Approving posts to update_verification_status, which also activates the b
                 data-user-name="{{ business.business_name }}">
                 <i class="fa-solid fa-xmark"></i> Reject
             </button>
+            {% endif %}
             {% else %}
             <div class="uvl__verified-bar">
                 <i class="fa-solid fa-circle-check"></i> Business is verified

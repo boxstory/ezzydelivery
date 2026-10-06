@@ -261,11 +261,11 @@
   });
 
   // Open detail on click (but not while dragging, and not on inner links
-  // like the WhatsApp chat chip — those navigate on their own)
+  // like the WhatsApp chat chip, or the Take form — those act on their own)
   document.addEventListener('click', function (e) {
     var card = e.target.closest && e.target.closest('.crmb__card');
     if (!card) return;
-    if (e.target.closest('a')) return;
+    if (e.target.closest('a, form')) return;
     var url = card.getAttribute('data-detail-url');
     if (url) window.location.href = url;
   });
@@ -275,6 +275,8 @@
     if (e.key !== 'Enter' && e.key !== ' ') return;
     var card = e.target.closest && e.target.closest('.crmb__card');
     if (!card) return;
+    // Enter on the Take button submits its form, not "open the card".
+    if (e.target.closest('a, form')) return;
     e.preventDefault();
     var url = card.getAttribute('data-detail-url');
     if (url) window.location.href = url;

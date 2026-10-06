@@ -27,6 +27,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.decorators import staff_required
+from crm import ownership
 from crm import services as crm_services
 from crm import wa_inbox
 from crm import contact_tags as crm_contact_tags
@@ -51,6 +52,31 @@ _ZIP_UNSAFE = re.compile(r'[^A-Za-z0-9._-]+')
 
 def _staff_users():
     return User.objects.filter(is_staff=True).order_by('first_name', 'username')
+
+
+def _hidden_lead_message(lead):
+    owner = ownership.card_of(lead).assigned_to
+    return (f'Lead #{lead.pk} belongs to {ownership.user_label(owner)} — only they '
+            'and a lead manager can open it.')
+
+
+def _owned_lead(request, lead_id, queryset=None):
+    """The lead behind a per-lead endpoint, or a JSON 403 when it belongs to someone
+    else. JSON rather than an HTML 403 page: every caller is a fetch() that reads
+    `error` out of the body — the board, the detail page and the inbox panel."""
+    lead = get_object_or_404(queryset if queryset is not None else Lead, pk=lead_id)
+    if ownership.can_see_lead(request.user, lead):
+        return lead, None
+    return None, JsonResponse({'success': False, 'error': _hidden_lead_message(lead)}, status=403)
+
+
+def _ownership_context(request):
+    """What the boards, lists and detail page need to draw Take / Release."""
+    return {
+        'is_lead_manager': ownership.is_lead_manager(request.user),
+        'can_claim_leads': ownership.can_claim(request.user),
+        'idle_days': ownership.IDLE_DAYS,
+    }
 
 
 def _parse_followup_date(raw):
@@ -132,6 +158,12 @@ def _filtered_leads(request, multi_facets=False):
     leads = (Lead.objects.select_related('assigned_to', 'converted_business')
              .filter(merged_into__isnull=True)
              .prefetch_related('merged_children'))
+    # Once a lead is taken it leaves everyone else's board, list, map and exports;
+    # only its owner and a lead manager still see it.
+    leads = ownership.visible_leads(leads, request.user)
+
+    if request.GET.get('idle') == '1':
+        leads = ownership.filter_idle(leads)
 
     search = request.GET.get('search', '').strip()
     if search:
@@ -597,6 +629,7 @@ def _render_leads_board(request, board_category, template):
     leads = list(leads.filter(keep).order_by('-created_at'))
     _annotate_wa_chats(leads)
     _annotate_driver_vehicles(leads)
+    ownership.mark_idle(leads)
 
     by_stage = {s.key: [] for s in stage_rows}
     for lead in leads:
@@ -648,14 +681,17 @@ def _render_leads_board(request, board_category, template):
     # A kanban hides the effect of a filter — cards just quietly stop appearing.
     # The scope line under the controls says out loud how much of the board is on
     # screen, and each engaged filter gets a chip that carries its own removal URL.
-    staff_users = _staff_users()
+    # A non-manager's board only ever holds their own cards and the pool, so naming
+    # other assignees in the picker would offer filters that can only come back empty.
+    staff_users = _staff_users() if ownership.is_lead_manager(request.user) else []
     board_total = sum(c['count'] for c in columns)
     driver_picks_on = any(driver_picks.values())
+    idle_filter = request.GET.get('idle') == '1'
     filters_on = bool(search or source_filter or assigned_filter or vehicle_filter
-                      or driver_picks_on or date_from or date_to)
+                      or driver_picks_on or date_from or date_to or idle_filter)
     board_grand_total = board_total
     if filters_on:
-        board_grand_total = (Lead.objects
+        board_grand_total = (ownership.visible_leads(Lead.objects, request.user)
                              .filter(merged_into__isnull=True, category=board_category)
                              .filter(keep).count())
 
@@ -682,6 +718,8 @@ def _render_leads_board(request, board_category, template):
     active_filters = []
     if search:
         active_filters.append(_chip('search', 'Search', search))
+    if idle_filter:
+        active_filters.append(_chip('idle', 'Flag', f'Idle {ownership.IDLE_DAYS}+ days'))
 
     source_labels = dict(Lead.SOURCE_CHOICES)
     for value in source_filter:
@@ -756,7 +794,9 @@ def _render_leads_board(request, board_category, template):
         'column_total': len(columns),
         'filters_on': filters_on,
         'active_filters': active_filters,
+        'board_path': request.get_full_path(),
     }
+    context.update(_ownership_context(request))
     return render(request, template, context)
 
 
@@ -833,6 +873,21 @@ def _date_filter(request):
     return '', None, None
 
 
+def _apply_followup_filter(leads, value):
+    """Narrow to cards whose follow-up has come up. One place, because the list page
+    and its CSV export both apply it and had drifted apart before.
+
+    '1' is strictly overdue (yesterday or earlier); 'due' includes today, which is
+    what the desk actually works from in the morning and what the dashboard's
+    Follow-ups row links to. Closed cards never count — a won deal is not a chore.
+    """
+    if value not in ('1', 'due'):
+        return leads
+    today = timezone.localdate()
+    cutoff = {'1': Q(next_followup_at__lt=today), 'due': Q(next_followup_at__lte=today)}[value]
+    return leads.filter(cutoff).exclude(stage__in=crm_services.closed_stage_keys())
+
+
 def _apply_date_filter(leads, date_from, date_to):
     """Narrow to cards raised inside the range, either end on its own being valid."""
     if date_from:
@@ -895,10 +950,7 @@ def _render_leads_list(request, list_category):
         leads = leads.filter(stage__in=stage_filter)
 
     overdue_filter = request.GET.get('overdue', '').strip()
-    if overdue_filter == '1':
-        leads = leads.filter(
-            next_followup_at__lt=timezone.localdate()
-        ).exclude(stage__in=crm_services.closed_stage_keys())
+    leads = _apply_followup_filter(leads, overdue_filter)
 
     # Vehicle is a recruitment question, so the facet only exists on the driver
     # page — a business lead has no application to carry one.
@@ -944,7 +996,7 @@ def _render_leads_list(request, list_category):
     # Metrics scoped to the active category tab (All / Business / Drivers). The closed
     # keys are scoped to the same board: a terminal column that exists on only one
     # board would otherwise reclassify the other board's leads with the same key.
-    scoped = Lead.objects.filter(category=list_category)
+    scoped = ownership.visible_leads(Lead.objects.filter(category=list_category), request.user)
     scoped_closed = crm_services.closed_stage_keys(list_category)
     total_count = scoped.count()
     open_count = scoped.exclude(stage__in=scoped_closed).count()
@@ -965,6 +1017,12 @@ def _render_leads_list(request, list_category):
     # a sliced queryset would hand the loop fresh, un-annotated instances.
     page_obj.object_list = list(page_obj.object_list)
     _annotate_driver_vehicles(page_obj.object_list)
+    ownership.mark_idle(page_obj.object_list)
+    idle_filter = '1' if request.GET.get('idle') == '1' else ''
+    idle_params = request.GET.copy()
+    idle_params.pop('idle', None)
+    idle_params.pop('page', None)
+    idle_remove_url = request.path + (f'?{idle_params.urlencode()}' if idle_params else '')
 
     # Two strings, deliberately: pagination has to carry the sort with it, while a
     # header cell writes its own sort and must not inherit the old one.
@@ -974,6 +1032,7 @@ def _render_leads_list(request, list_category):
         ('source', source_filter),
         ('assigned', assigned_filter),
         ('overdue', overdue_filter),
+        ('idle', idle_filter),
         ('vehicle', vehicle_filter),
         ('datePreset', date_preset),
         # Only a custom range carries its dates; a preset re-resolves server-side.
@@ -1014,6 +1073,8 @@ def _render_leads_list(request, list_category):
         'assigned_filter': assigned_filter,
         'stage_filter': stage_filter,
         'overdue_filter': overdue_filter,
+        'idle_filter': idle_filter,
+        'idle_remove_url': idle_remove_url,
         'vehicle_filter': vehicle_filter,
         'vehicle_choices': _vehicle_filter_choices(),
         'date_preset': date_preset,
@@ -1021,7 +1082,9 @@ def _render_leads_list(request, list_category):
         'date_to': date_to.isoformat() if date_to else '',
         'date_preset_choices': DATE_PRESET_CHOICES,
         'category_filter': category_filter,
-        'staff_users': _staff_users(),
+        # Other assignees only mean something to someone who can see their cards.
+        'staff_users': _staff_users() if ownership.is_lead_manager(request.user) else [],
+        'list_path': request.get_full_path(),
         'stage_choices': stage_choices,
         # The full column rows, not just (key, label): the bulk bar needs each
         # column's confirm text and reason flag so a bulk move prompts exactly
@@ -1036,6 +1099,7 @@ def _render_leads_list(request, list_category):
         'won_count': won_count,
         'today': timezone.localdate(),
     }
+    context.update(_ownership_context(request))
     context.update(export_columns_context(
         CRM_DRIVER_LEAD_EXPORT_COLUMNS if is_driver_list else CRM_BUSINESS_LEAD_EXPORT_COLUMNS,
         url_name=('workforce:crm_driver_leads_export_csv' if is_driver_list
@@ -1215,10 +1279,7 @@ def _export_leads_queryset(request, list_category):
     stage_filter = [v.strip() for v in request.GET.getlist('stage') if v.strip()]
     if stage_filter:
         leads = leads.filter(stage__in=stage_filter)
-    if request.GET.get('overdue', '').strip() == '1':
-        leads = leads.filter(
-            next_followup_at__lt=timezone.localdate()
-        ).exclude(stage__in=crm_services.closed_stage_keys())
+    leads = _apply_followup_filter(leads, request.GET.get('overdue', '').strip())
 
     if list_category == Lead.CATEGORY_DRIVER:
         leads = _apply_vehicle_filter(
@@ -2146,6 +2207,10 @@ def crm_lead_detail(request, lead_id):
         ),
         pk=lead_id,
     )
+    if not ownership.can_see_lead(request.user, lead):
+        messages.warning(request, _hidden_lead_message(lead))
+        return redirect('workforce:crm_driver_leads_list' if lead.category == Lead.CATEGORY_DRIVER
+                        else 'workforce:crm_leads_list')
 
     # Which of our numbers this conversation runs on. Persisted with .update()
     # so remembering a tab never touches updated_at — that field drives the
@@ -2159,6 +2224,7 @@ def crm_lead_detail(request, lead_id):
 
     wa_messages, wa_media = _lead_wa_conversation(lead, wa_session, request.user)
 
+    from core.decorators import is_superadmin
     from fleet.models import DriverDocument
 
     # Driver leads: keep the pipeline stage in sync with the applicant's real
@@ -2220,6 +2286,14 @@ def crm_lead_detail(request, lead_id):
     for child in merged_children:
         child.merge_diffs = crm_services.merge_differences(lead, child)
 
+    # A non-manager may only fold in cards they could open themselves — offering
+    # someone else's lead as a merge target would show it to them by the back door.
+    duplicate_candidates = [
+        candidate for candidate in crm_services.duplicate_candidates(lead)
+        if ownership.can_see_lead(request.user, candidate)
+    ]
+    ownership.mark_idle([lead])
+
     context = {
         'page_title': f'Lead – {lead.company_name or lead.contact_name or lead.phone}',
         'lead': lead,
@@ -2228,7 +2302,8 @@ def crm_lead_detail(request, lead_id):
         'activities': LeadActivity.objects.filter(
             lead_id__in=[lead.pk] + [c.pk for c in merged_children]
         ).select_related('created_by').order_by('-created_at'),
-        'staff_users': _staff_users(),
+        'staff_users': ownership.owner_choices(request.user, lead),
+        'is_own_lead': lead.assigned_to_id == request.user.pk,
         'stage_choices': stage_choices,
         # Untagged name for the WhatsApp composer — the customer never sees "ZyDrv".
         'lead_wa_name': strip_tags(lead.contact_name) or lead.company_name or '',
@@ -2238,7 +2313,7 @@ def crm_lead_detail(request, lead_id):
         'document_type_choices': DriverDocument.document_choices,
         # "Two cards in one": what has been absorbed here, and what still could be.
         'merged_children': merged_children,
-        'duplicate_candidates': crm_services.duplicate_candidates(lead),
+        'duplicate_candidates': duplicate_candidates,
         'wa_messages': wa_messages,
         'wa_media': wa_media,
         'wa_session': wa_session,
@@ -2262,7 +2337,10 @@ def crm_lead_detail(request, lead_id):
         # url_name which menu owns it — a driver card opened from the driver
         # board used to light up CRM Business. The card's own board decides.
         'crm_sidebar_board': lead.category,
+        # Permanent delete is super-admin only; crm_lead_delete checks again.
+        'can_delete_lead': is_superadmin(request.user),
     }
+    context.update(_ownership_context(request))
     return render(request, 'workforce/crm/lead_detail.html', context)
 
 
@@ -2354,7 +2432,9 @@ def crm_lead_chat_refresh(request, lead_id):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
 
-    lead = get_object_or_404(Lead, pk=lead_id)
+    lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
 
     # Same gate as the panel itself — a platform account's thread carries auth
     # messages and must not be pulled into view here.
@@ -2448,7 +2528,9 @@ def crm_lead_ai_summary(request, lead_id):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
 
-    lead = get_object_or_404(Lead, pk=lead_id)
+    lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
 
     if request.POST.get('force') != '1' and lead.ai_summary:
         return JsonResponse({'success': True, 'summary': lead.ai_summary, 'cached': True})
@@ -2474,7 +2556,9 @@ def crm_lead_wa_media(request, lead_id, msg_id):
     server-side."""
     from django.http import Http404
 
-    lead = get_object_or_404(Lead, pk=lead_id)
+    lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
     if not lead.phone and not lead.wa_link_values:
         raise Http404
 
@@ -2529,7 +2613,9 @@ def crm_lead_link_chat(request, lead_id):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
 
-    lead = get_object_or_404(Lead, pk=lead_id)
+    lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
     raw_identifier = request.POST.get('identifier', '').strip()
     identifier = crm_services.normalize_phone(raw_identifier)
     if not identifier:
@@ -2613,7 +2699,9 @@ def crm_lead_unlink_chat(request, lead_id):
     """POST identifier=<phone|lid>: detach one linked WhatsApp number from a lead."""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
-    lead = get_object_or_404(Lead, pk=lead_id)
+    lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
     identifier = crm_services.normalize_phone(request.POST.get('identifier', ''))
     if not identifier:
         return JsonResponse({'success': False, 'error': 'Which number?'}, status=400)
@@ -2860,7 +2948,7 @@ def crm_lead_create(request):
         if not (company_name or contact_name or phone):
             context = {
                 'page_title': 'New Lead',
-                'staff_users': _staff_users(),
+                'staff_users': ownership.owner_choices(request.user),
                 'error': 'Provide at least a company, contact name, or phone number.',
                 'form_data': request.POST,
                 'category_choices': Lead.CATEGORY_CHOICES,
@@ -2870,10 +2958,18 @@ def crm_lead_create(request):
             return render(request, 'workforce/crm/lead_form.html', context)
 
         followup, date_error = _parse_followup_date(request.POST.get('next_followup_at'))
+        # The owner is checked before the card exists, so a refused pick never
+        # leaves an orphan lead behind it.
+        owner = None
+        raw_owner = request.POST.get('assigned_to', '').strip()
+        if raw_owner and not date_error:
+            owner = User.objects.filter(pk=safe_int(raw_owner, default=0)).first()
+            date_error = ('Unknown staff member.' if owner is None
+                          else ownership.may_create_with_owner(request.user, owner))
         if date_error:
             context = {
                 'page_title': 'New Lead',
-                'staff_users': _staff_users(),
+                'staff_users': ownership.owner_choices(request.user),
                 'error': date_error,
                 'form_data': request.POST,
                 'category_choices': Lead.CATEGORY_CHOICES,
@@ -2898,14 +2994,8 @@ def crm_lead_create(request):
             product_category=request.POST.get('product_category', '').strip()[:200],
             notes=request.POST.get('notes', '').strip(),
             next_followup_at=followup,
+            assigned_to=owner,
         )
-        assigned_to_id = request.POST.get('assigned_to', '').strip()
-        if assigned_to_id:
-            try:
-                lead.assigned_to = User.objects.get(pk=int(assigned_to_id))
-                lead.save(update_fields=['assigned_to', 'updated_at'])
-            except (User.DoesNotExist, ValueError):
-                pass
         LeadActivity.objects.create(
             lead=lead, activity_type=LeadActivity.TYPE_NOTE,
             body='Lead created manually', created_by=request.user,
@@ -2915,7 +3005,7 @@ def crm_lead_create(request):
     initial_category = _lead_category(request.GET.get('category'))
     context = {
         'page_title': 'New Lead',
-        'staff_users': _staff_users(),
+        'staff_users': ownership.owner_choices(request.user),
         'category_choices': Lead.CATEGORY_CHOICES,
         'initial_category': initial_category,
         'crm_sidebar_board': initial_category,
@@ -3024,7 +3114,9 @@ def crm_lead_update_stage(request, lead_id):
     """AJAX: move a lead to a new pipeline stage (board drag-drop + detail page)."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    lead = get_object_or_404(Lead, pk=lead_id)
+    lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
 
     result = _apply_lead_stage(
         lead,
@@ -3102,7 +3194,8 @@ def crm_leads_bulk_stage(request):
     if not ids:
         return JsonResponse({'success': False, 'error': 'Tick the leads you want to move.'}, status=400)
 
-    leads = list(Lead.objects.filter(pk__in=ids, category=category))
+    leads = list(ownership.visible_leads(
+        Lead.objects.filter(pk__in=ids, category=category), request.user))
     if not leads:
         return JsonResponse({'success': False, 'error': 'None of those leads are on this board.'},
                             status=404)
@@ -3157,7 +3250,9 @@ def crm_lead_unpin_stage(request, lead_id):
     """AJAX: hand a pinned driver card back to automatic filing."""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
-    lead = get_object_or_404(Lead, pk=lead_id)
+    lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
     crm_services.unpin_lead_stage(lead, request.user)
 
     # Tell staff where it is about to go, so "resume" is not a blind action.
@@ -3189,7 +3284,9 @@ def crm_lead_move_board(request, lead_id):
     """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
-    lead = get_object_or_404(Lead, pk=lead_id)
+    lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
 
     target = (request.POST.get('category') or '').strip()
     if target not in {c for c, _ in Lead.CATEGORY_CHOICES}:
@@ -3263,27 +3360,26 @@ def crm_lead_update(request, lead_id):
     """AJAX: update assignee, follow-up date, notes, and contact fields."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    lead = get_object_or_404(Lead, pk=lead_id)
+    lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
 
     changes = []
+    owner_changed = False
 
+    # Checked and written first, on its own: a refused reassignment must not take
+    # the follow-up or the notes typed alongside it down with it unsaved — but it
+    # must not report success either. set_owner logs its own timeline entry.
     if 'assigned_to' in request.POST:
-        assigned_to_id = request.POST.get('assigned_to', '').strip()
-        if assigned_to_id == '':
-            if lead.assigned_to_id is not None:
-                lead.assigned_to = None
-                changes.append(('assignment', 'Assignment cleared'))
-        else:
-            try:
-                user = User.objects.get(pk=int(assigned_to_id))
-                if lead.assigned_to_id != user.pk:
-                    lead.assigned_to = user
-                    changes.append((
-                        'assignment',
-                        f'Assigned to {user.get_full_name() or user.username}',
-                    ))
-            except (User.DoesNotExist, ValueError):
-                pass
+        raw_owner = request.POST.get('assigned_to', '').strip()
+        target = None
+        if raw_owner:
+            target = User.objects.filter(pk=safe_int(raw_owner, default=0)).first()
+            if target is None:
+                return JsonResponse({'success': False, 'error': 'Unknown staff member.'}, status=400)
+        ok, message, owner_changed = ownership.set_owner(lead, target, request.user)
+        if not ok:
+            return JsonResponse({'success': False, 'error': message}, status=403)
 
     if 'next_followup_at' in request.POST:
         new_date, date_error = _parse_followup_date(request.POST.get('next_followup_at'))
@@ -3330,7 +3426,7 @@ def crm_lead_update(request, lead_id):
 
     return JsonResponse({
         'success': True,
-        'changes': len(changes),
+        'changes': len(changes) + (1 if owner_changed else 0),
         'assigned_to': (lead.assigned_to.get_full_name() or lead.assigned_to.username)
                        if lead.assigned_to else '',
         'next_followup_at': lead.next_followup_at.isoformat() if lead.next_followup_at else '',
@@ -3347,13 +3443,84 @@ def crm_lead_update(request, lead_id):
     })
 
 
+def _ownership_reply(request, ok, message, lead=None):
+    """Take / Release answer a fetch() with JSON and a plain form post with a flash
+    message and a redirect back to the page it came from (`next`, same host only)."""
+    from django.utils.http import url_has_allowed_host_and_scheme
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        payload = {'success': ok, ('message' if ok else 'error'): message}
+        if lead is not None:
+            payload['assigned_to'] = ownership.user_label(lead.assigned_to)
+        return JsonResponse(payload, status=200 if ok else 409)
+    (messages.success if ok else messages.warning)(request, message)
+    back = request.POST.get('next') or ''
+    if not url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()},
+                                           require_https=request.is_secure()):
+        back = (reverse('workforce:crm_lead_detail', args=[lead.pk]) if lead is not None
+                else reverse('workforce:wf_marketing_overview'))
+    return redirect(back)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_lead_claim(request, lead_id):
+    """POST: take an unassigned lead. Race-safe — the second of two takes is told
+    who got there first."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    lead = get_object_or_404(Lead.objects.select_related('assigned_to'), pk=lead_id)
+    ok, message = ownership.claim_lead(lead, request.user)
+    return _ownership_reply(request, ok, message, ownership.card_of(lead))
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_lead_release(request, lead_id):
+    """POST: hand your own lead back to the pool."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    lead = get_object_or_404(Lead, pk=lead_id)
+    ok, message = ownership.release_lead(lead, request.user)
+    return _ownership_reply(request, ok, message, ownership.card_of(lead))
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_lead_claim_next(request):
+    """POST category=<board>: take the newest open lead nobody owns, and open it.
+
+    Newest, not oldest: the pool still holds months of untouched history, and a
+    fresh enquiry is the one worth calling first. A card someone takes between the
+    query and the update is skipped for the next one rather than failing the press.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    category = _lead_category(request.POST.get('category'))
+    pool = (Lead.objects
+            .filter(category=category, merged_into__isnull=True, assigned_to__isnull=True)
+            .exclude(stage__in=crm_services.closed_stage_keys(category))
+            .order_by('-created_at'))
+    for lead in pool[:5]:
+        ok, message = ownership.claim_lead(lead, request.user)
+        if ok:
+            messages.success(request, message)
+            return redirect('workforce:crm_lead_detail', lead.pk)
+        if not ownership.can_claim(request.user):
+            return _ownership_reply(request, False, message)
+    board = 'driver applicants' if category == Lead.CATEGORY_DRIVER else 'business leads'
+    return _ownership_reply(request, False, f'No unassigned open {board} left to take.')
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def crm_lead_add_activity(request, lead_id):
     """AJAX: append a note/follow-up to the lead timeline."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    lead = get_object_or_404(Lead, pk=lead_id)
+    lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
     body = request.POST.get('body', '').strip()
     if not body:
         return JsonResponse({'success': False, 'error': 'Activity text is required'}, status=400)
@@ -3382,6 +3549,9 @@ def crm_lead_delete_activity(request, lead_id, activity_id):
     """AJAX: delete an activity (creator or superadmin only)."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+    _lead, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
     activity = get_object_or_404(LeadActivity, pk=activity_id, lead_id=lead_id)
     is_superadmin = getattr(getattr(request.user, 'profile', None), 'is_superadmin', False)
     if activity.created_by_id != request.user.pk and not is_superadmin:
@@ -3575,6 +3745,11 @@ def crm_wa_send_link(request):
         }, status=400)
 
     session = wa_sessions.normalize(request.POST.get('session', ''))
+    if kind == 'business':
+        # ?wa=<code> on the form link: whatever number the form names (often the
+        # office line), the lead it creates is joined to this chat.
+        from crm.chat_links import tag_pricing_link
+        body = tag_pricing_link(body, session, phone, request.user)
     ok, info = send_waha_text(phone, body, session=session)
     if not ok:
         return JsonResponse({
@@ -3824,7 +3999,8 @@ def _render_crm_reports(request, category, template):
     their outcomes differently ("Won"/"Lost" vs "Approved"/"Rejected") and used to be
     added together into a number that meant nothing."""
     today = timezone.localdate()
-    leads = Lead.objects.filter(category=category)
+    # Same scope as the board: a non-manager's scorecard covers their own cards and the pool.
+    leads = ownership.visible_leads(Lead.objects.filter(category=category), request.user)
 
     stage_counts = {
         row['stage']: row['n']
@@ -4428,10 +4604,14 @@ def crm_lead_merge(request, lead_id):
     timeline and renders inside this one, so a wrong merge can be undone."""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
-    primary = get_object_or_404(Lead, pk=lead_id)
+    primary, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
     duplicate = Lead.objects.filter(pk=(request.POST.get('duplicate_id') or '').strip()).first()
     if duplicate is None:
         return JsonResponse({'success': False, 'error': 'Pick a lead to merge.'}, status=400)
+    if not ownership.can_see_lead(request.user, duplicate):
+        return JsonResponse({'success': False, 'error': _hidden_lead_message(duplicate)}, status=403)
 
     ok, error = crm_services.merge_leads(primary, duplicate, request.user)
     if not ok:
@@ -4449,7 +4629,9 @@ def crm_lead_merge_adopt(request, lead_id):
     """POST child_id=<pk>, field=<name>: take one value from an absorbed card onto this one."""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
-    parent = get_object_or_404(Lead, pk=lead_id)
+    parent, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
     child = parent.merged_children.filter(pk=(request.POST.get('child_id') or '').strip()).first()
     if child is None:
         return JsonResponse({'success': False, 'error': 'That card is not merged into this one.'},
@@ -4467,7 +4649,9 @@ def crm_lead_unmerge(request, lead_id):
     """POST child_id=<pk>: put an absorbed card back on the board on its own."""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
-    parent = get_object_or_404(Lead, pk=lead_id)
+    parent, refusal = _owned_lead(request, lead_id)
+    if refusal:
+        return refusal
     child = parent.merged_children.filter(pk=(request.POST.get('child_id') or '').strip()).first()
     if child is None:
         return JsonResponse({'success': False, 'error': 'That card is not merged into this one.'},
@@ -4477,3 +4661,39 @@ def crm_lead_unmerge(request, lead_id):
     if not ok:
         return JsonResponse({'success': False, 'error': error}, status=400)
     return JsonResponse({'success': True, 'child_id': child.pk})
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def crm_lead_delete(request, lead_id):
+    """POST: permanently delete a lead — super admins only.
+
+    Its activities and linked WhatsApp numbers go with it (CASCADE), and so do the
+    duplicate cards merged into it: merged_into is SET_NULL, so leaving them would
+    put every absorbed duplicate back on the board as a lead of its own. The driver
+    record, the converted business and the WhatsApp messages are not touched.
+    Nothing in the database remembers the lead afterwards, so the log line is the
+    only record of who deleted what.
+    """
+    from django.db import transaction
+    from core.decorators import is_superadmin
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    if not is_superadmin(request.user):
+        return JsonResponse({'success': False, 'error': 'Only a super admin can delete a lead.'},
+                            status=403)
+    lead = get_object_or_404(Lead, pk=lead_id)
+    name = lead.company_name or lead.contact_name or lead.phone or f'#{lead.pk}'
+    board = 'crm_driver_leads_board' if lead.category == Lead.CATEGORY_DRIVER else 'crm_leads_board'
+    child_ids = list(lead.merged_children.values_list('pk', flat=True))
+
+    with transaction.atomic():
+        Lead.objects.filter(pk__in=child_ids).delete()
+        lead.delete()
+
+    logger.warning('crm: lead %s (%s, %s, phone %s) deleted by %s with %d merged card(s) %s',
+                   lead_id, name, lead.category, lead.phone, request.user.username,
+                   len(child_ids), child_ids)
+    messages.success(request, f'Lead "{name}" deleted.')
+    return JsonResponse({'success': True, 'redirect': reverse(f'workforce:{board}')})

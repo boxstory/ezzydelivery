@@ -12,7 +12,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
 
 {% block extra_css %}
 {# Leaflet CSS preloaded in wf_dashboard_base.html for HTMX compatibility #}
-<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=20260926a">
+<link rel="stylesheet" href="{% static 'workforce/css/delivery_task_detail.css' %}?v=20261006d">
 {% endblock extra_css %}
 
 {% block content %}
@@ -61,13 +61,13 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
     <div class="wfnote" id="workforce_parts_delivery_task_detail_card_notes"
          data-wfnote-src="{% url 'workforce:page_notes' 'workforce_parts_delivery_task_detail_card_notes' %}" hidden></div>
 
-    {% comment %}mx-0: the default row pulls -12px each side, which escapes the
-    wfpage__body padding and lands the cards 12px inside the hero's content edge.
-    Dropped, the columns' own gutter does the inset and the cards line up with the
-    hero title.{% endcomment %}
+    {% comment %}mx-0 + px-0 on both columns: no column gutter - the cards run to the
+    wfpage__body padding. pe-lg-2 leaves a small 8px gap between the two columns
+    on desktop only (they stack on phones). 8/4 split on laptops, 9/3 from xxl
+    (1400px+) so the sidebar doesn't take a third of a wide screen.{% endcomment %}
     <div class="row mx-0">
         <!-- Left Column -->
-        <div class="col-lg-8">
+        <div class="col-lg-8 col-xxl-9 px-0 pe-lg-2">
 
             <!-- Task Details Card -->
             <div class="dtd__card">
@@ -146,9 +146,8 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                             {% endif %}
 
                             <div class="dtd__route">
-                                <div class="dtd__route__point">
+                                <div class="dtd__route__point dtd__route__point--pickup">
                                     <div class="dtd__route__point-head">
-                                        <div class="dtd__route__dot dtd__route__dot--pickup"></div>
                                         <span class="dtd__route__type">Pickup</span>
                                         {% if task.pickup_location %}
                                             {% include "includes/components/_ai_parse_button.html" with address=task.pickup_location.pickup_location_title|default:""|add:" "|add:task.pickup_location.locality|default:"" lat=task.pickup_location.pickup_lat lng=task.pickup_location.pickup_lon title="Pickup Location" %}
@@ -174,9 +173,8 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                         <!-- Column 2 — dropoff -->
                         <div class="col-12 col-lg-6 dtd__detail-split__col dtd__detail-split__col--drop">
                             <div class="dtd__route dtd__route--bare">
-                                <div class="dtd__route__point">
+                                <div class="dtd__route__point dtd__route__point--dropoff">
                                     <div class="dtd__route__point-head">
-                                        <div class="dtd__route__dot dtd__route__dot--dropoff"></div>
                                         <span class="dtd__route__type">Dropoff</span>
                                     </div>
 
@@ -188,14 +186,17 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                                         </div>
                                         <div class="d-flex flex-column gap-1 flex-shrink-0">
                                             {% include "includes/components/_ai_parse_button.html" with address=task.order.customer_address|default:"" zone=task.order.dl_zone street=task.order.dl_street building=task.order.dl_building lat=task.order.latitude|default:task.dl_address_update.dl_latitude lng=task.order.longitude|default:task.dl_address_update.dl_longitude order_id=task.order.id order_number=task.order.order_number show_map="true" title="Dropoff Location" btn_label="AI Parse" %}
-                                            {% include "includes/components/_map_point.html" with uid=task.id|stringformat:"s"|add:"-drop" lat=task.order.latitude|default:task.dl_address_update.dl_latitude lon=task.order.longitude|default:task.dl_address_update.dl_longitude label="Delivery location" btn_label="Map" size="sm" %}
-                                            {% include "includes/components/_route_distance.html" with order=task.order label="from pickup" %}
+                                            {% comment %}Distance sits beside the Map button, number only - the tooltip still says it is the drive from pickup.{% endcomment %}
+                                            <div class="d-flex align-items-center gap-2">
+                                                {% include "includes/components/_map_point.html" with uid=task.id|stringformat:"s"|add:"-drop" lat=task.order.latitude|default:task.dl_address_update.dl_latitude lon=task.order.longitude|default:task.dl_address_update.dl_longitude label="Delivery location" btn_label="Map" size="sm" %}
+                                                {% include "includes/components/_route_distance.html" with order=task.order no_icon=True %}
+                                            </div>
                                         </div>
                                     </div>
 
                                     <!-- Zone / Street / Building / QNAS row -->
                                     <div class="row g-2 mt-0 align-items-center">
-                                        <div class="col-12 col-md-8">
+                                        <div class="col-12 col-md-8 dtd__plate-col">
                                             <!-- Signature: Qatar national address code -->
                                             <div class="qnas-plate" role="group" aria-label="Qatar national address code">
                                                 <div class="qnas-plate__cell">
@@ -471,8 +472,17 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                         <div class="dtd__update__body">
                             <div class="dtd__update__title">Assigned Driver</div>
                             <div class="dtd__update__transition">
+                                {% if task.public_pool %}
+                                <span class="dtd__update__pill dtd__update__pill--to">Public — all drivers</span>
+                                {% else %}
                                 <span class="dtd__update__pill dtd__update__pill--from">Not Assigned</span>
+                                {% endif %}
                             </div>
+                            {% if task.dl_task_publish and not task.public_pool %}
+                            <div class="dtd__update__meta">
+                                <i class="fa-solid fa-eye-slash"></i> In Unassigned Tasks — no driver can see it yet
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                     {% endif %}
@@ -565,7 +575,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
         </div>
 
         <!-- Right Column -->
-        <div class="col-lg-4">
+        <div class="col-lg-4 col-xxl-3 px-0">
 
             <!-- Quick Actions -->
             <div class="dtd__card">
@@ -605,6 +615,19 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                             </div>
                         </div>
                         <button class="dtd__btn dtd__btn--secondary dtd__btn--sm" data-bs-toggle="modal" data-bs-target="#assignDriverModal" title="Change Driver">
+                            <i class="fa-solid fa-pen"></i> Change
+                        </button>
+                    </div>
+                    {% elif task.public_pool %}
+                    <div class="dtd__assigned-driver">
+                        <div class="dtd__assigned-driver__info">
+                            <i class="fa-solid fa-users dtd__assigned-driver__mark"></i>
+                            <div>
+                                <div class="dtd__assigned-driver__name">Public — all drivers</div>
+                                <div class="dtd__assigned-driver__label">In every app driver's New tab</div>
+                            </div>
+                        </div>
+                        <button class="dtd__btn dtd__btn--secondary dtd__btn--sm" data-bs-toggle="modal" data-bs-target="#assignDriverModal" title="Change">
                             <i class="fa-solid fa-pen"></i> Change
                         </button>
                     </div>
@@ -1060,6 +1083,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                     <label for="driverSelect" class="form-label" style="font-size:0.75rem;font-weight:600;color:var(--brand-grey-500);text-transform:uppercase;letter-spacing:0.04em;">Select Driver</label>
                     <select class="form-select" id="driverSelect">
                         <option value="">-- Choose a driver --</option>
+                        <option value="public" {% if task.public_pool and not task.driver_id %}selected{% endif %}>Public &mdash; all drivers with app access</option>
                         {% for driver in approved_drivers %}
                         <option value="{{ driver.driver_id }}" {% if task.driver_id == driver.driver_id %}selected{% endif %}>
                             {{ driver.driver_code }} &mdash; {{ driver.user.get_full_name|default:driver.driver_phone }}
@@ -1074,11 +1098,16 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
                     <i class="fa-solid fa-info-circle me-1"></i>
                     Currently assigned: <strong>{{ task.driver.driver_code }}</strong> &mdash; {{ task.driver.user.get_full_name|default:task.driver.driver_phone }}
                 </div>
+                {% elif task.public_pool %}
+                <div class="dtd__modal__info">
+                    <i class="fa-solid fa-info-circle me-1"></i>
+                    <span>Currently in <strong>Public</strong> &mdash; any driver with app access can take it. Unassign moves it to Unassigned Tasks.</span>
+                </div>
                 {% endif %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="dtd__btn dtd__btn--secondary" data-bs-dismiss="modal" style="width:auto;">Cancel</button>
-                {% if task.driver %}
+                {% if task.driver or task.public_pool %}
                 <button type="button" class="dtd__btn dtd__btn--danger" id="btnUnassignDriver" onclick="unassignDriver({{ task.id }})" style="width:auto;">
                     <i class="fa-solid fa-user-minus"></i> Unassign
                 </button>
@@ -1534,7 +1563,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
     })();
 
     function publishToFleets(taskId) {
-        if (confirm('Publish this task to Fleet drivers?')) {
+        if (confirm('Publish this task? With no driver it goes to Unassigned Tasks, where you or a Task Automation rule picks a driver or Public.')) {
             fetch(`/workforce/delivery-task/${taskId}/publish-fleets/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
@@ -1549,7 +1578,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
     }
 
     function unassignDriver(taskId) {
-        if (!confirm('Remove driver assignment from this task?')) return;
+        if (!confirm('Unassign this task? It moves to Unassigned Tasks and no driver will see it until someone assigns it again.')) return;
         const btn = document.getElementById('btnUnassignDriver');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Removing...';
@@ -1569,7 +1598,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
     function assignDriver(taskId) {
         const select = document.getElementById('driverSelect');
         const driverId = select.value;
-        if (!driverId) { alert('Please select a driver'); return; }
+        if (!driverId) { alert('Please select a driver, or Public'); return; }
         const btn = document.getElementById('btnConfirmAssignDriver');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Assigning...';
@@ -1581,7 +1610,7 @@ Notes: The page-notes card (wfnote__, shared) sits under the hero, hidden on loa
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) { alert('Driver assigned successfully!'); location.reload(); }
+            if (data.success) { alert(data.message || 'Driver assigned successfully!'); location.reload(); }
             else { alert('Error: ' + (data.error || 'Failed to assign driver')); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign'; }
         })
         .catch(error => { console.error('Error:', error); alert('An error occurred'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign'; });

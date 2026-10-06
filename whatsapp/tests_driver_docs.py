@@ -86,6 +86,61 @@ class DriverDocsFromChatTests(TestCase):
         self.assertTrue(j['can_save_docs'])
         self.assertEqual(j['leads'][0]['docs']['items'][0]['type'], 'Selfie')
 
+    def test_documents_carry_the_image_check_for_the_viewer(self):
+        """The media viewer's document panel: same facts as the CRM popup, and the
+        id + edit base its Submit / verify post to."""
+        import datetime
+
+        from django.utils import timezone
+
+        doc = DriverDocument.objects.create(driver=self.driver, document_type='QID', document_no='30701200184')
+        DriverDocument.objects.filter(pk=doc.pk).update(
+            ai_status=DriverDocument.AI_MISMATCH, ai_document_no='30701200184',
+            ai_expiry_date=datetime.date(2029, 7, 16), ai_checked_at=timezone.now(),
+            ai_note='Expiry not entered (image shows 16 Jul 2029)')
+        docs = chat_panel.driver_documents(self.driver)
+        qid = docs['items'][1]
+        self.assertEqual(qid['id'], doc.pk)
+        self.assertEqual(qid['check'], 'Does not match the image')
+        self.assertEqual(qid['check_note'], 'Expiry not entered (image shows 16 Jul 2029)')
+        self.assertEqual((qid['ai_no'], qid['ai_expiry'], qid['ai_expiry_iso']),
+                         ('30701200184', '16 Jul 2029', '2029-07-16'))
+        self.assertFalse(qid['verified'])
+        self.assertEqual(docs['doc_edit_base'], f'/workforce/drivers/{self.driver.pk}/document/')
+        self.assertNotIn('id', docs['items'][2])   # no Passport row: nothing to edit
+
+    def test_marketing_may_edit_and_verify_from_the_viewer(self):
+        from core.models import Profile
+
+        mkt = User.objects.create_user('inboxmkt', is_staff=True)
+        Profile.objects.create(user=mkt, is_staff=True, dept_marketing=True)
+        from whatsapp.models import InboxSessionAccess
+        InboxSessionAccess.objects.create(user=mkt, session='default')  # inbox number gate
+        self.client.force_login(mkt)
+        j = self.client.get('/waha/wa-chats/', {'info': 1, 'chatId': self.chat, 'session': 'default'},
+                            HTTP_HOST='ezzydelivery.qa', secure=True).json()
+        self.assertTrue(j['can_save_docs'])
+        self.assertTrue(j['can_verify_docs'])
+
+    def _info(self):
+        return self.client.get('/waha/wa-chats/', {'info': 1, 'chatId': self.chat, 'session': 'default'},
+                               HTTP_HOST='ezzydelivery.qa', secure=True).json()
+
+    def test_open_driver_lead_offers_the_missing_items_reminder(self):
+        """"Send reminder" on the documents card: the CRM composer's own reminder body."""
+        reminder = self._info()['leads'][0]['reminder']
+        self.assertRegex(reminder['label'], r'^Reminder · \d+ missing$')
+        self.assertIn('still missing', reminder['body'])
+        self.assertIn('https://ezzydelivery.qa/join_us/driver/', reminder['body'])
+
+    def test_closed_driver_lead_is_not_chased(self):
+        from crm import services as crm_services
+
+        closed = crm_services.closed_stage_keys(self.lead.category)
+        self.assertTrue(closed)
+        Lead.objects.filter(pk=self.lead.pk).update(stage=closed[0])
+        self.assertIsNone(self._info()['leads'][0]['reminder'])
+
     def test_saving_a_chat_photo_fills_the_slot(self):
         r = self._save()
         self.assertEqual(r.status_code, 200, r.content)
